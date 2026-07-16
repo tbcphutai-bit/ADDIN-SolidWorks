@@ -29,7 +29,7 @@ namespace ADDIN.Commands
 
         public void Run()
         {
-            Debug.WriteLine("[DIM MAT CAT] build=20260716-curved-chain-scoped-v7");
+            Debug.WriteLine("[DIM MAT CAT] build=20260716-keep-outer-sharp-v8");
             ModelDoc2 model = swApp?.ActiveDoc as ModelDoc2;
             if (model == null)
             {
@@ -3154,6 +3154,9 @@ namespace ADDIN.Commands
             }
 
             double thicknessMm = EstimateMaterialThicknessMm(allEdges);
+            double profileCenterX;
+            double profileCenterY;
+            GetEdgeBoundsCenter(allEdges, out profileCenterX, out profileCenterY);
             foreach (OuterProfileJoint joint in joints)
             {
                 if (!ShouldAddProfileAngle(joint.First, joint.Second))
@@ -3183,6 +3186,26 @@ namespace ADDIN.Commands
                 // An explicitly selected terminal edge is authoritative.
                 if (terminal == null || terminal == selectedSeed)
                     continue;
+
+                // contourEdges da duoc loc ve phia phu bi. Neu terminal hien tai
+                // khong co mot canh song song nam xa tam hon thi no da la canh
+                // ngoai dung. Khong doi sang canh song song ben trong chi vi diem
+                // tiep tuyen cua cung bo gan hon giao diem ly thuyet. Voi bien dang
+                // canh thang, virtual sharp phai la giao cua hai duong thang keo dai.
+                if (!HasOuterParallelMate(
+                    terminal,
+                    allEdges,
+                    thicknessMm,
+                    profileCenterX,
+                    profileCenterY))
+                {
+                    Debug.WriteLine("[DIM MAT CAT] keep outer terminal joint. terminal="
+                        + EdgeSummary(terminal)
+                        + ", neighbor=" + EdgeSummary(neighbor)
+                        + ", point=(" + MToMm(joint.X).ToString("0.###")
+                        + "," + MToMm(joint.Y).ToString("0.###") + ")");
+                    continue;
+                }
 
                 EdgeInfo alternate = FindParallelMateAtThickness(
                     terminal, allEdges, thicknessMm);
