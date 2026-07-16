@@ -1,0 +1,49 @@
+﻿# Build results
+[Bb]in/
+[Oo]bj/
+build/
+Build/
+Debug/
+Release/
+x64/
+x86/
+AnyCPU/
+
+# Visual Studio workspace/user files
+.vs/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet packages
+packages/
+*.nupkg
+project.lock.json
+project.assets.json
+
+# Test and coverage output
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+*.cache
+Thumbs.db
+Desktop.ini
+
+# ReSharper / Rider
+_ReSharper*/
+*.DotSettings.user
+.idea/
+
+# SolidWorks / local generated files
+*.bak
+*.swp
+~$*
