@@ -3,11 +3,15 @@
 [Oo]bj/
 build/
 Build/
+build-check/
+buildcheck/
 Debug/
 Release/
 x64/
 x86/
 AnyCPU/
+*.dll
+*.pdb
 
 # Visual Studio workspace/user files
 .vs/
@@ -47,3 +51,7 @@ _ReSharper*/
 *.bak
 *.swp
 ~$*
+
+# Local inspection and temporary patch workspaces
+interop-inspect/
+patch-src/
