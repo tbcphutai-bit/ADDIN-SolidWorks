@@ -5,6 +5,7 @@ build/
 Build/
 build-check/
 buildcheck/
+.build-check/
 Debug/
 Release/
 x64/

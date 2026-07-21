@@ -29,6 +29,9 @@ namespace ADDIN.Commands
                 return;
             }
 
+            if (!ResolveLightweightComponents(activeModel))
+                return;
+
             bool oldCommandInProgress = false;
             try
             {
@@ -67,6 +70,61 @@ namespace ADDIN.Commands
             }
         }
 
+        private bool ResolveLightweightComponents(ModelDoc2 activeModel)
+        {
+            if (activeModel.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
+                return true;
+
+            AssemblyDoc assembly = activeModel as AssemblyDoc;
+            if (assembly == null)
+                return true;
+
+            try
+            {
+                int before = assembly.GetLightWeightComponentCount();
+                if (before <= 0 && assembly.LightweightAllResolved())
+                    return true;
+
+                Debug.WriteLine("[PAINT HOLE] Resolve lightweight before scan. before=" + before);
+                assembly.ResolveAllLightWeightComponents(false);
+                Application.DoEvents();
+
+                int after = assembly.GetLightWeightComponentCount();
+                bool resolved = after <= 0 || assembly.LightweightAllResolved();
+                if (!resolved)
+                {
+                    assembly.ResolveAllLightweight();
+                    Application.DoEvents();
+                    after = assembly.GetLightWeightComponentCount();
+                    resolved = after <= 0 || assembly.LightweightAllResolved();
+                }
+
+                Debug.WriteLine("[PAINT HOLE] Resolve lightweight result. after=" + after + ", resolved=" + resolved);
+                if (!resolved)
+                {
+                    MessageBox.Show(
+                        "Khong the bo het che do Lightweight. Hay Resolve component roi chay lai DEM LO.",
+                        "Dem hole",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return false;
+                }
+
+                activeModel.ForceRebuild3(false);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[PAINT HOLE] Resolve lightweight failed: " + ex.Message);
+                MessageBox.Show(
+                    "Khong the bo che do Lightweight: " + ex.Message,
+                    "Dem hole",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return false;
+            }
+        }
+
         private PaintHoleScanResult Scan(ModelDoc2 activeModel)
         {
             PaintHoleScanResult result = new PaintHoleScanResult();
@@ -75,7 +133,7 @@ namespace ADDIN.Commands
             int docType = activeModel.GetType();
             if (docType == (int)swDocumentTypes_e.swDocPART)
             {
-                foreach (HoleRecord record in ScanPart(activeModel, "", 1))
+                foreach (HoleRecord record in ScanPart(activeModel, "", 1, GetActiveConfigurationName(activeModel)))
                     AddRecord(result, record);
                 return result;
             }
@@ -109,7 +167,7 @@ namespace ADDIN.Commands
                 List<HoleRecord> records;
                 if (!cache.TryGetValue(cacheKey, out records))
                 {
-                    records = ScanPart(model, component.Name2, 1);
+                    records = ScanPart(model, component.Name2, 1, component.ReferencedConfiguration);
                     cache[cacheKey] = records;
                 }
 
@@ -174,11 +232,12 @@ namespace ADDIN.Commands
             }
         }
 
-        private List<HoleRecord> ScanPart(ModelDoc2 model, string componentName, int multiplier)
+        private List<HoleRecord> ScanPart(ModelDoc2 model, string componentName, int multiplier, string configurationName)
         {
             List<HoleRecord> records = new List<HoleRecord>();
             HashSet<string> keysWithPattern = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> baseKeysWithPattern = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string partNumber = GetPartNumber(model, configurationName);
 
             try
             {
@@ -199,7 +258,9 @@ namespace ADDIN.Commands
                         continue;
                     }
 
-                    int quantity = pattern ? GetPatternInstanceCount(feature) : GetHolePointCount(feature);
+                    int quantity = pattern
+                        ? GetPatternInstanceCount(feature) * GetPatternSeedHoleCount(feature)
+                        : GetDirectHoleCount(feature);
                     if (quantity < 1)
                         quantity = 1;
 
@@ -209,6 +270,7 @@ namespace ADDIN.Commands
                         FeatureName = featureName,
                         FeatureType = SafeFeatureType(feature),
                         PartPath = SafePath(model),
+                        PartNumber = partNumber,
                         ComponentName = componentName,
                         Quantity = quantity * Math.Max(1, multiplier),
                         IsPaint = featureName.IndexOf(PaintToken, StringComparison.OrdinalIgnoreCase) >= 0,
@@ -350,7 +412,7 @@ namespace ADDIN.Commands
             if (!IsUsableFeature(feature))
                 return false;
 
-            if (HasPatternWarningOrSkippedInstances(feature))
+            if (HasFeatureWarning(feature))
                 return false;
 
             int count = GetPatternInstanceCount(feature);
@@ -378,29 +440,46 @@ namespace ADDIN.Commands
         {
             try
             {
-                return Convert.ToBoolean(((dynamic)feature).IsSuppressed());
+                bool suppressed = feature.IsSuppressed();
+                if (suppressed)
+                    Debug.WriteLine("[PAINT HOLE] Skip suppressed feature. name=" + SafeFeatureName(feature));
+                return suppressed;
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine("[PAINT HOLE] IsSuppressed failed, use current-configuration fallback. name=" +
+                    SafeFeatureName(feature) + ", error=" + ex.Message);
             }
 
             try
             {
-                object value = ((dynamic)feature).IsSuppressed2(0, null);
+                object value = feature.IsSuppressed2(
+                    (int)swInConfigurationOpts_e.swThisConfiguration,
+                    null);
                 if (value is bool)
-                    return (bool)value;
+                {
+                    bool suppressed = (bool)value;
+                    if (suppressed)
+                        Debug.WriteLine("[PAINT HOLE] Skip suppressed feature (fallback). name=" + SafeFeatureName(feature));
+                    return suppressed;
+                }
                 object[] values = value as object[];
                 if (values != null)
                 {
                     foreach (object item in values)
                     {
                         if (item is bool && (bool)item)
+                        {
+                            Debug.WriteLine("[PAINT HOLE] Skip suppressed feature (fallback array). name=" + SafeFeatureName(feature));
                             return true;
+                        }
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.WriteLine("[PAINT HOLE] IsSuppressed2 failed. name=" +
+                    SafeFeatureName(feature) + ", error=" + ex.Message);
             }
 
             return false;
@@ -521,6 +600,39 @@ namespace ADDIN.Commands
         }
         private int GetPatternInstanceCount(Feature feature)
         {
+            try
+            {
+                object definition = feature.GetDefinition();
+                LinearPatternFeatureData linear = definition as LinearPatternFeatureData;
+                if (linear != null)
+                {
+                    int count = GetTwoDirectionPatternCount(linear.D1TotalInstances, linear.D2TotalInstances, linear.D2PatternSeedOnly);
+                    return Math.Max(1, count - linear.GetSkippedItemCount());
+                }
+                CurveDrivenPatternFeatureData curve = definition as CurveDrivenPatternFeatureData;
+                if (curve != null)
+                {
+                    int count = GetTwoDirectionPatternCount(curve.D1InstanceCount, curve.D2InstanceCount, curve.D2PatternSeedOnly);
+                    return Math.Max(1, count - curve.GetSkippedItemCount());
+                }
+                CircularPatternFeatureData circular = definition as CircularPatternFeatureData;
+                if (circular != null)
+                {
+                    int count = circular.TotalInstances2 > 0 ? circular.TotalInstances2 : circular.TotalInstances;
+                    return Math.Max(1, count - circular.GetSkippedItemCount());
+                }
+                FillPatternFeatureData fill = definition as FillPatternFeatureData;
+                if (fill != null && fill.NoOfInstances > 0)
+                    return fill.NoOfInstances;
+                TablePatternFeatureData table = definition as TablePatternFeatureData;
+                if (table != null)
+                    return Math.Max(1, table.GetPointCount() - table.GetSkippedItemCount());
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[PAINT HOLE] Read typed pattern count failed. feature=" + SafeFeatureName(feature) + ", error=" + ex.Message);
+            }
+
             int value = TryGetFeatureDimensionInt(feature, "D1");
             if (value > 1)
                 return value;
@@ -545,6 +657,52 @@ namespace ADDIN.Commands
                 Debug.WriteLine("[PAINT HOLE] Read pattern definition failed: " + ex.Message);
             }
             return 1;
+        }
+
+        private int GetTwoDirectionPatternCount(int direction1, int direction2, bool secondDirectionSeedOnly)
+        {
+            direction1 = Math.Max(1, direction1);
+            direction2 = Math.Max(1, direction2);
+            if (direction2 <= 1)
+                return direction1;
+            return secondDirectionSeedOnly ? direction1 + direction2 - 1 : direction1 * direction2;
+        }
+
+        private int GetPatternSeedHoleCount(Feature patternFeature)
+        {
+            try
+            {
+                object definition = patternFeature.GetDefinition();
+                object seedValue = null;
+                LinearPatternFeatureData linear = definition as LinearPatternFeatureData;
+                if (linear != null) seedValue = linear.PatternFeatureArray;
+                CurveDrivenPatternFeatureData curve = definition as CurveDrivenPatternFeatureData;
+                if (curve != null) seedValue = curve.PatternFeatureArray;
+                CircularPatternFeatureData circular = definition as CircularPatternFeatureData;
+                if (circular != null) seedValue = circular.PatternFeatureArray;
+                FillPatternFeatureData fill = definition as FillPatternFeatureData;
+                if (fill != null) seedValue = fill.PatternFeatureArray;
+                TablePatternFeatureData table = definition as TablePatternFeatureData;
+                if (table != null) seedValue = table.PatternFeatureArray;
+
+                Array seeds = seedValue as Array;
+                if (seeds == null || seeds.Length == 0)
+                    return 1;
+                int holeCount = 0;
+                foreach (object item in seeds)
+                {
+                    Feature seed = item as Feature;
+                    if (seed == null || IsPatternFeature(seed) || !IsUsableFeature(seed))
+                        continue;
+                    holeCount += GetDirectHoleCount(seed);
+                }
+                return Math.Max(1, holeCount);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[PAINT HOLE] Read pattern seed failed. feature=" + SafeFeatureName(patternFeature) + ", error=" + ex.Message);
+                return 1;
+            }
         }
 
         private int TryGetFeatureDimensionInt(Feature feature, string dimensionName)
@@ -579,9 +737,27 @@ namespace ADDIN.Commands
             }
         }
 
-        private int GetHolePointCount(Feature feature)
+        private int GetDirectHoleCount(Feature feature)
         {
-            int count = 0;
+            try
+            {
+                WizardHoleFeatureData2 holeData = feature.GetDefinition() as WizardHoleFeatureData2;
+                if (holeData != null)
+                {
+                    int positionCount = holeData.GetSketchPointCount();
+                    if (positionCount > 0)
+                    {
+                        Debug.WriteLine("[PAINT HOLE] Hole Wizard positions. feature=" + SafeFeatureName(feature) + ", count=" + positionCount);
+                        return positionCount;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[PAINT HOLE] Read Hole Wizard positions failed. feature=" + SafeFeatureName(feature) + ", error=" + ex.Message);
+            }
+
+            int contourCount = 0;
             try
             {
                 for (Feature sub = feature.GetFirstSubFeature() as Feature; sub != null; sub = sub.GetNextSubFeature() as Feature)
@@ -598,16 +774,28 @@ namespace ADDIN.Commands
                     if (sketch == null)
                         continue;
 
-                    object[] points = sketch.GetSketchPoints2() as object[];
-                    if (points != null && points.Length > count)
-                        count = points.Length;
+                    object[] contours = sketch.GetSketchContours() as object[];
+                    if (contours == null)
+                        continue;
+                    foreach (object item in contours)
+                    {
+                        SketchContour contour = item as SketchContour;
+                        if (contour != null && contour.IsClosed())
+                            contourCount++;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[PAINT HOLE] Count hole points failed: " + ex.Message);
+                Debug.WriteLine("[PAINT HOLE] Count closed hole contours failed: " + ex.Message);
             }
-            return Math.Max(1, count);
+            if (contourCount > 0)
+            {
+                Debug.WriteLine("[PAINT HOLE] Direct feature closed contours. feature=" + SafeFeatureName(feature) + ", count=" + contourCount);
+                return contourCount;
+            }
+            Debug.WriteLine("[PAINT HOLE] Direct feature fallback to one physical hole. feature=" + SafeFeatureName(feature));
+            return 1;
         }
 
         private string SafeFeatureName(Feature feature)
@@ -646,6 +834,49 @@ namespace ADDIN.Commands
             }
         }
 
+        private string GetActiveConfigurationName(ModelDoc2 model)
+        {
+            try
+            {
+                Configuration configuration = model?.ConfigurationManager?.ActiveConfiguration;
+                return configuration?.Name ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private string GetPartNumber(ModelDoc2 model, string configurationName)
+        {
+            string value = ReadCustomProperty(model, configurationName, "\u90E8\u54C1\u756A\u53F7");
+            if (string.IsNullOrWhiteSpace(value) && !string.IsNullOrWhiteSpace(configurationName))
+                value = ReadCustomProperty(model, "", "\u90E8\u54C1\u756A\u53F7");
+            return (value ?? "").Trim();
+        }
+
+        private string ReadCustomProperty(ModelDoc2 model, string configurationName, string propertyName)
+        {
+            try
+            {
+                CustomPropertyManager manager =
+                    model?.Extension?.get_CustomPropertyManager(configurationName ?? "");
+                if (manager == null)
+                    return "";
+
+                string raw;
+                string resolved;
+                bool wasResolved;
+                bool linked;
+                manager.Get6(propertyName, false, out raw, out resolved, out wasResolved, out linked);
+                return string.IsNullOrWhiteSpace(resolved) ? (raw ?? "") : resolved;
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
         private void ExportToExcel(PaintHoleScanResult result)
         {
             Type excelType = Type.GetTypeFromProgID("Excel.Application");
@@ -665,6 +896,11 @@ namespace ADDIN.Commands
             summarySheet.Cells[1, 3] = "\u7A74\u5857\u88C5";
             summarySheet.Cells[1, 4] = "So feature pattern";
             summarySheet.Cells[1, 5] = "So feature truc tiep";
+            summarySheet.Cells[1, 6] = "Loai lo";
+            summarySheet.Cells[1, 7] = "\u90E8\u54C1\u756A\u53F7";
+            summarySheet.Cells[1, 8] = "Ten component";
+            summarySheet.Cells[1, 9] = "Tong so lo";
+            summarySheet.Cells[1, 10] = "So feature";
 
             int row = 2;
             foreach (HoleSummary summary in result.GetSortedSummary())
@@ -687,6 +923,16 @@ namespace ADDIN.Commands
             catch
             {
             }
+            int featureRow = 2;
+            foreach (HolePartSummary partSummary in BuildHolePartSummaries(result))
+            {
+                summarySheet.Cells[featureRow, 6] = partSummary.HoleKey;
+                summarySheet.Cells[featureRow, 7] = partSummary.PartNumber;
+                summarySheet.Cells[featureRow, 8] = partSummary.ComponentName;
+                summarySheet.Cells[featureRow, 9] = partSummary.Quantity;
+                summarySheet.Cells[featureRow, 10] = partSummary.FeatureCount;
+                featureRow++;
+            }
             summarySheet.Columns.AutoFit();
 
             dynamic detailSheet = xlWB.Sheets.Add(Type.Missing, summarySheet);
@@ -696,8 +942,8 @@ namespace ADDIN.Commands
             detailSheet.Cells[1, 3] = "Feature";
             detailSheet.Cells[1, 4] = "Kieu feature";
             detailSheet.Cells[1, 5] = "La pattern";
-            detailSheet.Cells[1, 6] = "Component";
-            detailSheet.Cells[1, 7] = "Part";
+            detailSheet.Cells[1, 6] = "\u90E8\u54C1\u756A\u53F7";
+            detailSheet.Cells[1, 7] = "Ten component";
 
             row = 2;
             foreach (HoleRecord record in result.Records)
@@ -707,8 +953,8 @@ namespace ADDIN.Commands
                 detailSheet.Cells[row, 3] = record.FeatureName;
                 detailSheet.Cells[row, 4] = record.FeatureType;
                 detailSheet.Cells[row, 5] = record.IsPattern ? "Co" : "";
-                detailSheet.Cells[row, 6] = record.ComponentName;
-                detailSheet.Cells[row, 7] = record.PartPath;
+                detailSheet.Cells[row, 6] = record.PartNumber;
+                detailSheet.Cells[row, 7] = GetComponentDisplayName(record);
                 row++;
             }
             detailSheet.Columns.AutoFit();
@@ -721,6 +967,64 @@ namespace ADDIN.Commands
             {
             }
             xlApp.Visible = true;
+        }
+
+        private List<HolePartSummary> BuildHolePartSummaries(PaintHoleScanResult result)
+        {
+            Dictionary<string, HolePartSummary> grouped =
+                new Dictionary<string, HolePartSummary>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (HoleRecord record in result.Records)
+            {
+                string componentName = GetComponentDisplayName(record);
+                string key = (record.HoleKey ?? "") + "\u001F" +
+                    (record.PartNumber ?? "") + "\u001F" + componentName;
+
+                HolePartSummary summary;
+                if (!grouped.TryGetValue(key, out summary))
+                {
+                    summary = new HolePartSummary
+                    {
+                        HoleKey = record.HoleKey,
+                        PartNumber = record.PartNumber,
+                        ComponentName = componentName
+                    };
+                    grouped.Add(key, summary);
+                }
+
+                summary.Quantity += record.Quantity;
+                summary.FeatureCount++;
+            }
+
+            List<HolePartSummary> list = new List<HolePartSummary>(grouped.Values);
+            list.Sort((left, right) =>
+            {
+                int compare = string.Compare(left.HoleKey, right.HoleKey, StringComparison.OrdinalIgnoreCase);
+                if (compare != 0)
+                    return compare;
+                compare = string.Compare(left.PartNumber, right.PartNumber, StringComparison.OrdinalIgnoreCase);
+                if (compare != 0)
+                    return compare;
+                return string.Compare(left.ComponentName, right.ComponentName, StringComparison.OrdinalIgnoreCase);
+            });
+            return list;
+        }
+
+        private string GetComponentDisplayName(HoleRecord record)
+        {
+            try
+            {
+                string fileName = Path.GetFileNameWithoutExtension(record.PartPath ?? "");
+                if (!string.IsNullOrWhiteSpace(fileName))
+                    return fileName;
+            }
+            catch
+            {
+            }
+
+            string componentName = record.ComponentName ?? "";
+            int separator = Math.Max(componentName.LastIndexOf('/'), componentName.LastIndexOf('\\'));
+            return separator >= 0 ? componentName.Substring(separator + 1) : componentName;
         }
 
         private class PaintHoleScanResult
@@ -747,6 +1051,15 @@ namespace ADDIN.Commands
             public int DirectFeatureCount;
         }
 
+        private class HolePartSummary
+        {
+            public string HoleKey;
+            public string PartNumber;
+            public string ComponentName;
+            public int Quantity;
+            public int FeatureCount;
+        }
+
         private class HoleRecord
         {
             public string HoleKey;
@@ -755,6 +1068,7 @@ namespace ADDIN.Commands
             public bool IsPattern;
             public string FeatureName;
             public string FeatureType;
+            public string PartNumber;
             public string ComponentName;
             public string PartPath;
 
