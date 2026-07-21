@@ -58,15 +58,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="SolidWorks.Interop.sldworks">
-      <HintPath>..\..\..\Users\SGN26\Downloads\SolidWorks.Interop.sldworks.dll</HintPath>
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.sldworks.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="SolidWorks.Interop.swconst">
-      <HintPath>..\..\..\Users\SGN26\Downloads\SolidWorks.Interop.swconst.dll</HintPath>
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.swconst.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="SolidWorks.Interop.swpublished">
-      <HintPath>..\..\..\Users\SGN26\Downloads\SolidWorks.Interop.swpublished.dll</HintPath>
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.swpublished.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="System" />
@@ -103,6 +103,7 @@
     <Compile Include="Commands\SoSanhDfTk.cs" />
     <Compile Include="Commands\CheckUraOmote.cs" />
     <Compile Include="Commands\CheckKegaki.cs" />
+    <Compile Include="Commands\CheckBalloon.cs" />
     <Compile Include="Commands\DimKichThuocLo.cs" />
     <Compile Include="Commands\PaintHoleSummaryCommand.cs" />
     <Compile Include="Properties\Resources.Designer.cs">

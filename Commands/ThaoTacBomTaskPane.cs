@@ -46,7 +46,7 @@ namespace ADDIN.Commands
             AutoFitBomGrid();
         }
 
-        public void LoadBom()
+        public void LoadBom(Func<bool> isCancellationRequested = null)
         {
             LoadedBomContext = BomCommandContext.None;
             if (bomLoader == null)
@@ -64,7 +64,12 @@ namespace ADDIN.Commands
             }
 
             LoadedBomContext = bomLoader.GetBomCommandContext(swTable);
-            bomLoader.LoadBOMTableToGrid(gridBom, swTable);
+            bomLoader.LoadBOMTableToGrid(gridBom, swTable, isCancellationRequested);
+            if (isCancellationRequested != null && isCancellationRequested())
+            {
+                lblStatus.Text = "Da huy CAP NHAT BOM.";
+                return;
+            }
             AutoFitBomGrid();
             chkSelectAll.Checked = true;
             SetAllChecked(true);
@@ -140,7 +145,17 @@ namespace ADDIN.Commands
             if (rowIndex < 0 || columnIndex != 0)
                 return;
 
-            pendingCheckboxRows = GetSelectedRowIndexes();
+            bool modifierSelectionRequested =
+                (Control.ModifierKeys & (Keys.Control | Keys.Shift)) != Keys.None;
+            bool selectedRegionExists =
+                gridBom.SelectedCells.Count > 1 || gridBom.SelectedRows.Count > 1;
+
+            // A normal click must affect only the checkbox under the mouse.
+            // A highlighted region, or Ctrl/Shift, intentionally applies the
+            // checkbox value to every row represented by the selection.
+            pendingCheckboxRows = modifierSelectionRequested || selectedRegionExists
+                ? GetSelectedRowIndexes()
+                : new HashSet<int>();
             pendingCheckboxRows.Add(rowIndex);
         }
 

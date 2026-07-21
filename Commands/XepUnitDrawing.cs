@@ -22,7 +22,8 @@ namespace ADDIN.Commands
             DataGridView gridBom,
             Action<int> beginProgress,
             Action<int, int> updateProgress,
-            Action finishProgress)
+            Action finishProgress,
+            Func<bool> isCancellationRequested = null)
         {
             ModelDoc2 activeModel = swApp?.ActiveDoc as ModelDoc2;
             if (activeModel == null ||
@@ -48,6 +49,8 @@ namespace ADDIN.Commands
             {
                 finishProgress?.Invoke();
             }
+            if (IsCancellationRequested(isCancellationRequested))
+                return;
 
             if (drawingPaths.Count == 0)
             {
@@ -86,6 +89,8 @@ namespace ADDIN.Commands
                     currentCount++;
                     updateProgress?.Invoke(currentCount, totalCount);
                     Application.DoEvents();
+                    if (IsCancellationRequested(isCancellationRequested))
+                        break;
 
                     Debug.WriteLine("[XEP UNIT] Drawing=" + drawingPath);
                     if (string.IsNullOrWhiteSpace(drawingPath) || !File.Exists(drawingPath))
@@ -126,6 +131,9 @@ namespace ADDIN.Commands
                 finishProgress?.Invoke();
             }
 
+            if (IsCancellationRequested(isCancellationRequested))
+                return;
+
             MessageBox.Show(
                 "XEP UNIT xong." + System.Environment.NewLine +
                 "Da sap xep bang hien tai: " + activeSortedTableCount + System.Environment.NewLine +
@@ -139,6 +147,18 @@ namespace ADDIN.Commands
                 "XEP UNIT",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
+        }
+
+        private static bool IsCancellationRequested(Func<bool> callback)
+        {
+            try
+            {
+                return callback != null && callback();
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private IBomTableAnnotation GetSelectedBomTable(ModelDoc2 drawingModel)

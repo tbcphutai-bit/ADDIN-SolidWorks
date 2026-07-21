@@ -214,11 +214,12 @@ internal class LenhMakeHole
 			MessageBox.Show("Hay mo Part truoc.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
 			return false;
 		}
-		if (modelDoc.GetType() != 1)
+		if (!TryResolveMakeHoleContext(modelDoc, out var ownerModel, out var editComponentName))
 		{
-			MessageBox.Show("Chi ho tro pattern Hole Wizard trong Part.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+			MessageBox.Show("PATTERN chi chay trong Part, hoac trong Assembly khi dang Edit Component dung Part da tao Hole Wizard.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
 			return false;
 		}
+		Debug.WriteLine("[MAKE HOLE] Pattern context. activeType=" + modelDoc.GetType() + ", owner=" + (ownerModel.GetTitle() ?? "") + ", editComponent=" + (editComponentName ?? ""));
 		if (!pendingHybridPattern)
 		{
 			if (pendingPatternEquation)
@@ -243,8 +244,7 @@ internal class LenhMakeHole
 		{
 			return true;
 		}
-		ResetPendingMakeHole();
-		MessageBox.Show("Chua pattern duoc Hole Wizard moi. Lenh Make Hole da reset, hay tao lai tu dau.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+		MessageBox.Show("Chua mo duoc Curve Pattern. Trang thai Hole Wizard va duong dan van duoc giu; hay bam Pattern lai hoac bam Cancel de huy.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
 		return false;
 	}
 
@@ -270,11 +270,12 @@ internal class LenhMakeHole
 			MessageBox.Show("Hay mo Part truoc.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
 			return;
 		}
-		if (modelDoc.GetType() != 1)
+		if (!TryResolveMakeHoleContext(modelDoc, out var ownerModel, out var editComponentName))
 		{
-			MessageBox.Show("Ban dau chi ho tro Make Hole trong Part. Assembly se lam sau.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+			MessageBox.Show("MAKE HOLE chi chay trong Part, hoac trong Assembly khi dang Edit Component mot Part.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
 			return;
 		}
+		Debug.WriteLine("[MAKE HOLE] Context. activeType=" + modelDoc.GetType() + ", owner=" + (ownerModel.GetTitle() ?? "") + ", editComponent=" + (editComponentName ?? ""));
 		if (pendingHybridPattern)
 		{
 			MessageBox.Show("Da co lenh Pattern dang cho. Hay tao xong Hole Wizard roi bam nut Pattern.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
@@ -337,6 +338,51 @@ internal class LenhMakeHole
 			ResetPendingMakeHole();
 			MessageBox.Show("Loi Make Hole: " + ex.Message, "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Hand);
 		}
+	}
+
+	private bool TryResolveMakeHoleContext(ModelDoc2 activeModel, out ModelDoc2 ownerModel, out string editComponentName)
+	{
+		ownerModel = null;
+		editComponentName = null;
+		if (activeModel == null)
+		{
+			return false;
+		}
+		if (activeModel.GetType() == (int)swDocumentTypes_e.swDocPART)
+		{
+			ownerModel = activeModel;
+			return true;
+		}
+		if (activeModel.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY || !(activeModel is AssemblyDoc assemblyDoc))
+		{
+			return false;
+		}
+		try
+		{
+			Component2 editComponent = assemblyDoc.GetEditTargetComponent();
+			ModelDoc2 editTarget = assemblyDoc.IGetEditTarget2();
+			if (editComponent == null || editTarget == null || editTarget.GetType() != (int)swDocumentTypes_e.swDocPART)
+			{
+				return false;
+			}
+			ownerModel = editTarget;
+			editComponentName = editComponent.Name2;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine("[MAKE HOLE] Resolve Edit Component context failed: " + ex.Message);
+			return false;
+		}
+	}
+
+	private ModelDoc2 GetMakeHoleOwnerModel(ModelDoc2 activeModel)
+	{
+		if (TryResolveMakeHoleContext(activeModel, out var ownerModel, out _))
+		{
+			return ownerModel;
+		}
+		return activeModel;
 	}
 
 	public void RunRepairHole(MakeHoleOptions options)
@@ -841,6 +887,7 @@ internal class LenhMakeHole
 
 	private Feature FindTrackedPatternFeature(ModelDoc2 model)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null)
 		{
 			return null;
@@ -870,6 +917,7 @@ internal class LenhMakeHole
 
 	private Feature FindFeatureByName(ModelDoc2 model, string featureName)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null || string.IsNullOrWhiteSpace(featureName))
 		{
 			return null;
@@ -2634,9 +2682,18 @@ internal class LenhMakeHole
 			pointCount = 0;
 			return true;
 		}
-		pointCount = SplitSketchSegments(model, sketch, list, list3);
-		Debug.WriteLine("[MAKE HOLE] Split result. splitCount=" + pointCount);
-		Debug.WriteLine("[MAKE HOLE] Split endpoint dims=" + TryCreateSplitEndpointDimensions(model, sketch, list2, list3));
+		if (IsInContext3DSketch(model, sketch))
+		{
+			SketchPoint seedPoint = TryCreateSeedPatternPointInActiveSketch(model, list4);
+			pointCount = 0;
+			Debug.WriteLine("[MAKE HOLE] In-context 3D sketch: skip all split APIs; seedPoint=" + (seedPoint != null));
+		}
+		else
+		{
+			pointCount = SplitSketchSegments(model, sketch, list, list3);
+			Debug.WriteLine("[MAKE HOLE] Split result. splitCount=" + pointCount);
+			Debug.WriteLine("[MAKE HOLE] Split endpoint dims=" + TryCreateSplitEndpointDimensions(model, sketch, list2, list3));
+		}
 		List<SketchSegment> sketchSegments = GetSketchSegments(sketch);
 		SketchPoint sketchPoint = FindNearestExistingSketchPoint(sketch, (list4.Count > 0) ? list4[0] : null);
 		List<SketchPoint> list5 = ((sketchPoint == null) ? new List<SketchPoint>() : new List<SketchPoint> { sketchPoint });
@@ -2737,6 +2794,7 @@ internal class LenhMakeHole
 
 	private Sketch GetNewestSketch(ModelDoc2 model)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null)
 		{
 			return null;
@@ -2768,6 +2826,7 @@ internal class LenhMakeHole
 
 	private Feature GetNewestSketchFeatureWithSegments(ModelDoc2 model)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null)
 		{
 			return null;
@@ -3330,12 +3389,29 @@ internal class LenhMakeHole
 		return list;
 	}
 
+	private bool IsInContext3DSketch(ModelDoc2 model, Sketch sketch)
+	{
+		try
+		{
+			return model != null && model.GetType() == (int)swDocumentTypes_e.swDocASSEMBLY && sketch != null && sketch.Is3D();
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	private int SplitSketchSegments(ModelDoc2 model, Sketch sketch, List<SketchSegment> segments, List<double[]> splitPoints)
 	{
 		int num = 0;
 		if (model == null || splitPoints == null || splitPoints.Count == 0)
 		{
 			return num;
+		}
+		if (IsInContext3DSketch(model, sketch))
+		{
+			Debug.WriteLine("[MAKE HOLE] In-context 3D sketch: SplitSketchSegments bypassed to avoid SolidWorks AccessViolation.");
+			return 0;
 		}
 		for (int num2 = splitPoints.Count - 1; num2 >= 0; num2--)
 		{
@@ -4204,6 +4280,7 @@ internal class LenhMakeHole
 
 	private HashSet<string> CollectFeatureNames(ModelDoc2 model)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		try
 		{
@@ -4225,6 +4302,7 @@ internal class LenhMakeHole
 
 	private Feature FindNewHoleWizardFeature(ModelDoc2 model)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		Feature feature = null;
 		try
 		{
@@ -4261,6 +4339,7 @@ internal class LenhMakeHole
 
 	private Feature GetSketchFeature(ModelDoc2 model, Sketch sketch)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (sketch == null)
 		{
 			return null;
@@ -4276,6 +4355,9 @@ internal class LenhMakeHole
 		{
 			return null;
 		}
+		Feature latestSketchFeature = null;
+		Feature latestMatchingSketchFeature = null;
+		int targetSegmentCount = GetSketchSegments(sketch).Count;
 		try
 		{
 			for (Feature feature = model.FirstFeature() as Feature; feature != null; feature = feature.GetNextFeature() as Feature)
@@ -4293,13 +4375,30 @@ internal class LenhMakeHole
 					Debug.WriteLine("[MAKE HOLE] Resolved active sketch feature=" + SafeFeatureName(feature));
 					return feature;
 				}
+				if (sketch2 != null && !string.Equals(SafeFeatureName(feature), "MH-DIR", StringComparison.OrdinalIgnoreCase))
+				{
+					int candidateSegmentCount = GetSketchSegments(sketch2).Count;
+					if (candidateSegmentCount > 0)
+					{
+						latestSketchFeature = feature;
+						if (candidateSegmentCount == targetSegmentCount)
+						{
+							latestMatchingSketchFeature = feature;
+						}
+					}
+				}
 			}
 		}
 		catch (Exception ex)
 		{
 			Debug.WriteLine("[MAKE HOLE] Resolve active sketch feature failed: " + ex.Message);
 		}
-		return null;
+		Feature fallbackFeature = latestMatchingSketchFeature ?? latestSketchFeature;
+		if (fallbackFeature != null)
+		{
+			Debug.WriteLine("[MAKE HOLE] Resolved in-context sketch by newest Part feature. name=" + SafeFeatureName(fallbackFeature) + ", targetSegments=" + targetSegmentCount);
+		}
+		return fallbackFeature;
 	}
 
 	private bool IsSameComObject(object first, object second)
@@ -4339,6 +4438,7 @@ internal class LenhMakeHole
 
 	private Sketch FindSketchByName(ModelDoc2 model, string sketchName)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null || string.IsNullOrWhiteSpace(sketchName))
 		{
 			return null;
@@ -4391,10 +4491,19 @@ internal class LenhMakeHole
 				return null;
 			}
 			Debug.WriteLine("[MAKE HOLE] Curve pattern definition path disabled. PatternFeatureArray setter causes SolidWorks AccessViolation.");
-			Feature feature = TryCallLocalCurvePattern(model, seedFeature, sketchSegment, patternCount, num, 0, 0);
-			if (feature == null)
+			bool commandOnlyInContext = model.GetType() == (int)swDocumentTypes_e.swDocASSEMBLY;
+			Feature feature = null;
+			if (!commandOnlyInContext)
 			{
-				feature = TryCallLocalCurvePattern(model, seedFeature, sketchSegment, patternCount, num, 4, 1);
+				feature = TryCallLocalCurvePattern(model, seedFeature, sketchSegment, patternCount, num, 0, 0);
+				if (feature == null)
+				{
+					feature = TryCallLocalCurvePattern(model, seedFeature, sketchSegment, patternCount, num, 4, 1);
+				}
+			}
+			else
+			{
+				Debug.WriteLine("[MAKE HOLE] Edit Component: bypass FeatureLocalCurveDrivenPattern to avoid native SolidWorks crash; use RunCommand only.");
 			}
 			if (feature == null)
 			{
@@ -4453,6 +4562,43 @@ internal class LenhMakeHole
 		if (model == null || seedFeature == null || curveSegment == null)
 		{
 			return false;
+		}
+		if (model.GetType() == (int)swDocumentTypes_e.swDocASSEMBLY)
+		{
+			try
+			{
+				ModelDoc2 commandModel = GetMakeHoleOwnerModel(model);
+				if (commandModel == null || commandModel.GetType() != (int)swDocumentTypes_e.swDocPART)
+				{
+					return false;
+				}
+				commandModel.ClearSelection2(All: true);
+				bool seedSelected = SelectFeatureWithMark(seedFeature, append: false, 4);
+				bool curveSelected = SelectSketchSegmentWithMark(curveSegment, append: true, 1);
+				int seedCount = 0;
+				int curveCount = 0;
+				try
+				{
+					SelectionMgr selectionMgr = commandModel.SelectionManager as SelectionMgr;
+					seedCount = selectionMgr?.GetSelectedObjectCount2(4) ?? 0;
+					curveCount = selectionMgr?.GetSelectedObjectCount2(1) ?? 0;
+				}
+				catch
+				{
+				}
+				bool started = seedSelected && curveSelected && seedCount > 0 && curveCount > 0 && commandModel.Extension.RunCommand(362, "Curve Driven Pattern");
+				Debug.WriteLine("[MAKE HOLE] Edit Component Curve Pattern marked selection. seed=" + seedSelected + ", seedMark4=" + seedCount + ", curve=" + curveSelected + ", curveMark1=" + curveCount + ", started=" + started);
+				if (started)
+				{
+					TrySetCurvePatternUiByAutomation();
+				}
+				return started;
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine("[MAKE HOLE] Edit Component Curve Pattern marked selection failed: " + ex.Message);
+				return false;
+			}
 		}
 		try
 		{
@@ -4555,6 +4701,12 @@ internal class LenhMakeHole
 	{
 		if (model == null)
 		{
+			return false;
+		}
+		if (model.GetType() == (int)swDocumentTypes_e.swDocASSEMBLY)
+		{
+			// Trong Assembly, GetEditTarget la Part dang duoc Edit Component,
+			// khong phai mot feature PropertyManager dang mo.
 			return false;
 		}
 		try
@@ -4767,6 +4919,7 @@ internal class LenhMakeHole
 
 	private Feature FindNewCurvePatternFeature(ModelDoc2 model)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null)
 		{
 			return null;
@@ -4888,6 +5041,7 @@ internal class LenhMakeHole
 
 	private bool AddOrUpdateEquation(ModelDoc2 model, string equation)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null || string.IsNullOrWhiteSpace(equation))
 		{
 			return false;
@@ -4945,6 +5099,7 @@ internal class LenhMakeHole
 
 	private bool DeleteEquationByLeftSide(ModelDoc2 model, string leftSide)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null || string.IsNullOrWhiteSpace(leftSide))
 		{
 			return false;
@@ -4999,6 +5154,7 @@ internal class LenhMakeHole
 
 	private bool DeleteEquationsContaining(ModelDoc2 model, string token)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null || string.IsNullOrWhiteSpace(token))
 		{
 			return false;
@@ -5115,12 +5271,16 @@ internal class LenhMakeHole
 				LogCurvePatternManualValues();
 				return;
 			}
-			int num = 0;
-			foreach (AutomationElement item in list2.Where(IsEnabledAutomationElement).Take(1))
+			int num = list2.Any((AutomationElement item) => string.Equals(GetAutomationValue(item), text, StringComparison.OrdinalIgnoreCase)) ? 1 : 0;
+			if (num == 0)
 			{
-				if (TrySetAutomationValue(item, text))
+				foreach (AutomationElement item in list2.Take(2))
 				{
-					num++;
+					if (TrySetAutomationValue(item, text))
+					{
+						num++;
+						break;
+					}
 				}
 			}
 			if (num == 0)
@@ -5129,14 +5289,75 @@ internal class LenhMakeHole
 				LogCurvePatternManualValues();
 				return;
 			}
+			bool spacingSet = TrySetCurvePatternSpacingControls(controls, pendingPatternSpacing * 1000.0);
+			if (!spacingSet)
+			{
+				Debug.WriteLine("[MAKE HOLE] UIA set spacing failed; keep Curve Pattern PropertyManager open.");
+				LogCurvePatternManualValues();
+				return;
+			}
 			TryEnableCurvePatternEqualSpacingOption();
 			TryDisableCurvePatternGeometryOption();
-			Debug.WriteLine("[MAKE HOLE] UIA set Curve Pattern values ok. count=" + text + ", equationAfterCreate=" + pendingPatternEquation + ", countControls=" + num);
+			bool accepted = TryAcceptCurvePatternPropertyManager();
+			Debug.WriteLine("[MAKE HOLE] UIA set Curve Pattern values. count=" + text + ", spacing=" + (pendingPatternSpacing * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm, accepted=" + accepted + ", equationAfterCreate=" + pendingPatternEquation + ", countControls=" + num);
 		}
 		catch (Exception ex)
 		{
 			Debug.WriteLine("[MAKE HOLE] UIA set Curve Pattern count failed: " + ex.Message);
 			LogCurvePatternManualValues();
+		}
+	}
+
+	private bool TrySetCurvePatternSpacingControls(List<AutomationElement> controls, double spacingMm)
+	{
+		if (controls == null || spacingMm <= 0.0)
+		{
+			return false;
+		}
+		string value = spacingMm.ToString("0.###", CultureInfo.InvariantCulture) + "mm";
+		List<AutomationElement> candidates = controls.Where((AutomationElement control) => TryParseAutomationLengthMm(GetAutomationValue(control), out _)).Take(4).ToList();
+		if (candidates.Any((AutomationElement control) => TryParseAutomationLengthMm(GetAutomationValue(control), out var currentMm) && Math.Abs(currentMm - spacingMm) <= 0.01))
+		{
+			return true;
+		}
+		foreach (AutomationElement candidate in candidates)
+		{
+			if (TrySetAutomationValue(candidate, value))
+			{
+				Application.DoEvents();
+				Debug.WriteLine("[MAKE HOLE] UIA spacing control set to " + value + ".");
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private bool TryParseAutomationLengthMm(string value, out double lengthMm)
+	{
+		lengthMm = 0.0;
+		if (string.IsNullOrWhiteSpace(value) || value.IndexOf("mm", StringComparison.OrdinalIgnoreCase) < 0)
+		{
+			return false;
+		}
+		string number = value.Replace("mm", "").Replace("MM", "").Trim().Replace(',', '.');
+		return double.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out lengthMm);
+	}
+
+	private bool TryAcceptCurvePatternPropertyManager()
+	{
+		try
+		{
+			Application.DoEvents();
+			Thread.Sleep(250);
+			Application.DoEvents();
+			bool accepted = swApp != null && swApp.RunCommand(-2, "Accept Curve Driven Pattern");
+			Debug.WriteLine("[MAKE HOLE] Curve Pattern PropertyManager accept command=" + accepted);
+			return accepted;
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine("[MAKE HOLE] Curve Pattern PropertyManager accept failed: " + ex.Message);
+			return false;
 		}
 	}
 
@@ -5663,6 +5884,7 @@ internal class LenhMakeHole
 
 	private Sketch GetNewestSketchWithUsableSegments(ModelDoc2 model)
 	{
+		model = GetMakeHoleOwnerModel(model);
 		if (model == null)
 		{
 			return null;
