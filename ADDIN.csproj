@@ -39,7 +39,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x64\Debug\</OutputPath>
+    <OutputPath>C:\Tao moi\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <RegisterForComInterop>false</RegisterForComInterop>
     <DebugType>full</DebugType>
@@ -58,15 +58,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="SolidWorks.Interop.sldworks">
-      <HintPath>..\..\..\Users\SGN26\Downloads\SolidWorks.Interop.sldworks.dll</HintPath>
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.sldworks.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="SolidWorks.Interop.swconst">
-      <HintPath>..\..\..\Users\SGN26\Downloads\SolidWorks.Interop.swconst.dll</HintPath>
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.swconst.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="SolidWorks.Interop.swpublished">
-      <HintPath>..\..\..\Users\SGN26\Downloads\SolidWorks.Interop.swpublished.dll</HintPath>
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.swpublished.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <Reference Include="System" />
@@ -90,12 +90,32 @@
       <DependentUpon>BomTaskPaneControl.cs</DependentUpon>
     </Compile>
     <Compile Include="BomLoader.cs" />
+    <Compile Include="Commands\CreateMirrorPartPackage.cs" />
+    <Compile Include="Commands\DeleteYellowAnnotationsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\DeleteYellowAnnotationsDialog.Designer.cs">
+      <DependentUpon>DeleteYellowAnnotationsDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\SplineArcOptionsDialog.Designer.cs">
+      <DependentUpon>SplineArcOptionsDialog.cs</DependentUpon>
+    </Compile>
     <Compile Include="Commands\ThaoTacBomTaskPane.cs" />
+    <Compile Include="Commands\XoaBalloonMauVang.cs" />
     <Compile Include="Commands\XoaDimMauVang.cs" />
     <Compile Include="Commands\TaoDimKegaki.cs" />
+    <Compile Include="Commands\HistoryTextBox.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="Commands\LenhNoteTextBalloon.cs" />
     <Compile Include="Commands\LenhDimCanhSongSong.cs" />
+    <Compile Include="Commands\SplineArcOptions.cs" />
+    <Compile Include="Commands\SplineArcOptionsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\SplineToArcsCommand.cs" />
     <Compile Include="Commands\ChinhTiLeDrawingView.cs" />
+    <Compile Include="Commands\XoaTextMauVang.cs" />
     <Compile Include="Commands\XoayDrawingView.cs" />
     <Compile Include="Commands\XepUnitDrawing.cs" />
     <Compile Include="Commands\LenhMakeHole.cs" />
@@ -103,6 +123,29 @@
     <Compile Include="Commands\SoSanhDfTk.cs" />
     <Compile Include="Commands\CheckUraOmote.cs" />
     <Compile Include="Commands\CheckKegaki.cs" />
+    <Compile Include="Commands\BendTableDeepReader.cs" />
+    <Compile Include="Commands\CheckAll.cs" />
+    <Compile Include="Commands\CheckAllSelectionDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\CheckAllSelectionDialog.Designer.cs">
+      <DependentUpon>CheckAllSelectionDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\CheckBalloon.cs" />
+    <Compile Include="Commands\CheckDrawingBom.cs" />
+    <Compile Include="Commands\ExcelDrawingCheckExporter.cs" />
+    <Compile Include="Commands\CheckRound.cs" />
+    <Compile Include="Commands\CheckSamePart.cs" />
+    <Compile Include="Commands\SamePartToleranceInputDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\SamePartToleranceInputDialog.Designer.cs">
+      <DependentUpon>SamePartToleranceInputDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\CheckAssemblyHole.cs" />
+    <Compile Include="Commands\RoundHolePreviewForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Commands\DimKichThuocLo.cs" />
     <Compile Include="Commands\PaintHoleSummaryCommand.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
@@ -119,6 +162,15 @@
   <ItemGroup>
     <EmbeddedResource Include="BomTaskPaneControl.resx">
       <DependentUpon>BomTaskPaneControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Commands\CheckAllSelectionDialog.resx">
+      <DependentUpon>CheckAllSelectionDialog.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Commands\DeleteYellowAnnotationsDialog.resx">
+      <DependentUpon>DeleteYellowAnnotationsDialog.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Commands\SamePartToleranceInputDialog.resx">
+      <DependentUpon>SamePartToleranceInputDialog.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
@@ -148,6 +200,9 @@
     <Content Include="Images\counthole.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Images\checkhole3d.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Images\makehole.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -157,6 +212,6 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PreBuildEvent>taskkill /f /im sldworks.exe /fi "status eq running" 2&gt;nul &amp; set errorlevel=0</PreBuildEvent>
+    <PreBuildEvent Condition="'$(KillSolidWorksOnBuild)' == 'true'">taskkill /f /im sldworks.exe /fi "status eq running" 2&gt;nul &amp; set errorlevel=0</PreBuildEvent>
   </PropertyGroup>
 </Project>

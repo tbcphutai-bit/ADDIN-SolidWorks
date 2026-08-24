@@ -29,7 +29,7 @@ namespace ADDIN.Commands
 
         public void Run()
         {
-            Debug.WriteLine("[DIM MAT CAT] build=20260716-keep-outer-sharp-v8");
+            Debug.WriteLine("[DIM MAT CAT] build=20260821-envelope-first-valid-R-v13");
             ModelDoc2 model = swApp?.ActiveDoc as ModelDoc2;
             if (model == null)
             {
@@ -96,6 +96,35 @@ namespace ADDIN.Commands
             List<ArcInfo> usableArcs = FilterUsableFilletArcs(arcs, materialThicknessMm);
             ArcInfo selectedArc = GetSelectedArcInfo(selectedInputEdge, arcs, mathUtil, viewTransform);
 
+            // Giu lai hinh hoc cua canh user click. Neu contour co R hop le,
+            // canh nay van la seed cho LOGIC PHU BI CU sau khi drawing rebuild.
+            EdgeInfo selectedLineGeometryForCurvedProfile = null;
+
+            if (selectedInputEdge != null)
+            {
+                selectedLineGeometryForCurvedProfile = MakeEdgeInfo(
+                    selectedInputEdge,
+                    mathUtil,
+                    viewTransform);
+            }
+
+            if (selectedArc == null && selectedLineGeometryForCurvedProfile != null)
+            {
+                EdgeInfo selectedLine = FindMatchingEdgeGeometry(
+                    edges,
+                    selectedLineGeometryForCurvedProfile);
+
+                selectedArc = FindArcConnectedToSelectedContour(
+                    usableArcs,
+                    selectedLine,
+                    materialThicknessMm);
+
+                // Neu edge click khong noi truc tiep voi cung, chi fallback khi
+                // trong view chi co 1 open arc DA QUA DIEU KIEN R > thickness + 0.1.
+                if (selectedArc == null)
+                    selectedArc = FindSingleUsableOpenArc(usableArcs);
+            }
+
             Debug.WriteLine("[DIM MAT CAT] view=" + SafeViewName(view)
                 + ", visibleLineEdges=" + edges.Count
                 + ", visibleArcs=" + arcs.Count
@@ -115,6 +144,9 @@ namespace ADDIN.Commands
                 arcs = CollectVisibleArcEdges(view, mathUtil, viewTransform);
                 materialThicknessMm = EstimateMaterialThicknessMm(edges);
                 selectedArc = FindMatchingArcGeometry(arcs, selectedArcGeometry);
+                EdgeInfo selectedLineSeed = FindMatchingEdgeGeometry(
+                    edges,
+                    selectedLineGeometryForCurvedProfile);
 
                 int curvedCount = AddCurvedProfileDimensions(
                     model,
@@ -123,7 +155,8 @@ namespace ADDIN.Commands
                     edges,
                     arcs,
                     materialThicknessMm,
-                    selectedArc);
+                    selectedArc,
+                    selectedLineSeed);
 
                 model.ClearSelection2(true);
                 model.EditRebuild3();
@@ -348,6 +381,89 @@ namespace ADDIN.Commands
             return match;
         }
 
+        private ArcInfo FindSingleUsableOpenArc(List<ArcInfo> arcs)
+        {
+            if (arcs == null || arcs.Count == 0)
+                return null;
+
+            ArcInfo onlyArc = null;
+            int openArcCount = 0;
+
+            foreach (ArcInfo arc in arcs)
+            {
+                if (arc == null || arc.Edge == null)
+                    continue;
+
+                // Khong coi lo tron / full circle la cung R cua mat cat.
+                if (IsFullCircleArc(arc))
+                    continue;
+
+                if (arc.ArcLengthMm <= 0.0 || arc.RadiusMm <= 0.0)
+                    continue;
+
+                openArcCount++;
+                onlyArc = arc;
+
+                // Neu co tu 2 cung mo tro len thi khong tu doan.
+                // Luc nay de logic contour hien tai tu nhan dang nhu cu.
+                if (openArcCount > 1)
+                {
+                    Debug.WriteLine("[DIM MAT CAT CUNG] single-open-arc fallback skipped: openArcs="
+                        + openArcCount);
+                    return null;
+                }
+            }
+
+            if (openArcCount == 1)
+            {
+                Debug.WriteLine("[DIM MAT CAT CUNG] single-open-arc fallback selected R"
+                    + onlyArc.RadiusMm.ToString("0.###")
+                    + ", arcLength="
+                    + onlyArc.ArcLengthMm.ToString("0.###")
+                    + "mm");
+            }
+
+            return openArcCount == 1 ? onlyArc : null;
+        }
+
+        private ArcInfo FindArcConnectedToSelectedContour(
+            List<ArcInfo> arcs,
+            EdgeInfo selectedLine,
+            double materialThicknessMm)
+        {
+            if (arcs == null || selectedLine == null)
+                return null;
+
+            double endpointTol = MmToViewM(Math.Max(0.25, Math.Min(1.5, materialThicknessMm * 0.75)));
+            ArcInfo best = null;
+            double bestDistance = double.MaxValue;
+
+            foreach (ArcInfo arc in arcs)
+            {
+                if (arc == null || arc.Edge == null || IsFullCircleArc(arc))
+                    continue;
+
+                double startDistance = DistanceToEdgeEndpoint(
+                    arc.StartX, arc.StartY, selectedLine);
+                double endDistance = DistanceToEdgeEndpoint(
+                    arc.EndX, arc.EndY, selectedLine);
+                double distance = Math.Min(startDistance, endDistance);
+                if (distance > endpointTol || distance >= bestDistance)
+                    continue;
+
+                bestDistance = distance;
+                best = arc;
+            }
+
+            Debug.WriteLine("[DIM MAT CAT CUNG] arc from selected contour="
+                + (best == null ? "none" : "R" + best.RadiusMm.ToString("0.###"))
+                + ", selectedLine=" + EdgeSummary(selectedLine)
+                + ", gapMm=" + (bestDistance == double.MaxValue
+                    ? "n/a"
+                    : (bestDistance * 1000.0 / viewScale).ToString("0.###")));
+            return best;
+        }
+
         private Edge GetSelectedEdgeFromSelection(SelectionMgr selMgr, int selCount)
         {
             if (selMgr == null || selCount < 1)
@@ -432,6 +548,11 @@ namespace ADDIN.Commands
             }
 
             return best;
+        }
+
+        private bool ContainsMatchingEdgeGeometry(List<EdgeInfo> edges, EdgeInfo geometry)
+        {
+            return FindMatchingEdgeGeometry(edges, geometry) != null;
         }
 
         private EdgeInfo FindMatchingEdgeGeometry(
@@ -841,33 +962,57 @@ namespace ADDIN.Commands
             return bestAverage;
         }
 
+        // QUY TAC DUY NHAT CHO CUNG R:
+        // Chi coi la cung profile can xu ly khi R > be day vat lieu + 0.1 mm.
+        // R nho hon hoac bang nguong nay duoc xem la cung bend/fillet cua vat lieu
+        // va KHONG DUOC phep thay doi logic DIM phu bi cu.
+        private bool IsDimensionableProfileArc(ArcInfo arc, double materialThicknessMm)
+        {
+            if (arc == null || arc.Edge == null)
+                return false;
+
+            if (IsFullCircleArc(arc))
+                return false;
+
+            if (arc.RadiusMm <= 0.0 || arc.ArcLengthMm <= 0.0)
+                return false;
+
+            // Khong doan khi khong xac dinh duoc be day.
+            // Uu tien giu nguyen logic phu bi cu de tranh false-positive.
+            if (materialThicknessMm <= 0.001)
+                return false;
+
+            const double BendExtraMm = 0.1;
+            const double CompareTolMm = 0.001;
+            double minimumRadiusMm = materialThicknessMm + BendExtraMm;
+
+            return arc.RadiusMm > minimumRadiusMm + CompareTolMm;
+        }
+
         private List<ArcInfo> FilterUsableFilletArcs(List<ArcInfo> arcs, double materialThicknessMm)
         {
             List<ArcInfo> result = new List<ArcInfo>();
-            double tolMm = Math.Max(0.06, materialThicknessMm * 0.04);
-            double thicknessPlusBendMm = materialThicknessMm > 0 ? materialThicknessMm + 0.1 : 0.0;
+            if (arcs == null)
+                return result;
+
+            double limitMm = materialThicknessMm + 0.1;
 
             foreach (ArcInfo arc in arcs)
             {
-                bool radiusMatchesThickness = materialThicknessMm > 0
-                    && Math.Abs(arc.RadiusMm - materialThicknessMm) <= tolMm;
-                bool diameterMatchesThickness = materialThicknessMm > 0
-                    && Math.Abs(arc.RadiusMm * 2.0 - materialThicknessMm) <= tolMm;
-                bool radiusMatchesThicknessPlusBend = thicknessPlusBendMm > 0
-                    && Math.Abs(arc.RadiusMm - thicknessPlusBendMm) <= tolMm;
-                bool diameterMatchesThicknessPlusBend = thicknessPlusBendMm > 0
-                    && Math.Abs(arc.RadiusMm * 2.0 - thicknessPlusBendMm) <= tolMm;
-
-                if (radiusMatchesThickness || diameterMatchesThickness || radiusMatchesThicknessPlusBend || diameterMatchesThicknessPlusBend)
+                if (!IsDimensionableProfileArc(arc, materialThicknessMm))
                 {
-                    Debug.WriteLine("[DIM MAT CAT] skip thickness arc radiusMm=" + arc.RadiusMm.ToString("0.###")
-                        + ", thicknessMm=" + materialThicknessMm.ToString("0.###")
-                        + ", thicknessPlus0.1Mm=" + thicknessPlusBendMm.ToString("0.###"));
+                    Debug.WriteLine("[DIM MAT CAT CUNG] skip arc. R="
+                        + (arc == null ? "null" : arc.RadiusMm.ToString("0.###"))
+                        + ", thickness=" + materialThicknessMm.ToString("0.###")
+                        + ", required R>" + limitMm.ToString("0.###"));
                     continue;
                 }
 
                 result.Add(arc);
-                Debug.WriteLine("[DIM MAT CAT] usable arc radiusMm=" + arc.RadiusMm.ToString("0.###")
+                Debug.WriteLine("[DIM MAT CAT CUNG] usable profile arc. R="
+                    + arc.RadiusMm.ToString("0.###")
+                    + ", thickness=" + materialThicknessMm.ToString("0.###")
+                    + ", required R>" + limitMm.ToString("0.###")
                     + ", center=(" + MToMm(arc.CenterX).ToString("0.###")
                     + "," + MToMm(arc.CenterY).ToString("0.###") + ")");
             }
@@ -886,25 +1031,34 @@ namespace ADDIN.Commands
                 return candidates;
 
             List<ArcInfo> usable = FilterUsableFilletArcs(arcs, materialThicknessMm);
-            double largeRadiusMm = Math.Max(20.0, materialThicknessMm * 8.0);
-            double bendRadiusMm = materialThicknessMm > 0.0 ? materialThicknessMm + 0.2 : 0.0;
-            double bendRadiusTolMm = Math.Max(0.08, materialThicknessMm * 0.06);
 
             foreach (ArcInfo arc in usable)
             {
-                if (arc == null || arc.Edge == null || IsFullCircleArc(arc))
+                if (!IsDimensionableProfileArc(arc, materialThicknessMm))
                     continue;
 
-                bool isLargeProfileArc = arc.RadiusMm >= largeRadiusMm
-                    && arc.ArcLengthMm >= 5.0;
-                bool matchesThicknessPlus02 = bendRadiusMm > 0.0
-                    && Math.Abs(arc.RadiusMm - bendRadiusMm) <= bendRadiusTolMm;
-                bool isConnectedBendArc = arc.RadiusMm >= Math.Max(5.0, materialThicknessMm * 3.0)
-                    && arc.ArcLengthMm >= 5.0
-                    && CountConnectedLongLineEnds(arc, edges, materialThicknessMm) >= 2;
+                bool isSelectedProfileArc = selectedArc != null
+                    && FindMatchingArcGeometry(new List<ArcInfo> { arc }, selectedArc) != null;
 
-                if (isLargeProfileArc || matchesThicknessPlus02 || isConnectedBendArc)
+                bool hasParallelContourMate = HasParallelContourArcMate(
+                    arc,
+                    usable,
+                    materialThicknessMm);
+
+                // Cung R hop le nam tren contour co the noi truc tiep hai canh dai.
+                // Khong con dung cac nguong 5 mm / 3*t / t+0.2 vi dieu kien R
+                // da duoc thong nhat tai IsDimensionableProfileArc().
+                bool isConnectedProfileArc = CountConnectedLongLineEnds(
+                    arc,
+                    edges,
+                    materialThicknessMm) >= 2;
+
+                if (isSelectedProfileArc
+                    || hasParallelContourMate
+                    || isConnectedProfileArc)
+                {
                     candidates.Add(arc);
+                }
             }
 
             ArcInfo selectedCandidate = FindMatchingArcGeometry(candidates, selectedArc);
@@ -935,6 +1089,32 @@ namespace ADDIN.Commands
                 + ", selectedInner=" + innerContourArcs.Count
                 + ", thicknessMm=" + materialThicknessMm.ToString("0.###"));
             return innerContourArcs;
+        }
+
+        private bool HasParallelContourArcMate(
+            ArcInfo arc,
+            List<ArcInfo> arcs,
+            double materialThicknessMm)
+        {
+            if (arc == null || arcs == null)
+                return false;
+
+            double radiusGapTolMm = Math.Max(0.25, materialThicknessMm * 0.2);
+            foreach (ArcInfo other in arcs)
+            {
+                if (other == null || ReferenceEquals(other, arc))
+                    continue;
+
+                double radiusGapMm = Math.Abs(other.RadiusMm - arc.RadiusMm);
+                if (materialThicknessMm > 0.0
+                    && Math.Abs(radiusGapMm - materialThicknessMm) > radiusGapTolMm)
+                    continue;
+
+                if (AreParallelArcSegments(arc, other, materialThicknessMm))
+                    return true;
+            }
+
+            return false;
         }
 
         private bool IsFullCircleArc(ArcInfo arc)
@@ -1090,7 +1270,8 @@ namespace ADDIN.Commands
             List<EdgeInfo> edges,
             List<ArcInfo> arcs,
             double materialThicknessMm,
-            ArcInfo selectedArc)
+            ArcInfo selectedArc,
+            EdgeInfo selectedLineSeed)
         {
             List<ArcInfo> referenceArcs = GetCurvedProfileReferenceArcs(
                 arcs,
@@ -1154,56 +1335,423 @@ namespace ADDIN.Commands
                 edges,
                 materialThicknessMm);
 
+            // =============================================================
+            // QUAN TRONG: CO CUNG R KHONG DUOC DOI LOGIC DIM CANH THANG.
+            // Radius/arc-length la thong tin BO SUNG. Kich thuoc canh van phai
+            // dung LOGIC PHU BI CU (vi du L-profile: 35 va 14, khong phai 33 va 12).
+            // =============================================================
             int connectedLineDimensionCount = 0;
+
             if (connectedLines.Count >= 2)
             {
-                connectedLineDimensionCount = AddOrthogonalCurvedChainDimensions(
-                    model,
-                    selectData,
-                    connectedLines,
-                    centerX,
-                    centerY);
+                EdgeInfo legacySeed = selectedLineSeed;
 
-                // Dung lai toan bo logic canh thang cu. Cung bo nho chi noi chuoi,
-                // khong tao dimension rieng. Goc 90 dung envelope; goc khac 90
-                // dung virtual sharp va dimension goc.
-                if (connectedLineDimensionCount == 0)
-                {
-                    connectedLineDimensionCount = AddAngledOuterProfileDimensions(
-                        model,
-                        view,
+                // Sau rebuild, seed user click co the khong nam trong list da duoc
+                // loc tu cung. Neu vay dung 1 line tren dung contour cua cung.
+                if (legacySeed == null || !ContainsMatchingEdgeGeometry(connectedLines, legacySeed))
+                    legacySeed = connectedLines[0];
+
+                connectedLineDimensionCount = AddAngledOuterProfileDimensions(
+                    model,
+                    view,
                     selectData,
                     edges,
                     arcs,
-                    connectedLines[0],
-                    true);
+                    legacySeed,
+                    true,
+                    null,
+                    materialThicknessMm);
+
+                // Safe fallback: giu engine cu cho profile H/V neu contour engine
+                // khong tao duoc dimension. Khong bao gio fallback sang physical
+                // edge length cho truong hop co R, vi no se tao 33/12 thay vi 35/14.
+                if (connectedLineDimensionCount == 0 && legacySeed != null)
+                {
+                    connectedLineDimensionCount = AddSeededSectionDimensions(
+                        model,
+                        selectData,
+                        edges,
+                        legacySeed);
                 }
 
                 count += connectedLineDimensionCount;
-                Debug.WriteLine("[DIM MAT CAT CUNG] straight-chain legacy dimensions="
-                    + connectedLineDimensionCount);
-            }
 
-            if (connectedLineDimensionCount == 0)
-            {
-                HashSet<Edge> dimensionedLines = new HashSet<Edge>();
-                foreach (EdgeInfo edge in connectedLines)
-                {
-                    DimensionPlacement placement = GetOuterPlacement(edge, centerX, centerY);
-                    count += AddEdgeLengthDimension(
-                        model,
-                        selectData,
-                        edge,
-                        placement,
-                        DimOffsetMm,
-                        dimensionedLines);
-                }
+                Debug.WriteLine("[DIM MAT CAT CUNG] legacy outer-envelope dimensions="
+                    + connectedLineDimensionCount
+                    + ", seed=" + EdgeSummary(legacySeed));
             }
 
             Debug.WriteLine("[DIM MAT CAT CUNG] referenceArcs=" + referenceArcs.Count
                 + ", connectedLines=" + connectedLines.Count
                 + ", dimensions=" + count);
             return count;
+        }
+
+        private bool ShouldUseContinuousTangentChain(
+            List<ArcInfo> referenceArcs,
+            List<EdgeInfo> connectedLines,
+            double materialThicknessMm)
+        {
+            if (referenceArcs == null || connectedLines == null
+                || connectedLines.Count < 2 || materialThicknessMm <= 0.0)
+                return false;
+
+            double joinTolerance = MmToViewM(
+                Math.Max(0.2, Math.Min(0.7, materialThicknessMm * 0.3)));
+
+            foreach (ArcInfo arc in referenceArcs)
+            {
+                if (!IsDimensionableProfileArc(arc, materialThicknessMm))
+                    continue;
+
+                EdgeInfo startLine = FindTangentLineAtArcEndpoint(
+                    arc,
+                    true,
+                    connectedLines,
+                    joinTolerance);
+                EdgeInfo endLine = FindTangentLineAtArcEndpoint(
+                    arc,
+                    false,
+                    connectedLines,
+                    joinTolerance);
+
+                if (startLine == null || endLine == null || ReferenceEquals(startLine, endLine))
+                    continue;
+
+                Debug.WriteLine("[DIM MAT CAT CUNG] continuous tangent chain detected. R="
+                    + arc.RadiusMm.ToString("0.###")
+                    + ", thickness=" + materialThicknessMm.ToString("0.###")
+                    + ", start=" + EdgeSummary(startLine)
+                    + ", end=" + EdgeSummary(endLine));
+                return true;
+            }
+
+            return false;
+        }
+
+        private EdgeInfo FindTangentLineAtArcEndpoint(
+            ArcInfo arc,
+            bool useStart,
+            List<EdgeInfo> connectedLines,
+            double joinTolerance)
+        {
+            if (arc == null || connectedLines == null)
+                return null;
+
+            double pointX = useStart ? arc.StartX : arc.EndX;
+            double pointY = useStart ? arc.StartY : arc.EndY;
+            double radialX = pointX - arc.CenterX;
+            double radialY = pointY - arc.CenterY;
+            double radialLength = Math.Sqrt(radialX * radialX + radialY * radialY);
+            if (radialLength <= 0.0000001)
+                return null;
+
+            double tangentX = -radialY / radialLength;
+            double tangentY = radialX / radialLength;
+            EdgeInfo best = null;
+            double bestScore = double.MaxValue;
+
+            foreach (EdgeInfo line in connectedLines)
+            {
+                if (line == null || line.Edge == null)
+                    continue;
+
+                double endpointGap = Math.Min(
+                    Distance2D(pointX, pointY, line.X1, line.Y1),
+                    Distance2D(pointX, pointY, line.X2, line.Y2));
+                if (endpointGap > joinTolerance)
+                    continue;
+
+                double tangentAlignment = Math.Abs(
+                    line.DirX * tangentX + line.DirY * tangentY);
+                if (tangentAlignment < 0.9995)
+                    continue;
+
+                double score = endpointGap + (1.0 - tangentAlignment) * joinTolerance;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = line;
+                }
+            }
+
+            return best;
+        }
+
+        private int AddContinuousTangentChainLineDimensions(
+            ModelDoc2 model,
+            SolidWorks.Interop.sldworks.View view,
+            SelectData selectData,
+            List<EdgeInfo> allEdges,
+            List<ArcInfo> allArcs,
+            List<ArcInfo> referenceArcs,
+            List<EdgeInfo> connectedLines,
+            double materialThicknessMm,
+            double centerX,
+            double centerY)
+        {
+            if (model == null || view == null || selectData == null
+                || allEdges == null || allArcs == null || referenceArcs == null
+                || connectedLines == null || materialThicknessMm <= 0.0)
+                return 0;
+
+            int count = 0;
+            double joinTolerance = MmToViewM(
+                Math.Max(0.2, Math.Min(0.7, materialThicknessMm * 0.3)));
+            List<ArcInfo> continuousArcs = new List<ArcInfo>();
+            List<TangentChainSeed> tangentSeeds = new List<TangentChainSeed>();
+            HashSet<Edge> tangentSeedEdges = new HashSet<Edge>();
+
+            foreach (ArcInfo arc in referenceArcs)
+            {
+                if (!IsDimensionableProfileArc(arc, materialThicknessMm))
+                    continue;
+
+                EdgeInfo startLine = FindTangentLineAtArcEndpoint(
+                    arc, true, connectedLines, joinTolerance);
+                EdgeInfo endLine = FindTangentLineAtArcEndpoint(
+                    arc, false, connectedLines, joinTolerance);
+                if (startLine == null || endLine == null || ReferenceEquals(startLine, endLine))
+                    continue;
+
+                continuousArcs.Add(arc);
+                AddTangentChainSeed(
+                    tangentSeeds,
+                    tangentSeedEdges,
+                    startLine,
+                    arc.StartX,
+                    arc.StartY);
+                AddTangentChainSeed(
+                    tangentSeeds,
+                    tangentSeedEdges,
+                    endLine,
+                    arc.EndX,
+                    arc.EndY);
+            }
+
+            if (continuousArcs.Count == 0 || tangentSeeds.Count < 2)
+                return 0;
+
+            List<ArcInfo> legacyArcs = new List<ArcInfo>();
+            foreach (ArcInfo arc in allArcs)
+            {
+                if (FindMatchingArcGeometry(continuousArcs, arc) == null)
+                    legacyArcs.Add(arc);
+            }
+
+            HashSet<Edge> processedBranchEdges = new HashSet<Edge>();
+            foreach (TangentChainSeed seed in tangentSeeds)
+            {
+                count += AddTangentToOuterEnvelopeDimension(
+                    model,
+                    selectData,
+                    seed,
+                    allEdges,
+                    materialThicknessMm,
+                    centerX,
+                    centerY,
+                    DimOffsetMm);
+
+                List<EdgeInfo> branch = GetSelectedContourCandidateEdges(
+                    allEdges,
+                    legacyArcs,
+                    seed.Line,
+                    true);
+                bool branchAlreadyProcessed = false;
+                foreach (EdgeInfo branchEdge in branch)
+                {
+                    if (branchEdge?.Edge != null && processedBranchEdges.Contains(branchEdge.Edge))
+                    {
+                        branchAlreadyProcessed = true;
+                        break;
+                    }
+                }
+
+                if (branchAlreadyProcessed)
+                    continue;
+
+                foreach (EdgeInfo branchEdge in branch)
+                {
+                    if (branchEdge?.Edge != null)
+                        processedBranchEdges.Add(branchEdge.Edge);
+                }
+
+                if (branch.Count >= 2)
+                {
+                    count += AddAngledOuterProfileDimensions(
+                        model,
+                        view,
+                        selectData,
+                        allEdges,
+                        legacyArcs,
+                        seed.Line,
+                        true,
+                        tangentSeedEdges,
+                        materialThicknessMm);
+                }
+            }
+
+            Debug.WriteLine("[DIM MAT CAT CUNG] continuous tangent/envelope dimensions="
+                + count + ", tangentSeeds=" + tangentSeeds.Count);
+            return count;
+        }
+
+        private void AddTangentChainSeed(
+            List<TangentChainSeed> seeds,
+            HashSet<Edge> seedEdges,
+            EdgeInfo line,
+            double tangentX,
+            double tangentY)
+        {
+            if (seeds == null || seedEdges == null || line == null || line.Edge == null
+                || seedEdges.Contains(line.Edge))
+                return;
+
+            seedEdges.Add(line.Edge);
+            seeds.Add(new TangentChainSeed
+            {
+                Line = line,
+                TangentX = tangentX,
+                TangentY = tangentY
+            });
+        }
+
+        private int AddTangentToOuterEnvelopeDimension(
+            ModelDoc2 model,
+            SelectData selectData,
+            TangentChainSeed seed,
+            List<EdgeInfo> allEdges,
+            double materialThicknessMm,
+            double centerX,
+            double centerY,
+            double offsetMm)
+        {
+            EdgeInfo line = seed?.Line;
+            if (model == null || selectData == null || line == null || line.Edge == null)
+                return 0;
+
+            double startGap = Distance2D(seed.TangentX, seed.TangentY, line.X1, line.Y1);
+            double endGap = Distance2D(seed.TangentX, seed.TangentY, line.X2, line.Y2);
+            bool tangentAtStart = startGap <= endGap;
+            Vertex tangentVertex = tangentAtStart
+                ? line.Edge.GetStartVertex() as Vertex
+                : line.Edge.GetEndVertex() as Vertex;
+            if (tangentVertex == null)
+                return 0;
+
+            double farX = tangentAtStart ? line.X2 : line.X1;
+            double farY = tangentAtStart ? line.Y2 : line.Y1;
+            double directionX = farX - seed.TangentX;
+            double directionY = farY - seed.TangentY;
+            double directionLength = Math.Sqrt(directionX * directionX + directionY * directionY);
+            if (directionLength <= 0.0000001)
+                return 0;
+            directionX /= directionLength;
+            directionY /= directionLength;
+
+            EdgeInfo boundary = null;
+            double boundaryX = farX;
+            double boundaryY = farY;
+            double bestProjection = directionLength;
+            double minimumProjection = directionLength - MmToViewM(
+                Math.Max(1.0, materialThicknessMm * 0.75));
+            double maximumProjection = directionLength + MmToViewM(
+                Math.Max(5.0, materialThicknessMm * 3.0));
+            // O dau xa cua canh tiep tuyen, contour phu bi co the bat dau sau
+            // cung bo nho mot khoang xap xi be day. Dung sai cu (0.75 * t)
+            // loai nham contour ngoai va lam kich thuoc roi ve chieu dai vat ly.
+            double boundaryExtensionTolerance = MmToViewM(
+                Math.Max(2.0, materialThicknessMm * 1.6));
+            double parallelLimit = Math.Cos(5.0 * Math.PI / 180.0);
+
+            foreach (EdgeInfo candidate in allEdges)
+            {
+                if (candidate == null || candidate.Edge == null || candidate == line)
+                    continue;
+
+                double directionDot = Math.Abs(
+                    line.DirX * candidate.DirX + line.DirY * candidate.DirY);
+                if (directionDot >= parallelLimit)
+                    continue;
+
+                double x;
+                double y;
+                if (!TryIntersectLines2D(line, candidate, out x, out y))
+                    continue;
+
+                double projection = (x - seed.TangentX) * directionX
+                    + (y - seed.TangentY) * directionY;
+                if (projection < minimumProjection || projection > maximumProjection)
+                    continue;
+
+                double candidateExtension = DistancePointToSegment(
+                    x, y,
+                    candidate.X1, candidate.Y1,
+                    candidate.X2, candidate.Y2);
+                if (candidateExtension > boundaryExtensionTolerance)
+                    continue;
+
+                if (boundary == null || projection > bestProjection)
+                {
+                    boundary = candidate;
+                    boundaryX = x;
+                    boundaryY = y;
+                    bestProjection = projection;
+                }
+            }
+
+            if (boundary == null)
+            {
+                Vertex farVertex = tangentAtStart
+                    ? line.Edge.GetEndVertex() as Vertex
+                    : line.Edge.GetStartVertex() as Vertex;
+                if (farVertex == null)
+                    return 0;
+
+                int fallback = line.IsAngled
+                    ? AddReferenceToReferenceDimension(
+                        model, selectData,
+                        tangentVertex, farVertex,
+                        line,
+                        seed.TangentX, seed.TangentY,
+                        farX, farY,
+                        centerX, centerY,
+                        offsetMm)
+                    : AddProjectedReferenceDimension(
+                        model, selectData,
+                        tangentVertex, farVertex,
+                        seed.TangentX, seed.TangentY,
+                        farX, farY,
+                        centerX, centerY,
+                        offsetMm);
+                Debug.WriteLine("[DIM MAT CAT CUNG] tangent line fallback physical="
+                    + line.LengthMm.ToString("0.###") + ", added=" + fallback);
+                return fallback;
+            }
+
+            int added = line.IsAngled
+                ? AddReferenceToReferenceDimension(
+                    model, selectData,
+                    tangentVertex, boundary.Edge,
+                    line,
+                    seed.TangentX, seed.TangentY,
+                    boundaryX, boundaryY,
+                    centerX, centerY,
+                    offsetMm)
+                : AddProjectedReferenceDimension(
+                    model, selectData,
+                    tangentVertex, boundary.Edge,
+                    seed.TangentX, seed.TangentY,
+                    boundaryX, boundaryY,
+                    centerX, centerY,
+                    offsetMm);
+
+            Debug.WriteLine("[DIM MAT CAT CUNG] tangent-to-envelope target="
+                + (bestProjection * 1000.0 / viewScale).ToString("0.###")
+                + ", physical=" + line.LengthMm.ToString("0.###")
+                + ", boundary=" + EdgeSummary(boundary)
+                + ", added=" + added);
+            return added;
         }
 
         private int AddOrthogonalCurvedChainDimensions(
@@ -1314,15 +1862,10 @@ namespace ADDIN.Commands
 
         private bool ShouldAddArcLengthDimension(ArcInfo arc, double materialThicknessMm)
         {
-            if (arc == null || arc.ArcLengthMm <= 0.0)
-                return false;
-
-            double bendRadiusMm = materialThicknessMm > 0.0 ? materialThicknessMm + 0.2 : 0.0;
-            double bendRadiusTolMm = Math.Max(0.08, materialThicknessMm * 0.06);
-            bool matchesThicknessPlus02 = bendRadiusMm > 0.0
-                && Math.Abs(arc.RadiusMm - bendRadiusMm) <= bendRadiusTolMm;
-            bool isLargeArc = arc.RadiusMm >= Math.Max(20.0, materialThicknessMm * 8.0);
-            return matchesThicknessPlus02 || isLargeArc;
+            // Lop bao ve thu hai: chi them arc-length khi chinh cung nay
+            // thoa R > thickness + 0.1.
+            return IsDimensionableProfileArc(arc, materialThicknessMm)
+                && arc.ArcLengthMm > 0.0;
         }
 
         private int AddRadiusDimensionForArc(
@@ -2507,7 +3050,9 @@ namespace ADDIN.Commands
             List<EdgeInfo> edges,
             List<ArcInfo> arcs,
             EdgeInfo selectedContourSeed,
-            bool allowTwoEdgeContour = false)
+            bool allowTwoEdgeContour = false,
+            HashSet<Edge> skipDimensionEdges = null,
+            double knownThicknessMm = 0.0)
         {
             if (model == null || view == null || selectData == null || edges == null || edges.Count == 0)
                 return 0;
@@ -2563,6 +3108,15 @@ namespace ADDIN.Commands
 
             foreach (EdgeInfo edge in contourEdges)
             {
+                if (edge?.Edge != null
+                    && skipDimensionEdges != null
+                    && skipDimensionEdges.Contains(edge.Edge))
+                {
+                    Debug.WriteLine("[DIM MAT CAT CUNG] skip tangent seed in legacy envelope. edge="
+                        + EdgeSummary(edge));
+                    continue;
+                }
+
                 OuterProfileJoint startJoint = FindJointForEdgeSlot(joints, edge, 0);
                 OuterProfileJoint endJoint = FindJointForEdgeSlot(joints, edge, 1);
                 int edgeDimensionCount = 0;
@@ -2597,72 +3151,72 @@ namespace ADDIN.Commands
 
                     if (edgeDimensionCount == 0)
                     {
-                    OuterProfileJoint boundaryJoint = startJoint.DimensionBoundaryEdge != null
-                        ? startJoint
-                        : (endJoint.DimensionBoundaryEdge != null ? endJoint : null);
-                    OuterProfileJoint pointJoint = boundaryJoint == startJoint
-                        ? endJoint
-                        : startJoint;
+                        OuterProfileJoint boundaryJoint = startJoint.DimensionBoundaryEdge != null
+                            ? startJoint
+                            : (endJoint.DimensionBoundaryEdge != null ? endJoint : null);
+                        OuterProfileJoint pointJoint = boundaryJoint == startJoint
+                            ? endJoint
+                            : startJoint;
 
-                    if (edge.IsAngled && boundaryJoint != null && pointJoint?.Sharp != null)
-                    {
-                        double boundaryX = boundaryJoint.X;
-                        double boundaryY = boundaryJoint.Y;
-                        TryIntersectLines2D(
-                            edge,
-                            boundaryJoint.DimensionBoundaryEdge,
-                            out boundaryX,
-                            out boundaryY);
+                        if (edge.IsAngled && boundaryJoint != null && pointJoint?.Sharp != null)
+                        {
+                            double boundaryX = boundaryJoint.X;
+                            double boundaryY = boundaryJoint.Y;
+                            TryIntersectLines2D(
+                                edge,
+                                boundaryJoint.DimensionBoundaryEdge,
+                                out boundaryX,
+                                out boundaryY);
 
-                        edgeDimensionCount = AddProjectedReferenceDimension(
-                            model,
-                            selectData,
-                            pointJoint.Sharp.Point,
-                            boundaryJoint.DimensionBoundaryEdge.Edge,
-                            pointJoint.X,
-                            pointJoint.Y,
-                            boundaryX,
-                            boundaryY,
-                            centerX,
-                            centerY,
-                            DimOffsetMm);
+                            edgeDimensionCount = AddProjectedReferenceDimension(
+                                model,
+                                selectData,
+                                pointJoint.Sharp.Point,
+                                boundaryJoint.DimensionBoundaryEdge.Edge,
+                                pointJoint.X,
+                                pointJoint.Y,
+                                boundaryX,
+                                boundaryY,
+                                centerX,
+                                centerY,
+                                DimOffsetMm);
 
-                        Debug.WriteLine("[DIM MAT CAT] added point-to-contour projected dim. pointJoint=("
-                            + MToMm(pointJoint.X).ToString("0.###")
-                            + "," + MToMm(pointJoint.Y).ToString("0.###") + ")"
-                            + ", boundary=" + EdgeSummary(boundaryJoint.DimensionBoundaryEdge)
-                            + ", boundaryPoint=(" + MToMm(boundaryX).ToString("0.###")
-                            + "," + MToMm(boundaryY).ToString("0.###") + ")");
-                    }
-                    else
-                    {
-                        edgeDimensionCount = edge.IsAngled && hasAcuteJoint
-                        ? AddProjectedReferenceDimension(
-                            model,
-                            selectData,
-                            startJoint.Sharp.Point,
-                            endJoint.Sharp.Point,
-                            startJoint.X,
-                            startJoint.Y,
-                            endJoint.X,
-                            endJoint.Y,
-                            centerX,
-                            centerY,
-                            DimOffsetMm)
-                        : AddReferenceToReferenceDimension(
-                            model,
-                            selectData,
-                            startJoint.Sharp.Point,
-                            endJoint.Sharp.Point,
-                            edge,
-                            startJoint.X,
-                            startJoint.Y,
-                            endJoint.X,
-                            endJoint.Y,
-                            centerX,
-                            centerY,
-                            DimOffsetMm);
-                    }
+                            Debug.WriteLine("[DIM MAT CAT] added point-to-contour projected dim. pointJoint=("
+                                + MToMm(pointJoint.X).ToString("0.###")
+                                + "," + MToMm(pointJoint.Y).ToString("0.###") + ")"
+                                + ", boundary=" + EdgeSummary(boundaryJoint.DimensionBoundaryEdge)
+                                + ", boundaryPoint=(" + MToMm(boundaryX).ToString("0.###")
+                                + "," + MToMm(boundaryY).ToString("0.###") + ")");
+                        }
+                        else
+                        {
+                            edgeDimensionCount = edge.IsAngled && hasAcuteJoint
+                            ? AddProjectedReferenceDimension(
+                                model,
+                                selectData,
+                                startJoint.Sharp.Point,
+                                endJoint.Sharp.Point,
+                                startJoint.X,
+                                startJoint.Y,
+                                endJoint.X,
+                                endJoint.Y,
+                                centerX,
+                                centerY,
+                                DimOffsetMm)
+                            : AddReferenceToReferenceDimension(
+                                model,
+                                selectData,
+                                startJoint.Sharp.Point,
+                                endJoint.Sharp.Point,
+                                edge,
+                                startJoint.X,
+                                startJoint.Y,
+                                endJoint.X,
+                                endJoint.Y,
+                                centerX,
+                                centerY,
+                                DimOffsetMm);
+                        }
                     }
                 }
                 else if (edgeDimensionCount == 0)
@@ -2824,6 +3378,7 @@ namespace ADDIN.Commands
                     EdgeInfo preferredJointBoundary = terminalJoint != null
                         ? GetOtherJointEdge(terminalJoint, edge)
                         : null;
+
                     edgeDimensionCount = AddPairAroundEdge(
                         model,
                         selectData,
@@ -2832,7 +3387,8 @@ namespace ADDIN.Commands
                         offsetMm,
                         edges,
                         dimensionedPairs,
-                        preferredJointBoundary);
+                        preferredJointBoundary,
+                        knownThicknessMm);
                 }
 
                 if (edgeDimensionCount == 0)
@@ -4900,7 +5456,8 @@ namespace ADDIN.Commands
             double offsetMm,
             List<EdgeInfo> edges,
             HashSet<string> dimensionedPairs,
-            EdgeInfo preferredJointBoundary = null)
+            EdgeInfo preferredJointBoundary = null,
+            double knownThicknessMm = 0.0)
         {
             if (reference == null || edges == null || edges.Count == 0)
                 return 0;
@@ -4938,12 +5495,12 @@ namespace ADDIN.Commands
             if (!found && reference.IsHorizontal)
             {
                 found = TryFindOuterVerticalPairForHorizontal(
-                    reference, edges, out first, out second);
+                    reference, edges, out first, out second, knownThicknessMm);
             }
             else if (!found && reference.IsVertical)
             {
                 found = TryFindOuterHorizontalPairForVertical(
-                    reference, edges, out first, out second);
+                    reference, edges, out first, out second, knownThicknessMm);
             }
             else if (!found)
             {
@@ -5175,7 +5732,8 @@ namespace ADDIN.Commands
             EdgeInfo horizontal,
             List<EdgeInfo> edges,
             out EdgeInfo left,
-            out EdgeInfo right)
+            out EdgeInfo right,
+            double knownThicknessMm = 0.0)
         {
             left = null;
             right = null;
@@ -5228,12 +5786,14 @@ namespace ADDIN.Commands
                 return false;
             }
 
-            double centerX;
-            double centerY;
-            GetEdgeBoundsCenter(edges, out centerX, out centerY);
-
-            left = ExpandToOuterParallelMate(rawLeft, edges, centerX, centerY);
-            right = ExpandToOuterParallelMate(rawRight, edges, centerX, centerY);
+            // Dung cuc bo theo huong phu bi cua kich thuoc ngang.
+            // Canh trai lay mate ngoai cung ben trai, canh phai lay mate
+            // ngoai cung ben phai. Khong dung tam toan bo Drawing View vi
+            // bien dang gap nguoc co the lam mat ngoai nam gan tam hon.
+            left = ExpandVerticalToLocalExtreme(
+                rawLeft, edges, false, knownThicknessMm);
+            right = ExpandVerticalToLocalExtreme(
+                rawRight, edges, true, knownThicknessMm);
 
             if (left == null || right == null)
                 return false;
@@ -5261,11 +5821,77 @@ namespace ADDIN.Commands
             return true;
         }
 
+        private EdgeInfo ExpandVerticalToLocalExtreme(
+            EdgeInfo edge,
+            List<EdgeInfo> edges,
+            bool chooseRight,
+            double knownThicknessMm = 0.0)
+        {
+            if (edge == null || edges == null || !edge.IsVertical)
+                return edge;
+
+            double thicknessMm = knownThicknessMm > 0.001
+                ? knownThicknessMm
+                : EstimateMaterialThicknessMm(edges);
+            if (thicknessMm <= 0.001)
+                return edge;
+
+            bool useKnownThickness = knownThicknessMm > 0.001;
+            double thicknessView = MmToViewM(thicknessMm);
+            double thicknessTol = MmToViewM(Math.Max(0.35, thicknessMm * 0.35));
+            double minOverlap = MmToViewM(Math.Max(0.8, thicknessMm * 0.35));
+            double minimumKnownGap = thicknessView * 0.45;
+            double maximumKnownGap = thicknessView * 1.75;
+            EdgeInfo extreme = edge;
+
+            foreach (EdgeInfo candidate in edges)
+            {
+                if (candidate == null || candidate == edge || !candidate.IsVertical)
+                    continue;
+
+                double gap = Math.Abs(candidate.MidX - edge.MidX);
+                if (useKnownThickness)
+                {
+                    // Voi nhanh cung lon, be day da duoc xac dinh tu cap contour.
+                    // Canh mate o goc bo co the bi cat ngan nen khoang cach sheet
+                    // khong bang dung t. Chi nhan cap cuc bo trong vung be day.
+                    if (gap < minimumKnownGap || gap > maximumKnownGap)
+                        continue;
+                }
+                else if (Math.Abs(gap - thicknessView) > thicknessTol)
+                {
+                    continue;
+                }
+
+                double overlap = OverlapLength(
+                    edge.MinY, edge.MaxY,
+                    candidate.MinY, candidate.MaxY);
+                if (overlap < minOverlap)
+                    continue;
+
+                if ((chooseRight && candidate.MidX > extreme.MidX + MmToViewM(0.05))
+                    || (!chooseRight && candidate.MidX < extreme.MidX - MmToViewM(0.05)))
+                    extreme = candidate;
+            }
+
+            if (!IsSameEdgeGeometry(edge, extreme))
+            {
+                Debug.WriteLine("[DIM MAT CAT] expand vertical to local "
+                    + (chooseRight ? "right" : "left")
+                    + ". from=" + EdgeSummary(edge)
+                    + ", to=" + EdgeSummary(extreme)
+                    + ", thicknessMm=" + thicknessMm.ToString("0.###"));
+            }
+
+            return extreme;
+        }
+
         private bool TryFindOuterHorizontalPairForVertical(
             EdgeInfo vertical,
             List<EdgeInfo> edges,
             out EdgeInfo bottom,
-            out EdgeInfo top)
+            out EdgeInfo top,
+            double knownThicknessMm = 0.0)
         {
             bottom = null;
             top = null;
@@ -5318,12 +5944,13 @@ namespace ADDIN.Commands
                 return false;
             }
 
-            double centerX;
-            double centerY;
-            GetEdgeBoundsCenter(edges, out centerX, out centerY);
-
-            bottom = ExpandToOuterParallelMate(rawBottom, edges, centerX, centerY);
-            top = ExpandToOuterParallelMate(rawTop, edges, centerX, centerY);
+            // Voi return dang chu U, mat ngoai phia tren co the nam gan tam
+            // toan bo view hon mat trong. Vi vay khong dung OuterScore theo tam
+            // global. Chon cuc bo: bottom co Y nho nhat, top co Y lon nhat.
+            bottom = ExpandHorizontalToLocalExtreme(
+                rawBottom, edges, false, knownThicknessMm);
+            top = ExpandHorizontalToLocalExtreme(
+                rawTop, edges, true, knownThicknessMm);
 
             if (bottom == null || top == null)
                 return false;
@@ -5349,6 +5976,68 @@ namespace ADDIN.Commands
                 + ", value=" + valueMm.ToString("0.###"));
 
             return true;
+        }
+
+        private EdgeInfo ExpandHorizontalToLocalExtreme(
+            EdgeInfo edge,
+            List<EdgeInfo> edges,
+            bool chooseTop,
+            double knownThicknessMm = 0.0)
+        {
+            if (edge == null || edges == null || !edge.IsHorizontal)
+                return edge;
+
+            double thicknessMm = knownThicknessMm > 0.001
+                ? knownThicknessMm
+                : EstimateMaterialThicknessMm(edges);
+            if (thicknessMm <= 0.001)
+                return edge;
+
+            bool useKnownThickness = knownThicknessMm > 0.001;
+            double thicknessView = MmToViewM(thicknessMm);
+            double thicknessTol = MmToViewM(Math.Max(0.35, thicknessMm * 0.35));
+            double minOverlap = MmToViewM(Math.Max(0.8, thicknessMm * 0.35));
+            double minimumKnownGap = thicknessView * 0.45;
+            double maximumKnownGap = thicknessView * 1.75;
+            EdgeInfo extreme = edge;
+
+            foreach (EdgeInfo candidate in edges)
+            {
+                if (candidate == null || candidate == edge || !candidate.IsHorizontal)
+                    continue;
+
+                double gap = Math.Abs(candidate.MidY - edge.MidY);
+                if (useKnownThickness)
+                {
+                    if (gap < minimumKnownGap || gap > maximumKnownGap)
+                        continue;
+                }
+                else if (Math.Abs(gap - thicknessView) > thicknessTol)
+                {
+                    continue;
+                }
+
+                double overlap = OverlapLength(
+                    edge.MinX, edge.MaxX,
+                    candidate.MinX, candidate.MaxX);
+                if (overlap < minOverlap)
+                    continue;
+
+                if ((chooseTop && candidate.MidY > extreme.MidY + MmToViewM(0.05))
+                    || (!chooseTop && candidate.MidY < extreme.MidY - MmToViewM(0.05)))
+                    extreme = candidate;
+            }
+
+            if (!IsSameEdgeGeometry(edge, extreme))
+            {
+                Debug.WriteLine("[DIM MAT CAT] expand horizontal to local "
+                    + (chooseTop ? "top" : "bottom")
+                    + ". from=" + EdgeSummary(edge)
+                    + ", to=" + EdgeSummary(extreme)
+                    + ", thicknessMm=" + thicknessMm.ToString("0.###"));
+            }
+
+            return extreme;
         }
 
         private EdgeInfo ExpandToOuterParallelMate(
@@ -6152,6 +6841,13 @@ namespace ADDIN.Commands
             public double RadiusMm;
             public double ArcLengthMm;
             public double SweepAngleRad;
+        }
+
+        private class TangentChainSeed
+        {
+            public EdgeInfo Line;
+            public double TangentX;
+            public double TangentY;
         }
 
         private class VirtualCornerInfo

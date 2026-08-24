@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Drawing;
@@ -8,14 +8,27 @@ using SolidWorks.Interop.swpublished;
 
 namespace ADDIN
 {
+    [Guid("B1C7F4B2-9A1E-4B5C-B234-A1B2C3D4E5F7")]
+    [ComVisible(true)]
+    public interface ISwAddinTestFacade
+    {
+        string RunMirrorPackageSelfTest(string manifestPathOrJson);
+    }
+
     [Guid("D1C7F4B2-9A1E-4B5C-B234-A1B2C3D4E5F6")]
     [ComVisible(true)]
-    public class SwAddin : ISwAddin
+    [ClassInterface(ClassInterfaceType.AutoDual)]
+    public class SwAddin : ISwAddin, ISwAddinTestFacade
     {
         public ISldWorks swApp;
         private int addinID;
         private ITaskpaneView swTaskPane;
         private BomTaskPaneControl uiControl;
+
+        public string RunMirrorPackageSelfTest(string manifestPathOrJson)
+        {
+            return Commands.CreateMirrorPartPackage.RunSelfTest(swApp, manifestPathOrJson);
+        }
 
         public bool ConnectToSW(object ThisSW, int cookie)
         {

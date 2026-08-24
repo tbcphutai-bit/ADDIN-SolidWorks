@@ -79,6 +79,26 @@ namespace ADDIN.Properties {
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap CheckHole3D {
+            get {
+                object obj = ResourceManager.GetObject("CheckHole3D", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap MirrorPart3D {
+            get {
+                object obj = ResourceManager.GetObject("MirrorPart3D", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
@@ -126,6 +146,16 @@ namespace ADDIN.Properties {
         internal static System.Drawing.Bitmap MakeHole {
             get {
                 object obj = ResourceManager.GetObject("MakeHole", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap RepairHole {
+            get {
+                object obj = ResourceManager.GetObject("RepairHole", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

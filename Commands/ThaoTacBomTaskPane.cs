@@ -1,5 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
 
@@ -19,6 +22,8 @@ namespace ADDIN.Commands
         private HashSet<int> pendingCheckboxRows;
         private bool cancelRequested;
         private bool checkInProgress;
+        private KetQuaSoSanhDfTk cachedDfTkResult;
+        private string cachedDfTkSignature;
 
         public ThaoTacBomTaskPane(
             ISldWorks app,
@@ -42,13 +47,16 @@ namespace ADDIN.Commands
         {
             gridBom.MultiSelect = true;
             gridBom.SelectionMode = DataGridViewSelectionMode.CellSelect;
+            ConfigureGridForContext(BomCommandContext.None);
             ResetProgress();
             AutoFitBomGrid();
         }
 
-        public void LoadBom()
+        public void LoadBom(Func<bool> isCancellationRequested = null)
         {
+            InvalidateDfTkCache();
             LoadedBomContext = BomCommandContext.None;
+            ConfigureGridForContext(BomCommandContext.None);
             if (bomLoader == null)
             {
                 lblStatus.Text = "Chua ket noi SOLIDWORKS.";
@@ -64,11 +72,30 @@ namespace ADDIN.Commands
             }
 
             LoadedBomContext = bomLoader.GetBomCommandContext(swTable);
-            bomLoader.LoadBOMTableToGrid(gridBom, swTable);
-            AutoFitBomGrid();
-            chkSelectAll.Checked = true;
-            SetAllChecked(true);
-            SortGridByBuhinNoAscending();
+            ConfigureGridForContext(LoadedBomContext);
+
+            // Avoid measuring and repainting every row while COM data is loaded.
+            gridBom.SuspendLayout();
+            gridBom.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            gridBom.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
+            try
+            {
+                bomLoader.LoadBOMTableToGrid(gridBom, swTable, isCancellationRequested);
+                if (isCancellationRequested != null && isCancellationRequested())
+                {
+                    lblStatus.Text = "Da huy CAP NHAT BOM.";
+                    return;
+                }
+
+                chkSelectAll.Checked = true;
+                SetAllChecked(true);
+                SortGridByBuhinNoAscending();
+            }
+            finally
+            {
+                gridBom.ResumeLayout(false);
+                AutoFitBomGrid();
+            }
 
             string bomLabel = LoadedBomContext == BomCommandContext.Unit
                 ? "BOM UNIT"
@@ -111,9 +138,27 @@ namespace ADDIN.Commands
 
         public void ClearBom()
         {
+            InvalidateDfTkCache();
             bomLoader?.ClearBomGrid(gridBom);
             LoadedBomContext = BomCommandContext.None;
+            ConfigureGridForContext(BomCommandContext.None);
+            AutoFitBomGrid();
             lblStatus.Text = "Da xoa BOM";
+        }
+
+        private void ConfigureGridForContext(BomCommandContext context)
+        {
+            if (gridBom == null || gridBom.Columns.Count < 6)
+                return;
+
+            bool isUnit = context == BomCommandContext.Unit;
+            gridBom.Columns[1].HeaderText = "部品番号";
+            gridBom.Columns[2].HeaderText = isUnit ? "合番" : "材質";
+            gridBom.Columns[2].Visible = true;
+            gridBom.Columns[3].HeaderText = "板厚";
+            gridBom.Columns[3].Visible = !isUnit;
+            gridBom.Columns[4].HeaderText = "数量";
+            gridBom.Columns[5].HeaderText = "部品ファイル名";
         }
 
         public void SetAllChecked(bool isChecked)
@@ -140,7 +185,17 @@ namespace ADDIN.Commands
             if (rowIndex < 0 || columnIndex != 0)
                 return;
 
-            pendingCheckboxRows = GetSelectedRowIndexes();
+            bool modifierSelectionRequested =
+                (Control.ModifierKeys & (Keys.Control | Keys.Shift)) != Keys.None;
+            bool selectedRegionExists =
+                gridBom.SelectedCells.Count > 1 || gridBom.SelectedRows.Count > 1;
+
+            // A normal click must affect only the checkbox under the mouse.
+            // A highlighted region, or Ctrl/Shift, intentionally applies the
+            // checkbox value to every row represented by the selection.
+            pendingCheckboxRows = modifierSelectionRequested || selectedRegionExists
+                ? GetSelectedRowIndexes()
+                : new HashSet<int>();
             pendingCheckboxRows.Add(rowIndex);
         }
 
@@ -203,18 +258,18 @@ namespace ADDIN.Commands
                 gridBom.Columns[i].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
 
             gridBom.Columns[1].FillWeight = 120;
-            gridBom.Columns[2].FillWeight = 80;
+            gridBom.Columns[2].FillWeight = LoadedBomContext == BomCommandContext.Unit ? 100 : 80;
             gridBom.Columns[3].FillWeight = 60;
             gridBom.Columns[4].FillWeight = 60;
             gridBom.Columns[5].FillWeight = 180;
         }
 
-        public void CheckDfTk()
+        public bool CheckDfTk()
         {
             if (swApp == null)
             {
                 lblStatus.Text = "Chua ket noi SOLIDWORKS.";
-                return;
+                return false;
             }
 
             cancelRequested = false;
@@ -224,6 +279,7 @@ namespace ADDIN.Commands
             {
                 ChaySoSanhDfTk runner = new ChaySoSanhDfTk(swApp, gridBom);
                 result = runner.Run(BeginProgress, UpdateProgress, IsCancelRequested);
+                StoreDfTkCache(result);
             }
             finally
             {
@@ -235,6 +291,7 @@ namespace ADDIN.Commands
             HighlightRows(result.HighlightRowIndexes);
             AutoFitBomGrid();
             ShowCheckResult(result);
+            return result != null && !result.Canceled && result.CheckedCount > 0;
         }
 
         public void CheckUraOmote()
@@ -294,13 +351,282 @@ namespace ADDIN.Commands
             ShowKegakiResult(result);
         }
 
+        public void CheckRound()
+        {
+            if (swApp == null)
+            {
+                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                return;
+            }
+
+            cancelRequested = false;
+            checkInProgress = true;
+            RoundHoleCheckResult result = null;
+            try
+            {
+                CheckRoundRunner runner = new CheckRoundRunner(swApp, gridBom);
+                result = runner.Run(BeginProgress, UpdateProgress, IsCancelRequested);
+            }
+            finally
+            {
+                checkInProgress = false;
+                FinishProgress();
+            }
+
+            if (result == null)
+                return;
+
+            int alignedPreviewCount = RoundHolePreviewDrawingAligner.AlignToActiveDrawing(
+                swApp,
+                result.Results);
+            System.Diagnostics.Debug.WriteLine(
+                "[CHECK ROUND] Preview Drawing View aligned=" + alignedPreviewCount);
+            HighlightRows(result.HighlightRowIndexes);
+            AutoFitBomGrid();
+            ShowRoundResult(result);
+        }
+
+        public void CheckSamePart(SamePartToleranceOptions toleranceOptions)
+        {
+            if (swApp == null)
+            {
+                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                return;
+            }
+
+            if (toleranceOptions == null)
+                toleranceOptions = new SamePartToleranceOptions();
+
+            string excelOutputDirectory = GetActiveSolidWorksDocumentDirectory();
+            cancelRequested = false;
+            checkInProgress = true;
+            SamePartCheckResult result = null;
+            try
+            {
+                CheckSamePartRunner runner = new CheckSamePartRunner(
+                    swApp,
+                    gridBom,
+                    toleranceOptions);
+                result = runner.Run(BeginProgress, UpdateProgress, IsCancelRequested);
+            }
+            finally
+            {
+                checkInProgress = false;
+                FinishProgress();
+            }
+
+            if (result == null)
+                return;
+
+            HighlightRows(result.HighlightRowIndexes);
+            AutoFitBomGrid();
+            ShowSamePartResult(result, excelOutputDirectory);
+        }
+
+        public void CheckAll(CombinedCheckOptions options)
+        {
+            if (swApp == null)
+            {
+                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                return;
+            }
+            if (options == null)
+                options = CombinedCheckOptions.All();
+            // DF/TK is an independent command and is never part of this combined check.
+            options.CheckDfTk = false;
+            if (!options.HasSelection)
+                return;
+
+            cancelRequested = false;
+            checkInProgress = true;
+            CombinedCheckResult combined = new CombinedCheckResult();
+            int totalSteps = options.SelectedCount;
+            int currentStep = 0;
+            try
+            {
+                if (options.CheckUraOmote && !combined.Canceled && !IsCancelRequested())
+                {
+                    currentStep++;
+                    lblStatus.Text = "CHECK URA/KEGAKI " + currentStep + "/" + totalSteps
+                        + ": dang kiem tra \u30A6\u30E9\u8868...";
+                    combined.UraOmote = new CheckUraOmoteRunner(swApp, gridBom)
+                        .Run(BeginProgress, UpdateProgress, IsCancelRequested);
+                }
+
+                if (options.CheckKegaki && !combined.Canceled && !IsCancelRequested())
+                {
+                    currentStep++;
+                    lblStatus.Text = "CHECK URA/KEGAKI " + currentStep + "/" + totalSteps
+                        + ": dang kiem tra KEGAKI...";
+                    combined.Kegaki = new CheckKegakiRunner(swApp, gridBom)
+                        .Run(BeginProgress, UpdateProgress, IsCancelRequested);
+                }
+            }
+            finally
+            {
+                checkInProgress = false;
+                FinishProgress();
+            }
+
+            HighlightCombinedRows(combined);
+            AutoFitBomGrid();
+
+            if (combined.Canceled || IsCancelRequested())
+            {
+                lblStatus.Text = "Da huy CHECK URA/KEGAKI.";
+                return;
+            }
+
+            int checkedCount = 0;
+            if (combined.DfTk != null)
+                checkedCount = Math.Max(checkedCount, combined.DfTk.CheckedCount);
+            if (combined.UraOmote != null)
+                checkedCount = Math.Max(checkedCount, combined.UraOmote.CheckedCount);
+            if (combined.Kegaki != null)
+                checkedCount = Math.Max(checkedCount, combined.Kegaki.CheckedCount);
+            if (checkedCount == 0)
+            {
+                lblStatus.Text = "Chua chon chi tiet nao de CHECK URA/KEGAKI.";
+                return;
+            }
+
+            ExcelCombinedCheckExporter.Export(combined, gridBom);
+            lblStatus.Text = "CHECK URA/KEGAKI xong. Da xuat Excel gom "
+                + (totalSteps + 1) + " sheet.";
+        }
+
+        public void InvalidateDfTkCache()
+        {
+            cachedDfTkResult = null;
+            cachedDfTkSignature = null;
+        }
+
+        private void StoreDfTkCache(KetQuaSoSanhDfTk result)
+        {
+            if (result == null || result.Canceled || result.CheckedCount <= 0)
+            {
+                InvalidateDfTkCache();
+                return;
+            }
+
+            cachedDfTkResult = result;
+            cachedDfTkSignature = BuildDfTkCacheSignature();
+            System.Diagnostics.Debug.WriteLine(
+                "[CHECK DF/TK] Saved session cache. checked=" + result.CheckedCount
+                + ", signature=" + cachedDfTkSignature);
+        }
+
+        private bool TryGetCachedDfTkResult(out KetQuaSoSanhDfTk result)
+        {
+            result = null;
+            if (cachedDfTkResult == null || string.IsNullOrEmpty(cachedDfTkSignature))
+                return false;
+
+            string currentSignature = BuildDfTkCacheSignature();
+            if (!string.Equals(cachedDfTkSignature, currentSignature, StringComparison.Ordinal))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[CHECK DF/TK] Session cache is stale. old=" + cachedDfTkSignature
+                    + ", new=" + currentSignature);
+                InvalidateDfTkCache();
+                return false;
+            }
+
+            result = cachedDfTkResult;
+            System.Diagnostics.Debug.WriteLine(
+                "[CHECK DF/TK] Reuse session cache. checked=" + result.CheckedCount);
+            return true;
+        }
+
+        private string BuildDfTkCacheSignature()
+        {
+            StringBuilder signature = new StringBuilder();
+            signature.Append((int)LoadedBomContext).Append('|');
+
+            foreach (DataGridViewRow row in gridBom.Rows)
+            {
+                if (row.IsNewRow || !Convert.ToBoolean(row.Cells[0].Value ?? false))
+                    continue;
+
+                signature.Append(row.Index).Append(':');
+                signature.Append(Convert.ToString(row.Cells[1].Value ?? "").Trim()).Append(':');
+                signature.Append(Convert.ToString(row.Cells[5].Value ?? "").Trim()).Append(':');
+                AppendDfTkSourceSignature(signature, row.Tag);
+                signature.Append('|');
+            }
+
+            return signature.ToString();
+        }
+
+        private void AppendDfTkSourceSignature(StringBuilder signature, object source)
+        {
+            object[] sources = source as object[];
+            if (sources != null)
+            {
+                foreach (object item in sources)
+                {
+                    AppendDfTkSourceSignature(signature, item);
+                    signature.Append(';');
+                }
+                return;
+            }
+
+            Component2 component = source as Component2;
+            if (component != null)
+            {
+                string path = "";
+                string configuration = "";
+                try { path = component.GetPathName() ?? ""; } catch { }
+                try { configuration = component.ReferencedConfiguration ?? ""; } catch { }
+                AppendDfTkPathSignature(signature, path);
+                signature.Append('@').Append(configuration);
+                return;
+            }
+
+            AppendDfTkPathSignature(signature, source as string);
+        }
+
+        private void AppendDfTkPathSignature(StringBuilder signature, string path)
+        {
+            string normalizedPath = (path ?? "").Trim().ToUpperInvariant();
+            signature.Append(normalizedPath);
+
+            if (normalizedPath.Length == 0)
+                return;
+
+            try
+            {
+                if (File.Exists(path))
+                    signature.Append('#').Append(File.GetLastWriteTimeUtc(path).Ticks);
+            }
+            catch
+            {
+            }
+        }
+
+        private void HighlightCombinedRows(CombinedCheckResult result)
+        {
+            if (result == null)
+                return;
+
+            if (result.DfTk != null)
+            {
+                HighlightRowsForResults(result.DfTk.DiffResults);
+                HighlightRows(result.DfTk.HighlightRowIndexes);
+            }
+            if (result.UraOmote != null)
+                HighlightRows(result.UraOmote.HighlightRowIndexes);
+            if (result.Kegaki != null)
+                HighlightRows(result.Kegaki.HighlightRowIndexes);
+        }
+
         public void RequestCancel()
         {
             if (!checkInProgress)
                 return;
 
             cancelRequested = true;
-            lblStatus.Text = "Dang huy CHECK DF/TK...";
+            lblStatus.Text = "Dang huy lenh kiem tra...";
             Application.DoEvents();
         }
 
@@ -468,6 +794,125 @@ namespace ADDIN.Commands
                 + ", NG: " + ngCount
                 + ", CHECK: " + checkCount
                 + ", bo qua: " + result.SkippedCount;
+        }
+
+        private void ShowRoundResult(RoundHoleCheckResult result)
+        {
+            if (result == null)
+            {
+                lblStatus.Text = "Khong co ket qua CHECK ROUND.";
+                return;
+            }
+
+            if (result.Canceled)
+            {
+                lblStatus.Text = "Da huy CHECK ROUND. Da xu ly: "
+                    + result.ProcessedCount + "/" + result.CheckedCount;
+                return;
+            }
+
+            if (result.CheckedCount == 0)
+            {
+                lblStatus.Text = "Chua chon chi tiet nao de CHECK ROUND.";
+                return;
+            }
+
+            int previewCount = RoundHolePreviewForm.ShowPreview(result.Results);
+            int exportedCount = ExcelRoundHoleExporter.Export(result.Results);
+            RoundHolePreviewForm.BringLatestToFront();
+            string message = "CHECK ROUND xong. Lo tron: " + result.RoundHoleCount
+                + ", lo dai: " + result.SlotHoleCount
+                + ", NG: " + result.NgCount
+                + ", CHECK: " + result.CheckCount
+                + ", bo qua: " + result.SkippedCount + ".";
+
+            if (previewCount > 0)
+                message += " Da mo preview 2D cho " + previewCount + " chi tiet.";
+            else if (result.NgCount + result.CheckCount > 0)
+                message += " Khong tao duoc preview 2D cho ket qua nay.";
+
+            if (exportedCount > 0)
+                message += " Da xuat Excel " + exportedCount + " dong can kiem tra.";
+            else
+                message += " Khong co lo bat thuong de xuat Excel.";
+
+            lblStatus.Text = message;
+            MessageBox.Show(
+                message,
+                "CHECK ROUND",
+                MessageBoxButtons.OK,
+                result.NgCount > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+        }
+
+        private string GetActiveSolidWorksDocumentDirectory()
+        {
+            try
+            {
+                ModelDoc2 activeDocument = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+                string documentPath = activeDocument == null ? "" : activeDocument.GetPathName();
+                if (!string.IsNullOrWhiteSpace(documentPath))
+                    return Path.GetDirectoryName(documentPath);
+            }
+            catch
+            {
+            }
+
+            return "";
+        }
+
+        private void ShowSamePartResult(SamePartCheckResult result, string excelOutputDirectory)
+        {
+            if (result == null)
+            {
+                lblStatus.Text = "Khong co ket qua CHECK SAME PART.";
+                return;
+            }
+
+            if (result.Canceled)
+            {
+                lblStatus.Text = "Da huy CHECK SAME PART. Da xu ly: "
+                    + result.ProcessedCount + "/" + result.CheckedCount;
+                return;
+            }
+
+            if (result.CheckedCount == 0)
+            {
+                lblStatus.Text = "Chua chon chi tiet nao de CHECK SAME PART.";
+                return;
+            }
+
+            string exportedPath;
+            int exportedCount = ExcelSamePartExporter.Export(
+                result,
+                excelOutputDirectory,
+                out exportedPath);
+            int sameFull = result.Groups.Count(group => group.Status == "SAME FULL");
+            int sameGeometry = result.Groups.Count(group => group.Status == "SAME GEOMETRY");
+            int sameFlat = result.Groups.Count(group => group.Status == "SAME FLAT");
+            int mirrorCheck = result.Groups.Count(group => group.Status == "CHECK MIRROR");
+            string message = "CHECK SAME PART xong. Nhom trung hoan toan: " + sameFull
+                + ", trung hinh hoc: " + sameGeometry
+                + ", chi trung Flat-Pattern: " + sameFlat
+                + ", mirror/can doi chieu: " + mirrorCheck
+                + ", can kiem tra: " + result.Errors.Count + ".";
+
+            if (exportedCount > 0)
+            {
+                message += " Da xuat Excel " + exportedCount + " dong.";
+                if (!string.IsNullOrWhiteSpace(exportedPath))
+                    message += " File: " + exportedPath;
+            }
+            else
+                message += " Khong tim thay nhom chi tiet giong nhau.";
+            if (!string.IsNullOrWhiteSpace(result.DebugLogPath))
+                message += " Debug: " + result.DebugLogPath;
+
+            lblStatus.Text = message;
+            MessageBox.Show(
+                message,
+                "CHECK SAME PART",
+                MessageBoxButtons.OK,
+                result.Errors.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
         }
 
         private void WriteCheckDebugResult(KetQuaSoSanhDfTk result)

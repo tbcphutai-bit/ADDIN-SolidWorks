@@ -100,9 +100,11 @@ namespace ADDIN.Commands
         {
             ModelDoc2 model = null;
             bool undoStarted = false;
+            string stage = "Khoi tao";
 
             try
             {
+                stage = "Lay Drawing";
                 model = swApp?.ActiveDoc as ModelDoc2;
                 if (model == null ||
                     model.GetType() != (int)swDocumentTypes_e.swDocDRAWING)
@@ -119,18 +121,32 @@ namespace ADDIN.Commands
                     return;
                 }
 
-                MathUtility mathUtil = swApp?.IGetMathUtility();
-                MathTransform viewTransform = view.ModelToViewTransform;
-                if (mathUtil == null || viewTransform == null)
-                    return;
+                string selectedViewName = SafeViewName(view);
 
-                DebugFeatureTreeFromView(view);
-
+                stage = "Bat dau Undo";
                 model.Extension.StartRecordingUndoObject();
                 undoStarted = true;
 
-                DeleteHoleDimensionsInView(model, view);
+                stage = "Xoa kich thuoc lo cu";
+                int deletedCount = DeleteHoleDimensionsInView(model, selectedViewName, view);
+                Debug.WriteLine("[DIM HOLE] deleted old annotations=" + deletedCount);
 
+                // EditDelete co the lam COM proxy cua View va Transform cu bi mat ket noi.
+                // Luon lay lai View tu Drawing sau khi xoa, khong tai su dung proxy cu.
+                stage = "Lay lai Drawing View";
+                view = FindDrawingViewByName(model, selectedViewName);
+                if (view == null)
+                    throw new InvalidOperationException("Khong lay lai duoc Drawing View sau khi xoa kich thuoc cu.");
+
+                stage = "Lay transform moi";
+                MathUtility mathUtil = swApp?.IGetMathUtility();
+                MathTransform viewTransform = view.ModelToViewTransform;
+                if (mathUtil == null || viewTransform == null)
+                    throw new InvalidOperationException("Khong lay duoc ModelToViewTransform moi.");
+
+                DebugFeatureTreeFromView(view);
+
+                stage = "Doc hinh hoc lo";
                 List<LineInfo> contours = CollectVisibleLineEdges(view, mathUtil, viewTransform);
                 List<HoleInfo> holes = CollectVisibleHoles(view, mathUtil, viewTransform);
                 List<HoleGroup> holeGroups = GroupPatternHoles(holes);
@@ -183,7 +199,7 @@ namespace ADDIN.Commands
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "Loi khi dim kich thuoc lo:" + System.Environment.NewLine + ex.Message,
+                    "Loi khi dim kich thuoc lo tai buoc: " + stage + System.Environment.NewLine + ex.Message,
                     "Dim kich thuoc lo",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -191,7 +207,16 @@ namespace ADDIN.Commands
             finally
             {
                 if (undoStarted && model != null)
-                    model.Extension.FinishRecordingUndoObject("Dim kich thuoc lo");
+                {
+                    try
+                    {
+                        model.Extension.FinishRecordingUndoObject("Dim kich thuoc lo");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DIM HOLE] Finish undo failed: " + ex.Message);
+                    }
+                }
             }
         }
 
@@ -216,27 +241,135 @@ namespace ADDIN.Commands
             return null;
         }
 
-        private void DeleteHoleDimensionsInView(ModelDoc2 drawingModel, SolidWorks.Interop.sldworks.View view)
+        private int DeleteHoleDimensionsInView(
+            ModelDoc2 drawingModel,
+            string viewName,
+            SolidWorks.Interop.sldworks.View initialView)
         {
-            Array annotations = view.GetAnnotations() as Array;
-            if (annotations == null)
-                return;
+            int deletedCount = 0;
+            SolidWorks.Interop.sldworks.View currentView = initialView;
 
-            foreach (object item in annotations)
+            // Moi lan chi xoa mot annotation, sau do lay lai View va danh sach
+            // annotation moi. Khong giu COM object da bi EditDelete lam invalid.
+            for (int pass = 0; pass < 4096; pass++)
             {
-                Annotation annotation = item as Annotation;
-                if (annotation == null)
-                    continue;
+                if (pass > 0 || currentView == null)
+                    currentView = FindDrawingViewByName(drawingModel, viewName);
+                if (currentView == null)
+                    break;
 
-                if (!IsManagedHoleCenterMark(annotation) && !IsHoleRelatedDimension(annotation))
+                Array annotations;
+                try
+                {
+                    annotations = currentView.GetAnnotations() as Array;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[DIM HOLE] GetAnnotations failed: " + ex.Message);
+                    currentView = null;
                     continue;
+                }
+
+                if (annotations == null || annotations.Length == 0)
+                    break;
+
+                Annotation target = null;
+                foreach (object item in annotations)
+                {
+                    Annotation annotation = item as Annotation;
+                    if (annotation == null)
+                        continue;
+
+                    try
+                    {
+                        // Chi xoa doi tuong kich thuoc. Note, Text, Balloon va
+                        // center mark phai duoc giu nguyen khi chay lai lenh.
+                        if (IsHoleRelatedDimension(annotation))
+                        {
+                            target = annotation;
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DIM HOLE] Skip disconnected annotation: " + ex.Message);
+                    }
+                }
+
+                if (target == null)
+                    break;
 
                 drawingModel.ClearSelection2(true);
-                if (annotation.Select3(false, null))
-                    drawingModel.EditDelete();
+                bool selected = false;
+                try
+                {
+                    selected = target.Select3(false, null);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[DIM HOLE] Select old annotation failed: " + ex.Message);
+                }
+
+                if (!selected)
+                    break;
+
+                drawingModel.EditDelete();
+                deletedCount++;
+                drawingModel.ClearSelection2(true);
+                currentView = null;
             }
 
             drawingModel.ClearSelection2(true);
+            return deletedCount;
+        }
+
+        private string SafeViewName(SolidWorks.Interop.sldworks.View view)
+        {
+            try
+            {
+                return view?.Name ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private SolidWorks.Interop.sldworks.View FindDrawingViewByName(
+            ModelDoc2 drawingModel,
+            string viewName)
+        {
+            DrawingDoc drawing = drawingModel as DrawingDoc;
+            if (drawing == null || string.IsNullOrWhiteSpace(viewName))
+                return null;
+
+            SolidWorks.Interop.sldworks.View current = null;
+            try
+            {
+                current = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+            }
+            catch
+            {
+                return null;
+            }
+
+            while (current != null)
+            {
+                string currentName = SafeViewName(current);
+                if (string.Equals(currentName, viewName, StringComparison.OrdinalIgnoreCase))
+                    return current;
+
+                try
+                {
+                    current = current.GetNextView() as SolidWorks.Interop.sldworks.View;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            return null;
         }
 
         private bool IsManagedHoleCenterMark(Annotation annotation)
@@ -257,7 +390,7 @@ namespace ADDIN.Commands
             DisplayDimension displayDimension =
                 annotation.GetSpecificAnnotation() as DisplayDimension;
             if (displayDimension == null)
-                return HasAttachedCircularEntity(annotation) || LooksLikeHoleCalloutText(annotation);
+                return false;
 
             int dimensionType = displayDimension.GetType();
             if (dimensionType == (int)swDimensionType_e.swDiameterDimension ||
@@ -1906,24 +2039,33 @@ namespace ADDIN.Commands
                 double x = layout.CalloutX;
                 double y = layout.CalloutY;
 
-                DrawingDoc drawing = model as DrawingDoc;
                 object result = null;
-                if (drawing != null)
+                if (!hole.IsSlot)
                 {
-                    try
-                    {
-                        result = drawing.AddHoleCallout2(x, y, 0);
-                        if (hole.IsSlot)
-                            TrySimplifySlotHoleCallout(result as DisplayDimension, hole);
-                    }
-                    catch
-                    {
-                        result = null;
-                    }
-                }
-
-                if (result == null)
+                    // Lo tron chi can kich thuoc duong kinh lien ket voi canh tron.
+                    // Khong dung Hole Callout vi SOLIDWORKS se tu them so luong
+                    // pattern va thong tin chieu sau nhu "Next surface".
                     result = model.AddDiameterDimension2(x, y, 0);
+                }
+                else
+                {
+                    DrawingDoc drawing = model as DrawingDoc;
+                    if (drawing != null)
+                    {
+                        try
+                        {
+                            result = drawing.AddHoleCallout2(x, y, 0);
+                            TrySimplifySlotHoleCallout(result as DisplayDimension, hole);
+                        }
+                        catch
+                        {
+                            result = null;
+                        }
+                    }
+
+                    if (result == null)
+                        result = model.AddDiameterDimension2(x, y, 0);
+                }
 
                 return result != null;
             }

@@ -18,6 +18,14 @@ namespace ADDIN.Commands
     public class BomLoader
     {
         private readonly ISldWorks swApp;
+        private readonly HashSet<string> silentlyOpenedDocumentPaths =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> componentPropertyCache =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> assemblyPathCache =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private Func<bool> cancellationRequested;
+        private BomCommandContext activeBomContext = BomCommandContext.Detail;
 
         public BomLoader(ISldWorks app)
         {
@@ -165,10 +173,22 @@ namespace ADDIN.Commands
             return null;
         }
 
-        public void LoadBOMTableToGrid(DataGridView gridBom, ITableAnnotation swTable)
+        public void LoadBOMTableToGrid(DataGridView gridBom, ITableAnnotation swTable,
+            Func<bool> isCancellationRequested = null)
         {
             if (gridBom == null || swTable == null)
                 return;
+
+            CloseSilentlyOpenedDocuments();
+            componentPropertyCache.Clear();
+            assemblyPathCache.Clear();
+            ModelDoc2 originalDocument = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+            Func<bool> previousCancellation = cancellationRequested;
+            cancellationRequested = isCancellationRequested;
+            activeBomContext = GetBomCommandContext(swTable);
+
+            try
+            {
 
             gridBom.Rows.Clear();
             gridBom.AllowUserToAddRows = false;
@@ -177,6 +197,7 @@ namespace ADDIN.Commands
             int buhinNoCol = FindColumnIndex(swTable, "部品番号");
             int materialCol = FindColumnIndex(swTable, "材質");
             int thicknessCol = FindColumnIndex(swTable, "板厚");
+            int gobanCol = FindColumnIndex(swTable, "合番");
             int qtyCol = FindColumnIndex(swTable, "数量");
             int fileNameCol = FindColumnIndex(swTable, "部品ﾌｧｲﾙ名");
             if (fileNameCol < 0)
@@ -188,21 +209,54 @@ namespace ADDIN.Commands
 
             for (int r = 1; r < swTable.RowCount; r++)
             {
+                if ((r % 10) == 0)
+                    Application.DoEvents();
+                if (IsCancellationRequested())
+                    break;
                 string fileName = GetCellText(swTable, r, fileNameCol);
+                string bomBuhinNo = GetCellText(swTable, r, buhinNoCol);
 
                 int rowIndex = gridBom.Rows.Add(
                     false,
-                    GetCellText(swTable, r, buhinNoCol),
-                    GetCellText(swTable, r, materialCol),
-                    GetCellText(swTable, r, thicknessCol),
+                    bomBuhinNo,
+                    activeBomContext == BomCommandContext.Unit
+                        ? GetCellText(swTable, r, gobanCol)
+                        : GetCellText(swTable, r, materialCol),
+                    activeBomContext == BomCommandContext.Unit
+                        ? ""
+                        : GetCellText(swTable, r, thicknessCol),
                     GetCellText(swTable, r, qtyCol),
                     fileName
                 );
 
-                object[] rowComponents = SaveComponentPathToRowTag(gridBom, swTable, r, rowIndex);
-                string componentBuhinNo = GetComponentCustomProperty(rowComponents, "部品番号");
-                if (!string.IsNullOrWhiteSpace(componentBuhinNo))
-                    gridBom.Rows[rowIndex].Cells[1].Value = componentBuhinNo;
+                object[] rowComponents = SaveComponentPathToRowTag(
+                    gridBom,
+                    swTable,
+                    r,
+                    rowIndex,
+                    fileName,
+                    searchDirectories);
+                // The BOM value is already resolved by SOLIDWORKS. Opening every
+                // component again only to read the same property is very costly.
+                if (string.IsNullOrWhiteSpace(bomBuhinNo))
+                {
+                    string componentBuhinNo = GetComponentCustomProperty(rowComponents, "部品番号");
+                    if (!string.IsNullOrWhiteSpace(componentBuhinNo))
+                        gridBom.Rows[rowIndex].Cells[1].Value = componentBuhinNo;
+                }
+
+                if (activeBomContext == BomCommandContext.Unit
+                    && string.IsNullOrWhiteSpace(Convert.ToString(gridBom.Rows[rowIndex].Cells[2].Value)))
+                {
+                    string componentGoban = GetComponentCustomProperty(rowComponents, "合番");
+                    if (!string.IsNullOrWhiteSpace(componentGoban))
+                        gridBom.Rows[rowIndex].Cells[2].Value = componentGoban;
+                }
+
+                // Only BOM UNIT needs recursive assembly enrichment. A detail BOM
+                // already contains its component rows, so this scan is redundant.
+                if (activeBomContext != BomCommandContext.Unit)
+                    continue;
 
                 string assemblyPath = FindAssemblyPathByFileName(fileName, searchDirectories);
                 if (!IsAssemblyPath(assemblyPath))
@@ -215,9 +269,29 @@ namespace ADDIN.Commands
 
             HashSet<string> traversedAssemblyPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string assemblyPath in bomAssemblyPathsToScan)
+            {
+                Application.DoEvents();
+                if (IsCancellationRequested())
+                    break;
                 AddSubAssemblyRowsFromBomAssembly(gridBom, assemblyPath, rowAssemblyPaths, traversedAssemblyPaths);
+            }
 
             Debug.WriteLine("[BOM LOAD] final grid rows=" + gridBom.Rows.Count + ", bomAssembliesToScan=" + bomAssemblyPathsToScan.Count);
+            }
+            finally
+            {
+                CloseSilentlyOpenedDocuments();
+                if (originalDocument != null)
+                {
+                    try
+                    {
+                        int activateErrors = 0;
+                        swApp.ActivateDoc3(originalDocument.GetTitle(), false, 0, ref activateErrors);
+                    }
+                    catch { }
+                }
+                cancellationRequested = previousCancellation;
+            }
         }
 
         private int FindColumnIndex(ITableAnnotation table, string headerName)
@@ -245,27 +319,91 @@ namespace ADDIN.Commands
             DataGridView gridBom,
             ITableAnnotation swTable,
             int tableRow,
-            int gridRow)
+            int gridRow,
+            string fileName,
+            List<string> searchDirectories)
+        {
+            IBomTableAnnotation bomTable = swTable as IBomTableAnnotation;
+            if (bomTable == null)
+                return null;
+
+            try
+            {
+                object[] comps = bomTable.GetComponents2(tableRow, "") as object[];
+
+                if (comps != null && comps.Length > 0)
+                {
+                    gridBom.Rows[gridRow].Tag = comps;
+                    return comps;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[BOM LOAD] GetComponents2 failed row=" + tableRow
+                    + ", error=" + ex.Message);
+            }
+
+            string fallbackPartPath = GetBomRowPartPath(bomTable, tableRow);
+            string fallbackSource = "model path";
+            if (string.IsNullOrWhiteSpace(fallbackPartPath))
+            {
+                fallbackPartPath = FindPartPathByFileName(fileName, searchDirectories);
+                fallbackSource = "file name";
+            }
+
+            if (!string.IsNullOrWhiteSpace(fallbackPartPath))
+            {
+                gridBom.Rows[gridRow].Tag = fallbackPartPath;
+                Debug.WriteLine(
+                    "[BOM LOAD] use " + fallbackSource + " fallback row=" + tableRow
+                    + ", path=" + fallbackPartPath);
+            }
+            else
+            {
+                Debug.WriteLine(
+                    "[BOM LOAD] no component or model path row=" + tableRow);
+            }
+
+            return null;
+        }
+
+        private string GetBomRowPartPath(
+            IBomTableAnnotation bomTable,
+            int tableRow)
         {
             try
             {
-                IBomTableAnnotation bomTable = swTable as IBomTableAnnotation;
+                string itemNumber;
+                string partNumber;
+                Array paths = bomTable.GetModelPathNames(
+                    tableRow,
+                    out itemNumber,
+                    out partNumber) as Array;
 
-                if (bomTable == null)
-                    return null;
+                if (paths == null)
+                    return "";
 
-                object[] comps = bomTable.GetComponents2(tableRow, "") as object[];
-
-                if (comps == null || comps.Length == 0)
-                    return null;
-
-                gridBom.Rows[gridRow].Tag = comps;
-                return comps;
+                foreach (object pathObject in paths)
+                {
+                    string path = Convert.ToString(pathObject ?? "");
+                    if (string.Equals(
+                        Path.GetExtension(path),
+                        ".SLDPRT",
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        return path;
+                    }
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                Debug.WriteLine(
+                    "[BOM LOAD] GetModelPathNames failed row=" + tableRow
+                    + ", error=" + ex.Message);
             }
+
+            return "";
         }
 
         private List<string> GetAssemblySearchDirectories(ITableAnnotation swTable)
@@ -341,6 +479,9 @@ namespace ADDIN.Commands
                 baseName = cleanedName;
 
             string assemblyFileName = baseName + ".SLDASM";
+            string cachedPath;
+            if (assemblyPathCache.TryGetValue(assemblyFileName, out cachedPath))
+                return cachedPath;
 
             if (searchDirectories != null)
             {
@@ -351,25 +492,54 @@ namespace ADDIN.Commands
                     {
                         string path = Path.GetFullPath(directPath);
                         Debug.WriteLine("[BOM LOAD] BOM assembly resolved=" + path);
+                        assemblyPathCache[assemblyFileName] = path;
                         return path;
                     }
                 }
+            }
 
-                foreach (string directory in searchDirectories)
+            assemblyPathCache[assemblyFileName] = "";
+            return "";
+        }
+
+        private string FindPartPathByFileName(string fileName, List<string> searchDirectories)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return "";
+
+            string cleanedName = fileName.Trim();
+            if (string.Equals(
+                    Path.GetExtension(cleanedName),
+                    ".SLDPRT",
+                    StringComparison.OrdinalIgnoreCase)
+                && Path.IsPathRooted(cleanedName)
+                && File.Exists(cleanedName))
+            {
+                return Path.GetFullPath(cleanedName);
+            }
+
+            string baseName = Path.GetFileNameWithoutExtension(cleanedName);
+            if (string.IsNullOrWhiteSpace(baseName))
+                baseName = cleanedName;
+
+            string partFileName = baseName + ".SLDPRT";
+            if (searchDirectories == null)
+                return "";
+
+            foreach (string directory in searchDirectories)
+            {
+                try
                 {
-                    try
-                    {
-                        string[] matches = Directory.GetFiles(directory, assemblyFileName, SearchOption.TopDirectoryOnly);
-                        if (matches != null && matches.Length > 0)
-                        {
-                            string path = Path.GetFullPath(matches[0]);
-                            Debug.WriteLine("[BOM LOAD] BOM assembly searched=" + path);
-                            return path;
-                        }
-                    }
-                    catch
-                    {
-                    }
+                    string directPath = Path.Combine(directory, partFileName);
+                    if (!File.Exists(directPath))
+                        continue;
+
+                    string path = Path.GetFullPath(directPath);
+                    Debug.WriteLine("[BOM LOAD] BOM part resolved by file name=" + path);
+                    return path;
+                }
+                catch
+                {
                 }
             }
 
@@ -440,11 +610,14 @@ namespace ADDIN.Commands
             int childIndex = 0;
             foreach (object item in children)
             {
+                Application.DoEvents();
+                if (IsCancellationRequested())
+                    return;
                 childIndex++;
                 Component2 child = item as Component2;
                 if (child == null)
                 {
-                    Debug.WriteLine("[BOM LOAD][DBG] child[" + childIndex + "] parent=" + Path.GetFileNameWithoutExtension(assemblyPath) + ", not Component2");
+                    DebugBomVerbose("[BOM LOAD][DBG] child[" + childIndex + "] parent=" + Path.GetFileNameWithoutExtension(assemblyPath) + ", not Component2");
                     continue;
                 }
 
@@ -457,17 +630,18 @@ namespace ADDIN.Commands
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine("[BOM LOAD][DBG] child[" + childIndex + "] parent=" + Path.GetFileNameWithoutExtension(assemblyPath) + ", name=" + childName + ", GetPathName failed=" + ex.Message);
+                    DebugBomVerbose("[BOM LOAD][DBG] child[" + childIndex + "] parent=" + Path.GetFileNameWithoutExtension(assemblyPath) + ", name=" + childName + ", GetPathName failed=" + ex.Message);
                 }
 
                 bool isAssembly = IsAssemblyPath(childPath);
                 bool isEnvelope = IsEnvelopeComponent(child);
                 bool excludeFromBom = IsExcludeFromBomComponent(child);
-                Debug.WriteLine("[BOM LOAD][DBG] child[" + childIndex + "] parent=" + Path.GetFileNameWithoutExtension(assemblyPath) + ", name=" + childName + ", suppressed=" + suppressed + ", envelope=" + isEnvelope + ", excludeFromBom=" + excludeFromBom + ", isAssembly=" + isAssembly + ", path=" + childPath);
+                DebugBomVerbose("[BOM LOAD][DBG] child[" + childIndex + "] parent=" + Path.GetFileNameWithoutExtension(assemblyPath) + ", name=" + childName + ", suppressed=" + suppressed + ", envelope=" + isEnvelope + ", excludeFromBom=" + excludeFromBom + ", isAssembly=" + isAssembly + ", path=" + childPath);
 
-                if (isEnvelope || excludeFromBom)
+                if (suppressed || isEnvelope || excludeFromBom)
                 {
-                    Debug.WriteLine("[BOM LOAD] skip envelope/exclude BOM component=" + childName + ", path=" + childPath);
+                    Debug.WriteLine("[BOM LOAD] skip suppressed/envelope/exclude BOM component="
+                        + childName + ", suppressed=" + suppressed + ", path=" + childPath);
                     continue;
                 }
 
@@ -478,7 +652,7 @@ namespace ADDIN.Commands
                 if (childModel == null)
                     childModel = OpenAssembly(childPath);
                 if (childModel == null)
-                    Debug.WriteLine("[BOM LOAD][DBG] child assembly model null path=" + childPath);
+                    DebugBomVerbose("[BOM LOAD][DBG] child assembly model null path=" + childPath);
 
                 if (!rowAssemblyPaths.Contains(childPath))
                 {
@@ -499,16 +673,35 @@ namespace ADDIN.Commands
                 return null;
             }
 
-            ResolveAssemblyLightweight(assembly, path);
-
-            object[] children = assembly.GetComponents(true) as object[];
+            object[] children = null;
+            try
+            {
+                ConfigurationManager manager = model.ConfigurationManager as ConfigurationManager;
+                Configuration configuration = manager == null
+                    ? null : manager.ActiveConfiguration as Configuration;
+                Component2 root = configuration == null
+                    ? null : configuration.GetRootComponent3(true) as Component2;
+                children = root == null ? null : root.GetChildren() as object[];
+                Debug.WriteLine("[BOM LOAD] configuration tree="
+                    + (configuration == null ? "" : configuration.Name)
+                    + ", path=" + path + ", count=" + (children == null ? 0 : children.Length));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[BOM LOAD] configuration tree failed path=" + path
+                    + ", error=" + ex.Message);
+            }
+            if (children == null)
+                children = assembly.GetComponents(true) as object[];
             Debug.WriteLine("[BOM LOAD] GetComponents(true top) path=" + path + ", count=" + (children == null ? 0 : children.Length));
 
-            object[] flatChildren = assembly.GetComponents(false) as object[];
-            Debug.WriteLine("[BOM LOAD][DBG] GetComponents(false flat) path=" + path + ", count=" + (flatChildren == null ? 0 : flatChildren.Length));
-
-            if (flatChildren != null && flatChildren.Length > 0)
-                return flatChildren;
+            if (children == null || children.Length == 0)
+            {
+                ResolveAssemblyLightweight(assembly, path);
+                children = assembly.GetComponents(true) as object[];
+                Debug.WriteLine("[BOM LOAD] GetComponents(true retry) path=" + path
+                    + ", count=" + (children == null ? 0 : children.Length));
+            }
 
             return children;
         }
@@ -636,6 +829,9 @@ namespace ADDIN.Commands
         {
             if (gridBom == null || component == null)
                 return;
+            Application.DoEvents();
+            if (IsCancellationRequested())
+                return;
 
             if (IsSuppressed(component))
             {
@@ -684,11 +880,18 @@ namespace ADDIN.Commands
             string path,
             HashSet<string> rowModelPaths)
         {
+            string secondaryValue = activeBomContext == BomCommandContext.Unit
+                ? GetComponentCustomProperty(component, model, "合番")
+                : GetCustomProperty(model, "材質");
+            string thicknessValue = activeBomContext == BomCommandContext.Unit
+                ? ""
+                : GetCustomProperty(model, "板厚");
+
             int rowIndex = gridBom.Rows.Add(
                 true,
                 GetComponentCustomProperty(component, model, "部品番号"),
-                GetCustomProperty(model, "材質"),
-                GetCustomProperty(model, "板厚"),
+                secondaryValue,
+                thicknessValue,
                 "1",
                 Path.GetFileNameWithoutExtension(path)
             );
@@ -707,8 +910,6 @@ namespace ADDIN.Commands
                 return null;
             }
 
-            ResolveAssemblyLightweight(assembly, path);
-
             object[] children = assembly.GetComponents(false) as object[];
             Debug.WriteLine("[BOM LOAD] GetComponents(false) path=" + path + ", count=" + (children == null ? 0 : children.Length));
             if (children != null && children.Length > 0)
@@ -716,6 +917,12 @@ namespace ADDIN.Commands
 
             children = assembly.GetComponents(true) as object[];
             Debug.WriteLine("[BOM LOAD] GetComponents(true) path=" + path + ", count=" + (children == null ? 0 : children.Length));
+            if (children != null && children.Length > 0)
+                return children;
+
+            ResolveAssemblyLightweight(assembly, path);
+            children = assembly.GetComponents(false) as object[];
+            Debug.WriteLine("[BOM LOAD] GetComponents(false retry) path=" + path + ", count=" + (children == null ? 0 : children.Length));
             return children;
         }
 
@@ -734,14 +941,20 @@ namespace ADDIN.Commands
 
         private bool IsSuppressed(Component2 component)
         {
+            if (component == null)
+                return true;
             try
             {
-                return component.IsSuppressed();
+                return component.GetSuppression2()
+                    == (int)swComponentSuppressionState_e.swComponentSuppressed;
             }
-            catch
+            catch { }
+            try
             {
-                return true;
+                return component.GetSuppression()
+                    == (int)swComponentSuppressionState_e.swComponentSuppressed;
             }
+            catch { return false; }
         }
 
         private bool IsEnvelopeComponent(Component2 component)
@@ -822,13 +1035,16 @@ namespace ADDIN.Commands
                 swApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocASSEMBLY);
                 restoreVisibility = true;
 
-                return swApp.OpenDoc6(
+                ModelDoc2 opened = swApp.OpenDoc6(
                     assemblyPath,
                     (int)swDocumentTypes_e.swDocASSEMBLY,
                     (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
                     "",
                     ref errors,
                     ref warnings) as ModelDoc2;
+                if (opened != null)
+                    silentlyOpenedDocumentPaths.Add(assemblyPath);
+                return opened;
             }
             finally
             {
@@ -851,13 +1067,16 @@ namespace ADDIN.Commands
                 swApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
                 restoreVisibility = true;
 
-                return swApp.OpenDoc6(
+                ModelDoc2 opened = swApp.OpenDoc6(
                     partPath,
                     (int)swDocumentTypes_e.swDocPART,
                     (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
                     "",
                     ref errors,
                     ref warnings) as ModelDoc2;
+                if (opened != null)
+                    silentlyOpenedDocumentPaths.Add(partPath);
+                return opened;
             }
             finally
             {
@@ -899,6 +1118,8 @@ namespace ADDIN.Commands
 
             foreach (object item in components)
             {
+                if (IsCancellationRequested())
+                    return "";
                 Component2 component = item as Component2;
                 if (component == null)
                     continue;
@@ -916,17 +1137,25 @@ namespace ADDIN.Commands
             ModelDoc2 model = knownModel;
             string referencedConfiguration = "";
             string path = "";
-            bool openedForProperty = false;
 
             try
             {
                 if (component != null)
                 {
                     referencedConfiguration = component.ReferencedConfiguration ?? "";
-                    if (model == null)
-                        model = component.GetModelDoc2() as ModelDoc2;
                     path = component.GetPathName();
                 }
+
+                string cacheKey = (path ?? "").Trim().ToUpperInvariant() + "|"
+                    + (referencedConfiguration ?? "").Trim().ToUpperInvariant() + "|"
+                    + (propertyName ?? "").Trim().ToUpperInvariant();
+                string cachedValue;
+                if (!string.IsNullOrWhiteSpace(path)
+                    && componentPropertyCache.TryGetValue(cacheKey, out cachedValue))
+                    return cachedValue;
+
+                if (component != null && model == null)
+                    model = component.GetModelDoc2() as ModelDoc2;
 
                 if (model == null && !string.IsNullOrWhiteSpace(path))
                 {
@@ -934,7 +1163,6 @@ namespace ADDIN.Commands
                     if (model == null)
                     {
                         model = IsAssemblyPath(path) ? OpenAssembly(path) : OpenPart(path);
-                        openedForProperty = model != null;
                     }
                 }
 
@@ -942,24 +1170,52 @@ namespace ADDIN.Commands
                 if (string.IsNullOrWhiteSpace(value))
                     value = GetCustomProperty(model, "", propertyName);
 
+                if (!string.IsNullOrWhiteSpace(path))
+                    componentPropertyCache[cacheKey] = value ?? "";
+
                 return value;
             }
             catch
             {
                 return "";
             }
-            finally
+        }
+
+        [Conditional("BOM_LOAD_VERBOSE")]
+        private static void DebugBomVerbose(string message)
+        {
+            Debug.WriteLine(message);
+        }
+
+        private void CloseSilentlyOpenedDocuments()
+        {
+            if (swApp == null || silentlyOpenedDocumentPaths.Count == 0)
+                return;
+
+            List<string> paths = new List<string>(silentlyOpenedDocumentPaths);
+            paths.Reverse();
+            foreach (string path in paths)
             {
-                if (openedForProperty && model != null)
+                try
                 {
-                    try
-                    {
-                        swApp.CloseDoc(model.GetTitle());
-                    }
-                    catch
-                    {
-                    }
+                    ModelDoc2 document = swApp.GetOpenDocumentByName(path) as ModelDoc2;
+                    if (document != null)
+                        swApp.CloseDoc(document.GetTitle());
                 }
+                catch { }
+            }
+            silentlyOpenedDocumentPaths.Clear();
+        }
+
+        private bool IsCancellationRequested()
+        {
+            try
+            {
+                return cancellationRequested != null && cancellationRequested();
+            }
+            catch
+            {
+                return false;
             }
         }
 

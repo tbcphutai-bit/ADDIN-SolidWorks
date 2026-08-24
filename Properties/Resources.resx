@@ -124,6 +124,12 @@
   <data name="CountHole" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Images\counthole.png;System.Drawing.Bitmap, System.Drawing</value>
   </data>
+  <data name="CheckHole3D" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\checkhole3d.png;System.Drawing.Bitmap, System.Drawing</value>
+  </data>
+  <data name="MirrorPart3D" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\mirrorpart3d.png;System.Drawing.Bitmap, System.Drawing</value>
+  </data>
   <data name="DimVang" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Images\dimvang.png;System.Drawing.Bitmap, System.Drawing</value>
   </data>
@@ -135,6 +141,9 @@
   </data>
   <data name="MakeHole" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Images\makehole.png;System.Drawing.Bitmap, System.Drawing</value>
+  </data>
+  <data name="RepairHole" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\repairhole.png;System.Drawing.Bitmap, System.Drawing</value>
   </data>
   <data name="DimMatCat" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Images\DimMatCat.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>

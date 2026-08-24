@@ -22,7 +22,8 @@ namespace ADDIN.Commands
             DataGridView gridBom,
             Action<int> beginProgress,
             Action<int, int> updateProgress,
-            Action finishProgress)
+            Action finishProgress,
+            Func<bool> isCancellationRequested = null)
         {
             ModelDoc2 activeModel = swApp?.ActiveDoc as ModelDoc2;
             if (activeModel == null ||
@@ -48,6 +49,9 @@ namespace ADDIN.Commands
             {
                 finishProgress?.Invoke();
             }
+
+            if (IsCancellationRequested(isCancellationRequested))
+                return;
 
             if (drawingPaths.Count == 0)
             {
@@ -86,6 +90,8 @@ namespace ADDIN.Commands
                     currentCount++;
                     updateProgress?.Invoke(currentCount, totalCount);
                     Application.DoEvents();
+                    if (IsCancellationRequested(isCancellationRequested))
+                        break;
 
                     Debug.WriteLine("[XEP UNIT] Drawing=" + drawingPath);
                     if (string.IsNullOrWhiteSpace(drawingPath) || !File.Exists(drawingPath))
@@ -126,6 +132,9 @@ namespace ADDIN.Commands
                 finishProgress?.Invoke();
             }
 
+            if (IsCancellationRequested(isCancellationRequested))
+                return;
+
             MessageBox.Show(
                 "XEP UNIT xong." + System.Environment.NewLine +
                 "Da sap xep bang hien tai: " + activeSortedTableCount + System.Environment.NewLine +
@@ -141,6 +150,145 @@ namespace ADDIN.Commands
                 MessageBoxIcon.Information);
         }
 
+        public void OpenCheckedAssemblyDrawings(
+            DataGridView gridBom,
+            Action<int> beginProgress,
+            Action<int, int> updateProgress,
+            Action finishProgress,
+            Func<bool> isCancellationRequested = null)
+        {
+            ModelDoc2 activeModel = swApp?.ActiveDoc as ModelDoc2;
+            if (activeModel == null ||
+                activeModel.GetType() != (int)swDocumentTypes_e.swDocDRAWING)
+            {
+                MessageBox.Show(
+                    "Hay mo drawing va load BOM UNIT truoc.",
+                    "OPEN ASSEM",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            int checkedRowCount = GetCheckedRowCount(gridBom);
+            if (checkedRowCount == 0)
+            {
+                MessageBox.Show(
+                    "Chua co assembly nao duoc tick.",
+                    "OPEN ASSEM",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            IBomTableAnnotation selectedBomTable =
+                GetSelectedBomTable(activeModel) ?? GetFirstBomTable(activeModel);
+            List<string> drawingPaths = new List<string>();
+            CollectDirectAssemblyDrawingPathsFromCheckedRows(
+                gridBom,
+                selectedBomTable,
+                activeModel,
+                drawingPaths);
+
+            if (IsCancellationRequested(isCancellationRequested))
+                return;
+
+            if (drawingPaths.Count == 0)
+            {
+                MessageBox.Show(
+                    "Khong tim thay drawing assembly tu cac dong da tick.",
+                    "OPEN ASSEM",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            int openedCount = 0;
+            int alreadyOpenCount = 0;
+            int skippedCount = 0;
+            ModelDoc2 lastDrawing = null;
+
+            beginProgress?.Invoke(drawingPaths.Count);
+            try
+            {
+                for (int i = 0; i < drawingPaths.Count; i++)
+                {
+                    string drawingPath = drawingPaths[i];
+                    updateProgress?.Invoke(i + 1, drawingPaths.Count);
+                    Application.DoEvents();
+                    if (IsCancellationRequested(isCancellationRequested))
+                        break;
+
+                    if (string.IsNullOrWhiteSpace(drawingPath) || !File.Exists(drawingPath))
+                    {
+                        skippedCount++;
+                        continue;
+                    }
+
+                    bool wasOpen = swApp.GetOpenDocumentByName(drawingPath) != null;
+                    bool openedByCommand;
+                    ModelDoc2 drawingModel = OpenDrawing(drawingPath, out openedByCommand);
+                    if (drawingModel == null)
+                    {
+                        skippedCount++;
+                        Debug.WriteLine("[OPEN ASSEM] Cannot open drawing=" + drawingPath);
+                        continue;
+                    }
+
+                    if (wasOpen)
+                        alreadyOpenCount++;
+                    else
+                        openedCount++;
+
+                    lastDrawing = drawingModel;
+                    Debug.WriteLine("[OPEN ASSEM] Drawing=" + drawingPath);
+                }
+
+                if (!IsCancellationRequested(isCancellationRequested))
+                    ActivateDrawing(lastDrawing);
+            }
+            finally
+            {
+                finishProgress?.Invoke();
+            }
+
+            if (IsCancellationRequested(isCancellationRequested))
+                return;
+
+            MessageBox.Show(
+                "OPEN ASSEM xong." + System.Environment.NewLine +
+                "Da mo moi: " + openedCount + System.Environment.NewLine +
+                "Da mo san: " + alreadyOpenCount + System.Environment.NewLine +
+                "Bo qua: " + skippedCount,
+                "OPEN ASSEM",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+
+        private static bool IsCancellationRequested(Func<bool> callback)
+        {
+            try
+            {
+                return callback != null && callback();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public List<string> GetCheckedAssemblyDrawingPaths(DataGridView gridBom)
+        {
+            List<string> drawingPaths = new List<string>();
+            ModelDoc2 activeModel = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+            if (activeModel == null || activeModel.GetType() != (int)swDocumentTypes_e.swDocDRAWING)
+                return drawingPaths;
+
+            IBomTableAnnotation selectedBomTable =
+                GetSelectedBomTable(activeModel) ?? GetFirstBomTable(activeModel);
+            CollectDirectAssemblyDrawingPathsFromCheckedRows(
+                gridBom, selectedBomTable, activeModel, drawingPaths);
+            return drawingPaths;
+        }
         private IBomTableAnnotation GetSelectedBomTable(ModelDoc2 drawingModel)
         {
             SelectionMgr selMgr = drawingModel.SelectionManager as SelectionMgr;
@@ -336,6 +484,82 @@ namespace ADDIN.Commands
                 }
 
                 AddDrawingPathIfExists(drawingPath, drawingPaths);
+            }
+        }
+
+        private void CollectDirectAssemblyDrawingPathsFromCheckedRows(
+            DataGridView gridBom,
+            IBomTableAnnotation selectedBomTable,
+            ModelDoc2 activeDrawing,
+            List<string> drawingPaths)
+        {
+            if (gridBom == null || drawingPaths == null)
+                return;
+
+            List<string> searchDirectories =
+                GetDrawingSearchDirectories(selectedBomTable, activeDrawing);
+
+            foreach (DataGridViewRow row in gridBom.Rows)
+            {
+                if (row.IsNewRow || !Convert.ToBoolean(row.Cells[0].Value ?? false))
+                    continue;
+
+                bool foundAssemblyFromTag = false;
+                object[] components = row.Tag as object[];
+                if (components != null)
+                {
+                    foreach (object item in components)
+                    {
+                        Component2 component = item as Component2;
+                        if (component == null)
+                            continue;
+
+                        string assemblyPath = component.GetPathName();
+                        if (string.IsNullOrWhiteSpace(assemblyPath) ||
+                            !string.Equals(
+                                Path.GetExtension(assemblyPath),
+                                ".SLDASM",
+                                StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        foundAssemblyFromTag = true;
+                        AddDrawingPathIfExists(
+                            GetDrawingPathFromModelPath(assemblyPath),
+                            drawingPaths);
+                    }
+                }
+
+                if (foundAssemblyFromTag)
+                    continue;
+
+                string fileName = GetGridCellText(row, 5);
+                string fallbackAssemblyPath =
+                    FindAssemblyPathByFileName(fileName, searchDirectories);
+                if (string.IsNullOrWhiteSpace(fallbackAssemblyPath))
+                {
+                    Debug.WriteLine("[OPEN ASSEM] Assembly not found. file=" + fileName);
+                    continue;
+                }
+
+                AddDrawingPathIfExists(
+                    GetDrawingPathFromModelPath(fallbackAssemblyPath),
+                    drawingPaths);
+            }
+        }
+
+        private void ActivateDrawing(ModelDoc2 drawingModel)
+        {
+            if (drawingModel == null)
+                return;
+
+            try
+            {
+                int errors = 0;
+                swApp.ActivateDoc3(drawingModel.GetTitle(), false, 0, ref errors);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[OPEN ASSEM] Activate drawing failed: " + ex.Message);
             }
         }
 

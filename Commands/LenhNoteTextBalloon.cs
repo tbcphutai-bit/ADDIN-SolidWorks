@@ -13,15 +13,15 @@ namespace ADDIN.Commands
     {
         private readonly ISldWorks swApp;
         private readonly IWin32Window owner;
-        private readonly ComboBox noteComboBox;
-        private readonly ComboBox textComboBox;
+        private readonly HistoryTextBox noteComboBox;
+        private readonly HistoryTextBox textComboBox;
         private readonly ComboBox balloonPropertyComboBox;
 
         public LenhNoteTextBalloon(
             ISldWorks app,
             IWin32Window dialogOwner,
-            ComboBox noteList,
-            ComboBox textList,
+            HistoryTextBox noteList,
+            HistoryTextBox textList,
             ComboBox balloonPropertyList)
         {
             swApp = app;
@@ -32,8 +32,6 @@ namespace ADDIN.Commands
 
             LoadSavedItems(noteComboBox, GetSavedNotePath());
             LoadSavedItems(textComboBox, GetSavedTextPath());
-            ConfigureEditableComboBox(noteComboBox);
-            ConfigureEditableComboBox(textComboBox);
             InitializeBalloonPropertyOptions();
         }
 
@@ -518,167 +516,29 @@ namespace ADDIN.Commands
             return comboBox == null ? "" : comboBox.Text.Trim();
         }
 
-        private void ConfigureEditableComboBox(ComboBox comboBox)
+        private string GetCurrentComboText(HistoryTextBox textBox)
+        {
+            return textBox == null ? "" : textBox.Text.Trim();
+        }
+
+        private void LoadSavedItems(HistoryTextBox comboBox, string path)
         {
             if (comboBox == null)
                 return;
 
-            comboBox.DropDownStyle = ComboBoxStyle.DropDown;
-            comboBox.Enter += EditableComboBox_Enter;
-            comboBox.MouseUp += EditableComboBox_MouseUp;
-            comboBox.Leave += EditableComboBox_Leave;
-            comboBox.LostFocus += EditableComboBox_LostFocus;
-            comboBox.DropDownClosed += EditableComboBox_DropDownClosed;
-            comboBox.SelectionChangeCommitted += EditableComboBox_SelectionChangeCommitted;
-            ClearComboTextSelection(comboBox);
-        }
-
-        private void EditableComboBox_Enter(object sender, EventArgs e)
-        {
-            ComboBox comboBox = sender as ComboBox;
-            SetComboCaretDeferred(comboBox, (comboBox?.Text ?? "").Length);
-        }
-
-        private void EditableComboBox_MouseUp(object sender, MouseEventArgs e)
-        {
-            ComboBox comboBox = sender as ComboBox;
-            if (comboBox == null || e.Button != MouseButtons.Left)
-                return;
-
-            // Double click giu nguyen vung chu do Windows vua chon.
-            if (e.Clicks > 1)
-                return;
-
-            int dropDownButtonLeft = comboBox.ClientSize.Width - SystemInformation.VerticalScrollBarWidth;
-            if (e.X >= dropDownButtonLeft)
-                return;
-
-            SetComboCaretDeferred(comboBox, GetComboCaretIndexAtMouse(comboBox, e.X));
-        }
-
-        private void EditableComboBox_Leave(object sender, EventArgs e)
-        {
-            ClearComboTextSelectionAfterFocusChange(sender as ComboBox);
-        }
-
-        private void EditableComboBox_LostFocus(object sender, EventArgs e)
-        {
-            ClearComboTextSelectionAfterFocusChange(sender as ComboBox);
-        }
-
-        private void EditableComboBox_DropDownClosed(object sender, EventArgs e)
-        {
-            ClearComboTextSelection(sender as ComboBox);
-        }
-
-        private void EditableComboBox_SelectionChangeCommitted(object sender, EventArgs e)
-        {
-            ClearComboTextSelection(sender as ComboBox);
-        }
-
-        private void ClearComboTextSelection(ComboBox comboBox)
-        {
-            if (comboBox == null || comboBox.DropDownStyle == ComboBoxStyle.DropDownList)
-                return;
-
-            try
-            {
-                comboBox.SelectionStart = (comboBox.Text ?? "").Length;
-                comboBox.SelectionLength = 0;
-            }
-            catch
-            {
-            }
-        }
-
-        private void ClearComboTextSelectionAfterFocusChange(ComboBox comboBox)
-        {
-            ClearComboTextSelection(comboBox);
-
-            if (comboBox == null || comboBox.IsDisposed || !comboBox.IsHandleCreated)
-                return;
-
-            try
-            {
-                comboBox.BeginInvoke((MethodInvoker)delegate
-                {
-                    if (!comboBox.IsDisposed && !comboBox.Focused)
-                        ClearComboTextSelection(comboBox);
-                });
-            }
-            catch
-            {
-            }
-        }
-
-        private void SetComboCaretDeferred(ComboBox comboBox, int caretIndex)
-        {
-            if (comboBox == null || comboBox.IsDisposed || !comboBox.IsHandleCreated)
-                return;
-
-            try
-            {
-                comboBox.BeginInvoke((MethodInvoker)delegate
-                {
-                    if (comboBox.IsDisposed)
-                        return;
-
-                    string text = comboBox.Text ?? "";
-                    int index = Math.Max(0, Math.Min(caretIndex, text.Length));
-                    comboBox.SelectionStart = index;
-                    comboBox.SelectionLength = 0;
-                });
-            }
-            catch
-            {
-            }
-        }
-
-        private int GetComboCaretIndexAtMouse(ComboBox comboBox, int mouseX)
-        {
-            string text = comboBox?.Text ?? "";
-            if (text.Length == 0)
-                return 0;
-
-            int targetX = Math.Max(0, mouseX - 3);
-            int previousWidth = 0;
-            TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
-
-            for (int i = 1; i <= text.Length; i++)
-            {
-                int currentWidth = TextRenderer.MeasureText(
-                    text.Substring(0, i),
-                    comboBox.Font,
-                    Size.Empty,
-                    flags).Width;
-
-                if (targetX < (previousWidth + currentWidth) / 2)
-                    return i - 1;
-
-                previousWidth = currentWidth;
-            }
-
-            return text.Length;
-        }
-
-        private void LoadSavedItems(ComboBox comboBox, string path)
-        {
-            if (comboBox == null)
-                return;
-
-            comboBox.Items.Clear();
+            comboBox.ClearItems();
 
             List<string> items = ReadSavedItems(path);
             foreach (string item in items)
-                comboBox.Items.Add(item);
+                comboBox.AddItem(item);
 
-            if (comboBox.Items.Count > 0)
-                comboBox.Text = comboBox.Items[0].ToString();
+            if (comboBox.ItemCount > 0)
+                comboBox.Text = comboBox.GetItem(0);
 
-            ClearComboTextSelection(comboBox);
+            comboBox.MoveCaretToEnd();
         }
 
-        private void AddSavedItem(ComboBox comboBox, string path, string text)
+        private void AddSavedItem(HistoryTextBox comboBox, string path, string text)
         {
             if (comboBox == null || string.IsNullOrWhiteSpace(text))
                 return;
@@ -690,10 +550,10 @@ namespace ADDIN.Commands
             WriteSavedItems(path, items);
             LoadSavedItems(comboBox, path);
             comboBox.Text = text;
-            ClearComboTextSelection(comboBox);
+            comboBox.MoveCaretToEnd();
         }
 
-        private void DeleteSelectedItem(ComboBox comboBox, string path)
+        private void DeleteSelectedItem(HistoryTextBox comboBox, string path)
         {
             if (comboBox == null)
                 return;

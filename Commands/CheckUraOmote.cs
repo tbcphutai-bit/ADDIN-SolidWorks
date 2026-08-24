@@ -791,9 +791,28 @@ namespace ADDIN.Commands
             PaintFaceSummary summary = new PaintFaceSummary();
             try
             {
-                bool shown = ActivateConfiguration(part, configName);
-                part.ForceRebuild3(false);
-                part.EditRebuild3();
+                // Configuration va FlatPattern da duoc chuan bi o CheckModel.
+                // Khong rebuild lai tai day vi SOLIDWORKS co the dung khi rebuild
+                // lien tiep tren mot so part co Flat-Pattern phuc tap.
+                string activeBeforeScan = SafeActiveConfiguration(part);
+                bool shown = string.Equals(
+                    activeBeforeScan,
+                    configName,
+                    StringComparison.OrdinalIgnoreCase);
+
+                Debug.WriteLine("[URA OMOTE] Scan config prepare. requested=" + configName
+                    + ", activeBefore=" + activeBeforeScan
+                    + ", alreadyActive=" + shown);
+
+                if (!shown)
+                {
+                    Debug.WriteLine("[URA OMOTE] Scan config activate start. requested=" + configName);
+                    shown = ActivateConfiguration(part, configName);
+                    Debug.WriteLine("[URA OMOTE] Scan config activate end. requested=" + configName
+                        + ", shown=" + shown
+                        + ", activeAfter=" + SafeActiveConfiguration(part));
+                }
+
                 Debug.WriteLine("[URA OMOTE] Scan config start. requested=" + configName
                     + ", shown=" + shown
                     + ", active=" + SafeActiveConfiguration(part)
@@ -1427,6 +1446,7 @@ namespace ADDIN.Commands
                     TrySortExcelByBuhinNo(xlWS, lastRow);
 
                 xlWS.Columns.AutoFit();
+                AutoFitNoteColumn(xlWS, lastRow, 5);
                 xlApp.Visible = true;
             }
             catch (Exception ex)
@@ -1440,7 +1460,8 @@ namespace ADDIN.Commands
             xlWS.Cells[1, 1].Value = "\u90E8\u54C1\u756A\u53F7";
             xlWS.Cells[1, 2].Value = "S\u1ED1 m\u1EB7t h\u1ED3ng trong Default";
             xlWS.Cells[1, 3].Value = "S\u1ED1 m\u1EB7t h\u1ED3ng trong Flat-Pattern";
-            xlWS.Cells[1, 4].Value = "Ghi ch\u00FA";
+            xlWS.Cells[1, 4].Value = "Status";
+            xlWS.Cells[1, 5].Value = "Note";
         }
 
         private static void WriteRows(dynamic xlWS, List<UraOmoteRowResult> results)
@@ -1451,16 +1472,37 @@ namespace ADDIN.Commands
                 xlWS.Cells[row, 1].Value = result.BuhinNo;
                 xlWS.Cells[row, 2].Value = result.DefaultPinkFaceCount;
                 xlWS.Cells[row, 3].Value = result.FlatPinkFaceCount;
-                xlWS.Cells[row, 4].Value = result.Note;
+                xlWS.Cells[row, 4].Value = result.Status;
+                xlWS.Cells[row, 5].Value = result.Note;
 
                 if (result.Status == "NG")
-                    xlWS.Range["A" + row + ":D" + row].Interior.Color = Rgb(255, 199, 206);
+                    xlWS.Range["A" + row + ":E" + row].Interior.Color = Rgb(255, 199, 206);
                 else if (result.Status == "CHECK")
-                    xlWS.Range["A" + row + ":D" + row].Interior.Color = Rgb(255, 235, 156);
+                    xlWS.Range["A" + row + ":E" + row].Interior.Color = Rgb(255, 235, 156);
                 else if (result.Status == "SKIP")
-                    xlWS.Range["A" + row + ":D" + row].Interior.Color = Rgb(217, 217, 217);
+                    xlWS.Range["A" + row + ":E" + row].Interior.Color = Rgb(217, 217, 217);
 
                 row++;
+            }
+        }
+
+        private static void AutoFitNoteColumn(dynamic sheet, int lastRow, int noteColumn)
+        {
+            try
+            {
+                dynamic noteRange = sheet.Range[
+                    sheet.Cells[1, noteColumn],
+                    sheet.Cells[Math.Max(1, lastRow), noteColumn]];
+                dynamic excelColumn = sheet.Columns[noteColumn];
+                noteRange.WrapText = false;
+                excelColumn.AutoFit();
+                double width = Convert.ToDouble(excelColumn.ColumnWidth);
+                excelColumn.ColumnWidth = Math.Max(18.0, Math.Min(80.0, width));
+                noteRange.WrapText = true;
+                noteRange.Rows.AutoFit();
+            }
+            catch
+            {
             }
         }
 
@@ -1471,7 +1513,7 @@ namespace ADDIN.Commands
                 dynamic sort = xlWS.Sort;
                 sort.SortFields.Clear();
                 sort.SortFields.Add(xlWS.Range["A2:A" + lastRow], 0, 1);
-                sort.SetRange(xlWS.Range["A1:D" + lastRow]);
+                sort.SetRange(xlWS.Range["A1:E" + lastRow]);
                 sort.Header = 1;
                 sort.Apply();
             }

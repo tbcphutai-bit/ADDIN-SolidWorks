@@ -1,10 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 using ADDIN.Commands;
 using SolidWorks.Interop.sldworks;
@@ -26,6 +28,8 @@ namespace ADDIN
         private DimKichThuocLo holeDimensionCommand;
         private LenhDimCanhSongSong sectionEdgeDimensionCommand;
         private LenhNoteTextBalloon drawingTextAnnotationCommands;
+        private CheckBalloon balloonChecker;
+        private CheckDrawingBom drawingBomChecker;
         private XepUnitDrawing xepUnitDrawing;
         private LenhMakeHole makeHoleCommand;
         private PaintHoleSummaryCommand paintHoleSummaryCommand;
@@ -39,6 +43,12 @@ namespace ADDIN
         private Control lastDisabledBomToolTipControl;
         private int initialLayoutPassesRemaining;
         private bool taskPaneLayoutInProgress;
+        private bool drawingBomCommandInProgress;
+        private bool drawingBomCancelRequested;
+        private bool drawingBomUiLockActive;
+        private IMessageFilter solidWorksInputBlocker;
+        private readonly Dictionary<Control, bool> drawingBomControlEnabledStates =
+            new Dictionary<Control, bool>();
         private Control taskPaneHostControl;
         private string lastSelectedViewKey;
         private bool solidWorksClosing;
@@ -47,7 +57,61 @@ namespace ADDIN
         private TextBox txtMakeHolePaintName;
         private const string AppUiFontName = "Meiryo UI";
         private readonly Dictionary<string, string> loadedModelPropValues = new Dictionary<string, string>();
-        private const string MakeHoleSizeHistoryFileName = "make-hole-sizes.txt";
+
+        private sealed class SolidWorksInputBlocker : IMessageFilter
+        {
+            private readonly Control allowedControl;
+
+            [DllImport("user32.dll")]
+            private static extern IntPtr GetAncestor(IntPtr handle, uint flags);
+
+            [DllImport("user32.dll", CharSet = CharSet.Auto)]
+            private static extern int GetClassName(IntPtr handle, StringBuilder className, int maxCount);
+
+            [DllImport("user32.dll")]
+            private static extern IntPtr GetWindow(IntPtr handle, uint command);
+
+            public SolidWorksInputBlocker(Control allowed)
+            {
+                allowedControl = allowed;
+            }
+
+            public bool PreFilterMessage(ref Message message)
+            {
+                if (!IsUserInputMessage(message.Msg))
+                    return false;
+                return !IsAllowedTarget(message.HWnd);
+            }
+
+            private bool IsAllowedTarget(IntPtr handle)
+            {
+                Control control = Control.FromHandle(handle);
+                while (control != null)
+                {
+                    if (control == allowedControl)
+                        return true;
+                    control = control.Parent;
+                }
+                IntPtr root = GetAncestor(handle, 2);
+                StringBuilder className = new StringBuilder(64);
+                if (root != IntPtr.Zero && GetClassName(root, className, className.Capacity) > 0
+                    && string.Equals(className.ToString(), "#32770", StringComparison.Ordinal)
+                    && GetWindow(root, 4) != IntPtr.Zero)
+                    return true;
+                return false;
+            }
+
+            private static bool IsUserInputMessage(int message)
+            {
+                if (message >= 0x0100 && message <= 0x0109)
+                    return true;
+                if (message >= 0x0201 && message <= 0x020E)
+                    return true;
+                if (message >= 0x00A1 && message <= 0x00AD)
+                    return true;
+                return message == 0x007B;
+            }
+        }        private const string MakeHoleSizeHistoryFileName = "make-hole-sizes.txt";
         private const string PropNameHinmei = "\u54c1\u540d";
         private const string PropNameBuhinmei = "\u90e8\u54c1\u540d";
         private const string PropNameMaterial = "\u6750\u8cea";
@@ -74,6 +138,10 @@ namespace ADDIN
         public BomTaskPaneControl()
         {
             InitializeComponent();
+            if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
+                return;
+            EnsureCheckBalloonButton();
+            EnsureCheckDrawingBomButton();
             EnsureDimHoleButton();
             EnsureMakeHolePaintNameControls();
             ApplyUnifiedTypography(this);
@@ -118,6 +186,8 @@ namespace ADDIN
                 cboBendLine,
                 cboSide,
                 cboBalloonProperty);
+            balloonChecker = new CheckBalloon(swApp);
+            drawingBomChecker = new CheckDrawingBom(swApp, dgvModelBom);
             actions = new ThaoTacBomTaskPane(swApp, bomLoader, dgvModelBom, chkSelectAll, lblStatus, progressCheck, this);
             actions.ConfigureGrid();
             AttachSolidWorksEvents();
@@ -139,6 +209,7 @@ namespace ADDIN
         {
             solidWorksClosing = true;
             actions?.RequestCancel();
+            EndSolidWorksInputLock();
             DisposeComponentDrawingTimer();
             DisposeInitialLayoutTimer();
             DetachSolidWorksEvents();
@@ -154,6 +225,7 @@ namespace ADDIN
             xepUnitDrawing = null;
             makeHoleCommand = null;
             paintHoleSummaryCommand = null;
+            drawingBomChecker = null;
             swApp = null;
         }
 
@@ -374,6 +446,40 @@ namespace ADDIN
                 groupBox3.Controls.Add(btnDimKichThuocLo);
         }
 
+        private void EnsureCheckBalloonButton()
+        {
+            if (btnCheckBalloon != null)
+                return;
+
+            btnCheckBalloon = new Button();
+            btnCheckBalloon.Name = "btnCheckBalloon";
+            btnCheckBalloon.Text = "CHECK\r\nBALLOON";
+            btnCheckBalloon.Size = new Size(90, 42);
+            btnCheckBalloon.TabIndex = 13;
+            btnCheckBalloon.UseVisualStyleBackColor = false;
+            tabDrawingBom.Controls.Add(btnCheckBalloon);
+        }
+
+        private void EnsureCheckDrawingBomButton()
+        {
+            if (btnCheckDrawingBom != null)
+                return;
+
+            btnCheckDrawingBom = new Button();
+
+            btnCheckDrawingBom.Name = "btnCheckDrawingBom";
+            btnCheckDrawingBom.Text = "CHECK\r\nDRAWING";
+            btnCheckDrawingBom.Size = new Size(84, 38);
+            btnCheckDrawingBom.TabIndex = 17;
+            btnCheckDrawingBom.UseVisualStyleBackColor = false;
+
+            if (tabDrawingBom != null &&
+                !tabDrawingBom.Controls.Contains(btnCheckDrawingBom))
+            {
+                tabDrawingBom.Controls.Add(btnCheckDrawingBom);
+            }
+        }
+        
         private void WireEvents()
         {
             btnLoadBom.Click += btnLoadBom_Click;
@@ -381,6 +487,8 @@ namespace ADDIN
             btnCheckDfTk.Click += btnCheckDfTk_Click;
             btnCheckUraOmote.Click += btnCheckUraOmote_Click;
             btnCheckKegaki.Click += btnCheckKegaki_Click;
+            if (btnCheckDrawingBom != null)
+                btnCheckDrawingBom.Click += btnCheckDrawingBom_Click;
             button1.Click += cancel_Click;
             btnGetWL.Click += btnGetWL_Click;
             btnNote.Click += btnNote_Click;
@@ -415,6 +523,12 @@ namespace ADDIN
             btnModelResetProps.Click += btnModelResetProps_Click;
             tabBom.SelectedIndexChanged += tabBom_SelectedIndexChanged;
             WireXepUnitButton(this);
+            btnOpenAssem.Click += btnOpenAssem_Click;
+            btnCheckBalloon.Click += btnCheckBalloon_Click;
+            if (btnMirrorPart != null)
+                btnMirrorPart.Click += btnMirrorPart_Click;
+            if (btnCheckAssemblyHole != null)
+                btnCheckAssemblyHole.Click += btnCheckAssemblyHole_Click;
             chkSelectAll.CheckedChanged += chkSelectAll_CheckedChanged;
 
             dgvModelBom.CurrentCellDirtyStateChanged += dgvModelBom_CurrentCellDirtyStateChanged;
@@ -427,6 +541,44 @@ namespace ADDIN
             Resize += BomTaskPaneControl_Resize;
             panelModelCommands.SizeChanged += PanelModelCommands_SizeChanged;
             Disposed += BomTaskPaneControl_Disposed;
+        }
+
+        private void btnCheckDrawingBom_Click(object sender, EventArgs e)
+        {
+            RunDrawingBomCommand(() =>
+            {
+                drawingBomChecker?.RunBatch(
+                    BeginProgress,
+                    UpdateProgress,
+                    FinishProgress,
+                    IsDrawingBomCancelRequested);
+            });
+        }
+
+        private void btnMirrorPart_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                CreateMirrorPartPackage mirrorCmd = new CreateMirrorPartPackage(swApp);
+                mirrorCmd.Run();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khởi chạy MIRROR PART:\n" + ex.Message, "MIRROR PART", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnCheckAssemblyHole_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                CheckAssemblyHole holeCmd = new CheckAssemblyHole(swApp);
+                holeCmd.Run();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khởi chạy CHECK ASSEMBLY HOLE:\n" + ex.Message, "CHECK ASSEMBLY HOLE", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ApplyDeleteButtonIcons()
@@ -585,9 +737,10 @@ namespace ADDIN
             chkSelectAll.Font = CreateUiFont(8.75F, FontStyle.Bold);
             chkSelectAll.ForeColor = textColor;
             StyleBomTopButton(btnCheckDfTk);
-            StyleBomTopButton(button2);
+            StyleUnitActionButtons();
             StyleBomTopButton(btnCheckUraOmote);
             StyleBomTopButton(btnCheckKegaki);
+            StyleBomTopButton(btnCheckDrawingBom);
             StyleToolButton(btnLoadBom, Color.FromArgb(246, 249, 252), Color.FromArgb(186, 200, 216), Color.FromArgb(234, 242, 250), textColor);
             StyleToolButton(btnClearBom, Color.FromArgb(255, 246, 246), Color.FromArgb(214, 158, 158), Color.FromArgb(255, 235, 235), textColor);
             StyleToolButton(button1, Color.FromArgb(246, 247, 249), Color.FromArgb(197, 204, 213), Color.FromArgb(235, 240, 246), textColor);
@@ -873,6 +1026,8 @@ namespace ADDIN
                 btnCheckDfTk.Text = "CHECK\r\nDF/TK";
             if (button2 != null)
                 button2.Text = "XEP\r\nUNIT";
+            if (btnOpenAssem != null)
+                btnOpenAssem.Text = "OPEN\r\nASSEM";
             if (btnCheckUraOmote != null)
                 btnCheckUraOmote.Text = "CHECK\r\nウラ表";
             if (btnCheckKegaki != null)
@@ -886,9 +1041,10 @@ namespace ADDIN
                 button1.Text = "CANCEL";
 
             StyleBomTopButton(btnCheckDfTk);
-            StyleBomTopButton(button2);
+            StyleUnitActionButtons();
             StyleBomTopButton(btnCheckUraOmote);
             StyleBomTopButton(btnCheckKegaki);
+            StyleBomTopButton(btnCheckDrawingBom);
         }
 
         private Font CreateUiFont(float size, FontStyle style = FontStyle.Regular)
@@ -982,9 +1138,12 @@ namespace ADDIN
 
         private void btnLoadBom_Click(object sender, EventArgs e)
         {
-            actions?.LoadBom();
-            UpdateBomCommandButtonState();
-            RefreshHostedTaskPane();
+            RunDrawingBomCommand(() =>
+            {
+                actions?.LoadBom(IsDrawingBomCancelRequested);
+                UpdateBomCommandButtonState();
+                RefreshHostedTaskPane();
+            }, false);
         }
 
         private void btnClearBom_Click(object sender, EventArgs e)
@@ -1020,8 +1179,11 @@ namespace ADDIN
             // to the selected BOM type.
             btnCheckDfTk.Enabled = detailBomLoaded;
             button2.Enabled = unitBomLoaded;
+            btnOpenAssem.Enabled = unitBomLoaded;
+            btnCheckBalloon.Enabled = hasBomRows;
             btnCheckUraOmote.Enabled = detailBomLoaded;
             btnCheckKegaki.Enabled = detailBomLoaded;
+            btnCheckDrawingBom.Enabled = !drawingBomCommandInProgress;
         }
 
         private void InitBomCommandToolTips()
@@ -1054,6 +1216,15 @@ namespace ADDIN
                 button2,
                 "BOM UNIT: s\u1EAFp x\u1EBFp 部品番号 theo th\u1EE9 t\u1EF1 t\u0103ng d\u1EA7n.");
             SetBomCommandToolTip(
+                btnOpenAssem,
+                "BOM UNIT: m\u1EDF Drawing c\u1EE7a c\u00E1c assembly \u0111ang \u0111\u01B0\u1EE3c tick.");
+            SetBomCommandToolTip(
+                btnCheckBalloon,
+                "BOM UNIT: qu\u00E9t to\u00E0n b\u1ED9 sheet/view v\u00E0 ki\u1EC3m tra Balloon theo t\u1EEBng component instance.");
+            SetBomCommandToolTip(
+                btnCheckDrawingBom,
+                "BOM chi tiet: doi chieu thong tin tren Drawing voi gia tri trong BOM.");
+            SetBomCommandToolTip(
                 btnCheckUraOmote,
                 "BOM chi ti\u1EBFt: ki\u1EC3m tra v\u1ECB tr\u00ED m\u1EB7t m\u00E0u h\u1ED3ng gi\u1EEFa Default v\u00E0 Flat-Pattern.");
             SetBomCommandToolTip(
@@ -1076,12 +1247,12 @@ namespace ADDIN
 
         private string GetBomCommandToolTipText(Control control)
         {
-            if (control == button2)
+            if (control == button2 || control == btnOpenAssem || control == btnCheckBalloon)
             {
                 return "H\u00E3y click v\u00E0o b\u1EA3ng BOM UNIT v\u00E0 b\u1EA5m C\u1EACP NH\u1EACT\n\u0111\u1EC3 th\u1EF1c hi\u1EC7n thao t\u00E1c l\u1EC7nh.";
             }
             if (control == btnCheckDfTk || control == btnCheckUraOmote ||
-                control == btnCheckKegaki)
+                control == btnCheckKegaki || control == btnCheckDrawingBom)
             {
                 return "H\u00E3y click v\u00E0o b\u1EA3ng BOM chi ti\u1EBFt v\u00E0 b\u1EA5m C\u1EACP NH\u1EACT\n\u0111\u1EC3 th\u1EF1c hi\u1EC7n thao t\u00E1c l\u1EC7nh.";
             }
@@ -1145,7 +1316,7 @@ namespace ADDIN
 
             Point screenPoint = tabDrawingBom.PointToScreen(e.Location);
             Control hoveredControl = null;
-            Control[] commandButtons = { btnCheckDfTk, button2, btnCheckUraOmote, btnCheckKegaki };
+            Control[] commandButtons = { btnCheckDfTk, button2, btnOpenAssem, btnCheckBalloon, btnCheckUraOmote, btnCheckKegaki, btnCheckDrawingBom };
 
             foreach (Control control in commandButtons)
             {
@@ -1183,22 +1354,67 @@ namespace ADDIN
 
         private void btnCheckDfTk_Click(object sender, EventArgs e)
         {
-            actions?.CheckDfTk();
+            RunDrawingBomCommand(() => actions?.CheckDfTk());
         }
 
         private void btnCheckUraOmote_Click(object sender, EventArgs e)
         {
-            actions?.CheckUraOmote();
+            RunDrawingBomCommand(() => actions?.CheckUraOmote());
         }
 
         private void btnCheckKegaki_Click(object sender, EventArgs e)
         {
-            actions?.CheckKegaki();
+            RunDrawingBomCommand(() => actions?.CheckKegaki());
         }
 
         private void btnXepUnit_Click(object sender, EventArgs e)
         {
-            xepUnitDrawing?.Run(dgvModelBom, BeginProgress, UpdateProgress, FinishProgress);
+            RunDrawingBomCommand(() =>
+                xepUnitDrawing?.Run(dgvModelBom, BeginProgress, UpdateProgress, FinishProgress,
+                    IsDrawingBomCancelRequested));
+        }
+
+        private void btnCheckBalloon_Click(object sender, EventArgs e)
+        {
+            RunDrawingBomCommand(() =>
+            {
+                List<string> drawingPaths = xepUnitDrawing == null
+                    ? new List<string>()
+                    : xepUnitDrawing.GetCheckedAssemblyDrawingPaths(dgvModelBom);
+                if (drawingPaths.Count == 0)
+                {
+                    MessageBox.Show("Hay tick it nhat mot UNIT co Drawing truoc.",
+                        "CHECK BALLOON", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                BalloonCheckResult result = balloonChecker == null ? null : balloonChecker.RunBatch(
+                    drawingPaths, BeginProgress, UpdateProgress, FinishProgress,
+                    IsDrawingBomCancelRequested);
+                if (result == null)
+                    return;
+                if (IsDrawingBomCancelRequested())
+                {
+                    lblStatus.Text = "Da huy CHECK BALLOON.";
+                    return;
+                }
+
+                lblStatus.Text = result.IsOk
+                    ? "CHECK BALLOON: OK - " + result.ValidCount + "/" + result.ExpectedCount
+                    : "CHECK BALLOON: thieu " + result.MissingCount + ", trung " + result.DuplicateCount
+                        + ", sai so " + result.WrongTextCount + ", dangling " + result.DanglingCount;
+                result.ExportToExcel();
+            });
+        }
+        private void btnOpenAssem_Click(object sender, EventArgs e)
+        {
+            RunDrawingBomCommand(() =>
+                xepUnitDrawing?.OpenCheckedAssemblyDrawings(
+                    dgvModelBom,
+                    BeginProgress,
+                    UpdateProgress,
+                    FinishProgress,
+                    IsDrawingBomCancelRequested));
         }
 
         private void btnMakeHole_Click(object sender, EventArgs e)
@@ -2284,8 +2500,154 @@ namespace ADDIN
             progressCheck.Visible = false;
         }
 
+        private void RunDrawingBomCommand(Action command, bool lockInput = true)
+        {
+            if (command == null)
+                return;
+
+            // Never permit a leaked/queued click to start a second command while
+            // the first command is pumping messages through Application.DoEvents().
+            if (drawingBomCommandInProgress)
+                return;
+
+            drawingBomCommandInProgress = true;
+            drawingBomCancelRequested = false;
+            try
+            {
+                if (lockInput)
+                    BeginSolidWorksInputLock();
+                KeepDrawingBomTabVisible();
+                command();
+            }
+            finally
+            {
+                bool showCanceledMessage = drawingBomCancelRequested;
+                KeepDrawingBomTabVisible();
+                if (lockInput)
+                    EndSolidWorksInputLock();
+                drawingBomCommandInProgress = false;
+                drawingBomCancelRequested = false;
+                UpdateBomCommandButtonState();
+                if (showCanceledMessage)
+                {
+                    MessageBox.Show(
+                        "Lenh da duoc huy va qua trinh xu ly da ket thuc.",
+                        "CANCEL",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+            }
+        }
+
+        private void KeepDrawingBomTabVisible()
+        {
+            if (tabBom != null && tabDrawing != null)
+                tabBom.SelectedTab = tabDrawing;
+            if (tabDrawingPages != null && tabDrawingBom != null)
+                tabDrawingPages.SelectedTab = tabDrawingBom;
+        }
+
+
+        private void BeginSolidWorksInputLock()
+        {
+            // This method must never lock the Task Pane during initialization.
+            // It is valid only after RunDrawingBomCommand marks a command active.
+            if (!drawingBomCommandInProgress || drawingBomUiLockActive)
+                return;
+
+            drawingBomUiLockActive = true;
+            LockDrawingBomControls();
+            try
+            {
+                solidWorksInputBlocker = new SolidWorksInputBlocker(button1);
+                Application.AddMessageFilter(solidWorksInputBlocker);
+            }
+            catch
+            {
+                solidWorksInputBlocker = null;
+                RestoreDrawingBomControls();
+                drawingBomUiLockActive = false;
+                throw;
+            }
+        }
+
+        private void EndSolidWorksInputLock()
+        {
+            if (solidWorksInputBlocker != null)
+            {
+                Application.RemoveMessageFilter(solidWorksInputBlocker);
+                solidWorksInputBlocker = null;
+            }
+            RestoreDrawingBomControls();
+            drawingBomUiLockActive = false;
+        }
+
+        private void LockDrawingBomControls()
+        {
+            drawingBomControlEnabledStates.Clear();
+            SetDrawingBomControlsLocked(tabDrawingBom);
+
+            // CANCEL is the only command that must remain available.
+            if (button1 != null)
+                button1.Enabled = true;
+        }
+
+        private void SetDrawingBomControlsLocked(Control parent)
+        {
+            if (parent == null)
+                return;
+
+            foreach (Control control in parent.Controls)
+            {
+                if (control == button1)
+                    continue;
+
+                if (IsDrawingBomInteractiveControl(control))
+                {
+                    drawingBomControlEnabledStates[control] = control.Enabled;
+                    control.Enabled = false;
+                    continue;
+                }
+
+                SetDrawingBomControlsLocked(control);
+            }
+        }
+
+        private static bool IsDrawingBomInteractiveControl(Control control)
+        {
+            return control is ButtonBase
+                || control is TextBoxBase
+                || control is ComboBox
+                || control is ListControl
+                || control is DataGridView
+                || control is NumericUpDown
+                || control is TreeView
+                || control is ListView
+                || control is PropertyGrid;
+        }
+
+        private void RestoreDrawingBomControls()
+        {
+            foreach (KeyValuePair<Control, bool> state in drawingBomControlEnabledStates)
+            {
+                if (state.Key != null && !state.Key.IsDisposed)
+                    state.Key.Enabled = state.Value;
+            }
+            drawingBomControlEnabledStates.Clear();
+        }
+
+        private bool IsDrawingBomCancelRequested()
+        {
+            return drawingBomCancelRequested;
+        }
+
         private void cancel_Click(object sender, EventArgs e)
         {
+            if (drawingBomCommandInProgress)
+            {
+                drawingBomCancelRequested = true;
+                lblStatus.Text = "Dang huy lenh...";
+            }
             actions?.RequestCancel();
         }
 
@@ -2466,14 +2828,20 @@ namespace ADDIN
             Button[] topButtons =
             {
                 btnCheckDfTk,
+                btnCheckAll,
+                btnCheckRound,
+                btnCheckSamePart,
                 button2,
-                btnCheckUraOmote,
-                btnCheckKegaki
+                btnOpenAssem,
+                btnCheckBalloon,
+                btnCheckDrawingBom
             };
 
             int topButtonGap = 8;
-            int topButtonHeight = 44;
-            int topButtonWidth = pageWidth < 310 ? 88 : 96;
+            int topButtonHeight = 42;
+            int topButtonWidth = pageWidth < 310 ? 84 : 90;
+            if (topButtons.Length >= 5 && pageWidth >= 420)
+                topButtonWidth = Math.Max(70, (pageWidth - topButtonGap * (topButtons.Length - 1)) / topButtons.Length);
             int maxTopColumns = Math.Max(1, (pageWidth + topButtonGap) / (topButtonWidth + topButtonGap));
             int topColumns = Math.Max(1, Math.Min(topButtons.Length, maxTopColumns));
             int topGridWidth = topColumns * topButtonWidth + (topColumns - 1) * topButtonGap;
@@ -2562,6 +2930,31 @@ namespace ADDIN
                 bomCommandToolTipFont = null;
             }
         }
+
+        private void StyleUnitActionButtons()
+        {
+            StyleBomTopButton(button2);
+            StyleToolButton(
+                button2,
+                Color.FromArgb(220, 235, 252),
+                Color.FromArgb(82, 132, 190),
+                Color.FromArgb(202, 224, 249),
+                Color.FromArgb(24, 74, 126));
+
+            StyleBomTopButton(btnOpenAssem);
+            StyleToolButton(
+                btnOpenAssem,
+                Color.FromArgb(220, 235, 252),
+                Color.FromArgb(82, 132, 190),
+                Color.FromArgb(202, 224, 249),
+                Color.FromArgb(24, 74, 126));
+            StyleBomTopButton(btnCheckBalloon);
+            StyleToolButton(
+                btnCheckBalloon,
+                Color.FromArgb(220, 235, 252),
+                Color.FromArgb(82, 132, 190),
+                Color.FromArgb(202, 224, 249),
+                Color.FromArgb(24, 74, 126));        }
 
         private void InitComponentDrawingTimer()
         {
@@ -3193,6 +3586,11 @@ namespace ADDIN
 
             try
             {
+                if (drawingBomCommandInProgress)
+                {
+                    KeepDrawingBomTabVisible();
+                    return 0;
+                }
                 SwitchTabByActiveDocument();
                 if (IsActiveModelDocument())
                     LoadModelPropsFromActiveDocument(false);
@@ -3222,6 +3620,12 @@ namespace ADDIN
 
         private void SwitchTabByActiveDocument()
         {
+            if (drawingBomCommandInProgress)
+            {
+                KeepDrawingBomTabVisible();
+                return;
+            }
+
             ModelDoc2 model = swApp?.ActiveDoc as ModelDoc2;
             if (model == null)
             {

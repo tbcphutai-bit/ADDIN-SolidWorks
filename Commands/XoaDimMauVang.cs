@@ -40,7 +40,7 @@ namespace ADDIN.Commands
                 view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
             }
 
-            MessageBox.Show("Da xoa " + countDeleted + " dimension mau vang.", "Xoa DIM mau vang", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // MessageBox.Show("Da xoa " + countDeleted + " dimension mau vang.", "Xoa DIM mau vang", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return countDeleted;
         }
 

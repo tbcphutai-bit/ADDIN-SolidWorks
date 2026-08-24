@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
@@ -219,7 +220,15 @@ namespace ADDIN.Commands
                     results.Add(result);
                 else
                     AddCheckLog(checkLogs, row, partPath, checker.LastSkipReason);
+
+                return results;
             }
+
+            AddCheckLog(
+                checkLogs,
+                row,
+                "",
+                "Grid khong co Component hoac Part path");
 
             return results;
         }
@@ -263,6 +272,16 @@ namespace ADDIN.Commands
             System.Diagnostics.Debug.WriteLine("Outer DF=" + outerDf + " | TK=" + outerTk);
             System.Diagnostics.Debug.WriteLine("Inner DF=" + innerDf + " | TK=" + innerTk);
             System.Diagnostics.Debug.WriteLine("Area DF=" + areaDf + " | TK=" + areaTk);
+            if (debugResult != null)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "Geometry DF=" + debugResult.GeometryDfSummary
+                    + " | TK=" + debugResult.GeometryTkSummary);
+                System.Diagnostics.Debug.WriteLine(
+                    "Geometry Compared=" + debugResult.GeometryCompared
+                    + " | Different=" + debugResult.DiffGeometry
+                    + " | Detail=" + debugResult.GeometryNote);
+            }
             System.Diagnostics.Debug.WriteLine("Result=" + status + reason);
         }
 
@@ -702,6 +721,7 @@ namespace ADDIN.Commands
 
         private DfTkResult CheckModel(ModelDoc2 swPart, bool closeAfterCheck, string componentName)
         {
+            ModelDoc2 activeDocBeforeCheck = swApp.ActiveDoc as ModelDoc2;
             string originalConfig = swPart.ConfigurationManager.ActiveConfiguration.Name;
 
             try
@@ -724,35 +744,56 @@ namespace ADDIN.Commands
 
                 string buhinNo = GetCustomProperty(swPart, "", "部品番号");
 
-                swPart.ShowConfiguration2(confDef);
-                swPart.EditRebuild3();
-
-                double areaDf = Math.Round(GetFlatAreaFromDefault(swPart, confDef) * 1000000.0, 1);
-
-                string outerDf;
-                string innerDf;
-                GetCutListValues(swPart, out outerDf, out innerDf);
-
-                double areaTk = 0;
-                string outerTk = "";
-                string innerTk = "";
-
-                if (HasConfiguration(swPart, confFlat))
-                {
-                    swPart.ShowConfiguration2(confFlat);
-                    swPart.EditRebuild3();
-
-                    areaTk = Math.Round(GetFlatAreaFromFlatConfig(swPart, confFlat) * 1000000.0, 1);
-                    GetCutListValues(swPart, out outerTk, out innerTk);
-                }
-                else
+                if (!HasConfiguration(swPart, confFlat))
                 {
                     LastSkipReason = "Khong co flat config: " + confFlat;
+                    return null;
+                }
+
+                // Capture the existing Flat-Pattern state first. Do not rebuild,
+                // unsuppress, or update its Cut List before taking this snapshot;
+                // otherwise SOLIDWORKS can refresh the stale flat geometry and
+                // hide the difference that this command is intended to detect.
+                string flatActivationError;
+                if (!TryShowConfiguration(swPart, confFlat, out flatActivationError))
+                {
+                    LastSkipReason = "Khong chuyen duoc sang flat config: " + confFlat
+                        + ". " + flatActivationError;
+                    return null;
+                }
+
+                double areaTk = Math.Round(GetSurfaceArea(swPart) * 1000000.0, 1);
+                GeometrySignature geometryTk = CaptureGeometrySignature(swPart);
+                string outerTk;
+                string innerTk;
+                GetCutListValues(swPart, false, out outerTk, out innerTk);
+
+                // DF is rebuilt only in a disposable copy. Never toggle or
+                // rebuild FlatPattern in the original document because doing so
+                // can refresh the saved TK/cut-list state that we need to check.
+                GeometrySignature geometryDf;
+                double areaDf;
+                string outerDf;
+                string innerDf;
+                string dfCaptureError;
+                if (!TryCaptureDfFromTemporaryCopy(
+                    swPart,
+                    confDef,
+                    out areaDf,
+                    out geometryDf,
+                    out outerDf,
+                    out innerDf,
+                    out dfCaptureError))
+                {
+                    LastSkipReason = "Khong doc duoc DF tu ban sao tam. " + dfCaptureError;
+                    return null;
                 }
 
                 bool diffOuter = outerDf != outerTk;
                 bool diffInner = innerDf != innerTk;
                 bool diffArea = areaDf != areaTk;
+                GeometryComparison geometryComparison = CompareGeometry(geometryDf, geometryTk);
+                bool diffGeometry = geometryComparison.Compared && geometryComparison.IsDifferent;
 
                 DfTkResult checkedResult = new DfTkResult
                 {
@@ -767,12 +808,17 @@ namespace ADDIN.Commands
                     AreaTk = areaTk,
                     DiffOuter = diffOuter,
                     DiffInner = diffInner,
-                    DiffArea = diffArea
+                    DiffArea = diffArea,
+                    DiffGeometry = diffGeometry,
+                    GeometryCompared = geometryComparison.Compared,
+                    GeometryDfSummary = geometryDf.Summary,
+                    GeometryTkSummary = geometryTk.Summary,
+                    GeometryNote = geometryComparison.Detail
                 };
 
                 LastCheckedResult = checkedResult;
 
-                if (!diffOuter && !diffInner && !diffArea)
+                if (!diffOuter && !diffInner && !diffArea && !diffGeometry)
                 {
                     LastSkipReason = "Khong khac nhau";
                     return null;
@@ -789,30 +835,46 @@ namespace ADDIN.Commands
                 if (diffArea)
                     diffText += diffText == "" ? "表面積" : ", 表面積";
 
+                if (diffGeometry)
+                    diffText += diffText == ""
+                        ? "SAI VỊ TRÍ HÌNH HỌC"
+                        : ", SAI VỊ TRÍ HÌNH HỌC";
+
+                if (diffGeometry && !string.IsNullOrWhiteSpace(geometryComparison.Detail))
+                    diffText += " - " + geometryComparison.Detail;
+
                 checkedResult.DiffText = diffText;
                 return checkedResult;
             }
             finally
             {
-                try
-                {
-                    swPart.ShowConfiguration2(originalConfig);
-                    swPart.EditRebuild3();
-                }
-                catch
-                {
-                }
-
                 if (closeAfterCheck)
                 {
                     try
                     {
+                        // This document was opened silently by the checker. Close
+                        // it immediately without saving; restoring its display
+                        // configuration first would only add another activation.
                         swApp.CloseDoc(swPart.GetTitle());
                     }
                     catch
                     {
                     }
                 }
+                else
+                {
+                    try
+                    {
+                        // Never close a document that was already loaded by the
+                        // user or by the assembly. Return only its configuration.
+                        swPart.ShowConfiguration2(originalConfig);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                RestoreActiveDocument(activeDocBeforeCheck);
             }
         }
 
@@ -831,6 +893,128 @@ namespace ADDIN.Commands
             return false;
         }
 
+        private bool TryShowConfiguration(
+            ModelDoc2 swPart,
+            string confName,
+            out string failureDetail)
+        {
+            failureDetail = "";
+
+            bool showResult = false;
+            string firstError = "";
+
+            try
+            {
+                showResult = swPart.ShowConfiguration2(confName);
+            }
+            catch (Exception ex)
+            {
+                firstError = ex.Message;
+            }
+
+            // ShowConfiguration2 can return false for a model document that is
+            // loaded only through an assembly. Verify the actual active
+            // configuration before treating that return value as a failure.
+            if (IsConfigurationActive(swPart, confName))
+                return true;
+
+            int activateErrors = 0;
+
+            try
+            {
+                string activationName = GetDocumentActivationName(swPart);
+                ModelDoc2 activatedPart = swApp.ActivateDoc3(
+                    activationName,
+                    false,
+                    (int)swRebuildOnActivation_e.swDontRebuildActiveDoc,
+                    ref activateErrors
+                ) as ModelDoc2;
+
+                if (activatedPart != null)
+                    swPart = activatedPart;
+
+                showResult = swPart.ShowConfiguration2(confName);
+
+                if (IsConfigurationActive(swPart, confName))
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                failureDetail = "ActivateDoc3 error=" + activateErrors + ", exception=" + ex.Message;
+                return false;
+            }
+
+            string activeConfig = GetActiveConfigurationName(swPart);
+            failureDetail = "ShowConfiguration2=" + showResult
+                + ", ActivateDoc3 error=" + activateErrors
+                + ", active=" + (string.IsNullOrWhiteSpace(activeConfig) ? "<none>" : activeConfig);
+
+            if (!string.IsNullOrWhiteSpace(firstError))
+                failureDetail += ", first exception=" + firstError;
+
+            return false;
+        }
+
+        private bool IsConfigurationActive(ModelDoc2 swPart, string confName)
+        {
+            return string.Equals(
+                GetActiveConfigurationName(swPart),
+                confName,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string GetActiveConfigurationName(ModelDoc2 swPart)
+        {
+            try
+            {
+                Configuration activeConfiguration = swPart.ConfigurationManager.ActiveConfiguration;
+                return activeConfiguration == null ? "" : activeConfiguration.Name;
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private string GetDocumentActivationName(ModelDoc2 swPart)
+        {
+            string path = swPart.GetPathName();
+            if (!string.IsNullOrWhiteSpace(path))
+                return Path.GetFileName(path);
+
+            return swPart.GetTitle();
+        }
+
+        private void RestoreActiveDocument(ModelDoc2 document)
+        {
+            if (document == null)
+                return;
+
+            try
+            {
+                ModelDoc2 current = swApp.ActiveDoc as ModelDoc2;
+                if (current != null
+                    && string.Equals(
+                        GetDocumentActivationName(current),
+                        GetDocumentActivationName(document),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                int activateErrors = 0;
+                swApp.ActivateDoc3(
+                    GetDocumentActivationName(document),
+                    false,
+                    (int)swRebuildOnActivation_e.swDontRebuildActiveDoc,
+                    ref activateErrors
+                );
+            }
+            catch
+            {
+            }
+        }
+
         private string GetCustomProperty(ModelDoc2 model, string configName, string propName)
         {
             CustomPropertyManager propMgr = model.Extension.get_CustomPropertyManager(configName);
@@ -845,7 +1029,11 @@ namespace ADDIN.Commands
             return resolvedVal;
         }
 
-        private void GetCutListValues(ModelDoc2 swPart, out string outer, out string inner)
+        private void GetCutListValues(
+            ModelDoc2 swPart,
+            bool updateCutList,
+            out string outer,
+            out string inner)
         {
             outer = "";
             inner = "";
@@ -857,7 +1045,7 @@ namespace ADDIN.Commands
                 if (feat.GetTypeName2() == "CutListFolder")
                 {
                     BodyFolder bodyFolder = feat.GetSpecificFeature2() as BodyFolder;
-                    if (bodyFolder != null)
+                    if (updateCutList && bodyFolder != null)
                         bodyFolder.UpdateCutList();
 
                     CustomPropertyManager propMgr = feat.CustomPropertyManager;
@@ -917,8 +1105,165 @@ namespace ADDIN.Commands
             return mass.SurfaceArea;
         }
 
-        private double GetFlatAreaFromDefault(ModelDoc2 swPart, string confDef)
+        private bool TryCaptureDfFromTemporaryCopy(
+            ModelDoc2 sourcePart,
+            string confDef,
+            out double areaDf,
+            out GeometrySignature geometryDf,
+            out string outerDf,
+            out string innerDf,
+            out string failureDetail)
         {
+            areaDf = 0.0;
+            geometryDf = GeometrySignature.Invalid("Chua doc hinh hoc DF");
+            outerDf = "";
+            innerDf = "";
+            failureDetail = "";
+
+            if (sourcePart == null)
+            {
+                failureDetail = "Part nguon null";
+                return false;
+            }
+
+            string sourcePath = sourcePart.GetPathName();
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            {
+                failureDetail = "Part chua duoc luu hoac path khong ton tai: " + sourcePath;
+                return false;
+            }
+
+            string tempId = Guid.NewGuid().ToString("N");
+            string tempDirectory = Path.Combine(
+                Path.GetTempPath(),
+                "TAI_TOOL_DFTK_" + tempId);
+            string tempPartPath = Path.Combine(
+                tempDirectory,
+                Path.GetFileNameWithoutExtension(sourcePath)
+                    + "_DFTK_" + tempId.Substring(0, 8)
+                    + Path.GetExtension(sourcePath));
+            ModelDoc2 tempPart = null;
+            ModelDoc2 activeDocBeforeTemp = swApp.ActiveDoc as ModelDoc2;
+            bool partVisibilityChanged = false;
+
+            try
+            {
+                Directory.CreateDirectory(tempDirectory);
+                File.Copy(sourcePath, tempPartPath, true);
+
+                int errors = 0;
+                int warnings = 0;
+                swApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
+                partVisibilityChanged = true;
+                tempPart = swApp.OpenDoc6(
+                    tempPartPath,
+                    (int)swDocumentTypes_e.swDocPART,
+                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                    "",
+                    ref errors,
+                    ref warnings) as ModelDoc2;
+
+                if (tempPart == null)
+                {
+                    failureDetail = "Khong mo duoc ban sao tam. errors="
+                        + errors + ", warnings=" + warnings;
+                    return false;
+                }
+
+                if (!HasConfiguration(tempPart, confDef))
+                {
+                    failureDetail = "Ban sao tam khong co configuration: " + confDef;
+                    return false;
+                }
+
+                string activationError;
+                if (!TryShowConfiguration(tempPart, confDef, out activationError))
+                {
+                    failureDetail = "Khong chuyen duoc ban sao tam sang configuration "
+                        + confDef + ". " + activationError;
+                    return false;
+                }
+
+                Feature flatFeature = FindFlatPatternFeature(tempPart);
+                if (flatFeature == null)
+                {
+                    failureDetail = "Ban sao tam khong co FlatPattern";
+                    return false;
+                }
+
+                flatFeature.SetSuppression2(
+                    (int)swFeatureSuppressionAction_e.swUnSuppressFeature,
+                    (int)swInConfigurationOpts_e.swThisConfiguration,
+                    null);
+
+                // This is the only explicit rebuild in DF/TK. It runs in the
+                // temporary file, which is always closed without saving.
+                tempPart.EditRebuild3();
+
+                areaDf = Math.Round(GetSurfaceArea(tempPart) * 1000000.0, 1);
+                geometryDf = CaptureGeometrySignature(tempPart);
+                GetCutListValues(tempPart, true, out outerDf, out innerDf);
+
+                System.Diagnostics.Debug.WriteLine(
+                    "[CHECK DF/TK] DF captured from temporary copy. Source="
+                    + sourcePath + ", Temp=" + tempPartPath
+                    + ", Area=" + areaDf.ToString("0.0")
+                    + ", Outer=" + outerDf + ", Inner=" + innerDf);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                failureDetail = ex.Message;
+                return false;
+            }
+            finally
+            {
+                if (partVisibilityChanged)
+                {
+                    try
+                    {
+                        swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (tempPart != null)
+                {
+                    try
+                    {
+                        swApp.CloseDoc(tempPart.GetTitle());
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                RestoreActiveDocument(activeDocBeforeTemp);
+
+                try
+                {
+                    if (Directory.Exists(tempDirectory))
+                        Directory.Delete(tempDirectory, true);
+                }
+                catch (Exception cleanupException)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        "[CHECK DF/TK] Khong xoa duoc thu muc tam: "
+                        + tempDirectory + ". " + cleanupException.Message);
+                }
+            }
+        }
+
+        // Legacy implementation retained for quick rollback. The active logic
+        // above no longer calls this method on the original document.
+        private double GetFlatAreaFromDefault(
+            ModelDoc2 swPart,
+            string confDef,
+            out GeometrySignature geometrySignature)
+        {
+            geometrySignature = GeometrySignature.Invalid("Chua doc hinh hoc DF");
             Feature flatFeat = FindFlatPatternFeature(swPart);
             if (flatFeat == null)
                 return 0;
@@ -931,10 +1276,10 @@ namespace ADDIN.Commands
                 null
             );
 
-            swPart.ForceRebuild3(false);
             swPart.EditRebuild3();
 
             double area = GetSurfaceArea(swPart);
+            geometrySignature = CaptureGeometrySignature(swPart);
 
             flatFeat.SetSuppression2(
                 (int)swFeatureSuppressionAction_e.swSuppressFeature,
@@ -942,30 +1287,474 @@ namespace ADDIN.Commands
                 null
             );
 
-            swPart.ForceRebuild3(false);
             swPart.EditRebuild3();
 
             return area;
         }
 
-        private double GetFlatAreaFromFlatConfig(ModelDoc2 swPart, string confFlat)
+        private GeometrySignature CaptureGeometrySignature(ModelDoc2 swPart)
         {
-            Feature flatFeat = FindFlatPatternFeature(swPart);
-            if (flatFeat == null)
-                return 0;
+            try
+            {
+                PartDoc part = swPart as PartDoc;
+                if (part == null)
+                    return GeometrySignature.Invalid("Khong phai Part");
 
-            swPart.ShowConfiguration2(confFlat);
+                object[] bodies = part.GetBodies2(
+                    (int)swBodyType_e.swSolidBody,
+                    true) as object[];
 
-            flatFeat.SetSuppression2(
-                (int)swFeatureSuppressionAction_e.swUnSuppressFeature,
-                (int)swInConfigurationOpts_e.swThisConfiguration,
-                null
-            );
+                if (bodies == null || bodies.Length == 0)
+                    return GeometrySignature.Invalid("Khong co solid body");
 
-            swPart.ForceRebuild3(false);
-            swPart.EditRebuild3();
+                Face2 largestPlanarFace = null;
+                double largestArea = 0;
 
-            return GetSurfaceArea(swPart);
+                foreach (object bodyObject in bodies)
+                {
+                    Body2 body = bodyObject as Body2;
+                    if (body == null)
+                        continue;
+
+                    object[] faces = body.GetFaces() as object[];
+                    if (faces == null)
+                        continue;
+
+                    foreach (object faceObject in faces)
+                    {
+                        Face2 face = faceObject as Face2;
+                        if (face == null)
+                            continue;
+
+                        Surface surface = face.GetSurface() as Surface;
+                        if (surface == null || !surface.IsPlane())
+                            continue;
+
+                        double area = face.GetArea();
+                        if (area > largestArea)
+                        {
+                            largestArea = area;
+                            largestPlanarFace = face;
+                        }
+                    }
+                }
+
+                if (largestPlanarFace == null)
+                    return GeometrySignature.Invalid("Khong tim thay mat phang chinh");
+
+                GeometrySignature signature = new GeometrySignature();
+                object[] loops = largestPlanarFace.GetLoops() as object[];
+
+                if (loops == null || loops.Length == 0)
+                    return GeometrySignature.Invalid("Mat phang khong co loop");
+
+                foreach (object loopObject in loops)
+                {
+                    Loop2 loop = loopObject as Loop2;
+                    if (loop == null)
+                        continue;
+
+                    object[] edges = loop.GetEdges() as object[];
+                    if (edges == null || edges.Length == 0)
+                        continue;
+
+                    if (loop.IsOuter())
+                    {
+                        AddLoopReferencePoints(edges, signature.OuterReferencePoints);
+                        continue;
+                    }
+
+                    InnerLoopGeometry innerLoop = CreateInnerLoopGeometry(edges);
+                    if (innerLoop != null)
+                        signature.InnerLoops.Add(innerLoop);
+                }
+
+                if (signature.OuterReferencePoints.Count == 0)
+                {
+                    double[] box = largestPlanarFace.GetBox() as double[];
+                    if (box != null && box.Length >= 6)
+                    {
+                        AddUniquePoint(signature.OuterReferencePoints, new Point3(box[0], box[1], box[2]));
+                        AddUniquePoint(signature.OuterReferencePoints, new Point3(box[3], box[4], box[5]));
+                    }
+                }
+
+                signature.BuildInvariantSeries();
+                signature.Valid = true;
+                signature.Summary = "InnerLoop=" + signature.InnerLoops.Count
+                    + ", OuterRef=" + signature.OuterReferencePoints.Count;
+                return signature;
+            }
+            catch (Exception ex)
+            {
+                return GeometrySignature.Invalid(ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        private InnerLoopGeometry CreateInnerLoopGeometry(object[] edges)
+        {
+            List<Point3> edgePoints = new List<Point3>();
+            List<Point3> circleCenters = new List<Point3>();
+            List<double> circleRadiiMm = new List<double>();
+            double perimeterMm = 0;
+            bool allCircular = true;
+
+            foreach (object edgeObject in edges)
+            {
+                Edge edge = edgeObject as Edge;
+                if (edge == null)
+                    continue;
+
+                AddEdgeEndPoints(edge, edgePoints);
+
+                Curve curve = edge.GetCurve() as Curve;
+                if (curve == null)
+                {
+                    allCircular = false;
+                    continue;
+                }
+
+                try
+                {
+                    CurveParamData parameters = edge.GetCurveParams3();
+                    if (parameters != null)
+                    {
+                        perimeterMm += curve.GetLength3(
+                            parameters.UMinValue,
+                            parameters.UMaxValue) * 1000.0;
+                    }
+                }
+                catch
+                {
+                }
+
+                if (!curve.IsCircle())
+                {
+                    allCircular = false;
+                    continue;
+                }
+
+                double[] circle = curve.CircleParams as double[];
+                if (circle != null && circle.Length >= 7)
+                {
+                    circleCenters.Add(new Point3(circle[0], circle[1], circle[2]));
+                    circleRadiiMm.Add(circle[6] * 1000.0);
+                }
+            }
+
+            Point3 center;
+            double radiusMm = 0;
+
+            if (allCircular
+                && circleCenters.Count > 0
+                && CircleCentersAreCoincident(circleCenters))
+            {
+                center = AveragePoint(circleCenters);
+                radiusMm = circleRadiiMm.Count == 0 ? 0 : circleRadiiMm[0];
+            }
+            else if (edgePoints.Count > 0)
+            {
+                center = AveragePoint(edgePoints);
+            }
+            else if (circleCenters.Count > 0)
+            {
+                center = AveragePoint(circleCenters);
+            }
+            else
+            {
+                return null;
+            }
+
+            return new InnerLoopGeometry
+            {
+                Center = center,
+                PerimeterMm = perimeterMm,
+                RadiusMm = radiusMm
+            };
+        }
+
+        private void AddLoopReferencePoints(object[] edges, List<Point3> points)
+        {
+            foreach (object edgeObject in edges)
+            {
+                Edge edge = edgeObject as Edge;
+                if (edge != null)
+                    AddEdgeEndPoints(edge, points);
+            }
+        }
+
+        private void AddEdgeEndPoints(Edge edge, List<Point3> points)
+        {
+            try
+            {
+                CurveParamData parameters = edge.GetCurveParams3();
+                if (parameters == null)
+                    return;
+
+                AddPointArray(points, parameters.StartPoint as double[]);
+                AddPointArray(points, parameters.EndPoint as double[]);
+            }
+            catch
+            {
+            }
+        }
+
+        private void AddPointArray(List<Point3> points, double[] coordinates)
+        {
+            if (coordinates == null || coordinates.Length < 3)
+                return;
+
+            AddUniquePoint(points, new Point3(coordinates[0], coordinates[1], coordinates[2]));
+        }
+
+        private void AddUniquePoint(List<Point3> points, Point3 point)
+        {
+            const double duplicateToleranceMeters = 0.000001;
+
+            foreach (Point3 existing in points)
+            {
+                if (existing.DistanceTo(point) <= duplicateToleranceMeters)
+                    return;
+            }
+
+            points.Add(point);
+        }
+
+        private bool CircleCentersAreCoincident(List<Point3> centers)
+        {
+            if (centers == null || centers.Count == 0)
+                return false;
+
+            Point3 first = centers[0];
+            for (int i = 1; i < centers.Count; i++)
+            {
+                if (first.DistanceTo(centers[i]) > 0.00001)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private Point3 AveragePoint(List<Point3> points)
+        {
+            double x = 0;
+            double y = 0;
+            double z = 0;
+
+            foreach (Point3 point in points)
+            {
+                x += point.X;
+                y += point.Y;
+                z += point.Z;
+            }
+
+            return new Point3(x / points.Count, y / points.Count, z / points.Count);
+        }
+
+        private GeometryComparison CompareGeometry(
+            GeometrySignature df,
+            GeometrySignature tk)
+        {
+            if (df == null || tk == null || !df.Valid || !tk.Valid)
+            {
+                string dfReason = df == null ? "null" : df.FailureReason;
+                string tkReason = tk == null ? "null" : tk.FailureReason;
+                return GeometryComparison.NotCompared(
+                    "Khong doc duoc hinh hoc. DF=" + dfReason + ", TK=" + tkReason);
+            }
+
+            const double toleranceMm = 0.1;
+            double maxDeltaMm = 0;
+            string changedSeries = "";
+
+            if (df.InnerLoops.Count != tk.InnerLoops.Count)
+            {
+                return GeometryComparison.Different(
+                    "Số biên dạng kín bên trong DF=" + df.InnerLoops.Count
+                    + ", TK=" + tk.InnerLoops.Count);
+            }
+
+            if (!CompareSortedSeries(
+                df.LoopPerimetersMm,
+                tk.LoopPerimetersMm,
+                toleranceMm,
+                ref maxDeltaMm))
+            {
+                changedSeries = "kích thước biên dạng kín bên trong";
+            }
+
+            double centerPairDelta = 0;
+            if (!CompareSortedSeries(
+                df.InnerCenterPairDistancesMm,
+                tk.InnerCenterPairDistancesMm,
+                toleranceMm,
+                ref centerPairDelta))
+            {
+                changedSeries = string.IsNullOrWhiteSpace(changedSeries)
+                    ? "khoảng cách giữa các biên dạng kín bên trong"
+                    : changedSeries + ", khoảng cách giữa các biên dạng kín bên trong";
+                maxDeltaMm = Math.Max(maxDeltaMm, centerPairDelta);
+            }
+
+            double outerReferenceDelta = 0;
+            if (!CompareSortedSeries(
+                df.InnerToOuterReferenceDistancesMm,
+                tk.InnerToOuterReferenceDistancesMm,
+                toleranceMm,
+                ref outerReferenceDelta))
+            {
+                changedSeries = string.IsNullOrWhiteSpace(changedSeries)
+                    ? "vị trí biên dạng kín bên trong so với biên ngoài"
+                    : changedSeries + ", vị trí biên dạng kín bên trong so với biên ngoài";
+                maxDeltaMm = Math.Max(maxDeltaMm, outerReferenceDelta);
+            }
+
+            if (!string.IsNullOrWhiteSpace(changedSeries))
+            {
+                return GeometryComparison.Different(
+                    changedSeries + "; lệch lớn nhất "
+                    + maxDeltaMm.ToString("0.###") + " mm");
+            }
+
+            return GeometryComparison.Same();
+        }
+
+        private bool CompareSortedSeries(
+            List<double> first,
+            List<double> second,
+            double toleranceMm,
+            ref double maxDeltaMm)
+        {
+            if (first == null || second == null || first.Count != second.Count)
+            {
+                maxDeltaMm = double.PositiveInfinity;
+                return false;
+            }
+
+            List<double> firstSorted = new List<double>(first);
+            List<double> secondSorted = new List<double>(second);
+            firstSorted.Sort();
+            secondSorted.Sort();
+
+            bool same = true;
+            for (int i = 0; i < firstSorted.Count; i++)
+            {
+                double delta = Math.Abs(firstSorted[i] - secondSorted[i]);
+                maxDeltaMm = Math.Max(maxDeltaMm, delta);
+                if (delta > toleranceMm)
+                    same = false;
+            }
+
+            return same;
+        }
+
+        private sealed class GeometrySignature
+        {
+            public GeometrySignature()
+            {
+                InnerLoops = new List<InnerLoopGeometry>();
+                OuterReferencePoints = new List<Point3>();
+                LoopPerimetersMm = new List<double>();
+                InnerCenterPairDistancesMm = new List<double>();
+                InnerToOuterReferenceDistancesMm = new List<double>();
+            }
+
+            public bool Valid { get; set; }
+            public string FailureReason { get; set; }
+            public string Summary { get; set; }
+            public List<InnerLoopGeometry> InnerLoops { get; private set; }
+            public List<Point3> OuterReferencePoints { get; private set; }
+            public List<double> LoopPerimetersMm { get; private set; }
+            public List<double> InnerCenterPairDistancesMm { get; private set; }
+            public List<double> InnerToOuterReferenceDistancesMm { get; private set; }
+
+            public static GeometrySignature Invalid(string reason)
+            {
+                return new GeometrySignature
+                {
+                    Valid = false,
+                    FailureReason = reason ?? ""
+                };
+            }
+
+            public void BuildInvariantSeries()
+            {
+                foreach (InnerLoopGeometry loop in InnerLoops)
+                {
+                    LoopPerimetersMm.Add(loop.PerimeterMm);
+
+                    foreach (Point3 outerPoint in OuterReferencePoints)
+                    {
+                        InnerToOuterReferenceDistancesMm.Add(
+                            loop.Center.DistanceTo(outerPoint) * 1000.0);
+                    }
+                }
+
+                for (int i = 0; i < InnerLoops.Count; i++)
+                {
+                    for (int j = i + 1; j < InnerLoops.Count; j++)
+                    {
+                        InnerCenterPairDistancesMm.Add(
+                            InnerLoops[i].Center.DistanceTo(InnerLoops[j].Center) * 1000.0);
+                    }
+                }
+            }
+        }
+
+        private sealed class InnerLoopGeometry
+        {
+            public Point3 Center { get; set; }
+            public double PerimeterMm { get; set; }
+            public double RadiusMm { get; set; }
+        }
+
+        private sealed class Point3
+        {
+            public Point3(double x, double y, double z)
+            {
+                X = x;
+                Y = y;
+                Z = z;
+            }
+
+            public double X { get; private set; }
+            public double Y { get; private set; }
+            public double Z { get; private set; }
+
+            public double DistanceTo(Point3 other)
+            {
+                double dx = X - other.X;
+                double dy = Y - other.Y;
+                double dz = Z - other.Z;
+                return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            }
+        }
+
+        private sealed class GeometryComparison
+        {
+            public bool Compared { get; private set; }
+            public bool IsDifferent { get; private set; }
+            public string Detail { get; private set; }
+
+            public static GeometryComparison NotCompared(string detail)
+            {
+                return new GeometryComparison { Compared = false, Detail = detail ?? "" };
+            }
+
+            public static GeometryComparison Different(string detail)
+            {
+                return new GeometryComparison
+                {
+                    Compared = true,
+                    IsDifferent = true,
+                    Detail = detail ?? ""
+                };
+            }
+
+            public static GeometryComparison Same()
+            {
+                return new GeometryComparison { Compared = true, IsDifferent = false };
+            }
         }
     }
 
@@ -988,13 +1777,18 @@ namespace ADDIN.Commands
 
                 WriteResultHeader(xlWS);
                 WriteResults(xlWS, results);
+                FreezeTopRow(xlWS);
 
                 int lastRow = results.Count + 1;
                 if (lastRow > 1)
                     TrySortExcelByBuhinNo(xlWS, lastRow);
 
                 xlWS.Columns.AutoFit();
+                AutoFitNoteColumn(xlWS, Math.Max(1, lastRow), 9);
+                AutoFitNoteColumn(xlWS, Math.Max(1, lastRow), 11);
                 WriteCheckLog(xlWB, xlWS, checkLogs);
+                xlWS.Activate();
+                xlWS.Range["A1"].Select();
 
                 xlApp.Visible = true;
                 MessageBox.Show("Da so sanh xong. Co chi tiet khac nhau.", "Ket qua kiem tra", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1007,15 +1801,17 @@ namespace ADDIN.Commands
 
         private static void WriteResultHeader(dynamic xlWS)
         {
-            xlWS.Cells[1, 1].Value = "Component";
-            xlWS.Cells[1, 2].Value = "部品番号";
+            xlWS.Cells[1, 1].Value = "部品番号";
+            xlWS.Cells[1, 2].Value = "Component";
             xlWS.Cells[1, 3].Value = "外側-DF";
             xlWS.Cells[1, 4].Value = "外側-TK";
             xlWS.Cells[1, 5].Value = "内側-DF";
             xlWS.Cells[1, 6].Value = "内側-TK";
             xlWS.Cells[1, 7].Value = "表面積 DF (mm2)";
             xlWS.Cells[1, 8].Value = "表面積 TK (mm2)";
-            xlWS.Cells[1, 9].Value = "Khac nhau";
+            xlWS.Cells[1, 9].Value = "差分値 (DF-TK)";
+            xlWS.Cells[1, 10].Value = "Status";
+            xlWS.Cells[1, 11].Value = "Note";
         }
 
         private static void WriteResults(dynamic xlWS, List<DfTkResult> results)
@@ -1023,15 +1819,18 @@ namespace ADDIN.Commands
             int xlRow = 2;
             foreach (DfTkResult result in results)
             {
-                xlWS.Cells[xlRow, 1].Value = result.Component;
-                xlWS.Cells[xlRow, 2].Value = result.BuhinNo;
+                xlWS.Cells[xlRow, 1].Value = result.BuhinNo;
+                xlWS.Cells[xlRow, 2].Value = result.Component;
                 xlWS.Cells[xlRow, 3].Value = result.OuterDf;
                 xlWS.Cells[xlRow, 4].Value = result.OuterTk;
                 xlWS.Cells[xlRow, 5].Value = result.InnerDf;
                 xlWS.Cells[xlRow, 6].Value = result.InnerTk;
                 xlWS.Cells[xlRow, 7].Value = result.AreaDf;
                 xlWS.Cells[xlRow, 8].Value = result.AreaTk;
-                xlWS.Cells[xlRow, 9].Value = result.DiffText;
+                xlWS.Cells[xlRow, 9].Value = BuildDifferenceValue(result);
+                xlWS.Cells[xlRow, 10].Value = "NG";
+                xlWS.Cells[xlRow, 11].Value = result.DiffText;
+                xlWS.Cells[xlRow, 9].WrapText = true;
 
                 int yellow = Rgb(255, 255, 153);
 
@@ -1053,8 +1852,107 @@ namespace ADDIN.Commands
                     xlWS.Cells[xlRow, 8].Interior.Color = yellow;
                 }
 
+                if (result.DiffOuter || result.DiffInner || result.DiffArea || result.DiffGeometry)
+                    xlWS.Cells[xlRow, 9].Interior.Color = yellow;
+
+                if (result.DiffGeometry)
+                    xlWS.Cells[xlRow, 11].Interior.Color = yellow;
+
                 xlRow++;
             }
+        }
+
+        private static string BuildDifferenceValue(DfTkResult result)
+        {
+            List<string> differences = new List<string>();
+
+            if (result.DiffOuter)
+                AddLengthDifference(differences, "外側", result.OuterDf, result.OuterTk);
+
+            if (result.DiffInner)
+                AddLengthDifference(differences, "内側", result.InnerDf, result.InnerTk);
+
+            if (result.DiffArea)
+            {
+                double areaDelta = result.AreaDf - result.AreaTk;
+                differences.Add("表面積: "
+                    + areaDelta.ToString("0.0", CultureInfo.InvariantCulture)
+                    + " mm2");
+            }
+
+            // Geometry does not have one DF/TK scalar value to subtract.
+            // If this is the only mismatch, keep the geometry detail here.
+            if (result.DiffGeometry && differences.Count == 0)
+            {
+                differences.Add("位置: "
+                    + (string.IsNullOrWhiteSpace(result.GeometryNote)
+                        ? "差異あり"
+                        : result.GeometryNote));
+            }
+
+            return string.Join(System.Environment.NewLine, differences);
+        }
+
+        private static void AddLengthDifference(
+            List<string> differences,
+            string label,
+            string dfText,
+            string tkText)
+        {
+            double dfValue;
+            double tkValue;
+
+            if (TryParseMeasurement(dfText, out dfValue)
+                && TryParseMeasurement(tkText, out tkValue))
+            {
+                double delta = dfValue - tkValue;
+                differences.Add(label + ": "
+                    + delta.ToString("0.###", CultureInfo.InvariantCulture)
+                    + " mm");
+                return;
+            }
+
+            differences.Add(label + ": DF=" + (dfText ?? "")
+                + " / TK=" + (tkText ?? "")
+                + " (計算不可)");
+        }
+
+        private static bool TryParseMeasurement(string text, out double value)
+        {
+            value = 0.0;
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            string normalized = text.Trim()
+                .Replace("mm²", "")
+                .Replace("mm2", "")
+                .Replace("mm", "")
+                .Trim();
+
+            if (double.TryParse(
+                normalized,
+                NumberStyles.Float | NumberStyles.AllowThousands,
+                CultureInfo.InvariantCulture,
+                out value))
+            {
+                return true;
+            }
+
+            if (double.TryParse(
+                normalized,
+                NumberStyles.Float | NumberStyles.AllowThousands,
+                CultureInfo.CurrentCulture,
+                out value))
+            {
+                return true;
+            }
+
+            normalized = normalized.Replace(',', '.');
+            return double.TryParse(
+                normalized,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value);
         }
 
         private static void WriteCheckLog(dynamic xlWB, dynamic xlWS, List<string> checkLogs)
@@ -1072,6 +1970,51 @@ namespace ADDIN.Commands
             }
 
             logSheet.Columns.AutoFit();
+            AutoFitNoteColumn(logSheet, checkLogs.Count + 1, 1);
+            FreezeTopRow(logSheet);
+        }
+
+        private static void FreezeTopRow(dynamic sheet)
+        {
+            if (sheet == null)
+                return;
+
+            try
+            {
+                sheet.Activate();
+                dynamic window = sheet.Application.ActiveWindow;
+                if (window == null)
+                    return;
+
+                window.FreezePanes = false;
+                window.SplitColumn = 0;
+                window.SplitRow = 1;
+                window.FreezePanes = true;
+            }
+            catch
+            {
+                // Freeze header is presentation only; export must still succeed.
+            }
+        }
+
+        private static void AutoFitNoteColumn(dynamic sheet, int lastRow, int noteColumn)
+        {
+            try
+            {
+                dynamic noteRange = sheet.Range[
+                    sheet.Cells[1, noteColumn],
+                    sheet.Cells[Math.Max(1, lastRow), noteColumn]];
+                dynamic excelColumn = sheet.Columns[noteColumn];
+                noteRange.WrapText = false;
+                excelColumn.AutoFit();
+                double width = Convert.ToDouble(excelColumn.ColumnWidth);
+                excelColumn.ColumnWidth = Math.Max(18.0, Math.Min(80.0, width));
+                noteRange.WrapText = true;
+                noteRange.Rows.AutoFit();
+            }
+            catch
+            {
+            }
         }
 
         private static void TrySortExcelByBuhinNo(dynamic xlWS, int lastRow)
@@ -1080,8 +2023,8 @@ namespace ADDIN.Commands
             {
                 dynamic sort = xlWS.Sort;
                 sort.SortFields.Clear();
-                sort.SortFields.Add(xlWS.Range["B2:B" + lastRow], 0, 1);
-                sort.SetRange(xlWS.Range["A1:I" + lastRow]);
+                sort.SortFields.Add(xlWS.Range["A2:A" + lastRow], 0, 1);
+                sort.SetRange(xlWS.Range["A1:K" + lastRow]);
                 sort.Header = 1;
                 sort.Apply();
             }
@@ -1116,5 +2059,10 @@ namespace ADDIN.Commands
         public bool DiffOuter { get; set; }
         public bool DiffInner { get; set; }
         public bool DiffArea { get; set; }
+        public bool DiffGeometry { get; set; }
+        public bool GeometryCompared { get; set; }
+        public string GeometryDfSummary { get; set; }
+        public string GeometryTkSummary { get; set; }
+        public string GeometryNote { get; set; }
     }
 }
