@@ -129,9 +129,8 @@ namespace ADDIN.Commands
         private readonly ISldWorks swApp;
 
         private const double RepairRoundToleranceMm = 0.5;
-
+        private const double RepairCenterDuplicateToleranceM = 0.0001; // 0.1 mm
         private bool holeWizardCommandStarted;
-
         private double[] pendingHoleWizardSeedPoint;
 
         private bool pendingHybridPattern;
@@ -401,6 +400,7 @@ namespace ADDIN.Commands
         public void RunRepairHole(MakeHoleOptions options)
         {
             Debug.WriteLine("[REPAIR HOLE] ===== RUN START =====");
+            Debug.WriteLine("[REPAIR HOLE] build=20260824-one-loop-one-reference-v2");
             if (options == null)
             {
                 Debug.WriteLine("[REPAIR HOLE] canceled: options=null");
@@ -7836,21 +7836,38 @@ namespace ADDIN.Commands
             }
             foreach (RepairHoleLoopCandidate item3 in list2)
             {
-                if (TryCreateRepairFillSurfaceCenter(model, item3, facePlaneFrame, out var fillFeature, out var center3))
+                // IMPORTANT:
+                // Moi RepairHoleLoopCandidate da dai dien cho 1 Face Loop rieng biet.
+                // Khong duoc gop 2 loop chi vi tam cua chung gan nhau, vi nhu vay co the
+                // lam mat lo that va lam lech mapping Center <-> Fill Surface <-> RH-P.
+                //
+                // Chi add vao CAC list khi ca Fill Surface va center deu hop le, de dam bao:
+                // centers[i] <-> temporaryFillFeatures[i] <-> RH-P(i+1) luon dung 1-1.
+                if (TryCreateRepairFillSurfaceCenter(
+                    model,
+                    item3,
+                    facePlaneFrame,
+                    out var fillFeature,
+                    out var center3)
+                    && fillFeature != null
+                    && IsPoint(center3))
                 {
-                    if (fillFeature != null)
-                    {
-                        temporaryFillFeatures.Add(fillFeature);
-                    }
-                    if (IsPoint(center3) && !ContainsNearPoint(list, center3, Math.Max(0.0005, diameterM * 0.2)))
-                    {
-                        list.Add(center3);
-                        looseDirections.Add(item3.MajorDirection ?? facePlaneFrame?.AxisU);
-                        Debug.WriteLine("[REPAIR HOLE] loop " + item3.Index + " center from fill surface=(" + (center3[0] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "," + (center3[1] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "," + (center3[2] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ")");
-                        continue;
-                    }
+                    temporaryFillFeatures.Add(fillFeature);
+                    list.Add(center3);
+                    looseDirections.Add(item3.MajorDirection ?? facePlaneFrame?.AxisU);
+
+                    Debug.WriteLine(
+                        "[REPAIR HOLE] loop " + item3.Index
+                        + " accepted 1:1. center=("
+                        + (center3[0] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
+                        + (center3[1] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
+                        + (center3[2] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ")");
+                    continue;
                 }
-                Debug.WriteLine("[REPAIR HOLE] loop " + item3.Index + " skipped: fill surface center is required.");
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE] loop " + item3.Index
+                    + " skipped: fill surface/center invalid.");
             }
             return list;
         }

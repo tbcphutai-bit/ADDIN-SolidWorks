@@ -27,6 +27,7 @@ namespace ADDIN
         private TaoDimKegaki drawingDimensionGenerator;
         private DimKichThuocLo holeDimensionCommand;
         private LenhDimCanhSongSong sectionEdgeDimensionCommand;
+        private SplineToArcsCommand splineToArcsCommand;
         private LenhNoteTextBalloon drawingTextAnnotationCommands;
         private CheckBalloon balloonChecker;
         private CheckDrawingBom drawingBomChecker;
@@ -36,7 +37,6 @@ namespace ADDIN
         private Timer componentDrawingTimer;
         private Timer makeHoleUpdateTimer;
         private Timer initialLayoutTimer;
-        private Button btnDimKichThuocLo;
         private ToolTip bomCommandToolTip;
         private Font bomCommandToolTipFont;
         private string manualBomCommandToolTipText;
@@ -142,7 +142,6 @@ namespace ADDIN
                 return;
             EnsureCheckBalloonButton();
             EnsureCheckDrawingBomButton();
-            EnsureDimHoleButton();
             EnsureMakeHolePaintNameControls();
             ApplyUnifiedTypography(this);
             ApplyDeleteButtonIcons();
@@ -177,6 +176,7 @@ namespace ADDIN
             drawingDimensionGenerator = new TaoDimKegaki(swApp);
             holeDimensionCommand = new DimKichThuocLo(swApp);
             sectionEdgeDimensionCommand = new LenhDimCanhSongSong(swApp);
+            splineToArcsCommand = new SplineToArcsCommand(swApp);
             xepUnitDrawing = new XepUnitDrawing(swApp);
             makeHoleCommand = new LenhMakeHole(swApp);
             paintHoleSummaryCommand = new PaintHoleSummaryCommand(swApp);
@@ -221,6 +221,7 @@ namespace ADDIN
             drawingDimensionGenerator = null;
             holeDimensionCommand = null;
             sectionEdgeDimensionCommand = null;
+            splineToArcsCommand = null;
             drawingTextAnnotationCommands = null;
             xepUnitDrawing = null;
             makeHoleCommand = null;
@@ -430,22 +431,6 @@ namespace ADDIN
             }
         }
 
-        private void EnsureDimHoleButton()
-        {
-            if (btnDimKichThuocLo != null)
-                return;
-
-            btnDimKichThuocLo = new Button();
-            btnDimKichThuocLo.Name = "btnDimKichThuocLo";
-            btnDimKichThuocLo.Text = "Dim kich\r\nthuoc lo";
-            btnDimKichThuocLo.Size = new Size(126, 44);
-            btnDimKichThuocLo.TabIndex = 6;
-            btnDimKichThuocLo.UseVisualStyleBackColor = false;
-
-            if (groupBox3 != null && !groupBox3.Controls.Contains(btnDimKichThuocLo))
-                groupBox3.Controls.Add(btnDimKichThuocLo);
-        }
-
         private void EnsureCheckBalloonButton()
         {
             if (btnCheckBalloon != null)
@@ -506,6 +491,7 @@ namespace ADDIN
             if (btnDimKichThuocLo != null)
                 btnDimKichThuocLo.Click += btnDimKichThuocLo_Click;
             btnDimMatCat.Click += btnDimMatCat_Click;
+            btnSplineToArcs.Click += btnSplineToArcs_Click;
             btnMakeHole.Click += btnMakeHole_Click;
             btnRepairHole.Click += btnRepairHole_Click;
             btnPaintHoleSummary.Click += btnPaintHoleSummary_Click;
@@ -745,54 +731,7 @@ namespace ADDIN
             StyleToolButton(btnClearBom, Color.FromArgb(255, 246, 246), Color.FromArgb(214, 158, 158), Color.FromArgb(255, 235, 235), textColor);
             StyleToolButton(button1, Color.FromArgb(246, 247, 249), Color.FromArgb(197, 204, 213), Color.FromArgb(235, 240, 246), textColor);
 
-            tabComponentDrawing.BackColor = pageBack;
-            tabComponentDrawing.UseVisualStyleBackColor = false;
-            grpComponentSize.ForeColor = titleColor;
-            grpComponentBom.ForeColor = titleColor;
-            groupBox1.ForeColor = titleColor;
-            groupBox2.ForeColor = titleColor;
-            groupBox3.ForeColor = titleColor;
-            groupBox3.Text = "Macro";
-            groupBox1.Text = "Width";
-            groupBox2.Text = "Length";
-
-            grpComponentSize.Font = CreateUiFont(8.75F, FontStyle.Bold);
-            grpComponentBom.Font = CreateUiFont(8.75F, FontStyle.Bold);
-            groupBox1.Font = CreateUiFont(8.5F, FontStyle.Bold);
-            groupBox2.Font = CreateUiFont(8.5F, FontStyle.Bold);
-            groupBox3.Font = CreateUiFont(8.75F, FontStyle.Bold);
-
-            txtWidth.Font = CreateUiFont(9.0F, FontStyle.Bold);
-            txtLength.Font = CreateUiFont(9.0F, FontStyle.Bold);
-            txtWidth.ForeColor = textColor;
-            txtLength.ForeColor = textColor;
-
-            StyleToolButton(btnGetWL, Color.FromArgb(244, 248, 253), Color.FromArgb(173, 193, 216), Color.FromArgb(232, 241, 252), Color.FromArgb(28, 65, 105));
-            StyleToolButton(btnHorizontalAlignment, Color.FromArgb(246, 247, 249), Color.FromArgb(197, 204, 213), Color.FromArgb(235, 240, 246), Color.FromArgb(42, 53, 66));
-            StyleToolButton(btnRotateCw, Color.FromArgb(246, 247, 249), Color.FromArgb(197, 204, 213), Color.FromArgb(235, 240, 246), Color.FromArgb(42, 53, 66));
-            StyleToolButton(btnRotateCcw, Color.FromArgb(246, 247, 249), Color.FromArgb(197, 204, 213), Color.FromArgb(235, 240, 246), Color.FromArgb(42, 53, 66));
-            StyleToolButton(btnNote, Color.FromArgb(246, 249, 252), Color.FromArgb(186, 200, 216), Color.FromArgb(234, 242, 250), Color.FromArgb(28, 72, 112));
-            StyleToolButton(btnText, Color.FromArgb(246, 249, 252), Color.FromArgb(186, 200, 216), Color.FromArgb(234, 242, 250), Color.FromArgb(28, 72, 112));
-            StyleToolButton(btnInsertBalloon, Color.FromArgb(246, 249, 252), Color.FromArgb(186, 200, 216), Color.FromArgb(234, 242, 250), Color.FromArgb(28, 72, 112));
-            StyleIconOnlyButton(btnDeleteNote);
-            StyleIconOnlyButton(btnDeleteText);
-
-            StyleMacroButton(dimvang, Color.FromArgb(201, 241, 211), Color.FromArgb(68, 154, 88), Color.FromArgb(183, 231, 196), Color.FromArgb(20, 102, 44));
-            StyleMacroButton(btnDimMatCat, Color.FromArgb(255, 235, 158), Color.FromArgb(205, 154, 28), Color.FromArgb(255, 223, 125), Color.FromArgb(118, 78, 0));
-            StyleMacroButton(btnDimKegaki, Color.FromArgb(219, 228, 255), Color.FromArgb(92, 119, 202), Color.FromArgb(202, 215, 252), Color.FromArgb(36, 66, 148));
-            StyleMacroButton(btnDimKichThuocLo, Color.FromArgb(226, 244, 255), Color.FromArgb(76, 151, 204), Color.FromArgb(207, 235, 252), Color.FromArgb(22, 89, 142));
-            StyleMacroButton(btnFixScale, Color.FromArgb(255, 215, 199), Color.FromArgb(204, 103, 70), Color.FromArgb(255, 199, 178), Color.FromArgb(139, 55, 30));
-
-            if (dimvang != null)
-                dimvang.Text = "Xoa DIM\r\nmau vang";
-            if (btnDimMatCat != null)
-                btnDimMatCat.Text = "Dim\r\nmat cat";
-            if (btnDimKegaki != null)
-                btnDimKegaki.Text = "Dim\r\nkegaki";
-            if (btnDimKichThuocLo != null)
-                btnDimKichThuocLo.Text = "Dim kich\r\nthuoc lo";
-            if (btnFixScale != null)
-                btnFixScale.Text = "Fix ti le";
+            // Component Drawing visual properties are defined exclusively in the Designer.
         }
 
         private void StyleBomTopButton(Button button)
@@ -1055,6 +994,10 @@ namespace ADDIN
         private void ApplyUnifiedTypography(Control root)
         {
             if (root == null)
+                return;
+
+            // Component Drawing is intentionally styled entirely by its WinForms Designer.
+            if (root == tabComponentDrawing)
                 return;
 
             root.Font = CreateUiFont(9.0F);
@@ -1454,6 +1397,11 @@ namespace ADDIN
         private void btnDimMatCat_Click(object sender, EventArgs e)
         {
             sectionEdgeDimensionCommand?.Run();
+        }
+
+        private void btnSplineToArcs_Click(object sender, EventArgs e)
+        {
+            splineToArcsCommand?.Run(this);
         }
 
         private void btnMakeHoleAccept_Click(object sender, EventArgs e)
@@ -2717,8 +2665,30 @@ namespace ADDIN
 
         private void dimvang_Click(object sender, EventArgs e)
         {
-            XoaDimMauVang cleaner = new XoaDimMauVang(swApp);
-            cleaner.DeleteDanglingDimensions();
+            using (DeleteYellowAnnotationsDialog dialog =
+                   new DeleteYellowAnnotationsDialog())
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                if (dialog.DeleteDimension)
+                {
+                    XoaDimMauVang cleaner = new XoaDimMauVang(swApp);
+                    cleaner.DeleteDanglingDimensions();
+                }
+
+                if (dialog.DeleteBalloon)
+                {
+                    XoaBalloonMauVang cleaner = new XoaBalloonMauVang(swApp);
+                    cleaner.DeleteDanglingBalloons();
+                }
+
+                if (dialog.DeleteText)
+                {
+                    XoaTextMauVang cleaner = new XoaTextMauVang(swApp);
+                    cleaner.DeleteDanglingText();
+                }
+            }
         }
 
         private void btnFixScale_Click(object sender, EventArgs e)
@@ -3185,6 +3155,7 @@ namespace ADDIN
 
             ConfigureMacroButton(dimvang);
             ConfigureMacroButton(btnDimMatCat);
+            ConfigureMacroButton(btnSplineToArcs);
             ConfigureMacroButton(btnDimKegaki);
             ConfigureMacroButton(btnDimKichThuocLo);
             ConfigureMacroButton(btnFixScale);
@@ -3193,6 +3164,7 @@ namespace ADDIN
             {
                 dimvang,
                 btnDimMatCat,
+                btnSplineToArcs,
                 btnDimKegaki,
                 btnDimKichThuocLo,
                 btnFixScale

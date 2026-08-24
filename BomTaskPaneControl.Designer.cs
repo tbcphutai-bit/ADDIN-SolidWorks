@@ -56,6 +56,7 @@ namespace ADDIN
             this.btnLoadBom = new System.Windows.Forms.Button();
             this.tabComponentDrawing = new System.Windows.Forms.TabPage();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
+            this.btnDimKichThuocLo = new System.Windows.Forms.Button();
             this.btnDimKegaki = new System.Windows.Forms.Button();
             this.btnFixScale = new System.Windows.Forms.Button();
             this.btnSplineToArcs = new System.Windows.Forms.Button();
@@ -524,6 +525,7 @@ namespace ADDIN
             // 
             // tabComponentDrawing
             // 
+            this.tabComponentDrawing.AutoScroll = true;
             this.tabComponentDrawing.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(251)))), ((int)(((byte)(253)))));
             this.tabComponentDrawing.Controls.Add(this.groupBox3);
             this.tabComponentDrawing.Controls.Add(this.grpComponentBom);
@@ -540,6 +542,7 @@ namespace ADDIN
             // 
             this.groupBox3.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.groupBox3.Controls.Add(this.btnDimKichThuocLo);
             this.groupBox3.Controls.Add(this.btnDimKegaki);
             this.groupBox3.Controls.Add(this.btnFixScale);
             this.groupBox3.Controls.Add(this.btnSplineToArcs);
@@ -553,6 +556,23 @@ namespace ADDIN
             this.groupBox3.TabIndex = 2;
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Macro";
+            // 
+            // btnDimKichThuocLo
+            // 
+            this.btnDimKichThuocLo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(244)))), ((int)(((byte)(255)))));
+            this.btnDimKichThuocLo.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(76)))), ((int)(((byte)(151)))), ((int)(((byte)(204)))));
+            this.btnDimKichThuocLo.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(207)))), ((int)(((byte)(235)))), ((int)(((byte)(252)))));
+            this.btnDimKichThuocLo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnDimKichThuocLo.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.btnDimKichThuocLo.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(22)))), ((int)(((byte)(89)))), ((int)(((byte)(142)))));
+            this.btnDimKichThuocLo.Location = new System.Drawing.Point(186, 132);
+            this.btnDimKichThuocLo.Name = "btnDimKichThuocLo";
+            this.btnDimKichThuocLo.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+            this.btnDimKichThuocLo.Size = new System.Drawing.Size(126, 44);
+            this.btnDimKichThuocLo.TabIndex = 6;
+            this.btnDimKichThuocLo.Text = "Dim kich\r\nthuoc lo";
+            this.btnDimKichThuocLo.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+            this.btnDimKichThuocLo.UseVisualStyleBackColor = false;
             // 
             // btnDimKegaki
             // 
@@ -1651,7 +1671,7 @@ namespace ADDIN
             // BomTaskPaneControl
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.Controls.Add(this.tabBom);
             this.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
@@ -1729,6 +1749,7 @@ namespace ADDIN
         private System.Windows.Forms.TextBox txtLength;
         private System.Windows.Forms.GroupBox groupBox3;
         private System.Windows.Forms.Button btnDimKegaki;
+        private System.Windows.Forms.Button btnDimKichThuocLo;
         private System.Windows.Forms.Button btnFixScale;
         private System.Windows.Forms.Button dimvang;
         private System.Windows.Forms.Button button2;

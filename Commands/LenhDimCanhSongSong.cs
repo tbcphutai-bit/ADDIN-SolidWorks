@@ -29,7 +29,7 @@ namespace ADDIN.Commands
 
         public void Run()
         {
-            Debug.WriteLine("[DIM MAT CAT] build=20260821-envelope-first-valid-R-v13");
+            Debug.WriteLine("[DIM MAT CAT] build=20260824-section-R-arclength-v15");
             ModelDoc2 model = swApp?.ActiveDoc as ModelDoc2;
             if (model == null)
             {
@@ -110,19 +110,46 @@ namespace ADDIN.Commands
 
             if (selectedArc == null && selectedLineGeometryForCurvedProfile != null)
             {
+                // Thu tim canh trong danh sach visible edges truoc.
                 EdgeInfo selectedLine = FindMatchingEdgeGeometry(
                     edges,
                     selectedLineGeometryForCurvedProfile);
 
+                // Section View co the khong tra ve visible line edges.
+                // Khi do van dung truc tiep geometry cua canh user da click.
+                if (selectedLine == null)
+                {
+                    selectedLine = selectedLineGeometryForCurvedProfile;
+
+                    Debug.WriteLine(
+                        "[DIM MAT CAT CUNG] selected line not found in visible edges; " +
+                        "use clicked edge geometry directly.");
+                }
+
+                // Neu da xac dinh duoc thickness thi uu tien danh sach cung da loc.
+                // Neu thickness=0 thi tam dung raw arcs de tim cung noi voi canh click.
+                List<ArcInfo> arcSearchPool =
+                    usableArcs.Count > 0
+                        ? usableArcs
+                        : arcs;
+
                 selectedArc = FindArcConnectedToSelectedContour(
-                    usableArcs,
+                    arcSearchPool,
                     selectedLine,
                     materialThicknessMm);
 
-                // Neu edge click khong noi truc tiep voi cung, chi fallback khi
-                // trong view chi co 1 open arc DA QUA DIEU KIEN R > thickness + 0.1.
+                // Neu van chua tim duoc:
+                // chi fallback khi trong pool co dung 1 open arc.
                 if (selectedArc == null)
-                    selectedArc = FindSingleUsableOpenArc(usableArcs);
+                {
+                    selectedArc = FindSingleUsableOpenArc(arcSearchPool);
+                }
+
+                Debug.WriteLine(
+                    "[DIM MAT CAT CUNG] selected/connected arc result="
+                    + (selectedArc == null
+                        ? "none"
+                        : "R" + selectedArc.RadiusMm.ToString("0.###")));
             }
 
             Debug.WriteLine("[DIM MAT CAT] view=" + SafeViewName(view)
@@ -1021,73 +1048,172 @@ namespace ADDIN.Commands
         }
 
         private List<ArcInfo> GetCurvedProfileReferenceArcs(
-            List<ArcInfo> arcs,
-            List<EdgeInfo> edges,
-            double materialThicknessMm,
-            ArcInfo selectedArc)
+     List<ArcInfo> arcs,
+     List<EdgeInfo> edges,
+     double materialThicknessMm,
+     ArcInfo selectedArc)
         {
             List<ArcInfo> candidates = new List<ArcInfo>();
+
             if (arcs == null || arcs.Count == 0)
                 return candidates;
 
-            List<ArcInfo> usable = FilterUsableFilletArcs(arcs, materialThicknessMm);
+            // ============================================================
+            // UU TIEN CUNG DO USER CHON / CUNG NOI VOI CANH USER CHON.
+            //
+            // Section View co the khong lay duoc thickness -> thickness = 0.
+            // Trong truong hop do KHONG duoc loai selectedArc.
+            //
+            // Neu biet thickness thi van giu quy tac:
+            // R > thickness + 0.1
+            // ============================================================
+
+            ArcInfo explicitlySelectedArc =
+                FindMatchingArcGeometry(arcs, selectedArc);
+
+            bool thicknessKnown = materialThicknessMm > 0.001;
+
+            bool selectedArcAllowed =
+                explicitlySelectedArc != null
+                && explicitlySelectedArc.Edge != null
+                && !IsFullCircleArc(explicitlySelectedArc)
+                && explicitlySelectedArc.RadiusMm > 0.0
+                && explicitlySelectedArc.ArcLengthMm > 0.0
+                && (
+                    !thicknessKnown
+                    || IsDimensionableProfileArc(
+                        explicitlySelectedArc,
+                        materialThicknessMm)
+                );
+
+            if (selectedArcAllowed)
+            {
+                candidates.Add(explicitlySelectedArc);
+
+                Debug.WriteLine(
+                    "[DIM MAT CAT CUNG] accept selected arc. R="
+                    + explicitlySelectedArc.RadiusMm.ToString("0.###")
+                    + ", thickness="
+                    + materialThicknessMm.ToString("0.###")
+                    + ", thicknessKnown="
+                    + thicknessKnown);
+            }
+
+            // ============================================================
+            // AUTO DETECT CAC CUNG KHAC
+            // Khi thickness da biet, van giu quy tac R > thickness + 0.1
+            // ============================================================
+
+            List<ArcInfo> usable =
+                FilterUsableFilletArcs(arcs, materialThicknessMm);
 
             foreach (ArcInfo arc in usable)
             {
-                if (!IsDimensionableProfileArc(arc, materialThicknessMm))
+                if (!IsDimensionableProfileArc(
+                        arc,
+                        materialThicknessMm))
+                {
                     continue;
+                }
 
-                bool isSelectedProfileArc = selectedArc != null
-                    && FindMatchingArcGeometry(new List<ArcInfo> { arc }, selectedArc) != null;
+                bool isSelectedProfileArc =
+                    selectedArc != null
+                    && FindMatchingArcGeometry(
+                        new List<ArcInfo> { arc },
+                        selectedArc) != null;
 
-                bool hasParallelContourMate = HasParallelContourArcMate(
-                    arc,
-                    usable,
-                    materialThicknessMm);
+                bool hasParallelContourMate =
+                    HasParallelContourArcMate(
+                        arc,
+                        usable,
+                        materialThicknessMm);
 
-                // Cung R hop le nam tren contour co the noi truc tiep hai canh dai.
-                // Khong con dung cac nguong 5 mm / 3*t / t+0.2 vi dieu kien R
-                // da duoc thong nhat tai IsDimensionableProfileArc().
-                bool isConnectedProfileArc = CountConnectedLongLineEnds(
-                    arc,
-                    edges,
-                    materialThicknessMm) >= 2;
+                bool isConnectedProfileArc =
+                    CountConnectedLongLineEnds(
+                        arc,
+                        edges,
+                        materialThicknessMm) >= 2;
 
                 if (isSelectedProfileArc
                     || hasParallelContourMate
                     || isConnectedProfileArc)
                 {
-                    candidates.Add(arc);
+                    // Khong them trung selected arc.
+                    if (FindMatchingArcGeometry(
+                            candidates,
+                            arc) == null)
+                    {
+                        candidates.Add(arc);
+                    }
                 }
             }
 
-            ArcInfo selectedCandidate = FindMatchingArcGeometry(candidates, selectedArc);
+            // ============================================================
+            // NEU USER DA XAC DINH DUOC CUNG
+            // -> UU TIEN CUNG DO
+            // ============================================================
+
+            ArcInfo selectedCandidate =
+                FindMatchingArcGeometry(
+                    candidates,
+                    selectedArc);
+
             if (selectedCandidate != null)
             {
-                List<ArcInfo> selectedSide = new List<ArcInfo>();
-                double centerTolMm = Math.Max(0.4, materialThicknessMm * 0.3);
-                foreach (ArcInfo arc in candidates)
+                List<ArcInfo> selectedSide =
+                    new List<ArcInfo>();
+
+                double centerTolMm =
+                    Math.Max(
+                        0.4,
+                        materialThicknessMm * 0.3);
+
+                foreach (ArcInfo candidateArc in candidates)
                 {
-                    double centerGapMm = Distance2D(
-                        arc.CenterX,
-                        arc.CenterY,
-                        selectedCandidate.CenterX,
-                        selectedCandidate.CenterY) * 1000.0 / viewScale;
+                    double centerGapMm =
+                        Distance2D(
+                            candidateArc.CenterX,
+                            candidateArc.CenterY,
+                            selectedCandidate.CenterX,
+                            selectedCandidate.CenterY)
+                        * 1000.0 / viewScale;
+
                     if (centerGapMm <= centerTolMm
-                        && Math.Abs(arc.RadiusMm - selectedCandidate.RadiusMm) <= 0.15)
-                        selectedSide.Add(arc);
+                        && Math.Abs(
+                            candidateArc.RadiusMm
+                            - selectedCandidate.RadiusMm) <= 0.15)
+                    {
+                        selectedSide.Add(candidateArc);
+                    }
                 }
 
-                Debug.WriteLine("[DIM MAT CAT CUNG] selected contour R"
+                Debug.WriteLine(
+                    "[DIM MAT CAT CUNG] selected contour R"
                     + selectedCandidate.RadiusMm.ToString("0.###")
-                    + ", segments=" + selectedSide.Count);
+                    + ", segments="
+                    + selectedSide.Count);
+
                 return selectedSide;
             }
 
-            List<ArcInfo> innerContourArcs = SelectInnerContourArcs(candidates, materialThicknessMm);
-            Debug.WriteLine("[DIM MAT CAT CUNG] candidates=" + candidates.Count
-                + ", selectedInner=" + innerContourArcs.Count
-                + ", thicknessMm=" + materialThicknessMm.ToString("0.###"));
+            // ============================================================
+            // KHONG CO CUNG DUOC CHON
+            // -> DUNG LOGIC AUTO DETECT CU
+            // ============================================================
+
+            List<ArcInfo> innerContourArcs =
+                SelectInnerContourArcs(
+                    candidates,
+                    materialThicknessMm);
+
+            Debug.WriteLine(
+                "[DIM MAT CAT CUNG] candidates="
+                + candidates.Count
+                + ", selectedInner="
+                + innerContourArcs.Count
+                + ", thicknessMm="
+                + materialThicknessMm.ToString("0.###"));
+
             return innerContourArcs;
         }
 
@@ -1860,12 +1986,21 @@ namespace ADDIN.Commands
             return added;
         }
 
-        private bool ShouldAddArcLengthDimension(ArcInfo arc, double materialThicknessMm)
+        private bool ShouldAddArcLengthDimension(
+    ArcInfo arc,
+    double materialThicknessMm)
         {
-            // Lop bao ve thu hai: chi them arc-length khi chinh cung nay
-            // thoa R > thickness + 0.1.
-            return IsDimensionableProfileArc(arc, materialThicknessMm)
-                && arc.ArcLengthMm > 0.0;
+            // Cung den duoc day da duoc GetCurvedProfileReferenceArcs()
+            // xac nhan la cung profile can DIM.
+            //
+            // Section View co the khong lay duoc thickness (thickness = 0),
+            // nhung neu cung da duoc user chon/xac dinh thi van phai
+            // tao Arc Length nhu logic cu.
+            return arc != null
+                && arc.Edge != null
+                && !IsFullCircleArc(arc)
+                && arc.ArcLengthMm > 0.0
+                && arc.RadiusMm > 0.0;
         }
 
         private int AddRadiusDimensionForArc(

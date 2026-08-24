@@ -236,6 +236,39 @@ namespace ADDIN.Commands
                 Normal = localNormal
             };
         }
+
+        public static PlaneData CreatePartOriginAnchoredPlane(PlaneData selectedLocalPlane)
+        {
+            if (selectedLocalPlane == null || selectedLocalPlane.Normal == null || selectedLocalPlane.Normal.Length < 3)
+            {
+                throw new ArgumentException("Selected local mirror plane is invalid.", nameof(selectedLocalPlane));
+            }
+
+            double nx = selectedLocalPlane.Normal[0];
+            double ny = selectedLocalPlane.Normal[1];
+            double nz = selectedLocalPlane.Normal[2];
+            double length = Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (length <= 1e-12)
+            {
+                throw new InvalidOperationException("Selected local mirror plane has a zero-length normal.");
+            }
+
+            PlaneData anchoredPlane = new PlaneData
+            {
+                Origin = new double[] { 0.0, 0.0, 0.0 },
+                Normal = new double[] { nx / length, ny / length, nz / length }
+            };
+
+            double[] selectedOrigin = selectedLocalPlane.Origin ?? new double[] { 0.0, 0.0, 0.0 };
+            CreateMirrorPartPackage.LogDebug(
+                "PART_ORIGIN_MIRROR_PLANE\n" +
+                $"selectedPlaneOrigin=({selectedOrigin[0]:F9},{selectedOrigin[1]:F9},{selectedOrigin[2]:F9})\n" +
+                "effectiveOrigin=(0.000000000,0.000000000,0.000000000)\n" +
+                $"normal=({anchoredPlane.Normal[0]:F9},{anchoredPlane.Normal[1]:F9},{anchoredPlane.Normal[2]:F9})\n" +
+                "rule=SELECTED_PLANE_DIRECTION_THROUGH_PART_ORIGIN");
+
+            return anchoredPlane;
+        }
     }
 
     public sealed class BodyBooleanResult
@@ -269,6 +302,9 @@ namespace ADDIN.Commands
 
         public double ActualAddedVolume { get; set; }
         public double ActualRemovedVolume { get; set; }
+        public double ExpectedAddedVolume { get; set; }
+        public double ExpectedRemovedVolume { get; set; }
+        public double RelativeVolumeError { get; set; }
 
         public bool ActualMinusBeforeBooleanSuccess { get; set; }
         public bool BeforeMinusActualBooleanSuccess { get; set; }
@@ -285,6 +321,46 @@ namespace ADDIN.Commands
         public int MirroredNormal { get; set; }
         public int InvariantNormal { get; set; }
         public int UnexpectedNormal { get; set; }
+        public string FailureReason { get; set; }
+    }
+
+    public sealed class SketchDimensionState
+    {
+        public string Key { get; set; }
+        public string Name { get; set; }
+        public string FullName { get; set; }
+        public double SystemValue { get; set; }
+        public int DrivenState { get; set; }
+        public bool IsReference { get; set; }
+        public bool IsDangling { get; set; }
+        public bool IsOriginLinked { get; set; }
+    }
+
+    public sealed class SketchAuditSnapshot
+    {
+        public List<SketchDimensionState> Dimensions { get; } = new List<SketchDimensionState>();
+        public int RelationCount { get; set; }
+        public int SuppressedRelationCount { get; set; }
+        public int OriginLinkedDimensionCount { get; set; }
+        public string CaptureWarning { get; set; }
+    }
+
+    public sealed class SketchDimensionAuditResult
+    {
+        public bool Success { get; set; }
+        public int BeforeCount { get; set; }
+        public int AfterCount { get; set; }
+        public int RelationCountBefore { get; set; }
+        public int RelationCountAfter { get; set; }
+        public int SuppressedRelationsBefore { get; set; }
+        public int SuppressedRelationsAfter { get; set; }
+        public int OriginLinkedBefore { get; set; }
+        public int OriginLinkedAfter { get; set; }
+        public int DanglingAfter { get; set; }
+        public int MissingCount { get; set; }
+        public int ValueMismatchCount { get; set; }
+        public string MissingDimensions { get; set; }
+        public string ValueMismatchDimensions { get; set; }
         public string FailureReason { get; set; }
     }
 
@@ -307,6 +383,364 @@ namespace ADDIN.Commands
             }
             catch {}
             return 0.0;
+        }
+
+        public static double SumBodyVolumes(IEnumerable<Body2> bodies)
+        {
+            double total = 0.0;
+            if (bodies == null) return total;
+            foreach (Body2 body in bodies)
+            {
+                total += GetBodyVolume(body);
+            }
+            return total;
+        }
+
+        private static bool TryGetBodiesVolumeCentroid(
+            IEnumerable<Body2> bodies,
+            out double totalVolume,
+            out double[] centroid)
+        {
+            totalVolume = 0.0;
+            centroid = null;
+            double sx = 0.0;
+            double sy = 0.0;
+            double sz = 0.0;
+
+            if (bodies == null) return false;
+
+            foreach (Body2 body in bodies)
+            {
+                if (body == null) continue;
+                try
+                {
+                    double[] mp = body.GetMassProperties(0) as double[];
+                    if (mp == null || mp.Length < 4) continue;
+
+                    double volume = Math.Abs(mp[3]);
+                    if (double.IsNaN(volume) || double.IsInfinity(volume) ||
+                        volume <= ABSOLUTE_GEOMETRY_TOLERANCE)
+                    {
+                        continue;
+                    }
+
+                    sx += mp[0] * volume;
+                    sy += mp[1] * volume;
+                    sz += mp[2] * volume;
+                    totalVolume += volume;
+                }
+                catch { }
+            }
+
+            if (totalVolume <= ABSOLUTE_GEOMETRY_TOLERANCE) return false;
+
+            centroid = new[]
+            {
+                sx / totalVolume,
+                sy / totalVolume,
+                sz / totalVolume
+            };
+            return true;
+        }
+
+        private static double[] ReflectPointAcrossPlane(double[] point, PlaneData plane)
+        {
+            if (point == null || point.Length < 3 || plane?.Origin == null || plane?.Normal == null)
+            {
+                return null;
+            }
+
+            double[] origin = plane.Origin;
+            double[] normal = plane.Normal;
+            double nn = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2];
+            if (nn <= ABSOLUTE_GEOMETRY_TOLERANCE) return null;
+
+            double signedScale =
+                ((point[0] - origin[0]) * normal[0] +
+                 (point[1] - origin[1]) * normal[1] +
+                 (point[2] - origin[2]) * normal[2]) / nn;
+
+            return new[]
+            {
+                point[0] - 2.0 * signedScale * normal[0],
+                point[1] - 2.0 * signedScale * normal[1],
+                point[2] - 2.0 * signedScale * normal[2]
+            };
+        }
+
+        private static double Distance(double[] a, double[] b)
+        {
+            if (a == null || b == null || a.Length < 3 || b.Length < 3)
+            {
+                return double.PositiveInfinity;
+            }
+
+            double dx = a[0] - b[0];
+            double dy = a[1] - b[1];
+            double dz = a[2] - b[2];
+            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+
+        private static string FormatPoint(double[] point)
+        {
+            return point == null || point.Length < 3
+                ? "N/A"
+                : string.Format("({0:F6},{1:F6},{2:F6})", point[0], point[1], point[2]);
+        }
+
+        private static bool TryMeasureRemovedGeometry(
+            Body2 beforeBody,
+            Body2 afterBody,
+            string label,
+            out double removedVolume,
+            out double[] removedCentroid,
+            out string error)
+        {
+            removedVolume = 0.0;
+            removedCentroid = null;
+            error = null;
+
+            BodyBooleanResult cut = BooleanCutStrict(beforeBody, afterBody, label);
+            if (!cut.Success)
+            {
+                error = cut.ErrorMessage ?? "Boolean cut failed while measuring removed geometry.";
+                return false;
+            }
+
+            if (!TryGetBodiesVolumeCentroid(cut.Bodies, out removedVolume, out removedCentroid))
+            {
+                error = "Removed geometry is empty or its mass properties are unavailable.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryMeasureRemovedVolume(
+            Body2 beforeBody,
+            Body2 afterBody,
+            string label,
+            out double removedVolume,
+            out string error)
+        {
+            removedVolume = 0.0;
+            error = null;
+
+            double[] ignoredCentroid;
+            return TryMeasureRemovedGeometry(
+                beforeBody,
+                afterBody,
+                label,
+                out removedVolume,
+                out ignoredCentroid,
+                out error);
+        }
+
+        private static bool TrySetFlipSideToCut(
+            ModelDoc2 partDoc,
+            Feature feature,
+            bool flip,
+            out string error)
+        {
+            error = null;
+            IExtrudeFeatureData2 definition = null;
+            bool selectionAccess = false;
+
+            try
+            {
+                definition = feature?.GetDefinition() as IExtrudeFeatureData2;
+                if (definition == null)
+                {
+                    error = "Feature definition is not IExtrudeFeatureData2.";
+                    return false;
+                }
+
+                selectionAccess = definition.AccessSelections(partDoc, null);
+                if (!selectionAccess)
+                {
+                    error = "IExtrudeFeatureData2.AccessSelections returned false.";
+                    return false;
+                }
+
+                definition.FlipSideToCut = flip;
+                if (!feature.ModifyDefinition(definition, partDoc, null))
+                {
+                    error = "Feature.ModifyDefinition returned false.";
+                    return false;
+                }
+
+                partDoc.ForceRebuild3(false);
+                bool warning = false;
+                int featureError = feature.GetErrorCode2(out warning);
+                if (featureError != 0)
+                {
+                    error = $"Feature rebuild error after FlipSideToCut={flip}: error={featureError}, warning={warning}.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+            finally
+            {
+                if (definition != null && selectionAccess)
+                {
+                    try { definition.ReleaseSelectionAccess(); } catch { }
+                }
+            }
+        }
+
+        public static bool TryCorrectExtrudeCutFlip(
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            Body2 previousActualBody,
+            FeatureBodyState originalCache,
+            PlaneData mirrorPlane,
+            ref Body2 replayedActualBody,
+            out bool allowAsymmetricCutVolume,
+            out string details)
+        {
+            allowAsymmetricCutVolume = false;
+            details = null;
+            if (partDoc == null || info?.Feature == null || previousActualBody == null || replayedActualBody == null)
+            {
+                details = "CUT_FLIP_EVALUATE result=FAIL reason=INVALID_ARGUMENT";
+                return false;
+            }
+
+            if (!SketchDrivenFeatureMirrorHandler.IsExtrudeCutType(info.Type))
+            {
+                return true;
+            }
+
+            double expectedRemoved;
+            double[] sourceRemovedCentroid;
+            bool sourceGeometryAvailable = TryGetBodiesVolumeCentroid(
+                originalCache?.RemovedBodies,
+                out expectedRemoved,
+                out sourceRemovedCentroid);
+            if (!sourceGeometryAvailable)
+            {
+                details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nresult=FAIL\nreason=SOURCE_REMOVED_GEOMETRY_UNAVAILABLE";
+                return false;
+            }
+
+            double expectedTolerance = Math.Max(
+                ABSOLUTE_GEOMETRY_TOLERANCE,
+                Math.Max(expectedRemoved, GetBodyVolume(previousActualBody)) * RELATIVE_TOLERANCE);
+
+            double currentRemoved;
+            double[] currentRemovedCentroid;
+            string measureError;
+            if (!TryMeasureRemovedGeometry(
+                previousActualBody,
+                replayedActualBody,
+                info.Name + "_CUT_FLIP_BEFORE",
+                out currentRemoved,
+                out currentRemovedCentroid,
+                out measureError))
+            {
+                details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nresult=FAIL\nreason=BEFORE_MEASURE_FAILED: {measureError}";
+                return false;
+            }
+
+            double currentError = Math.Abs(currentRemoved - expectedRemoved);
+            if (currentError <= expectedTolerance)
+            {
+                details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nexpectedRemovedVolume={expectedRemoved:E6}\nbeforeToggleRemovedVolume={currentRemoved:E6}\nchosenFlip=UNCHANGED\nresult=PASS\nreason=SOURCE_VOLUME_ALREADY_MATCHES";
+                return true;
+            }
+
+            IExtrudeFeatureData2 currentDefinition = info.Feature.GetDefinition() as IExtrudeFeatureData2;
+            if (currentDefinition == null)
+            {
+                details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nexpectedRemovedVolume={expectedRemoved:E6}\nbeforeToggleRemovedVolume={currentRemoved:E6}\nresult=FAIL\nreason=NOT_EXTRUDE_FEATURE_DATA2";
+                return false;
+            }
+
+            bool originalFlip;
+            try { originalFlip = currentDefinition.FlipSideToCut; }
+            catch (Exception ex)
+            {
+                details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nresult=FAIL\nreason=CANNOT_READ_FLIP_SIDE: {ex.Message}";
+                return false;
+            }
+
+            bool toggledFlip = !originalFlip;
+            string setError;
+            if (!TrySetFlipSideToCut(partDoc, info.Feature, toggledFlip, out setError))
+            {
+                details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\noriginalFlip={originalFlip}\nexpectedRemovedVolume={expectedRemoved:E6}\nbeforeToggleRemovedVolume={currentRemoved:E6}\ntoggledFlip={toggledFlip}\nresult=FAIL\nreason=TOGGLE_FAILED: {setError}";
+                return false;
+            }
+
+            string captureError;
+            Body2 toggledBody = GetSolidBodyCopyStrict(partDoc, out captureError);
+            double toggledRemoved = 0.0;
+            double[] toggledRemovedCentroid = null;
+            string toggledMeasureError = null;
+            bool toggledMeasured = toggledBody != null &&
+                TryMeasureRemovedGeometry(
+                    previousActualBody,
+                    toggledBody,
+                    info.Name + "_CUT_FLIP_AFTER",
+                    out toggledRemoved,
+                    out toggledRemovedCentroid,
+                    out toggledMeasureError);
+            double toggledError = toggledMeasured ? Math.Abs(toggledRemoved - expectedRemoved) : double.PositiveInfinity;
+
+            bool currentVolumeMatches = currentError <= expectedTolerance;
+            bool toggledVolumeMatches = toggledMeasured && toggledError <= expectedTolerance;
+            bool chooseToggled;
+            string selectionReason;
+            string geometryDetails = null;
+
+            if (currentVolumeMatches || toggledVolumeMatches)
+            {
+                chooseToggled = toggledVolumeMatches && (!currentVolumeMatches || toggledError < currentError);
+                selectionReason = "SOURCE_REMOVED_VOLUME_MATCHED";
+            }
+            else
+            {
+                double[] expectedMirroredCentroid = ReflectPointAcrossPlane(sourceRemovedCentroid, mirrorPlane);
+                double currentDistance = Distance(currentRemovedCentroid, expectedMirroredCentroid);
+                double toggledDistance = Distance(toggledRemovedCentroid, expectedMirroredCentroid);
+
+                if (expectedMirroredCentroid == null ||
+                    double.IsInfinity(currentDistance) ||
+                    double.IsInfinity(toggledDistance))
+                {
+                    details = $"CUT_FLIP_GEOMETRY_EVALUATE\nfeature={info.Name}\nsourceRemovedCentroid={FormatPoint(sourceRemovedCentroid)}\nexpectedMirroredCentroid={FormatPoint(expectedMirroredCentroid)}\nbeforeCentroid={FormatPoint(currentRemovedCentroid)}\nafterCentroid={FormatPoint(toggledRemovedCentroid)}\nresult=FAIL\nreason=REMOVED_REGION_CENTROID_UNAVAILABLE";
+                    return false;
+                }
+
+                chooseToggled = toggledDistance < currentDistance;
+                allowAsymmetricCutVolume = true;
+                selectionReason = "MIRRORED_REMOVED_REGION_NEAREST";
+                geometryDetails = $"CUT_FLIP_GEOMETRY_EVALUATE\nfeature={info.Name}\nsourceRemovedCentroid={FormatPoint(sourceRemovedCentroid)}\nexpectedMirroredCentroid={FormatPoint(expectedMirroredCentroid)}\nbeforeCentroid={FormatPoint(currentRemovedCentroid)}\nafterCentroid={FormatPoint(toggledRemovedCentroid)}\nbeforeDistance={currentDistance * 1000.0:F6}mm\nafterDistance={toggledDistance * 1000.0:F6}mm\nchosenFlip={(chooseToggled ? toggledFlip.ToString() : originalFlip.ToString())}\nvolumeMode=ASYMMETRIC_BASE\nresult=PASS\nreason={selectionReason}";
+            }
+
+            if (chooseToggled)
+            {
+                replayedActualBody = toggledBody;
+            }
+            else
+            {
+                string restoreError;
+                if (!TrySetFlipSideToCut(partDoc, info.Feature, originalFlip, out restoreError))
+                {
+                    details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\noriginalFlip={originalFlip}\nexpectedRemovedVolume={expectedRemoved:E6}\nbeforeToggleRemovedVolume={currentRemoved:E6}\ntoggledFlip={toggledFlip}\nafterToggleRemovedVolume={(toggledMeasured ? toggledRemoved.ToString("E6") : "N/A")}\nresult=FAIL\nreason=RESTORE_FAILED: {restoreError}";
+                    return false;
+                }
+            }
+
+            details = geometryDetails ??
+                $"CUT_FLIP_EVALUATE\nfeature={info.Name}\noriginalFlip={originalFlip}\nexpectedRemovedVolume={expectedRemoved:E6}\nbeforeToggleRemovedVolume={currentRemoved:E6}\ntoggledFlip={toggledFlip}\nafterToggleRemovedVolume={(toggledMeasured ? toggledRemoved.ToString("E6") : "N/A")}\nchosenFlip={(chooseToggled ? toggledFlip.ToString() : originalFlip.ToString())}\nresult=PASS\nreason={selectionReason}";
+            return true;
         }
 
         public static List<Body2> GetSolidBodyCopies(ModelDoc2 partDoc)
@@ -719,6 +1153,8 @@ namespace ADDIN.Commands
 
             res.ActualAddedVolume = actualAddedVol;
             res.ActualRemovedVolume = actualRemovedVol;
+            res.ExpectedAddedVolume = SumBodyVolumes(originalCache?.AddedBodies);
+            res.ExpectedRemovedVolume = SumBodyVolumes(originalCache?.RemovedBodies);
 
             double tol = Math.Max(ABSOLUTE_GEOMETRY_TOLERANCE, bVol * RELATIVE_TOLERANCE);
 
@@ -740,6 +1176,26 @@ namespace ADDIN.Commands
                 {
                     res.FailureReason = $"CUT_VOLUME_DID_NOT_DECREASE (before={bVol:E6}, after={aVol:E6})";
                     return res;
+                }
+
+                double volumeMatchTolerance = Math.Max(
+                    ABSOLUTE_GEOMETRY_TOLERANCE,
+                    Math.Max(res.ExpectedRemovedVolume, bVol) * RELATIVE_TOLERANCE);
+                double removedDifference = Math.Abs(actualRemovedVol - res.ExpectedRemovedVolume);
+                res.RelativeVolumeError = res.ExpectedRemovedVolume > ABSOLUTE_GEOMETRY_TOLERANCE
+                    ? removedDifference / res.ExpectedRemovedVolume
+                    : removedDifference;
+
+                if (originalCache != null && originalCache.ChangesGeometry && removedDifference > volumeMatchTolerance)
+                {
+                    if (replayResult == null || !replayResult.AllowAsymmetricCutVolume)
+                    {
+                        res.FailureReason = $"CUT_REMOVED_VOLUME_MISMATCH(expected={res.ExpectedRemovedVolume:E6}, actual={actualRemovedVol:E6}, relativeError={res.RelativeVolumeError:E6})";
+                        return res;
+                    }
+
+                    CreateMirrorPartPackage.LogDebug(
+                        $"CUT_ASYMMETRIC_VOLUME_ACCEPTED\nfeature={info.Name}\nexpectedRemovedVolume={res.ExpectedRemovedVolume:E6}\nactualRemovedVolume={actualRemovedVol:E6}\nrelativeError={res.RelativeVolumeError:E6}\nreason=MIRRORED_REMOVED_REGION_SELECTED");
                 }
             }
             else if (SketchDrivenFeatureMirrorHandler.IsExtrudeBossType(info.Type))
@@ -880,63 +1336,28 @@ namespace ADDIN.Commands
                 res.AxisPoint1 = new double[] { s1[0], s1[1] };
                 res.AxisPoint2 = new double[] { s2[0], s2[1] };
 
-                // 1. Try checking standard Model Planes
-                Feature feat = partDoc.FirstFeature() as Feature;
-                while (feat != null)
-                {
-                    if (string.Equals(feat.GetTypeName2(), "RefPlane", StringComparison.OrdinalIgnoreCase))
-                    {
-                        RefPlane refPlane = feat.GetSpecificFeature2() as RefPlane;
-                        if (refPlane != null)
-                        {
-                            MathTransform pt = refPlane.Transform;
-                            if (pt != null)
-                            {
-                                MathVector vZ = mathUtility.CreateVector(new double[] { 0, 0, 1 }) as MathVector;
-                                MathVector normalVec = vZ.MultiplyTransform(pt) as MathVector;
-                                double[] nData = normalVec.ArrayData as double[];
-
-                                double pDot = nData[0] * mirrorPlane.Normal[0] + nData[1] * mirrorPlane.Normal[1] + nData[2] * mirrorPlane.Normal[2];
-                                if (Math.Abs(Math.Abs(pDot) - 1.0) < 1e-4)
-                                {
-                                    MathPoint p0 = mathUtility.CreatePoint(new double[] { 0, 0, 0 }) as MathPoint;
-                                    MathPoint originPoint = p0.MultiplyTransform(pt) as MathPoint;
-                                    double[] oData = originPoint.ArrayData as double[];
-
-                                    double dist = Math.Abs((oData[0] - mirrorPlane.Origin[0]) * mirrorPlane.Normal[0] +
-                                                           (oData[1] - mirrorPlane.Origin[1]) * mirrorPlane.Normal[1] +
-                                                           (oData[2] - mirrorPlane.Origin[2]) * mirrorPlane.Normal[2]);
-
-                                    if (dist < 1e-4)
-                                    {
-                                        bool sel = feat.Select2(true, 0);
-                                        if (sel)
-                                        {
-                                            res.Success = true;
-                                            res.Kind = MirrorReferenceKind.ModelPlane;
-                                            res.PlaneFeature = feat;
-                                            res.Message = "MODEL_PLANE (" + feat.Name + ")";
-                                            return res;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    feat = feat.GetNextFeature() as Feature;
-                }
-
-                // 2. Create Intersection Centerline
+                // Native SketchMirror is reliable only when its mirror reference belongs
+                // to the active sketch. Selecting a coincident model RefPlane can make the
+                // API report success while the persisted sketch geometry remains unchanged.
+                // Match the proven user macro: create an explicit construction centerline
+                // at the intersection of the assembly mirror plane and this sketch plane.
                 SketchSegment cl = partDoc.SketchManager.CreateCenterLine(s1[0], s1[1], 0.0, s2[0], s2[1], 0.0) as SketchSegment;
                 if (cl != null)
                 {
+                    try { cl.ConstructionGeometry = true; } catch { }
                     bool clSel = cl.Select4(true, null);
                     if (clSel)
                     {
                         res.Success = true;
                         res.Kind = MirrorReferenceKind.IntersectionCenterline;
                         res.Centerline = cl;
-                        res.Message = "INTERSECTION_CENTERLINE";
+                        res.Message = "EXPLICIT_SKETCH_CENTERLINE";
+                        CreateMirrorPartPackage.LogDebug(
+                            $"SKETCH_MIRROR_REFERENCE\nmode=EXPLICIT_CENTERLINE\n" +
+                            "anchor=PART_ORIGIN\n" +
+                            $"mirrorPlaneOrigin=({oMp[0]:F9},{oMp[1]:F9},{oMp[2]:F9})\n" +
+                            $"axis1=({s1[0]:F9},{s1[1]:F9})\n" +
+                            $"axis2=({s2[0]:F9},{s2[1]:F9})");
                         return res;
                     }
                 }
@@ -988,14 +1409,19 @@ namespace ADDIN.Commands
         public bool SketchMirrorExecuted { get; set; }
         public bool MirrorGeometryVerified { get; set; }
         public bool OriginalsNeutralized { get; set; }
+        public bool DimensionAuditPassed { get; set; }
+        public bool OriginReferencePreserved { get; set; }
         public bool RebuildPassed { get; set; }
         public int FeatureErrorCode { get; set; }
         public bool FeatureWarning { get; set; }
+        public bool AllowAsymmetricCutVolume { get; set; }
 
         public int SourceEntities { get; set; }
         public int InvariantEntities { get; set; }
         public int MirroredEntities { get; set; }
         public int ConstructionEntities { get; set; }
+        public int DimensionCountBefore { get; set; }
+        public int DimensionCountAfter { get; set; }
 
         public MirrorReferenceKind MirrorReferenceKind { get; set; } = MirrorReferenceKind.None;
     }
@@ -1229,6 +1655,17 @@ namespace ADDIN.Commands
                 }
                 result.SketchEntered = true;
 
+                SketchAuditSnapshot dimensionBaseline = CaptureSketchAudit(sketchFeat, sketch);
+                result.DimensionCountBefore = dimensionBaseline.Dimensions.Count;
+                CreateMirrorPartPackage.LogDebug(
+                    $"SKETCH_DIMENSION_BASELINE\n" +
+                    $"sketch={sketchFeat.Name}\n" +
+                    $"dimensionCount={dimensionBaseline.Dimensions.Count}\n" +
+                    $"originLinked={dimensionBaseline.OriginLinkedDimensionCount}\n" +
+                    $"relationCount={dimensionBaseline.RelationCount}\n" +
+                    $"suppressedRelations={dimensionBaseline.SuppressedRelationCount}\n" +
+                    $"warning={dimensionBaseline.CaptureWarning ?? string.Empty}");
+
                 // 1. Snapshot Before Reference
                 object[] segsBeforeRefObj = sketch.GetSketchSegments() as object[];
                 int countBeforeReference = (segsBeforeRefObj != null) ? segsBeforeRefObj.Length : 0;
@@ -1408,7 +1845,44 @@ namespace ADDIN.Commands
 
                 partDoc.ForceRebuild3(false);
 
-                // 12. Verify feature health
+                // 12. Audit dimensions and sketch relations after the final rebuild.
+                // This is intentionally done after leaving the sketch because dangling
+                // annotations can appear only after SolidWorks resolves the rebuilt feature.
+                SketchAuditSnapshot dimensionFinal = CaptureSketchAudit(sketchFeat, sketch);
+                SketchDimensionAuditResult dimensionAudit = CompareSketchAudits(dimensionBaseline, dimensionFinal);
+                result.DimensionCountAfter = dimensionFinal.Dimensions.Count;
+                result.DimensionAuditPassed = dimensionAudit.Success;
+                result.OriginReferencePreserved = dimensionAudit.OriginLinkedAfter >= dimensionAudit.OriginLinkedBefore;
+
+                CreateMirrorPartPackage.LogDebug(
+                    $"SKETCH_DIMENSION_AUDIT\n" +
+                    $"sketch={sketchFeat.Name}\n" +
+                    $"beforeCount={dimensionAudit.BeforeCount}\n" +
+                    $"afterCount={dimensionAudit.AfterCount}\n" +
+                    $"originLinkedBefore={dimensionAudit.OriginLinkedBefore}\n" +
+                    $"originLinkedAfter={dimensionAudit.OriginLinkedAfter}\n" +
+                    $"relationCountBefore={dimensionAudit.RelationCountBefore}\n" +
+                    $"relationCountAfter={dimensionAudit.RelationCountAfter}\n" +
+                    $"suppressedRelationsBefore={dimensionAudit.SuppressedRelationsBefore}\n" +
+                    $"suppressedRelationsAfter={dimensionAudit.SuppressedRelationsAfter}\n" +
+                    $"danglingAfter={dimensionAudit.DanglingAfter}\n" +
+                    $"missing={dimensionAudit.MissingCount}\n" +
+                    $"missingNames={dimensionAudit.MissingDimensions ?? string.Empty}\n" +
+                    $"valueMismatch={dimensionAudit.ValueMismatchCount}\n" +
+                    $"valueMismatchNames={dimensionAudit.ValueMismatchDimensions ?? string.Empty}\n" +
+                    $"captureWarningBefore={dimensionBaseline.CaptureWarning ?? string.Empty}\n" +
+                    $"captureWarningAfter={dimensionFinal.CaptureWarning ?? string.Empty}\n" +
+                    $"result={(dimensionAudit.Success ? "PASS" : "FAIL")}\n" +
+                    $"reason={dimensionAudit.FailureReason ?? string.Empty}");
+
+                if (!dimensionAudit.Success)
+                {
+                    result.StatusCode = "SKETCH_DIMENSION_AUDIT_FAILED";
+                    result.Message = "Sketch dimension/relation audit failed: " + dimensionAudit.FailureReason;
+                    return result;
+                }
+
+                // 13. Verify feature health
                 bool isWarning = false;
                 int errCode = info.Feature.GetErrorCode2(out isWarning);
                 result.FeatureErrorCode = errCode;
@@ -1475,6 +1949,288 @@ namespace ADDIN.Commands
             }
 
             return newSegments;
+        }
+
+        private static SketchAuditSnapshot CaptureSketchAudit(Feature sketchFeature, Sketch sketch)
+        {
+            SketchAuditSnapshot snapshot = new SketchAuditSnapshot();
+            List<string> warnings = new List<string>();
+
+            if (sketchFeature == null)
+            {
+                snapshot.CaptureWarning = "SKETCH_FEATURE_NULL";
+                return snapshot;
+            }
+
+            try
+            {
+                object displayObject = sketchFeature.GetFirstDisplayDimension();
+                int guard = 0;
+                while (displayObject != null && guard++ < 10000)
+                {
+                    object nextObject = null;
+                    try { nextObject = sketchFeature.GetNextDisplayDimension(displayObject); }
+                    catch (Exception ex) { warnings.Add("NEXT_DIM:" + ex.Message); }
+
+                    try
+                    {
+                        dynamic displayDimension = displayObject;
+                        dynamic dimension = displayDimension.GetDimension2(0);
+                        if (dimension != null)
+                        {
+                            SketchDimensionState state = new SketchDimensionState();
+                            state.Name = SafeDynamicString(() => (object)dimension.Name);
+                            state.FullName = SafeDynamicString(() => (object)dimension.FullName);
+                            state.SystemValue = SafeDynamicDouble(() => (object)dimension.SystemValue, double.NaN);
+                            state.DrivenState = SafeDynamicInt(() => (object)dimension.DrivenState, -1);
+                            state.IsReference = SafeDynamicBool(() => (object)dimension.IsReference(), false);
+
+                            try
+                            {
+                                dynamic annotation = displayDimension.GetAnnotation();
+                                state.IsDangling = annotation != null && (bool)annotation.IsDangling();
+                            }
+                            catch { state.IsDangling = false; }
+
+                            state.IsOriginLinked = DimensionReferencesSketchOrigin(dimension);
+                            state.Key = BuildDimensionKey(state);
+                            snapshot.Dimensions.Add(state);
+                            if (state.IsOriginLinked) snapshot.OriginLinkedDimensionCount++;
+
+                            CreateMirrorPartPackage.LogDebug(
+                                $"SKETCH_DIMENSION_ITEM\n" +
+                                $"key={state.Key}\n" +
+                                $"value={FormatAuditValue(state.SystemValue)}\n" +
+                                $"drivenState={state.DrivenState}\n" +
+                                $"reference={state.IsReference}\n" +
+                                $"dangling={state.IsDangling}\n" +
+                                $"originLinked={state.IsOriginLinked}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        warnings.Add("READ_DIM:" + ex.Message);
+                    }
+
+                    displayObject = nextObject;
+                }
+
+                if (guard >= 10000) warnings.Add("DIMENSION_GUARD_REACHED");
+            }
+            catch (Exception ex)
+            {
+                warnings.Add("DIMENSION_ENUM:" + ex.Message);
+            }
+
+            try
+            {
+                dynamic dynamicSketch = sketch;
+                dynamic relationManager = dynamicSketch != null ? dynamicSketch.RelationManager : null;
+                if (relationManager != null)
+                {
+                    object relationObject = relationManager.GetRelations((int)swSketchRelationFilterType_e.swAll);
+                    object[] relations = relationObject as object[];
+                    if (relations != null)
+                    {
+                        snapshot.RelationCount = relations.Length;
+                        foreach (object relationObjectItem in relations)
+                        {
+                            try
+                            {
+                                dynamic relation = relationObjectItem;
+                                if (SafeDynamicBool(() => (object)relation.Suppressed, false))
+                                    snapshot.SuppressedRelationCount++;
+                            }
+                            catch (Exception ex)
+                            {
+                                warnings.Add("READ_RELATION:" + ex.Message);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        snapshot.RelationCount = SafeDynamicInt(
+                            () => (object)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll), 0);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                warnings.Add("RELATION_ENUM:" + ex.Message);
+            }
+
+            snapshot.CaptureWarning = string.Join(" | ", warnings.ToArray());
+            return snapshot;
+        }
+
+        private static SketchDimensionAuditResult CompareSketchAudits(
+            SketchAuditSnapshot before,
+            SketchAuditSnapshot after)
+        {
+            before = before ?? new SketchAuditSnapshot();
+            after = after ?? new SketchAuditSnapshot();
+
+            SketchDimensionAuditResult result = new SketchDimensionAuditResult
+            {
+                BeforeCount = before.Dimensions.Count,
+                AfterCount = after.Dimensions.Count,
+                RelationCountBefore = before.RelationCount,
+                RelationCountAfter = after.RelationCount,
+                SuppressedRelationsBefore = before.SuppressedRelationCount,
+                SuppressedRelationsAfter = after.SuppressedRelationCount,
+                OriginLinkedBefore = before.OriginLinkedDimensionCount,
+                OriginLinkedAfter = after.OriginLinkedDimensionCount,
+                DanglingAfter = after.Dimensions.FindAll(d => d.IsDangling).Count
+            };
+
+            List<string> missing = new List<string>();
+            List<string> mismatched = new List<string>();
+            HashSet<int> usedAfter = new HashSet<int>();
+
+            foreach (SketchDimensionState expected in before.Dimensions)
+            {
+                int matchedIndex = FindDimensionMatch(expected, after.Dimensions, usedAfter);
+                if (matchedIndex < 0)
+                {
+                    missing.Add(expected.Key);
+                    continue;
+                }
+
+                usedAfter.Add(matchedIndex);
+                SketchDimensionState actual = after.Dimensions[matchedIndex];
+                if (!double.IsNaN(expected.SystemValue) && !double.IsNaN(actual.SystemValue))
+                {
+                    double tolerance = Math.Max(1e-8, Math.Abs(expected.SystemValue) * 1e-8);
+                    if (Math.Abs(expected.SystemValue - actual.SystemValue) > tolerance)
+                    {
+                        mismatched.Add(expected.Key + ":" +
+                            FormatAuditValue(expected.SystemValue) + "->" +
+                            FormatAuditValue(actual.SystemValue));
+                    }
+                }
+            }
+
+            result.MissingCount = missing.Count;
+            result.ValueMismatchCount = mismatched.Count;
+            result.MissingDimensions = string.Join(",", missing.ToArray());
+            result.ValueMismatchDimensions = string.Join(",", mismatched.ToArray());
+
+            List<string> failures = new List<string>();
+            if (result.MissingCount > 0) failures.Add("DIMENSION_MISSING");
+            if (result.ValueMismatchCount > 0) failures.Add("DIMENSION_VALUE_CHANGED");
+            if (result.DanglingAfter > 0) failures.Add("DIMENSION_DANGLING");
+            if (result.OriginLinkedAfter < result.OriginLinkedBefore) failures.Add("PART_ORIGIN_REFERENCE_LOST");
+            if (result.RelationCountBefore > 0 && result.RelationCountAfter < result.RelationCountBefore)
+                failures.Add("SKETCH_RELATION_LOST");
+            if (result.SuppressedRelationsAfter > result.SuppressedRelationsBefore)
+                failures.Add("SKETCH_RELATION_SUPPRESSED");
+
+            result.Success = failures.Count == 0;
+            result.FailureReason = string.Join(";", failures.ToArray());
+            return result;
+        }
+
+        private static int FindDimensionMatch(
+            SketchDimensionState expected,
+            List<SketchDimensionState> candidates,
+            HashSet<int> used)
+        {
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (used.Contains(i)) continue;
+                if (!string.IsNullOrWhiteSpace(expected.FullName) &&
+                    string.Equals(expected.FullName, candidates[i].FullName, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (used.Contains(i)) continue;
+                if (!string.IsNullOrWhiteSpace(expected.Name) &&
+                    string.Equals(expected.Name, candidates[i].Name, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (used.Contains(i)) continue;
+                SketchDimensionState candidate = candidates[i];
+                if (expected.IsReference != candidate.IsReference || expected.DrivenState != candidate.DrivenState)
+                    continue;
+                if (double.IsNaN(expected.SystemValue) || double.IsNaN(candidate.SystemValue))
+                    continue;
+                double tolerance = Math.Max(1e-8, Math.Abs(expected.SystemValue) * 1e-8);
+                if (Math.Abs(expected.SystemValue - candidate.SystemValue) <= tolerance)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private static bool DimensionReferencesSketchOrigin(dynamic dimension)
+        {
+            try
+            {
+                object referenceObject = dimension.ReferencePoints;
+                object[] references = referenceObject as object[];
+                if (references == null) return false;
+                foreach (object reference in references)
+                {
+                    if (EntityIsAtSketchOrigin(reference)) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private static bool EntityIsAtSketchOrigin(object entity)
+        {
+            if (entity == null) return false;
+            try
+            {
+                dynamic point = entity;
+                double x = Convert.ToDouble(point.X);
+                double y = Convert.ToDouble(point.Y);
+                double z = Convert.ToDouble(point.Z);
+                return Math.Abs(x) <= 1e-9 && Math.Abs(y) <= 1e-9 && Math.Abs(z) <= 1e-9;
+            }
+            catch { return false; }
+        }
+
+        private static string BuildDimensionKey(SketchDimensionState state)
+        {
+            if (!string.IsNullOrWhiteSpace(state.FullName)) return state.FullName;
+            if (!string.IsNullOrWhiteSpace(state.Name)) return state.Name;
+            return "DIM@" + FormatAuditValue(state.SystemValue) + "#" + state.DrivenState;
+        }
+
+        private static string FormatAuditValue(double value)
+        {
+            return double.IsNaN(value) ? "NaN" : value.ToString("G17", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static string SafeDynamicString(Func<object> getter)
+        {
+            try { return Convert.ToString(getter()) ?? string.Empty; }
+            catch { return string.Empty; }
+        }
+
+        private static double SafeDynamicDouble(Func<object> getter, double fallback)
+        {
+            try { return Convert.ToDouble(getter(), System.Globalization.CultureInfo.InvariantCulture); }
+            catch { return fallback; }
+        }
+
+        private static int SafeDynamicInt(Func<object> getter, int fallback)
+        {
+            try { return Convert.ToInt32(getter(), System.Globalization.CultureInfo.InvariantCulture); }
+            catch { return fallback; }
+        }
+
+        private static bool SafeDynamicBool(Func<object> getter, bool fallback)
+        {
+            try { return Convert.ToBoolean(getter(), System.Globalization.CultureInfo.InvariantCulture); }
+            catch { return fallback; }
         }
 
         private static FinalSketchStateResult ValidateFinalSketchState(
@@ -1763,7 +2519,8 @@ namespace ADDIN.Commands
             CreateMirrorPartPackage.LogDebug($"TARGET path={chosenTargetPartPath}");
 
             IMathUtility mathUtility = swApp.GetMathUtility() as IMathUtility;
-            PlaneData mirrorPlane = MirrorPlaneMapper.GetLocalPlane(mathUtility, sourceComponent, assemblyPlane);
+            PlaneData selectedMirrorPlane = MirrorPlaneMapper.GetLocalPlane(mathUtility, sourceComponent, assemblyPlane);
+            PlaneData mirrorPlane = MirrorPlaneMapper.CreatePartOriginAnchoredPlane(selectedMirrorPlane);
 
             using (SourceDocumentGuard sourceGuard = new SourceDocumentGuard(swApp, sourcePath))
             {
@@ -2039,6 +2796,39 @@ namespace ADDIN.Commands
                             return result;
                         }
 
+                        // A mirrored sketch can require the opposite Flip Side To Cut state.
+                        // Prefer the source removed-volume oracle when it remains valid. For an
+                        // asymmetric unchanged sheet-metal base, select the state whose removed
+                        // region is nearest the reflected source removed-region centroid.
+                        string cutFlipDetails;
+                        bool allowAsymmetricCutVolume;
+                        if (!BodyOperationsHelper.TryCorrectExtrudeCutFlip(
+                            copiedPartDoc,
+                            featInfo,
+                            currentActualBody,
+                            cacheState,
+                            mirrorPlane,
+                            ref stepActualBody,
+                            out allowAsymmetricCutVolume,
+                            out cutFlipDetails))
+                        {
+                            if (!string.IsNullOrEmpty(cutFlipDetails))
+                            {
+                                CreateMirrorPartPackage.LogDebug(cutFlipDetails);
+                            }
+                            failedCount++;
+                            result.Message = $"Cut direction correction failed for feature '{featInfo.Name}'.";
+                            CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                            return result;
+                        }
+
+                        replayRes.AllowAsymmetricCutVolume = allowAsymmetricCutVolume;
+
+                        if (!string.IsNullOrEmpty(cutFlipDetails))
+                        {
+                            CreateMirrorPartPackage.LogDebug(cutFlipDetails);
+                        }
+
                         // Feature-Semantic Validation (V6.2 Oracle)
                         FeatureSemanticValidationResult semVal = BodyOperationsHelper.ValidateReplaySemantics(
                             currentActualBody,
@@ -2049,7 +2839,7 @@ namespace ADDIN.Commands
                             copiedPartDoc);
 
                         string semPassStr = semVal.Success ? "PASS" : "FAIL";
-                        CreateMirrorPartPackage.LogDebug($"FEATURE_SEMANTIC_VALIDATE\nfeature={featInfo.Name}\nkind={semVal.ExpectedChangeKind}\nbeforeBodyCount={semVal.BeforeBodyCount}\nafterBodyCount={semVal.AfterBodyCount}\nbeforeVolume={semVal.BeforeVolume:E6}\nafterVolume={semVal.AfterVolume:E6}\nactualAddedVolume={semVal.ActualAddedVolume:E6}\nactualRemovedVolume={semVal.ActualRemovedVolume:E6}\nresult={semPassStr}\nreason={semVal.FailureReason}");
+                        CreateMirrorPartPackage.LogDebug($"FEATURE_SEMANTIC_VALIDATE\nfeature={featInfo.Name}\nkind={semVal.ExpectedChangeKind}\nbeforeBodyCount={semVal.BeforeBodyCount}\nafterBodyCount={semVal.AfterBodyCount}\nbeforeVolume={semVal.BeforeVolume:E6}\nafterVolume={semVal.AfterVolume:E6}\nexpectedAddedVolume={semVal.ExpectedAddedVolume:E6}\nexpectedRemovedVolume={semVal.ExpectedRemovedVolume:E6}\nactualAddedVolume={semVal.ActualAddedVolume:E6}\nactualRemovedVolume={semVal.ActualRemovedVolume:E6}\nrelativeVolumeError={semVal.RelativeVolumeError:E6}\nresult={semPassStr}\nreason={semVal.FailureReason}");
 
                         if (!semVal.Success)
                         {
@@ -2517,7 +3307,8 @@ namespace ADDIN.Commands
             if (!File.Exists(sourcePath) || !File.Exists(mirrorPartPath)) return 0;
 
             IMathUtility mathUtility = swApp.GetMathUtility() as IMathUtility;
-            PlaneData mirrorPlane = MirrorPlaneMapper.GetLocalPlane(mathUtility, sourceComponent, assemblyPlane);
+            PlaneData selectedMirrorPlane = MirrorPlaneMapper.GetLocalPlane(mathUtility, sourceComponent, assemblyPlane);
+            PlaneData mirrorPlane = MirrorPlaneMapper.CreatePartOriginAnchoredPlane(selectedMirrorPlane);
 
             int totalMapped = 0;
 
