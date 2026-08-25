@@ -543,7 +543,7 @@ namespace ADDIN.Commands
             viewGeom.RecordDiagnostics.Clear();
             viewGeom.RawBoundarySamples.Clear();
             viewGeom.CandidateHeaderSamples.Clear();
-            viewGeom.Record164ConstructionLog.Clear();
+            viewGeom.PolylineRecordConstructionLog.Clear();
             viewGeom.Type0NonZeroRecordIndices.Clear();
             viewGeom.AuxGeometryBlocks.Clear();
 
@@ -1013,14 +1013,14 @@ namespace ADDIN.Commands
                 diag.CursorEnd = cursor;
                 diag.IsValid = true;
 
-                // Log Records #164..#175 Construction Breakdown
-                if (recordIndex >= 164 && recordIndex <= 175)
+                // Log Sample Records Construction Breakdown
+                if (recordIndex <= 10)
                 {
-                    viewGeom.Record164ConstructionLog.Add($"Rec #{recordIndex:D3}: CursorStart={cursorStart}, Type={geomType}, GeomSizeField={geomDataSize}, GeomConsumed={geomDataConsumed}");
-                    viewGeom.Record164ConstructionLog.Add($"  Attributes=[{attrStart}->{attrEnd}] (Color={diag.LineColor}, Style={diag.LineStyle}, Font={diag.LineFont}, Wt={diag.LineWeight}, Layer={diag.LayerID}, Ovr={diag.LayerOverride})");
-                    viewGeom.Record164ConstructionLog.Add($"  NumPoints Pos={numPtsPos}, Raw={numPtsRaw.ToString("R", CultureInfo.InvariantCulture)}, Val={numPolyPoints}");
-                    viewGeom.Record164ConstructionLog.Add($"  PointData=[{ptDataStart}->{ptDataEnd}] ({needed} doubles)");
-                    viewGeom.Record164ConstructionLog.Add($"  CursorEnd={cursor}");
+                    viewGeom.PolylineRecordConstructionLog.Add($"Rec #{recordIndex:D3}: CursorStart={cursorStart}, Type={geomType}, GeomSizeField={geomDataSize}, GeomConsumed={geomDataConsumed}");
+                    viewGeom.PolylineRecordConstructionLog.Add($"  Attributes=[{attrStart}->{attrEnd}] (Color={diag.LineColor}, Style={diag.LineStyle}, Font={diag.LineFont}, Wt={diag.LineWeight}, Layer={diag.LayerID}, Ovr={diag.LayerOverride})");
+                    viewGeom.PolylineRecordConstructionLog.Add($"  NumPoints Pos={numPtsPos}, Raw={numPtsRaw.ToString("R", CultureInfo.InvariantCulture)}, Val={numPolyPoints}");
+                    viewGeom.PolylineRecordConstructionLog.Add($"  PointData=[{ptDataStart}->{ptDataEnd}] ({needed} doubles)");
+                    viewGeom.PolylineRecordConstructionLog.Add($"  CursorEnd={cursor}");
                 }
 
                 // 5. Update Structural Record Counters

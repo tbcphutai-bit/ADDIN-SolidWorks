@@ -584,7 +584,7 @@ namespace ADDIN.Commands
         public string PolylineApiStatus { get; set; }
         public string PolylineRootCause { get; set; }
 
-        public List<string> Record164ConstructionLog { get; set; } = new List<string>();
+        public List<string> PolylineRecordConstructionLog { get; set; } = new List<string>();
         public List<PolylineRawRecordDiagnostic> RawRecordDiagnostics { get; set; } = new List<PolylineRawRecordDiagnostic>();
         public List<PolylineRawRecordDiagnostic> RecordDiagnostics { get; set; } = new List<PolylineRawRecordDiagnostic>();
     }
