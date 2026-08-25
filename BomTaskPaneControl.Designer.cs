@@ -57,6 +57,7 @@ namespace ADDIN
             this.tabComponentDrawing = new System.Windows.Forms.TabPage();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
             this.btnDimKichThuocLo = new System.Windows.Forms.Button();
+            this.btnRepairDim = new System.Windows.Forms.Button();
             this.btnDimKegaki = new System.Windows.Forms.Button();
             this.btnFixScale = new System.Windows.Forms.Button();
             this.btnSplineToArcs = new System.Windows.Forms.Button();
@@ -543,6 +544,7 @@ namespace ADDIN
             this.groupBox3.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.groupBox3.Controls.Add(this.btnDimKichThuocLo);
+            this.groupBox3.Controls.Add(this.btnRepairDim);
             this.groupBox3.Controls.Add(this.btnDimKegaki);
             this.groupBox3.Controls.Add(this.btnFixScale);
             this.groupBox3.Controls.Add(this.btnSplineToArcs);
@@ -552,7 +554,7 @@ namespace ADDIN
             this.groupBox3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(229)))), ((int)(((byte)(83)))), ((int)(((byte)(12)))));
             this.groupBox3.Location = new System.Drawing.Point(6, 341);
             this.groupBox3.Name = "groupBox3";
-            this.groupBox3.Size = new System.Drawing.Size(366, 180);
+            this.groupBox3.Size = new System.Drawing.Size(366, 238);
             this.groupBox3.TabIndex = 2;
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Macro";
@@ -573,6 +575,23 @@ namespace ADDIN
             this.btnDimKichThuocLo.Text = "Dim kich\r\nthuoc lo";
             this.btnDimKichThuocLo.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
             this.btnDimKichThuocLo.UseVisualStyleBackColor = false;
+            // 
+            // btnRepairDim
+            // 
+            this.btnRepairDim.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(244)))), ((int)(((byte)(255)))));
+            this.btnRepairDim.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(76)))), ((int)(((byte)(151)))), ((int)(((byte)(204)))));
+            this.btnRepairDim.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(207)))), ((int)(((byte)(235)))), ((int)(((byte)(252)))));
+            this.btnRepairDim.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnRepairDim.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.btnRepairDim.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(22)))), ((int)(((byte)(89)))), ((int)(((byte)(142)))));
+            this.btnRepairDim.Location = new System.Drawing.Point(50, 186);
+            this.btnRepairDim.Name = "btnRepairDim";
+            this.btnRepairDim.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+            this.btnRepairDim.Size = new System.Drawing.Size(126, 44);
+            this.btnRepairDim.TabIndex = 8;
+            this.btnRepairDim.Text = "REPAIR DIM";
+            this.btnRepairDim.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+            this.btnRepairDim.UseVisualStyleBackColor = false;
             // 
             // btnDimKegaki
             // 
@@ -1810,6 +1829,7 @@ namespace ADDIN
         private System.Windows.Forms.Label lblModelName;
         private System.Windows.Forms.Button btnDimMatCat;
         private System.Windows.Forms.Button btnSplineToArcs;
+        private System.Windows.Forms.Button btnRepairDim;
     }
 }
 

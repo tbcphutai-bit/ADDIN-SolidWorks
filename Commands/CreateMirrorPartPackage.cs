@@ -334,6 +334,27 @@ namespace ADDIN.Commands
         public bool IsReference { get; set; }
         public bool IsDangling { get; set; }
         public bool IsOriginLinked { get; set; }
+        public object DisplayDimensionObject { get; set; }
+        public object DimensionObject { get; set; }
+        public List<object> AttachedEntities { get; } = new List<object>();
+        public double[] AnnotationPosition { get; set; }
+    }
+
+    public sealed class SketchDimensionTransferResult
+    {
+        public bool Success { get; set; }
+        public int Candidates { get; set; }
+        public int Transferred { get; set; }
+        public int Skipped { get; set; }
+        public string FailureReason { get; set; }
+    }
+
+    internal sealed class PendingSketchDimensionTransfer
+    {
+        public SketchDimensionState Source { get; set; }
+        public object NewDisplayDimension { get; set; }
+        public object NewDimension { get; set; }
+        public string Mode { get; set; }
     }
 
     public sealed class SketchAuditSnapshot
@@ -361,6 +382,18 @@ namespace ADDIN.Commands
         public int ValueMismatchCount { get; set; }
         public string MissingDimensions { get; set; }
         public string ValueMismatchDimensions { get; set; }
+        public string FailureReason { get; set; }
+    }
+
+    public sealed class SketchIndependenceResult
+    {
+        public bool Success { get; set; }
+        public int RelationsBeforeMirror { get; set; }
+        public int RelationsAfterMirror { get; set; }
+        public int CandidateRelations { get; set; }
+        public int SymmetricRelationsFound { get; set; }
+        public int SymmetricRelationsDeleted { get; set; }
+        public int RelationsAfterDetach { get; set; }
         public string FailureReason { get; set; }
     }
 
@@ -594,6 +627,298 @@ namespace ADDIN.Commands
             }
         }
 
+        public static bool TryRetargetExtrudeContours(
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            Feature sketchFeature,
+            out string details)
+        {
+            details = null;
+            if (partDoc == null || info?.Feature == null || sketchFeature == null)
+            {
+                details = "EXTRUDE_CONTOUR_RETARGET\nresult=SKIP\nreason=INVALID_ARGUMENT";
+                return false;
+            }
+
+            if (!SketchDrivenFeatureMirrorHandler.IsExtrudeCutType(info.Type) &&
+                !SketchDrivenFeatureMirrorHandler.IsExtrudeBossType(info.Type))
+            {
+                details =
+                    $"EXTRUDE_CONTOUR_RETARGET\nfeature={info.Name}\nfeatureType={info.Type}\n" +
+                    "result=SKIP\nreason=NOT_EXTRUDE_FEATURE";
+                return true;
+            }
+
+            Sketch sketch = null;
+            IExtrudeFeatureData2 definition = null;
+            bool selectionAccess = false;
+            int contourCandidates = 0;
+            int activeContoursCount = 0;
+            int activeSegmentsCount = 0;
+            int assignedContoursCount = -1;
+            int assignedContoursAfter = -1;
+            string assignmentMode = "NONE";
+
+            try
+            {
+                sketch = sketchFeature.GetSpecificFeature2() as Sketch;
+                if (sketch == null)
+                {
+                    details =
+                        $"EXTRUDE_CONTOUR_RETARGET\nfeature={info.Name}\nsketch={sketchFeature.Name}\n" +
+                        "result=FAIL\nreason=SKETCH_NOT_AVAILABLE";
+                    return false;
+                }
+
+                var activeContours = new List<SketchContour>();
+                object rawContours = sketch.GetSketchContours();
+                Array contourArray = rawContours as Array;
+                if (contourArray != null)
+                {
+                    contourCandidates = contourArray.Length;
+                    foreach (object rawContour in contourArray)
+                    {
+                        SketchContour contour = rawContour as SketchContour;
+                        if (contour == null)
+                            continue;
+
+                        Array segmentArray = null;
+                        try { segmentArray = contour.GetSketchSegments() as Array; }
+                        catch { }
+
+                        if (segmentArray == null || segmentArray.Length == 0)
+                            continue;
+
+                        int normalSegmentCount = 0;
+                        foreach (object rawSegment in segmentArray)
+                        {
+                            SketchSegment segment = rawSegment as SketchSegment;
+                            if (segment == null)
+                                continue;
+
+                            bool construction = true;
+                            try { construction = segment.ConstructionGeometry; }
+                            catch { }
+
+                            if (!construction)
+                                normalSegmentCount++;
+                        }
+
+                        // Only a contour containing active (non-construction) geometry may
+                        // drive the mirrored cut. The original contour was intentionally
+                        // converted to construction geometry and must not be reused here.
+                        if (normalSegmentCount <= 0)
+                            continue;
+
+                        activeSegmentsCount += normalSegmentCount;
+                        activeContours.Add(contour);
+                    }
+                }
+
+                activeContoursCount = activeContours.Count;
+                if (activeContoursCount == 0)
+                {
+                    details =
+                        $"EXTRUDE_CONTOUR_RETARGET\nfeature={info.Name}\nsketch={sketchFeature.Name}\n" +
+                        $"contourCandidates={contourCandidates}\nactiveContours=0\nactiveSegments=0\n" +
+                        "result=FAIL\nreason=NO_ACTIVE_MIRRORED_CONTOUR";
+                    return false;
+                }
+
+                definition = info.Feature.GetDefinition() as IExtrudeFeatureData2;
+                if (definition == null)
+                {
+                    details =
+                        $"EXTRUDE_CONTOUR_RETARGET\nfeature={info.Name}\nsketch={sketchFeature.Name}\n" +
+                        $"contourCandidates={contourCandidates}\nactiveContours={activeContoursCount}\n" +
+                        $"activeSegments={activeSegmentsCount}\nresult=FAIL\nreason=DEFINITION_NOT_EXTRUDE";
+                    return false;
+                }
+
+                selectionAccess = definition.AccessSelections(partDoc, null);
+                if (!selectionAccess)
+                {
+                    details =
+                        $"EXTRUDE_CONTOUR_RETARGET\nfeature={info.Name}\nsketch={sketchFeature.Name}\n" +
+                        $"contourCandidates={contourCandidates}\nactiveContours={activeContoursCount}\n" +
+                        $"activeSegments={activeSegmentsCount}\nresult=FAIL\nreason=ACCESS_SELECTIONS_FAILED";
+                    return false;
+                }
+
+                // Use the strongly typed COM setter. Assigning an object[] through the
+                // Contours property can appear to work for a one-segment contour, but
+                // SOLIDWORKS may reject ModifyDefinition for a closed contour made from
+                // several sketch segments because the SAFEARRAY is not marshalled with
+                // the explicit contour count expected by IExtrudeFeatureData2.
+                SketchContour[] typedContours = activeContours.ToArray();
+                object contourPayload = typedContours;
+                try
+                {
+                    definition.ISetContours(typedContours.Length, ref contourPayload);
+                    assignmentMode = "ISETCONTOURS";
+                }
+                catch (Exception setContoursException)
+                {
+                    // Retain the former property setter only as a compatibility fallback
+                    // for SOLIDWORKS versions that expose ISetContours but reject the call.
+                    definition.Contours = typedContours;
+                    assignmentMode = "PROPERTY_FALLBACK:" + setContoursException.GetType().Name;
+                }
+
+                try { assignedContoursCount = definition.GetContoursCount(); }
+                catch { assignedContoursCount = -1; }
+
+                bool modified = info.Feature.ModifyDefinition(definition, partDoc, null);
+
+                // ModifyDefinition may return true even when SOLIDWORKS silently keeps
+                // the old contour selection. Re-read the live feature definition and
+                // confirm that at least one explicit mirrored contour is persisted.
+                try
+                {
+                    IExtrudeFeatureData2 verifyDefinition = info.Feature.GetDefinition() as IExtrudeFeatureData2;
+                    if (verifyDefinition != null)
+                        assignedContoursAfter = verifyDefinition.GetContoursCount();
+                }
+                catch
+                {
+                    assignedContoursAfter = -1;
+                }
+
+                bool assignmentConfirmed = modified && assignedContoursAfter > 0;
+                details =
+                    $"EXTRUDE_CONTOUR_RETARGET\nfeature={info.Name}\nsketch={sketchFeature.Name}\n" +
+                    $"contourCandidates={contourCandidates}\nactiveContours={activeContoursCount}\n" +
+                    $"activeSegments={activeSegmentsCount}\nassignmentMode={assignmentMode}\n" +
+                    $"assignedContoursBefore={assignedContoursCount}\nassignedContoursAfter={assignedContoursAfter}\n" +
+                    $"modifyResult={modified}\n" +
+                    $"result={(assignmentConfirmed ? "PASS" : "FAIL")}\n" +
+                    $"reason={(assignmentConfirmed ? "ACTIVE_MIRRORED_CONTOURS_ASSIGNED" : (modified ? "CONTOUR_ASSIGNMENT_NOT_CONFIRMED" : "MODIFY_DEFINITION_FAILED"))}";
+                return assignmentConfirmed;
+            }
+            catch (Exception ex)
+            {
+                details =
+                    $"EXTRUDE_CONTOUR_RETARGET\nfeature={info.Name}\nsketch={sketchFeature.Name}\n" +
+                    $"contourCandidates={contourCandidates}\nactiveContours={activeContoursCount}\n" +
+                    $"activeSegments={activeSegmentsCount}\nassignmentMode={assignmentMode}\n" +
+                    $"assignedContoursBefore={assignedContoursCount}\nassignedContoursAfter={assignedContoursAfter}\n" +
+                    $"result=FAIL\nreason=EXCEPTION: {ex.Message}";
+                return false;
+            }
+            finally
+            {
+                if (definition != null && selectionAccess)
+                {
+                    try { definition.ReleaseSelectionAccess(); } catch { }
+                }
+            }
+        }
+
+        public static bool TryRecoverExtrudeCutRebuild(
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            FeatureBodyState originalCache,
+            out string details)
+        {
+            details = null;
+            if (partDoc == null || info?.Feature == null)
+            {
+                details = "CUT_FLIP_REBUILD_RECOVERY\nresult=SKIP\nreason=INVALID_ARGUMENT";
+                return false;
+            }
+
+            if (!SketchDrivenFeatureMirrorHandler.IsExtrudeCutType(info.Type) ||
+                originalCache?.RemovedBodies == null ||
+                originalCache.RemovedBodies.Count == 0)
+            {
+                details =
+                    $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nfeatureType={info.Type}\n" +
+                    "result=SKIP\nreason=NOT_CONFIRMED_CUT_FEATURE";
+                return false;
+            }
+
+            bool warningBefore = false;
+            int errorBefore = info.Feature.GetErrorCode2(out warningBefore);
+            if (errorBefore == 0)
+            {
+                details =
+                    $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nerrorBefore=0\n" +
+                    "result=PASS\nreason=FEATURE_ALREADY_HEALTHY";
+                return true;
+            }
+
+            IExtrudeFeatureData2 definition = null;
+            bool selectionAccess = false;
+            bool originalFlip;
+            try
+            {
+                definition = info.Feature.GetDefinition() as IExtrudeFeatureData2;
+                if (definition == null)
+                {
+                    details =
+                        $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nerrorBefore={errorBefore}\n" +
+                        "result=FAIL\nreason=DEFINITION_NOT_EXTRUDE";
+                    return false;
+                }
+
+                selectionAccess = definition.AccessSelections(partDoc, null);
+                if (!selectionAccess)
+                {
+                    details =
+                        $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nerrorBefore={errorBefore}\n" +
+                        "result=FAIL\nreason=ACCESS_SELECTIONS_FAILED";
+                    return false;
+                }
+
+                originalFlip = definition.FlipSideToCut;
+            }
+            catch (Exception ex)
+            {
+                details =
+                    $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nerrorBefore={errorBefore}\n" +
+                    $"result=FAIL\nreason=READ_FLIP_FAILED: {ex.Message}";
+                return false;
+            }
+            finally
+            {
+                if (definition != null && selectionAccess)
+                {
+                    try { definition.ReleaseSelectionAccess(); } catch { }
+                }
+            }
+
+            bool toggledFlip = !originalFlip;
+            string toggleError;
+            bool toggleResult = TrySetFlipSideToCut(partDoc, info.Feature, toggledFlip, out toggleError);
+            bool warningAfter = false;
+            int errorAfter = info.Feature.GetErrorCode2(out warningAfter);
+            if (toggleResult && errorAfter == 0)
+            {
+                details =
+                    $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nfeatureType={info.Type}\n" +
+                    $"errorBefore={errorBefore}\nwarningBefore={warningBefore}\n" +
+                    $"originalFlip={originalFlip}\ntoggledFlip={toggledFlip}\n" +
+                    $"errorAfter={errorAfter}\nwarningAfter={warningAfter}\n" +
+                    "result=PASS\nreason=TOGGLED_FLIP_REBUILT";
+                return true;
+            }
+
+            string restoreError;
+            bool restoreResult = TrySetFlipSideToCut(partDoc, info.Feature, originalFlip, out restoreError);
+            bool warningRestored = false;
+            int errorRestored = info.Feature.GetErrorCode2(out warningRestored);
+            details =
+                $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nfeatureType={info.Type}\n" +
+                $"errorBefore={errorBefore}\nwarningBefore={warningBefore}\n" +
+                $"originalFlip={originalFlip}\ntoggledFlip={toggledFlip}\n" +
+                $"toggleResult={toggleResult}\ntoggleError={toggleError ?? string.Empty}\n" +
+                $"errorAfter={errorAfter}\nwarningAfter={warningAfter}\n" +
+                $"restoreResult={restoreResult}\nrestoreError={restoreError ?? string.Empty}\n" +
+                $"errorRestored={errorRestored}\nwarningRestored={warningRestored}\n" +
+                "result=FAIL\nreason=TOGGLED_FLIP_DID_NOT_REBUILD";
+            return false;
+        }
+
         public static bool TryCorrectExtrudeCutFlip(
             ModelDoc2 partDoc,
             PostBaseFeatureInfo info,
@@ -649,10 +974,16 @@ namespace ADDIN.Commands
             }
 
             double currentError = Math.Abs(currentRemoved - expectedRemoved);
-            if (currentError <= expectedTolerance)
+            double[] expectedMirroredCentroid = ReflectPointAcrossPlane(sourceRemovedCentroid, mirrorPlane);
+            double currentDistance = Distance(currentRemovedCentroid, expectedMirroredCentroid);
+
+            // The removed volume is normally identical on both cut directions. Volume alone
+            // cannot prove that the cut moved to the mirrored side. Always test the opposite
+            // FlipSideToCut state and use the mirrored removed-region centroid to disambiguate.
+            if (expectedMirroredCentroid == null || double.IsInfinity(currentDistance))
             {
-                details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nexpectedRemovedVolume={expectedRemoved:E6}\nbeforeToggleRemovedVolume={currentRemoved:E6}\nchosenFlip=UNCHANGED\nresult=PASS\nreason=SOURCE_VOLUME_ALREADY_MATCHES";
-                return true;
+                details = $"CUT_FLIP_GEOMETRY_EVALUATE\nfeature={info.Name}\nsourceRemovedCentroid={FormatPoint(sourceRemovedCentroid)}\nexpectedMirroredCentroid={FormatPoint(expectedMirroredCentroid)}\nbeforeCentroid={FormatPoint(currentRemovedCentroid)}\nresult=FAIL\nreason=BEFORE_REMOVED_REGION_CENTROID_UNAVAILABLE";
+                return false;
             }
 
             IExtrudeFeatureData2 currentDefinition = info.Feature.GetDefinition() as IExtrudeFeatureData2;
@@ -693,35 +1024,47 @@ namespace ADDIN.Commands
                     out toggledMeasureError);
             double toggledError = toggledMeasured ? Math.Abs(toggledRemoved - expectedRemoved) : double.PositiveInfinity;
 
+            if (!toggledMeasured)
+            {
+                string restoreError;
+                bool restored = TrySetFlipSideToCut(partDoc, info.Feature, originalFlip, out restoreError);
+                details = $"CUT_FLIP_GEOMETRY_EVALUATE\nfeature={info.Name}\nsourceRemovedCentroid={FormatPoint(sourceRemovedCentroid)}\nexpectedMirroredCentroid={FormatPoint(expectedMirroredCentroid)}\nbeforeCentroid={FormatPoint(currentRemovedCentroid)}\nafterCentroid={FormatPoint(toggledRemovedCentroid)}\nresult=FAIL\nreason=AFTER_MEASURE_FAILED: {toggledMeasureError ?? captureError}\nrestoreResult={restored}\nrestoreError={restoreError}";
+                return false;
+            }
+
+            double toggledDistance = Distance(toggledRemovedCentroid, expectedMirroredCentroid);
+            if (double.IsInfinity(toggledDistance))
+            {
+                string restoreError;
+                bool restored = TrySetFlipSideToCut(partDoc, info.Feature, originalFlip, out restoreError);
+                details = $"CUT_FLIP_GEOMETRY_EVALUATE\nfeature={info.Name}\nsourceRemovedCentroid={FormatPoint(sourceRemovedCentroid)}\nexpectedMirroredCentroid={FormatPoint(expectedMirroredCentroid)}\nbeforeCentroid={FormatPoint(currentRemovedCentroid)}\nafterCentroid={FormatPoint(toggledRemovedCentroid)}\nresult=FAIL\nreason=AFTER_REMOVED_REGION_CENTROID_UNAVAILABLE\nrestoreResult={restored}\nrestoreError={restoreError}";
+                return false;
+            }
+
             bool currentVolumeMatches = currentError <= expectedTolerance;
             bool toggledVolumeMatches = toggledMeasured && toggledError <= expectedTolerance;
             bool chooseToggled;
             string selectionReason;
-            string geometryDetails = null;
-
-            if (currentVolumeMatches || toggledVolumeMatches)
+            if (currentVolumeMatches && toggledVolumeMatches)
             {
-                chooseToggled = toggledVolumeMatches && (!currentVolumeMatches || toggledError < currentError);
-                selectionReason = "SOURCE_REMOVED_VOLUME_MATCHED";
+                chooseToggled = toggledDistance < currentDistance;
+                selectionReason = "BOTH_VOLUMES_MATCHED_MIRRORED_CENTROID_NEAREST";
+            }
+            else if (toggledVolumeMatches)
+            {
+                chooseToggled = true;
+                selectionReason = "TOGGLED_SOURCE_VOLUME_MATCHED";
+            }
+            else if (currentVolumeMatches)
+            {
+                chooseToggled = false;
+                selectionReason = "CURRENT_SOURCE_VOLUME_MATCHED";
             }
             else
             {
-                double[] expectedMirroredCentroid = ReflectPointAcrossPlane(sourceRemovedCentroid, mirrorPlane);
-                double currentDistance = Distance(currentRemovedCentroid, expectedMirroredCentroid);
-                double toggledDistance = Distance(toggledRemovedCentroid, expectedMirroredCentroid);
-
-                if (expectedMirroredCentroid == null ||
-                    double.IsInfinity(currentDistance) ||
-                    double.IsInfinity(toggledDistance))
-                {
-                    details = $"CUT_FLIP_GEOMETRY_EVALUATE\nfeature={info.Name}\nsourceRemovedCentroid={FormatPoint(sourceRemovedCentroid)}\nexpectedMirroredCentroid={FormatPoint(expectedMirroredCentroid)}\nbeforeCentroid={FormatPoint(currentRemovedCentroid)}\nafterCentroid={FormatPoint(toggledRemovedCentroid)}\nresult=FAIL\nreason=REMOVED_REGION_CENTROID_UNAVAILABLE";
-                    return false;
-                }
-
                 chooseToggled = toggledDistance < currentDistance;
                 allowAsymmetricCutVolume = true;
                 selectionReason = "MIRRORED_REMOVED_REGION_NEAREST";
-                geometryDetails = $"CUT_FLIP_GEOMETRY_EVALUATE\nfeature={info.Name}\nsourceRemovedCentroid={FormatPoint(sourceRemovedCentroid)}\nexpectedMirroredCentroid={FormatPoint(expectedMirroredCentroid)}\nbeforeCentroid={FormatPoint(currentRemovedCentroid)}\nafterCentroid={FormatPoint(toggledRemovedCentroid)}\nbeforeDistance={currentDistance * 1000.0:F6}mm\nafterDistance={toggledDistance * 1000.0:F6}mm\nchosenFlip={(chooseToggled ? toggledFlip.ToString() : originalFlip.ToString())}\nvolumeMode=ASYMMETRIC_BASE\nresult=PASS\nreason={selectionReason}";
             }
 
             if (chooseToggled)
@@ -738,8 +1081,7 @@ namespace ADDIN.Commands
                 }
             }
 
-            details = geometryDetails ??
-                $"CUT_FLIP_EVALUATE\nfeature={info.Name}\noriginalFlip={originalFlip}\nexpectedRemovedVolume={expectedRemoved:E6}\nbeforeToggleRemovedVolume={currentRemoved:E6}\ntoggledFlip={toggledFlip}\nafterToggleRemovedVolume={(toggledMeasured ? toggledRemoved.ToString("E6") : "N/A")}\nchosenFlip={(chooseToggled ? toggledFlip.ToString() : originalFlip.ToString())}\nresult=PASS\nreason={selectionReason}";
+            details = $"CUT_FLIP_GEOMETRY_EVALUATE\nfeature={info.Name}\nsourceRemovedCentroid={FormatPoint(sourceRemovedCentroid)}\nexpectedMirroredCentroid={FormatPoint(expectedMirroredCentroid)}\nbeforeCentroid={FormatPoint(currentRemovedCentroid)}\nafterCentroid={FormatPoint(toggledRemovedCentroid)}\nbeforeDistance={currentDistance * 1000.0:F6}mm\nafterDistance={toggledDistance * 1000.0:F6}mm\nexpectedRemovedVolume={expectedRemoved:E6}\nbeforeToggleRemovedVolume={currentRemoved:E6}\nafterToggleRemovedVolume={toggledRemoved:E6}\nbeforeVolumeError={currentError:E6}\nafterVolumeError={toggledError:E6}\nbeforeVolumeMatches={currentVolumeMatches}\nafterVolumeMatches={toggledVolumeMatches}\noriginalFlip={originalFlip}\ntoggledFlip={toggledFlip}\nchosenFlip={(chooseToggled ? toggledFlip.ToString() : originalFlip.ToString())}\nvolumeMode={(allowAsymmetricCutVolume ? "ASYMMETRIC_BASE" : "SOURCE_MATCH")}\nresult=PASS\nreason={selectionReason}";
             return true;
         }
 
@@ -1604,6 +1946,220 @@ namespace ADDIN.Commands
             string protectedBaseFeatureName,
             string protectedBaseSketchName)
         {
+            FeatureReplayResult invalidResult = new FeatureReplayResult
+            {
+                Success = false,
+                FeatureName = info?.Name,
+                FeatureType = info?.Type
+            };
+
+            if (partDoc == null || info?.Feature == null || info.DrivingSketchFeature == null)
+            {
+                invalidResult.StatusCode = "INDEPENDENT_SKETCH_INVALID_ARGUMENT";
+                invalidResult.Message = "Part, feature or driving sketch is not available.";
+                return invalidResult;
+            }
+
+            Feature originalSketch = info.DrivingSketchFeature;
+            string originalSketchName = info.DrivingSketchName;
+            Feature copiedSketch = null;
+            string copiedSketchName = string.Empty;
+            PostBaseFeatureInfo copiedInfo = null;
+            bool retargeted = false;
+
+            try
+            {
+                string copyDetails;
+                if (!TryDuplicateSketchFeature(partDoc, originalSketch, out copiedSketch, out copyDetails))
+                {
+                    CreateMirrorPartPackage.LogDebug(
+                        "[MIRROR-SKETCH-INDEPENDENT] COPY\n" +
+                        $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
+                        $"result=FAIL\ndetails={copyDetails}");
+
+                    invalidResult.StatusCode = "INDEPENDENT_SKETCH_COPY_FAILED";
+                    invalidResult.Message = copyDetails;
+                    return invalidResult;
+                }
+
+                CreateMirrorPartPackage.LogDebug(
+                    "[MIRROR-SKETCH-INDEPENDENT] COPY\n" +
+                    $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
+                    $"copiedSketch={copiedSketch.Name}\nresult=PASS");
+                copiedSketchName = copiedSketch.Name;
+
+                copiedInfo = CloneFeatureInfoWithSketch(info, copiedSketch);
+                FeatureReplayResult coreResult = ReplayOnIndependentSketch(
+                    swApp,
+                    partDoc,
+                    copiedInfo,
+                    mirrorPlane,
+                    cache,
+                    protectedBaseFeatureName,
+                    protectedBaseSketchName);
+
+                if (coreResult == null || !coreResult.Success)
+                {
+                    string restoreDetails;
+                    bool restored = BodyOperationsHelper.TryRetargetExtrudeContours(
+                        partDoc,
+                        info,
+                        originalSketch,
+                        out restoreDetails);
+                    partDoc.EditRebuild3();
+
+                    string deleteDetails;
+                    TryDeleteFeature(partDoc, copiedSketch, out deleteDetails);
+                    CreateMirrorPartPackage.LogDebug(
+                        "[MIRROR-SKETCH-INDEPENDENT] ROLLBACK\n" +
+                        $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
+                        $"copiedSketch={copiedSketchName}\nretargeted=false\n" +
+                        $"reason=CORE_FAILED\nrestore={restored}\nrestoreDetails={restoreDetails}\n" +
+                        $"delete={deleteDetails}");
+                    return coreResult ?? invalidResult;
+                }
+
+                string retargetDetails;
+                retargeted = BodyOperationsHelper.TryRetargetExtrudeContours(
+                    partDoc,
+                    copiedInfo,
+                    copiedSketch,
+                    out retargetDetails);
+
+                CreateMirrorPartPackage.LogDebug(
+                    "[MIRROR-SKETCH-INDEPENDENT] RETARGET\n" +
+                    $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
+                    $"copiedSketch={copiedSketch.Name}\nresult={(retargeted ? "PASS" : "FAIL")}\n" +
+                    $"details={retargetDetails}");
+
+                if (!retargeted)
+                {
+                    string restoreDetails;
+                    bool restored = BodyOperationsHelper.TryRetargetExtrudeContours(
+                        partDoc,
+                        info,
+                        originalSketch,
+                        out restoreDetails);
+                    partDoc.EditRebuild3();
+
+                    string deleteDetails;
+                    TryDeleteFeature(partDoc, copiedSketch, out deleteDetails);
+                    coreResult.Success = false;
+                    coreResult.StatusCode = "INDEPENDENT_SKETCH_RETARGET_FAILED";
+                    coreResult.Message = retargetDetails;
+                    CreateMirrorPartPackage.LogDebug(
+                        "[MIRROR-SKETCH-INDEPENDENT] ROLLBACK\n" +
+                        $"feature={info.Name}\nretargeted=false\nreason=RETARGET_FAILED\n" +
+                        $"restore={restored}\nrestoreDetails={restoreDetails}\n" +
+                        $"delete={deleteDetails}");
+                    return coreResult;
+                }
+
+                partDoc.EditRebuild3();
+                bool warning = false;
+                int errorCode = info.Feature.GetErrorCode2(out warning);
+                if (errorCode != 0 && IsExtrudeCutType(info.Type))
+                {
+                    string recoveryDetails;
+                    BodyOperationsHelper.TryRecoverExtrudeCutRebuild(
+                        partDoc,
+                        copiedInfo,
+                        cache,
+                        out recoveryDetails);
+                    CreateMirrorPartPackage.LogDebug(recoveryDetails ??
+                        $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nresult=FAIL\nreason=NO_DETAILS");
+                    errorCode = info.Feature.GetErrorCode2(out warning);
+                }
+
+                if (errorCode != 0)
+                {
+                    string restoreDetails;
+                    bool restored = BodyOperationsHelper.TryRetargetExtrudeContours(
+                        partDoc,
+                        info,
+                        originalSketch,
+                        out restoreDetails);
+                    partDoc.EditRebuild3();
+
+                    string deleteDetails;
+                    TryDeleteFeature(partDoc, copiedSketch, out deleteDetails);
+                    coreResult.Success = false;
+                    coreResult.StatusCode = "INDEPENDENT_SKETCH_REBUILD_FAILED";
+                    coreResult.Message =
+                        $"Mirrored sketch caused rebuild error {errorCode}. Original sketch restored={restored}.";
+                    coreResult.FeatureErrorCode = errorCode;
+                    coreResult.FeatureWarning = warning;
+                    CreateMirrorPartPackage.LogDebug(
+                        "[MIRROR-SKETCH-INDEPENDENT] ROLLBACK\n" +
+                        $"feature={info.Name}\nretargeted=true\nreason=REBUILD_ERROR_{errorCode}\n" +
+                        $"restore={restored}\nrestoreDetails={restoreDetails}\ndelete={deleteDetails}");
+                    return coreResult;
+                }
+
+                info.DrivingSketchFeature = copiedSketch;
+                info.DrivingSketchName = copiedSketch.Name;
+                info.HasDrivingSketch = true;
+
+                coreResult.Success = true;
+                coreResult.StatusCode = "SUCCESS_INDEPENDENT_SKETCH";
+                coreResult.Message = "Feature now uses an independent mirrored sketch.";
+                coreResult.FeatureErrorCode = 0;
+                coreResult.FeatureWarning = warning;
+                CreateMirrorPartPackage.LogDebug(
+                    "[MIRROR-SKETCH-INDEPENDENT] COMMIT\n" +
+                    $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
+                    $"copiedSketch={copiedSketch.Name}\nresult=PASS");
+                return coreResult;
+            }
+            catch (Exception ex)
+            {
+                string restoreDetails = "NOT_REQUIRED";
+                if (retargeted)
+                {
+                    try
+                    {
+                        BodyOperationsHelper.TryRetargetExtrudeContours(
+                            partDoc,
+                            info,
+                            originalSketch,
+                            out restoreDetails);
+                        partDoc.EditRebuild3();
+                    }
+                    catch (Exception restoreEx)
+                    {
+                        restoreDetails = "EXCEPTION: " + restoreEx.Message;
+                    }
+                }
+
+                string deleteDetails = "NO_COPY";
+                if (copiedSketch != null)
+                {
+                    TryDeleteFeature(partDoc, copiedSketch, out deleteDetails);
+                }
+
+                CreateMirrorPartPackage.LogDebug(
+                    "[MIRROR-SKETCH-INDEPENDENT] ROLLBACK\n" +
+                    $"feature={info.Name}\nretargeted={retargeted}\nreason=EXCEPTION: {ex.Message}\n" +
+                    $"restoreDetails={restoreDetails}\ndelete={deleteDetails}");
+                invalidResult.StatusCode = "INDEPENDENT_SKETCH_EXCEPTION";
+                invalidResult.Message = ex.Message;
+                return invalidResult;
+            }
+            finally
+            {
+                try { partDoc.ClearSelection2(true); } catch { }
+            }
+        }
+
+        private FeatureReplayResult ReplayOnIndependentSketch(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            PlaneData mirrorPlane,
+            FeatureBodyState cache,
+            string protectedBaseFeatureName,
+            string protectedBaseSketchName)
+        {
             FeatureReplayResult result = new FeatureReplayResult
             {
                 Success = false,
@@ -1748,6 +2304,16 @@ namespace ADDIN.Commands
                     return result;
                 }
 
+                // Native SketchMirror is used only as a temporary geometry generator.
+                // Remember the exact source relations so only newly-created symmetric
+                // dependencies can be removed after the reflected geometry is verified.
+                int relationCountBeforeMirror;
+                string relationSnapshotWarning;
+                HashSet<long> relationIdsBeforeMirror = CaptureSketchRelationIds(
+                    sketch,
+                    out relationCountBeforeMirror,
+                    out relationSnapshotWarning);
+
                 // 5. Select segments to mirror + mirror reference
                 partDoc.ClearSelection2(true);
                 foreach (SketchSegment seg in segmentsToMirror)
@@ -1813,7 +2379,84 @@ namespace ADDIN.Commands
                 result.MirrorGeometryVerified = true;
                 result.MirroredEntities = geometryMatches;
 
-                // 9. Safely neutralize non-invariant original segments to Construction
+                // Remove the temporary mirror dependency while retaining the reflected
+                // entities. Source dimensions and all pre-existing relations stay intact.
+                SketchIndependenceResult independence = DetachNewSymmetricRelations(
+                    sketch,
+                    relationIdsBeforeMirror,
+                    relationCountBeforeMirror);
+
+                int geometryMatchesAfterDetach = 0;
+                foreach (SketchSegment srcSeg in segmentsToMirror)
+                {
+                    if (FindReflectedMatch(srcSeg, newSegments, ax1, ay1, ax2, ay2))
+                    {
+                        geometryMatchesAfterDetach++;
+                    }
+                }
+
+                CreateMirrorPartPackage.LogDebug(
+                    $"SKETCH_INDEPENDENCE_AUDIT\n" +
+                    $"sketch={sketchFeat.Name}\n" +
+                    $"relationsBeforeMirror={independence.RelationsBeforeMirror}\n" +
+                    $"relationsAfterMirror={independence.RelationsAfterMirror}\n" +
+                    $"candidateRelations={independence.CandidateRelations}\n" +
+                    $"symmetricRelationsFound={independence.SymmetricRelationsFound}\n" +
+                    $"symmetricRelationsDeleted={independence.SymmetricRelationsDeleted}\n" +
+                    $"relationsAfterDetach={independence.RelationsAfterDetach}\n" +
+                    $"geometryMatchesAfterDetach={geometryMatchesAfterDetach}/{expectedMirror}\n" +
+                    $"snapshotWarning={relationSnapshotWarning ?? string.Empty}\n" +
+                    $"result={(independence.Success && geometryMatchesAfterDetach == expectedMirror ? "PASS" : "FAIL")}\n" +
+                    $"reason={independence.FailureReason ?? string.Empty}");
+
+                if (!independence.Success || geometryMatchesAfterDetach != expectedMirror)
+                {
+                    partDoc.SketchManager.InsertSketch(true);
+                    partDoc.ClearSelection2(true);
+                    result.StatusCode = "SKETCH_INDEPENDENCE_FAILED";
+                    result.Message = !independence.Success
+                        ? "Cannot detach temporary symmetric relations: " + independence.FailureReason
+                        : $"Reflected geometry changed after detach: {geometryMatchesAfterDetach}/{expectedMirror}.";
+                    return result;
+                }
+
+                // A native sketch mirror copies geometry, but after the temporary
+                // symmetric relation is removed SolidWorks does not retarget existing
+                // dimensions. Recreate only dimensions that actually reference source
+                // entities, attach them to the reflected entities, and then remove the
+                // old source dimensions. This makes the reflected sketch independently
+                // editable while preserving the original parameter values.
+                SketchDimensionTransferResult dimensionTransfer = TransferDimensionsToReflectedGeometry(
+                    partDoc,
+                    dimensionBaseline,
+                    segmentsToMirror,
+                    newSegments,
+                    refRes,
+                    ax1,
+                    ay1,
+                    ax2,
+                    ay2);
+
+                CreateMirrorPartPackage.LogDebug(
+                    $"SKETCH_DIMENSION_TRANSFER\n" +
+                    $"sketch={sketchFeat.Name}\n" +
+                    $"candidates={dimensionTransfer.Candidates}\n" +
+                    $"transferred={dimensionTransfer.Transferred}\n" +
+                    $"skipped={dimensionTransfer.Skipped}\n" +
+                    $"result={(dimensionTransfer.Success ? "PASS" : "FAIL")}\n" +
+                    $"reason={dimensionTransfer.FailureReason ?? string.Empty}");
+
+                if (!dimensionTransfer.Success)
+                {
+                    partDoc.SketchManager.InsertSketch(true);
+                    partDoc.ClearSelection2(true);
+                    result.StatusCode = "SKETCH_DIMENSION_TRANSFER_FAILED";
+                    result.Message = "Cannot transfer source dimensions to reflected geometry: " +
+                                     dimensionTransfer.FailureReason;
+                    return result;
+                }
+
+                // 10. Safely neutralize non-invariant original segments to Construction
                 partDoc.ClearSelection2(true);
                 foreach (SketchSegment seg in segmentsToMirror)
                 {
@@ -1843,6 +2486,14 @@ namespace ADDIN.Commands
                 partDoc.SketchManager.InsertSketch(true);
                 partDoc.ClearSelection2(true);
 
+                // The mirrored profile lives in the SAME driving sketch. Let SOLIDWORKS
+                // resolve the feature's native sketch dependency first. Calling
+                // ISetContours unconditionally here is unsafe in managed COM: valid closed
+                // multi-segment contours can be marshalled as the wrong SAFEARRAY type and
+                // ModifyDefinition then breaks a feature that could rebuild on its own.
+                CreateMirrorPartPackage.LogDebug(
+                    $"IN_PLACE_SKETCH_REBUILD\nfeature={info.Name}\nsketch={sketchFeat.Name}\n" +
+                    "contourRetarget=DEFERRED\nresult=PRIMARY_REBUILD");
                 partDoc.ForceRebuild3(false);
 
                 // 12. Audit dimensions and sketch relations after the final rebuild.
@@ -1892,9 +2543,60 @@ namespace ADDIN.Commands
 
                 if (errCode != 0)
                 {
-                    result.StatusCode = "FEATURE_REBUILD_ERROR";
-                    result.Message = $"Feature has rebuild error code={errCode} warning={isWarning}";
-                    return result;
+                    // Fallback 1: only a feature that failed the native in-place rebuild is
+                    // allowed to enter the fragile contour-retarget path.
+                    string contourRetargetDetails;
+                    bool contourRetargeted = BodyOperationsHelper.TryRetargetExtrudeContours(
+                        partDoc,
+                        info,
+                        sketchFeat,
+                        out contourRetargetDetails);
+                    CreateMirrorPartPackage.LogDebug(contourRetargetDetails ??
+                        $"EXTRUDE_CONTOUR_RETARGET\nfeature={info.Name}\nresult=FAIL\nreason=NO_DETAILS");
+
+                    if (contourRetargeted)
+                    {
+                        partDoc.ForceRebuild3(false);
+                    }
+
+                    isWarning = false;
+                    errCode = info.Feature.GetErrorCode2(out isWarning);
+                    result.FeatureErrorCode = errCode;
+                    result.FeatureWarning = isWarning;
+                    CreateMirrorPartPackage.LogDebug(
+                        $"REPLAY_FEATURE_HEALTH_AFTER_CONTOUR_FALLBACK\nfeature={info.Name}\n" +
+                        $"retargeted={contourRetargeted}\nerrorCode={errCode}\nwarning={isWarning}\n" +
+                        $"result={(errCode == 0 ? "PASS" : "FAIL")}");
+
+                    // Fallback 2: geometry is now valid but a mirrored cut can still point
+                    // at the wrong side. Flip only after contour resolution has completed.
+                    if (errCode != 0)
+                    {
+                        string flipRecoveryDetails;
+                        bool recovered = BodyOperationsHelper.TryRecoverExtrudeCutRebuild(
+                            partDoc,
+                            info,
+                            cache,
+                            out flipRecoveryDetails);
+                        CreateMirrorPartPackage.LogDebug(flipRecoveryDetails ??
+                            $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nresult=FAIL\nreason=NO_DETAILS");
+
+                        isWarning = false;
+                        errCode = info.Feature.GetErrorCode2(out isWarning);
+                        result.FeatureErrorCode = errCode;
+                        result.FeatureWarning = isWarning;
+                        CreateMirrorPartPackage.LogDebug(
+                            $"REPLAY_FEATURE_HEALTH_AFTER_FLIP_RECOVERY\nfeature={info.Name}\n" +
+                            $"recovered={recovered}\nerrorCode={errCode}\nwarning={isWarning}\n" +
+                            $"result={(errCode == 0 ? "PASS" : "FAIL")}");
+                    }
+
+                    if (errCode != 0)
+                    {
+                        result.StatusCode = "FEATURE_REBUILD_ERROR";
+                        result.Message = $"Feature has rebuild error code={errCode} warning={isWarning}";
+                        return result;
+                    }
                 }
 
                 result.RebuildPassed = true;
@@ -1951,6 +2653,734 @@ namespace ADDIN.Commands
             return newSegments;
         }
 
+        private static SketchDimensionTransferResult TransferDimensionsToReflectedGeometry(
+            ModelDoc2 partDoc,
+            SketchAuditSnapshot baseline,
+            List<SketchSegment> sourceSegments,
+            List<SketchSegment> reflectedSegments,
+            MirrorReferenceResult mirrorReference,
+            double x1,
+            double y1,
+            double x2,
+            double y2)
+        {
+            SketchDimensionTransferResult result = new SketchDimensionTransferResult();
+            List<PendingSketchDimensionTransfer> created = new List<PendingSketchDimensionTransfer>();
+
+            if (partDoc == null || baseline == null)
+            {
+                result.FailureReason = "DIMENSION_TRANSFER_INPUT_NULL";
+                return result;
+            }
+
+            Dictionary<long, SketchSegment> segmentMap = new Dictionary<long, SketchSegment>();
+            foreach (SketchSegment source in sourceSegments ?? new List<SketchSegment>())
+            {
+                SketchSegment target = FindReflectedSegment(source, reflectedSegments, x1, y1, x2, y2);
+                if (target != null) segmentMap[GetComIdentity(source)] = target;
+            }
+
+            foreach (SketchDimensionState state in baseline.Dimensions)
+            {
+                List<object> mappedEntities = new List<object>();
+                int sourceReferenceCount = 0;
+                int mappedReferenceCount = 0;
+                bool mappingFailed = false;
+                string mode = "ATTACHED_ENTITIES";
+
+                foreach (object entity in state.AttachedEntities)
+                {
+                    bool belongsToSource;
+                    object mapped = MapDimensionEntity(
+                        entity,
+                        sourceSegments,
+                        segmentMap,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        out belongsToSource);
+
+                    if (belongsToSource)
+                    {
+                        sourceReferenceCount++;
+                        if (mapped == null)
+                        {
+                            mappingFailed = true;
+                            break;
+                        }
+                        mappedReferenceCount++;
+                        mappedEntities.Add(mapped);
+                    }
+                    else if (entity != null)
+                    {
+                        mappedEntities.Add(entity);
+                    }
+                }
+
+                if (sourceReferenceCount == 0 && state.IsOriginLinked)
+                {
+                    mappedEntities.Clear();
+                    if (TryBuildAxisDistanceReferences(
+                        state,
+                        sourceSegments,
+                        segmentMap,
+                        mirrorReference,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        mappedEntities))
+                    {
+                        sourceReferenceCount = 1;
+                        mappedReferenceCount = 1;
+                        mode = "AXIS_DISTANCE_FALLBACK";
+                    }
+                }
+
+                // A broken external relation can leave attachment metadata behind while no
+                // attached entity can be mapped back to the source sketch. Preserve the solved
+                // dimension by using the same strict geometric axis-distance reconstruction.
+                // Live references that map normally never enter this fallback.
+                if (sourceReferenceCount == 0 &&
+                    state.AttachedEntities.Count > 0 &&
+                    !state.IsReference &&
+                    !state.IsOriginLinked)
+                {
+                    mappedEntities.Clear();
+                    bool fallbackBuilt = TryBuildAxisDistanceReferences(
+                        state,
+                        sourceSegments,
+                        segmentMap,
+                        mirrorReference,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        mappedEntities);
+
+                    CreateMirrorPartPackage.LogDebug(
+                        $"SKETCH_DIMENSION_BROKEN_REFERENCE_FALLBACK\ndimension={state.Key}\n" +
+                        $"dangling={state.IsDangling}\nattachedCount={state.AttachedEntities.Count}\n" +
+                        $"value={state.SystemValue:R}\nresult={(fallbackBuilt ? "ACCEPT" : "REJECT")}\n" +
+                        $"reason={(fallbackBuilt ? "EXACT_AXIS_DISTANCE_MATCH" : "NO_EXACT_GEOMETRIC_MATCH")}");
+
+                    if (fallbackBuilt)
+                    {
+                        sourceReferenceCount = 1;
+                        mappedReferenceCount = 1;
+                        mappingFailed = false;
+                        mode = "BROKEN_REFERENCE_AXIS_DISTANCE";
+                    }
+                }
+
+                if (sourceReferenceCount == 0)
+                {
+                    result.Skipped++;
+                    LogDimensionTransferItem(state, mode, 0, 0, "SKIP", "NO_SOURCE_REFERENCE");
+                    continue;
+                }
+
+                result.Candidates++;
+                if (mappingFailed || mappedEntities.Count < 2)
+                {
+                    DeleteCreatedSketchDimensions(partDoc, created);
+                    result.FailureReason = mappingFailed
+                        ? "DIMENSION_REFERENCE_MAPPING_FAILED:" + state.Key
+                        : "DIMENSION_REFERENCE_COUNT_LT_2:" + state.Key;
+                    LogDimensionTransferItem(state, mode, sourceReferenceCount, mappedReferenceCount, "FAIL", result.FailureReason);
+                    return result;
+                }
+
+                partDoc.ClearSelection2(true);
+                int selected = 0;
+                foreach (object mappedEntity in mappedEntities)
+                {
+                    if (SelectSketchDimensionEntity(mappedEntity, selected > 0)) selected++;
+                }
+
+                if (selected < 2)
+                {
+                    partDoc.ClearSelection2(true);
+                    DeleteCreatedSketchDimensions(partDoc, created);
+                    result.FailureReason = "DIMENSION_REFERENCE_SELECTION_FAILED:" + state.Key;
+                    LogDimensionTransferItem(state, mode, sourceReferenceCount, mappedReferenceCount, "FAIL", result.FailureReason);
+                    return result;
+                }
+
+                double[] position = ReflectDimensionPosition(state.AnnotationPosition, x1, y1, x2, y2);
+                if (position == null)
+                {
+                    position = BuildFallbackDimensionPosition(mappedEntities, x1, y1, x2, y2);
+                }
+
+                object newDisplayObject = null;
+                object newDimensionObject = null;
+                string createReason;
+                bool createdOk = TryCreateReplacementDimension(
+                    partDoc,
+                    state,
+                    position,
+                    out newDisplayObject,
+                    out newDimensionObject,
+                    out createReason);
+                partDoc.ClearSelection2(true);
+
+                if (!createdOk)
+                {
+                    DeleteCreatedSketchDimensions(partDoc, created);
+                    result.FailureReason = "DIMENSION_CREATE_FAILED:" + state.Key + ":" + createReason;
+                    LogDimensionTransferItem(state, mode, sourceReferenceCount, mappedReferenceCount, "FAIL", result.FailureReason);
+                    return result;
+                }
+
+                created.Add(new PendingSketchDimensionTransfer
+                {
+                    Source = state,
+                    NewDisplayDimension = newDisplayObject,
+                    NewDimension = newDimensionObject,
+                    Mode = mode
+                });
+                LogDimensionTransferItem(state, mode, sourceReferenceCount, mappedReferenceCount, "PASS", "CREATED");
+            }
+
+            if (!DeleteOriginalSketchDimensions(partDoc, created))
+            {
+                DeleteCreatedSketchDimensions(partDoc, created);
+                result.FailureReason = "SOURCE_DIMENSION_DELETE_FAILED";
+                return result;
+            }
+
+            result.Success = true;
+            result.Transferred = created.Count;
+            return result;
+        }
+
+        private static PostBaseFeatureInfo CloneFeatureInfoWithSketch(
+            PostBaseFeatureInfo source,
+            Feature sketchFeature)
+        {
+            return new PostBaseFeatureInfo
+            {
+                Index = source.Index,
+                Name = source.Name,
+                Type = source.Type,
+                Feature = source.Feature,
+                ParentFeatureNames = source.ParentFeatureNames == null
+                    ? new List<string>()
+                    : new List<string>(source.ParentFeatureNames),
+                ChildFeatureNames = source.ChildFeatureNames == null
+                    ? new List<string>()
+                    : new List<string>(source.ChildFeatureNames),
+                DrivingSketchName = sketchFeature?.Name,
+                DrivingSketchFeature = sketchFeature,
+                HasDrivingSketch = sketchFeature != null,
+                IsSuppressed = source.IsSuppressed,
+                Disposition = source.Disposition
+            };
+        }
+
+        private static bool TryDuplicateSketchFeature(
+            ModelDoc2 partDoc,
+            Feature sourceSketch,
+            out Feature copiedSketch,
+            out string details)
+        {
+            copiedSketch = null;
+            details = null;
+            if (partDoc == null || sourceSketch == null)
+            {
+                details = "INVALID_ARGUMENT";
+                return false;
+            }
+
+            var before = new HashSet<long>();
+            foreach (Feature sketchFeature in EnumerateSketchFeatures(partDoc))
+            {
+                before.Add(GetComIdentity(sketchFeature));
+            }
+
+            try
+            {
+                partDoc.ClearSelection2(true);
+                if (!sourceSketch.Select2(false, 0))
+                {
+                    details = "SOURCE_SKETCH_SELECT_FAILED";
+                    return false;
+                }
+
+                partDoc.EditCopy();
+                partDoc.Paste();
+                partDoc.ClearSelection2(true);
+
+                foreach (Feature candidate in EnumerateSketchFeatures(partDoc))
+                {
+                    long identity = GetComIdentity(candidate);
+                    if (before.Contains(identity))
+                        continue;
+
+                    copiedSketch = candidate;
+                    break;
+                }
+
+                if (copiedSketch == null)
+                {
+                    details = "PASTE_DID_NOT_CREATE_SKETCH_FEATURE";
+                    return false;
+                }
+
+                string copiedName = GenerateUniqueSketchName(partDoc, sourceSketch.Name);
+                try { copiedSketch.Name = copiedName; }
+                catch (Exception renameEx)
+                {
+                    details = "COPIED_SKETCH_RENAME_FAILED: " + renameEx.Message;
+                    TryDeleteFeature(partDoc, copiedSketch, out _);
+                    copiedSketch = null;
+                    return false;
+                }
+
+                details = $"source={sourceSketch.Name}; copied={copiedName}";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                details = "EXCEPTION: " + ex.Message;
+                if (copiedSketch != null)
+                {
+                    TryDeleteFeature(partDoc, copiedSketch, out _);
+                    copiedSketch = null;
+                }
+                return false;
+            }
+            finally
+            {
+                try { partDoc.ClearSelection2(true); } catch { }
+            }
+        }
+
+        private static IEnumerable<Feature> EnumerateSketchFeatures(ModelDoc2 partDoc)
+        {
+            Feature feature = partDoc?.FirstFeature() as Feature;
+            while (feature != null)
+            {
+                string type = null;
+                try { type = feature.GetTypeName2(); } catch { }
+                if (string.Equals(type, "ProfileFeature", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(type, "3DProfileFeature", StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return feature;
+                }
+                feature = feature.GetNextFeature() as Feature;
+            }
+        }
+
+        private static string GenerateUniqueSketchName(ModelDoc2 partDoc, string sourceName)
+        {
+            string safeSource = string.IsNullOrWhiteSpace(sourceName) ? "Sketch" : sourceName;
+            string baseName = "MIRROR_" + safeSource;
+            string candidate = baseName;
+            int suffix = 1;
+            PartDoc pDoc = partDoc as PartDoc;
+            while (pDoc != null && pDoc.FeatureByName(candidate) != null)
+            {
+                candidate = baseName + "_" + suffix.ToString();
+                suffix++;
+            }
+            return candidate;
+        }
+
+        private static bool TryDeleteFeature(ModelDoc2 partDoc, Feature feature, out string details)
+        {
+            details = null;
+            if (partDoc == null || feature == null)
+            {
+                details = "SKIP_INVALID_ARGUMENT";
+                return false;
+            }
+
+            try
+            {
+                string featureName = feature.Name;
+                partDoc.ClearSelection2(true);
+                if (!feature.Select2(false, 0))
+                {
+                    details = "SELECT_FAILED: " + featureName;
+                    return false;
+                }
+
+                partDoc.EditDelete();
+                partDoc.ClearSelection2(true);
+                details = "DELETED: " + featureName;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                details = "EXCEPTION: " + ex.Message;
+                return false;
+            }
+        }
+
+        private static object MapDimensionEntity(
+            object entity,
+            List<SketchSegment> sourceSegments,
+            Dictionary<long, SketchSegment> segmentMap,
+            double x1,
+            double y1,
+            double x2,
+            double y2,
+            out bool belongsToSource)
+        {
+            belongsToSource = false;
+            if (entity == null) return null;
+
+            long identity = GetComIdentity(entity);
+            SketchSegment mappedSegment;
+            if (segmentMap.TryGetValue(identity, out mappedSegment))
+            {
+                belongsToSource = true;
+                return mappedSegment;
+            }
+
+            foreach (SketchSegment source in sourceSegments ?? new List<SketchSegment>())
+            {
+                SketchSegment target;
+                if (!segmentMap.TryGetValue(GetComIdentity(source), out target)) continue;
+
+                object mappedPoint = MapOwnedSketchPoint(entity, source, target, x1, y1, x2, y2);
+                if (mappedPoint != null)
+                {
+                    belongsToSource = true;
+                    return mappedPoint;
+                }
+
+                if (EntityBelongsToSegment(entity, source))
+                {
+                    belongsToSource = true;
+                    return null;
+                }
+            }
+
+            return entity;
+        }
+
+        private static object MapOwnedSketchPoint(
+            object entity,
+            SketchSegment source,
+            SketchSegment target,
+            double x1,
+            double y1,
+            double x2,
+            double y2)
+        {
+            List<SketchPoint> sourcePoints = GetSegmentPoints(source);
+            List<SketchPoint> targetPoints = GetSegmentPoints(target);
+            if (sourcePoints.Count == 0 || targetPoints.Count == 0) return null;
+
+            long entityId = GetComIdentity(entity);
+            for (int i = 0; i < sourcePoints.Count; i++)
+            {
+                SketchPoint sourcePoint = sourcePoints[i];
+                if (GetComIdentity(sourcePoint) != entityId) continue;
+
+                double[] reflected = ReflectPoint2D(sourcePoint.X, sourcePoint.Y, x1, y1, x2, y2);
+                SketchPoint best = null;
+                double bestDistance = double.MaxValue;
+                foreach (SketchPoint targetPoint in targetPoints)
+                {
+                    double distance = Dist2D(reflected[0], reflected[1], targetPoint.X, targetPoint.Y);
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        best = targetPoint;
+                    }
+                }
+                return bestDistance <= 1e-4 ? best : null;
+            }
+            return null;
+        }
+
+        private static bool EntityBelongsToSegment(object entity, SketchSegment segment)
+        {
+            long entityId = GetComIdentity(entity);
+            foreach (SketchPoint point in GetSegmentPoints(segment))
+            {
+                if (GetComIdentity(point) == entityId) return true;
+            }
+            return false;
+        }
+
+        private static List<SketchPoint> GetSegmentPoints(SketchSegment segment)
+        {
+            List<SketchPoint> points = new List<SketchPoint>();
+            try
+            {
+                SketchLine line = segment as SketchLine;
+                if (line != null)
+                {
+                    AddUniqueSketchPoint(points, line.GetStartPoint2() as SketchPoint);
+                    AddUniqueSketchPoint(points, line.GetEndPoint2() as SketchPoint);
+                    return points;
+                }
+
+                SketchArc arc = segment as SketchArc;
+                if (arc != null)
+                {
+                    AddUniqueSketchPoint(points, arc.GetCenterPoint2() as SketchPoint);
+                    AddUniqueSketchPoint(points, arc.GetStartPoint2() as SketchPoint);
+                    AddUniqueSketchPoint(points, arc.GetEndPoint2() as SketchPoint);
+                }
+            }
+            catch { }
+            return points;
+        }
+
+        private static void AddUniqueSketchPoint(List<SketchPoint> points, SketchPoint point)
+        {
+            if (point == null) return;
+            long id = GetComIdentity(point);
+            foreach (SketchPoint existing in points)
+            {
+                if (GetComIdentity(existing) == id) return;
+            }
+            points.Add(point);
+        }
+
+        private static bool TryBuildAxisDistanceReferences(
+            SketchDimensionState state,
+            List<SketchSegment> sourceSegments,
+            Dictionary<long, SketchSegment> segmentMap,
+            MirrorReferenceResult mirrorReference,
+            double x1,
+            double y1,
+            double x2,
+            double y2,
+            List<object> mappedEntities)
+        {
+            if (state == null || double.IsNaN(state.SystemValue) || mirrorReference == null || mirrorReference.Centerline == null)
+                return false;
+
+            double axisDx = x2 - x1;
+            double axisDy = y2 - y1;
+            double axisLength = Math.Sqrt(axisDx * axisDx + axisDy * axisDy);
+            if (axisLength <= 1e-12) return false;
+            axisDx /= axisLength;
+            axisDy /= axisLength;
+
+            SketchLine bestSource = null;
+            SketchSegment bestTarget = null;
+            double bestError = double.MaxValue;
+
+            foreach (SketchSegment source in sourceSegments ?? new List<SketchSegment>())
+            {
+                SketchLine line = source as SketchLine;
+                if (line == null) continue;
+                SketchPoint start = line.GetStartPoint2() as SketchPoint;
+                SketchPoint end = line.GetEndPoint2() as SketchPoint;
+                if (start == null || end == null) continue;
+
+                double lineDx = end.X - start.X;
+                double lineDy = end.Y - start.Y;
+                double lineLength = Math.Sqrt(lineDx * lineDx + lineDy * lineDy);
+                if (lineLength <= 1e-12) continue;
+                lineDx /= lineLength;
+                lineDy /= lineLength;
+                if (Math.Abs(lineDx * axisDy - lineDy * axisDx) > 1e-4) continue;
+
+                double midX = (start.X + end.X) * 0.5;
+                double midY = (start.Y + end.Y) * 0.5;
+                double distance = Math.Abs((midX - x1) * (-axisDy) + (midY - y1) * axisDx);
+                double error = Math.Abs(distance - Math.Abs(state.SystemValue));
+                if (error >= bestError) continue;
+
+                SketchSegment target;
+                if (!segmentMap.TryGetValue(GetComIdentity(source), out target)) continue;
+                bestError = error;
+                bestSource = line;
+                bestTarget = target;
+            }
+
+            double tolerance = Math.Max(1e-6, Math.Abs(state.SystemValue) * 1e-4);
+            if (bestSource == null || bestTarget == null || bestError > tolerance) return false;
+
+            mappedEntities.Add(mirrorReference.Centerline);
+            mappedEntities.Add(bestTarget);
+            return true;
+        }
+
+        private static bool SelectSketchDimensionEntity(object entity, bool append)
+        {
+            if (entity == null) return false;
+            try { return (bool)((dynamic)entity).Select4(append, null); } catch { }
+            try { return (bool)((dynamic)entity).Select2(append, 0); } catch { }
+            try { return (bool)((dynamic)entity).Select(append); } catch { }
+            return false;
+        }
+
+        private static bool TryCreateReplacementDimension(
+            ModelDoc2 partDoc,
+            SketchDimensionState source,
+            double[] position,
+            out object displayObject,
+            out object dimensionObject,
+            out string reason)
+        {
+            displayObject = null;
+            dimensionObject = null;
+            reason = string.Empty;
+            try
+            {
+                DisplayDimension display = partDoc.AddDimension2(position[0], position[1], position[2]) as DisplayDimension;
+                if (display == null)
+                {
+                    reason = "ADD_DIMENSION_RETURNED_NULL";
+                    return false;
+                }
+
+                Dimension dimension = display.GetDimension2(0) as Dimension;
+                if (dimension == null)
+                {
+                    reason = "GET_DIMENSION_RETURNED_NULL";
+                    return false;
+                }
+
+                if (!double.IsNaN(source.SystemValue))
+                {
+                    dimension.SystemValue = source.SystemValue;
+                    double tolerance = Math.Max(1e-8, Math.Abs(source.SystemValue) * 1e-8);
+                    if (Math.Abs(dimension.SystemValue - source.SystemValue) > tolerance)
+                    {
+                        reason = "VALUE_APPLY_FAILED";
+                        DeleteDisplayDimension(partDoc, display);
+                        return false;
+                    }
+                }
+
+                try { ((dynamic)dimension).DrivenState = source.DrivenState; } catch { }
+                try
+                {
+                    Annotation annotation = display.GetAnnotation() as Annotation;
+                    if (annotation != null && annotation.IsDangling())
+                    {
+                        reason = "NEW_DIMENSION_DANGLING";
+                        DeleteDisplayDimension(partDoc, display);
+                        return false;
+                    }
+                }
+                catch { }
+
+                displayObject = display;
+                dimensionObject = dimension;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = ex.GetType().Name + ":" + ex.Message;
+                return false;
+            }
+        }
+
+        private static bool DeleteOriginalSketchDimensions(ModelDoc2 partDoc, List<PendingSketchDimensionTransfer> transfers)
+        {
+            if (transfers == null || transfers.Count == 0) return true;
+            partDoc.ClearSelection2(true);
+            int selected = 0;
+            foreach (PendingSketchDimensionTransfer transfer in transfers)
+            {
+                try
+                {
+                    dynamic display = transfer.Source.DisplayDimensionObject;
+                    dynamic annotation = display.GetAnnotation();
+                    if (annotation != null && (bool)annotation.Select3(selected > 0, null)) selected++;
+                }
+                catch { }
+            }
+
+            if (selected != transfers.Count)
+            {
+                partDoc.ClearSelection2(true);
+                return false;
+            }
+
+            try
+            {
+                partDoc.EditDelete();
+                partDoc.ClearSelection2(true);
+                return true;
+            }
+            catch
+            {
+                partDoc.ClearSelection2(true);
+                return false;
+            }
+        }
+
+        private static void DeleteCreatedSketchDimensions(ModelDoc2 partDoc, List<PendingSketchDimensionTransfer> transfers)
+        {
+            if (transfers == null) return;
+            for (int i = transfers.Count - 1; i >= 0; i--)
+            {
+                DeleteDisplayDimension(partDoc, transfers[i].NewDisplayDimension);
+            }
+            partDoc.ClearSelection2(true);
+        }
+
+        private static void DeleteDisplayDimension(ModelDoc2 partDoc, object displayObject)
+        {
+            if (partDoc == null || displayObject == null) return;
+            try
+            {
+                partDoc.ClearSelection2(true);
+                dynamic display = displayObject;
+                dynamic annotation = display.GetAnnotation();
+                if (annotation != null && (bool)annotation.Select3(false, null)) partDoc.EditDelete();
+            }
+            catch { }
+        }
+
+        private static double[] ReflectDimensionPosition(double[] position, double x1, double y1, double x2, double y2)
+        {
+            if (position == null || position.Length < 3) return null;
+            double[] reflected = ReflectPoint2D(position[0], position[1], x1, y1, x2, y2);
+            return new[] { reflected[0], reflected[1], position[2] };
+        }
+
+        private static double[] BuildFallbackDimensionPosition(List<object> entities, double x1, double y1, double x2, double y2)
+        {
+            double x = (x1 + x2) * 0.5;
+            double y = (y1 + y2) * 0.5;
+            foreach (object entity in entities)
+            {
+                try
+                {
+                    dynamic point = entity;
+                    x = Convert.ToDouble(point.X);
+                    y = Convert.ToDouble(point.Y);
+                    break;
+                }
+                catch { }
+            }
+            return new[] { x + 0.01, y + 0.01, 0.0 };
+        }
+
+        private static void LogDimensionTransferItem(
+            SketchDimensionState state,
+            string mode,
+            int sourceReferences,
+            int mappedReferences,
+            string result,
+            string reason)
+        {
+            CreateMirrorPartPackage.LogDebug(
+                "SKETCH_DIMENSION_TRANSFER_ITEM\n" +
+                "key=" + (state != null ? state.Key : string.Empty) + "\n" +
+                "mode=" + mode + "\n" +
+                "sourceRefs=" + sourceReferences + "\n" +
+                "mappedRefs=" + mappedReferences + "\n" +
+                "value=" + (state != null ? FormatAuditValue(state.SystemValue) : "NaN") + "\n" +
+                "result=" + result + "\n" +
+                "reason=" + reason);
+        }
+
         private static SketchAuditSnapshot CaptureSketchAudit(Feature sketchFeature, Sketch sketch)
         {
             SketchAuditSnapshot snapshot = new SketchAuditSnapshot();
@@ -1979,6 +3409,8 @@ namespace ADDIN.Commands
                         if (dimension != null)
                         {
                             SketchDimensionState state = new SketchDimensionState();
+                            state.DisplayDimensionObject = displayObject;
+                            state.DimensionObject = dimension;
                             state.Name = SafeDynamicString(() => (object)dimension.Name);
                             state.FullName = SafeDynamicString(() => (object)dimension.FullName);
                             state.SystemValue = SafeDynamicDouble(() => (object)dimension.SystemValue, double.NaN);
@@ -1989,10 +3421,54 @@ namespace ADDIN.Commands
                             {
                                 dynamic annotation = displayDimension.GetAnnotation();
                                 state.IsDangling = annotation != null && (bool)annotation.IsDangling();
+                                if (annotation != null)
+                                {
+                                    state.AnnotationPosition = ReadAnnotationPosition(annotation);
+                                }
                             }
                             catch { state.IsDangling = false; }
 
-                            state.IsOriginLinked = DimensionReferencesSketchOrigin(dimension);
+                            // GetAttachedEntities2 contains the real sketch entities used by
+                            // the dimension.  The old audit only compared name/value, so a
+                            // dimension that remained attached to the source geometry could
+                            // incorrectly pass after that geometry became construction.
+                            try
+                            {
+                                object attachedObject = displayDimension.GetAttachedEntities2();
+                                Array attached = attachedObject as Array;
+                                if (attached != null)
+                                {
+                                    foreach (object entity in attached)
+                                    {
+                                        if (entity != null) state.AttachedEntities.Add(entity);
+                                    }
+                                }
+                            }
+                            catch { }
+
+                            if (state.AttachedEntities.Count == 0)
+                            {
+                                try
+                                {
+                                    Array references = dimension.ReferencePoints as Array;
+                                    if (references != null)
+                                    {
+                                        foreach (object entity in references)
+                                        {
+                                            if (entity != null) state.AttachedEntities.Add(entity);
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+
+                            // Depending on the SOLIDWORKS version and dimension type, the
+                            // origin/centerline reference can be exposed either through
+                            // Dimension.ReferencePoints or DisplayDimension attached
+                            // entities. Inspect both so axis dimensions (for example the
+                            // 400 mm dimension) are transferred reliably.
+                            state.IsOriginLinked = DimensionReferencesSketchOrigin(dimension) ||
+                                                   EntitiesReferenceSketchOrigin(state.AttachedEntities);
                             state.Key = BuildDimensionKey(state);
                             snapshot.Dimensions.Add(state);
                             if (state.IsOriginLinked) snapshot.OriginLinkedDimensionCount++;
@@ -2004,7 +3480,9 @@ namespace ADDIN.Commands
                                 $"drivenState={state.DrivenState}\n" +
                                 $"reference={state.IsReference}\n" +
                                 $"dangling={state.IsDangling}\n" +
-                                $"originLinked={state.IsOriginLinked}");
+                                $"originLinked={state.IsOriginLinked}\n" +
+                                $"attachedEntities={state.AttachedEntities.Count}\n" +
+                                $"annotationPosition={FormatAuditPosition(state.AnnotationPosition)}");
                         }
                     }
                     catch (Exception ex)
@@ -2061,6 +3539,167 @@ namespace ADDIN.Commands
 
             snapshot.CaptureWarning = string.Join(" | ", warnings.ToArray());
             return snapshot;
+        }
+
+        private static HashSet<long> CaptureSketchRelationIds(
+            Sketch sketch,
+            out int relationCount,
+            out string warning)
+        {
+            HashSet<long> ids = new HashSet<long>();
+            relationCount = 0;
+            warning = string.Empty;
+
+            try
+            {
+                dynamic dynamicSketch = sketch;
+                dynamic relationManager = dynamicSketch != null ? dynamicSketch.RelationManager : null;
+                if (relationManager == null)
+                {
+                    warning = "RELATION_MANAGER_NULL";
+                    return ids;
+                }
+
+                object relationObject = relationManager.GetRelations((int)swSketchRelationFilterType_e.swAll);
+                Array relations = relationObject as Array;
+                if (relations == null)
+                {
+                    relationCount = SafeDynamicInt(
+                        () => (object)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll),
+                        0);
+                    return ids;
+                }
+
+                relationCount = relations.Length;
+                foreach (object relation in relations)
+                {
+                    long id = GetComIdentity(relation);
+                    if (id != 0) ids.Add(id);
+                }
+            }
+            catch (Exception ex)
+            {
+                warning = "RELATION_SNAPSHOT:" + ex.Message;
+            }
+
+            return ids;
+        }
+
+        private static SketchIndependenceResult DetachNewSymmetricRelations(
+            Sketch sketch,
+            HashSet<long> relationIdsBeforeMirror,
+            int relationCountBeforeMirror)
+        {
+            SketchIndependenceResult result = new SketchIndependenceResult();
+            result.RelationsBeforeMirror = relationCountBeforeMirror;
+            relationIdsBeforeMirror = relationIdsBeforeMirror ?? new HashSet<long>();
+
+            try
+            {
+                dynamic dynamicSketch = sketch;
+                dynamic relationManager = dynamicSketch != null ? dynamicSketch.RelationManager : null;
+                if (relationManager == null)
+                {
+                    result.FailureReason = "RELATION_MANAGER_NULL";
+                    return result;
+                }
+
+                object relationObject = relationManager.GetRelations((int)swSketchRelationFilterType_e.swAll);
+                Array relations = relationObject as Array;
+                result.RelationsAfterMirror = relations != null
+                    ? relations.Length
+                    : SafeDynamicInt(
+                        () => (object)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll),
+                        0);
+
+                List<object> symmetricRelationsToDelete = new List<object>();
+                if (relations != null)
+                {
+                    foreach (object relation in relations)
+                    {
+                        if (relation == null) continue;
+
+                        long id = GetComIdentity(relation);
+                        bool existedBefore = id != 0 && relationIdsBeforeMirror.Contains(id);
+                        if (existedBefore) continue;
+
+                        result.CandidateRelations++;
+                        int relationType = SafeDynamicInt(
+                            () => (object)((dynamic)relation).GetRelationType(),
+                            -1);
+                        if (relationType == (int)swConstraintType_e.swConstraintType_SYMMETRIC)
+                        {
+                            result.SymmetricRelationsFound++;
+                            symmetricRelationsToDelete.Add(relation);
+                        }
+                    }
+                }
+
+                foreach (object relation in symmetricRelationsToDelete)
+                {
+                    bool deleted = false;
+                    try
+                    {
+                        deleted = (bool)relationManager.DeleteRelation((dynamic)relation);
+                    }
+                    catch
+                    {
+                        deleted = false;
+                    }
+
+                    if (deleted) result.SymmetricRelationsDeleted++;
+                }
+
+                result.RelationsAfterDetach = SafeDynamicInt(
+                    () => (object)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll),
+                    0);
+
+                if (result.SymmetricRelationsFound == 0)
+                {
+                    result.FailureReason = "NEW_SYMMETRIC_RELATION_NOT_FOUND";
+                    return result;
+                }
+
+                if (result.SymmetricRelationsDeleted != result.SymmetricRelationsFound)
+                {
+                    result.FailureReason = "SYMMETRIC_RELATION_DELETE_INCOMPLETE";
+                    return result;
+                }
+
+                if (result.RelationsAfterDetach > result.RelationsAfterMirror - result.SymmetricRelationsDeleted)
+                {
+                    result.FailureReason = "RELATION_COUNT_NOT_REDUCED";
+                    return result;
+                }
+
+                result.Success = true;
+            }
+            catch (Exception ex)
+            {
+                result.FailureReason = "DETACH_EXCEPTION:" + ex.Message;
+            }
+
+            return result;
+        }
+
+        private static long GetComIdentity(object comObject)
+        {
+            if (comObject == null || !Marshal.IsComObject(comObject)) return 0;
+
+            IntPtr unknown = IntPtr.Zero;
+            try
+            {
+                unknown = Marshal.GetIUnknownForObject(comObject);
+                return unknown.ToInt64();
+            }
+            catch
+            {
+                return 0;
+            }
+            finally
+            {
+                if (unknown != IntPtr.Zero) Marshal.Release(unknown);
+            }
         }
 
         private static SketchDimensionAuditResult CompareSketchAudits(
@@ -2172,7 +3811,7 @@ namespace ADDIN.Commands
             try
             {
                 object referenceObject = dimension.ReferencePoints;
-                object[] references = referenceObject as object[];
+                Array references = referenceObject as Array;
                 if (references == null) return false;
                 foreach (object reference in references)
                 {
@@ -2180,6 +3819,16 @@ namespace ADDIN.Commands
                 }
             }
             catch { }
+            return false;
+        }
+
+        private static bool EntitiesReferenceSketchOrigin(IEnumerable<object> entities)
+        {
+            if (entities == null) return false;
+            foreach (object entity in entities)
+            {
+                if (EntityIsAtSketchOrigin(entity)) return true;
+            }
             return false;
         }
 
@@ -2194,6 +3843,27 @@ namespace ADDIN.Commands
                 double z = Convert.ToDouble(point.Z);
                 return Math.Abs(x) <= 1e-9 && Math.Abs(y) <= 1e-9 && Math.Abs(z) <= 1e-9;
             }
+            catch { }
+
+            // A construction centerline through the sketch origin is also an
+            // origin reference.  This is the normal reference used by the
+            // 400 mm dimension in the mirror workflow.
+            try
+            {
+                SketchLine line = entity as SketchLine;
+                if (line == null) return false;
+                SketchPoint start = line.GetStartPoint2() as SketchPoint;
+                SketchPoint end = line.GetEndPoint2() as SketchPoint;
+                if (start == null || end == null) return false;
+
+                double dx = end.X - start.X;
+                double dy = end.Y - start.Y;
+                double length = Math.Sqrt(dx * dx + dy * dy);
+                if (length <= 1e-12) return false;
+
+                double distanceToOrigin = Math.Abs(start.X * end.Y - start.Y * end.X) / length;
+                return distanceToOrigin <= 1e-9;
+            }
             catch { return false; }
         }
 
@@ -2207,6 +3877,39 @@ namespace ADDIN.Commands
         private static string FormatAuditValue(double value)
         {
             return double.IsNaN(value) ? "NaN" : value.ToString("G17", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static double[] ReadAnnotationPosition(object annotationObject)
+        {
+            if (annotationObject == null) return null;
+            try
+            {
+                object raw = ((dynamic)annotationObject).GetPosition();
+                Array values = raw as Array;
+                if (values == null && raw != null)
+                {
+                    try { values = ((dynamic)raw).ArrayData as Array; }
+                    catch { values = null; }
+                }
+
+                if (values == null || values.Length < 3) return null;
+                return new[]
+                {
+                    Convert.ToDouble(values.GetValue(0), System.Globalization.CultureInfo.InvariantCulture),
+                    Convert.ToDouble(values.GetValue(1), System.Globalization.CultureInfo.InvariantCulture),
+                    Convert.ToDouble(values.GetValue(2), System.Globalization.CultureInfo.InvariantCulture)
+                };
+            }
+            catch { return null; }
+        }
+
+        private static string FormatAuditPosition(double[] position)
+        {
+            if (position == null || position.Length < 3) return "(null)";
+            return "(" +
+                   FormatAuditValue(position[0]) + "," +
+                   FormatAuditValue(position[1]) + "," +
+                   FormatAuditValue(position[2]) + ")";
         }
 
         private static string SafeDynamicString(Func<object> getter)
@@ -2366,7 +4069,7 @@ namespace ADDIN.Commands
             return false;
         }
 
-        private static bool FindReflectedMatch(SketchSegment srcSeg, List<SketchSegment> candidates, double x1, double y1, double x2, double y2)
+        private static SketchSegment FindReflectedSegment(SketchSegment srcSeg, List<SketchSegment> candidates, double x1, double y1, double x2, double y2)
         {
             try
             {
@@ -2375,7 +4078,7 @@ namespace ADDIN.Commands
                 {
                     SketchPoint sp = srcLine.GetStartPoint2() as SketchPoint;
                     SketchPoint ep = srcLine.GetEndPoint2() as SketchPoint;
-                    if (sp == null || ep == null) return false;
+                    if (sp == null || ep == null) return null;
 
                     double[] rStart = ReflectPoint2D(sp.X, sp.Y, x1, y1, x2, y2);
                     double[] rEnd = ReflectPoint2D(ep.X, ep.Y, x1, y1, x2, y2);
@@ -2393,7 +4096,7 @@ namespace ADDIN.Commands
                         bool matchRev = (Dist2D(rStart[0], rStart[1], cep.X, cep.Y) < 1e-4) &&
                                         (Dist2D(rEnd[0], rEnd[1], csp.X, csp.Y) < 1e-4);
 
-                        if (matchFwd || matchRev) return true;
+                        if (matchFwd || matchRev) return c;
                     }
                 }
 
@@ -2404,7 +4107,7 @@ namespace ADDIN.Commands
                     SketchPoint sp = srcArc.GetStartPoint2() as SketchPoint;
                     SketchPoint ep = srcArc.GetEndPoint2() as SketchPoint;
                     double radius = srcArc.GetRadius();
-                    if (cp == null) return false;
+                    if (cp == null) return null;
 
                     double[] rCenter = ReflectPoint2D(cp.X, cp.Y, x1, y1, x2, y2);
 
@@ -2418,13 +4121,18 @@ namespace ADDIN.Commands
                         if (Dist2D(rCenter[0], rCenter[1], ccp.X, ccp.Y) < 1e-4 &&
                             Math.Abs(radius - candArc.GetRadius()) < 1e-4)
                         {
-                            return true;
+                            return c;
                         }
                     }
                 }
             }
             catch {}
-            return false;
+            return null;
+        }
+
+        private static bool FindReflectedMatch(SketchSegment srcSeg, List<SketchSegment> candidates, double x1, double y1, double x2, double y2)
+        {
+            return FindReflectedSegment(srcSeg, candidates, x1, y1, x2, y2) != null;
         }
 
         private static double[] ReflectPoint2D(double px, double py, double x1, double y1, double x2, double y2)
@@ -2454,6 +4162,479 @@ namespace ADDIN.Commands
         }
     }
 
+    public sealed class ChamferFeatureMirrorHandler : IFeatureMirrorHandler
+    {
+        private sealed class EdgeGeometry
+        {
+            public Edge Edge { get; set; }
+            public int CurveType { get; set; }
+            public bool Closed { get; set; }
+            public double Length { get; set; }
+            public List<double[]> Points { get; set; } = new List<double[]>();
+        }
+
+        public bool CanHandle(PostBaseFeatureInfo info)
+        {
+            return info != null &&
+                   !string.IsNullOrEmpty(info.Type) &&
+                   info.Type.IndexOf("Chamfer", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public FeatureReplayResult Replay(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            PlaneData mirrorPlane,
+            FeatureBodyState cache,
+            string protectedBaseFeatureName,
+            string protectedBaseSketchName)
+        {
+            FeatureReplayResult result = new FeatureReplayResult
+            {
+                FeatureName = info != null ? info.Name : string.Empty,
+                FeatureType = info != null ? info.Type : string.Empty,
+                StatusCode = "CHAMFER_REPLAY_FAILED",
+                Message = "Khong the replay Chamfer.",
+                MirrorReferenceKind = MirrorReferenceKind.ModelPlane
+            };
+
+            if (partDoc == null || info == null || info.Feature == null || mirrorPlane == null)
+            {
+                result.Message = "Thieu du lieu de replay Chamfer.";
+                return result;
+            }
+
+            IChamferFeatureData2 definition = null;
+            bool selectionAccess = false;
+
+            try
+            {
+                Debug.WriteLine("CHAMFER_REPLAY_BEGIN feature=" + info.Name + " type=" + info.Type);
+
+                definition = info.Feature.GetDefinition() as IChamferFeatureData2;
+                if (definition == null)
+                {
+                    result.Message = "Khong doc duoc IChamferFeatureData2.";
+                    return result;
+                }
+
+                selectionAccess = definition.AccessSelections(partDoc, null);
+                if (!selectionAccess)
+                {
+                    result.Message = "Chamfer AccessSelections that bai.";
+                    return result;
+                }
+
+                List<Edge> sourceEdges = ToEdges(definition.Edges);
+                if (sourceEdges.Count == 0)
+                {
+                    result.Message = "Chamfer khong co canh tham chieu.";
+                    return result;
+                }
+
+                List<bool> sourceFlip = new List<bool>();
+                foreach (Edge edge in sourceEdges)
+                {
+                    bool flipped = false;
+                    try { flipped = definition.GetIsFlipped(edge); } catch { }
+                    sourceFlip.Add(flipped);
+                }
+
+                List<Edge> targetEdges = GetCurrentBodyEdges(partDoc);
+                if (targetEdges.Count == 0)
+                {
+                    result.Message = "Khong tim thay canh tren body dich.";
+                    return result;
+                }
+
+                double modelScale = GetModelScale(partDoc);
+                double pointTolerance = Math.Max(1.0e-6, modelScale * 1.0e-6);
+                double lengthTolerance = Math.Max(1.0e-6, modelScale * 1.0e-6);
+
+                List<Edge> mappedEdges = new List<Edge>();
+                HashSet<Edge> usedEdges = new HashSet<Edge>();
+
+                for (int i = 0; i < sourceEdges.Count; i++)
+                {
+                    EdgeGeometry sourceGeometry;
+                    string sourceReason;
+                    if (!TryReadEdgeGeometry(sourceEdges[i], out sourceGeometry, out sourceReason))
+                    {
+                        result.Message = "Khong doc duoc canh Chamfer nguon: " + sourceReason;
+                        return result;
+                    }
+
+                    EdgeGeometry reflectedSource = ReflectGeometry(sourceGeometry, mirrorPlane);
+                    Edge directBestEdge = null;
+                    double directBestScore = double.MaxValue;
+                    double directBestLengthDelta = double.MaxValue;
+                    Edge reflectedBestEdge = null;
+                    double reflectedBestScore = double.MaxValue;
+                    double reflectedBestLengthDelta = double.MaxValue;
+
+                    foreach (Edge candidate in targetEdges)
+                    {
+                        if (candidate == null || usedEdges.Contains(candidate)) continue;
+
+                        EdgeGeometry candidateGeometry;
+                        string candidateReason;
+                        if (!TryReadEdgeGeometry(candidate, out candidateGeometry, out candidateReason)) continue;
+                        if (candidateGeometry.CurveType != sourceGeometry.CurveType) continue;
+
+                        double lengthDelta = Math.Abs(candidateGeometry.Length - sourceGeometry.Length);
+                        if (lengthDelta > lengthTolerance) continue;
+
+                        double directScore = CompareGeometry(sourceGeometry, candidateGeometry);
+                        if (directScore < directBestScore)
+                        {
+                            directBestScore = directScore;
+                            directBestLengthDelta = lengthDelta;
+                            directBestEdge = candidate;
+                        }
+
+                        double reflectedScore = CompareGeometry(reflectedSource, candidateGeometry);
+                        if (reflectedScore < reflectedBestScore)
+                        {
+                            reflectedBestScore = reflectedScore;
+                            reflectedBestLengthDelta = lengthDelta;
+                            reflectedBestEdge = candidate;
+                        }
+                    }
+
+                    bool directAccepted = directBestEdge != null && directBestScore <= pointTolerance;
+                    bool reflectedAccepted = reflectedBestEdge != null && reflectedBestScore <= pointTolerance;
+                    Edge bestEdge = null;
+                    double bestScore = double.MaxValue;
+                    double bestLengthDelta = double.MaxValue;
+                    string mappingMode = "NONE";
+
+                    if (directAccepted && (!reflectedAccepted || directBestScore <= reflectedBestScore))
+                    {
+                        bestEdge = directBestEdge;
+                        bestScore = directBestScore;
+                        bestLengthDelta = directBestLengthDelta;
+                        mappingMode = "DIRECT_CURRENT";
+                    }
+                    else if (reflectedAccepted)
+                    {
+                        bestEdge = reflectedBestEdge;
+                        bestScore = reflectedBestScore;
+                        bestLengthDelta = reflectedBestLengthDelta;
+                        mappingMode = "REFLECTED";
+                    }
+
+                    Debug.WriteLine(
+                        "CHAMFER_EDGE_MAP feature=" + info.Name +
+                        " sourceIndex=" + i +
+                        " sourceLengthMm=" + (sourceGeometry.Length * 1000.0).ToString("0.######") +
+                        " directScoreMm=" + (directBestScore < double.MaxValue ? (directBestScore * 1000.0).ToString("0.######") : "NA") +
+                        " reflectedScoreMm=" + (reflectedBestScore < double.MaxValue ? (reflectedBestScore * 1000.0).ToString("0.######") : "NA") +
+                        " directLengthDeltaMm=" + (directBestLengthDelta < double.MaxValue ? (directBestLengthDelta * 1000.0).ToString("0.######") : "NA") +
+                        " reflectedLengthDeltaMm=" + (reflectedBestLengthDelta < double.MaxValue ? (reflectedBestLengthDelta * 1000.0).ToString("0.######") : "NA") +
+                        " selectedScoreMm=" + (bestScore < double.MaxValue ? (bestScore * 1000.0).ToString("0.######") : "NA") +
+                        " selectedLengthDeltaMm=" + (bestLengthDelta < double.MaxValue ? (bestLengthDelta * 1000.0).ToString("0.######") : "NA") +
+                        " toleranceMm=" + (pointTolerance * 1000.0).ToString("0.######") +
+                        " mode=" + mappingMode +
+                        " accepted=" + (bestEdge != null));
+
+                    if (bestEdge == null)
+                    {
+                        result.Message = "Khong tim thay canh Chamfer khop hinh hoc trong dung sai.";
+                        return result;
+                    }
+
+                    mappedEdges.Add(bestEdge);
+                    usedEdges.Add(bestEdge);
+                }
+
+                definition.Edges = mappedEdges.ToArray();
+                for (int i = 0; i < mappedEdges.Count; i++)
+                {
+                    try { definition.SetIsFlipped(mappedEdges[i], sourceFlip[i]); } catch { }
+                }
+
+                bool modified = info.Feature.ModifyDefinition(definition, partDoc, null);
+                if (!modified)
+                {
+                    result.Message = "Chamfer ModifyDefinition that bai.";
+                    return result;
+                }
+
+                partDoc.ForceRebuild3(false);
+
+                bool warning;
+                int errorCode = info.Feature.GetErrorCode2(out warning);
+                result.FeatureErrorCode = errorCode;
+                result.FeatureWarning = warning;
+                result.RebuildPassed = errorCode == 0;
+
+                if (errorCode != 0)
+                {
+                    result.Message = "Chamfer rebuild loi. Error=" + errorCode + ", Warning=" + warning;
+                    return result;
+                }
+
+                result.Success = true;
+                result.StatusCode = "CHAMFER_REPLAY_OK";
+                result.Message = "Chamfer da duoc anh xa va replay doc lap.";
+                result.MirrorReferenceResolved = true;
+                result.MirrorGeometryVerified = true;
+                result.OriginReferencePreserved = true;
+
+                Debug.WriteLine(
+                    "CHAMFER_REPLAY_RESULT feature=" + info.Name +
+                    " success=True edgeCount=" + mappedEdges.Count +
+                    " error=" + errorCode + " warning=" + warning);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.Message = "Chamfer replay exception: " + ex.GetType().Name + " - " + ex.Message;
+                Debug.WriteLine("CHAMFER_REPLAY_RESULT feature=" + (info != null ? info.Name : string.Empty) +
+                                " success=False exception=" + ex);
+                return result;
+            }
+            finally
+            {
+                if (definition != null && selectionAccess)
+                {
+                    try { definition.ReleaseSelectionAccess(); } catch { }
+                }
+            }
+        }
+
+        private static List<Edge> ToEdges(object value)
+        {
+            List<Edge> edges = new List<Edge>();
+            if (value == null) return edges;
+
+            Edge single = value as Edge;
+            if (single != null)
+            {
+                edges.Add(single);
+                return edges;
+            }
+
+            Array values = value as Array;
+            if (values == null) return edges;
+            foreach (object item in values)
+            {
+                Edge edge = item as Edge;
+                if (edge != null) edges.Add(edge);
+            }
+            return edges;
+        }
+
+        private static List<Edge> GetCurrentBodyEdges(ModelDoc2 partDoc)
+        {
+            List<Edge> edges = new List<Edge>();
+            PartDoc part = partDoc as PartDoc;
+            if (part == null) return edges;
+
+            object[] bodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as object[];
+            if (bodies == null) return edges;
+
+            foreach (object bodyObject in bodies)
+            {
+                Body2 body = bodyObject as Body2;
+                if (body == null) continue;
+                object[] bodyEdges = body.GetEdges() as object[];
+                if (bodyEdges == null) continue;
+                foreach (object edgeObject in bodyEdges)
+                {
+                    Edge edge = edgeObject as Edge;
+                    if (edge != null) edges.Add(edge);
+                }
+            }
+            return edges;
+        }
+
+        private static double GetModelScale(ModelDoc2 partDoc)
+        {
+            PartDoc part = partDoc as PartDoc;
+            if (part == null) return 1.0;
+            object[] bodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as object[];
+            if (bodies == null || bodies.Length == 0) return 1.0;
+
+            double scale = 0.0;
+            foreach (object bodyObject in bodies)
+            {
+                Body2 body = bodyObject as Body2;
+                double[] box = body != null ? body.GetBodyBox() as double[] : null;
+                if (box == null || box.Length < 6) continue;
+                double dx = box[3] - box[0];
+                double dy = box[4] - box[1];
+                double dz = box[5] - box[2];
+                scale = Math.Max(scale, Math.Sqrt(dx * dx + dy * dy + dz * dz));
+            }
+            return scale > 1.0e-9 ? scale : 1.0;
+        }
+
+        private static bool TryReadEdgeGeometry(Edge edge, out EdgeGeometry geometry, out string reason)
+        {
+            geometry = null;
+            reason = string.Empty;
+            if (edge == null)
+            {
+                reason = "EDGE_NULL";
+                return false;
+            }
+
+            try
+            {
+                Curve curve = edge.GetCurve() as Curve;
+                CurveParamData parameters = edge.GetCurveParams3() as CurveParamData;
+                if (curve == null || parameters == null)
+                {
+                    reason = "CURVE_OR_PARAMS_NULL";
+                    return false;
+                }
+
+                double u0 = parameters.UMinValue;
+                double u1 = parameters.UMaxValue;
+                bool closed = false;
+                bool periodic = false;
+                double ignoredStart = 0.0;
+                double ignoredEnd = 0.0;
+                try { curve.GetEndParams(out ignoredStart, out ignoredEnd, out closed, out periodic); } catch { }
+
+                int sampleCount = (closed || periodic) ? 12 : 7;
+                List<double[]> points = new List<double[]>();
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    double t = sampleCount == 1 ? 0.0 : (double)i / (sampleCount - 1);
+                    double u = u0 + (u1 - u0) * t;
+                    object evaluation = curve.Evaluate2(u, 0);
+                    double[] values = evaluation as double[];
+                    if (values == null || values.Length < 3) continue;
+                    points.Add(new double[] { values[0], values[1], values[2] });
+                }
+
+                if (points.Count < 2)
+                {
+                    reason = "INSUFFICIENT_SAMPLES";
+                    return false;
+                }
+
+                double length = 0.0;
+                try { length = curve.GetLength3(u0, u1); } catch { }
+                if (double.IsNaN(length) || double.IsInfinity(length) || length <= 1.0e-12)
+                {
+                    for (int i = 1; i < points.Count; i++) length += Distance(points[i - 1], points[i]);
+                }
+
+                if (length <= 1.0e-12)
+                {
+                    reason = "ZERO_LENGTH";
+                    return false;
+                }
+
+                geometry = new EdgeGeometry
+                {
+                    Edge = edge,
+                    CurveType = curve.Identity(),
+                    Closed = closed || periodic,
+                    Length = length,
+                    Points = points
+                };
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = ex.GetType().Name + ":" + ex.Message;
+                return false;
+            }
+        }
+
+        private static EdgeGeometry ReflectGeometry(EdgeGeometry source, PlaneData plane)
+        {
+            EdgeGeometry reflected = new EdgeGeometry
+            {
+                Edge = source.Edge,
+                CurveType = source.CurveType,
+                Closed = source.Closed,
+                Length = source.Length
+            };
+
+            foreach (double[] point in source.Points)
+            {
+                reflected.Points.Add(ReflectPoint(point, plane));
+            }
+            return reflected;
+        }
+
+        private static double[] ReflectPoint(double[] point, PlaneData plane)
+        {
+            double nx = plane.Normal[0];
+            double ny = plane.Normal[1];
+            double nz = plane.Normal[2];
+            double length = Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (length <= 1.0e-12) return new double[] { point[0], point[1], point[2] };
+            nx /= length;
+            ny /= length;
+            nz /= length;
+
+            double dx = point[0] - plane.Origin[0];
+            double dy = point[1] - plane.Origin[1];
+            double dz = point[2] - plane.Origin[2];
+            double signedDistance = dx * nx + dy * ny + dz * nz;
+
+            return new double[]
+            {
+                point[0] - 2.0 * signedDistance * nx,
+                point[1] - 2.0 * signedDistance * ny,
+                point[2] - 2.0 * signedDistance * nz
+            };
+        }
+
+        private static double CompareGeometry(EdgeGeometry expected, EdgeGeometry candidate)
+        {
+            if (expected == null || candidate == null || expected.Points.Count == 0 || candidate.Points.Count == 0)
+                return double.MaxValue;
+
+            int count = Math.Min(expected.Points.Count, candidate.Points.Count);
+            double forward = ComparePointSequence(expected.Points, candidate.Points, count, false, 0);
+            double reverse = ComparePointSequence(expected.Points, candidate.Points, count, true, 0);
+            double best = Math.Min(forward, reverse);
+
+            if (expected.Closed && candidate.Closed)
+            {
+                for (int offset = 1; offset < count; offset++)
+                {
+                    best = Math.Min(best, ComparePointSequence(expected.Points, candidate.Points, count, false, offset));
+                    best = Math.Min(best, ComparePointSequence(expected.Points, candidate.Points, count, true, offset));
+                }
+            }
+            return best;
+        }
+
+        private static double ComparePointSequence(
+            List<double[]> expected,
+            List<double[]> candidate,
+            int count,
+            bool reverse,
+            int offset)
+        {
+            double maxDistance = 0.0;
+            for (int i = 0; i < count; i++)
+            {
+                int candidateIndex = reverse ? (count - 1 - i) : i;
+                candidateIndex = (candidateIndex + offset) % count;
+                maxDistance = Math.Max(maxDistance, Distance(expected[i], candidate[candidateIndex]));
+            }
+            return maxDistance;
+        }
+
+        private static double Distance(double[] a, double[] b)
+        {
+            double dx = a[0] - b[0];
+            double dy = a[1] - b[1];
+            double dz = a[2] - b[2];
+            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+    }
+
     public sealed class FeatureReplayDispatcher
     {
         private readonly List<IFeatureMirrorHandler> handlers = new List<IFeatureMirrorHandler>();
@@ -2461,6 +4642,7 @@ namespace ADDIN.Commands
         public FeatureReplayDispatcher()
         {
             handlers.Add(new SketchDrivenFeatureMirrorHandler());
+            handlers.Add(new ChamferFeatureMirrorHandler());
         }
 
         public IFeatureMirrorHandler GetHandler(PostBaseFeatureInfo info)
@@ -2687,6 +4869,7 @@ namespace ADDIN.Commands
                     int unsupportedGeometryCount = 0;
                     int failedCount = 0;
                     int validatedCount = 0;
+                    int manualSkippedGeometryCount = 0;
 
                     // Track replayed sketch signatures for upstream persistence checking
                     Dictionary<int, List<SketchSignatureHelper.SketchSegmentSignature>> replayedSketchSignatures =
@@ -2709,6 +4892,14 @@ namespace ADDIN.Commands
                             featInfo.Disposition == FeatureReplayDisposition.NoGeometryChange)
                         {
                             CreateMirrorPartPackage.LogDebug("handler=SKIPPED_NO_GEOMETRY_CHANGE");
+                            continue;
+                        }
+
+                        // Curve-driven patterns are intentionally left for manual correction.
+                        if (string.Equals(featInfo.Type, "CurvePattern", StringComparison.OrdinalIgnoreCase))
+                        {
+                            manualSkippedGeometryCount++;
+                            CreateMirrorPartPackage.LogDebug($"FEATURE_REPLAY_SKIP_MANUAL\nname={featInfo.Name}\ntype={featInfo.Type}\nreason=CURVE_PATTERN_MANUAL_CORRECTION");
                             continue;
                         }
 
@@ -2877,6 +5068,11 @@ namespace ADDIN.Commands
                     for (int i = 0; i < postBaseFeatures.Count; i++)
                     {
                         var featInfo = postBaseFeatures[i];
+                        if (string.Equals(featInfo.Type, "CurvePattern", StringComparison.OrdinalIgnoreCase))
+                        {
+                            CreateMirrorPartPackage.LogDebug($"FINAL_REPLAY_AUDIT_SKIP\nname={featInfo.Name}\ntype={featInfo.Type}\nreason=CURVE_PATTERN_MANUAL_CORRECTION");
+                            continue;
+                        }
                         if (featInfo.Disposition == FeatureReplayDisposition.ReplayRequired &&
                             featInfo.HasDrivingSketch &&
                             featInfo.DrivingSketchFeature != null)
@@ -2918,7 +5114,7 @@ namespace ADDIN.Commands
 
                     bool overallPass = (failedCount == 0) &&
                                        (unsupportedGeometryCount == 0) &&
-                                       (bodyChangingCount == validatedCount) &&
+                                       (bodyChangingCount == validatedCount + manualSkippedGeometryCount) &&
                                        baseSketchUnchanged &&
                                        baseFeatureHealthy &&
                                        allAuditPass &&
@@ -2931,6 +5127,7 @@ namespace ADDIN.Commands
                     CreateMirrorPartPackage.LogDebug($"bodyChangingCount={bodyChangingCount}");
                     CreateMirrorPartPackage.LogDebug($"replayed={replayedCount}");
                     CreateMirrorPartPackage.LogDebug($"validated={validatedCount}");
+                    CreateMirrorPartPackage.LogDebug($"manualSkipped={manualSkippedGeometryCount}");
                     CreateMirrorPartPackage.LogDebug($"unsupported={unsupportedGeometryCount}");
                     CreateMirrorPartPackage.LogDebug($"failed={failedCount}");
 

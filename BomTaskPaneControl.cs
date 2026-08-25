@@ -472,6 +472,9 @@ namespace ADDIN
             btnCheckDfTk.Click += btnCheckDfTk_Click;
             btnCheckUraOmote.Click += btnCheckUraOmote_Click;
             btnCheckKegaki.Click += btnCheckKegaki_Click;
+            btnCheckAll.Click += btnCheckAll_Click;
+            btnCheckRound.Click += btnCheckRound_Click;
+            btnCheckSamePart.Click += btnCheckSamePart_Click;
             if (btnCheckDrawingBom != null)
                 btnCheckDrawingBom.Click += btnCheckDrawingBom_Click;
             button1.Click += cancel_Click;
@@ -490,6 +493,8 @@ namespace ADDIN
             btnDimKegaki.Click += btnDimKegaki_Click;
             if (btnDimKichThuocLo != null)
                 btnDimKichThuocLo.Click += btnDimKichThuocLo_Click;
+            if (btnRepairDim != null)
+                btnRepairDim.Click += btnRepairDim_Click;
             btnDimMatCat.Click += btnDimMatCat_Click;
             btnSplineToArcs.Click += btnSplineToArcs_Click;
             btnMakeHole.Click += btnMakeHole_Click;
@@ -630,6 +635,7 @@ namespace ADDIN
                 SetButtonImageIfExists(btnFixScale, Path.Combine(imagesDir, "fixscale.png"));
                 SetButtonImageIfExists(btnDimKegaki, Path.Combine(imagesDir, "dimkegaki.png"));
                 SetButtonImageIfExists(btnDimKichThuocLo, Path.Combine(imagesDir, "dimmatcat.png"));
+                SetButtonImageIfExists(btnRepairDim, Path.Combine(imagesDir, "repairhole.png"));
 
                 SetModelCommandImageIfExists(btnMakeHole, Path.Combine(imagesDir, "makehole.png"));
                 SetModelCommandImageIfExists(btnRepairHole, Path.Combine(imagesDir, "repairhole.png"));
@@ -1098,6 +1104,22 @@ namespace ADDIN
 
         private void UpdateBomCommandButtonState()
         {
+            if (drawingBomCommandInProgress)
+            {
+                btnCheckDfTk.Enabled = false;
+                button2.Enabled = false;
+                btnOpenAssem.Enabled = false;
+                btnCheckBalloon.Enabled = false;
+                btnCheckUraOmote.Enabled = false;
+                btnCheckKegaki.Enabled = false;
+                btnCheckAll.Enabled = false;
+                btnCheckRound.Enabled = false;
+                btnCheckSamePart.Enabled = false;
+                if (btnCheckDrawingBom != null)
+                    btnCheckDrawingBom.Enabled = false;
+                return;
+            }
+
             bool hasBomRows = false;
 
             if (dgvModelBom != null)
@@ -1126,6 +1148,9 @@ namespace ADDIN
             btnCheckBalloon.Enabled = hasBomRows;
             btnCheckUraOmote.Enabled = detailBomLoaded;
             btnCheckKegaki.Enabled = detailBomLoaded;
+            btnCheckAll.Enabled = detailBomLoaded;
+            btnCheckRound.Enabled = detailBomLoaded;
+            btnCheckSamePart.Enabled = detailBomLoaded;
             btnCheckDrawingBom.Enabled = !drawingBomCommandInProgress;
         }
 
@@ -1173,6 +1198,15 @@ namespace ADDIN
             SetBomCommandToolTip(
                 btnCheckKegaki,
                 "BOM chi ti\u1EBFt: ki\u1EC3m tra Bend Table chung v\u00E0 setting ri\u00EAng c\u1EE7a t\u1EEBng c\u1EA1nh b\u1EBB.");
+            SetBomCommandToolTip(
+                btnCheckAll,
+                "BOM chi tiet: chay CHECK Ura/Omote va CHECK KEGAKI. Khong can chay CHECK DF/TK truoc.");
+            SetBomCommandToolTip(
+                btnCheckRound,
+                "BOM chi tiet: chi kiem tra hinh hoc lo tron va hai dau R cua lo dai trong Flat-Pattern; khong kiem tra DIM/kich thuoc.");
+            SetBomCommandToolTip(
+                btnCheckSamePart,
+                "BOM chi tiet: tim cac chi tiet co bien dang hinh hoc giong nhau tren Flat-Pattern; doi chieu trang thai gap, vat lieu va chieu day.");
 
             // Disabled WinForms controls do not raise hover events. Listen on the
             // parent as well so the description remains available while buttons are dimmed.
@@ -1195,7 +1229,9 @@ namespace ADDIN
                 return "H\u00E3y click v\u00E0o b\u1EA3ng BOM UNIT v\u00E0 b\u1EA5m C\u1EACP NH\u1EACT\n\u0111\u1EC3 th\u1EF1c hi\u1EC7n thao t\u00E1c l\u1EC7nh.";
             }
             if (control == btnCheckDfTk || control == btnCheckUraOmote ||
-                control == btnCheckKegaki || control == btnCheckDrawingBom)
+                control == btnCheckKegaki || control == btnCheckAll ||
+                control == btnCheckRound || control == btnCheckSamePart ||
+                control == btnCheckDrawingBom)
             {
                 return "H\u00E3y click v\u00E0o b\u1EA3ng BOM chi ti\u1EBFt v\u00E0 b\u1EA5m C\u1EACP NH\u1EACT\n\u0111\u1EC3 th\u1EF1c hi\u1EC7n thao t\u00E1c l\u1EC7nh.";
             }
@@ -1259,7 +1295,19 @@ namespace ADDIN
 
             Point screenPoint = tabDrawingBom.PointToScreen(e.Location);
             Control hoveredControl = null;
-            Control[] commandButtons = { btnCheckDfTk, button2, btnOpenAssem, btnCheckBalloon, btnCheckUraOmote, btnCheckKegaki, btnCheckDrawingBom };
+            Control[] commandButtons =
+            {
+                btnCheckDfTk,
+                button2,
+                btnOpenAssem,
+                btnCheckBalloon,
+                btnCheckUraOmote,
+                btnCheckKegaki,
+                btnCheckAll,
+                btnCheckRound,
+                btnCheckSamePart,
+                btnCheckDrawingBom
+            };
 
             foreach (Control control in commandButtons)
             {
@@ -1308,6 +1356,45 @@ namespace ADDIN
         private void btnCheckKegaki_Click(object sender, EventArgs e)
         {
             RunDrawingBomCommand(() => actions?.CheckKegaki());
+        }
+
+        private void btnCheckAll_Click(object sender, EventArgs e)
+        {
+            CombinedCheckOptions options = null;
+            using (CheckAllSelectionDialog dialog = new CheckAllSelectionDialog())
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                options = dialog.Options;
+            }
+
+            if (options == null || !options.HasSelection)
+                return;
+
+            RunDrawingBomCommand(() => actions?.CheckAll(options));
+        }
+
+        private void btnCheckRound_Click(object sender, EventArgs e)
+        {
+            RunDrawingBomCommand(() => actions?.CheckRound());
+        }
+
+        private void btnCheckSamePart_Click(object sender, EventArgs e)
+        {
+            SamePartToleranceOptions options = null;
+            using (SamePartToleranceInputDialog dialog = new SamePartToleranceInputDialog())
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                options = dialog.Options;
+            }
+
+            if (options == null)
+                return;
+
+            RunDrawingBomCommand(() => actions?.CheckSamePart(options));
         }
 
         private void btnXepUnit_Click(object sender, EventArgs e)
@@ -2707,6 +2794,51 @@ namespace ADDIN
             holeDimensionCommand?.GenerateHoleDimensions();
         }
 
+        private void btnRepairDim_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                ModelDoc2 swModel = swApp?.ActiveDoc as ModelDoc2;
+
+                if (swModel == null)
+                {
+                    MessageBox.Show(
+                        "Không có tài liệu SOLIDWORKS đang mở.",
+                        "REPAIR DIM",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+
+                    return;
+                }
+
+                if (swModel.GetType() != (int)swDocumentTypes_e.swDocDRAWING)
+                {
+                    MessageBox.Show(
+                        "REPAIR DIM chỉ sử dụng trong môi trường Drawing.",
+                        "REPAIR DIM",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+
+                    return;
+                }
+
+                DrawingDoc swDrawing = swModel as DrawingDoc;
+
+                RepairDanglingDimensions.Run(
+                    swApp,
+                    swDrawing
+                );
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "REPAIR DIM - ERROR",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
         private void WireXepUnitButton(Control parent)
         {
             if (parent == null)
@@ -3149,7 +3281,7 @@ namespace ADDIN
         private void LayoutComponentMacroGroup(int pageMargin, int pageWidth, int gap, bool narrow)
         {
             int groupTop = grpComponentBom.Bottom + 6;
-            int minHeight = narrow ? 180 : 148;
+            int minHeight = narrow ? 238 : 202;
             int remainingHeight = tabComponentDrawing.ClientSize.Height - groupTop - pageMargin;
             groupBox3.SetBounds(pageMargin, groupTop, pageWidth, Math.Max(minHeight, remainingHeight));
 
@@ -3159,6 +3291,7 @@ namespace ADDIN
             ConfigureMacroButton(btnDimKegaki);
             ConfigureMacroButton(btnDimKichThuocLo);
             ConfigureMacroButton(btnFixScale);
+            ConfigureMacroButton(btnRepairDim);
 
             Button[] buttons =
             {
@@ -3167,7 +3300,8 @@ namespace ADDIN
                 btnSplineToArcs,
                 btnDimKegaki,
                 btnDimKichThuocLo,
-                btnFixScale
+                btnFixScale,
+                btnRepairDim
             };
 
             int innerLeft = 12;
