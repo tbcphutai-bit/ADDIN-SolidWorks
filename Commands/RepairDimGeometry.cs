@@ -2163,6 +2163,249 @@ namespace ADDIN.Commands
             return (crossingCount > 0);
         }
 
+        public static PointAnchorInfo ResolveSketchPointSheetPosition(
+            ISldWorks swApp,
+            SolidWorks.Interop.sldworks.View view,
+            SketchPoint sp,
+            DisplayWitnessProfile profile)
+        {
+            PointAnchorInfo info = new PointAnchorInfo
+            {
+                LivePoint = sp
+            };
+
+            if (sp == null)
+            {
+                info.ResolutionStatus = "POINT_ANCHOR_OBJECT_INVALID";
+                return info;
+            }
+
+            try
+            {
+                info.RawX = sp.X;
+                info.RawY = sp.Y;
+                info.RawZ = sp.Z;
+            }
+            catch
+            {
+                info.ResolutionStatus = "POINT_ANCHOR_OBJECT_INVALID";
+                return info;
+            }
+
+            try
+            {
+                object idObj = sp.GetID();
+                if (idObj is int[] idArr && idArr.Length > 0) info.PointID = idArr[0];
+            }
+            catch {}
+
+            Sketch liveSketch = null;
+            try { liveSketch = sp.GetSketch() as Sketch; } catch {}
+            info.OwnerSketch = liveSketch;
+
+            Sketch viewSketch = null;
+            try { viewSketch = view?.GetSketch() as Sketch; } catch {}
+
+            try
+            {
+                Feature skFeat = liveSketch as Feature;
+                info.SketchFeatureName = skFeat?.GetNameForSelection(out string _) ?? "";
+            }
+            catch {}
+
+            if (liveSketch != null && viewSketch != null)
+            {
+                if (object.ReferenceEquals(liveSketch, viewSketch))
+                {
+                    info.BelongsToCurrentView = true;
+                }
+                else
+                {
+                    Feature lf = liveSketch as Feature;
+                    Feature vf = viewSketch as Feature;
+                    string lName = lf?.GetNameForSelection(out string _) ?? "";
+                    string vName = vf?.GetNameForSelection(out string _) ?? "";
+                    if (!string.IsNullOrEmpty(lName) && lName.Equals(vName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        info.BelongsToCurrentView = true;
+                    }
+                }
+            }
+
+            double[] viewPos = null;
+            try { viewPos = view?.Position as double[]; } catch {}
+            double vx = (viewPos != null && viewPos.Length >= 2) ? viewPos[0] : 0.0;
+            double vy = (viewPos != null && viewPos.Length >= 2) ? viewPos[1] : 0.0;
+
+            double[] scaleRatio = null;
+            try { scaleRatio = view?.ScaleRatio as double[]; } catch {}
+            double scaleDecimal = (scaleRatio != null && scaleRatio.Length >= 2 && scaleRatio[1] > 0) ? (scaleRatio[0] / scaleRatio[1]) : 1.0;
+
+            MathUtility mathUtil = null;
+            try { mathUtil = swApp?.GetMathUtility() as MathUtility; } catch {}
+
+            List<PointCoordinateHypothesis> rawHypotheses = new List<PointCoordinateHypothesis>();
+
+            // Hypothesis 1: RAW_SKETCH_XYZ
+            rawHypotheses.Add(new PointCoordinateHypothesis
+            {
+                Method = "RAW_SKETCH_XYZ",
+                SheetXY = new double[] { info.RawX, info.RawY }
+            });
+
+            // Hypothesis 2: VIEW_POSITION_PLUS_RAW
+            rawHypotheses.Add(new PointCoordinateHypothesis
+            {
+                Method = "VIEW_POSITION_PLUS_RAW",
+                SheetXY = new double[] { vx + info.RawX, vy + info.RawY }
+            });
+
+            // Hypothesis 3: SKETCH_TO_MODEL -> VIEW_MODEL_TO_VIEW
+            if (liveSketch != null)
+            {
+                try
+                {
+                    MathTransform skXform = liveSketch.ModelToSketchTransform;
+                    if (skXform != null)
+                    {
+                        MathTransform invXform = skXform.Inverse() as MathTransform;
+                        if (invXform != null && mathUtil != null)
+                        {
+                            MathPoint rawMathPt = mathUtil.CreatePoint(new double[] { info.RawX, info.RawY, info.RawZ }) as MathPoint;
+                            MathPoint modelPt = rawMathPt?.MultiplyTransform(invXform) as MathPoint;
+                            double[] mArr = modelPt?.ArrayData as double[];
+
+                            if (mArr != null && mArr.Length >= 3)
+                            {
+                                MathTransform vXform = view?.ModelToViewTransform;
+                                if (vXform != null)
+                                {
+                                    MathPoint viewPt = modelPt.MultiplyTransform(vXform) as MathPoint;
+                                    double[] vArr = viewPt?.ArrayData as double[];
+                                    if (vArr != null && vArr.Length >= 2)
+                                    {
+                                        rawHypotheses.Add(new PointCoordinateHypothesis
+                                        {
+                                            Method = "SKETCH_TO_MODEL_TO_VIEW_XFORM",
+                                            SheetXY = new double[] { vArr[0], vArr[1] }
+                                        });
+                                    }
+                                }
+
+                                rawHypotheses.Add(new PointCoordinateHypothesis
+                                {
+                                    Method = "SKETCH_TO_MODEL_PLUS_VIEW_POS_SCALE",
+                                    SheetXY = new double[] { vx + mArr[0] * scaleDecimal, vy + mArr[1] * scaleDecimal }
+                                });
+                            }
+                        }
+                    }
+                }
+                catch {}
+            }
+
+            // Hypothesis 4: VIEW_MODELTOVIEW_DIRECT
+            if (mathUtil != null && view != null)
+            {
+                try
+                {
+                    MathTransform vXform = view.ModelToViewTransform;
+                    if (vXform != null)
+                    {
+                        MathPoint rawMathPt = mathUtil.CreatePoint(new double[] { info.RawX, info.RawY, info.RawZ }) as MathPoint;
+                        MathPoint viewPt = rawMathPt?.MultiplyTransform(vXform) as MathPoint;
+                        double[] vArr = viewPt?.ArrayData as double[];
+                        if (vArr != null && vArr.Length >= 2)
+                        {
+                            rawHypotheses.Add(new PointCoordinateHypothesis
+                            {
+                                Method = "VIEW_MODELTOVIEW_DIRECT",
+                                SheetXY = new double[] { vArr[0], vArr[1] }
+                            });
+                        }
+                    }
+                }
+                catch {}
+            }
+
+            // Evaluate all hypotheses against DisplayWitnessProfile
+            List<PointCoordinateHypothesis> evaluated = new List<PointCoordinateHypothesis>();
+            List<PointCoordinateHypothesis> matched = new List<PointCoordinateHypothesis>();
+
+            foreach (var hyp in rawHypotheses)
+            {
+                if (profile != null && profile.IsValid && profile.Witness1GeometryPoint != null && profile.Witness2GeometryPoint != null)
+                {
+                    double d1 = Math.Sqrt(Math.Pow(hyp.SheetXY[0] - profile.Witness1GeometryPoint[0], 2) + Math.Pow(hyp.SheetXY[1] - profile.Witness1GeometryPoint[1], 2)) * 1000.0;
+                    double d2 = Math.Sqrt(Math.Pow(hyp.SheetXY[0] - profile.Witness2GeometryPoint[0], 2) + Math.Pow(hyp.SheetXY[1] - profile.Witness2GeometryPoint[1], 2)) * 1000.0;
+
+                    hyp.Witness1ErrorMm = d1;
+                    hyp.Witness2ErrorMm = d2;
+
+                    if (d1 <= 1.5 && d2 > 2.0)
+                    {
+                        hyp.IsMatched = true;
+                        hyp.MatchedWitnessSide = 1;
+                        hyp.ErrorMm = d1;
+                        matched.Add(hyp);
+                    }
+                    else if (d2 <= 1.5 && d1 > 2.0)
+                    {
+                        hyp.IsMatched = true;
+                        hyp.MatchedWitnessSide = 2;
+                        hyp.ErrorMm = d2;
+                        matched.Add(hyp);
+                    }
+                    else
+                    {
+                        hyp.IsMatched = false;
+                        hyp.MatchedWitnessSide = 0;
+                        hyp.ErrorMm = Math.Min(d1, d2);
+                    }
+                }
+
+                evaluated.Add(hyp);
+            }
+
+            info.Hypotheses = evaluated;
+
+            if (matched.Count == 0)
+            {
+                info.IsResolved = false;
+                info.ResolutionStatus = "POINT_ANCHOR_POSITION_UNRESOLVED";
+                return info;
+            }
+
+            // Check if matched hypotheses have conflicting witness sides
+            bool hasSide1 = false, hasSide2 = false;
+            foreach (var m in matched)
+            {
+                if (m.MatchedWitnessSide == 1) hasSide1 = true;
+                if (m.MatchedWitnessSide == 2) hasSide2 = true;
+            }
+
+            if (hasSide1 && hasSide2)
+            {
+                info.IsResolved = false;
+                info.ResolutionStatus = "POINT_ANCHOR_WITNESS_AMBIGUOUS";
+                return info;
+            }
+
+            // Sort matched hypotheses by ErrorMm ascending
+            matched.Sort((a, b) => a.ErrorMm.CompareTo(b.ErrorMm));
+            PointCoordinateHypothesis best = matched[0];
+
+            info.BestHypothesis = best;
+            info.ResolvedSheetXY = best.SheetXY;
+            info.LivePointWitnessSide = best.MatchedWitnessSide;
+            info.MissingWitnessSide = (best.MatchedWitnessSide == 1) ? 2 : 1;
+            info.PointWitnessErrorMm = best.ErrorMm;
+            info.IsResolved = true;
+            info.ResolutionStatus = "RESOLVED";
+
+            return info;
+        }
+
         private class WitnessHypothesis
         {
             public DisplayDimLine W1 { get; set; }

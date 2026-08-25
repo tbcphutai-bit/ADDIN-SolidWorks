@@ -13,7 +13,8 @@ namespace ADDIN.Commands
         ComponentReinsertedOrGeometryReplaced,
         ModelFileMissingOrUnresolved,
         GeometryChangedNoCandidate,
-        RepairCandidateFound
+        RepairCandidateFound,
+        SketchPointAnchorLostReference
     }
 
     public sealed class DocumentDependencyInfo
@@ -225,6 +226,86 @@ namespace ADDIN.Commands
         public List<string> DuplicatePairLogs { get; set; } = new List<string>();
         public FullyLostPairCandidate BestPair { get; set; }
         public FullyLostPairCandidate SecondPair { get; set; }
+        public double ScoreGap { get; set; }
+        public double WitnessErrorGap { get; set; }
+        public string AmbiguityReason { get; set; } = "";
+        public string RecommendedAction { get; set; } = "MANUAL_REVIEW";
+    }
+
+    public sealed class PointCoordinateHypothesis
+    {
+        public string Method { get; set; }
+        public double[] SheetXY { get; set; }
+        public double Witness1ErrorMm { get; set; }
+        public double Witness2ErrorMm { get; set; }
+        public bool IsMatched { get; set; }
+        public int MatchedWitnessSide { get; set; } // 1 or 2, 0 if none
+        public double ErrorMm { get; set; }
+    }
+
+    public sealed class PointAnchorInfo
+    {
+        public SketchPoint LivePoint { get; set; }
+        public double RawX { get; set; }
+        public double RawY { get; set; }
+        public double RawZ { get; set; }
+        public int PointID { get; set; }
+        public Sketch OwnerSketch { get; set; }
+        public string SketchFeatureName { get; set; }
+        public bool BelongsToCurrentView { get; set; }
+        public List<PointCoordinateHypothesis> Hypotheses { get; set; } = new List<PointCoordinateHypothesis>();
+        public PointCoordinateHypothesis BestHypothesis { get; set; }
+        public double[] ResolvedSheetXY { get; set; }
+        public int LivePointWitnessSide { get; set; } // 1 or 2
+        public int MissingWitnessSide { get; set; } // 2 or 1
+        public double PointWitnessErrorMm { get; set; }
+        public bool IsResolved { get; set; }
+        public string ResolutionStatus { get; set; } = "UNRESOLVED";
+    }
+
+    public sealed class PointAnchorEdgeCandidate
+    {
+        public int Rank { get; set; }
+        public DrawingPolylineEdgeInfo EdgeInfo { get; set; }
+        public int RawRecordIndex { get; set; }
+        public int EntityArrayIndex { get; set; }
+        public string ComponentName { get; set; }
+        public string Orientation { get; set; }
+        public double[] SheetStart { get; set; }
+        public double[] SheetEnd { get; set; }
+        public double[] AttachPoint { get; set; }
+        public double AttachParamT { get; set; }
+        public double WitnessProximityMm { get; set; }
+        public double RayAngularErrorDeg { get; set; }
+        public bool WitnessRayConsistency { get; set; } = true;
+        public double ProjectedSheetDistanceMm { get; set; }
+        public double ModelDistanceMm { get; set; }
+        public double TargetDistanceMm { get; set; }
+        public double DistanceErrorMm { get; set; }
+        public double PerpendicularResidualMm { get; set; }
+        public DistanceVerificationMode DistanceMode { get; set; } = DistanceVerificationMode.NORMAL_SHEET_SCALE;
+        public bool CrossesActiveBreak { get; set; }
+        public int BreakCrossingCount { get; set; }
+        public bool PreCreateDistanceComparable { get; set; } = true;
+        public string PreCreateDistanceReason { get; set; } = "";
+        public bool DistanceMatched { get; set; }
+        public double Score { get; set; }
+        public string Reason { get; set; }
+    }
+
+    public sealed class PointAnchorDecision
+    {
+        public string Decision { get; set; } = "NO_CANDIDATE"; // POINT_ANCHOR_HIGH_CONFIDENCE, POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE, etc.
+        public PointAnchorInfo PointInfo { get; set; }
+        public DisplayWitnessProfile WitnessProfile { get; set; }
+        public BrokenViewInfo BrokenViewInfo { get; set; }
+        public DistanceVerificationMode DistanceMode { get; set; } = DistanceVerificationMode.NORMAL_SHEET_SCALE;
+        public bool CrossesActiveBreak { get; set; }
+        public int BreakCrossingCount { get; set; }
+        public List<PointAnchorEdgeCandidate> EdgeCandidates { get; set; } = new List<PointAnchorEdgeCandidate>();
+        public List<string> DuplicateLogs { get; set; } = new List<string>();
+        public PointAnchorEdgeCandidate BestEdge { get; set; }
+        public PointAnchorEdgeCandidate SecondEdge { get; set; }
         public double ScoreGap { get; set; }
         public double WitnessErrorGap { get; set; }
         public string AmbiguityReason { get; set; } = "";
@@ -584,6 +665,7 @@ namespace ADDIN.Commands
 
         public List<RepairCandidate> Candidates { get; set; } = new List<RepairCandidate>();
         public string CandidateDecision { get; set; } = "NO_CANDIDATE";
+        public PointAnchorDecision PointDecision { get; set; }
         public List<string> DiagnosticNotes { get; set; } = new List<string>();
 
         // Failure Mode Classification

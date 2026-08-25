@@ -333,7 +333,13 @@ namespace ADDIN.Commands
                 return;
             }
 
-            // 2. Check Anchor Type: Must be an Edge
+            // 2. Check Anchor Type
+            if (dimInfo.AnchorEntityType == (int)swSelectType_e.swSelSKETCHPOINTS)
+            {
+                AnalyzePointAnchorCandidates(swApp, dimInfo, viewGeom, view, dispDim);
+                return;
+            }
+
             if (dimInfo.AnchorEntityType != (int)swSelectType_e.swSelEDGES)
             {
                 dimInfo.CandidateDecision = "UNSUPPORTED_ANCHOR_TYPE";
@@ -1278,6 +1284,322 @@ namespace ADDIN.Commands
                 else
                 {
                     decision.Decision = "FULLY_LOST_AMBIGUOUS";
+                    decision.AmbiguityReason = (Math.Abs(decision.WitnessErrorGap) < 1e-4) ? "IDENTICAL_GEOMETRIC_SCORE" : "WITNESS_ERROR_GAP_TOO_SMALL";
+                    decision.RecommendedAction = "MANUAL_REVIEW";
+                }
+            }
+
+            return decision;
+        }
+
+        public static void AnalyzePointAnchorCandidates(
+            ISldWorks swApp,
+            DanglingDimensionInfo dimInfo,
+            ViewGeometryInfo viewGeom,
+            SolidWorks.Interop.sldworks.View view,
+            DisplayDimension dispDim)
+        {
+            if (dimInfo == null) return;
+
+            PointAnchorDecision decision = FindPointAnchorEdgeCandidate(swApp, dimInfo, viewGeom, view, dispDim);
+            dimInfo.PointDecision = decision;
+            dimInfo.CandidateDecision = decision.Decision;
+
+            if (decision.Decision == "POINT_ANCHOR_HIGH_CONFIDENCE" || decision.Decision == "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE")
+            {
+                dimInfo.RouteCCandidateAvailable = true;
+                dimInfo.RequiresDimensionRecreate = true;
+                dimInfo.RecommendedAction = decision.RecommendedAction;
+            }
+            else
+            {
+                dimInfo.RouteCCandidateAvailable = false;
+                dimInfo.RequiresDimensionRecreate = false;
+                dimInfo.RecommendedAction = "MANUAL_REVIEW";
+            }
+        }
+
+        public static PointAnchorDecision FindPointAnchorEdgeCandidate(
+            ISldWorks swApp,
+            DanglingDimensionInfo info,
+            ViewGeometryInfo viewGeom,
+            SolidWorks.Interop.sldworks.View view,
+            DisplayDimension dispDim)
+        {
+            PointAnchorDecision decision = new PointAnchorDecision();
+
+            if (info == null || viewGeom == null || view == null || dispDim == null)
+            {
+                decision.Decision = "POINT_ANCHOR_OBJECT_INVALID";
+                return decision;
+            }
+
+            // 1. Build Witness Profile from old DisplayData
+            DisplayWitnessProfile profile = (info.DisplayLineSegments != null && info.DisplayLineSegments.Count > 0)
+                ? RepairDimGeometry.BuildDisplayWitnessProfile(info.DisplayLineSegments, info.Position)
+                : null;
+
+            decision.WitnessProfile = profile;
+
+            if (profile == null || !profile.IsValid)
+            {
+                decision.Decision = "POINT_ANCHOR_PROFILE_INVALID";
+                decision.AmbiguityReason = profile != null ? profile.ErrorReason : "NO_DISPLAY_DATA";
+                return decision;
+            }
+
+            // 2. Resolve Live SketchPoint
+            SketchPoint sp = info.AnchorEntity as SketchPoint;
+            if (sp == null)
+            {
+                decision.Decision = "POINT_ANCHOR_OBJECT_INVALID";
+                return decision;
+            }
+
+            PointAnchorInfo ptInfo = RepairDimGeometry.ResolveSketchPointSheetPosition(swApp, view, sp, profile);
+            decision.PointInfo = ptInfo;
+
+            if (!ptInfo.IsResolved)
+            {
+                decision.Decision = ptInfo.ResolutionStatus; // e.g. POINT_ANCHOR_POSITION_UNRESOLVED, POINT_ANCHOR_WITNESS_AMBIGUOUS
+                return decision;
+            }
+
+            // 3. Extract Broken View Info
+            BrokenViewInfo brokenInfo = RepairDimGeometry.ExtractBrokenViewInfo(view);
+            decision.BrokenViewInfo = brokenInfo;
+
+            // 4. Identify Missing Witness Origin & Direction
+            double[] missingWitnessOrigin = (ptInfo.LivePointWitnessSide == 1) ? profile.Witness2GeometryPoint : profile.Witness1GeometryPoint;
+            double[] missingWitnessDimPt = (ptInfo.LivePointWitnessSide == 1) ? profile.Witness2DimensionPoint : profile.Witness1DimensionPoint;
+            double targetDimensionMm = info.SystemValue.HasValue ? Math.Abs(info.SystemValue.Value) * 1000.0 : 0.0;
+            double targetToleranceMm = Math.Max(RepairDimGeometry.AbsoluteDistanceToleranceMm, Math.Abs(targetDimensionMm) * RepairDimGeometry.RelativeDistanceTolerance);
+
+            List<PointAnchorEdgeCandidate> rawCandidates = new List<PointAnchorEdgeCandidate>();
+
+            // 5. Search Missing Counterpart in viewGeom.RepairLineRecords (Route C)
+            foreach (DrawingPolylineEdgeInfo cand in viewGeom.RepairLineRecords)
+            {
+                if (cand == null || cand.SheetStart == null || cand.SheetEnd == null || cand.ModelEntity == null)
+                    continue;
+
+                // Orientation Check: Must be approximately parallel to witness direction
+                double candDx = cand.SheetEnd[0] - cand.SheetStart[0];
+                double candDy = cand.SheetEnd[1] - cand.SheetStart[1];
+                double candLenM = Math.Sqrt(candDx * candDx + candDy * candDy);
+                if (candLenM < 1e-7) continue;
+
+                double candUx = candDx / candLenM;
+                double candUy = candDy / candLenM;
+
+                double dotWit = Math.Abs(candUx * profile.WitnessDirectionUnitVector[0] + candUy * profile.WitnessDirectionUnitVector[1]);
+                if (dotWit < 0.85) // Not parallel to witness lines
+                    continue;
+
+                // Attachment Point on Edge closest to missing witness origin
+                var res = RepairDimGeometry.ClosestPointOnSegment2D(
+                    missingWitnessOrigin[0], missingWitnessOrigin[1],
+                    cand.SheetStart[0], cand.SheetStart[1],
+                    cand.SheetEnd[0], cand.SheetEnd[1]);
+
+                if (res.DistanceMm > 1.5)
+                    continue;
+
+                // Witness Ray Consistency
+                double r_dx = missingWitnessDimPt[0] - res.Point[0];
+                double r_dy = missingWitnessDimPt[1] - res.Point[1];
+                double r_len = Math.Sqrt(r_dx * r_dx + r_dy * r_dy);
+
+                double old_r_dx = missingWitnessDimPt[0] - missingWitnessOrigin[0];
+                double old_r_dy = missingWitnessDimPt[1] - missingWitnessOrigin[1];
+                double old_r_len = Math.Sqrt(old_r_dx * old_r_dx + old_r_dy * old_r_dy);
+
+                double angErr = 0.0;
+                bool rayConsistent = true;
+                if (r_len > 1e-6 && old_r_len > 1e-6)
+                {
+                    double dotRay = (r_dx * old_r_dx + r_dy * old_r_dy) / (r_len * old_r_len);
+                    if (dotRay > 1.0) dotRay = 1.0; else if (dotRay < -1.0) dotRay = -1.0;
+                    angErr = Math.Acos(dotRay) * 180.0 / Math.PI;
+                    if (dotRay < 0.5) rayConsistent = false;
+                }
+
+                if (!rayConsistent)
+                    continue;
+
+                // Point-to-Edge Separation
+                double sx = res.Point[0] - ptInfo.ResolvedSheetXY[0];
+                double sy = res.Point[1] - ptInfo.ResolvedSheetXY[1];
+
+                double sheetDistM = Math.Abs(sx * profile.DimensionAxisUnitVector[0] + sy * profile.DimensionAxisUnitVector[1]);
+                double sheetDistMm = sheetDistM * 1000.0;
+
+                double perpResidualM = Math.Abs(sx * profile.WitnessDirectionUnitVector[0] + sy * profile.WitnessDirectionUnitVector[1]);
+                double perpResidualMm = perpResidualM * 1000.0;
+
+                if (perpResidualMm > 10.0)
+                    continue;
+
+                double modelDistMm = RepairDimGeometry.SheetDistanceToModelMm(sheetDistMm, viewGeom.ScaleDecimal);
+                double distErrorMm = Math.Abs(modelDistMm - targetDimensionMm);
+
+                int crossingCount = 0;
+                bool crossesBreak = RepairDimGeometry.CheckIfDimensionCrossesBreak(
+                    profile,
+                    brokenInfo,
+                    ptInfo.ResolvedSheetXY,
+                    res.Point,
+                    modelDistMm,
+                    targetDimensionMm,
+                    out crossingCount);
+
+                DistanceVerificationMode distMode = DistanceVerificationMode.NORMAL_SHEET_SCALE;
+                if (brokenInfo != null && brokenInfo.IsBroken)
+                {
+                    distMode = crossesBreak ? DistanceVerificationMode.BROKEN_VIEW_CROSS_BREAK : DistanceVerificationMode.BROKEN_VIEW_LOCAL;
+                }
+
+                bool distMatched = false;
+                bool preCreateComparable = true;
+                string preCreateReason = "";
+
+                if (distMode == DistanceVerificationMode.BROKEN_VIEW_CROSS_BREAK)
+                {
+                    preCreateComparable = false;
+                    preCreateReason = "DISPLAY_COMPRESSED_BY_ACTIVE_BREAK";
+                    distMatched = true; // Verified post-create via AddDimension2!
+                }
+                else
+                {
+                    preCreateComparable = true;
+                    distMatched = (distErrorMm <= targetToleranceMm);
+                    if (!distMatched)
+                        continue;
+                }
+
+                double score = 100.0 - (res.DistanceMm * 20.0) - (angErr * 0.5) - (perpResidualMm * 2.0) + (distMatched ? 40.0 : 0.0) + (distErrorMm <= 0.05 ? 10.0 : 0.0);
+
+                rawCandidates.Add(new PointAnchorEdgeCandidate
+                {
+                    EdgeInfo = cand,
+                    RawRecordIndex = cand.RawRecordIndex,
+                    EntityArrayIndex = cand.EntityArrayIndex,
+                    ComponentName = cand.ComponentName,
+                    Orientation = cand.Orientation,
+                    SheetStart = cand.SheetStart,
+                    SheetEnd = cand.SheetEnd,
+                    AttachPoint = res.Point,
+                    AttachParamT = res.ParamT,
+                    WitnessProximityMm = res.DistanceMm,
+                    RayAngularErrorDeg = angErr,
+                    WitnessRayConsistency = rayConsistent,
+                    ProjectedSheetDistanceMm = sheetDistMm,
+                    ModelDistanceMm = modelDistMm,
+                    TargetDistanceMm = targetDimensionMm,
+                    DistanceErrorMm = distErrorMm,
+                    PerpendicularResidualMm = perpResidualMm,
+                    DistanceMode = distMode,
+                    CrossesActiveBreak = crossesBreak,
+                    BreakCrossingCount = crossingCount,
+                    PreCreateDistanceComparable = preCreateComparable,
+                    PreCreateDistanceReason = preCreateReason,
+                    DistanceMatched = distMatched,
+                    Score = score,
+                    Reason = (distMode == DistanceVerificationMode.BROKEN_VIEW_CROSS_BREAK)
+                        ? $"CrossBreak (NaiveSheet={sheetDistMm:F2}mm), Prox={res.DistanceMm:F2}mm, PerpRes={perpResidualMm:F2}mm"
+                        : $"ModelDist={modelDistMm:F4}mm (Err={distErrorMm:F4}mm), Prox={res.DistanceMm:F2}mm, PerpRes={perpResidualMm:F2}mm"
+                });
+            }
+
+            // 6. Deduplicate and Rank
+            List<PointAnchorEdgeCandidate> uniqueCandidates = new List<PointAnchorEdgeCandidate>();
+            foreach (var c in rawCandidates)
+            {
+                bool isDup = false;
+                for (int ui = 0; ui < uniqueCandidates.Count; ui++)
+                {
+                    var ex = uniqueCandidates[ui];
+                    if (IsGeometricallyIdentical(ex.EdgeInfo, c.EdgeInfo))
+                    {
+                        isDup = true;
+                        decision.DuplicateLogs.Add($"Edge (Rec #{c.RawRecordIndex}) duplicate of (Rec #{ex.RawRecordIndex})");
+                        if (c.WitnessProximityMm < ex.WitnessProximityMm)
+                        {
+                            uniqueCandidates[ui] = c;
+                        }
+                        break;
+                    }
+                }
+                if (!isDup) uniqueCandidates.Add(c);
+            }
+
+            uniqueCandidates.Sort((a, b) =>
+            {
+                int cmp = a.WitnessProximityMm.CompareTo(b.WitnessProximityMm);
+                if (cmp != 0) return cmp;
+                cmp = a.RayAngularErrorDeg.CompareTo(b.RayAngularErrorDeg);
+                if (cmp != 0) return cmp;
+                cmp = a.PerpendicularResidualMm.CompareTo(b.PerpendicularResidualMm);
+                if (cmp != 0) return cmp;
+                return b.Score.CompareTo(a.Score);
+            });
+
+            for (int r = 0; r < uniqueCandidates.Count; r++)
+            {
+                uniqueCandidates[r].Rank = r + 1;
+            }
+
+            decision.EdgeCandidates = uniqueCandidates;
+
+            if (uniqueCandidates.Count == 0)
+            {
+                decision.Decision = "POINT_ANCHOR_NO_EDGE_CANDIDATE";
+                decision.RecommendedAction = "MANUAL_REVIEW";
+            }
+            else if (uniqueCandidates.Count == 1)
+            {
+                decision.BestEdge = uniqueCandidates[0];
+                decision.DistanceMode = uniqueCandidates[0].DistanceMode;
+                decision.CrossesActiveBreak = uniqueCandidates[0].CrossesActiveBreak;
+                decision.BreakCrossingCount = uniqueCandidates[0].BreakCrossingCount;
+
+                if (uniqueCandidates[0].DistanceMode == DistanceVerificationMode.BROKEN_VIEW_CROSS_BREAK)
+                {
+                    decision.Decision = "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE";
+                    decision.RecommendedAction = "PROVISIONAL_CREATE_AND_VERIFY";
+                }
+                else
+                {
+                    decision.Decision = "POINT_ANCHOR_HIGH_CONFIDENCE";
+                    decision.RecommendedAction = "RECREATE_POINT_EDGE_DIMENSION_REQUIRED";
+                }
+            }
+            else
+            {
+                decision.BestEdge = uniqueCandidates[0];
+                decision.SecondEdge = uniqueCandidates[1];
+                decision.ScoreGap = decision.BestEdge.Score - decision.SecondEdge.Score;
+                decision.WitnessErrorGap = decision.SecondEdge.WitnessProximityMm - decision.BestEdge.WitnessProximityMm;
+                decision.DistanceMode = decision.BestEdge.DistanceMode;
+                decision.CrossesActiveBreak = decision.BestEdge.CrossesActiveBreak;
+                decision.BreakCrossingCount = decision.BestEdge.BreakCrossingCount;
+
+                if (decision.WitnessErrorGap >= 0.2 || decision.ScoreGap >= 20.0)
+                {
+                    if (decision.BestEdge.DistanceMode == DistanceVerificationMode.BROKEN_VIEW_CROSS_BREAK)
+                    {
+                        decision.Decision = "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE";
+                        decision.RecommendedAction = "PROVISIONAL_CREATE_AND_VERIFY";
+                    }
+                    else
+                    {
+                        decision.Decision = "POINT_ANCHOR_HIGH_CONFIDENCE";
+                        decision.RecommendedAction = "RECREATE_POINT_EDGE_DIMENSION_REQUIRED";
+                    }
+                }
+                else
+                {
+                    decision.Decision = "POINT_ANCHOR_EDGE_AMBIGUOUS";
                     decision.AmbiguityReason = (Math.Abs(decision.WitnessErrorGap) < 1e-4) ? "IDENTICAL_GEOMETRIC_SCORE" : "WITNESS_ERROR_GAP_TOO_SMALL";
                     decision.RecommendedAction = "MANUAL_REVIEW";
                 }
