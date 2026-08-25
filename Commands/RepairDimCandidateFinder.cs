@@ -1301,15 +1301,15 @@ namespace ADDIN.Commands
         {
             if (dimInfo == null) return;
 
-            PointAnchorDecision decision = FindPointAnchorEdgeCandidate(swApp, dimInfo, viewGeom, view, dispDim);
-            dimInfo.PointDecision = decision;
-            dimInfo.CandidateDecision = decision.Decision;
+            PointAnchorProbeDecision probeDecision = DiscoverPointAnchorProbeCandidates(swApp, dimInfo, viewGeom, view, dispDim);
+            dimInfo.PointProbeDecision = probeDecision;
+            dimInfo.CandidateDecision = probeDecision.Decision;
 
-            if (decision.Decision == "POINT_ANCHOR_HIGH_CONFIDENCE" || decision.Decision == "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE")
+            if (probeDecision.Decision == "POINT_ANCHOR_PROBE_CANDIDATES_AVAILABLE")
             {
                 dimInfo.RouteCCandidateAvailable = true;
                 dimInfo.RequiresDimensionRecreate = true;
-                dimInfo.RecommendedAction = decision.RecommendedAction;
+                dimInfo.RecommendedAction = "EXECUTE_PROVISIONAL_PROBE";
             }
             else
             {
@@ -1317,6 +1317,171 @@ namespace ADDIN.Commands
                 dimInfo.RequiresDimensionRecreate = false;
                 dimInfo.RecommendedAction = "MANUAL_REVIEW";
             }
+        }
+
+        public static PointAnchorProbeDecision DiscoverPointAnchorProbeCandidates(
+            ISldWorks swApp,
+            DanglingDimensionInfo info,
+            ViewGeometryInfo viewGeom,
+            SolidWorks.Interop.sldworks.View view,
+            DisplayDimension dispDim)
+        {
+            PointAnchorProbeDecision decision = new PointAnchorProbeDecision();
+
+            if (info == null || viewGeom == null || view == null || dispDim == null)
+            {
+                decision.Decision = "POINT_ANCHOR_OBJECT_INVALID";
+                return decision;
+            }
+
+            // 1. Build Witness Profile from old DisplayData
+            DisplayWitnessProfile profile = (info.DisplayLineSegments != null && info.DisplayLineSegments.Count > 0)
+                ? RepairDimGeometry.BuildDisplayWitnessProfile(info.DisplayLineSegments, info.Position)
+                : null;
+
+            decision.WitnessProfile = profile;
+
+            if (profile == null || !profile.IsValid)
+            {
+                decision.Decision = "POINT_ANCHOR_PROFILE_INVALID";
+                decision.AmbiguityReason = profile != null ? profile.ErrorReason : "NO_DISPLAY_DATA";
+                return decision;
+            }
+
+            // 2. Discover candidates around BOTH historical witness origins W1 and W2
+            List<PointAnchorProbeCandidate> discovered = new List<PointAnchorProbeCandidate>();
+
+            foreach (DrawingPolylineEdgeInfo cand in viewGeom.RepairLineRecords)
+            {
+                if (cand == null || cand.SheetStart == null || cand.SheetEnd == null || cand.ModelEntity == null)
+                    continue;
+
+                // Candidate orientation check: approx parallel to witness direction
+                double candDx = cand.SheetEnd[0] - cand.SheetStart[0];
+                double candDy = cand.SheetEnd[1] - cand.SheetStart[1];
+                double candLenM = Math.Sqrt(candDx * candDx + candDy * candDy);
+                if (candLenM < 1e-7) continue;
+
+                double candUx = candDx / candLenM;
+                double candUy = candDy / candLenM;
+
+                double dotWit = Math.Abs(candUx * profile.WitnessDirectionUnitVector[0] + candUy * profile.WitnessDirectionUnitVector[1]);
+                if (dotWit < 0.85) // Not parallel to witness lines
+                    continue;
+
+                // Check proximity to W1 and W2
+                var res1 = RepairDimGeometry.ClosestPointOnSegment2D(
+                    profile.Witness1GeometryPoint[0], profile.Witness1GeometryPoint[1],
+                    cand.SheetStart[0], cand.SheetStart[1],
+                    cand.SheetEnd[0], cand.SheetEnd[1]);
+
+                var res2 = RepairDimGeometry.ClosestPointOnSegment2D(
+                    profile.Witness2GeometryPoint[0], profile.Witness2GeometryPoint[1],
+                    cand.SheetStart[0], cand.SheetStart[1],
+                    cand.SheetEnd[0], cand.SheetEnd[1]);
+
+                double d1 = res1.DistanceMm;
+                double d2 = res2.DistanceMm;
+
+                if (d1 > 2.0 && d2 > 2.0)
+                    continue;
+
+                int closerSide = (d1 <= d2) ? 1 : 2;
+                double minProx = (closerSide == 1) ? d1 : d2;
+                var closerRes = (closerSide == 1) ? res1 : res2;
+                double[] targetDimPt = (closerSide == 1) ? profile.Witness1DimensionPoint : profile.Witness2DimensionPoint;
+                double[] targetGeomPt = (closerSide == 1) ? profile.Witness1GeometryPoint : profile.Witness2GeometryPoint;
+
+                // Witness Ray Consistency check
+                double r_dx = targetDimPt[0] - closerRes.Point[0];
+                double r_dy = targetDimPt[1] - closerRes.Point[1];
+                double r_len = Math.Sqrt(r_dx * r_dx + r_dy * r_dy);
+
+                double old_r_dx = targetDimPt[0] - targetGeomPt[0];
+                double old_r_dy = targetDimPt[1] - targetGeomPt[1];
+                double old_r_len = Math.Sqrt(old_r_dx * old_r_dx + old_r_dy * old_r_dy);
+
+                double angErr = 0.0;
+                bool rayConsistent = true;
+                if (r_len > 1e-6 && old_r_len > 1e-6)
+                {
+                    double dotRay = (r_dx * old_r_dx + r_dy * old_r_dy) / (r_len * old_r_len);
+                    if (dotRay > 1.0) dotRay = 1.0; else if (dotRay < -1.0) dotRay = -1.0;
+                    angErr = Math.Acos(dotRay) * 180.0 / Math.PI;
+                    if (dotRay < 0.5) rayConsistent = false;
+                }
+
+                if (!rayConsistent)
+                    continue;
+
+                discovered.Add(new PointAnchorProbeCandidate
+                {
+                    EdgeInfo = cand,
+                    RawRecordIndex = cand.RawRecordIndex,
+                    ComponentName = cand.ComponentName,
+                    SheetStart = cand.SheetStart,
+                    SheetEnd = cand.SheetEnd,
+                    HistoricalSide = closerSide,
+                    W1ProximityMm = d1,
+                    W2ProximityMm = d2,
+                    MinProximityMm = minProx,
+                    RayAngularErrorDeg = angErr,
+                    RayConsistent = rayConsistent,
+                    AttachPoint = closerRes.Point,
+                    AttachParamT = closerRes.ParamT
+                });
+            }
+
+            decision.DiscoveredCandidates = discovered;
+
+            // 3. Physical Edge Deduplication
+            List<PointAnchorProbeCandidate> physical = new List<PointAnchorProbeCandidate>();
+            foreach (var c in discovered)
+            {
+                bool isDup = false;
+                for (int pi = 0; pi < physical.Count; pi++)
+                {
+                    var ex = physical[pi];
+                    if (IsGeometricallyIdentical(ex.EdgeInfo, c.EdgeInfo))
+                    {
+                        isDup = true;
+                        decision.DuplicateLogs.Add($"Edge (Rec #{c.RawRecordIndex}) duplicate of (Rec #{ex.RawRecordIndex})");
+                        if (c.MinProximityMm < ex.MinProximityMm)
+                        {
+                            physical[pi] = c;
+                        }
+                        break;
+                    }
+                }
+                if (!isDup) physical.Add(c);
+            }
+
+            physical.Sort((a, b) => a.MinProximityMm.CompareTo(b.MinProximityMm));
+            for (int i = 0; i < physical.Count; i++)
+            {
+                physical[i].CandidateIndex = i + 1;
+            }
+
+            decision.PhysicalProbeCandidates = physical;
+
+            if (physical.Count == 0)
+            {
+                decision.Decision = "POINT_ANCHOR_NO_PROBE_CANDIDATE";
+                decision.RecommendedAction = "MANUAL_REVIEW";
+            }
+            else if (physical.Count > 12)
+            {
+                decision.Decision = "POINT_ANCHOR_PROBE_SET_TOO_LARGE";
+                decision.AmbiguityReason = $"Probe set size {physical.Count} exceeds safety cap 12";
+                decision.RecommendedAction = "MANUAL_REVIEW";
+            }
+            else
+            {
+                decision.Decision = "POINT_ANCHOR_PROBE_CANDIDATES_AVAILABLE";
+                decision.RecommendedAction = "EXECUTE_PROVISIONAL_PROBE";
+            }
+
+            return decision;
         }
 
         public static PointAnchorDecision FindPointAnchorEdgeCandidate(

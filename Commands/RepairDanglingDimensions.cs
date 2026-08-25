@@ -13,9 +13,9 @@ namespace ADDIN.Commands
 {
     public static class RepairDanglingDimensions
     {
-        private const string REPAIR_DIM_BUILD = "STEP12A_LIVE_POINT_LOST_EDGE_REPAIR_20260825";
+        private const string REPAIR_DIM_BUILD = "STEP12C_SKETCHPOINT_PROBE_REPAIR_20260825";
 
-        private class BatchTargetSnapshot
+        private sealed class BatchTargetSnapshot
         {
             public int TargetIndex { get; set; }
             public string SheetName { get; set; }
@@ -47,6 +47,10 @@ namespace ADDIN.Commands
             public bool IsUnsafeState { get; set; }
             public int PostDisplayCount { get; set; }
             public int PostDanglingCount { get; set; }
+            public int ProbeCandidateCount { get; set; }
+            public int ProbesAttempted { get; set; }
+            public int ValidProbeCount { get; set; }
+            public bool FinalCreateAttempted { get; set; }
         }
 
         public static void Run(ISldWorks swApp, DrawingDoc swDrawing)
@@ -74,7 +78,7 @@ namespace ADDIN.Commands
 
             InitLog();
             LogDebug($"=== REPAIR DIM BUILD: {REPAIR_DIM_BUILD} ===");
-            LogDebug("=== REPAIR DIM SESSION START (STEP 12A: LIVE POINT + LOST EDGE REPAIR) ===");
+            LogDebug("=== REPAIR DIM SESSION START (STEP 12B: ALL SUPPORTED DANGLING DIMENSIONS) ===");
 
             try
             {
@@ -611,40 +615,56 @@ namespace ADDIN.Commands
 
             int pointAnchorDetected = pointAnchorBatchTargets.Count;
             int pointAnchorEligibleCount = pointAnchorBatchTargets.Count(t => t.AttachedEntityTypes.Count == 2 && t.AttachedEntityTypes.Contains(0) && t.AttachedEntityTypes.Contains(11));
-            int pointAnchorHighConfidence = pointAnchorBatchTargets.Count(t => t.CandidateDecision == "POINT_ANCHOR_HIGH_CONFIDENCE" || t.CandidateDecision == "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE");
-            int pointAnchorAttempted = 0;
+            int pointAnchorProbeCandidatesCount = 0;
+            int pointAnchorProbesAttempted = 0;
+            int pointAnchorValidProbesCount = 0;
+            int pointAnchorAmbiguousCount = 0;
+            int pointAnchorFinalCreateAttempted = 0;
             int pointAnchorSuccessCount = 0;
             int pointAnchorManualReviewCount = 0;
             int pointAnchorFailedCount = 0;
 
-            LogDebug($"\n=== PHASE 4: POINT-ANCHOR REPAIR SCAN: Detected={pointAnchorDetected}, Eligible={pointAnchorEligibleCount}, HighConfidence={pointAnchorHighConfidence} ===");
+            LogDebug($"\n=== PHASE 4: POINT-ANCHOR REPAIR SCAN: Detected={pointAnchorDetected}, Eligible={pointAnchorEligibleCount} ===");
 
             if (pointAnchorBatchTargets.Count > 0)
             {
-                // STEP 12A SINGLE-TARGET SAFETY CAP: Mutate at most ONE target per command run
-                BatchTargetSnapshot chosenTarget = null;
+                bool pointAnchorBatchAborted = false;
                 for (int i = 0; i < pointAnchorBatchTargets.Count; i++)
                 {
                     var target = pointAnchorBatchTargets[i];
-                    if (chosenTarget == null && (target.CandidateDecision == "POINT_ANCHOR_HIGH_CONFIDENCE" || target.CandidateDecision == "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE"))
-                    {
-                        chosenTarget = target;
-                    }
-                    else
-                    {
-                        LogDebug($"[POINT_ANCHOR_BATCH #{target.TargetIndex}] View='{target.ViewName}', Dim='{target.DimensionName}': Decision={target.CandidateDecision} -> NOT_ATTEMPTED_STEP12A_SINGLE_TARGET_CAP");
-                        pointAnchorManualReviewCount++;
-                    }
-                }
+                    bool probeEligible =
+                        target.CandidateDecision == "POINT_ANCHOR_PROBE_CANDIDATES_AVAILABLE" ||
+                        target.CandidateDecision == "POINT_ANCHOR_PROBE_UNIQUE_HIGH_CONFIDENCE" ||
+                        target.CandidateDecision == "POINT_ANCHOR_HIGH_CONFIDENCE" ||
+                        target.CandidateDecision == "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE";
 
-                if (chosenTarget != null)
-                {
-                    pointAnchorAttempted = 1;
-                    LogDebug($"\n=== EXECUTING STEP12A SINGLE-TARGET POINT-ANCHOR REPAIR on Target #{chosenTarget.TargetIndex} ('{chosenTarget.ViewName}' - '{chosenTarget.DimensionName}') ===");
-                    var res = ExecuteSinglePointAnchorTargetRepair(swApp, swDrawing, swModel, chosenTarget, initialDrawingDisplayDimCount, initialDrawingDanglingCount);
+                    if (!probeEligible)
+                    {
+                        LogDebug($"[POINT_ANCHOR_BATCH #{target.TargetIndex}] View='{target.ViewName}', Dim='{target.DimensionName}': Decision={target.CandidateDecision} -> MANUAL_REVIEW");
+                        pointAnchorManualReviewCount++;
+                        continue;
+                    }
+
+                    LogDebug($"\n=== EXECUTING STEP12C POINT-ANCHOR PROVISIONAL PROBE REPAIR on Target #{target.TargetIndex} ('{target.ViewName}' - '{target.DimensionName}') ===");
+                    var res = ExecuteSinglePointAnchorTargetRepair(
+                        swApp,
+                        swDrawing,
+                        swModel,
+                        target,
+                        runningDisplayCount,
+                        runningDanglingCount);
+
+                    pointAnchorProbeCandidatesCount += res.ProbeCandidateCount;
+                    pointAnchorProbesAttempted += res.ProbesAttempted;
+                    pointAnchorValidProbesCount += res.ValidProbeCount;
+                    if (res.ValidProbeCount > 1) pointAnchorAmbiguousCount++;
+                    if (res.FinalCreateAttempted) pointAnchorFinalCreateAttempted++;
+
                     if (res.Status == SingleTargetStatus.Success)
                     {
                         pointAnchorSuccessCount++;
+                        runningDisplayCount = res.PostDisplayCount;
+                        runningDanglingCount = res.PostDanglingCount;
                     }
                     else if (res.Status == SingleTargetStatus.ManualReview || res.Status == SingleTargetStatus.Skipped)
                     {
@@ -653,10 +673,16 @@ namespace ADDIN.Commands
                     else if (res.Status == SingleTargetStatus.Failed)
                     {
                         pointAnchorFailedCount++;
+                        if (res.IsUnsafeState)
+                        {
+                            LogDebug("POINT_ANCHOR_BATCH_ABORT_UNSAFE_STATE: Aborting remaining targets.");
+                            pointAnchorBatchAborted = true;
+                            break;
+                        }
                     }
                 }
 
-                LogDebug($"\n=== POINT-ANCHOR BATCH FINISHED: Repaired={pointAnchorSuccessCount}/{pointAnchorDetected}, ManualReview={pointAnchorManualReviewCount}, Failed={pointAnchorFailedCount} ===");
+                LogDebug($"\n=== POINT-ANCHOR BATCH FINISHED: Detected={pointAnchorDetected}, Eligible={pointAnchorEligibleCount}, ProbesAttempted={pointAnchorProbesAttempted}, Repaired={pointAnchorSuccessCount}/{pointAnchorDetected}, ManualReview={pointAnchorManualReviewCount}, Failed={pointAnchorFailedCount}, Aborted={pointAnchorBatchAborted} ===");
             }
 
             // =========================================================================
@@ -763,20 +789,23 @@ namespace ADDIN.Commands
             sbSummary.AppendLine($"FullyLost Repaired         : {fullyLostSuccessCount}");
             sbSummary.AppendLine();
             sbSummary.AppendLine("PointAnchor:");
-            sbSummary.AppendLine($"  Detected       : {pointAnchorDetected}");
-            sbSummary.AppendLine($"  Eligible       : {pointAnchorEligibleCount}");
-            sbSummary.AppendLine($"  HighConfidence : {pointAnchorHighConfidence}");
-            sbSummary.AppendLine($"  Attempted      : {pointAnchorAttempted}");
-            sbSummary.AppendLine($"  Repaired       : {pointAnchorSuccessCount}");
-            sbSummary.AppendLine($"  ManualReview   : {pointAnchorManualReviewCount}");
-            sbSummary.AppendLine($"  Failed         : {pointAnchorFailedCount}");
+            sbSummary.AppendLine($"  Detected            : {pointAnchorDetected}");
+            sbSummary.AppendLine($"  Eligible            : {pointAnchorEligibleCount}");
+            sbSummary.AppendLine($"  ProbeCandidates     : {pointAnchorProbeCandidatesCount}");
+            sbSummary.AppendLine($"  ProbesAttempted     : {pointAnchorProbesAttempted}");
+            sbSummary.AppendLine($"  ValidProbes         : {pointAnchorValidProbesCount}");
+            sbSummary.AppendLine($"  Ambiguous           : {pointAnchorAmbiguousCount}");
+            sbSummary.AppendLine($"  FinalCreateAttempted: {pointAnchorFinalCreateAttempted}");
+            sbSummary.AppendLine($"  Repaired            : {pointAnchorSuccessCount}");
+            sbSummary.AppendLine($"  ManualReview        : {pointAnchorManualReviewCount}");
+            sbSummary.AppendLine($"  Failed              : {pointAnchorFailedCount}");
             sbSummary.AppendLine();
             sbSummary.AppendLine("Remaining:");
-            sbSummary.AppendLine($"  FullyLost      : {remainingFullyLost}");
-            sbSummary.AppendLine($"  PointAnchor    : {remainingPointAnchor}");
-            sbSummary.AppendLine($"  UnsupportedOther: {remainingUnsupported}");
-            sbSummary.AppendLine($"  HighConfidence : {remainingHighConfidence}");
-            sbSummary.AppendLine($"  ModelMissing   : {remainingModelMissing}");
+            sbSummary.AppendLine($"  FullyLost           : {remainingFullyLost}");
+            sbSummary.AppendLine($"  PointAnchor         : {remainingPointAnchor}");
+            sbSummary.AppendLine($"  UnsupportedOther    : {remainingUnsupported}");
+            sbSummary.AppendLine($"  HighConfidence      : {remainingHighConfidence}");
+            sbSummary.AppendLine($"  ModelMissing        : {remainingModelMissing}");
             sbSummary.AppendLine();
             sbSummary.AppendLine("OTHER NON-TARGET DIMENSIONS MODIFIED: NO");
             sbSummary.AppendLine("DRAWING SAVED: NO");
@@ -787,7 +816,7 @@ namespace ADDIN.Commands
 
             MessageBox.Show(
                 sbSummary.ToString(),
-                "REPAIR DIM - STEP 12A BATCH RUN COMPLETE",
+                "REPAIR DIM - ALL SUPPORTED DIMENSIONS COMPLETE",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -1479,6 +1508,7 @@ namespace ADDIN.Commands
                 sbLog.AppendLine("\nRESULT: FAILED (AMBIGUOUS_DIM_IDENTITY)");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
+                DeleteProvisionalDimension(swModel, newDisp, "FULLY_LOST AMBIGUOUS_DIM_IDENTITY");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "AMBIGUOUS_DIM_IDENTITY" };
             }
@@ -1535,6 +1565,7 @@ namespace ADDIN.Commands
                 sbLog.AppendLine("\nRESULT: FAILED (SAFE_DELETE_SELECTION_FAILED)");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
+                DeleteProvisionalDimension(swModel, newDisp, "FULLY_LOST SAFE_DELETE_SELECTION_FAILED");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "SAFE_DELETE_SELECTION_FAILED" };
             }
@@ -1554,6 +1585,7 @@ namespace ADDIN.Commands
                 sbLog.AppendLine("\nRESULT: FAILED (DELETE_RETURNED_FALSE)");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
+                DeleteProvisionalDimension(swModel, newDisp, "FULLY_LOST DELETE_RETURNED_FALSE");
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DELETE_RETURNED_FALSE" };
             }
 
@@ -1615,7 +1647,7 @@ namespace ADDIN.Commands
             StringBuilder sbLog = new StringBuilder();
             sbLog.AppendLine();
             sbLog.AppendLine("-----------------------------------");
-            sbLog.AppendLine("=== POINT ANCHOR TARGET ===");
+            sbLog.AppendLine("STEP12C POINT-ANCHOR PROVISIONAL PROBE REPAIR");
             sbLog.AppendLine($"Sheet: {target.SheetName}");
             sbLog.AppendLine($"View: {target.ViewName}");
             sbLog.AppendLine($"Old Full Name: {target.OldDimFullName}");
@@ -1631,7 +1663,7 @@ namespace ADDIN.Commands
             SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
             SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
 
-            while (cView != null)
+            while (cView != null && targetDispDim == null)
             {
                 string vName = cView.GetName2() ?? "";
                 if (vName.Equals(target.ViewName, StringComparison.OrdinalIgnoreCase) ||
@@ -1662,24 +1694,22 @@ namespace ADDIN.Commands
                         }
                         dd = dd.GetNext5() as DisplayDimension;
                     }
-                    if (targetDispDim != null) break;
                 }
                 cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
             }
 
-            if (targetView == null || targetDispDim == null || targetAnnot == null)
+            if (targetDispDim == null || targetAnnot == null || targetView == null)
             {
-                sbLog.AppendLine("\nRESULT: SKIPPED (TARGET_REACQUIRE_FAILED)");
+                sbLog.AppendLine("\nRESULT: SKIPPED (TARGET_NOT_FOUND_OR_NO_LONGER_DANGLING)");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
-                return new SingleTargetRepairResult { Status = SingleTargetStatus.Skipped, Reason = "TARGET_REACQUIRE_FAILED" };
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Skipped, Reason = "TARGET_NOT_FOUND" };
             }
 
-            sbLog.AppendLine("STEP12A A TARGET_REACQUIRED");
+            sbLog.AppendLine("STEP12C A TARGET_REACQUIRED");
 
-            DanglingDimensionInfo info = ExtractDanglingInfo(target.SheetName, target.ViewName, targetDispDim, targetAnnot);
             ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, targetView);
-            ClassifyFailureMode(info, viewGeom, true, targetView.GetReferencedModelName() ?? "");
+            DanglingDimensionInfo info = ExtractDanglingInfo(target.SheetName, target.ViewName, targetDispDim, targetAnnot);
 
             bool isPointAnchor = (info.AnchorEntityType == (int)swSelectType_e.swSelSKETCHPOINTS) &&
                                  (info.AttachedEntityCount >= 2) &&
@@ -1693,9 +1723,9 @@ namespace ADDIN.Commands
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Skipped, Reason = $"NOT_POINT_ANCHOR ({info.AnchorEntityType})" };
             }
 
-            sbLog.AppendLine("STEP12A B POINT_ANCHOR_CONFIRMED");
+            sbLog.AppendLine("STEP12C B POINT_ANCHOR_CONFIRMED");
 
-            // Build Witness Profile
+            // Build Witness Profile from historical DisplayData
             DisplayWitnessProfile profile = (info.DisplayLineSegments != null && info.DisplayLineSegments.Count > 0)
                 ? RepairDimGeometry.BuildDisplayWitnessProfile(info.DisplayLineSegments, info.Position)
                 : null;
@@ -1708,9 +1738,9 @@ namespace ADDIN.Commands
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "POINT_ANCHOR_PROFILE_INVALID" };
             }
 
-            sbLog.AppendLine("STEP12A C DISPLAY_PROFILE_VALID");
+            sbLog.AppendLine("STEP12C C DISPLAY_PROFILE_VALID");
 
-            // Point Object & Sketch
+            // Authoritative Live SketchPoint Reference (READ-ONLY)
             SketchPoint sp = info.AnchorEntity as SketchPoint;
             if (sp == null)
             {
@@ -1720,11 +1750,11 @@ namespace ADDIN.Commands
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "POINT_ANCHOR_OBJECT_INVALID" };
             }
 
-            sbLog.AppendLine("STEP12A D POINT_OBJECT_RESOLVED");
+            sbLog.AppendLine("STEP12C D POINT_OBJECT_RESOLVED");
 
+            // Optional diagnostic resolution (does not block probe)
             PointAnchorInfo ptInfo = RepairDimGeometry.ResolveSketchPointSheetPosition(swApp, targetView, sp, profile);
-            sbLog.AppendLine("STEP12A E POINT_SKETCH_RESOLVED");
-            sbLog.AppendLine("STEP12A F POINT_POSITION_HYPOTHESES_BUILT");
+            sbLog.AppendLine("STEP12C E POINT_SKETCH_DIAGNOSTICS_CAPTURED");
 
             sbLog.AppendLine();
             sbLog.AppendLine("ATTACHED REFERENCES:");
@@ -1737,9 +1767,7 @@ namespace ADDIN.Commands
 
             sbLog.AppendLine();
             sbLog.AppendLine("SKETCH POINT:");
-            sbLog.AppendLine($"  X: {ptInfo.RawX:F6} m");
-            sbLog.AppendLine($"  Y: {ptInfo.RawY:F6} m");
-            sbLog.AppendLine($"  Z: {ptInfo.RawZ:F6} m");
+            sbLog.AppendLine($"  X: {ptInfo.RawX:F6} m, Y: {ptInfo.RawY:F6} m, Z: {ptInfo.RawZ:F6} m");
             sbLog.AppendLine($"  Point ID: {ptInfo.PointID}");
             sbLog.AppendLine($"  Sketch: {ptInfo.SketchFeatureName}");
             sbLog.AppendLine($"  Belongs To View: {ptInfo.BelongsToCurrentView}");
@@ -1751,91 +1779,6 @@ namespace ADDIN.Commands
             sbLog.AppendLine($"  Dimension Axis: [{(profile.DimensionAxisUnitVector != null && profile.DimensionAxisUnitVector.Length >= 2 ? $"{profile.DimensionAxisUnitVector[0]:F4}, {profile.DimensionAxisUnitVector[1]:F4}" : "N/A")}]");
             sbLog.AppendLine($"  Witness1 Geometry: ({profile.Witness1GeometryPoint[0]:F4}, {profile.Witness1GeometryPoint[1]:F4})");
             sbLog.AppendLine($"  Witness2 Geometry: ({profile.Witness2GeometryPoint[0]:F4}, {profile.Witness2GeometryPoint[1]:F4})");
-
-            sbLog.AppendLine();
-            sbLog.AppendLine("POINT POSITION HYPOTHESES:");
-            for (int hi = 0; hi < ptInfo.Hypotheses.Count; hi++)
-            {
-                var hyp = ptInfo.Hypotheses[hi];
-                sbLog.AppendLine($"  Hypothesis #{hi + 1}:");
-                sbLog.AppendLine($"    Method: {hyp.Method}");
-                sbLog.AppendLine($"    Point Sheet XY: ({hyp.SheetXY[0]:F4}, {hyp.SheetXY[1]:F4})");
-                sbLog.AppendLine($"    Witness1 Error: {hyp.Witness1ErrorMm:F4} mm");
-                sbLog.AppendLine($"    Witness2 Error: {hyp.Witness2ErrorMm:F4} mm");
-                sbLog.AppendLine($"    Matched: {hyp.IsMatched} (Side: {hyp.MatchedWitnessSide}, Error: {hyp.ErrorMm:F4} mm)");
-            }
-
-            sbLog.AppendLine();
-            sbLog.AppendLine("POINT RESOLUTION:");
-            sbLog.AppendLine($"  Resolved: {ptInfo.IsResolved}");
-            sbLog.AppendLine($"  Matched Witness Side: {ptInfo.LivePointWitnessSide}");
-            sbLog.AppendLine($"  Missing Witness Side: {ptInfo.MissingWitnessSide}");
-            sbLog.AppendLine($"  Point Witness Error: {ptInfo.PointWitnessErrorMm:F4} mm");
-            sbLog.AppendLine($"  Status: {ptInfo.ResolutionStatus}");
-
-            if (!ptInfo.IsResolved)
-            {
-                sbLog.AppendLine($"\nRESULT: MANUAL_REVIEW ({ptInfo.ResolutionStatus})");
-                sbLog.AppendLine("-----------------------------------");
-                LogDebug(sbLog.ToString().TrimEnd());
-                return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = ptInfo.ResolutionStatus };
-            }
-
-            sbLog.AppendLine("STEP12A G POINT_WITNESS_SIDE_RESOLVED");
-
-            // Edge Candidate Search
-            PointAnchorDecision decision = RepairDimCandidateFinder.FindPointAnchorEdgeCandidate(swApp, info, viewGeom, targetView, targetDispDim);
-            sbLog.AppendLine("STEP12A H EDGE_CANDIDATES_BUILT");
-
-            sbLog.AppendLine();
-            sbLog.AppendLine("MISSING EDGE:");
-            sbLog.AppendLine($"  Candidate Count: {decision.EdgeCandidates.Count}");
-            for (int ci = 0; ci < decision.EdgeCandidates.Count; ci++)
-            {
-                var cand = decision.EdgeCandidates[ci];
-                sbLog.AppendLine($"  Candidate #{cand.Rank}:");
-                sbLog.AppendLine($"    RawRecord: {cand.RawRecordIndex}");
-                sbLog.AppendLine($"    Component: {cand.ComponentName}");
-                sbLog.AppendLine($"    Sheet Geometry: ({cand.SheetStart[0]:F4}, {cand.SheetStart[1]:F4}) -> ({cand.SheetEnd[0]:F4}, {cand.SheetEnd[1]:F4})");
-                sbLog.AppendLine($"    Attach Point: ({cand.AttachPoint[0]:F4}, {cand.AttachPoint[1]:F4})");
-                sbLog.AppendLine($"    Witness Error: {cand.WitnessProximityMm:F4} mm");
-                sbLog.AppendLine($"    Ray Angular Error: {cand.RayAngularErrorDeg:F1}°");
-                sbLog.AppendLine($"    Projected Sheet Distance: {cand.ProjectedSheetDistanceMm:F4} mm");
-                sbLog.AppendLine($"    Model Distance: {cand.ModelDistanceMm:F4} mm");
-                sbLog.AppendLine($"    Distance Error: {cand.DistanceErrorMm:F4} mm");
-                sbLog.AppendLine($"    Distance Mode: {cand.DistanceMode}");
-                sbLog.AppendLine($"    Score: {cand.Score:F1}");
-            }
-
-            if (decision.DuplicateLogs.Count > 0)
-            {
-                sbLog.AppendLine("  DUPLICATE EDGE LOGS:");
-                foreach (var dup in decision.DuplicateLogs)
-                {
-                    sbLog.AppendLine($"    * {dup}");
-                }
-            }
-
-            sbLog.AppendLine();
-            sbLog.AppendLine($"DECISION: {decision.Decision}");
-            if (!string.IsNullOrEmpty(decision.AmbiguityReason))
-            {
-                sbLog.AppendLine($"Ambiguity Reason: {decision.AmbiguityReason}");
-            }
-
-            bool isEligibleForCreate = (decision.Decision == "POINT_ANCHOR_HIGH_CONFIDENCE" || decision.Decision == "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE") && decision.BestEdge != null;
-
-            if (!isEligibleForCreate)
-            {
-                sbLog.AppendLine($"\nRESULT: MANUAL_REVIEW ({decision.Decision})");
-                sbLog.AppendLine("-----------------------------------");
-                LogDebug(sbLog.ToString().TrimEnd());
-                return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = decision.Decision };
-            }
-
-            sbLog.AppendLine("STEP12A I POINT_EDGE_HIGH_CONFIDENCE");
-
-            var bestEdge = decision.BestEdge;
 
             // Snapshot old state & presentation
             bool oldIsDangling = false;
@@ -1905,98 +1848,465 @@ namespace ADDIN.Commands
             int oldColor = -1;
             try { oldColor = targetAnnot.Color; } catch {}
 
-            sbLog.AppendLine("STEP12A J OLD_STATE_SNAPSHOTTED");
+            sbLog.AppendLine("STEP12C F OLD_STATE_SNAPSHOTTED");
 
-            // SELECTION
-            swModel.ClearSelection2(true);
-            SelectionMgr selMgr = swModel.SelectionManager as SelectionMgr;
-
-            SelectData pointSelData = selMgr?.CreateSelectData();
-            if (pointSelData != null) pointSelData.View = targetView;
-
-            SelectData edgeSelData = selMgr?.CreateSelectData();
-            if (edgeSelData != null) edgeSelData.View = targetView;
+            // Candidate Discovery around BOTH W1 and W2
+            PointAnchorProbeDecision probeDecision = RepairDimCandidateFinder.DiscoverPointAnchorProbeCandidates(swApp, info, viewGeom, targetView, targetDispDim);
+            sbLog.AppendLine("STEP12C G PROBE_CANDIDATES_DISCOVERED");
 
             sbLog.AppendLine();
-            sbLog.AppendLine("SELECTION:");
-
-            sbLog.AppendLine("STEP12A K ABOUT_TO_SELECT_POINT");
-            bool ptSelOk = false;
-            try
+            sbLog.AppendLine($"PROBE CANDIDATE DISCOVERY ({probeDecision.DiscoveredCandidates.Count} Discovered, {probeDecision.PhysicalProbeCandidates.Count} Physical):");
+            if (probeDecision.DuplicateLogs.Count > 0)
             {
-                ptSelOk = sp.Select4(false, pointSelData);
+                sbLog.AppendLine("  DUPLICATE LOGS:");
+                foreach (var dup in probeDecision.DuplicateLogs)
+                {
+                    sbLog.AppendLine($"    * {dup}");
+                }
             }
-            catch (Exception ex)
+
+            if (probeDecision.PhysicalProbeCandidates.Count == 0)
             {
-                sbLog.AppendLine($"  ERROR selecting SketchPoint: {ex.Message}");
+                sbLog.AppendLine("\nRESULT: MANUAL_REVIEW (POINT_ANCHOR_NO_PROBE_CANDIDATE)");
+                sbLog.AppendLine("-----------------------------------");
+                LogDebug(sbLog.ToString().TrimEnd());
+                return new SingleTargetRepairResult
+                {
+                    Status = SingleTargetStatus.ManualReview,
+                    Reason = "POINT_ANCHOR_NO_PROBE_CANDIDATE",
+                    ProbeCandidateCount = 0
+                };
             }
-            sbLog.AppendLine($"STEP12A L POINT_SELECTED (Result={ptSelOk})");
 
-            object candDrawingEntity = targetView.GetCorrespondingEntity(bestEdge.EdgeInfo.ModelEntity);
-            IEntity candIEnt = candDrawingEntity as IEntity;
-            bool edgeSelOk = false;
-            try
+            if (probeDecision.PhysicalProbeCandidates.Count > 12)
             {
-                edgeSelOk = (candIEnt != null) && candIEnt.Select4(true, edgeSelData);
+                sbLog.AppendLine($"\nRESULT: MANUAL_REVIEW (POINT_ANCHOR_PROBE_SET_TOO_LARGE: Count={probeDecision.PhysicalProbeCandidates.Count} > 12)");
+                sbLog.AppendLine("-----------------------------------");
+                LogDebug(sbLog.ToString().TrimEnd());
+                return new SingleTargetRepairResult
+                {
+                    Status = SingleTargetStatus.ManualReview,
+                    Reason = "POINT_ANCHOR_PROBE_SET_TOO_LARGE",
+                    ProbeCandidateCount = probeDecision.PhysicalProbeCandidates.Count
+                };
             }
-            catch (Exception ex)
+
+            // PROVISIONAL PROBE TRANSACTION LOOP
+            sbLog.AppendLine();
+            sbLog.AppendLine("STEP12C H PROVISIONAL_PROBES_START");
+
+            SelectionMgr selMgr = swModel.SelectionManager as SelectionMgr;
+            IModelDocExtension ext = swModel.Extension;
+
+            int probesAttempted = 0;
+            double effTolMm = oldSysVal.HasValue ? Math.Max(0.15, Math.Abs(oldSysVal.Value * 1000.0) * 0.001) : 0.15;
+
+            for (int pi = 0; pi < probeDecision.PhysicalProbeCandidates.Count; pi++)
             {
-                sbLog.AppendLine($"  ERROR selecting Edge: {ex.Message}");
+                var cand = probeDecision.PhysicalProbeCandidates[pi];
+                probesAttempted++;
+
+                sbLog.AppendLine();
+                sbLog.AppendLine("=== POINT ANCHOR PROBE ===");
+                sbLog.AppendLine($"Candidate #{cand.CandidateIndex}:");
+                sbLog.AppendLine($"RawRecord: {cand.RawRecordIndex}");
+                sbLog.AppendLine($"Component: {cand.ComponentName}");
+                sbLog.AppendLine($"Sheet Segment: ({cand.SheetStart[0]:F4}, {cand.SheetStart[1]:F4}) -> ({cand.SheetEnd[0]:F4}, {cand.SheetEnd[1]:F4})");
+                sbLog.AppendLine($"Historical Side: {cand.HistoricalSide}");
+                sbLog.AppendLine($"W1 proximity: {cand.W1ProximityMm:F4} mm");
+                sbLog.AppendLine($"W2 proximity: {cand.W2ProximityMm:F4} mm");
+                sbLog.AppendLine($"Ray error: {cand.RayAngularErrorDeg:F1}°");
+
+                // SELECTION
+                swModel.ClearSelection2(true);
+
+                SelectData pointSelData = selMgr?.CreateSelectData();
+                if (pointSelData != null) pointSelData.View = targetView;
+
+                bool ptSelOk = false;
+                try { ptSelOk = sp.Select4(false, pointSelData); } catch {}
+
+                object candDrawingEntity = null;
+                try { candDrawingEntity = targetView.GetCorrespondingEntity(cand.EdgeInfo.ModelEntity); } catch {}
+                IEntity candIEnt = candDrawingEntity as IEntity;
+
+                SelectData edgeSelData = selMgr?.CreateSelectData();
+                if (edgeSelData != null) edgeSelData.View = targetView;
+
+                bool edgeSelOk = false;
+                if (candIEnt != null)
+                {
+                    try { edgeSelOk = candIEnt.Select4(true, edgeSelData); } catch {}
+                }
+
+                int selCount = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+                List<int> selTypes = new List<int>();
+                if (selMgr != null && selCount > 0)
+                {
+                    for (int si = 1; si <= selCount; si++)
+                    {
+                        selTypes.Add(selMgr.GetSelectedObjectType3(si, -1));
+                    }
+                }
+
+                bool selPass = (selCount == 2) &&
+                               selTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS) &&
+                               selTypes.Contains((int)swSelectType_e.swSelEDGES);
+
+                sbLog.AppendLine("SELECTION:");
+                sbLog.AppendLine($"  Point Select4: {ptSelOk}");
+                sbLog.AppendLine($"  Edge Select4: {edgeSelOk}");
+                sbLog.AppendLine($"  Count: {selCount}");
+                sbLog.AppendLine($"  Types: [{string.Join(", ", selTypes)}]");
+
+                if (!selPass)
+                {
+                    cand.IsProbed = true;
+                    cand.IsValidProbe = false;
+                    cand.RejectionReason = "SELECTION_FAILED";
+                    sbLog.AppendLine("PROBE RESULT: REJECT");
+                    sbLog.AppendLine("REJECTION REASON: SELECTION_FAILED");
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                // CREATE PROVISIONAL DIM
+                DisplayDimension provDisp = null;
+                try
+                {
+                    provDisp = swModel.AddDimension2(
+                        oldPos != null && oldPos.Length >= 1 ? oldPos[0] : 0.0,
+                        oldPos != null && oldPos.Length >= 2 ? oldPos[1] : 0.0,
+                        oldPos != null && oldPos.Length >= 3 ? oldPos[2] : 0.0) as DisplayDimension;
+                }
+                catch (Exception ex)
+                {
+                    sbLog.AppendLine($"  ERROR calling AddDimension2: {ex.Message}");
+                }
+
+                if (provDisp == null)
+                {
+                    cand.IsProbed = true;
+                    cand.IsValidProbe = false;
+                    cand.RejectionReason = "CREATE_RETURNED_NULL";
+                    sbLog.AppendLine("PROBE RESULT: REJECT");
+                    sbLog.AppendLine("REJECTION REASON: CREATE_RETURNED_NULL");
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                Annotation provAnnot = provDisp.GetAnnotation() as Annotation;
+                Dimension provDim = provDisp.GetDimension2(0) as Dimension ?? provDisp.GetDimension() as Dimension;
+                string provFullName = "";
+                if (provDim != null) { try { provFullName = provDim.FullName ?? ""; } catch {} }
+                if (string.IsNullOrEmpty(provFullName) && provAnnot != null) { try { provFullName = provAnnot.GetName() ?? ""; } catch {} }
+
+                bool provDangling = true;
+                try { provDangling = (provAnnot != null) && provAnnot.IsDangling(); } catch {}
+
+                int provAttachedCount = 0;
+                try { provAttachedCount = (provAnnot != null) ? provAnnot.GetAttachedEntityCount3() : 0; } catch {}
+
+                List<int> provAttachedTypes = new List<int>();
+                try
+                {
+                    object nat = provAnnot?.GetAttachedEntityTypes();
+                    if (nat is int[] iarr) provAttachedTypes.AddRange(iarr);
+                    else if (nat is object[] oarr) foreach (var o in oarr) provAttachedTypes.Add(Convert.ToInt32(o));
+                }
+                catch {}
+
+                double? provSysVal = null;
+                if (provDim != null)
+                {
+                    try
+                    {
+                        object v = provDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                        if (v is double[] arr && arr.Length > 0) provSysVal = arr[0];
+                        else if (v is double d) provSysVal = d;
+                        else provSysVal = provDim.GetSystemValue2("");
+                    }
+                    catch {}
+                }
+
+                sbLog.AppendLine("CREATE:");
+                sbLog.AppendLine($"  New Name: {provFullName}");
+                sbLog.AppendLine($"  Dangling: {provDangling}");
+                sbLog.AppendLine($"  Attached Count: {provAttachedCount}");
+                sbLog.AppendLine($"  Attached Types: [{string.Join(", ", provAttachedTypes)}]");
+                sbLog.AppendLine($"  Value: {(provSysVal.HasValue ? $"{provSysVal.Value * 1000.0:F4} mm" : "<null>")}");
+
+                // PROVISIONAL VERIFY
+                double deltaValMm = (oldSysVal.HasValue && provSysVal.HasValue) ? Math.Abs(provSysVal.Value - oldSysVal.Value) * 1000.0 : double.MaxValue;
+                bool valMatch = provSysVal.HasValue && deltaValMm <= effTolMm;
+
+                if (oldPos != null && oldPos.Length >= 3 && provAnnot != null)
+                {
+                    try { provAnnot.SetPosition2(oldPos[0], oldPos[1], oldPos[2]); } catch {}
+                }
+
+                double[] provPos = null;
+                try { provPos = provAnnot?.GetPosition() as double[]; } catch {}
+                double deltaPosMm = (oldPos != null && provPos != null && oldPos.Length >= 2 && provPos.Length >= 2)
+                    ? Math.Sqrt(Math.Pow(provPos[0] - oldPos[0], 2) + Math.Pow(provPos[1] - oldPos[1], 2)) * 1000.0
+                    : 0.0;
+                bool posMatch = (deltaPosMm <= 0.05);
+
+                List<DisplayDimLine> provDisplayLines = new List<DisplayDimLine>();
+                try
+                {
+                    DisplayData provDd = provDisp.GetDisplayData() as DisplayData;
+                    if (provDd != null)
+                    {
+                        int lc = provDd.GetLineCount();
+                        for (int li = 0; li < lc; li++)
+                        {
+                            object lObj = provDd.GetLineAtIndex3(li);
+                            if (lObj is double[] lArr && lArr.Length >= 10)
+                            {
+                                provDisplayLines.Add(new DisplayDimLine
+                                {
+                                    LineIndex = li,
+                                    LineType = Convert.ToInt32(lArr[1]),
+                                    StartX = lArr[4], StartY = lArr[5], StartZ = lArr[6],
+                                    EndX = lArr[7], EndY = lArr[8], EndZ = lArr[9]
+                                });
+                            }
+                        }
+                    }
+                }
+                catch {}
+
+                DisplayWitnessProfile provWitnessProfile = RepairDimGeometry.BuildDisplayWitnessProfile(provDisplayLines, provPos ?? oldPos);
+                bool witnessPairMatch = false;
+                double w1DeltaMm = double.MaxValue, w2DeltaMm = double.MaxValue;
+
+                if (provWitnessProfile != null && provWitnessProfile.IsValid && profile != null && profile.IsValid)
+                {
+                    double d11 = Math.Sqrt(Math.Pow(profile.Witness1GeometryPoint[0] - provWitnessProfile.Witness1GeometryPoint[0], 2) + Math.Pow(profile.Witness1GeometryPoint[1] - provWitnessProfile.Witness1GeometryPoint[1], 2)) * 1000.0;
+                    double d22 = Math.Sqrt(Math.Pow(profile.Witness2GeometryPoint[0] - provWitnessProfile.Witness2GeometryPoint[0], 2) + Math.Pow(profile.Witness2GeometryPoint[1] - provWitnessProfile.Witness2GeometryPoint[1], 2)) * 1000.0;
+
+                    double d12 = Math.Sqrt(Math.Pow(profile.Witness1GeometryPoint[0] - provWitnessProfile.Witness2GeometryPoint[0], 2) + Math.Pow(profile.Witness1GeometryPoint[1] - provWitnessProfile.Witness2GeometryPoint[1], 2)) * 1000.0;
+                    double d21 = Math.Sqrt(Math.Pow(profile.Witness2GeometryPoint[0] - provWitnessProfile.Witness1GeometryPoint[0], 2) + Math.Pow(profile.Witness2GeometryPoint[1] - provWitnessProfile.Witness2GeometryPoint[1], 2)) * 1000.0;
+
+                    if ((d11 + d22) <= (d12 + d21))
+                    {
+                        w1DeltaMm = d11;
+                        w2DeltaMm = d22;
+                    }
+                    else
+                    {
+                        w1DeltaMm = d12;
+                        w2DeltaMm = d21;
+                    }
+
+                    witnessPairMatch = (w1DeltaMm <= 1.5 && w2DeltaMm <= 1.5);
+                }
+
+                bool pointRefMatch = provAttachedTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS);
+
+                sbLog.AppendLine("VERIFY:");
+                sbLog.AppendLine($"  Value Match: {valMatch} (Delta={deltaValMm:F4} mm, Tol={effTolMm:F4} mm)");
+                sbLog.AppendLine($"  Position Match: {posMatch} (Delta={deltaPosMm:F4} mm)");
+                sbLog.AppendLine($"  Witness Pair Match: {witnessPairMatch} (W1 Delta={w1DeltaMm:F4} mm, W2 Delta={w2DeltaMm:F4} mm)");
+                sbLog.AppendLine($"  Point Reference Match: {pointRefMatch}");
+
+                bool attachedTypesMatch = (provAttachedCount == 2) &&
+                                          provAttachedTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS) &&
+                                          provAttachedTypes.Contains((int)swSelectType_e.swSelEDGES);
+
+                bool isValidProbe = (!provDangling) && attachedTypesMatch && valMatch && posMatch && witnessPairMatch;
+
+                cand.IsProbed = true;
+                cand.IsValidProbe = isValidProbe;
+                cand.CreatedDimFullName = provFullName;
+                cand.CreatedValueMm = provSysVal.HasValue ? provSysVal.Value * 1000.0 : (double?)null;
+                cand.ValueDeltaMm = deltaValMm;
+                cand.ValueMatch = valMatch;
+                cand.PositionMatch = posMatch;
+                cand.PositionDeltaMm = deltaPosMm;
+                cand.WitnessPairMatch = witnessPairMatch;
+                cand.W1DeltaMm = w1DeltaMm;
+                cand.W2DeltaMm = w2DeltaMm;
+                cand.PointReferenceMatch = pointRefMatch;
+
+                if (!isValidProbe)
+                {
+                    cand.RejectionReason = !valMatch ? "VALUE_MISMATCH" : (!witnessPairMatch ? "WITNESS_MISMATCH" : (provDangling ? "DANGLING" : "ATTACHED_TYPES_MISMATCH"));
+                }
+
+                sbLog.AppendLine($"PROBE RESULT: {(isValidProbe ? "VALID" : "REJECT")}");
+                sbLog.AppendLine($"REJECTION REASON: {(isValidProbe ? "NONE" : cand.RejectionReason)}");
+
+                // CLEANUP PROVISIONAL DIMENSION
+                swModel.ClearSelection2(true);
+                bool cleanSel = false;
+                if (!string.IsNullOrEmpty(provFullName) && ext != null)
+                {
+                    try { cleanSel = ext.SelectByID2(provFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
+                }
+
+                int cleanSelCount = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+                int cleanSelType = (selMgr != null && cleanSelCount > 0) ? selMgr.GetSelectedObjectType3(1, -1) : 0;
+                string cleanSelTypeName = ((swSelectType_e)cleanSelType).ToString();
+
+                bool cleanDel = false;
+                if (cleanSel && cleanSelCount == 1 && cleanSelType == (int)swSelectType_e.swSelDIMENSIONS)
+                {
+                    try { cleanDel = ext.DeleteSelection2(0); } catch {}
+                }
+                swModel.ClearSelection2(true);
+
+                cand.CleanupStatus = cleanDel ? "CLEANED" : "FAILED";
+
+                sbLog.AppendLine("CLEANUP:");
+                sbLog.AppendLine($"  Selected: {cleanSel}");
+                sbLog.AppendLine($"  Selection Count: {cleanSelCount}");
+                sbLog.AppendLine($"  Selection Type: {cleanSelTypeName}");
+                sbLog.AppendLine($"  Deleted: {cleanDel}");
+
+                if (!cleanDel)
+                {
+                    sbLog.AppendLine("\nABORT: UNSAFE STATE — PROVISIONAL CLEANUP FAILED (NO SAVE)");
+                    sbLog.AppendLine("-----------------------------------");
+                    LogDebug(sbLog.ToString().TrimEnd());
+                    return new SingleTargetRepairResult
+                    {
+                        Status = SingleTargetStatus.Failed,
+                        Reason = "ABORT_PROVISIONAL_CLEANUP_FAILED",
+                        IsUnsafeState = true,
+                        ProbesAttempted = probesAttempted
+                    };
+                }
             }
-            sbLog.AppendLine($"STEP12A M EDGE_SELECTED (Result={edgeSelOk})");
 
-            int sCount = selMgr != null ? selMgr.GetSelectedObjectCount2(-1) : 0;
-            int t1 = selMgr != null && sCount >= 1 ? selMgr.GetSelectedObjectType3(1, -1) : 0;
-            int t2 = selMgr != null && sCount >= 2 ? selMgr.GetSelectedObjectType3(2, -1) : 0;
-            bool typesOk = (sCount == 2) &&
-                           ((t1 == (int)swSelectType_e.swSelSKETCHPOINTS && t2 == (int)swSelectType_e.swSelEDGES) ||
-                            (t1 == (int)swSelectType_e.swSelEDGES && t2 == (int)swSelectType_e.swSelSKETCHPOINTS));
+            sbLog.AppendLine("STEP12C I PROVISIONAL_PROBES_FINISHED");
 
-            sbLog.AppendLine($"  Point Select4: {ptSelOk}");
-            sbLog.AppendLine($"  Edge Select4: {edgeSelOk}");
-            sbLog.AppendLine($"  Selection Count: {sCount}");
-            sbLog.AppendLine($"  Selection Types: [{t1} ({(swSelectType_e)t1}), {t2} ({(swSelectType_e)t2})]");
-            sbLog.AppendLine($"STEP12A N SELECTION_TYPES_VERIFIED (Valid={typesOk})");
+            // COUNT VALID PHYSICAL CANDIDATES
+            var validCandidates = probeDecision.PhysicalProbeCandidates.Where(c => c.IsValidProbe).ToList();
+            probeDecision.ValidProbeCandidates = validCandidates;
 
-            if (!ptSelOk || !edgeSelOk || !typesOk)
+            sbLog.AppendLine();
+            sbLog.AppendLine($"PROBE RESULTS SUMMARY: Attempted={probesAttempted}, Valid={validCandidates.Count}/{probeDecision.PhysicalProbeCandidates.Count}");
+
+            if (validCandidates.Count == 0)
             {
-                sbLog.AppendLine("\nRESULT: FAILED (SELECTION_VERIFICATION_FAILED)");
+                probeDecision.Decision = "POINT_ANCHOR_NO_VALID_PROBE";
+                sbLog.AppendLine("\nRESULT: MANUAL_REVIEW (POINT_ANCHOR_NO_VALID_PROBE)");
+                sbLog.AppendLine("-----------------------------------");
+                LogDebug(sbLog.ToString().TrimEnd());
+                return new SingleTargetRepairResult
+                {
+                    Status = SingleTargetStatus.ManualReview,
+                    Reason = "POINT_ANCHOR_NO_VALID_PROBE",
+                    ProbeCandidateCount = probeDecision.PhysicalProbeCandidates.Count,
+                    ProbesAttempted = probesAttempted,
+                    ValidProbeCount = 0
+                };
+            }
+
+            if (validCandidates.Count > 1)
+            {
+                probeDecision.Decision = "POINT_ANCHOR_PROBE_AMBIGUOUS";
+                probeDecision.AmbiguityReason = $"Found {validCandidates.Count} valid probe candidates";
+                sbLog.AppendLine($"\nRESULT: MANUAL_REVIEW (POINT_ANCHOR_PROBE_AMBIGUOUS: {validCandidates.Count} valid candidates)");
+                sbLog.AppendLine("-----------------------------------");
+                LogDebug(sbLog.ToString().TrimEnd());
+                return new SingleTargetRepairResult
+                {
+                    Status = SingleTargetStatus.ManualReview,
+                    Reason = "POINT_ANCHOR_PROBE_AMBIGUOUS",
+                    ProbeCandidateCount = probeDecision.PhysicalProbeCandidates.Count,
+                    ProbesAttempted = probesAttempted,
+                    ValidProbeCount = validCandidates.Count
+                };
+            }
+
+            // EXACTLY ONE VALID CANDIDATE -> UNIQUE HIGH CONFIDENCE!
+            probeDecision.Decision = "POINT_ANCHOR_PROBE_UNIQUE_HIGH_CONFIDENCE";
+            var chosen = validCandidates[0];
+            probeDecision.SelectedUniqueCandidate = chosen;
+
+            sbLog.AppendLine();
+            sbLog.AppendLine("STEP12C J UNIQUE_PROBE_CANDIDATE_CONFIRMED");
+            sbLog.AppendLine($"  Winning Candidate: #{chosen.CandidateIndex} (Rec #{chosen.RawRecordIndex}, Comp='{chosen.ComponentName}')");
+            sbLog.AppendLine($"  Sheet Geometry: ({chosen.SheetStart[0]:F4}, {chosen.SheetStart[1]:F4}) -> ({chosen.SheetEnd[0]:F4}, {chosen.SheetEnd[1]:F4})");
+            sbLog.AppendLine($"  Attach Point: ({chosen.AttachPoint[0]:F4}, {chosen.AttachPoint[1]:F4})");
+            sbLog.AppendLine($"  Value Delta: {chosen.ValueDeltaMm:F4} mm");
+            sbLog.AppendLine($"  Witness Deltas: W1={chosen.W1DeltaMm:F4} mm, W2={chosen.W2DeltaMm:F4} mm");
+
+            // FINAL CREATE TRANSACTION
+            sbLog.AppendLine();
+            sbLog.AppendLine("FINAL CREATE TRANSACTION:");
+            swModel.ClearSelection2(true);
+
+            SelectData finalPtSelData = selMgr?.CreateSelectData();
+            if (finalPtSelData != null) finalPtSelData.View = targetView;
+            bool finalPtSelOk = false;
+            try { finalPtSelOk = sp.Select4(false, finalPtSelData); } catch {}
+
+            object finalCandDrawingEntity = null;
+            try { finalCandDrawingEntity = targetView.GetCorrespondingEntity(chosen.EdgeInfo.ModelEntity); } catch {}
+            IEntity finalCandIEnt = finalCandDrawingEntity as IEntity;
+
+            SelectData finalEdgeSelData = selMgr?.CreateSelectData();
+            if (finalEdgeSelData != null) finalEdgeSelData.View = targetView;
+            bool finalEdgeSelOk = false;
+            if (finalCandIEnt != null)
+            {
+                try { finalEdgeSelOk = finalCandIEnt.Select4(true, finalEdgeSelData); } catch {}
+            }
+
+            int finalSelCount = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+            List<int> finalSelTypes = new List<int>();
+            if (selMgr != null && finalSelCount > 0)
+            {
+                for (int si = 1; si <= finalSelCount; si++)
+                    finalSelTypes.Add(selMgr.GetSelectedObjectType3(si, -1));
+            }
+
+            bool finalSelPass = (finalSelCount == 2) &&
+                                finalSelTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS) &&
+                                finalSelTypes.Contains((int)swSelectType_e.swSelEDGES);
+
+            sbLog.AppendLine($"  Selection: Point={finalPtSelOk}, Edge={finalEdgeSelOk}, Count={finalSelCount}, Types=[{string.Join(", ", finalSelTypes)}]");
+            sbLog.AppendLine($"STEP12C K FINAL_SELECTION_VERIFIED (Pass={finalSelPass})");
+
+            if (!finalSelPass)
+            {
+                sbLog.AppendLine("\nRESULT: FAILED (FINAL_SELECTION_FAILED)");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
                 swModel.ClearSelection2(true);
-                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "SELECTION_VERIFICATION_FAILED" };
-            }
-
-            // CREATION
-            sbLog.AppendLine();
-            sbLog.AppendLine("CREATE:");
-            sbLog.AppendLine("STEP12A O ABOUT_TO_CREATE");
-
-            double initialTestX = (ptInfo.ResolvedSheetXY[0] + bestEdge.AttachPoint[0]) * 0.5;
-            double initialTestY = (ptInfo.ResolvedSheetXY[1] + bestEdge.AttachPoint[1]) * 0.5;
-            double initialTestZ = 0.0;
-            if (oldPos != null && oldPos.Length >= 3)
-            {
-                initialTestX = oldPos[0];
-                initialTestY = oldPos[1];
-                initialTestZ = oldPos[2];
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "FINAL_SELECTION_FAILED" };
             }
 
             DisplayDimension newDisp = null;
             try
             {
-                newDisp = swModel.AddDimension2(initialTestX, initialTestY, initialTestZ) as DisplayDimension;
+                newDisp = swModel.AddDimension2(
+                    oldPos != null && oldPos.Length >= 1 ? oldPos[0] : 0.0,
+                    oldPos != null && oldPos.Length >= 2 ? oldPos[1] : 0.0,
+                    oldPos != null && oldPos.Length >= 3 ? oldPos[2] : 0.0) as DisplayDimension;
             }
             catch (Exception ex)
             {
-                sbLog.AppendLine($"  ERROR calling AddDimension2: {ex.Message}");
+                sbLog.AppendLine($"  ERROR in final AddDimension2: {ex.Message}");
             }
 
-            Annotation newAnnot = null;
-            try { newAnnot = newDisp?.GetAnnotation() as Annotation; } catch {}
+            if (newDisp == null)
+            {
+                sbLog.AppendLine("\nRESULT: FAILED (FINAL_ADD_DIMENSION_RETURNED_NULL)");
+                sbLog.AppendLine("-----------------------------------");
+                LogDebug(sbLog.ToString().TrimEnd());
+                swModel.ClearSelection2(true);
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "FINAL_ADD_DIMENSION_RETURNED_NULL" };
+            }
 
-            Dimension newDim = null;
-            try { newDim = newDisp?.GetDimension2(0) as Dimension ?? newDisp?.GetDimension() as Dimension; } catch {}
+            sbLog.AppendLine("STEP12C L FINAL_DIMENSION_CREATED");
+
+            Annotation newAnnot = newDisp.GetAnnotation() as Annotation;
+            Dimension newDim = newDisp.GetDimension2(0) as Dimension ?? newDisp.GetDimension() as Dimension;
 
             string newDimFullName = "";
             if (newDim != null) { try { newDimFullName = newDim.FullName ?? ""; } catch {} }
@@ -2021,55 +2331,52 @@ namespace ADDIN.Commands
             int newAttachedCount = 0;
             try { newAttachedCount = (newAnnot != null) ? newAnnot.GetAttachedEntityCount3() : 0; } catch {}
 
-            object[] newAttachedEnts = null;
-            try { newAttachedEnts = newAnnot?.GetAttachedEntities3() as object[]; } catch {}
+            List<int> newAttachedTypes = new List<int>();
+            try
+            {
+                object nat = newAnnot?.GetAttachedEntityTypes();
+                if (nat is int[] iarr) newAttachedTypes.AddRange(iarr);
+                else if (nat is object[] oarr) foreach (var o in oarr) newAttachedTypes.Add(Convert.ToInt32(o));
+            }
+            catch {}
 
-            int[] newAttachedTypes = null;
-            try { newAttachedTypes = newAnnot?.GetAttachedEntityTypes() as int[]; } catch {}
+            bool finalAttachedMatch = (newAttachedCount == 2) &&
+                                      newAttachedTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS) &&
+                                      newAttachedTypes.Contains((int)swSelectType_e.swSelEDGES);
 
-            bool attachedTypesMatch = (newAttachedCount == 2) &&
-                                      (newAttachedTypes != null) &&
-                                      (newAttachedTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS)) &&
-                                      (newAttachedTypes.Contains((int)swSelectType_e.swSelEDGES));
-
-            sbLog.AppendLine($"STEP12A P NEW_DIM_CREATED (New Full Name: {newDimFullName})");
-            sbLog.AppendLine($"  Value: {(newSysVal.HasValue ? $"{newSysVal.Value * 1000.0:F6} mm" : "<null>")}");
-            sbLog.AppendLine($"  Dangling: {newDangling}");
-            sbLog.AppendLine($"  Attached Count: {newAttachedCount}");
-            sbLog.AppendLine($"  Attached Types: [{(newAttachedTypes != null ? string.Join(", ", newAttachedTypes) : "null")}]");
-
-            // Post-Create Value Check
-            double targetToleranceM = (Math.Max(0.15, (oldSysVal.HasValue ? Math.Abs(oldSysVal.Value * 1000.0) : 0.0) * 0.001)) / 1000.0;
-            bool valueMatch = oldSysVal.HasValue && newSysVal.HasValue && (Math.Abs(newSysVal.Value - oldSysVal.Value) <= targetToleranceM);
+            double finalDeltaValMm = (oldSysVal.HasValue && newSysVal.HasValue) ? Math.Abs(newSysVal.Value - oldSysVal.Value) * 1000.0 : double.MaxValue;
+            bool finalValMatch = newSysVal.HasValue && finalDeltaValMm <= effTolMm;
 
             sbLog.AppendLine();
-            sbLog.AppendLine("VERIFY:");
-            sbLog.AppendLine($"STEP12A Q TRUE_VALUE_VERIFIED (NewVal={(newSysVal.HasValue ? $"{newSysVal.Value * 1000.0:F4}" : "<null>")} mm vs OldVal={(oldSysVal.HasValue ? $"{oldSysVal.Value * 1000.0:F4}" : "<null>")} mm, Delta={(newSysVal.HasValue && oldSysVal.HasValue ? $"{Math.Abs(newSysVal.Value - oldSysVal.Value) * 1000.0:F4}" : "N/A")} mm, Match={valueMatch})");
-            sbLog.AppendLine($"STEP12A R ATTACHED_TYPES_VERIFIED (Valid={attachedTypesMatch})");
+            sbLog.AppendLine("FINAL CREATE VERIFICATION:");
+            sbLog.AppendLine($"  New DIM: {newDimFullName}");
+            sbLog.AppendLine($"  Value: {(newSysVal.HasValue ? $"{newSysVal.Value * 1000.0:F4} mm" : "<null>")} (Delta={finalDeltaValMm:F4} mm, Tol={effTolMm:F4} mm, Match={finalValMatch})");
+            sbLog.AppendLine($"  Dangling: {newDangling}");
+            sbLog.AppendLine($"  Attached: {newAttachedCount} [{string.Join(", ", newAttachedTypes)}] (Match={finalAttachedMatch})");
 
-            if (!valueMatch || !attachedTypesMatch || newDangling)
+            bool finalGeomPass = (!newDangling) && finalAttachedMatch && finalValMatch;
+            sbLog.AppendLine($"STEP12C M FINAL_GEOMETRY_VERIFIED (Pass={finalGeomPass})");
+
+            if (!finalGeomPass)
             {
-                // Safe Provisional Cleanup
                 swModel.ClearSelection2(true);
-                IModelDocExtension extCleanup = swModel.Extension;
-                bool cleanSelected = false;
-                if (!string.IsNullOrEmpty(newDimFullName) && extCleanup != null)
+                bool cleanSel = false;
+                if (!string.IsNullOrEmpty(newDimFullName) && ext != null)
                 {
-                    try { cleanSelected = extCleanup.SelectByID2(newDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
+                    try { cleanSel = ext.SelectByID2(newDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
                 }
-                bool cleanDeleted = false;
-                if (cleanSelected)
+                bool cleanDel = false;
+                if (cleanSel)
                 {
-                    try { cleanDeleted = extCleanup.DeleteSelection2(0); } catch {}
+                    try { cleanDel = ext.DeleteSelection2(0); } catch {}
                 }
                 swModel.ClearSelection2(true);
 
-                string failReason = !valueMatch ? "POINT_ANCHOR_POSTCREATE_VALUE_MISMATCH" : (!attachedTypesMatch ? "POINT_ANCHOR_ATTACHED_TYPES_MISMATCH" : "POINT_ANCHOR_NEW_DIM_DANGLING");
-                sbLog.AppendLine($"  PROVISIONAL CLEANUP: Selected={cleanSelected}, Deleted={cleanDeleted}");
-                sbLog.AppendLine($"\nRESULT: MANUAL_REVIEW ({failReason})");
+                string failReason = !finalValMatch ? "FINAL_VALUE_MISMATCH" : (!finalAttachedMatch ? "FINAL_ATTACHED_TYPES_MISMATCH" : "FINAL_DIM_DANGLING");
+                sbLog.AppendLine($"\nRESULT: FAILED ({failReason})");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
-                return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = failReason };
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = failReason };
             }
 
             // Clone Presentation P2..P8
@@ -2138,190 +2445,136 @@ namespace ADDIN.Commands
 
             string propMatchLevel = (propCopyText == "MATCH" && propCopyPrecision == "MATCH" && propCopyTolerance == "MATCH" && propCopyFormat == "MATCH" && propCopyUnits == "MATCH" && propCopyArrow == "MATCH" && propCopyLayer == "MATCH") ? "FULL_MATCH" : "PARTIAL_MATCH";
 
-            sbLog.AppendLine($"STEP12A S PRESENTATION_CLONED (Level={propMatchLevel})");
+            sbLog.AppendLine($"STEP12C N PRESENTATION_CLONED (Level={propMatchLevel})");
 
             // Restore Position
-            if (oldPos != null && oldPos.Length >= 3)
+            if (oldPos != null && oldPos.Length >= 3 && newAnnot != null)
             {
-                try
-                {
-                    newAnnot.SetPosition2(oldPos[0], oldPos[1], oldPos[2]);
-                }
-                catch {}
+                try { newAnnot.SetPosition2(oldPos[0], oldPos[1], oldPos[2]); } catch {}
             }
 
             double[] newPos = null;
             try { newPos = newAnnot?.GetPosition() as double[]; } catch {}
-            double deltaPosMm = 0.0;
-            if (oldPos != null && newPos != null && oldPos.Length >= 2 && newPos.Length >= 2)
-            {
-                deltaPosMm = Math.Sqrt(Math.Pow(newPos[0] - oldPos[0], 2) + Math.Pow(newPos[1] - oldPos[1], 2)) * 1000.0;
-            }
-            bool posMatch = (deltaPosMm <= 0.05);
+            double finalDeltaPosMm = (oldPos != null && newPos != null && oldPos.Length >= 2 && newPos.Length >= 2)
+                ? Math.Sqrt(Math.Pow(newPos[0] - oldPos[0], 2) + Math.Pow(newPos[1] - oldPos[1], 2)) * 1000.0
+                : 0.0;
+            bool finalPosMatch = (finalDeltaPosMm <= 0.05);
 
-            sbLog.AppendLine($"STEP12A T POSITION_RESTORED (Delta={deltaPosMm:F4} mm, Match={posMatch})");
+            sbLog.AppendLine($"STEP12C O POSITION_RESTORED (Delta={finalDeltaPosMm:F4} mm, Match={finalPosMatch})");
 
-            // Read New DisplayData & Verify Witness Profile Match
-            DisplayData newDData = null;
-            try { newDData = newDisp?.GetDisplayData() as DisplayData; } catch {}
-            List<DisplayDimLine> newLines = new List<DisplayDimLine>();
-            if (newDData != null)
+            // Build NEW Witness Profile & Verify Old vs New
+            List<DisplayDimLine> newDisplayLines = new List<DisplayDimLine>();
+            try
             {
-                int nLc = newDData.GetLineCount();
-                for (int nli = 0; nli < nLc; nli++)
+                DisplayData newDd = newDisp.GetDisplayData() as DisplayData;
+                if (newDd != null)
                 {
-                    object nlObj = newDData.GetLineAtIndex3(nli);
-                    if (nlObj is double[] nla && nla.Length >= 10)
+                    int lc = newDd.GetLineCount();
+                    for (int li = 0; li < lc; li++)
                     {
-                        newLines.Add(new DisplayDimLine
+                        object lObj = newDd.GetLineAtIndex3(li);
+                        if (lObj is double[] lArr && lArr.Length >= 10)
                         {
-                            LineIndex = nli,
-                            LineType = (int)nla[1],
-                            StartX = nla[4],
-                            StartY = nla[5],
-                            StartZ = nla[6],
-                            EndX = nla[7],
-                            EndY = nla[8],
-                            EndZ = nla[9]
-                        });
+                            newDisplayLines.Add(new DisplayDimLine
+                            {
+                                LineIndex = li,
+                                LineType = Convert.ToInt32(lArr[1]),
+                                StartX = lArr[4], StartY = lArr[5], StartZ = lArr[6],
+                                EndX = lArr[7], EndY = lArr[8], EndZ = lArr[9]
+                            });
+                        }
                     }
                 }
             }
+            catch {}
 
-            DisplayWitnessProfile newWitnessProfile = (newLines.Count > 0)
-                ? RepairDimGeometry.BuildDisplayWitnessProfile(newLines, newPos)
-                : null;
+            DisplayWitnessProfile newProfile = RepairDimGeometry.BuildDisplayWitnessProfile(newDisplayLines, newPos ?? oldPos);
+            bool finalWitnessPairMatch = false;
+            double finalW1DeltaMm = double.MaxValue, finalW2DeltaMm = double.MaxValue;
 
-            double w1DeltaMm = double.MaxValue, w2DeltaMm = double.MaxValue;
-            bool witnessPairMatch = false;
-
-            if (profile != null && profile.IsValid && newWitnessProfile != null && newWitnessProfile.IsValid)
+            if (newProfile != null && newProfile.IsValid && profile != null && profile.IsValid)
             {
-                double d11 = Math.Sqrt(Math.Pow(newWitnessProfile.Witness1GeometryPoint[0] - profile.Witness1GeometryPoint[0], 2) + Math.Pow(newWitnessProfile.Witness1GeometryPoint[1] - profile.Witness1GeometryPoint[1], 2)) * 1000.0;
-                double d22 = Math.Sqrt(Math.Pow(newWitnessProfile.Witness2GeometryPoint[0] - profile.Witness2GeometryPoint[0], 2) + Math.Pow(newWitnessProfile.Witness2GeometryPoint[1] - profile.Witness2GeometryPoint[1], 2)) * 1000.0;
+                double d11 = Math.Sqrt(Math.Pow(profile.Witness1GeometryPoint[0] - newProfile.Witness1GeometryPoint[0], 2) + Math.Pow(profile.Witness1GeometryPoint[1] - newProfile.Witness1GeometryPoint[1], 2)) * 1000.0;
+                double d22 = Math.Sqrt(Math.Pow(profile.Witness2GeometryPoint[0] - newProfile.Witness2GeometryPoint[0], 2) + Math.Pow(profile.Witness2GeometryPoint[1] - newProfile.Witness2GeometryPoint[1], 2)) * 1000.0;
 
-                double d12 = Math.Sqrt(Math.Pow(newWitnessProfile.Witness1GeometryPoint[0] - profile.Witness2GeometryPoint[0], 2) + Math.Pow(newWitnessProfile.Witness1GeometryPoint[1] - profile.Witness2GeometryPoint[1], 2)) * 1000.0;
-                double d21 = Math.Sqrt(Math.Pow(newWitnessProfile.Witness2GeometryPoint[0] - profile.Witness1GeometryPoint[0], 2) + Math.Pow(newWitnessProfile.Witness2GeometryPoint[1] - profile.Witness1GeometryPoint[1], 2)) * 1000.0;
+                double d12 = Math.Sqrt(Math.Pow(profile.Witness1GeometryPoint[0] - newProfile.Witness2GeometryPoint[0], 2) + Math.Pow(profile.Witness1GeometryPoint[1] - newProfile.Witness2GeometryPoint[1], 2)) * 1000.0;
+                double d21 = Math.Sqrt(Math.Pow(profile.Witness2GeometryPoint[0] - newProfile.Witness1GeometryPoint[0], 2) + Math.Pow(profile.Witness2GeometryPoint[1] - newProfile.Witness1GeometryPoint[1], 2)) * 1000.0;
 
-                if (d11 + d22 <= d12 + d21)
+                if ((d11 + d22) <= (d12 + d21))
                 {
-                    w1DeltaMm = d11;
-                    w2DeltaMm = d22;
+                    finalW1DeltaMm = d11;
+                    finalW2DeltaMm = d22;
                 }
                 else
                 {
-                    w1DeltaMm = d12;
-                    w2DeltaMm = d21;
+                    finalW1DeltaMm = d12;
+                    finalW2DeltaMm = d21;
                 }
 
-                witnessPairMatch = (w1DeltaMm <= 1.5 && w2DeltaMm <= 1.5);
+                finalWitnessPairMatch = (finalW1DeltaMm <= 1.5 && finalW2DeltaMm <= 1.5);
             }
 
-            sbLog.AppendLine($"STEP12A U NEW_WITNESS_VERIFIED (W1Delta={w1DeltaMm:F4} mm, W2Delta={w2DeltaMm:F4} mm, Match={witnessPairMatch})");
-            sbLog.AppendLine("STEP12A V POINT_REFERENCE_VERIFIED (LiveSketchPoint preserved in new dimension references)");
+            sbLog.AppendLine($"STEP12C P NEW_WITNESS_PROFILE_VERIFIED (W1 Delta={finalW1DeltaMm:F4} mm, W2 Delta={finalW2DeltaMm:F4} mm, Match={finalWitnessPairMatch})");
 
-            // Delete Safety Gate
-            bool deleteAllowed = oldIsDangling &&
-                                 (!newDangling) &&
-                                 (newAttachedCount == 2) &&
-                                 attachedTypesMatch &&
-                                 valueMatch &&
-                                 posMatch &&
-                                 witnessPairMatch;
-
-            sbLog.AppendLine($"STEP12A W DELETE_ALLOWED ({deleteAllowed})");
-
-            sbLog.AppendLine();
-            sbLog.AppendLine("DELETE:");
-            sbLog.AppendLine($"  Allowed: {deleteAllowed}");
+            bool deleteAllowed = finalGeomPass && (propMatchLevel == "FULL_MATCH") && finalPosMatch && finalWitnessPairMatch;
+            sbLog.AppendLine($"STEP12C Q DELETE_GATE_EVALUATED (DeleteAllowed={deleteAllowed})");
 
             if (!deleteAllowed)
             {
                 swModel.ClearSelection2(true);
-                IModelDocExtension extCleanup = swModel.Extension;
-                bool cleanSelected = false;
-                if (!string.IsNullOrEmpty(newDimFullName) && extCleanup != null)
+                bool cleanSel = false;
+                if (!string.IsNullOrEmpty(newDimFullName) && ext != null)
                 {
-                    try { cleanSelected = extCleanup.SelectByID2(newDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
+                    try { cleanSel = ext.SelectByID2(newDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
                 }
-                bool cleanDeleted = false;
-                if (cleanSelected)
+                bool cleanDel = false;
+                if (cleanSel)
                 {
-                    try { cleanDeleted = extCleanup.DeleteSelection2(0); } catch {}
+                    try { cleanDel = ext.DeleteSelection2(0); } catch {}
                 }
                 swModel.ClearSelection2(true);
 
-                sbLog.AppendLine($"  PROVISIONAL CLEANUP: Selected={cleanSelected}, Deleted={cleanDeleted}");
                 sbLog.AppendLine("\nRESULT: FAILED (DELETE_SAFETY_GATE_FAILED)");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DELETE_SAFETY_GATE_FAILED" };
             }
 
-            // SAFE DELETE OLD DIMENSION
-            sbLog.AppendLine();
-            sbLog.AppendLine("SAFE OLD SELECT:");
+            // SAFE DELETE OLD DANGLING DIMENSION
             swModel.ClearSelection2(true);
+            bool oldSel = false;
+            try { oldSel = ext.SelectByID2(oldDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
 
-            IModelDocExtension ext = swModel.Extension;
-            bool selectByIdResult = false;
-            try
-            {
-                selectByIdResult = ext.SelectByID2(oldDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0);
-            }
-            catch (Exception ex)
-            {
-                sbLog.AppendLine($"  ERROR calling SelectByID2 on old DIM: {ex.Message}");
-            }
+            int oldSelCount = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+            int oldSelType = (selMgr != null && oldSelCount > 0) ? selMgr.GetSelectedObjectType3(1, -1) : 0;
+            string oldSelTypeName = ((swSelectType_e)oldSelType).ToString();
 
-            int selCountAfterSelect = 0;
-            int selTypeRaw = 0;
-            string selTypeName = "NONE";
-            if (selMgr != null)
-            {
-                try
-                {
-                    selCountAfterSelect = selMgr.GetSelectedObjectCount2(-1);
-                    if (selCountAfterSelect > 0)
-                    {
-                        selTypeRaw = selMgr.GetSelectedObjectType3(1, -1);
-                        selTypeName = ((swSelectType_e)selTypeRaw).ToString();
-                    }
-                }
-                catch {}
-            }
+            bool oldSelOk = oldSel && (oldSelCount == 1) && (oldSelType == (int)swSelectType_e.swSelDIMENSIONS || oldSelTypeName.IndexOf("DIMENSION", StringComparison.OrdinalIgnoreCase) >= 0);
 
-            bool selectOk = (selectByIdResult && selCountAfterSelect == 1 && (selTypeRaw == (int)swSelectType_e.swSelDIMENSIONS || selTypeName.IndexOf("DIMENSION", StringComparison.OrdinalIgnoreCase) >= 0));
+            sbLog.AppendLine($"STEP12C R OLD_SELECTED_BY_ID (Selected={oldSel}, Count={oldSelCount}, Type={oldSelTypeName})");
 
-            sbLog.AppendLine($"STEP12A X OLD_SELECTED_BY_ID (Selected={selectByIdResult})");
-            sbLog.AppendLine($"  Selection Count: {selCountAfterSelect}");
-            sbLog.AppendLine($"  Selection Type: {selTypeName} ({selTypeRaw})");
-            sbLog.AppendLine($"STEP12A Y OLD_SELECTION_VERIFIED (Valid={selectOk})");
-
-            if (!selectOk)
+            if (!oldSelOk)
             {
                 sbLog.AppendLine("\nRESULT: FAILED (SAFE_DELETE_SELECTION_FAILED)");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
+                DeleteProvisionalDimension(swModel, newDisp, "POINT_ANCHOR SAFE_DELETE_SELECTION_FAILED");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "SAFE_DELETE_SELECTION_FAILED" };
             }
 
-            bool deleteResult = false;
-            try
-            {
-                deleteResult = ext.DeleteSelection2(0);
-            }
-            catch {}
-
-            sbLog.AppendLine($"STEP12A Z OLD_DELETED (Deleted={deleteResult})");
+            bool oldDeleted = false;
+            try { oldDeleted = ext.DeleteSelection2(0); } catch {}
             swModel.ClearSelection2(true);
 
-            if (!deleteResult)
+            sbLog.AppendLine($"STEP12C S OLD_DELETED (Deleted={oldDeleted})");
+
+            if (!oldDeleted)
             {
                 sbLog.AppendLine("\nRESULT: FAILED (DELETE_RETURNED_FALSE)");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
+                DeleteProvisionalDimension(swModel, newDisp, "POINT_ANCHOR DELETE_RETURNED_FALSE");
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DELETE_RETURNED_FALSE" };
             }
 
@@ -2342,7 +2595,7 @@ namespace ADDIN.Commands
             sbLog.AppendLine($"  Display Count: {postDisplayCount} (Before: {currentDisplayBefore})");
             sbLog.AppendLine($"  Dangling Count: {postDanglingCount} (Before: {currentDanglingBefore})");
             sbLog.AppendLine($"  New Valid: {newValidAfterDelete}");
-            sbLog.AppendLine("STEP12A AA FRESH_RESCAN_COMPLETE");
+            sbLog.AppendLine("STEP12C T FRESH_RESCAN_COMPLETE");
 
             if (!newValidAfterDelete)
             {
@@ -2360,17 +2613,20 @@ namespace ADDIN.Commands
             }
 
             sbLog.AppendLine();
-            sbLog.AppendLine("STEP12A AB SUCCESS");
+            sbLog.AppendLine("STEP12C AB SUCCESS");
             sbLog.AppendLine("RESULT: SUCCESS");
             sbLog.AppendLine("-----------------------------------");
-
             LogDebug(sbLog.ToString().TrimEnd());
 
             return new SingleTargetRepairResult
             {
                 Status = SingleTargetStatus.Success,
                 PostDisplayCount = postDisplayCount,
-                PostDanglingCount = postDanglingCount
+                PostDanglingCount = postDanglingCount,
+                ProbeCandidateCount = probeDecision.PhysicalProbeCandidates.Count,
+                ProbesAttempted = probesAttempted,
+                ValidProbeCount = 1,
+                FinalCreateAttempted = true
             };
         }
 
@@ -2657,6 +2913,7 @@ namespace ADDIN.Commands
             if (newIsDangling || newAttachedCount != 2 || !newSysVal.HasValue || deltaValMm > effTolMm)
             {
                 LogDebug($"{tPrefix} FAILED: TARGET_CREATE_VERIFY_FAILED (Dangling={newIsDangling}, Attached={newAttachedCount}, DeltaVal={deltaValMm:F4} mm).");
+                DeleteProvisionalDimension(swModel, newDisp, tPrefix + " TARGET_CREATE_VERIFY_FAILED");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "TARGET_CREATE_VERIFY_FAILED" };
             }
@@ -2759,6 +3016,7 @@ namespace ADDIN.Commands
             if (!deleteAllowed)
             {
                 LogDebug($"{tPrefix} FAILED: DELETE_ALLOWED = FALSE (ValueMatch={valueMatchPass}, PosMatch={posMatchPass}, RefValid={refValidPass}, PresMatch={presentationPass}).");
+                DeleteProvisionalDimension(swModel, newDisp, tPrefix + " DELETE_SAFETY_GATE_FAILED");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DELETE_SAFETY_GATE_FAILED" };
             }
@@ -2780,6 +3038,7 @@ namespace ADDIN.Commands
             if (string.IsNullOrEmpty(oldDimFullName) || oldDimFullName.Equals(newDimFullName, StringComparison.OrdinalIgnoreCase))
             {
                 LogDebug($"{tPrefix} FAILED: Ambiguous dimension identity (Names identical or empty).");
+                DeleteProvisionalDimension(swModel, newDisp, tPrefix + " AMBIGUOUS_DIM_IDENTITY");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "AMBIGUOUS_DIM_IDENTITY" };
             }
@@ -2816,6 +3075,7 @@ namespace ADDIN.Commands
             if (!selectByIdResult)
             {
                 LogDebug($"{tPrefix} FAILED: SelectByID2 returned false.");
+                DeleteProvisionalDimension(swModel, newDisp, tPrefix + " FAIL_SELECT_BY_ID");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "FAIL_SELECT_BY_ID" };
             }
@@ -2841,6 +3101,7 @@ namespace ADDIN.Commands
             if (selCountAfterSelect != 1 || (selTypeRaw != (int)swSelectType_e.swSelDIMENSIONS && selTypeName.IndexOf("DIMENSION", StringComparison.OrdinalIgnoreCase) < 0))
             {
                 LogDebug($"{tPrefix} FAILED: Invalid old selection (Count={selCountAfterSelect}, Type={selTypeName}).");
+                DeleteProvisionalDimension(swModel, newDisp, tPrefix + " OLD_SELECTION_VERIFY_FAILED");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "OLD_SELECTION_VERIFY_FAILED" };
             }
@@ -2865,6 +3126,7 @@ namespace ADDIN.Commands
             if (!deleteResult)
             {
                 LogDebug($"{tPrefix} FAILED: DeleteSelection2 returned false.");
+                DeleteProvisionalDimension(swModel, newDisp, tPrefix + " FAIL_DELETE_RETURNED_FALSE");
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "FAIL_DELETE_RETURNED_FALSE" };
             }
@@ -2921,6 +3183,68 @@ namespace ADDIN.Commands
                 PostDisplayCount = postDisplayCount,
                 PostDanglingCount = postDanglingCount
             };
+        }
+
+        private static bool DeleteProvisionalDimension(
+            ModelDoc2 swModel,
+            DisplayDimension provisionalDimension,
+            string context)
+        {
+            if (swModel == null || provisionalDimension == null)
+                return false;
+
+            string dimensionName = "";
+            try
+            {
+                Dimension dimension = provisionalDimension.GetDimension2(0) as Dimension
+                    ?? provisionalDimension.GetDimension() as Dimension;
+                dimensionName = dimension?.FullName ?? "";
+            }
+            catch {}
+
+            if (string.IsNullOrEmpty(dimensionName))
+            {
+                try
+                {
+                    Annotation annotation = provisionalDimension.GetAnnotation() as Annotation;
+                    dimensionName = annotation?.GetName() ?? "";
+                }
+                catch {}
+            }
+
+            bool selected = false;
+            bool deleted = false;
+            try
+            {
+                swModel.ClearSelection2(true);
+                IModelDocExtension extension = swModel.Extension;
+                if (extension != null && !string.IsNullOrEmpty(dimensionName))
+                {
+                    selected = extension.SelectByID2(
+                        dimensionName,
+                        "DIMENSION",
+                        0.0,
+                        0.0,
+                        0.0,
+                        false,
+                        0,
+                        null,
+                        0);
+                    if (selected)
+                        deleted = extension.DeleteSelection2(0);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"PROVISIONAL CLEANUP ERROR [{context}]: {ex.Message}");
+            }
+            finally
+            {
+                try { swModel.ClearSelection2(true); } catch {}
+            }
+
+            LogDebug($"PROVISIONAL CLEANUP [{context}]: Name='{dimensionName}', Selected={selected}, Deleted={deleted}");
+            return deleted;
         }
 
         private static void CountTotalDrawingDimensions(
@@ -3175,17 +3499,19 @@ namespace ADDIN.Commands
 
             if (info.AnchorEntityType == (int)swSelectType_e.swSelSKETCHPOINTS && isLinear)
             {
-                if (info.CandidateDecision == "POINT_ANCHOR_HIGH_CONFIDENCE" || info.CandidateDecision == "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE")
+                info.FailureMode = RepairDimFailureMode.SketchPointAnchorLostReference;
+                if (info.CandidateDecision == "POINT_ANCHOR_PROBE_CANDIDATES_AVAILABLE" ||
+                    info.CandidateDecision == "POINT_ANCHOR_PROBE_UNIQUE_HIGH_CONFIDENCE" ||
+                    info.CandidateDecision == "POINT_ANCHOR_HIGH_CONFIDENCE" ||
+                    info.CandidateDecision == "POINT_ANCHOR_PROVISIONAL_HIGH_CONFIDENCE")
                 {
-                    info.FailureMode = RepairDimFailureMode.SketchPointAnchorLostReference;
-                    info.FailureModeReason = "Live SketchPoint anchor exists and high-confidence Route C replacement Edge geometry was found for the lost reference.";
+                    info.FailureModeReason = "Live SketchPoint anchor exists and Route C replacement Edge geometry candidates are available for provisional probe.";
                     info.RouteCCandidateAvailable = true;
                     info.RequiresDimensionRecreate = true;
-                    info.RecommendedAction = "RECREATE_POINT_EDGE_DIMENSION_REQUIRED";
+                    info.RecommendedAction = "EXECUTE_PROVISIONAL_PROBE";
                 }
                 else
                 {
-                    info.FailureMode = RepairDimFailureMode.UnsupportedAnchor;
                     info.FailureModeReason = $"Live SketchPoint anchor evaluated: {info.CandidateDecision}";
                     info.RouteCCandidateAvailable = false;
                     info.RequiresDimensionRecreate = false;

@@ -312,6 +312,51 @@ namespace ADDIN.Commands
         public string RecommendedAction { get; set; } = "MANUAL_REVIEW";
     }
 
+    public sealed class PointAnchorProbeCandidate
+    {
+        public int CandidateIndex { get; set; }
+        public DrawingPolylineEdgeInfo EdgeInfo { get; set; }
+        public int RawRecordIndex { get; set; }
+        public string ComponentName { get; set; }
+        public double[] SheetStart { get; set; }
+        public double[] SheetEnd { get; set; }
+        public int HistoricalSide { get; set; } // 1 or 2
+        public double W1ProximityMm { get; set; }
+        public double W2ProximityMm { get; set; }
+        public double MinProximityMm { get; set; }
+        public double RayAngularErrorDeg { get; set; }
+        public bool RayConsistent { get; set; } = true;
+        public double[] AttachPoint { get; set; }
+        public double AttachParamT { get; set; }
+        public bool IsProbed { get; set; }
+        public bool IsValidProbe { get; set; }
+        public string RejectionReason { get; set; } = "";
+        public string CreatedDimFullName { get; set; }
+        public double? CreatedValueMm { get; set; }
+        public double ValueDeltaMm { get; set; }
+        public bool ValueMatch { get; set; }
+        public bool PositionMatch { get; set; }
+        public double PositionDeltaMm { get; set; }
+        public bool WitnessPairMatch { get; set; }
+        public double W1DeltaMm { get; set; }
+        public double W2DeltaMm { get; set; }
+        public bool PointReferenceMatch { get; set; }
+        public string CleanupStatus { get; set; }
+    }
+
+    public sealed class PointAnchorProbeDecision
+    {
+        public string Decision { get; set; } = "NO_CANDIDATE"; // POINT_ANCHOR_PROBE_UNIQUE_HIGH_CONFIDENCE, POINT_ANCHOR_NO_VALID_PROBE, POINT_ANCHOR_PROBE_AMBIGUOUS, POINT_ANCHOR_PROBE_SET_TOO_LARGE
+        public DisplayWitnessProfile WitnessProfile { get; set; }
+        public List<PointAnchorProbeCandidate> DiscoveredCandidates { get; set; } = new List<PointAnchorProbeCandidate>();
+        public List<PointAnchorProbeCandidate> PhysicalProbeCandidates { get; set; } = new List<PointAnchorProbeCandidate>();
+        public List<PointAnchorProbeCandidate> ValidProbeCandidates { get; set; } = new List<PointAnchorProbeCandidate>();
+        public List<string> DuplicateLogs { get; set; } = new List<string>();
+        public PointAnchorProbeCandidate SelectedUniqueCandidate { get; set; }
+        public string AmbiguityReason { get; set; } = "";
+        public string RecommendedAction { get; set; } = "MANUAL_REVIEW";
+    }
+
     public sealed class PolylineAuxGeometryBlock
     {
         public int BlockIndex { get; set; }
@@ -666,6 +711,7 @@ namespace ADDIN.Commands
         public List<RepairCandidate> Candidates { get; set; } = new List<RepairCandidate>();
         public string CandidateDecision { get; set; } = "NO_CANDIDATE";
         public PointAnchorDecision PointDecision { get; set; }
+        public PointAnchorProbeDecision PointProbeDecision { get; set; }
         public List<string> DiagnosticNotes { get; set; } = new List<string>();
 
         // Failure Mode Classification
