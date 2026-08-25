@@ -13,7 +13,18 @@ namespace ADDIN.Commands
 {
     public static class RepairDanglingDimensions
     {
-        private const string REPAIR_DIM_BUILD = "STEP12D_SKETCHPOINT_PROBE_PIPELINE_FIX_20260825";
+        private const string REPAIR_DIM_BUILD = "STEP12E_EXTSKETCHPOINT_SELECTION_FIX_20260825";
+
+        private static bool IsSketchPointSelectionType(int type)
+        {
+            return type == (int)swSelectType_e.swSelSKETCHPOINTS || // 11
+                   type == (int)swSelectType_e.swSelEXTSKETCHPOINTS; // 25
+        }
+
+        private static bool IsEdgeSelectionType(int type)
+        {
+            return type == (int)swSelectType_e.swSelEDGES; // 1
+        }
 
         private sealed class BatchTargetSnapshot
         {
@@ -645,7 +656,7 @@ namespace ADDIN.Commands
                         continue;
                     }
 
-                    LogDebug($"\n=== EXECUTING STEP12C POINT-ANCHOR PROVISIONAL PROBE REPAIR on Target #{target.TargetIndex} ('{target.ViewName}' - '{target.DimensionName}') ===");
+                    LogDebug($"\n=== EXECUTING STEP12E POINT-ANCHOR PROVISIONAL PROBE REPAIR on Target #{target.TargetIndex} ('{target.ViewName}' - '{target.DimensionName}') ===");
                     var res = ExecuteSinglePointAnchorTargetRepair(
                         swApp,
                         swDrawing,
@@ -1647,7 +1658,7 @@ namespace ADDIN.Commands
             StringBuilder sbLog = new StringBuilder();
             sbLog.AppendLine();
             sbLog.AppendLine("-----------------------------------");
-            sbLog.AppendLine("STEP12D POINT-ANCHOR PROVISIONAL PROBE REPAIR");
+            sbLog.AppendLine("STEP12E POINT-ANCHOR PROVISIONAL PROBE REPAIR");
             sbLog.AppendLine($"Sheet: {target.SheetName}");
             sbLog.AppendLine($"View: {target.ViewName}");
             sbLog.AppendLine($"Old Full Name: {target.OldDimFullName}");
@@ -1706,14 +1717,15 @@ namespace ADDIN.Commands
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Skipped, Reason = "TARGET_NOT_FOUND" };
             }
 
-            sbLog.AppendLine("STEP12D A TARGET_REACQUIRED");
+            sbLog.AppendLine("STEP12E A TARGET_REACQUIRED");
 
             ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, targetView);
             DanglingDimensionInfo info = ExtractDanglingInfo(target.SheetName, target.ViewName, targetDispDim, targetAnnot);
 
-            bool isPointAnchor = (info.AnchorEntityType == (int)swSelectType_e.swSelSKETCHPOINTS) &&
+            bool isPointAnchor = IsSketchPointSelectionType(info.AnchorEntityType) &&
                                  (info.AttachedEntityCount >= 2) &&
-                                 (info.AttachedEntityTypes.Contains(0) && info.AttachedEntityTypes.Contains(11));
+                                 info.AttachedEntityTypes.Contains(0) &&
+                                 info.AttachedEntityTypes.Any(t => IsSketchPointSelectionType(t));
 
             if (!isPointAnchor)
             {
@@ -1723,7 +1735,7 @@ namespace ADDIN.Commands
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Skipped, Reason = $"NOT_POINT_ANCHOR ({info.AnchorEntityType})" };
             }
 
-            sbLog.AppendLine("STEP12D B POINT_ANCHOR_CONFIRMED");
+            sbLog.AppendLine("STEP12E B POINT_ANCHOR_CONFIRMED");
 
             // Freshly read DisplayData from targetDispDim
             List<DisplayDimLine> oldDisplayLines = new List<DisplayDimLine>();
@@ -1733,7 +1745,7 @@ namespace ADDIN.Commands
                 if (displayData != null)
                 {
                     int lineCount = displayData.GetLineCount();
-                    sbLog.AppendLine($"STEP12D C DISPLAY_DATA_READ (Raw Line Count: {lineCount})");
+                    sbLog.AppendLine($"STEP12E C DISPLAY_DATA_READ (Raw Line Count: {lineCount})");
 
                     for (int li = 0; li < lineCount; li++)
                     {
@@ -1758,12 +1770,12 @@ namespace ADDIN.Commands
                 }
                 else
                 {
-                    sbLog.AppendLine("STEP12D C DISPLAY_DATA_READ: GetDisplayData returned NULL");
+                    sbLog.AppendLine("STEP12E C DISPLAY_DATA_READ: GetDisplayData returned NULL");
                 }
             }
             catch (Exception ex)
             {
-                sbLog.AppendLine($"STEP12D C DISPLAY_DATA_EXCEPTION: {ex.Message}");
+                sbLog.AppendLine($"STEP12E C DISPLAY_DATA_EXCEPTION: {ex.Message}");
             }
 
             info.DisplayLineSegments = oldDisplayLines;
@@ -1779,7 +1791,7 @@ namespace ADDIN.Commands
             // Build Profile with staged validation
             DisplayWitnessProfile profile = RepairDimGeometry.BuildDisplayWitnessProfile(oldDisplayLines, info.Position);
 
-            sbLog.AppendLine("STEP12D D DISPLAY_PROFILE_BUILT");
+            sbLog.AppendLine("STEP12E D DISPLAY_PROFILE_BUILT");
             sbLog.AppendLine($"  Profile Null: {profile == null}");
             sbLog.AppendLine($"  Profile Valid: {(profile != null && profile.IsValid)}");
             sbLog.AppendLine($"  Status: {profile?.Status}");
@@ -1805,7 +1817,7 @@ namespace ADDIN.Commands
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = $"DISPLAY_PROFILE_INVALID: {profile.ErrorReason}" };
             }
 
-            sbLog.AppendLine("STEP12D E DISPLAY_PROFILE_VALID");
+            sbLog.AppendLine("STEP12E E DISPLAY_PROFILE_VALID");
 
             // Authoritative Live SketchPoint Reference (READ-ONLY)
             SketchPoint sp = info.AnchorEntity as SketchPoint;
@@ -1914,7 +1926,7 @@ namespace ADDIN.Commands
 
             // Candidate Discovery around BOTH W1 and W2
             PointAnchorProbeDecision probeDecision = RepairDimCandidateFinder.DiscoverPointAnchorProbeCandidates(swApp, info, viewGeom, targetView, targetDispDim);
-            sbLog.AppendLine($"STEP12D F PROBE_CANDIDATES_BUILT ({probeDecision.DiscoveredCandidates.Count} Discovered, {probeDecision.PhysicalProbeCandidates.Count} Physical)");
+            sbLog.AppendLine($"STEP12E F PROBE_CANDIDATES_BUILT ({probeDecision.DiscoveredCandidates.Count} Discovered, {probeDecision.PhysicalProbeCandidates.Count} Physical)");
 
             if (probeDecision.DuplicateLogs.Count > 0)
             {
@@ -1997,22 +2009,30 @@ namespace ADDIN.Commands
 
                 int selCount = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
                 List<int> selTypes = new List<int>();
+                List<string> selTypeDescriptions = new List<string>();
                 if (selMgr != null && selCount > 0)
                 {
                     for (int si = 1; si <= selCount; si++)
                     {
-                        selTypes.Add(selMgr.GetSelectedObjectType3(si, -1));
+                        int st = selMgr.GetSelectedObjectType3(si, -1);
+                        selTypes.Add(st);
+                        selTypeDescriptions.Add($"  #{si} = {st} ({(swSelectType_e)st})");
                     }
                 }
 
                 bool selPass = (selCount == 2) &&
-                               selTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS) &&
-                               selTypes.Contains((int)swSelectType_e.swSelEDGES);
+                               selTypes.Any(t => IsSketchPointSelectionType(t)) &&
+                               selTypes.Any(t => IsEdgeSelectionType(t));
 
                 sbLog.AppendLine($"POINT_SELECT: {ptSelOk}");
                 sbLog.AppendLine($"EDGE_SELECT: {edgeSelOk}");
                 sbLog.AppendLine($"Selection Count: {selCount}");
-                sbLog.AppendLine($"Selection Types: [{string.Join(", ", selTypes)}]");
+                sbLog.AppendLine("Selection Types:");
+                foreach (var desc in selTypeDescriptions)
+                {
+                    sbLog.AppendLine(desc);
+                }
+                sbLog.AppendLine($"SELECTION_VALID: {selPass}");
 
                 if (!selPass)
                 {
@@ -2025,6 +2045,7 @@ namespace ADDIN.Commands
                 }
 
                 // CREATE PROVISIONAL DIM
+                sbLog.AppendLine($"STEP12E PROBE #{cand.CandidateIndex} ADD_DIMENSION_START");
                 DisplayDimension provDisp = null;
                 try
                 {
@@ -2038,14 +2059,14 @@ namespace ADDIN.Commands
                     sbLog.AppendLine($"  ERROR calling AddDimension2: {ex.Message}");
                 }
 
-                sbLog.AppendLine($"ADD_DIMENSION_RETURN: {provDisp != null}");
+                sbLog.AppendLine($"ADD_DIMENSION_RETURN: {(provDisp != null ? "NON_NULL" : "NULL")}");
 
                 if (provDisp == null)
                 {
                     cand.IsProbed = true;
                     cand.IsValidProbe = false;
-                    cand.RejectionReason = "CREATE_RETURNED_NULL";
-                    sbLog.AppendLine("PROBE_RESULT: INVALID (CREATE_RETURNED_NULL)");
+                    cand.RejectionReason = "ADD_DIMENSION_NULL";
+                    sbLog.AppendLine("PROBE_RESULT: INVALID (ADD_DIMENSION_NULL)");
                     swModel.ClearSelection2(true);
                     continue;
                 }
@@ -2063,11 +2084,20 @@ namespace ADDIN.Commands
                 try { provAttachedCount = (provAnnot != null) ? provAnnot.GetAttachedEntityCount3() : 0; } catch {}
 
                 List<int> provAttachedTypes = new List<int>();
+                List<string> provAttachedTypeDescs = new List<string>();
                 try
                 {
                     object nat = provAnnot?.GetAttachedEntityTypes();
                     if (nat is int[] iarr) provAttachedTypes.AddRange(iarr);
                     else if (nat is object[] oarr) foreach (var o in oarr) provAttachedTypes.Add(Convert.ToInt32(o));
+
+                    object[] provAttachedEnts = provAnnot?.GetAttachedEntities3() as object[];
+                    for (int ai = 0; ai < provAttachedTypes.Count; ai++)
+                    {
+                        int at = provAttachedTypes[ai];
+                        string entTypeStr = (provAttachedEnts != null && ai < provAttachedEnts.Length && provAttachedEnts[ai] != null) ? provAttachedEnts[ai].GetType().FullName : "unknown";
+                        provAttachedTypeDescs.Add($"{at} ({(swSelectType_e)at}, {entTypeStr})");
+                    }
                 }
                 catch {}
 
@@ -2084,15 +2114,27 @@ namespace ADDIN.Commands
                     catch {}
                 }
 
-                sbLog.AppendLine($"New Dimension FullName: {provFullName}");
-                sbLog.AppendLine($"New Value: {(provSysVal.HasValue ? $"{provSysVal.Value * 1000.0:F4} mm" : "<null>")}");
+                sbLog.AppendLine($"New Full Name: {provFullName}");
+                sbLog.AppendLine($"New Value mm: {(provSysVal.HasValue ? $"{provSysVal.Value * 1000.0:F4} mm" : "<null>")}");
                 sbLog.AppendLine($"New Dangling: {provDangling}");
                 sbLog.AppendLine($"New Attached Count: {provAttachedCount}");
-                sbLog.AppendLine($"New Attached Types: [{string.Join(", ", provAttachedTypes)}]");
+                sbLog.AppendLine($"New Attached Entity Types: [{string.Join(", ", provAttachedTypeDescs)}]");
 
                 // PROVISIONAL VERIFY
                 double deltaValMm = (oldSysVal.HasValue && provSysVal.HasValue) ? Math.Abs(provSysVal.Value - oldSysVal.Value) * 1000.0 : double.MaxValue;
                 bool valMatch = provSysVal.HasValue && deltaValMm <= effTolMm;
+
+                sbLog.AppendLine($"TRUE_VALUE: {(provSysVal.HasValue ? $"{provSysVal.Value * 1000.0:F4} mm" : "<null>")}");
+                sbLog.AppendLine($"TARGET_VALUE: {(oldSysVal.HasValue ? $"{oldSysVal.Value * 1000.0:F4} mm" : "<null>")}");
+                sbLog.AppendLine($"VALUE_ERROR: {deltaValMm:F4} mm");
+                sbLog.AppendLine($"VALUE_TOLERANCE: {effTolMm:F4} mm");
+                sbLog.AppendLine($"VALUE_MATCH: {valMatch}");
+
+                bool attachedTypesMatch = (provAttachedCount == 2) &&
+                                          provAttachedTypes.Any(t => IsSketchPointSelectionType(t)) &&
+                                          provAttachedTypes.Any(t => IsEdgeSelectionType(t));
+
+                sbLog.AppendLine($"REFERENCE_MATCH: {attachedTypesMatch}");
 
                 if (oldPos != null && oldPos.Length >= 3 && provAnnot != null)
                 {
@@ -2157,9 +2199,10 @@ namespace ADDIN.Commands
                     witnessPairMatch = (w1DeltaMm <= 1.5 && w2DeltaMm <= 1.5);
                 }
 
-                bool attachedTypesMatch = (provAttachedCount == 2) &&
-                                          provAttachedTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS) &&
-                                          provAttachedTypes.Contains((int)swSelectType_e.swSelEDGES);
+                sbLog.AppendLine($"POSITION_MATCH: {posMatch} (Delta={deltaPosMm:F4} mm)");
+                sbLog.AppendLine($"WITNESS1_DELTA: {w1DeltaMm:F4} mm");
+                sbLog.AppendLine($"WITNESS2_DELTA: {w2DeltaMm:F4} mm");
+                sbLog.AppendLine($"WITNESS_PAIR_MATCH: {witnessPairMatch}");
 
                 bool isValidProbe = (!provDangling) && attachedTypesMatch && valMatch && posMatch && witnessPairMatch;
 
@@ -2181,12 +2224,6 @@ namespace ADDIN.Commands
                     cand.RejectionReason = !valMatch ? "VALUE_MISMATCH" : (!witnessPairMatch ? "WITNESS_MISMATCH" : (provDangling ? "DANGLING" : "ATTACHED_TYPES_MISMATCH"));
                 }
 
-                sbLog.AppendLine($"VALUE_MATCH: {valMatch} (Delta={deltaValMm:F4} mm, Tol={effTolMm:F4} mm)");
-                sbLog.AppendLine($"REFERENCE_MATCH: {attachedTypesMatch}");
-                sbLog.AppendLine($"POSITION_MATCH: {posMatch} (Delta={deltaPosMm:F4} mm)");
-                sbLog.AppendLine($"WITNESS1_DELTA: {w1DeltaMm:F4} mm");
-                sbLog.AppendLine($"WITNESS2_DELTA: {w2DeltaMm:F4} mm");
-                sbLog.AppendLine($"WITNESS_PAIR_MATCH: {witnessPairMatch}");
                 sbLog.AppendLine($"PROBE_RESULT: {(isValidProbe ? "VALID" : $"INVALID ({cand.RejectionReason})")}");
 
                 // CLEANUP PROVISIONAL DIMENSION
@@ -2311,8 +2348,8 @@ namespace ADDIN.Commands
             }
 
             bool finalSelPass = (finalSelCount == 2) &&
-                                finalSelTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS) &&
-                                finalSelTypes.Contains((int)swSelectType_e.swSelEDGES);
+                                finalSelTypes.Any(t => IsSketchPointSelectionType(t)) &&
+                                finalSelTypes.Any(t => IsEdgeSelectionType(t));
 
             if (!finalSelPass)
             {
@@ -2383,8 +2420,8 @@ namespace ADDIN.Commands
             catch {}
 
             bool finalAttachedMatch = (newAttachedCount == 2) &&
-                                      newAttachedTypes.Contains((int)swSelectType_e.swSelSKETCHPOINTS) &&
-                                      newAttachedTypes.Contains((int)swSelectType_e.swSelEDGES);
+                                      newAttachedTypes.Any(t => IsSketchPointSelectionType(t)) &&
+                                      newAttachedTypes.Any(t => IsEdgeSelectionType(t));
 
             double finalDeltaValMm = (oldSysVal.HasValue && newSysVal.HasValue) ? Math.Abs(newSysVal.Value - oldSysVal.Value) * 1000.0 : double.MaxValue;
             bool finalValMatch = newSysVal.HasValue && finalDeltaValMm <= effTolMm;
@@ -3530,7 +3567,7 @@ namespace ADDIN.Commands
                             info.DimensionType == swDimensionType_e.swHorLinearDimension ||
                             info.DimensionType == swDimensionType_e.swVertLinearDimension;
 
-            if (info.AnchorEntityType == (int)swSelectType_e.swSelSKETCHPOINTS && isLinear)
+            if (IsSketchPointSelectionType(info.AnchorEntityType) && isLinear)
             {
                 info.FailureMode = RepairDimFailureMode.SketchPointAnchorLostReference;
                 if (info.CandidateDecision == "POINT_ANCHOR_PROBE_CANDIDATES_AVAILABLE" ||
