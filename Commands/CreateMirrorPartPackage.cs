@@ -401,6 +401,7 @@ namespace ADDIN.Commands
     {
         public const double ABSOLUTE_GEOMETRY_TOLERANCE = 1e-12;
         public const double RELATIVE_TOLERANCE = 1e-7;
+        public const double BODY_TRANSFORM_RELATIVE_TOLERANCE = 1e-6;
 
         public static double GetBodyVolume(Body2 body)
         {
@@ -745,24 +746,39 @@ namespace ADDIN.Commands
                     return false;
                 }
 
-                // Use the strongly typed COM setter. Assigning an object[] through the
-                // Contours property can appear to work for a one-segment contour, but
-                // SOLIDWORKS may reject ModifyDefinition for a closed contour made from
-                // several sketch segments because the SAFEARRAY is not marshalled with
-                // the explicit contour count expected by IExtrudeFeatureData2.
-                SketchContour[] typedContours = activeContours.ToArray();
-                object contourPayload = typedContours;
+                // The .NET interop Contours property expects a VARIANT SAFEARRAY.
+                // Passing SketchContour[] causes InvalidCastException for some valid
+                // closed contours because it is marshalled as a typed COM array.
+                // Build object[] explicitly so every element is passed as IDispatch.
+                object[] contourObjects = new object[activeContours.Count];
+                for (int contourIndex = 0; contourIndex < activeContours.Count; contourIndex++)
+                    contourObjects[contourIndex] = activeContours[contourIndex];
+                object contourPayload = contourObjects;
                 try
                 {
-                    definition.ISetContours(typedContours.Length, ref contourPayload);
-                    assignmentMode = "ISETCONTOURS";
+                    definition.Contours = contourPayload;
+                    assignmentMode = "PROPERTY_OBJECT_ARRAY";
                 }
-                catch (Exception setContoursException)
+                catch (Exception propertyException)
                 {
-                    // Retain the former property setter only as a compatibility fallback
-                    // for SOLIDWORKS versions that expose ISetContours but reject the call.
-                    definition.Contours = typedContours;
-                    assignmentMode = "PROPERTY_FALLBACK:" + setContoursException.GetType().Name;
+                    // Older interop assemblies can expose only the count-based setter.
+                    // Keep it as a compatibility fallback, using the same VARIANT payload.
+                    object fallbackPayload = contourObjects;
+                    try
+                    {
+                        definition.ISetContours(contourObjects.Length, ref fallbackPayload);
+                        assignmentMode = "ISETCONTOURS_FALLBACK:" + propertyException.GetType().Name;
+                    }
+                    catch (Exception setContoursException)
+                    {
+                        assignmentMode =
+                            "ASSIGN_FAILED:PROPERTY_" + propertyException.GetType().Name +
+                            ";ISET_" + setContoursException.GetType().Name;
+                        throw new InvalidOperationException(
+                            "Khong the gan contour cua sketch mirror vao extrude definition. " +
+                            assignmentMode,
+                            setContoursException);
+                    }
                 }
 
                 try { assignedContoursCount = definition.GetContoursCount(); }
@@ -1107,6 +1123,38 @@ namespace ADDIN.Commands
             return list;
         }
 
+        public static List<Body2> GetAllSolidBodies(ModelDoc2 partDoc)
+        {
+            List<Body2> list = new List<Body2>();
+            PartDoc part = partDoc as PartDoc;
+            if (part == null) return list;
+
+            // Include hidden bodies. Mirroring only currently visible bodies would make the
+            // result depend on display state instead of the active configuration definition.
+            object[] bodies = part.GetBodies2((int)swBodyType_e.swSolidBody, false) as object[];
+            if (bodies == null) return list;
+
+            foreach (object bodyObject in bodies)
+            {
+                Body2 body = bodyObject as Body2;
+                if (body != null) list.Add(body);
+            }
+
+            return list;
+        }
+
+        public static List<Body2> GetAllSolidBodyCopies(ModelDoc2 partDoc)
+        {
+            List<Body2> list = new List<Body2>();
+            foreach (Body2 body in GetAllSolidBodies(partDoc))
+            {
+                Body2 copy = body.Copy2(false) as Body2;
+                if (copy != null) list.Add(copy);
+            }
+
+            return list;
+        }
+
         public static Body2 GetSolidBodyCopyStrict(ModelDoc2 partDoc, out string error)
         {
             error = null;
@@ -1410,12 +1458,57 @@ namespace ADDIN.Commands
                 }
 
                 double mirrVol = GetBodyVolume(copy);
-                double tol = Math.Max(ABSOLUTE_GEOMETRY_TOLERANCE, origVol * RELATIVE_TOLERANCE);
-                if (Math.Abs(origVol - mirrVol) > tol)
+                double volumeDelta = Math.Abs(origVol - mirrVol);
+                double tol = Math.Max(
+                    ABSOLUTE_GEOMETRY_TOLERANCE,
+                    origVol * BODY_TRANSFORM_RELATIVE_TOLERANCE);
+                if (volumeDelta > tol)
                 {
-                    res.ErrorMessage = $"REFLECTION_VOLUME_CHANGED (orig={origVol:E6}, mirr={mirrVol:E6})";
+                    res.ErrorMessage =
+                        $"REFLECTION_VOLUME_CHANGED (orig={origVol:E12}, mirr={mirrVol:E12}, " +
+                        $"delta={volumeDelta:E12}, tolerance={tol:E12})";
                     return res;
                 }
+
+                // Mass properties from a transformed temporary Parasolid body can differ
+                // by a few 1e-7 relatively even when the topology is unchanged. Do not rely
+                // on that scalar alone: reflect the result a second time and compare the
+                // round-trip body to the source with Boolean differences in both directions.
+                Body2 roundTripBody = copy.Copy2(false) as Body2;
+                if (roundTripBody == null || !roundTripBody.ApplyTransform(mathXform))
+                {
+                    res.ErrorMessage = "REFLECTION_ROUND_TRIP_TRANSFORM_FAILED";
+                    return res;
+                }
+
+                BodyBooleanResult sourceMinusRoundTrip = BooleanCutStrict(
+                    sourceBody,
+                    roundTripBody,
+                    "MIRROR_BODY_ROUND_TRIP_SOURCE_MINUS_RESULT");
+                BodyBooleanResult roundTripMinusSource = BooleanCutStrict(
+                    roundTripBody,
+                    sourceBody,
+                    "MIRROR_BODY_ROUND_TRIP_RESULT_MINUS_SOURCE");
+                double sourceResidual = sourceMinusRoundTrip.Success
+                    ? SumBodyVolumes(sourceMinusRoundTrip.Bodies)
+                    : double.PositiveInfinity;
+                double roundTripResidual = roundTripMinusSource.Success
+                    ? SumBodyVolumes(roundTripMinusSource.Bodies)
+                    : double.PositiveInfinity;
+
+                if (!sourceMinusRoundTrip.Success || !roundTripMinusSource.Success ||
+                    sourceResidual > tol || roundTripResidual > tol)
+                {
+                    res.ErrorMessage =
+                        $"REFLECTION_ROUND_TRIP_MISMATCH (sourceResidual={sourceResidual:E12}, " +
+                        $"resultResidual={roundTripResidual:E12}, tolerance={tol:E12})";
+                    return res;
+                }
+
+                CreateMirrorPartPackage.LogDebug(
+                    $"MIRROR_BODY_STRICT\noriginalVolume={origVol:E12}\nmirroredVolume={mirrVol:E12}\n" +
+                    $"volumeDelta={volumeDelta:E12}\nvolumeTolerance={tol:E12}\n" +
+                    $"sourceResidual={sourceResidual:E12}\nroundTripResidual={roundTripResidual:E12}\nresult=PASS");
 
                 res.Body = copy;
                 res.Success = true;
@@ -1500,39 +1593,48 @@ namespace ADDIN.Commands
 
             double tol = Math.Max(ABSOLUTE_GEOMETRY_TOLERANCE, bVol * RELATIVE_TOLERANCE);
 
-            if (SketchDrivenFeatureMirrorHandler.IsExtrudeCutType(info.Type))
+            double addedDifference = Math.Abs(actualAddedVol - res.ExpectedAddedVolume);
+            double removedDifference = Math.Abs(actualRemovedVol - res.ExpectedRemovedVolume);
+            double addedMatchTolerance = Math.Max(
+                ABSOLUTE_GEOMETRY_TOLERANCE,
+                Math.Max(res.ExpectedAddedVolume, bVol) * RELATIVE_TOLERANCE);
+            double removedMatchTolerance = Math.Max(
+                ABSOLUTE_GEOMETRY_TOLERANCE,
+                Math.Max(res.ExpectedRemovedVolume, bVol) * RELATIVE_TOLERANCE);
+
+            if (res.ExpectedChangeKind == FeatureGeometryChangeKind.Subtractive)
             {
                 if (actualAddedVol > tol)
                 {
-                    res.FailureReason = $"CUT_ADDED_MATERIAL (addedVol={actualAddedVol:E6})";
+                    res.FailureReason = $"SUBTRACTIVE_FEATURE_ADDED_MATERIAL (addedVol={actualAddedVol:E6})";
                     return res;
                 }
 
                 if (originalCache != null && originalCache.ChangesGeometry && actualRemovedVol <= tol)
                 {
-                    res.FailureReason = $"CUT_REMOVED_NOTHING (removedVol={actualRemovedVol:E6})";
+                    res.FailureReason = $"SUBTRACTIVE_FEATURE_REMOVED_NOTHING (removedVol={actualRemovedVol:E6})";
                     return res;
                 }
 
                 if (originalCache != null && originalCache.ChangesGeometry && aVol >= bVol - tol)
                 {
-                    res.FailureReason = $"CUT_VOLUME_DID_NOT_DECREASE (before={bVol:E6}, after={aVol:E6})";
+                    res.FailureReason = $"SUBTRACTIVE_VOLUME_DID_NOT_DECREASE (before={bVol:E6}, after={aVol:E6})";
                     return res;
                 }
 
-                double volumeMatchTolerance = Math.Max(
-                    ABSOLUTE_GEOMETRY_TOLERANCE,
-                    Math.Max(res.ExpectedRemovedVolume, bVol) * RELATIVE_TOLERANCE);
-                double removedDifference = Math.Abs(actualRemovedVol - res.ExpectedRemovedVolume);
                 res.RelativeVolumeError = res.ExpectedRemovedVolume > ABSOLUTE_GEOMETRY_TOLERANCE
                     ? removedDifference / res.ExpectedRemovedVolume
                     : removedDifference;
 
-                if (originalCache != null && originalCache.ChangesGeometry && removedDifference > volumeMatchTolerance)
+                if (originalCache != null && originalCache.ChangesGeometry && removedDifference > removedMatchTolerance)
                 {
-                    if (replayResult == null || !replayResult.AllowAsymmetricCutVolume)
+                    bool asymmetricExtrudeCutAccepted =
+                        SketchDrivenFeatureMirrorHandler.IsExtrudeCutType(info.Type) &&
+                        replayResult != null &&
+                        replayResult.AllowAsymmetricCutVolume;
+                    if (!asymmetricExtrudeCutAccepted)
                     {
-                        res.FailureReason = $"CUT_REMOVED_VOLUME_MISMATCH(expected={res.ExpectedRemovedVolume:E6}, actual={actualRemovedVol:E6}, relativeError={res.RelativeVolumeError:E6})";
+                        res.FailureReason = $"SUBTRACTIVE_REMOVED_VOLUME_MISMATCH(expected={res.ExpectedRemovedVolume:E6}, actual={actualRemovedVol:E6}, relativeError={res.RelativeVolumeError:E6})";
                         return res;
                     }
 
@@ -1540,25 +1642,55 @@ namespace ADDIN.Commands
                         $"CUT_ASYMMETRIC_VOLUME_ACCEPTED\nfeature={info.Name}\nexpectedRemovedVolume={res.ExpectedRemovedVolume:E6}\nactualRemovedVolume={actualRemovedVol:E6}\nrelativeError={res.RelativeVolumeError:E6}\nreason=MIRRORED_REMOVED_REGION_SELECTED");
                 }
             }
-            else if (SketchDrivenFeatureMirrorHandler.IsExtrudeBossType(info.Type))
+            else if (res.ExpectedChangeKind == FeatureGeometryChangeKind.Additive)
             {
                 if (actualRemovedVol > tol)
                 {
-                    res.FailureReason = $"BOSS_REMOVED_MATERIAL (removedVol={actualRemovedVol:E6})";
+                    res.FailureReason = $"ADDITIVE_FEATURE_REMOVED_MATERIAL (removedVol={actualRemovedVol:E6})";
                     return res;
                 }
 
                 if (originalCache != null && originalCache.ChangesGeometry && actualAddedVol <= tol)
                 {
-                    res.FailureReason = $"BOSS_ADDED_NOTHING (addedVol={actualAddedVol:E6})";
+                    res.FailureReason = $"ADDITIVE_FEATURE_ADDED_NOTHING (addedVol={actualAddedVol:E6})";
                     return res;
                 }
 
                 if (originalCache != null && originalCache.ChangesGeometry && aVol <= bVol + tol)
                 {
-                    res.FailureReason = $"BOSS_VOLUME_DID_NOT_INCREASE (before={bVol:E6}, after={aVol:E6})";
+                    res.FailureReason = $"ADDITIVE_VOLUME_DID_NOT_INCREASE (before={bVol:E6}, after={aVol:E6})";
                     return res;
                 }
+
+                res.RelativeVolumeError = res.ExpectedAddedVolume > ABSOLUTE_GEOMETRY_TOLERANCE
+                    ? addedDifference / res.ExpectedAddedVolume
+                    : addedDifference;
+                if (originalCache != null && originalCache.ChangesGeometry && addedDifference > addedMatchTolerance)
+                {
+                    res.FailureReason = $"ADDITIVE_ADDED_VOLUME_MISMATCH(expected={res.ExpectedAddedVolume:E6}, actual={actualAddedVol:E6}, relativeError={res.RelativeVolumeError:E6})";
+                    return res;
+                }
+            }
+            else if (res.ExpectedChangeKind == FeatureGeometryChangeKind.Mixed)
+            {
+                if (actualAddedVol <= tol || actualRemovedVol <= tol)
+                {
+                    res.FailureReason = $"MIXED_FEATURE_DELTA_MISSING(added={actualAddedVol:E6}, removed={actualRemovedVol:E6})";
+                    return res;
+                }
+
+                if (addedDifference > addedMatchTolerance || removedDifference > removedMatchTolerance)
+                {
+                    res.FailureReason =
+                        $"MIXED_FEATURE_VOLUME_MISMATCH(expectedAdded={res.ExpectedAddedVolume:E6}, actualAdded={actualAddedVol:E6}, " +
+                        $"expectedRemoved={res.ExpectedRemovedVolume:E6}, actualRemoved={actualRemovedVol:E6})";
+                    return res;
+                }
+            }
+            else if (actualAddedVol > tol || actualRemovedVol > tol)
+            {
+                res.FailureReason = $"NO_GEOMETRY_CHANGE_EXPECTED(added={actualAddedVol:E6}, removed={actualRemovedVol:E6})";
+                return res;
             }
 
             if (replayResult != null && !replayResult.Success)
@@ -1960,198 +2092,40 @@ namespace ADDIN.Commands
                 return invalidResult;
             }
 
-            Feature originalSketch = info.DrivingSketchFeature;
-            string originalSketchName = info.DrivingSketchName;
-            Feature copiedSketch = null;
-            string copiedSketchName = string.Empty;
-            PostBaseFeatureInfo copiedInfo = null;
-            bool retargeted = false;
+            // IExtrudeFeatureData2.Contours selects regions inside the extrude's one
+            // existing sketch; it cannot re-parent an extrude to a separately pasted
+            // sketch.  Replaying a copied sketch and then assigning its contours therefore
+            // leaves the feature on the old sketch (ModifyDefinition can still return true).
+            //
+            // This document is already a disposable copy of the source part.  Keep the
+            // native feature/sketch dependency and replace the active profile in that
+            // driving sketch.  ReplayOnDrivingSketch removes the temporary symmetric
+            // relation, transfers dimensions to reflected entities, neutralizes the old
+            // profile, rebuilds, and validates the resulting body before the copy is saved.
+            CreateMirrorPartPackage.LogDebug(
+                "[MIRROR-SKETCH-IN-PLACE] START\n" +
+                $"feature={info.Name}\nsketch={info.DrivingSketchName}\n" +
+                "dependency=NATIVE_DRIVING_SKETCH\nresult=BEGIN");
 
-            try
-            {
-                string copyDetails;
-                if (!TryDuplicateSketchFeature(partDoc, originalSketch, out copiedSketch, out copyDetails))
-                {
-                    CreateMirrorPartPackage.LogDebug(
-                        "[MIRROR-SKETCH-INDEPENDENT] COPY\n" +
-                        $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
-                        $"result=FAIL\ndetails={copyDetails}");
+            FeatureReplayResult replayResult = ReplayOnDrivingSketch(
+                swApp,
+                partDoc,
+                info,
+                mirrorPlane,
+                cache,
+                protectedBaseFeatureName,
+                protectedBaseSketchName);
 
-                    invalidResult.StatusCode = "INDEPENDENT_SKETCH_COPY_FAILED";
-                    invalidResult.Message = copyDetails;
-                    return invalidResult;
-                }
+            CreateMirrorPartPackage.LogDebug(
+                "[MIRROR-SKETCH-IN-PLACE] COMMIT\n" +
+                $"feature={info.Name}\nsketch={info.DrivingSketchName}\n" +
+                $"result={(replayResult != null && replayResult.Success ? "PASS" : "FAIL")}\n" +
+                $"status={replayResult?.StatusCode ?? "NULL_RESULT"}");
 
-                CreateMirrorPartPackage.LogDebug(
-                    "[MIRROR-SKETCH-INDEPENDENT] COPY\n" +
-                    $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
-                    $"copiedSketch={copiedSketch.Name}\nresult=PASS");
-                copiedSketchName = copiedSketch.Name;
-
-                copiedInfo = CloneFeatureInfoWithSketch(info, copiedSketch);
-                FeatureReplayResult coreResult = ReplayOnIndependentSketch(
-                    swApp,
-                    partDoc,
-                    copiedInfo,
-                    mirrorPlane,
-                    cache,
-                    protectedBaseFeatureName,
-                    protectedBaseSketchName);
-
-                if (coreResult == null || !coreResult.Success)
-                {
-                    string restoreDetails;
-                    bool restored = BodyOperationsHelper.TryRetargetExtrudeContours(
-                        partDoc,
-                        info,
-                        originalSketch,
-                        out restoreDetails);
-                    partDoc.EditRebuild3();
-
-                    string deleteDetails;
-                    TryDeleteFeature(partDoc, copiedSketch, out deleteDetails);
-                    CreateMirrorPartPackage.LogDebug(
-                        "[MIRROR-SKETCH-INDEPENDENT] ROLLBACK\n" +
-                        $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
-                        $"copiedSketch={copiedSketchName}\nretargeted=false\n" +
-                        $"reason=CORE_FAILED\nrestore={restored}\nrestoreDetails={restoreDetails}\n" +
-                        $"delete={deleteDetails}");
-                    return coreResult ?? invalidResult;
-                }
-
-                string retargetDetails;
-                retargeted = BodyOperationsHelper.TryRetargetExtrudeContours(
-                    partDoc,
-                    copiedInfo,
-                    copiedSketch,
-                    out retargetDetails);
-
-                CreateMirrorPartPackage.LogDebug(
-                    "[MIRROR-SKETCH-INDEPENDENT] RETARGET\n" +
-                    $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
-                    $"copiedSketch={copiedSketch.Name}\nresult={(retargeted ? "PASS" : "FAIL")}\n" +
-                    $"details={retargetDetails}");
-
-                if (!retargeted)
-                {
-                    string restoreDetails;
-                    bool restored = BodyOperationsHelper.TryRetargetExtrudeContours(
-                        partDoc,
-                        info,
-                        originalSketch,
-                        out restoreDetails);
-                    partDoc.EditRebuild3();
-
-                    string deleteDetails;
-                    TryDeleteFeature(partDoc, copiedSketch, out deleteDetails);
-                    coreResult.Success = false;
-                    coreResult.StatusCode = "INDEPENDENT_SKETCH_RETARGET_FAILED";
-                    coreResult.Message = retargetDetails;
-                    CreateMirrorPartPackage.LogDebug(
-                        "[MIRROR-SKETCH-INDEPENDENT] ROLLBACK\n" +
-                        $"feature={info.Name}\nretargeted=false\nreason=RETARGET_FAILED\n" +
-                        $"restore={restored}\nrestoreDetails={restoreDetails}\n" +
-                        $"delete={deleteDetails}");
-                    return coreResult;
-                }
-
-                partDoc.EditRebuild3();
-                bool warning = false;
-                int errorCode = info.Feature.GetErrorCode2(out warning);
-                if (errorCode != 0 && IsExtrudeCutType(info.Type))
-                {
-                    string recoveryDetails;
-                    BodyOperationsHelper.TryRecoverExtrudeCutRebuild(
-                        partDoc,
-                        copiedInfo,
-                        cache,
-                        out recoveryDetails);
-                    CreateMirrorPartPackage.LogDebug(recoveryDetails ??
-                        $"CUT_FLIP_REBUILD_RECOVERY\nfeature={info.Name}\nresult=FAIL\nreason=NO_DETAILS");
-                    errorCode = info.Feature.GetErrorCode2(out warning);
-                }
-
-                if (errorCode != 0)
-                {
-                    string restoreDetails;
-                    bool restored = BodyOperationsHelper.TryRetargetExtrudeContours(
-                        partDoc,
-                        info,
-                        originalSketch,
-                        out restoreDetails);
-                    partDoc.EditRebuild3();
-
-                    string deleteDetails;
-                    TryDeleteFeature(partDoc, copiedSketch, out deleteDetails);
-                    coreResult.Success = false;
-                    coreResult.StatusCode = "INDEPENDENT_SKETCH_REBUILD_FAILED";
-                    coreResult.Message =
-                        $"Mirrored sketch caused rebuild error {errorCode}. Original sketch restored={restored}.";
-                    coreResult.FeatureErrorCode = errorCode;
-                    coreResult.FeatureWarning = warning;
-                    CreateMirrorPartPackage.LogDebug(
-                        "[MIRROR-SKETCH-INDEPENDENT] ROLLBACK\n" +
-                        $"feature={info.Name}\nretargeted=true\nreason=REBUILD_ERROR_{errorCode}\n" +
-                        $"restore={restored}\nrestoreDetails={restoreDetails}\ndelete={deleteDetails}");
-                    return coreResult;
-                }
-
-                info.DrivingSketchFeature = copiedSketch;
-                info.DrivingSketchName = copiedSketch.Name;
-                info.HasDrivingSketch = true;
-
-                coreResult.Success = true;
-                coreResult.StatusCode = "SUCCESS_INDEPENDENT_SKETCH";
-                coreResult.Message = "Feature now uses an independent mirrored sketch.";
-                coreResult.FeatureErrorCode = 0;
-                coreResult.FeatureWarning = warning;
-                CreateMirrorPartPackage.LogDebug(
-                    "[MIRROR-SKETCH-INDEPENDENT] COMMIT\n" +
-                    $"feature={info.Name}\nsourceSketch={originalSketchName}\n" +
-                    $"copiedSketch={copiedSketch.Name}\nresult=PASS");
-                return coreResult;
-            }
-            catch (Exception ex)
-            {
-                string restoreDetails = "NOT_REQUIRED";
-                if (retargeted)
-                {
-                    try
-                    {
-                        BodyOperationsHelper.TryRetargetExtrudeContours(
-                            partDoc,
-                            info,
-                            originalSketch,
-                            out restoreDetails);
-                        partDoc.EditRebuild3();
-                    }
-                    catch (Exception restoreEx)
-                    {
-                        restoreDetails = "EXCEPTION: " + restoreEx.Message;
-                    }
-                }
-
-                string deleteDetails = "NO_COPY";
-                if (copiedSketch != null)
-                {
-                    TryDeleteFeature(partDoc, copiedSketch, out deleteDetails);
-                }
-
-                CreateMirrorPartPackage.LogDebug(
-                    "[MIRROR-SKETCH-INDEPENDENT] ROLLBACK\n" +
-                    $"feature={info.Name}\nretargeted={retargeted}\nreason=EXCEPTION: {ex.Message}\n" +
-                    $"restoreDetails={restoreDetails}\ndelete={deleteDetails}");
-                invalidResult.StatusCode = "INDEPENDENT_SKETCH_EXCEPTION";
-                invalidResult.Message = ex.Message;
-                return invalidResult;
-            }
-            finally
-            {
-                try { partDoc.ClearSelection2(true); } catch { }
-            }
+            return replayResult ?? invalidResult;
         }
 
-        private FeatureReplayResult ReplayOnIndependentSketch(
+        private FeatureReplayResult ReplayOnDrivingSketch(
             ISldWorks swApp,
             ModelDoc2 partDoc,
             PostBaseFeatureInfo info,
@@ -4635,6 +4609,127 @@ namespace ADDIN.Commands
         }
     }
 
+    public sealed class CurvePatternFeatureReplayHandler : IFeatureMirrorHandler
+    {
+        public bool CanHandle(PostBaseFeatureInfo info)
+        {
+            return info != null &&
+                   string.Equals(info.Type, "CurvePattern", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public FeatureReplayResult Replay(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            PlaneData mirrorPlane,
+            FeatureBodyState cache,
+            string protectedBaseFeatureName,
+            string protectedBaseSketchName)
+        {
+            FeatureReplayResult result = new FeatureReplayResult
+            {
+                Success = false,
+                FeatureName = info?.Name,
+                FeatureType = info?.Type,
+                StatusCode = "CURVE_PATTERN_INVALID_ARGUMENT"
+            };
+
+            if (partDoc == null || info?.Feature == null)
+            {
+                result.Message = "Part or curve pattern feature is not available.";
+                return result;
+            }
+
+            ICurveDrivenPatternFeatureData definition = null;
+            bool selectionAccess = false;
+            try
+            {
+                definition = info.Feature.GetDefinition() as ICurveDrivenPatternFeatureData;
+                if (definition == null)
+                {
+                    result.StatusCode = "CURVE_PATTERN_DEFINITION_UNAVAILABLE";
+                    result.Message = "Feature definition is not ICurveDrivenPatternFeatureData.";
+                    return result;
+                }
+
+                selectionAccess = definition.AccessSelections(partDoc, null);
+                if (!selectionAccess)
+                {
+                    result.StatusCode = "CURVE_PATTERN_ACCESS_SELECTIONS_FAILED";
+                    result.Message = "AccessSelections returned false for curve pattern.";
+                    return result;
+                }
+
+                int featureSeedCount = definition.GetPatternFeatureCount();
+                int bodySeedCount = definition.GetPatternBodyCount();
+                int faceSeedCount = definition.GetPatternFaceCount();
+                int totalSeedCount = featureSeedCount + bodySeedCount + faceSeedCount;
+                int direction1Instances = definition.D1InstanceCount;
+                int direction2Instances = definition.Dir2Specified ? definition.D2InstanceCount : 0;
+                bool direction1Reversed = definition.D1ReverseDirection;
+                bool direction2Reversed = definition.Dir2Specified && definition.D2ReverseDirection;
+
+                CreateMirrorPartPackage.LogDebug(
+                    "CURVE_PATTERN_NATIVE_REPLAY\n" +
+                    $"feature={info.Name}\nfeatureSeeds={featureSeedCount}\n" +
+                    $"bodySeeds={bodySeedCount}\nfaceSeeds={faceSeedCount}\n" +
+                    $"direction1Instances={direction1Instances}\ndirection2Instances={direction2Instances}\n" +
+                    $"direction1Reversed={direction1Reversed}\ndirection2Reversed={direction2Reversed}");
+
+                if (totalSeedCount <= 0)
+                {
+                    result.StatusCode = "CURVE_PATTERN_HAS_NO_SEED";
+                    result.Message = "Curve pattern has no feature, body, or face seed.";
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                result.StatusCode = "CURVE_PATTERN_READ_FAILED";
+                result.Message = ex.Message;
+                return result;
+            }
+            finally
+            {
+                if (definition != null && selectionAccess)
+                {
+                    try { definition.ReleaseSelectionAccess(); } catch { }
+                }
+            }
+
+            try
+            {
+                partDoc.ForceRebuild3(false);
+                bool warning = false;
+                int errorCode = info.Feature.GetErrorCode2(out warning);
+
+                result.FeatureErrorCode = errorCode;
+                result.FeatureWarning = warning;
+                result.RebuildPassed = errorCode == 0;
+                result.Success = errorCode == 0;
+                result.StatusCode = result.Success
+                    ? "SUCCESS_CURVE_PATTERN_NATIVE_DEPENDENCY_REBUILD"
+                    : "CURVE_PATTERN_REBUILD_ERROR";
+                result.Message = result.Success
+                    ? "Curve pattern rebuilt from its replayed seed dependencies."
+                    : $"Curve pattern rebuild error code={errorCode}, warning={warning}.";
+
+                CreateMirrorPartPackage.LogDebug(
+                    "CURVE_PATTERN_NATIVE_REPLAY_RESULT\n" +
+                    $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\n" +
+                    $"result={(result.Success ? "PASS" : "FAIL")}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.StatusCode = "CURVE_PATTERN_REBUILD_EXCEPTION";
+                result.Message = ex.Message;
+                return result;
+            }
+        }
+    }
+
     public sealed class FeatureReplayDispatcher
     {
         private readonly List<IFeatureMirrorHandler> handlers = new List<IFeatureMirrorHandler>();
@@ -4643,6 +4738,7 @@ namespace ADDIN.Commands
         {
             handlers.Add(new SketchDrivenFeatureMirrorHandler());
             handlers.Add(new ChamferFeatureMirrorHandler());
+            handlers.Add(new CurvePatternFeatureReplayHandler());
         }
 
         public IFeatureMirrorHandler GetHandler(PostBaseFeatureInfo info)
@@ -4703,6 +4799,12 @@ namespace ADDIN.Commands
             IMathUtility mathUtility = swApp.GetMathUtility() as IMathUtility;
             PlaneData selectedMirrorPlane = MirrorPlaneMapper.GetLocalPlane(mathUtility, sourceComponent, assemblyPlane);
             PlaneData mirrorPlane = MirrorPlaneMapper.CreatePartOriginAnchoredPlane(selectedMirrorPlane);
+            string targetDirectory = Path.GetDirectoryName(chosenTargetPartPath);
+            if (string.IsNullOrWhiteSpace(targetDirectory)) targetDirectory = defaultDir;
+            string stagingTargetPartPath = Path.Combine(
+                targetDirectory,
+                Path.GetFileNameWithoutExtension(chosenTargetPartPath) +
+                ".mirror_stage_" + Guid.NewGuid().ToString("N") + ".sldprt");
 
             using (SourceDocumentGuard sourceGuard = new SourceDocumentGuard(swApp, sourcePath))
             {
@@ -4713,17 +4815,20 @@ namespace ADDIN.Commands
                     return result;
                 }
 
-                if (File.Exists(chosenTargetPartPath))
+                if (sourceGuard.DirtyBefore)
                 {
-                    try { File.Delete(chosenTargetPartPath); } catch {}
+                    result.Message = "Part nguon dang co thay doi chua luu. Hay Save Part truoc khi tao Mirror.";
+                    CreateMirrorPartPackage.LogDebug("SOURCE_DIRTY result=FAIL action=SAVE_SOURCE_REQUIRED");
+                    return result;
                 }
 
-                File.Copy(sourcePath, chosenTargetPartPath, true);
+                File.Copy(sourcePath, stagingTargetPartPath, true);
+                CreateMirrorPartPackage.LogDebug($"TARGET_STAGING path={stagingTargetPartPath}");
 
                 int errors = 0;
                 int warnings = 0;
                 ModelDoc2 copiedPartDoc = swApp.OpenDoc6(
-                    chosenTargetPartPath,
+                    stagingTargetPartPath,
                     (int)swDocumentTypes_e.swDocPART,
                     (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
                     "",
@@ -4732,11 +4837,14 @@ namespace ADDIN.Commands
 
                 if (copiedPartDoc == null)
                 {
+                    try { if (File.Exists(stagingTargetPartPath)) File.Delete(stagingTargetPartPath); } catch { }
                     result.Message = "Khong the mo Part copy.";
                     CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
                     return result;
                 }
 
+                bool mirrorReadyToCommit = false;
+                bool copiedPartClosedForNativeFallback = false;
                 try
                 {
                     // Activate Referenced Configuration
@@ -4761,6 +4869,62 @@ namespace ADDIN.Commands
                         return result;
                     }
 
+                    // Capture the final geometry before rollback/replay changes anything. It
+                    // is used only as an oracle for validating a native SOLIDWORKS body-mirror
+                    // feature; it is never imported into a blank Part.
+                    List<Body2> exactSourceBodies = BodyOperationsHelper.GetAllSolidBodyCopies(copiedPartDoc);
+                    if (exactSourceBodies.Count == 0)
+                    {
+                        result.Message = "Part nguon khong co solid body de mirror.";
+                        CreateMirrorPartPackage.LogDebug("NATIVE_MIRROR_SOURCE_CAPTURE result=FAIL reason=NO_SOLID_BODY");
+                        return result;
+                    }
+
+                    CreateMirrorPartPackage.LogDebug(
+                        $"NATIVE_MIRROR_SOURCE_CAPTURE\nbodyCount={exactSourceBodies.Count}\n" +
+                        $"totalVolume={BodyOperationsHelper.SumBodyVolumes(exactSourceBodies):E6}\nresult=PASS");
+
+                    Func<string, bool> prepareNativeFeatureFallback = delegate(string fallbackReason)
+                    {
+                        string fallbackError;
+                        bool fallbackOk = TryCreateNativeFeatureMirrorStaging(
+                            swApp,
+                            copiedPartDoc,
+                            sourcePath,
+                            reqConfig,
+                            exactSourceBodies,
+                            mirrorPlane,
+                            stagingTargetPartPath,
+                            fallbackReason,
+                            ref copiedPartClosedForNativeFallback,
+                            out fallbackError);
+
+                        if (fallbackOk)
+                        {
+                            mirrorReadyToCommit = true;
+                            result.Message = "Da tao Mirror Part voi feature Mirror Bodies va Keep Bodies.";
+                            result.Warning =
+                                "Cac feature nguon duoc giu nguyen; hai feature native o cuoi cay tao va giu than mirror.";
+                        }
+                        else
+                        {
+                            result.Message =
+                                fallbackReason + " Khong the tao native mirror feature: " + fallbackError +
+                                " Lenh da dung va khong xuat Part dang imported body.";
+                            CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                        }
+
+                        return fallbackOk;
+                    };
+
+                    // The sequential feature replay is currently single-body. Multibody
+                    // Parts use the generic native Mirror Bodies path.
+                    if (exactSourceBodies.Count != 1)
+                    {
+                        prepareNativeFeatureFallback("MULTIBODY_NATIVE_PATH");
+                        return result;
+                    }
+
                     // 1. Find Base-Flange and Driving Sketch
                     Feature baseFeature = null;
                     Feature baseDrivingSketch = null;
@@ -4768,8 +4932,7 @@ namespace ADDIN.Commands
 
                     if (baseFeature == null)
                     {
-                        result.Message = "Khong tim thay Base-Flange feature trong Part.";
-                        CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                        prepareNativeFeatureFallback("BASE_FLANGE_NOT_FOUND");
                         return result;
                     }
 
@@ -4794,9 +4957,8 @@ namespace ADDIN.Commands
                     List<FeatureBodyState> bodyCache = BuildFeatureBodyCache(copiedPartDoc, baseFeature, postBaseFeatures, out cacheError);
                     if (!string.IsNullOrEmpty(cacheError))
                     {
-                        result.Message = "Cache build failed: " + cacheError;
                         CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: CACHE_BUILD_FAILED " + cacheError);
-                        CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                        prepareNativeFeatureFallback("CACHE_BUILD_FAILED: " + cacheError);
                         return result;
                     }
 
@@ -4832,8 +4994,7 @@ namespace ADDIN.Commands
                     bool rbBaseOk = MoveRollbackForReplay(copiedPartDoc, baseFeature, out rbBaseErr);
                     if (!rbBaseOk)
                     {
-                        result.Message = "Initial rollback to Base-Flange failed: " + rbBaseErr;
-                        CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                        prepareNativeFeatureFallback("INITIAL_ROLLBACK_FAILED: " + rbBaseErr);
                         return result;
                     }
 
@@ -4841,8 +5002,7 @@ namespace ADDIN.Commands
                     Body2 liveBaseBody = BodyOperationsHelper.GetSolidBodyCopyStrict(copiedPartDoc, out liveBaseErr);
                     if (liveBaseBody == null)
                     {
-                        result.Message = "Failed to capture live base body after rollback: " + liveBaseErr;
-                        CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                        prepareNativeFeatureFallback("LIVE_BASE_CAPTURE_FAILED: " + liveBaseErr);
                         return result;
                     }
 
@@ -4857,8 +5017,7 @@ namespace ADDIN.Commands
 
                     if (!syncPass)
                     {
-                        result.Message = $"Live model state does not match B0 cache (diff={syncDiff:E6})";
-                        CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                        prepareNativeFeatureFallback($"BASE_STATE_MISMATCH diff={syncDiff:E6}");
                         return result;
                     }
 
@@ -4869,7 +5028,6 @@ namespace ADDIN.Commands
                     int unsupportedGeometryCount = 0;
                     int failedCount = 0;
                     int validatedCount = 0;
-                    int manualSkippedGeometryCount = 0;
 
                     // Track replayed sketch signatures for upstream persistence checking
                     Dictionary<int, List<SketchSignatureHelper.SketchSegmentSignature>> replayedSketchSignatures =
@@ -4895,22 +5053,14 @@ namespace ADDIN.Commands
                             continue;
                         }
 
-                        // Curve-driven patterns are intentionally left for manual correction.
-                        if (string.Equals(featInfo.Type, "CurvePattern", StringComparison.OrdinalIgnoreCase))
-                        {
-                            manualSkippedGeometryCount++;
-                            CreateMirrorPartPackage.LogDebug($"FEATURE_REPLAY_SKIP_MANUAL\nname={featInfo.Name}\ntype={featInfo.Type}\nreason=CURVE_PATTERN_MANUAL_CORRECTION");
-                            continue;
-                        }
-
                         IFeatureMirrorHandler handler = dispatcher.GetHandler(featInfo);
                         if (handler == null)
                         {
                             CreateMirrorPartPackage.LogDebug("handler=UNSUPPORTED");
                             unsupportedGeometryCount++;
                             failedCount++;
-                            result.Message = $"Unsupported geometry-changing feature '{featInfo.Name}' type='{featInfo.Type}'";
-                            CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                            prepareNativeFeatureFallback(
+                                $"UNSUPPORTED_FEATURE name={featInfo.Name} type={featInfo.Type}");
                             return result;
                         }
 
@@ -4922,8 +5072,8 @@ namespace ADDIN.Commands
                         if (!rbFeatOk)
                         {
                             failedCount++;
-                            result.Message = $"Rollback for feature '{featInfo.Name}' failed: {rbFeatErr}";
-                            CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                            prepareNativeFeatureFallback(
+                                $"FEATURE_ROLLBACK_FAILED name={featInfo.Name} reason={rbFeatErr}");
                             return result;
                         }
 
@@ -4944,8 +5094,8 @@ namespace ADDIN.Commands
                                 if (!match)
                                 {
                                     failedCount++;
-                                    result.Message = $"CRITICAL: Upstream sketch '{prevFeat.DrivingSketchName}' was modified/reverted when rolling back to '{featInfo.Name}'!";
-                                    CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                                    prepareNativeFeatureFallback(
+                                        $"UPSTREAM_SKETCH_CHANGED sketch={prevFeat.DrivingSketchName} next={featInfo.Name}");
                                     return result;
                                 }
                             }
@@ -4962,8 +5112,8 @@ namespace ADDIN.Commands
                         if (!replayRes.Success)
                         {
                             failedCount++;
-                            result.Message = $"Replay failed for feature '{featInfo.Name}': {replayRes.Message}";
-                            CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                            prepareNativeFeatureFallback(
+                                $"FEATURE_REPLAY_FAILED name={featInfo.Name} status={replayRes.StatusCode} reason={replayRes.Message}");
                             return result;
                         }
 
@@ -4982,8 +5132,8 @@ namespace ADDIN.Commands
                         if (stepActualBody == null)
                         {
                             failedCount++;
-                            result.Message = $"Failed to capture actual body after feature '{featInfo.Name}': {actErr}";
-                            CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                            prepareNativeFeatureFallback(
+                                $"FEATURE_BODY_CAPTURE_FAILED name={featInfo.Name} reason={actErr}");
                             return result;
                         }
 
@@ -5008,8 +5158,8 @@ namespace ADDIN.Commands
                                 CreateMirrorPartPackage.LogDebug(cutFlipDetails);
                             }
                             failedCount++;
-                            result.Message = $"Cut direction correction failed for feature '{featInfo.Name}'.";
-                            CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                            prepareNativeFeatureFallback(
+                                $"CUT_DIRECTION_CORRECTION_FAILED name={featInfo.Name}");
                             return result;
                         }
 
@@ -5035,8 +5185,8 @@ namespace ADDIN.Commands
                         if (!semVal.Success)
                         {
                             failedCount++;
-                            result.Message = $"Feature Semantic Validation failed for feature '{featInfo.Name}': {semVal.FailureReason}";
-                            CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
+                            prepareNativeFeatureFallback(
+                                $"FEATURE_SEMANTIC_VALIDATION_FAILED name={featInfo.Name} reason={semVal.FailureReason}");
                             return result;
                         }
 
@@ -5068,11 +5218,6 @@ namespace ADDIN.Commands
                     for (int i = 0; i < postBaseFeatures.Count; i++)
                     {
                         var featInfo = postBaseFeatures[i];
-                        if (string.Equals(featInfo.Type, "CurvePattern", StringComparison.OrdinalIgnoreCase))
-                        {
-                            CreateMirrorPartPackage.LogDebug($"FINAL_REPLAY_AUDIT_SKIP\nname={featInfo.Name}\ntype={featInfo.Type}\nreason=CURVE_PATTERN_MANUAL_CORRECTION");
-                            continue;
-                        }
                         if (featInfo.Disposition == FeatureReplayDisposition.ReplayRequired &&
                             featInfo.HasDrivingSketch &&
                             featInfo.DrivingSketchFeature != null)
@@ -5114,7 +5259,7 @@ namespace ADDIN.Commands
 
                     bool overallPass = (failedCount == 0) &&
                                        (unsupportedGeometryCount == 0) &&
-                                       (bodyChangingCount == validatedCount + manualSkippedGeometryCount) &&
+                                       (bodyChangingCount == validatedCount) &&
                                        baseSketchUnchanged &&
                                        baseFeatureHealthy &&
                                        allAuditPass &&
@@ -5127,7 +5272,6 @@ namespace ADDIN.Commands
                     CreateMirrorPartPackage.LogDebug($"bodyChangingCount={bodyChangingCount}");
                     CreateMirrorPartPackage.LogDebug($"replayed={replayedCount}");
                     CreateMirrorPartPackage.LogDebug($"validated={validatedCount}");
-                    CreateMirrorPartPackage.LogDebug($"manualSkipped={manualSkippedGeometryCount}");
                     CreateMirrorPartPackage.LogDebug($"unsupported={unsupportedGeometryCount}");
                     CreateMirrorPartPackage.LogDebug($"failed={failedCount}");
 
@@ -5136,12 +5280,13 @@ namespace ADDIN.Commands
 
                     if (!overallPass)
                     {
-                        if (!baseSketchUnchanged) result.Message = "CRITICAL: Base Sketch signature changed during replay!";
-                        else if (!baseFeatureHealthy) result.Message = $"CRITICAL: Base-Flange has error code {baseErrCode}!";
-                        else if (!singleSolidBody) result.Message = $"CRITICAL: Final solid body check failed: {finalActErr}";
-                        else if (!allAuditPass) result.Message = "CRITICAL: Final replay audit failed.";
-                        else result.Message = "Final validation failed.";
-                        result.Success = false;
+                        string finalReason;
+                        if (!baseSketchUnchanged) finalReason = "BASE_SKETCH_CHANGED";
+                        else if (!baseFeatureHealthy) finalReason = $"BASE_FLANGE_ERROR code={baseErrCode}";
+                        else if (!singleSolidBody) finalReason = $"FINAL_SOLID_BODY_FAILED reason={finalActErr}";
+                        else if (!allAuditPass) finalReason = "FINAL_REPLAY_AUDIT_FAILED";
+                        else finalReason = "FINAL_VALIDATION_FAILED";
+                        prepareNativeFeatureFallback(finalReason);
                         return result;
                     }
 
@@ -5150,16 +5295,779 @@ namespace ADDIN.Commands
 
                     ValidateSheetMetalPart(copiedPartDoc);
 
-                    result.Success = true;
-                    result.MirrorPartPath = chosenTargetPartPath;
+                    mirrorReadyToCommit = true;
                 }
                 finally
                 {
-                    swApp.CloseDoc(copiedPartDoc.GetTitle());
+                    if (!copiedPartClosedForNativeFallback)
+                    {
+                        swApp.CloseDoc(copiedPartDoc.GetTitle());
+                    }
+
+                    if (mirrorReadyToCommit)
+                    {
+                        try
+                        {
+                            File.Copy(stagingTargetPartPath, chosenTargetPartPath, true);
+                            result.Success = true;
+                            result.MirrorPartPath = chosenTargetPartPath;
+                            CreateMirrorPartPackage.LogDebug(
+                                $"TARGET_COMMIT staging={stagingTargetPartPath}\ntarget={chosenTargetPartPath}\nresult=PASS");
+                        }
+                        catch (Exception commitException)
+                        {
+                            result.Success = false;
+                            result.MirrorPartPath = null;
+                            result.Message = "Khong the ghi file Mirror vao duong dan da chon: " + commitException.Message;
+                            CreateMirrorPartPackage.LogDebug(
+                                $"TARGET_COMMIT staging={stagingTargetPartPath}\ntarget={chosenTargetPartPath}\n" +
+                                $"result=FAIL\nreason={commitException.Message}");
+                        }
+                    }
+
+                    try
+                    {
+                        if (File.Exists(stagingTargetPartPath)) File.Delete(stagingTargetPartPath);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        CreateMirrorPartPackage.LogDebug(
+                            $"TARGET_STAGING_CLEANUP path={stagingTargetPartPath}\nresult=FAIL\nreason={cleanupException.Message}");
+                    }
                 }
             }
 
             return result;
+        }
+
+        private static bool TryCreateNativeFeatureMirrorStaging(
+            ISldWorks swApp,
+            ModelDoc2 replayPartDoc,
+            string sourcePartPath,
+            string referencedConfiguration,
+            List<Body2> sourceBodies,
+            PlaneData mirrorPlane,
+            string stagingTargetPartPath,
+            string fallbackReason,
+            ref bool replayPartClosed,
+            out string error)
+        {
+            error = null;
+            if (swApp == null || replayPartDoc == null || sourceBodies == null ||
+                sourceBodies.Count == 0 || mirrorPlane == null ||
+                string.IsNullOrWhiteSpace(sourcePartPath) ||
+                string.IsNullOrWhiteSpace(stagingTargetPartPath))
+            {
+                error = "Invalid native-feature mirror arguments.";
+                return false;
+            }
+
+            // The temporary bodies are validation oracles only. They are never inserted into
+            // the output document, so the saved Part remains a native feature-based model.
+            List<Body2> expectedMirroredBodies = new List<Body2>();
+            for (int bodyIndex = 0; bodyIndex < sourceBodies.Count; bodyIndex++)
+            {
+                BodyTransformResult mirrorResult = BodyOperationsHelper.MirrorBodyStrict(
+                    swApp,
+                    sourceBodies[bodyIndex],
+                    mirrorPlane);
+                if (mirrorResult == null || !mirrorResult.Success || mirrorResult.Body == null)
+                {
+                    error =
+                        $"Cannot calculate validation body {bodyIndex + 1}/{sourceBodies.Count}: " +
+                        (mirrorResult?.ErrorMessage ?? "null mirror result");
+                    CreateMirrorPartPackage.LogDebug(
+                        $"NATIVE_FEATURE_FALLBACK\nreason={fallbackReason}\nbodyIndex={bodyIndex}\n" +
+                        $"result=FAIL\ndetails={error}");
+                    return false;
+                }
+
+                expectedMirroredBodies.Add(mirrorResult.Body);
+            }
+
+            try
+            {
+                swApp.CloseDoc(replayPartDoc.GetTitle());
+                replayPartClosed = true;
+            }
+            catch (Exception closeException)
+            {
+                error = "Cannot close replay staging Part: " + closeException.Message;
+                return false;
+            }
+
+            ModelDoc2 nativePartDoc = null;
+            bool nativePartClosed = false;
+            try
+            {
+                // Replay may have changed sketches before failing. Recreate staging from the
+                // untouched source, then append native features to that clean feature tree.
+                File.Copy(sourcePartPath, stagingTargetPartPath, true);
+
+                int openErrors = 0;
+                int openWarnings = 0;
+                nativePartDoc = swApp.OpenDoc6(
+                    stagingTargetPartPath,
+                    (int)swDocumentTypes_e.swDocPART,
+                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                    "",
+                    ref openErrors,
+                    ref openWarnings);
+                if (nativePartDoc == null)
+                {
+                    error =
+                        $"Cannot open clean native-feature staging Part " +
+                        $"(errors={openErrors}, warnings={openWarnings}).";
+                    return false;
+                }
+
+                if (!string.IsNullOrEmpty(referencedConfiguration))
+                {
+                    bool shown = nativePartDoc.ShowConfiguration2(referencedConfiguration);
+                    string activeConfiguration = nativePartDoc.ConfigurationManager.ActiveConfiguration.Name;
+                    if (!shown || !string.Equals(
+                        activeConfiguration,
+                        referencedConfiguration,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        error =
+                            $"Cannot activate configuration '{referencedConfiguration}' in native staging Part; " +
+                            $"active='{activeConfiguration}'.";
+                        return false;
+                    }
+                }
+
+                string nativeFeatureError;
+                if (!TryAppendNativeMirrorFeatures(
+                    swApp,
+                    nativePartDoc,
+                    expectedMirroredBodies,
+                    mirrorPlane,
+                    out nativeFeatureError))
+                {
+                    error = nativeFeatureError;
+                    return false;
+                }
+
+                int saveErrors = 0;
+                int saveWarnings = 0;
+                bool saved = nativePartDoc.Save3(
+                    (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                    ref saveErrors,
+                    ref saveWarnings);
+                CreateMirrorPartPackage.LogDebug(
+                    $"NATIVE_FEATURE_SAVE\npath={stagingTargetPartPath}\nsaved={saved}\n" +
+                    $"errors={saveErrors}\nwarnings={saveWarnings}");
+                if (!saved || saveErrors != 0 || !File.Exists(stagingTargetPartPath))
+                {
+                    error =
+                        $"Saving native-feature Part failed " +
+                        $"(saved={saved}, errors={saveErrors}, warnings={saveWarnings}).";
+                    return false;
+                }
+
+                swApp.CloseDoc(nativePartDoc.GetTitle());
+                nativePartClosed = true;
+                nativePartDoc = null;
+
+                int reopenErrors = 0;
+                int reopenWarnings = 0;
+                ModelDoc2 persistedDoc = swApp.OpenDoc6(
+                    stagingTargetPartPath,
+                    (int)swDocumentTypes_e.swDocPART,
+                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                    "",
+                    ref reopenErrors,
+                    ref reopenWarnings);
+                if (persistedDoc == null)
+                {
+                    error =
+                        $"Cannot reopen native-feature staging Part " +
+                        $"(errors={reopenErrors}, warnings={reopenWarnings}).";
+                    return false;
+                }
+
+                try
+                {
+                    persistedDoc.ForceRebuild3(false);
+                    List<Body2> persistedBodies = BodyOperationsHelper.GetAllSolidBodyCopies(persistedDoc);
+                    string persistedValidationError;
+                    if (!AreExactBodySetsEquivalent(
+                        expectedMirroredBodies,
+                        persistedBodies,
+                        "NATIVE_FEATURE_AFTER_REOPEN",
+                        out persistedValidationError))
+                    {
+                        error = "Persisted native mirror validation failed: " + persistedValidationError;
+                        return false;
+                    }
+
+                    Feature persistedMirror = FindTopLevelFeatureByName(
+                        persistedDoc,
+                        "MIRROR_BODY_NATIVE");
+                    Feature persistedKeep = FindTopLevelFeatureByName(
+                        persistedDoc,
+                        "KEEP_MIRRORED_BODIES");
+                    if (persistedMirror == null || persistedKeep == null)
+                    {
+                        error =
+                            "Native Mirror Bodies or Keep Bodies feature is missing after reopening the Part.";
+                        return false;
+                    }
+
+                    bool mirrorWarning = false;
+                    bool keepWarning = false;
+                    int mirrorError = persistedMirror.GetErrorCode2(out mirrorWarning);
+                    int keepError = persistedKeep.GetErrorCode2(out keepWarning);
+                    if (mirrorError != 0 || keepError != 0)
+                    {
+                        error =
+                            $"Native features have rebuild errors after reopen " +
+                            $"(mirror={mirrorError}, keep={keepError}).";
+                        return false;
+                    }
+                }
+                finally
+                {
+                    swApp.CloseDoc(persistedDoc.GetTitle());
+                }
+
+                CreateMirrorPartPackage.LogDebug(
+                    $"NATIVE_FEATURE_FALLBACK\nreason={fallbackReason}\n" +
+                    $"sourceBodyCount={sourceBodies.Count}\nmirroredBodyCount={expectedMirroredBodies.Count}\n" +
+                    $"totalVolume={BodyOperationsHelper.SumBodyVolumes(expectedMirroredBodies):E6}\n" +
+                    "features=MIRROR_BODY_NATIVE,KEEP_MIRRORED_BODIES\nresult=PASS");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = "Native-feature fallback exception: " + ex.Message;
+                CreateMirrorPartPackage.LogDebug(
+                    $"NATIVE_FEATURE_FALLBACK\nreason={fallbackReason}\nresult=FAIL\ndetails={error}");
+                return false;
+            }
+            finally
+            {
+                if (nativePartDoc != null && !nativePartClosed)
+                {
+                    try { swApp.CloseDoc(nativePartDoc.GetTitle()); }
+                    catch { }
+                }
+            }
+        }
+
+        private static bool TryAppendNativeMirrorFeatures(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            List<Body2> expectedMirroredBodies,
+            PlaneData mirrorPlane,
+            out string error)
+        {
+            error = null;
+            if (swApp == null || partDoc == null || expectedMirroredBodies == null ||
+                expectedMirroredBodies.Count == 0 || mirrorPlane == null)
+            {
+                error = "Invalid native mirror feature arguments.";
+                return false;
+            }
+
+            List<Body2> sourceBodyReferences = BodyOperationsHelper.GetAllSolidBodies(partDoc);
+            if (sourceBodyReferences.Count != expectedMirroredBodies.Count)
+            {
+                error =
+                    $"Source body count changed before native mirror: " +
+                    $"actual={sourceBodyReferences.Count}, expected={expectedMirroredBodies.Count}.";
+                return false;
+            }
+
+            HashSet<string> sourceBodyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> sourceSelectionIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Body2 sourceBody in sourceBodyReferences)
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(sourceBody.Name)) sourceBodyNames.Add(sourceBody.Name);
+                }
+                catch { }
+
+                try
+                {
+                    string selectionId = sourceBody.GetSelectionId();
+                    if (!string.IsNullOrEmpty(selectionId)) sourceSelectionIds.Add(selectionId);
+                }
+                catch { }
+            }
+
+            bool createdReferencePlane;
+            string planeError;
+            Feature mirrorPlaneFeature = TryGetOrCreateNativeMirrorPlane(
+                swApp,
+                partDoc,
+                mirrorPlane,
+                out createdReferencePlane,
+                out planeError);
+            if (mirrorPlaneFeature == null)
+            {
+                error = planeError ?? "Cannot resolve native mirror plane.";
+                return false;
+            }
+
+            partDoc.ClearSelection2(true);
+            if (!mirrorPlaneFeature.Select2(false, 2))
+            {
+                error = "Cannot select native mirror plane with selection mark 2.";
+                return false;
+            }
+
+            foreach (Body2 sourceBody in sourceBodyReferences)
+            {
+                if (!sourceBody.Select(true, 256))
+                {
+                    partDoc.ClearSelection2(true);
+                    error = "Cannot select a source solid body with selection mark 256.";
+                    return false;
+                }
+            }
+
+            Feature mirrorFeature = partDoc.FeatureManager.InsertMirrorFeature2(
+                true,
+                false,
+                false,
+                false,
+                (int)swFeatureScope_e.swFeatureScope_AllBodies);
+            partDoc.ClearSelection2(true);
+            if (mirrorFeature == null)
+            {
+                error = "IFeatureManager.InsertMirrorFeature2 returned null.";
+                return false;
+            }
+
+            try { mirrorFeature.Name = "MIRROR_BODY_NATIVE"; }
+            catch { }
+
+            partDoc.ForceRebuild3(false);
+            bool mirrorWarning = false;
+            int mirrorError = mirrorFeature.GetErrorCode2(out mirrorWarning);
+            if (mirrorError != 0)
+            {
+                error = $"Mirror Bodies feature rebuild error={mirrorError}, warning={mirrorWarning}.";
+                return false;
+            }
+
+            List<Body2> allBodiesAfterMirror = BodyOperationsHelper.GetAllSolidBodies(partDoc);
+            List<Body2> newBodyCandidates = new List<Body2>();
+            foreach (Body2 body in allBodiesAfterMirror)
+            {
+                bool isOriginal = false;
+                try
+                {
+                    isOriginal = !string.IsNullOrEmpty(body.Name) && sourceBodyNames.Contains(body.Name);
+                }
+                catch { }
+
+                if (!isOriginal)
+                {
+                    try
+                    {
+                        string selectionId = body.GetSelectionId();
+                        isOriginal = !string.IsNullOrEmpty(selectionId) && sourceSelectionIds.Contains(selectionId);
+                    }
+                    catch { }
+                }
+
+                if (!isOriginal) newBodyCandidates.Add(body);
+            }
+
+            List<Body2> mirroredBodyReferences;
+            string mappingError;
+            if (!TryMapExactBodyReferences(
+                expectedMirroredBodies,
+                newBodyCandidates,
+                "NATIVE_MIRROR_NEW_BODY_MATCH",
+                out mirroredBodyReferences,
+                out mappingError))
+            {
+                // Some SOLIDWORKS versions rename source bodies while creating a mirror.
+                // Geometry is the final authority, so retry against every post-mirror body.
+                if (!TryMapExactBodyReferences(
+                    expectedMirroredBodies,
+                    allBodiesAfterMirror,
+                    "NATIVE_MIRROR_ALL_BODY_MATCH",
+                    out mirroredBodyReferences,
+                    out mappingError))
+                {
+                    error = "Cannot identify mirrored bodies produced by native feature: " + mappingError;
+                    return false;
+                }
+            }
+
+            partDoc.ClearSelection2(true);
+            foreach (Body2 mirroredBody in mirroredBodyReferences)
+            {
+                if (!mirroredBody.Select(true, 0))
+                {
+                    partDoc.ClearSelection2(true);
+                    error = "Cannot select a mirrored body for Keep Bodies.";
+                    return false;
+                }
+            }
+
+            Feature keepBodiesFeature = partDoc.FeatureManager.InsertDeleteBody2(true);
+            partDoc.ClearSelection2(true);
+            if (keepBodiesFeature == null)
+            {
+                error = "IFeatureManager.InsertDeleteBody2(true) returned null.";
+                return false;
+            }
+
+            try { keepBodiesFeature.Name = "KEEP_MIRRORED_BODIES"; }
+            catch { }
+
+            partDoc.ForceRebuild3(false);
+            bool keepWarning = false;
+            int keepError = keepBodiesFeature.GetErrorCode2(out keepWarning);
+            if (keepError != 0)
+            {
+                error = $"Keep Bodies feature rebuild error={keepError}, warning={keepWarning}.";
+                return false;
+            }
+
+            List<Body2> finalBodies = BodyOperationsHelper.GetAllSolidBodyCopies(partDoc);
+            string finalValidationError;
+            if (!AreExactBodySetsEquivalent(
+                expectedMirroredBodies,
+                finalBodies,
+                "NATIVE_FEATURE_BEFORE_SAVE",
+                out finalValidationError))
+            {
+                error = "Native feature result does not match mirrored source: " + finalValidationError;
+                return false;
+            }
+
+            CreateMirrorPartPackage.LogDebug(
+                $"NATIVE_BODY_MIRROR\nsourceBodyCount={sourceBodyReferences.Count}\n" +
+                $"postMirrorBodyCount={allBodiesAfterMirror.Count}\nkeptBodyCount={mirroredBodyReferences.Count}\n" +
+                $"planeFeature={mirrorPlaneFeature.Name}\nplaneCreated={createdReferencePlane}\n" +
+                $"mirrorFeature={mirrorFeature.Name}\nkeepFeature={keepBodiesFeature.Name}\nresult=PASS");
+            return true;
+        }
+
+        private static Feature TryGetOrCreateNativeMirrorPlane(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PlaneData mirrorPlane,
+            out bool created,
+            out string error)
+        {
+            created = false;
+            error = null;
+            Feature matchingPlane = FindMatchingReferencePlaneFeature(swApp, partDoc, mirrorPlane);
+            if (matchingPlane != null) return matchingPlane;
+
+            double[] normal = mirrorPlane.Normal;
+            double normalLength = Math.Sqrt(
+                normal[0] * normal[0] +
+                normal[1] * normal[1] +
+                normal[2] * normal[2]);
+            if (normalLength <= 1.0e-12)
+            {
+                error = "Mirror plane has a zero-length normal.";
+                return null;
+            }
+
+            double[] n = new double[]
+            {
+                normal[0] / normalLength,
+                normal[1] / normalLength,
+                normal[2] / normalLength
+            };
+            double[] axis = Math.Abs(n[0]) < 0.9
+                ? new double[] { 1.0, 0.0, 0.0 }
+                : new double[] { 0.0, 1.0, 0.0 };
+            double[] u = NormalizeVector(CrossProduct(axis, n));
+            double[] v = NormalizeVector(CrossProduct(n, u));
+            double[] origin = mirrorPlane.Origin ?? new double[] { 0.0, 0.0, 0.0 };
+            const double planeSize = 0.1;
+            double[] p1 = new double[] { origin[0], origin[1], origin[2] };
+            double[] p2 = new double[]
+            {
+                origin[0] + planeSize * u[0],
+                origin[1] + planeSize * u[1],
+                origin[2] + planeSize * u[2]
+            };
+            double[] p3 = new double[]
+            {
+                origin[0] + planeSize * v[0],
+                origin[1] + planeSize * v[1],
+                origin[2] + planeSize * v[2]
+            };
+
+            object createdPlane = partDoc.CreatePlaneFixed2(p1, p2, p3, false);
+            if (createdPlane == null)
+            {
+                error = "IModelDoc2.CreatePlaneFixed2 returned null.";
+                return null;
+            }
+
+            created = true;
+            matchingPlane = FindMatchingReferencePlaneFeature(swApp, partDoc, mirrorPlane);
+            if (matchingPlane == null)
+            {
+                error = "Created fixed reference plane cannot be resolved by its geometry.";
+                return null;
+            }
+
+            try { matchingPlane.Name = "MIRROR_REFERENCE_PLANE"; }
+            catch { }
+            return matchingPlane;
+        }
+
+        private static Feature FindMatchingReferencePlaneFeature(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PlaneData targetPlane)
+        {
+            if (swApp == null || partDoc == null || targetPlane == null) return null;
+            IMathUtility mathUtility = swApp.GetMathUtility() as IMathUtility;
+            if (mathUtility == null) return null;
+
+            double[] targetNormal = NormalizeVector(targetPlane.Normal);
+            double[] targetOrigin = targetPlane.Origin ?? new double[] { 0.0, 0.0, 0.0 };
+            Feature feature = partDoc.FirstFeature() as Feature;
+            while (feature != null)
+            {
+                try
+                {
+                    if (string.Equals(feature.GetTypeName2(), "RefPlane", StringComparison.Ordinal))
+                    {
+                        RefPlane referencePlane = feature.GetSpecificFeature2() as RefPlane;
+                        MathTransform transform = referencePlane?.Transform;
+                        if (transform != null)
+                        {
+                            MathPoint canonicalOrigin = mathUtility.CreatePoint(
+                                new double[] { 0.0, 0.0, 0.0 }) as MathPoint;
+                            MathVector canonicalNormal = mathUtility.CreateVector(
+                                new double[] { 0.0, 0.0, 1.0 }) as MathVector;
+                            MathPoint modelOrigin = canonicalOrigin?.MultiplyTransform(transform) as MathPoint;
+                            MathVector modelNormal = canonicalNormal?.MultiplyTransform(transform) as MathVector;
+                            double[] origin = modelOrigin?.ArrayData as double[];
+                            double[] normal = NormalizeVector(modelNormal?.ArrayData as double[]);
+                            if (origin != null && normal != null)
+                            {
+                                double normalAlignment = Math.Abs(DotProduct(normal, targetNormal));
+                                double pointPlaneDistance = Math.Abs(
+                                    (origin[0] - targetOrigin[0]) * targetNormal[0] +
+                                    (origin[1] - targetOrigin[1]) * targetNormal[1] +
+                                    (origin[2] - targetOrigin[2]) * targetNormal[2]);
+                                if (normalAlignment >= 1.0 - 1.0e-8 && pointPlaneDistance <= 1.0e-8)
+                                {
+                                    return feature;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                feature = feature.GetNextFeature() as Feature;
+            }
+
+            return null;
+        }
+
+        private static Feature FindTopLevelFeatureByName(ModelDoc2 partDoc, string featureName)
+        {
+            if (partDoc == null || string.IsNullOrEmpty(featureName)) return null;
+            Feature feature = partDoc.FirstFeature() as Feature;
+            while (feature != null)
+            {
+                if (string.Equals(feature.Name, featureName, StringComparison.Ordinal))
+                {
+                    return feature;
+                }
+
+                feature = feature.GetNextFeature() as Feature;
+            }
+
+            return null;
+        }
+
+        private static double[] NormalizeVector(double[] vector)
+        {
+            if (vector == null || vector.Length < 3) return null;
+            double length = Math.Sqrt(
+                vector[0] * vector[0] +
+                vector[1] * vector[1] +
+                vector[2] * vector[2]);
+            if (length <= 1.0e-12) return null;
+            return new double[]
+            {
+                vector[0] / length,
+                vector[1] / length,
+                vector[2] / length
+            };
+        }
+
+        private static double[] CrossProduct(double[] left, double[] right)
+        {
+            return new double[]
+            {
+                left[1] * right[2] - left[2] * right[1],
+                left[2] * right[0] - left[0] * right[2],
+                left[0] * right[1] - left[1] * right[0]
+            };
+        }
+
+        private static double DotProduct(double[] left, double[] right)
+        {
+            if (left == null || right == null || left.Length < 3 || right.Length < 3) return 0.0;
+            return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
+        }
+
+        private static bool TryMapExactBodyReferences(
+            List<Body2> expectedBodies,
+            List<Body2> candidateBodies,
+            string label,
+            out List<Body2> matchedBodies,
+            out string error)
+        {
+            matchedBodies = new List<Body2>();
+            error = null;
+            if (expectedBodies == null || candidateBodies == null)
+            {
+                error = "Body collection is null.";
+                return false;
+            }
+
+            if (candidateBodies.Count < expectedBodies.Count)
+            {
+                error =
+                    $"Not enough candidate bodies: expected={expectedBodies.Count}, " +
+                    $"candidates={candidateBodies.Count}.";
+                return false;
+            }
+
+            bool[] usedCandidates = new bool[candidateBodies.Count];
+            for (int expectedIndex = 0; expectedIndex < expectedBodies.Count; expectedIndex++)
+            {
+                Body2 expectedBody = expectedBodies[expectedIndex];
+                double expectedVolume = BodyOperationsHelper.GetBodyVolume(expectedBody);
+                double tolerance = Math.Max(
+                    BodyOperationsHelper.ABSOLUTE_GEOMETRY_TOLERANCE,
+                    expectedVolume * BodyOperationsHelper.BODY_TRANSFORM_RELATIVE_TOLERANCE);
+                bool found = false;
+
+                for (int candidateIndex = 0; candidateIndex < candidateBodies.Count; candidateIndex++)
+                {
+                    if (usedCandidates[candidateIndex]) continue;
+                    Body2 candidateBody = candidateBodies[candidateIndex];
+                    double candidateVolume = BodyOperationsHelper.GetBodyVolume(candidateBody);
+                    if (Math.Abs(expectedVolume - candidateVolume) > tolerance) continue;
+
+                    BodyBooleanResult expectedMinusCandidate = BodyOperationsHelper.BooleanCutStrict(
+                        expectedBody,
+                        candidateBody,
+                        label + "_EXPECTED_MINUS_CANDIDATE");
+                    BodyBooleanResult candidateMinusExpected = BodyOperationsHelper.BooleanCutStrict(
+                        candidateBody,
+                        expectedBody,
+                        label + "_CANDIDATE_MINUS_EXPECTED");
+                    if (!expectedMinusCandidate.Success || !candidateMinusExpected.Success) continue;
+
+                    double expectedResidual = BodyOperationsHelper.SumBodyVolumes(expectedMinusCandidate.Bodies);
+                    double candidateResidual = BodyOperationsHelper.SumBodyVolumes(candidateMinusExpected.Bodies);
+                    if (expectedResidual <= tolerance && candidateResidual <= tolerance)
+                    {
+                        usedCandidates[candidateIndex] = true;
+                        matchedBodies.Add(candidateBody);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                {
+                    error = $"No exact geometric match for expected body index {expectedIndex}.";
+                    return false;
+                }
+            }
+
+            CreateMirrorPartPackage.LogDebug(
+                $"NATIVE_BODY_MAP\nlabel={label}\nexpectedCount={expectedBodies.Count}\n" +
+                $"candidateCount={candidateBodies.Count}\nmatchedCount={matchedBodies.Count}\nresult=PASS");
+            return true;
+        }
+
+        private static bool AreExactBodySetsEquivalent(
+            List<Body2> expectedBodies,
+            List<Body2> actualBodies,
+            string label,
+            out string error)
+        {
+            error = null;
+            if (expectedBodies == null || actualBodies == null)
+            {
+                error = "Body collection is null.";
+                return false;
+            }
+
+            if (expectedBodies.Count != actualBodies.Count)
+            {
+                error = $"Body count mismatch: expected={expectedBodies.Count}, actual={actualBodies.Count}.";
+                return false;
+            }
+
+            bool[] usedActualBodies = new bool[actualBodies.Count];
+            for (int expectedIndex = 0; expectedIndex < expectedBodies.Count; expectedIndex++)
+            {
+                Body2 expectedBody = expectedBodies[expectedIndex];
+                double expectedVolume = BodyOperationsHelper.GetBodyVolume(expectedBody);
+                double tolerance = Math.Max(
+                    BodyOperationsHelper.ABSOLUTE_GEOMETRY_TOLERANCE,
+                    expectedVolume * BodyOperationsHelper.BODY_TRANSFORM_RELATIVE_TOLERANCE);
+                bool found = false;
+
+                for (int actualIndex = 0; actualIndex < actualBodies.Count; actualIndex++)
+                {
+                    if (usedActualBodies[actualIndex]) continue;
+
+                    Body2 actualBody = actualBodies[actualIndex];
+                    double actualVolume = BodyOperationsHelper.GetBodyVolume(actualBody);
+                    if (Math.Abs(expectedVolume - actualVolume) > tolerance) continue;
+
+                    BodyBooleanResult expectedMinusActual = BodyOperationsHelper.BooleanCutStrict(
+                        expectedBody,
+                        actualBody,
+                        label + "_EXPECTED_MINUS_ACTUAL");
+                    BodyBooleanResult actualMinusExpected = BodyOperationsHelper.BooleanCutStrict(
+                        actualBody,
+                        expectedBody,
+                        label + "_ACTUAL_MINUS_EXPECTED");
+                    if (!expectedMinusActual.Success || !actualMinusExpected.Success) continue;
+
+                    double expectedResidual = BodyOperationsHelper.SumBodyVolumes(expectedMinusActual.Bodies);
+                    double actualResidual = BodyOperationsHelper.SumBodyVolumes(actualMinusExpected.Bodies);
+                    if (expectedResidual <= tolerance && actualResidual <= tolerance)
+                    {
+                        usedActualBodies[actualIndex] = true;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                {
+                    error = $"No exact geometric match for expected body index {expectedIndex}.";
+                    return false;
+                }
+            }
+
+            CreateMirrorPartPackage.LogDebug(
+                $"EXACT_BODY_VALIDATE\nlabel={label}\nexpectedCount={expectedBodies.Count}\n" +
+                $"actualCount={actualBodies.Count}\n" +
+                $"expectedVolume={BodyOperationsHelper.SumBodyVolumes(expectedBodies):E6}\n" +
+                $"actualVolume={BodyOperationsHelper.SumBodyVolumes(actualBodies):E6}\nresult=PASS");
+            return true;
         }
 
         private static bool MoveRollbackForReplay(
@@ -6815,7 +7723,7 @@ namespace ADDIN.Commands
                     }
                 }
 
-                if (targetComp == null && comps != null && comps.Length > 0)
+                if (targetComp == null && string.IsNullOrWhiteSpace(manifest.ComponentName) && comps != null && comps.Length > 0)
                 {
                     targetComp = comps[0] as Component2;
                 }
@@ -6826,6 +7734,21 @@ namespace ADDIN.Commands
                 }
 
                 string sourcePartPath = targetComp.GetPathName();
+                ModelDoc2 sourceModelBefore = targetComp.GetModelDoc2() as ModelDoc2;
+                int sourceFeatureCountBefore = -1;
+                bool sourceDirtyBefore = false;
+                try
+                {
+                    if (sourceModelBefore != null)
+                    {
+                        sourceFeatureCountBefore = sourceModelBefore.GetFeatureCount();
+                        sourceDirtyBefore = sourceModelBefore.GetSaveFlag();
+                    }
+                }
+                catch { }
+                DateTime sourceWriteTimeBefore = File.GetLastWriteTimeUtc(sourcePartPath);
+                long sourceLengthBefore = new FileInfo(sourcePartPath).Length;
+                int assemblyComponentCountBefore = comps != null ? comps.Length : 0;
 
                 RefPlane assemblyPlane = null;
                 Feature planeFeature = null;
@@ -6863,22 +7786,80 @@ namespace ADDIN.Commands
                 CreateMirrorPartPackage cmd = new CreateMirrorPartPackage(swApp, testSaveProvider);
                 MirrorPackageResult testResult = cmd.ExecuteDirectWorkflow(targetComp, assemblyPlane, testSaveProvider);
 
-                bool a1 = testResult.Success && File.Exists(mirrorPartTarget);
-                assertions.Add(new AssertionResult { Number = 1, Name = "Output Part exists and is independent Sheet Metal", Passed = a1, Detail = mirrorPartTarget });
+                ModelDoc2 sourceModelAfter = targetComp.GetModelDoc2() as ModelDoc2;
+                int sourceFeatureCountAfter = -1;
+                bool sourceDirtyAfter = false;
+                try
+                {
+                    if (sourceModelAfter != null)
+                    {
+                        sourceFeatureCountAfter = sourceModelAfter.GetFeatureCount();
+                        sourceDirtyAfter = sourceModelAfter.GetSaveFlag();
+                    }
+                }
+                catch { }
 
-                assertions.Add(new AssertionResult { Number = 2, Name = "Source document unchanged", Passed = true, Detail = "SOURCE_UNCHANGED verified" });
+                DateTime sourceWriteTimeAfter = File.GetLastWriteTimeUtc(sourcePartPath);
+                long sourceLengthAfter = new FileInfo(sourcePartPath).Length;
+                object[] componentsAfter = assembly.GetComponents(false) as object[];
+                int assemblyComponentCountAfter = componentsAfter != null ? componentsAfter.Length : 0;
+                string[] stagingFiles = Directory.GetFiles(outDir, "*.mirror_stage_*.sldprt");
 
-                assertions.Add(new AssertionResult { Number = 3, Name = "Occurrence Transform2 matched", Passed = a1, Detail = "OCCURRENCE_TRANSFORM match=true" });
+                bool outputCreated =
+                    testResult.Success &&
+                    File.Exists(mirrorPartTarget) &&
+                    !string.Equals(sourcePartPath, mirrorPartTarget, StringComparison.OrdinalIgnoreCase);
+                assertions.Add(new AssertionResult
+                {
+                    Number = 1,
+                    Name = "Validated mirror Part committed",
+                    Passed = outputCreated,
+                    Detail = outputCreated ? mirrorPartTarget : (testResult.Message ?? "Mirror workflow failed.")
+                });
 
-                assertions.Add(new AssertionResult { Number = 4, Name = "Pink faces mapped", Passed = a1, Detail = "PINK_FACE mapped" });
+                bool sourceUnchanged =
+                    sourceWriteTimeBefore == sourceWriteTimeAfter &&
+                    sourceLengthBefore == sourceLengthAfter &&
+                    sourceDirtyBefore == sourceDirtyAfter &&
+                    (sourceFeatureCountBefore < 0 || sourceFeatureCountAfter == sourceFeatureCountBefore);
+                assertions.Add(new AssertionResult
+                {
+                    Number = 2,
+                    Name = "Source document unchanged",
+                    Passed = sourceUnchanged,
+                    Detail =
+                        $"featureCount={sourceFeatureCountBefore}->{sourceFeatureCountAfter}; " +
+                        $"dirty={sourceDirtyBefore}->{sourceDirtyAfter}; " +
+                        $"length={sourceLengthBefore}->{sourceLengthAfter}; " +
+                        $"writeTime={sourceWriteTimeBefore:O}->{sourceWriteTimeAfter:O}"
+                });
 
-                assertions.Add(new AssertionResult { Number = 5, Name = "Base Sketch signature unchanged", Passed = a1, Detail = "BASE_SKETCH_CHANGED check passed" });
+                bool assemblyUnchanged = assemblyComponentCountBefore == assemblyComponentCountAfter;
+                assertions.Add(new AssertionResult
+                {
+                    Number = 3,
+                    Name = "Assembly component count unchanged",
+                    Passed = assemblyUnchanged,
+                    Detail = $"componentCount={assemblyComponentCountBefore}->{assemblyComponentCountAfter}"
+                });
 
-                assertions.Add(new AssertionResult { Number = 6, Name = "Every geometry-changing feature Replay PASS", Passed = a1, Detail = "V6 Replay validated" });
+                bool stagingCleaned = stagingFiles.Length == 0;
+                assertions.Add(new AssertionResult
+                {
+                    Number = 4,
+                    Name = "Temporary mirror staging cleaned",
+                    Passed = stagingCleaned,
+                    Detail = stagingCleaned ? "No staging Part remains." : string.Join(";", stagingFiles)
+                });
 
-                assertions.Add(new AssertionResult { Number = 7, Name = "Final 3D geometry validation PASS", Passed = a1, Detail = "FINAL_VALIDATE passed" });
-
-                assertions.Add(new AssertionResult { Number = 8, Name = "Unsupported geometry count == 0", Passed = a1, Detail = "unsupportedGeometryCount=0" });
+                bool partOnlyContract = string.IsNullOrEmpty(testResult.MirrorDrawingPath);
+                assertions.Add(new AssertionResult
+                {
+                    Number = 5,
+                    Name = "Part-only workflow scope preserved",
+                    Passed = partOnlyContract,
+                    Detail = "Drawing creation, face-color mapping, and assembly insertion are not executed in STEP 1."
+                });
 
                 foreach (var a in assertions)
                 {
