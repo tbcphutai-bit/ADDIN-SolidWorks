@@ -533,7 +533,8 @@ namespace ADDIN.Commands
         public static List<DrawingPolylineEdgeInfo> EnumerateDrawingPolylines(
             ISldWorks swApp,
             SolidWorks.Interop.sldworks.View currentView,
-            ViewGeometryInfo viewGeom)
+            ViewGeometryInfo viewGeom,
+            string vPrefix = null)
         {
             List<DrawingPolylineEdgeInfo> list = new List<DrawingPolylineEdgeInfo>();
             if (currentView == null) return list;
@@ -570,6 +571,11 @@ namespace ADDIN.Commands
             // Pre-build VisibleEdgeOwnerEntries for fallback
             List<VisibleEdgeOwnerEntry> visibleEdgeEntries = BuildVisibleEdgeOwnerEntries(currentView);
 
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                RepairDanglingDimensions.LogDebug($"{vPrefix} L ABOUT_TO_GET_XFORM");
+            }
+
             // Read View Translation & Scale via GetXform()
             try
             {
@@ -605,6 +611,11 @@ namespace ADDIN.Commands
             {
                 viewGeom.ViewXformStatus = "EX: " + ex.Message;
                 viewGeom.ViewXformScale = viewGeom.ScaleDecimal;
+            }
+
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                RepairDanglingDimensions.LogDebug($"{vPrefix} M GET_XFORM_RETURNED");
             }
 
             // Display Mode Precheck
@@ -653,6 +664,11 @@ namespace ADDIN.Commands
                 viewGeom.PolylineApiStatus = "EXCEPTION_COUNT1: " + ex.Message;
             }
 
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                RepairDanglingDimensions.LogDebug($"{vPrefix} N ABOUT_TO_GET_POLYLINES7");
+            }
+
             // Call GetPolylines7
             object polylinesDataObj = null;
             object entitiesObj = null;
@@ -688,6 +704,13 @@ namespace ADDIN.Commands
 
             Array entityArr = entitiesObj as Array;
             Array polylineArr = polylinesDataObj as Array;
+
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                int entLen = (entityArr != null) ? entityArr.Length : 0;
+                int polyLen = (polylineArr != null) ? polylineArr.Length : 0;
+                RepairDanglingDimensions.LogDebug($"{vPrefix} O GET_POLYLINES7_RETURNED (EntityCount={entLen}, RawDoubleCount={polyLen})");
+            }
 
             if (entityArr != null)
             {
@@ -749,6 +772,11 @@ namespace ADDIN.Commands
                 {
                     viewGeom.CandidateHeaderSamples.Add($"Offset {offset}: TypeCandidate={rawDoubles[offset].ToString("R", CultureInfo.InvariantCulture)}, GeomSizeCandidate={rawDoubles[offset + 1].ToString("R", CultureInfo.InvariantCulture)}");
                 }
+            }
+
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                RepairDanglingDimensions.LogDebug($"{vPrefix} P ABOUT_TO_PARSE_POLYLINES7");
             }
 
             // EXPECTED-RECORDS BASED PARSER
@@ -1035,6 +1063,11 @@ namespace ADDIN.Commands
                 if (numPolyPoints < 2) viewGeom.InsufficientPointRecordCount++;
 
                 // 6. Component Owner Resolution Pipeline
+                if (recordIndex == 0 && !string.IsNullOrEmpty(vPrefix))
+                {
+                    RepairDanglingDimensions.LogDebug($"{vPrefix} R ABOUT_TO_RESOLVE_CORRESPONDING_ENTITIES");
+                }
+
                 string ownerMethod;
                 string failureReason;
                 Component2 canonComp = ResolvePolylineOwner(swApp, correspondingEntity, currentView, visibleEdgeEntries, viewGeom, out ownerMethod, out failureReason);
@@ -1185,6 +1218,12 @@ namespace ADDIN.Commands
 
                 // Add to main list
                 list.Add(info);
+            }
+
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                RepairDanglingDimensions.LogDebug($"{vPrefix} Q PARSE_POLYLINES7_RETURNED (LogicalRecords={viewGeom.AllPolylineRecords.Count}, RepairLineRecords={viewGeom.RepairLineRecords.Count})");
+                RepairDanglingDimensions.LogDebug($"{vPrefix} S RESOLVE_CORRESPONDING_ENTITIES_RETURNED");
             }
 
             viewGeom.RecordCursorFinal = cursor;

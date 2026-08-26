@@ -13,7 +13,7 @@ namespace ADDIN.Commands
 {
     public static class RepairDanglingDimensions
     {
-        private const string REPAIR_DIM_BUILD = "STEP13_PRODUCTION_GENERALIZATION_REGRESSION_20260825";
+        private const string REPAIR_DIM_BUILD = "STEP13A_ZERO_DANGLING_FAST_EXIT_NATIVE_SCAN_GUARD_20260825";
 
         private static bool IsSketchPointSelectionType(int type)
         {
@@ -89,7 +89,7 @@ namespace ADDIN.Commands
 
             InitLog();
             LogDebug($"=== REPAIR DIM BUILD: {REPAIR_DIM_BUILD} ===");
-            LogDebug("=== REPAIR DIM SESSION START (STEP 13: PRODUCTION GENERALIZATION REGRESSION) ===");
+            LogDebug("=== REPAIR DIM SESSION START (STEP 13A: ZERO-DANGLING FAST EXIT + NATIVE SCAN GUARD) ===");
 
             try
             {
@@ -129,6 +129,47 @@ namespace ADDIN.Commands
                 out initialDrawingDanglingCount);
 
             LogDebug($"Baseline Counts: DrawingDisplayDims={initialDrawingDisplayDimCount}, DrawingDangling={initialDrawingDanglingCount}");
+
+            // =========================================================================
+            // ZERO-DANGLING FAST EXIT — MANDATORY
+            // =========================================================================
+            if (initialDrawingDanglingCount == 0)
+            {
+                StringBuilder sbFastExit = new StringBuilder();
+                sbFastExit.AppendLine("\n=== ZERO DANGLING FAST EXIT ===");
+                sbFastExit.AppendLine($"Display Dimensions : {initialDrawingDisplayDimCount}");
+                sbFastExit.AppendLine($"Dangling Dimensions: 0");
+                sbFastExit.AppendLine($"Reason             : NO_DANGLING_DIMENSIONS");
+                sbFastExit.AppendLine($"Geometry Scan      : SKIPPED");
+                sbFastExit.AppendLine($"Mutation Attempted : NO");
+                sbFastExit.AppendLine($"Drawing Saved      : NO");
+                sbFastExit.AppendLine();
+                sbFastExit.AppendLine("=== FINAL DRAWING SUMMARY ===");
+                sbFastExit.AppendLine($"Initial Display Dimensions : {initialDrawingDisplayDimCount}");
+                sbFastExit.AppendLine($"Final Display Dimensions   : {initialDrawingDisplayDimCount}");
+                sbFastExit.AppendLine();
+                sbFastExit.AppendLine($"Initial Dangling Dimensions: 0");
+                sbFastExit.AppendLine($"Final Dangling Dimensions  : 0");
+                sbFastExit.AppendLine();
+                sbFastExit.AppendLine("Repair Required : NO");
+                sbFastExit.AppendLine("Geometry Scan   : SKIPPED");
+                sbFastExit.AppendLine("Mutation        : NONE");
+                sbFastExit.AppendLine();
+                sbFastExit.AppendLine("OTHER NON-TARGET DIMENSIONS MODIFIED: NO");
+                sbFastExit.AppendLine("DRAWING SAVED: NO");
+                sbFastExit.AppendLine();
+                sbFastExit.AppendLine("STOP.");
+
+                LogDebug(sbFastExit.ToString().TrimEnd());
+
+                MessageBox.Show(
+                    sbFastExit.ToString(),
+                    "REPAIR DIM - ZERO DANGLING FAST EXIT",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                return;
+            }
 
             // 1. DOCUMENT-LEVEL MISSING MODEL REFERENCE SCAN (Semantic Name + Path Pair Parsing)
             List<DocumentDependencyInfo> dependencies = ScanMissingModelReferences(swApp, swDrawing, swModel);
@@ -183,22 +224,52 @@ namespace ADDIN.Commands
                     return;
                 }
 
+                int viewScanIdx = 0;
                 foreach (string sheetName in sheetNames)
                 {
+                    LogDebug("VIEWSCAN A ABOUT_TO_GET_SHEET");
                     swDrawing.ActivateSheet(sheetName);
+                    LogDebug($"VIEWSCAN B SHEET_ACQUIRED (Name='{sheetName}')");
                     LogDebug($"\nScanning Sheet: {sheetName}");
 
+                    LogDebug("VIEWSCAN C ABOUT_TO_GET_FIRST_VIEW");
                     SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                    string sViewName = sheetView?.GetName2() ?? "";
+                    int sViewType = (sheetView != null) ? sheetView.Type : 0;
+                    LogDebug($"VIEWSCAN D FIRST_VIEW_RETURNED (Null={sheetView == null}, ViewName='{sViewName}', ViewType={(sheetView != null ? ((swDrawingViewTypes_e)sViewType).ToString() : "NULL")})");
+
+                    LogDebug("VIEWSCAN E ABOUT_TO_GET_NEXT_VIEW_FROM_SHEET_FORMAT");
                     SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
+                    string cViewFirst = currentView?.GetName2() ?? "";
+                    LogDebug($"VIEWSCAN F FIRST_DRAWING_VIEW_RETURNED (Null={currentView == null}, ViewName='{cViewFirst}')");
 
                     while (currentView != null)
                     {
-                        bool viewModelResolved = true;
-                        string viewRefModelName = "";
-                        try { viewRefModelName = currentView.GetReferencedModelName() ?? ""; } catch {}
+                        viewScanIdx++;
+                        string vPrefix = $"VIEWSCAN V{viewScanIdx:D2}";
+                        string cViewName = "";
+                        try { cViewName = currentView.GetName2() ?? ""; } catch {}
+                        int cViewType = 0;
+                        try { cViewType = currentView.Type; } catch {}
+                        string cViewTypeStr = ((swDrawingViewTypes_e)cViewType).ToString();
 
+                        LogDebug($"{vPrefix} A ENTER_VIEW (Name='{cViewName}', Type={cViewTypeStr})");
+
+                        LogDebug($"{vPrefix} B ABOUT_TO_GET_REFERENCED_DOCUMENT");
                         ModelDoc2 refDoc = null;
                         try { refDoc = currentView.ReferencedDocument; } catch {}
+                        LogDebug($"{vPrefix} C REFERENCED_DOCUMENT_RETURNED (Null={refDoc == null})");
+
+                        LogDebug($"{vPrefix} D ABOUT_TO_GET_REFERENCED_MODEL_NAME");
+                        string viewRefModelName = "";
+                        try { viewRefModelName = currentView.GetReferencedModelName() ?? ""; } catch {}
+                        LogDebug($"{vPrefix} E REFERENCED_MODEL_NAME_RETURNED (Name='{viewRefModelName}')");
+
+                        LogDebug($"{vPrefix} F ABOUT_TO_GET_SCALE");
+                        double[] scaleRatioArr = null;
+                        try { scaleRatioArr = currentView.ScaleRatio as double[]; } catch {}
+                        string scaleStr = (scaleRatioArr != null && scaleRatioArr.Length >= 2) ? $"{scaleRatioArr[0]}:{scaleRatioArr[1]}" : "N/A";
+                        LogDebug($"{vPrefix} G SCALE_RETURNED (Scale={scaleStr})");
 
                         string refDocPath = "";
                         try { refDocPath = refDoc?.GetPathName() ?? ""; } catch {}
@@ -215,20 +286,10 @@ namespace ADDIN.Commands
                             try { refDocExists = File.Exists(refDocPath); } catch {}
                         }
 
-                        if (viewRefExists || refDocExists || refDoc != null)
-                        {
-                            viewModelResolved = true;
-                        }
-                        else if (!string.IsNullOrEmpty(viewRefModelName) && IsValidSolidWorksFilePath(viewRefModelName) && !viewRefExists)
-                        {
-                            viewModelResolved = false;
-                        }
-                        else
-                        {
-                            viewModelResolved = true;
-                        }
+                        bool viewModelResolved = (viewRefExists || refDocExists || refDoc != null) ||
+                                                 (string.IsNullOrEmpty(viewRefModelName) || !IsValidSolidWorksFilePath(viewRefModelName));
 
-                        ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, currentView);
+                        ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, currentView, vPrefix);
 
                         LogDebug($"\n--------------------------------------------------");
                         LogDebug($"VIEW: {viewGeom.ViewName} (Type: {viewGeom.ViewTypeString})");
@@ -3935,7 +3996,7 @@ namespace ADDIN.Commands
             LogDebug(sb.ToString().TrimEnd());
         }
 
-        private static void LogDebug(string msg)
+        internal static void LogDebug(string msg)
         {
             try
             {

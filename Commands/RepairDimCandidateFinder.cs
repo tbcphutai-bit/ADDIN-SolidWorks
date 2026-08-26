@@ -57,9 +57,14 @@ namespace ADDIN.Commands
             return string.Equals(anchorKey, candidateKey, StringComparison.OrdinalIgnoreCase);
         }
 
-        public static ViewGeometryInfo EnumerateViewGeometry(ISldWorks swApp, SolidWorks.Interop.sldworks.View view)
+        public static ViewGeometryInfo EnumerateViewGeometry(
+            ISldWorks swApp,
+            SolidWorks.Interop.sldworks.View view,
+            string viewScanPrefix = null)
         {
             if (view == null) return null;
+
+            string vPrefix = viewScanPrefix;
 
             ViewGeometryInfo geomInfo = new ViewGeometryInfo
             {
@@ -111,6 +116,11 @@ namespace ADDIN.Commands
             catch {}
 
             // Enumerate Components in View
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                RepairDanglingDimensions.LogDebug($"{vPrefix} H ABOUT_TO_GET_VISIBLE_COMPONENTS");
+            }
+
             object[] comps = null;
             try
             {
@@ -119,11 +129,21 @@ namespace ADDIN.Commands
             }
             catch {}
 
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                RepairDanglingDimensions.LogDebug($"{vPrefix} I GET_VISIBLE_COMPONENTS_RETURNED (Count={(comps != null ? comps.Length : 0)})");
+            }
+
             HashSet<string> seenSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             if (comps != null && comps.Length > 0)
             {
                 geomInfo.VisibleComponentCount = comps.Length;
+
+                if (!string.IsNullOrEmpty(vPrefix))
+                {
+                    RepairDanglingDimensions.LogDebug($"{vPrefix} J ABOUT_TO_GET_VISIBLE_ENTITIES");
+                }
 
                 foreach (object compObj in comps)
                 {
@@ -185,11 +205,21 @@ namespace ADDIN.Commands
                     }
                     catch {}
                 }
+
+                if (!string.IsNullOrEmpty(vPrefix))
+                {
+                    RepairDanglingDimensions.LogDebug($"{vPrefix} K GET_VISIBLE_ENTITIES_RETURNED (Count={geomInfo.VisibleEdgeCount})");
+                }
             }
             else
             {
                 // Fallback for Part Drawing or views without component array
                 geomInfo.VisibleComponentCount = 1;
+
+                if (!string.IsNullOrEmpty(vPrefix))
+                {
+                    RepairDanglingDimensions.LogDebug($"{vPrefix} J ABOUT_TO_GET_VISIBLE_ENTITIES");
+                }
 
                 // 1. Normal Edges
                 try
@@ -245,12 +275,17 @@ namespace ADDIN.Commands
                     }
                 }
                 catch {}
+
+                if (!string.IsNullOrEmpty(vPrefix))
+                {
+                    RepairDanglingDimensions.LogDebug($"{vPrefix} K GET_VISIBLE_ENTITIES_RETURNED (Count={geomInfo.VisibleEdgeCount})");
+                }
             }
 
             // STEP 8D-FIX1A / FIX3E: Enumerate Drawing Polylines & Diagnostic
             try
             {
-                geomInfo.Polylines = RepairDimGeometry.EnumerateDrawingPolylines(swApp, view, geomInfo);
+                geomInfo.Polylines = RepairDimGeometry.EnumerateDrawingPolylines(swApp, view, geomInfo, vPrefix);
                 foreach (var p in geomInfo.Polylines)
                 {
                     if (p.ModelEntity is IEdge) geomInfo.MappedPolylineEdgeCount++;
@@ -261,6 +296,11 @@ namespace ADDIN.Commands
             catch (Exception ex)
             {
                 geomInfo.PolylineApiStatus = "EXCEPTION: " + ex.GetType().FullName + " | " + ex.Message;
+            }
+
+            if (!string.IsNullOrEmpty(vPrefix))
+            {
+                RepairDanglingDimensions.LogDebug($"{vPrefix} T VIEW_GEOMETRY_COMPLETE");
             }
 
             return geomInfo;
