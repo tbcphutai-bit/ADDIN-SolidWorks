@@ -13,7 +13,18 @@ namespace ADDIN.Commands
 {
     public static class RepairDanglingDimensions
     {
-        private const string REPAIR_DIM_BUILD = "STEP13A_ZERO_DANGLING_FAST_EXIT_NATIVE_SCAN_GUARD_20260825";
+        private const string REPAIR_DIM_BUILD = "STEP13B_TWO_PASS_DANGLING_VIEW_GEOMETRY_SCAN_20260826";
+
+        private sealed class ViewDanglingDiscovery
+        {
+            public int ViewIndex { get; set; }
+            public string SheetName { get; set; }
+            public string ViewName { get; set; }
+            public swDrawingViewTypes_e ViewType { get; set; }
+            public int DisplayDimCount { get; set; }
+            public int DanglingDimCount { get; set; }
+            public bool GeometryScanRequired => DanglingDimCount > 0;
+        }
 
         private static bool IsSketchPointSelectionType(int type)
         {
@@ -89,7 +100,7 @@ namespace ADDIN.Commands
 
             InitLog();
             LogDebug($"=== REPAIR DIM BUILD: {REPAIR_DIM_BUILD} ===");
-            LogDebug("=== REPAIR DIM SESSION START (STEP 13A: ZERO-DANGLING FAST EXIT + NATIVE SCAN GUARD) ===");
+            LogDebug("=== REPAIR DIM SESSION START (STEP 13B: TWO-PASS DANGLING VIEW DISCOVERY + TARGETED GEOMETRY SCAN) ===");
 
             try
             {
@@ -120,18 +131,130 @@ namespace ADDIN.Commands
 
             LogDebug($"Copy File Guard Check: Title='{docTitle}', Path='{docPath}', IsCopy={isCopyFile}");
 
-            // Baseline Counts Before Any Mutation
-            int initialDrawingDisplayDimCount = 0;
-            int initialDrawingDanglingCount = 0;
-            CountTotalDrawingDimensions(
-                swDrawing,
-                out initialDrawingDisplayDimCount,
-                out initialDrawingDanglingCount);
+            // =========================================================================
+            // PASS 1 — LIGHTWEIGHT DIMENSION DISCOVERY (NO GEOMETRY APIS)
+            // =========================================================================
+            LogDebug("\n=== PASS 1: LIGHTWEIGHT DIMENSION DISCOVERY ===");
+            List<ViewDanglingDiscovery> discoveredViews = new List<ViewDanglingDiscovery>();
+            int totalPass1Display = 0;
+            int totalPass1Dangling = 0;
 
-            LogDebug($"Baseline Counts: DrawingDisplayDims={initialDrawingDisplayDimCount}, DrawingDangling={initialDrawingDanglingCount}");
+            string initialSheet = "";
+            try
+            {
+                Sheet activeSheet = swDrawing.GetCurrentSheet() as Sheet;
+                if (activeSheet != null)
+                {
+                    initialSheet = activeSheet.GetName();
+                }
+            }
+            catch {}
+
+            try
+            {
+                string[] sheetNames = swDrawing.GetSheetNames() as string[];
+                if (sheetNames == null || sheetNames.Length == 0)
+                {
+                    MessageBox.Show(
+                        "Không tìm thấy Sheet nào trong bản vẽ.",
+                        "REPAIR DIM",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    return;
+                }
+
+                int vIdx = 0;
+                foreach (string sheetName in sheetNames)
+                {
+                    swDrawing.ActivateSheet(sheetName);
+                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                    SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
+
+                    while (currentView != null)
+                    {
+                        vIdx++;
+                        string cViewName = "";
+                        try { cViewName = currentView.GetName2() ?? ""; } catch {}
+                        int cViewType = 0;
+                        try { cViewType = currentView.Type; } catch {}
+                        swDrawingViewTypes_e vTypeEnum = (swDrawingViewTypes_e)cViewType;
+
+                        int viewDisplayCount = 0;
+                        int viewDanglingCount = 0;
+
+                        DisplayDimension dd = currentView.GetFirstDisplayDimension5() as DisplayDimension;
+                        while (dd != null)
+                        {
+                            viewDisplayCount++;
+                            Annotation a = dd.GetAnnotation() as Annotation;
+                            if (a != null && a.IsDangling())
+                            {
+                                viewDanglingCount++;
+                            }
+                            dd = dd.GetNext5() as DisplayDimension;
+                        }
+
+                        totalPass1Display += viewDisplayCount;
+                        totalPass1Dangling += viewDanglingCount;
+
+                        var disc = new ViewDanglingDiscovery
+                        {
+                            ViewIndex = vIdx,
+                            SheetName = sheetName,
+                            ViewName = cViewName,
+                            ViewType = vTypeEnum,
+                            DisplayDimCount = viewDisplayCount,
+                            DanglingDimCount = viewDanglingCount
+                        };
+                        discoveredViews.Add(disc);
+
+                        LogDebug($"\nPASS1 VIEW V{vIdx:D2}");
+                        LogDebug($"  Sheet: {sheetName}");
+                        LogDebug($"  View: {cViewName}");
+                        LogDebug($"  Type: {vTypeEnum}");
+                        LogDebug($"  DisplayDims: {viewDisplayCount}");
+                        LogDebug($"  DanglingDims: {viewDanglingCount}");
+                        LogDebug($"  GeometryScanRequired: {(disc.GeometryScanRequired ? "YES" : "NO")}");
+
+                        if (!disc.GeometryScanRequired)
+                        {
+                            LogDebug($"  GEOMETRY_SCAN_SKIPPED_NO_DANGLING (View '{cViewName}')");
+                        }
+
+                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("ERROR during PASS 1 Discovery: " + ex.Message);
+                MessageBox.Show(
+                    "Lỗi trong quá trình quét PASS 1:\n" + ex.Message,
+                    "REPAIR DIM - ERROR",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(initialSheet))
+                {
+                    try { swDrawing.ActivateSheet(initialSheet); } catch {}
+                }
+            }
+
+            int initialDrawingDisplayDimCount = totalPass1Display;
+            int initialDrawingDanglingCount = totalPass1Dangling;
+            int targetViewCount = discoveredViews.Count(v => v.GeometryScanRequired);
+
+            LogDebug($"\n=== PASS 1 COMPLETE ===");
+            LogDebug($"PASS1 Total Views        : {discoveredViews.Count}");
+            LogDebug($"PASS1 Total Display Dims : {initialDrawingDisplayDimCount}");
+            LogDebug($"PASS1 Total Dangling Dims: {initialDrawingDanglingCount}");
+            LogDebug($"PASS1 Target Views       : {targetViewCount}");
 
             // =========================================================================
-            // ZERO-DANGLING FAST EXIT — MANDATORY
+            // DECISION GATE 1 — ZERO-DANGLING FAST EXIT
             // =========================================================================
             if (initialDrawingDanglingCount == 0)
             {
@@ -145,18 +268,21 @@ namespace ADDIN.Commands
                 sbFastExit.AppendLine($"Drawing Saved      : NO");
                 sbFastExit.AppendLine();
                 sbFastExit.AppendLine("=== FINAL DRAWING SUMMARY ===");
-                sbFastExit.AppendLine($"Initial Display Dimensions : {initialDrawingDisplayDimCount}");
-                sbFastExit.AppendLine($"Final Display Dimensions   : {initialDrawingDisplayDimCount}");
                 sbFastExit.AppendLine();
-                sbFastExit.AppendLine($"Initial Dangling Dimensions: 0");
-                sbFastExit.AppendLine($"Final Dangling Dimensions  : 0");
+                sbFastExit.AppendLine($"PASS1 Views: {discoveredViews.Count}");
+                sbFastExit.AppendLine("Target Views: 0");
                 sbFastExit.AppendLine();
-                sbFastExit.AppendLine("Repair Required : NO");
-                sbFastExit.AppendLine("Geometry Scan   : SKIPPED");
-                sbFastExit.AppendLine("Mutation        : NONE");
+                sbFastExit.AppendLine("Geometry Views Scanned: 0");
+                sbFastExit.AppendLine($"Geometry Views Skipped: {discoveredViews.Count}");
                 sbFastExit.AppendLine();
-                sbFastExit.AppendLine("OTHER NON-TARGET DIMENSIONS MODIFIED: NO");
-                sbFastExit.AppendLine("DRAWING SAVED: NO");
+                sbFastExit.AppendLine($"Initial Display: {initialDrawingDisplayDimCount}");
+                sbFastExit.AppendLine($"Final Display: {initialDrawingDisplayDimCount}");
+                sbFastExit.AppendLine();
+                sbFastExit.AppendLine("Initial Dangling: 0");
+                sbFastExit.AppendLine("Final Dangling: 0");
+                sbFastExit.AppendLine();
+                sbFastExit.AppendLine("Mutation Attempted: NO");
+                sbFastExit.AppendLine("Drawing Saved: NO");
                 sbFastExit.AppendLine();
                 sbFastExit.AppendLine("STOP.");
 
@@ -167,6 +293,52 @@ namespace ADDIN.Commands
                     "REPAIR DIM - ZERO DANGLING FAST EXIT",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
+
+                return;
+            }
+
+            // =========================================================================
+            // DECISION GATE 2 — NON-COPY DRAWING GUARD (EXIT BEFORE PASS 2)
+            // =========================================================================
+            if (!isCopyFile)
+            {
+                StringBuilder sbNotCopy = new StringBuilder();
+                sbNotCopy.AppendLine("\n=== REPAIR SKIPPED — NOT A COPY DRAWING ===");
+                sbNotCopy.AppendLine($"Drawing                    : {docTitle}");
+                sbNotCopy.AppendLine($"Initial Display Dimensions : {initialDrawingDisplayDimCount}");
+                sbNotCopy.AppendLine($"Initial Dangling Dimensions: {initialDrawingDanglingCount}");
+                sbNotCopy.AppendLine($"Target Views With Dangling : {targetViewCount}");
+                sbNotCopy.AppendLine("Reason                     : SAFETY_GUARD_NOT_COPY_FILE");
+                sbNotCopy.AppendLine("Geometry Scan PASS2        : SKIPPED");
+                sbNotCopy.AppendLine("Mutation Attempted         : NO");
+                sbNotCopy.AppendLine("Drawing Saved              : NO");
+                sbNotCopy.AppendLine();
+                sbNotCopy.AppendLine("=== FINAL DRAWING SUMMARY ===");
+                sbNotCopy.AppendLine();
+                sbNotCopy.AppendLine($"PASS1 Views: {discoveredViews.Count}");
+                sbNotCopy.AppendLine($"Target Views: {targetViewCount}");
+                sbNotCopy.AppendLine();
+                sbNotCopy.AppendLine("Geometry Views Scanned: 0");
+                sbNotCopy.AppendLine($"Geometry Views Skipped: {discoveredViews.Count}");
+                sbNotCopy.AppendLine();
+                sbNotCopy.AppendLine($"Initial Display: {initialDrawingDisplayDimCount}");
+                sbNotCopy.AppendLine($"Final Display: {initialDrawingDisplayDimCount}");
+                sbNotCopy.AppendLine();
+                sbNotCopy.AppendLine($"Initial Dangling: {initialDrawingDanglingCount}");
+                sbNotCopy.AppendLine($"Final Dangling: {initialDrawingDanglingCount}");
+                sbNotCopy.AppendLine();
+                sbNotCopy.AppendLine("Mutation Attempted: NO");
+                sbNotCopy.AppendLine("Drawing Saved: NO");
+                sbNotCopy.AppendLine();
+                sbNotCopy.AppendLine("STOP.");
+
+                LogDebug(sbNotCopy.ToString().TrimEnd());
+
+                MessageBox.Show(
+                    sbNotCopy.ToString(),
+                    "REPAIR DIM - NOT A COPY DRAWING",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
 
                 return;
             }
@@ -193,185 +365,159 @@ namespace ADDIN.Commands
             }
 
             // =========================================================================
-            // PHASE 1 — INITIAL SCAN (COLLECT STEP 10 1-LIVE-ANCHOR TARGETS)
+            // PASS 2 — TARGETED GEOMETRY SCAN (ONLY TARGET VIEWS WITH DANGLING DIMS)
             // =========================================================================
-            int totalDisplayDimensions = 0;
-            int totalDanglingDimensions = 0;
+            LogDebug("\n=== PASS 2: TARGETED GEOMETRY SCAN ===");
+            int geometryViewsScanned = 0;
             List<DanglingDimensionInfo> initialDanglingList = new List<DanglingDimensionInfo>();
             List<BatchTargetSnapshot> step10BatchTargets = new List<BatchTargetSnapshot>();
 
-            string initialSheet = "";
             try
             {
-                Sheet activeSheet = swDrawing.GetCurrentSheet() as Sheet;
-                if (activeSheet != null)
+                var targetDiscoveredList = discoveredViews.Where(v => v.GeometryScanRequired).ToList();
+                foreach (var targetDisc in targetDiscoveredList)
                 {
-                    initialSheet = activeSheet.GetName();
-                }
-            }
-            catch {}
+                    LogDebug($"\n=== PASS2 TARGET VIEW START: '{targetDisc.ViewName}' (Sheet: '{targetDisc.SheetName}', Dangling: {targetDisc.DanglingDimCount}) ===");
 
-            try
-            {
-                string[] sheetNames = swDrawing.GetSheetNames() as string[];
-                if (sheetNames == null || sheetNames.Length == 0)
-                {
-                    MessageBox.Show(
-                        "Không tìm thấy Sheet nào trong bản vẽ.",
-                        "REPAIR DIM",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
-                    return;
-                }
-
-                int viewScanIdx = 0;
-                foreach (string sheetName in sheetNames)
-                {
-                    LogDebug("VIEWSCAN A ABOUT_TO_GET_SHEET");
-                    swDrawing.ActivateSheet(sheetName);
-                    LogDebug($"VIEWSCAN B SHEET_ACQUIRED (Name='{sheetName}')");
-                    LogDebug($"\nScanning Sheet: {sheetName}");
-
-                    LogDebug("VIEWSCAN C ABOUT_TO_GET_FIRST_VIEW");
+                    swDrawing.ActivateSheet(targetDisc.SheetName);
                     SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                    string sViewName = sheetView?.GetName2() ?? "";
-                    int sViewType = (sheetView != null) ? sheetView.Type : 0;
-                    LogDebug($"VIEWSCAN D FIRST_VIEW_RETURNED (Null={sheetView == null}, ViewName='{sViewName}', ViewType={(sheetView != null ? ((swDrawingViewTypes_e)sViewType).ToString() : "NULL")})");
-
-                    LogDebug("VIEWSCAN E ABOUT_TO_GET_NEXT_VIEW_FROM_SHEET_FORMAT");
                     SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-                    string cViewFirst = currentView?.GetName2() ?? "";
-                    LogDebug($"VIEWSCAN F FIRST_DRAWING_VIEW_RETURNED (Null={currentView == null}, ViewName='{cViewFirst}')");
 
+                    SolidWorks.Interop.sldworks.View targetView = null;
                     while (currentView != null)
                     {
-                        viewScanIdx++;
-                        string vPrefix = $"VIEWSCAN V{viewScanIdx:D2}";
-                        string cViewName = "";
-                        try { cViewName = currentView.GetName2() ?? ""; } catch {}
-                        int cViewType = 0;
-                        try { cViewType = currentView.Type; } catch {}
-                        string cViewTypeStr = ((swDrawingViewTypes_e)cViewType).ToString();
-
-                        LogDebug($"{vPrefix} A ENTER_VIEW (Name='{cViewName}', Type={cViewTypeStr})");
-
-                        LogDebug($"{vPrefix} B ABOUT_TO_GET_REFERENCED_DOCUMENT");
-                        ModelDoc2 refDoc = null;
-                        try { refDoc = currentView.ReferencedDocument; } catch {}
-                        LogDebug($"{vPrefix} C REFERENCED_DOCUMENT_RETURNED (Null={refDoc == null})");
-
-                        LogDebug($"{vPrefix} D ABOUT_TO_GET_REFERENCED_MODEL_NAME");
-                        string viewRefModelName = "";
-                        try { viewRefModelName = currentView.GetReferencedModelName() ?? ""; } catch {}
-                        LogDebug($"{vPrefix} E REFERENCED_MODEL_NAME_RETURNED (Name='{viewRefModelName}')");
-
-                        LogDebug($"{vPrefix} F ABOUT_TO_GET_SCALE");
-                        double[] scaleRatioArr = null;
-                        try { scaleRatioArr = currentView.ScaleRatio as double[]; } catch {}
-                        string scaleStr = (scaleRatioArr != null && scaleRatioArr.Length >= 2) ? $"{scaleRatioArr[0]}:{scaleRatioArr[1]}" : "N/A";
-                        LogDebug($"{vPrefix} G SCALE_RETURNED (Scale={scaleStr})");
-
-                        string refDocPath = "";
-                        try { refDocPath = refDoc?.GetPathName() ?? ""; } catch {}
-
-                        bool viewRefExists = false;
-                        if (!string.IsNullOrEmpty(viewRefModelName) && IsValidSolidWorksFilePath(viewRefModelName))
+                        string vName = currentView.GetName2() ?? "";
+                        if (string.Equals(vName, targetDisc.ViewName, StringComparison.OrdinalIgnoreCase))
                         {
-                            try { viewRefExists = File.Exists(viewRefModelName); } catch {}
+                            targetView = currentView;
+                            break;
                         }
+                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                    }
 
-                        bool refDocExists = false;
-                        if (!string.IsNullOrEmpty(refDocPath) && IsValidSolidWorksFilePath(refDocPath))
+                    if (targetView == null)
+                    {
+                        LogDebug($"WARNING: Target view '{targetDisc.ViewName}' could not be re-acquired on sheet '{targetDisc.SheetName}'.");
+                        continue;
+                    }
+
+                    geometryViewsScanned++;
+                    string vPrefix = $"VIEWSCAN V{targetDisc.ViewIndex:D2}";
+                    string cViewName = targetDisc.ViewName;
+                    string cViewTypeStr = targetDisc.ViewType.ToString();
+
+                    LogDebug($"{vPrefix} A ENTER_VIEW (Name='{cViewName}', Type={cViewTypeStr})");
+
+                    LogDebug($"{vPrefix} B ABOUT_TO_GET_REFERENCED_DOCUMENT");
+                    ModelDoc2 refDoc = null;
+                    try { refDoc = targetView.ReferencedDocument; } catch {}
+                    LogDebug($"{vPrefix} C REFERENCED_DOCUMENT_RETURNED (Null={refDoc == null})");
+
+                    LogDebug($"{vPrefix} D ABOUT_TO_GET_REFERENCED_MODEL_NAME");
+                    string viewRefModelName = "";
+                    try { viewRefModelName = targetView.GetReferencedModelName() ?? ""; } catch {}
+                    LogDebug($"{vPrefix} E REFERENCED_MODEL_NAME_RETURNED (Name='{viewRefModelName}')");
+
+                    LogDebug($"{vPrefix} F ABOUT_TO_GET_SCALE");
+                    double[] scaleRatioArr = null;
+                    try { scaleRatioArr = targetView.ScaleRatio as double[]; } catch {}
+                    string scaleStr = (scaleRatioArr != null && scaleRatioArr.Length >= 2) ? $"{scaleRatioArr[0]}:{scaleRatioArr[1]}" : "N/A";
+                    LogDebug($"{vPrefix} G SCALE_RETURNED (Scale={scaleStr})");
+
+                    string refDocPath = "";
+                    try { refDocPath = refDoc?.GetPathName() ?? ""; } catch {}
+
+                    bool viewRefExists = false;
+                    if (!string.IsNullOrEmpty(viewRefModelName) && IsValidSolidWorksFilePath(viewRefModelName))
+                    {
+                        try { viewRefExists = File.Exists(viewRefModelName); } catch {}
+                    }
+
+                    bool refDocExists = false;
+                    if (!string.IsNullOrEmpty(refDocPath) && IsValidSolidWorksFilePath(refDocPath))
+                    {
+                        try { refDocExists = File.Exists(refDocPath); } catch {}
+                    }
+
+                    bool viewModelResolved = (viewRefExists || refDocExists || refDoc != null) ||
+                                             (string.IsNullOrEmpty(viewRefModelName) || !IsValidSolidWorksFilePath(viewRefModelName));
+
+                    ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, targetView, vPrefix);
+
+                    LogDebug($"\n--------------------------------------------------");
+                    LogDebug($"VIEW: {viewGeom.ViewName} (Type: {viewGeom.ViewTypeString})");
+                    LogDebug($"  Referenced Document    : {viewGeom.ReferencedDoc}");
+                    LogDebug($"  Referenced Config      : {viewGeom.ReferencedConfig}");
+                    LogDebug($"  Referenced Model Name  : {viewRefModelName}");
+                    LogDebug($"  View Model Resolved    : {viewModelResolved} (RefExists: {viewRefExists}, DocExists: {refDocExists})");
+                    LogDebug($"  View Scale Ratio       : {viewGeom.ScaleRatio}");
+                    LogDebug($"  Visible Components     : {viewGeom.VisibleComponentCount}");
+                    LogDebug($"  Visible Edges          : {viewGeom.VisibleEdgeCount} (Unique: {viewGeom.Edges.Count})");
+                    LogDebug($"  Repair Line Records    : {viewGeom.RepairLineRecords.Count}");
+                    LogDebug($"--------------------------------------------------");
+
+                    DisplayDimension dispDim = targetView.GetFirstDisplayDimension5() as DisplayDimension;
+                    while (dispDim != null)
+                    {
+                        Annotation annot = dispDim.GetAnnotation() as Annotation;
+                        bool isDangling = (annot != null) && annot.IsDangling();
+
+                        if (isDangling)
                         {
-                            try { refDocExists = File.Exists(refDocPath); } catch {}
-                        }
+                            DanglingDimensionInfo info = ExtractDanglingInfo(targetDisc.SheetName, viewGeom.ViewName, dispDim, annot);
 
-                        bool viewModelResolved = (viewRefExists || refDocExists || refDoc != null) ||
-                                                 (string.IsNullOrEmpty(viewRefModelName) || !IsValidSolidWorksFilePath(viewRefModelName));
-
-                        ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, currentView, vPrefix);
-
-                        LogDebug($"\n--------------------------------------------------");
-                        LogDebug($"VIEW: {viewGeom.ViewName} (Type: {viewGeom.ViewTypeString})");
-                        LogDebug($"  Referenced Document    : {viewGeom.ReferencedDoc}");
-                        LogDebug($"  Referenced Config      : {viewGeom.ReferencedConfig}");
-                        LogDebug($"  Referenced Model Name  : {viewRefModelName}");
-                        LogDebug($"  View Model Resolved    : {viewModelResolved} (RefExists: {viewRefExists}, DocExists: {refDocExists})");
-                        LogDebug($"  View Scale Ratio       : {viewGeom.ScaleRatio}");
-                        LogDebug($"  Visible Components     : {viewGeom.VisibleComponentCount}");
-                        LogDebug($"  Visible Edges          : {viewGeom.VisibleEdgeCount} (Unique: {viewGeom.Edges.Count})");
-                        LogDebug($"  Repair Line Records    : {viewGeom.RepairLineRecords.Count}");
-                        LogDebug($"--------------------------------------------------");
-
-                        DisplayDimension dispDim = currentView.GetFirstDisplayDimension5() as DisplayDimension;
-                        while (dispDim != null)
-                        {
-                            totalDisplayDimensions++;
-                            Annotation annot = dispDim.GetAnnotation() as Annotation;
-
-                            bool isDangling = (annot != null) && annot.IsDangling();
-
-                            if (isDangling)
+                            if (viewModelResolved)
                             {
-                                totalDanglingDimensions++;
-
-                                DanglingDimensionInfo info = ExtractDanglingInfo(sheetName, viewGeom.ViewName, dispDim, annot);
-
-                                if (viewModelResolved)
-                                {
-                                    RepairDimCandidateFinder.AnalyzeCandidatesForDimension(swApp, info, viewGeom, currentView, dispDim);
-                                }
-                                else
-                                {
-                                    info.CandidateDecision = "MODEL_FILE_UNRESOLVED";
-                                    info.DiagnosticNotes.Add($"ViewModelUnresolved: Model path '{viewRefModelName}' missing or unresolved.");
-                                }
-
-                                ClassifyFailureMode(info, viewGeom, viewModelResolved, viewRefModelName);
-                                initialDanglingList.Add(info);
-                                LogDanglingDetail(info, viewGeom);
-
-                                // Check STEP 10 1-Live-Anchor Batch Eligibility
-                                bool isStep10Eligible = (info.CandidateDecision == "HIGH_CONFIDENCE") &&
-                                                        (info.FailureMode == RepairDimFailureMode.ComponentReinsertedOrGeometryReplaced) &&
-                                                        (info.RecommendedAction == "RECREATE_DIMENSION_REQUIRED") &&
-                                                        (info.AnchorEntityType == (int)swSelectType_e.swSelEDGES) &&
-                                                        (info.AnchorPolylineMatches.Count > 0) &&
-                                                        (info.Candidates.Count > 0);
-
-                                if (isStep10Eligible)
-                                {
-                                    step10BatchTargets.Add(new BatchTargetSnapshot
-                                    {
-                                        TargetIndex = step10BatchTargets.Count + 1,
-                                        SheetName = sheetName,
-                                        ViewName = viewGeom.ViewName,
-                                        DimensionName = annot.GetName() ?? info.DimensionName,
-                                        OldDimFullName = info.DimensionName,
-                                        DimensionType = info.DimensionType,
-                                        SystemValue = info.SystemValue,
-                                        Position = info.Position != null ? new double[] { info.Position[0], info.Position[1], info.Position[2] } : null,
-                                        AttachedEntityTypes = new List<int>(info.AttachedEntityTypes),
-                                        FailureMode = info.FailureMode,
-                                        CandidateDecision = info.CandidateDecision,
-                                        AnchorOccurrenceKey = info.AnchorOccurrenceKey,
-                                        CandidateOccurrenceKey = info.Candidates[0].ComponentOccurrenceKey
-                                    });
-                                }
+                                RepairDimCandidateFinder.AnalyzeCandidatesForDimension(swApp, info, viewGeom, targetView, dispDim);
+                            }
+                            else
+                            {
+                                info.CandidateDecision = "MODEL_FILE_UNRESOLVED";
+                                info.DiagnosticNotes.Add($"ViewModelUnresolved: Model path '{viewRefModelName}' missing or unresolved.");
                             }
 
-                            dispDim = dispDim.GetNext5() as DisplayDimension;
+                            ClassifyFailureMode(info, viewGeom, viewModelResolved, viewRefModelName);
+                            initialDanglingList.Add(info);
+                            LogDanglingDetail(info, viewGeom);
+
+                            // Check STEP 10 1-Live-Anchor Batch Eligibility
+                            bool isStep10Eligible = (info.CandidateDecision == "HIGH_CONFIDENCE") &&
+                                                    (info.FailureMode == RepairDimFailureMode.ComponentReinsertedOrGeometryReplaced) &&
+                                                    (info.RecommendedAction == "RECREATE_DIMENSION_REQUIRED") &&
+                                                    (info.AnchorEntityType == (int)swSelectType_e.swSelEDGES) &&
+                                                    (info.AnchorPolylineMatches.Count > 0) &&
+                                                    (info.Candidates.Count > 0);
+
+                            if (isStep10Eligible)
+                            {
+                                step10BatchTargets.Add(new BatchTargetSnapshot
+                                {
+                                    TargetIndex = step10BatchTargets.Count + 1,
+                                    SheetName = targetDisc.SheetName,
+                                    ViewName = viewGeom.ViewName,
+                                    DimensionName = annot.GetName() ?? info.DimensionName,
+                                    OldDimFullName = info.DimensionName,
+                                    DimensionType = info.DimensionType,
+                                    SystemValue = info.SystemValue,
+                                    Position = info.Position != null ? new double[] { info.Position[0], info.Position[1], info.Position[2] } : null,
+                                    AttachedEntityTypes = new List<int>(info.AttachedEntityTypes),
+                                    FailureMode = info.FailureMode,
+                                    CandidateDecision = info.CandidateDecision,
+                                    AnchorOccurrenceKey = info.AnchorOccurrenceKey,
+                                    CandidateOccurrenceKey = info.Candidates[0].ComponentOccurrenceKey
+                                });
+                            }
                         }
 
-                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                        dispDim = dispDim.GetNext5() as DisplayDimension;
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogDebug("ERROR during initial scan: " + ex.Message);
+                LogDebug("ERROR during PASS 2 Targeted Geometry Scan: " + ex.Message);
                 MessageBox.Show(
-                    "Lỗi trong quá trình quét Dangling Dimensions:\n" + ex.Message,
+                    "Lỗi trong quá trình quét PASS 2:\n" + ex.Message,
                     "REPAIR DIM - ERROR",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -385,21 +531,11 @@ namespace ADDIN.Commands
                 }
             }
 
-            LogDebug($"\n=== PHASE 1 SCAN COMPLETE ===");
-            LogDebug($"Total Display Dimensions : {totalDisplayDimensions}");
-            LogDebug($"Total Dangling Dimensions: {totalDanglingDimensions}");
+            LogDebug($"\n=== PASS 2 TARGETED SCAN COMPLETE ===");
+            LogDebug($"Geometry Views Scanned   : {geometryViewsScanned}");
+            LogDebug($"Geometry Views Skipped   : {discoveredViews.Count - geometryViewsScanned}");
+            LogDebug($"Initial Dangling Targets : {initialDanglingList.Count}");
             LogDebug($"STEP 10 Batch Targets    : {step10BatchTargets.Count}");
-
-            if (!isCopyFile)
-            {
-                LogDebug("BATCH_ABORT_NOT_COPY_DRAWING (File title/path does not contain 'コピー')");
-                MessageBox.Show(
-                    "REPAIR DIM ABORT: Drawing file is NOT a copy file (Title/Path does not contain 'コピー').\nMutation cancelled for safety.",
-                    "REPAIR DIM - GUARD",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
 
             // =========================================================================
             // PHASE 2 — RUN STEP 10 BATCH (1-LIVE-ANCHOR HIGH_CONFIDENCE TARGETS)
@@ -491,6 +627,22 @@ namespace ADDIN.Commands
 
                         while (currentView != null)
                         {
+                            int viewDanglingCount = 0;
+                            DisplayDimension testDd = currentView.GetFirstDisplayDimension5() as DisplayDimension;
+                            while (testDd != null)
+                            {
+                                Annotation a = testDd.GetAnnotation() as Annotation;
+                                if (a != null && a.IsDangling()) viewDanglingCount++;
+                                testDd = testDd.GetNext5() as DisplayDimension;
+                            }
+
+                            if (viewDanglingCount == 0)
+                            {
+                                LogDebug($"GEOMETRY_SCAN_SKIPPED_NO_DANGLING (Phase 3 View '{currentView.GetName2() ?? ""}')");
+                                currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                                continue;
+                            }
+
                             bool viewModelResolved = true;
                             string viewRefModelName = "";
                             try { viewRefModelName = currentView.GetReferencedModelName() ?? ""; } catch {}
@@ -621,6 +773,22 @@ namespace ADDIN.Commands
 
                         while (cView != null)
                         {
+                            int viewDanglingCount = 0;
+                            DisplayDimension testDd = cView.GetFirstDisplayDimension5() as DisplayDimension;
+                            while (testDd != null)
+                            {
+                                Annotation a = testDd.GetAnnotation() as Annotation;
+                                if (a != null && a.IsDangling()) viewDanglingCount++;
+                                testDd = testDd.GetNext5() as DisplayDimension;
+                            }
+
+                            if (viewDanglingCount == 0)
+                            {
+                                LogDebug($"GEOMETRY_SCAN_SKIPPED_NO_DANGLING (Phase 4 View '{cView.GetName2() ?? ""}')");
+                                cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                                continue;
+                            }
+
                             bool vResolved = true;
                             string vModel = "";
                             try { vModel = cView.GetReferencedModelName() ?? ""; } catch {}
@@ -784,16 +952,8 @@ namespace ADDIN.Commands
 
                         while (cView != null)
                         {
-                            bool vResolved = true;
-                            string vModel = "";
-                            try { vModel = cView.GetReferencedModelName() ?? ""; } catch {}
-                            if (!string.IsNullOrEmpty(vModel) && IsValidSolidWorksFilePath(vModel))
-                            {
-                                try { vResolved = File.Exists(vModel); } catch { vResolved = false; }
-                            }
-
-                            ViewGeometryInfo vGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, cView);
                             DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
+                            List<DisplayDimension> danglingInView = new List<DisplayDimension>();
                             while (dd != null)
                             {
                                 finalTotalDisplay++;
@@ -801,10 +961,29 @@ namespace ADDIN.Commands
                                 if (a != null && a.IsDangling())
                                 {
                                     finalTotalDangling++;
-                                    DanglingDimensionInfo dInfo = ExtractDanglingInfo(sName, vGeom.ViewName, dd, a);
+                                    danglingInView.Add(dd);
+                                }
+                                dd = dd.GetNext5() as DisplayDimension;
+                            }
+
+                            if (danglingInView.Count > 0)
+                            {
+                                bool vResolved = true;
+                                string vModel = "";
+                                try { vModel = cView.GetReferencedModelName() ?? ""; } catch {}
+                                if (!string.IsNullOrEmpty(vModel) && IsValidSolidWorksFilePath(vModel))
+                                {
+                                    try { vResolved = File.Exists(vModel); } catch { vResolved = false; }
+                                }
+
+                                ViewGeometryInfo vGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, cView);
+                                foreach (var dDim in danglingInView)
+                                {
+                                    Annotation a = dDim.GetAnnotation() as Annotation;
+                                    DanglingDimensionInfo dInfo = ExtractDanglingInfo(sName, vGeom.ViewName, dDim, a);
                                     if (vResolved)
                                     {
-                                        RepairDimCandidateFinder.AnalyzeCandidatesForDimension(swApp, dInfo, vGeom, cView, dd);
+                                        RepairDimCandidateFinder.AnalyzeCandidatesForDimension(swApp, dInfo, vGeom, cView, dDim);
                                     }
                                     ClassifyFailureMode(dInfo, vGeom, vResolved, vModel);
 
@@ -830,8 +1009,12 @@ namespace ADDIN.Commands
                                             break;
                                     }
                                 }
-                                dd = dd.GetNext5() as DisplayDimension;
                             }
+                            else
+                            {
+                                LogDebug($"GEOMETRY_SCAN_SKIPPED_NO_DANGLING (Phase 5 View '{cView.GetName2() ?? ""}')");
+                            }
+
                             cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
                         }
                     }
@@ -846,10 +1029,20 @@ namespace ADDIN.Commands
                 if (!string.IsNullOrEmpty(initialSheet)) { try { swDrawing.ActivateSheet(initialSheet); } catch {} }
             }
 
+            bool mutationAttempted = (step10SuccessCount > 0 || fullyLostSuccessCount > 0 || pointAnchorSuccessCount > 0 ||
+                                      step10BatchTargets.Count > 0 || fullyLostBatchTargets.Count > 0 || pointAnchorBatchTargets.Count > 0);
+
+            int geometryViewsSkipped = Math.Max(0, discoveredViews.Count - geometryViewsScanned);
+
             StringBuilder sbSummary = new StringBuilder();
-            sbSummary.AppendLine("\n=== STEP13 REGRESSION SUMMARY ===");
+            sbSummary.AppendLine("\n=== FINAL DRAWING SUMMARY ===");
             sbSummary.AppendLine();
-            sbSummary.AppendLine($"Drawing: {docTitle}");
+            sbSummary.AppendLine($"PASS1 Views: {discoveredViews.Count}");
+            sbSummary.AppendLine($"Target Views: {targetViewCount}");
+            sbSummary.AppendLine();
+            sbSummary.AppendLine($"Geometry Views Scanned: {geometryViewsScanned}");
+            sbSummary.AppendLine($"Geometry Views Skipped: {geometryViewsSkipped}");
+            sbSummary.AppendLine();
             sbSummary.AppendLine($"Initial Display: {initialDrawingDisplayDimCount}");
             sbSummary.AppendLine($"Final Display: {finalTotalDisplay}");
             sbSummary.AppendLine();
@@ -884,12 +1077,14 @@ namespace ADDIN.Commands
             sbSummary.AppendLine($"  Unsupported: {remainingUnsupported}");
             sbSummary.AppendLine($"  HighConfidence: {remainingHighConfidence}");
             sbSummary.AppendLine($"  ModelMissing: {remainingModelMissing}");
+            sbSummary.AppendLine($"  GeometryChanged: {remainingGeomChanged}");
             sbSummary.AppendLine();
-            sbSummary.AppendLine("Other Non-Target Dimensions Modified: NO");
+            sbSummary.AppendLine($"Mutation Attempted: {(mutationAttempted ? "YES" : "NO")}");
             sbSummary.AppendLine("Drawing Saved: NO");
             sbSummary.AppendLine();
-            string step13Result = (finalTotalDangling == 0 && finalTotalDisplay == initialDrawingDisplayDimCount) ? "SUCCESS" : (finalTotalDangling < initialDrawingDanglingCount ? "SUCCESS" : "FAILED_REGRESSION");
-            sbSummary.AppendLine($"STEP13_RESULT: {step13Result}");
+            string step13bResult = (finalTotalDangling == 0 && finalTotalDisplay == initialDrawingDisplayDimCount) ? "SUCCESS" :
+                                   (finalTotalDangling < initialDrawingDanglingCount ? "SUCCESS" : "NO_MUTATION_OR_MANUAL_REVIEW");
+            sbSummary.AppendLine($"STEP13B_RESULT: {step13bResult}");
             sbSummary.AppendLine();
             sbSummary.AppendLine("STOP.");
 
@@ -897,7 +1092,7 @@ namespace ADDIN.Commands
 
             MessageBox.Show(
                 sbSummary.ToString(),
-                "REPAIR DIM - STEP13 REGRESSION SUMMARY",
+                "REPAIR DIM - FINAL SUMMARY",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
