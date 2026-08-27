@@ -1834,9 +1834,6 @@ namespace ADDIN
 
             if (text.IndexOf("x", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                if (repairMode)
-                    return false;
-
                 string[] parts = text.ToLowerInvariant().Split(new[] { 'x' }, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length != 2)
                     return false;
@@ -2004,9 +2001,7 @@ namespace ADDIN
             string looseSize = "None";
             if (!TryParseMakeHoleSize(holeSizeText, repairHolePanelMode, out diameter, out looseSize, out slotHole))
             {
-                string message = repairHolePanelMode
-                    ? "Hole Dia phai la so lon hon 0."
-                    : "Hole Size phai la so lon hon 0 hoac dang AxB, vi du 4.2x25.";
+                string message = "Hole Size phai la so lon hon 0 hoac dang AxB, vi du 4.2x25.";
                 MessageBox.Show(message, repairHolePanelMode ? "Repair Hole" : "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return false;
             }
