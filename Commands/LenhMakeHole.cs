@@ -1,4 +1,4 @@
-﻿#define DEBUG
+#define DEBUG
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -69,6 +69,8 @@ namespace ADDIN.Commands
             public double Height;
 
             public double[] MajorDirection;
+
+            public bool IsFromRoundHole;
         }
 
         private class SelectionInfo
@@ -7799,17 +7801,65 @@ namespace ADDIN.Commands
                 double perimeterM = 0.0;
                 double equivalentDiameterM = 0.0;
                 double sourceDiameterM = 0.0;
-                string roundFilterReason = "";
-                bool flag2;
-                if (looseSize != null)
+                string filterReason = "";
+                bool isCandidate = false;
+                bool isFromRoundHole = false;
+
+                if (flag)
                 {
-                    // Giu nguyen logic cu cho lo dai.
-                    flag2 = !flag && IsRepairHoleLoopSizeCandidate(major, minor, diameterM, looseSize);
+                    filterReason = "loop ngoai (outer loop)";
+                    isCandidate = false;
+                }
+                else if (looseSize != null)
+                {
+                    // Chế độ Loose (Repair thành lỗ dài AxB):
+                    // Nhánh 1: Kiểm tra xem có phải lỗ tròn hoàn chỉnh cần nâng cấp thành Loose không
+                    if (TryGetCompleteCircularRepairLoop(list5, major, minor, out var existingDiameterM, out var circleCenter, out perimeterM))
+                    {
+                        double existingDiameterMm = existingDiameterM * 1000.0;
+                        double targetWidthMm = looseSize.WidthM * 1000.0;
+                        double differenceMm = targetWidthMm - existingDiameterMm;
+                        sourceDiameterM = existingDiameterM;
+                        equivalentDiameterM = existingDiameterM;
+
+                        if (differenceMm <= 0.01)
+                        {
+                            filterReason = "lo tron hien co Ø" + existingDiameterMm.ToString("0.###", CultureInfo.InvariantCulture) + "mm >= WidthM " + targetWidthMm.ToString("0.###", CultureInfo.InvariantCulture) + "mm";
+                            isCandidate = false;
+                        }
+                        else if (differenceMm > RepairRoundToleranceMm + 1E-06)
+                        {
+                            filterReason = "lo tron hien co Ø" + existingDiameterMm.ToString("0.###", CultureInfo.InvariantCulture) + "mm vuot dung sai repair " + RepairRoundToleranceMm.ToString("0.###", CultureInfo.InvariantCulture) + "mm (diff=" + differenceMm.ToString("0.###", CultureInfo.InvariantCulture) + "mm)";
+                            isCandidate = false;
+                        }
+                        else
+                        {
+                            filterReason = "lo tron hien co Ø" + existingDiameterMm.ToString("0.###", CultureInfo.InvariantCulture) + "mm nang cap thanh Loose, diff=" + differenceMm.ToString("0.###", CultureInfo.InvariantCulture) + "mm";
+                            isCandidate = true;
+                            isFromRoundHole = true;
+                        }
+                    }
+                    else
+                    {
+                        // Nhánh 2: Fallback cho loop lỗ dài (slot méo/cũ)
+                        bool slotSizeOk = IsRepairHoleLoopSizeCandidate(major, minor, diameterM, looseSize);
+                        if (slotSizeOk)
+                        {
+                            filterReason = "loop slot cu khop kich thuoc Loose candidate (" + (width * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "x" + (height * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + " mm)";
+                            isCandidate = true;
+                        }
+                        else
+                        {
+                            filterReason = "loop khong phai lo tron va khong khop bounding box Loose candidate (" + (width * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "x" + (height * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + " mm)";
+                            isCandidate = false;
+                        }
+                    }
                 }
                 else
                 {
-                    // Lo tron chi duoc repair khi chu vi khop quy chuan lo meo.
-                    flag2 = !flag && IsRepairRoundHoleLoopCandidate(
+                    // Chế độ Circle (Repair thành lỗ tròn):
+                    // Lỗ tròn chỉ được repair khi chu vi khớp quy chuẩn lỗ méo.
+                    isCandidate = IsRepairRoundHoleLoopCandidate(
                         list5,
                         major,
                         minor,
@@ -7817,11 +7867,23 @@ namespace ADDIN.Commands
                         out perimeterM,
                         out equivalentDiameterM,
                         out sourceDiameterM,
-                        out roundFilterReason);
+                        out filterReason);
                 }
-                double[] majorDirection = GetRepairLoopMajorDirection(list3, facePlaneFrame, width, height);
-                Debug.WriteLine("[REPAIR HOLE] loop " + num + ". outer=" + flag + ", edges=" + num2 + ", points=" + list3.Count + ", sizeMm=(" + (width * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + " x " + (height * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "), perimeterMm=" + (perimeterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ", equivalentDiameterMm=" + (equivalentDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ", sourceDiameterMm=" + (sourceDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ", center=(" + (center2[0] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "," + (center2[1] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "," + (center2[2] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "), type=" + ((looseSize == null) ? "Circle" : "Loose") + ", direction=" + FormatRepairVector(majorDirection) + ", candidate=" + flag2 + ", reason=" + roundFilterReason);
-                if (flag2)
+
+                double[] majorDirection;
+                if (looseSize != null && isFromRoundHole)
+                {
+                    majorDirection = facePlaneFrame?.AxisU;
+                    Debug.WriteLine("[REPAIR HOLE] loop " + num + " tu lo tron -> dung huong mac dinh AxisU vi khong co thong tin huong tu hinh hoc tron.");
+                }
+                else
+                {
+                    majorDirection = GetRepairLoopMajorDirection(list3, facePlaneFrame, width, height);
+                }
+
+                Debug.WriteLine("[REPAIR HOLE] loop " + num + ". outer=" + flag + ", edges=" + num2 + ", points=" + list3.Count + ", sizeMm=(" + (width * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + " x " + (height * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "), perimeterMm=" + (perimeterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ", equivalentDiameterMm=" + (equivalentDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ", sourceDiameterMm=" + (sourceDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ", center=(" + (center2[0] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "," + (center2[1] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "," + (center2[2] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "), type=" + ((looseSize == null) ? "Circle" : "Loose") + ", direction=" + FormatRepairVector(majorDirection) + ", candidate=" + isCandidate + ", reason=" + filterReason);
+
+                if (isCandidate)
                 {
                     list2.Add(new RepairHoleLoopCandidate
                     {
@@ -7830,7 +7892,8 @@ namespace ADDIN.Commands
                         FallbackCenter = center2,
                         Width = width,
                         Height = height,
-                        MajorDirection = majorDirection
+                        MajorDirection = majorDirection,
+                        IsFromRoundHole = isFromRoundHole
                     });
                 }
             }
@@ -9152,6 +9215,71 @@ namespace ADDIN.Commands
                 }
             }
             return perimeter;
+        }
+
+        private bool TryGetCompleteCircularRepairLoop(
+            List<Edge> edges,
+            double major,
+            double minor,
+            out double existingDiameterM,
+            out double[] circleCenter,
+            out double perimeterM)
+        {
+            existingDiameterM = 0.0;
+            circleCenter = null;
+            perimeterM = 0.0;
+
+            if (edges == null || edges.Count == 0 || minor <= 1E-06)
+            {
+                return false;
+            }
+
+            double[] referenceCenter = null;
+            double referenceRadius = 0.0;
+            foreach (Edge edge in edges)
+            {
+                if (!TryGetCircularEdgeData(edge, out var center, out var radius))
+                {
+                    return false;
+                }
+                if (referenceCenter == null)
+                {
+                    referenceCenter = center;
+                    referenceRadius = radius;
+                    continue;
+                }
+                if (Distance(referenceCenter, center) > 2E-05 || Math.Abs(referenceRadius - radius) > 2E-05)
+                {
+                    return false;
+                }
+            }
+
+            if (referenceCenter == null || referenceRadius <= 1E-06)
+            {
+                return false;
+            }
+
+            if (major > 1E-06 && (major / minor > 1.05))
+            {
+                return false;
+            }
+
+            perimeterM = GetRepairLoopPerimeter(edges);
+            if (perimeterM <= 1E-06)
+            {
+                return false;
+            }
+
+            double expectedPerimeter = 2.0 * Math.PI * referenceRadius;
+            double tolerance = Math.Max(5E-05, expectedPerimeter * 0.02);
+            if (Math.Abs(perimeterM - expectedPerimeter) > tolerance)
+            {
+                return false;
+            }
+
+            existingDiameterM = referenceRadius * 2.0;
+            circleCenter = referenceCenter;
+            return true;
         }
 
         private bool IsCompleteCircularRepairLoop(List<Edge> edges, double perimeterM, double major, double minor)
