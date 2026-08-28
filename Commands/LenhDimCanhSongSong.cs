@@ -901,7 +901,7 @@ namespace ADDIN.Commands
 
             List<double> candidates = new List<double>();
 
-            // 1. L?y c?c c?nh ng?n nghi l? ?? d?y t?m
+            // 1. Lay cac canh ngan nghi la do day ton
             foreach (EdgeInfo edge in edges)
             {
                 if (edge == null)
@@ -911,7 +911,7 @@ namespace ADDIN.Commands
                     candidates.Add(edge.LengthMm);
             }
 
-            // 2. L?y kho?ng c?ch gi?a c?c c?p c?nh song song nghi l? ?? d?y
+            // 2. Lay khoang cach giua cac cap canh song song nghi la do day
             for (int i = 0; i < edges.Count; i++)
             {
                 for (int j = i + 1; j < edges.Count; j++)
@@ -1149,56 +1149,9 @@ namespace ADDIN.Commands
             }
 
             // ============================================================
-            // NEU USER DA XAC DINH DUOC CUNG
-            // -> UU TIEN CUNG DO
-            // ============================================================
-
-            ArcInfo selectedCandidate =
-                FindMatchingArcGeometry(
-                    candidates,
-                    selectedArc);
-
-            if (selectedCandidate != null)
-            {
-                List<ArcInfo> selectedSide =
-                    new List<ArcInfo>();
-
-                double centerTolMm =
-                    Math.Max(
-                        0.4,
-                        materialThicknessMm * 0.3);
-
-                foreach (ArcInfo candidateArc in candidates)
-                {
-                    double centerGapMm =
-                        Distance2D(
-                            candidateArc.CenterX,
-                            candidateArc.CenterY,
-                            selectedCandidate.CenterX,
-                            selectedCandidate.CenterY)
-                        * 1000.0 / viewScale;
-
-                    if (centerGapMm <= centerTolMm
-                        && Math.Abs(
-                            candidateArc.RadiusMm
-                            - selectedCandidate.RadiusMm) <= 0.15)
-                    {
-                        selectedSide.Add(candidateArc);
-                    }
-                }
-
-                Debug.WriteLine(
-                    "[DIM MAT CAT CUNG] selected contour R"
-                    + selectedCandidate.RadiusMm.ToString("0.###")
-                    + ", segments="
-                    + selectedSide.Count);
-
-                return selectedSide;
-            }
-
-            // ============================================================
-            // KHONG CO CUNG DUOC CHON
-            // -> DUNG LOGIC AUTO DETECT CU
+            // RETURN ALL VALID CONTOUR ARCS
+            // Previously, this restricted the return to a single arc location.
+            // We now return all candidates so every bend gets dimensioned.
             // ============================================================
 
             List<ArcInfo> innerContourArcs =
@@ -1439,7 +1392,7 @@ namespace ADDIN.Commands
                         arc,
                         centerX,
                         centerY,
-                        18.0);
+                        -12.0); // NEGATIVE offset places the Radius text neatly INSIDE the bend
                     radiusGroups.Add(arc);
                 }
 
@@ -1451,7 +1404,7 @@ namespace ADDIN.Commands
                         arc,
                         centerX,
                         centerY,
-                        10.0 + count * 2.5);
+                        12.0); // POSITIVE offset places the Arc Length OUTSIDE the bend
                 }
             }
 
@@ -1462,49 +1415,34 @@ namespace ADDIN.Commands
                 materialThicknessMm);
 
             // =============================================================
-            // QUAN TRONG: CO CUNG R KHONG DUOC DOI LOGIC DIM CANH THANG.
-            // Radius/arc-length la thong tin BO SUNG. Kich thuoc canh van phai
-            // dung LOGIC PHU BI CU (vi du L-profile: 35 va 14, khong phai 33 va 12).
+            // DIMENSION PHYSICAL LENGTH FOR CURVED PROFILES
+            // If the profile has deliberate arcs (R > thickness + 0.1), 
+            // dimension the true physical straight edges (e.g. 47, 44, 897) 
+            // instead of using Virtual Sharps for the outer envelope.
             // =============================================================
             int connectedLineDimensionCount = 0;
+            HashSet<Edge> dimensionedEdges = new HashSet<Edge>();
 
-            if (connectedLines.Count >= 2)
+            if (connectedLines.Count > 0)
             {
-                EdgeInfo legacySeed = selectedLineSeed;
-
-                // Sau rebuild, seed user click co the khong nam trong list da duoc
-                // loc tu cung. Neu vay dung 1 line tren dung contour cua cung.
-                if (legacySeed == null || !ContainsMatchingEdgeGeometry(connectedLines, legacySeed))
-                    legacySeed = connectedLines[0];
-
-                connectedLineDimensionCount = AddAngledOuterProfileDimensions(
-                    model,
-                    view,
-                    selectData,
-                    edges,
-                    arcs,
-                    legacySeed,
-                    true,
-                    null,
-                    materialThicknessMm);
-
-                // Safe fallback: giu engine cu cho profile H/V neu contour engine
-                // khong tao duoc dimension. Khong bao gio fallback sang physical
-                // edge length cho truong hop co R, vi no se tao 33/12 thay vi 35/14.
-                if (connectedLineDimensionCount == 0 && legacySeed != null)
+                foreach (EdgeInfo line in connectedLines)
                 {
-                    connectedLineDimensionCount = AddSeededSectionDimensions(
+                    if (line == null || line.Edge == null) continue;
+
+                    DimensionPlacement placement = GetOuterPlacement(line, centerX, centerY);
+                    connectedLineDimensionCount += AddEdgeLengthDimension(
                         model,
                         selectData,
-                        edges,
-                        legacySeed);
+                        line,
+                        placement,
+                        DimOffsetMm,
+                        dimensionedEdges);
                 }
 
                 count += connectedLineDimensionCount;
 
-                Debug.WriteLine("[DIM MAT CAT CUNG] legacy outer-envelope dimensions="
-                    + connectedLineDimensionCount
-                    + ", seed=" + EdgeSummary(legacySeed));
+                Debug.WriteLine("[DIM MAT CAT CUNG] physical straight edge dimensions="
+                    + connectedLineDimensionCount);
             }
 
             Debug.WriteLine("[DIM MAT CAT CUNG] referenceArcs=" + referenceArcs.Count
@@ -2263,25 +2201,25 @@ namespace ADDIN.Commands
             out double x,
             out double y)
         {
-            double dx = arc.MidX - profileCenterX;
-            double dy = arc.MidY - profileCenterY;
+            double dx = arc.MidX - arc.CenterX;
+            double dy = arc.MidY - arc.CenterY;
             double len = Math.Sqrt(dx * dx + dy * dy);
+
             if (len <= 0.0000001)
             {
-                dx = arc.MidX - arc.CenterX;
-                dy = arc.MidY - arc.CenterY;
+                dx = arc.MidX - profileCenterX;
+                dy = arc.MidY - profileCenterY;
                 len = Math.Sqrt(dx * dx + dy * dy);
+                if (len <= 0.0000001)
+                {
+                    dx = 1.0;
+                    dy = -1.0;
+                    len = Math.Sqrt(2.0);
+                }
             }
 
-            if (len <= 0.0000001)
-            {
-                dx = 0.0;
-                dy = -1.0;
-                len = 1.0;
-            }
-
-            x = arc.MidX + dx / len * MmToM(offsetMm);
-            y = arc.MidY + dy / len * MmToM(offsetMm);
+            x = arc.MidX + (dx / len) * MmToM(offsetMm);
+            y = arc.MidY + (dy / len) * MmToM(offsetMm);
         }
 
         private void GetCurvedProfileBoundsCenter(
@@ -2398,22 +2336,31 @@ namespace ADDIN.Commands
                 }
             }
 
-            return RemoveParallelDuplicateProfileLines(result, materialThicknessMm);
+            return RemoveParallelDuplicateProfileLines(result, edges, materialThicknessMm);
         }
 
         private List<EdgeInfo> RemoveParallelDuplicateProfileLines(
             List<EdgeInfo> lines,
+            List<EdgeInfo> allEdges,
             double materialThicknessMm)
         {
             List<EdgeInfo> result = new List<EdgeInfo>();
             if (lines == null)
                 return result;
 
+            double centerX = 0.0;
+            double centerY = 0.0;
+            if (allEdges != null && allEdges.Count > 0)
+                GetEdgeBoundsCenter(allEdges, out centerX, out centerY);
+            else
+                GetEdgeBoundsCenter(lines, out centerX, out centerY);
+
             foreach (EdgeInfo edge in lines)
             {
                 bool duplicate = false;
-                foreach (EdgeInfo kept in result)
+                for (int i = 0; i < result.Count; i++)
                 {
+                    EdgeInfo kept = result[i];
                     double gapViewM;
                     double overlapViewM;
                     if (!TryGetParallelMetrics(edge, kept, out gapViewM, out overlapViewM))
@@ -2425,6 +2372,16 @@ namespace ADDIN.Commands
                         && overlapMm >= Math.Min(edge.LengthMm, kept.LengthMm) * 0.65)
                     {
                         duplicate = true;
+
+                        // Compare which edge is further from the center
+                        double edgeScore = OuterScore(edge, centerX, centerY);
+                        double keptScore = OuterScore(kept, centerX, centerY);
+
+                        if (edgeScore > keptScore + MmToViewM(0.05))
+                        {
+                            // The new edge is the true outer face, replace the inner face
+                            result[i] = edge;
+                        }
                         break;
                     }
                 }
@@ -3223,7 +3180,12 @@ namespace ADDIN.Commands
 
             foreach (OuterProfileJoint joint in joints)
             {
-                joint.UseVirtualSharp = ShouldAddProfileAngle(joint.First, joint.Second);
+                bool needsAngleDim = ShouldAddProfileAngle(joint.First, joint.Second);
+
+                // ONLY create a virtual sharp if the joint angle is not 90 degrees, 
+                // OR if at least one of the intersecting edges is physically tilted (Angled) on the drawing sheet.
+                joint.UseVirtualSharp = needsAngleDim || joint.First.IsAngled || joint.Second.IsAngled;
+
                 if (joint.UseVirtualSharp)
                 {
                     joint.Sharp = CreateNativeVirtualSharp(
@@ -3371,32 +3333,43 @@ namespace ADDIN.Commands
                             EdgeInfo perpendicularEdge = GetOtherJointEdge(otherJoint, edge);
                             if (perpendicularEdge != null)
                             {
-                                edgeDimensionCount = edge.IsAngled && IsAcuteProfileJoint(sharpJoint)
-                                    ? AddProjectedReferenceDimension(
-                                        model,
-                                        selectData,
-                                        oneSharp.Point,
-                                        perpendicularEdge.Edge,
-                                        oneSharp.X,
-                                        oneSharp.Y,
-                                        otherJoint.X,
-                                        otherJoint.Y,
-                                        centerX,
-                                        centerY,
-                                        DimOffsetMm)
-                                    : AddReferenceToReferenceDimension(
-                                        model,
-                                        selectData,
-                                        oneSharp.Point,
-                                        perpendicularEdge.Edge,
-                                        edge,
-                                        oneSharp.X,
-                                        oneSharp.Y,
-                                        otherJoint.X,
-                                        otherJoint.Y,
-                                        centerX,
-                                        centerY,
-                                        DimOffsetMm);
+                                double thkMm = knownThicknessMm > 0.001 ? knownThicknessMm : EstimateMaterialThicknessMm(edges);
+                                EdgeInfo outerMate = FindParallelMateAtThickness(perpendicularEdge, edges, thkMm);
+                                
+                                double boundX = otherJoint.X;
+                                double boundY = otherJoint.Y;
+
+                                // If an outer mate exists, verify if it extends the physical envelope span.
+                                if (outerMate != null)
+                                {
+                                    double distCurrent = Distance2D(oneSharp.X, oneSharp.Y, boundX, boundY);
+                                    double newX, newY;
+                                    if (TryIntersectLines2D(edge, outerMate, out newX, out newY))
+                                    {
+                                        double distNew = Distance2D(oneSharp.X, oneSharp.Y, newX, newY);
+                                        // If the mate expands the distance by roughly the material thickness, it is the true outer face.
+                                        if (distNew > distCurrent + MmToViewM(thkMm * 0.5))
+                                        {
+                                            perpendicularEdge = outerMate;
+                                            boundX = newX;
+                                            boundY = newY;
+                                        }
+                                    }
+                                }
+
+                                edgeDimensionCount = AddReferenceToReferenceDimension(
+                                    model,
+                                    selectData,
+                                    oneSharp.Point,
+                                    perpendicularEdge.Edge,
+                                    edge,
+                                    oneSharp.X,
+                                    oneSharp.Y,
+                                    boundX,
+                                    boundY,
+                                    centerX,
+                                    centerY,
+                                    DimOffsetMm);
                             }
                         }
                         else if (otherJoint == null)
@@ -3543,7 +3516,8 @@ namespace ADDIN.Commands
 
             foreach (OuterProfileJoint joint in joints)
             {
-                if (!joint.UseVirtualSharp)
+                // Only draw the angular dimension if it's genuinely not 90 degrees.
+                if (!ShouldAddProfileAngle(joint.First, joint.Second))
                     continue;
 
                 count += AddAngularDimension(
@@ -3769,18 +3743,14 @@ namespace ADDIN.Commands
                 foreach (List<EdgeInfo> component in components)
                 {
                     double totalLengthMm = 0.0;
-                    double totalOuterScore = 0.0;
                     foreach (EdgeInfo edge in component)
                     {
                         totalLengthMm += edge.LengthMm;
-                        totalOuterScore += OuterScore(edge, centerX, centerY);
                     }
 
-                    // Edge count is the primary criterion. Length and the
-                    // envelope score only resolve ties between two surfaces.
-                    double componentScore = component.Count * 1000000.0
-                        + totalLengthMm * 100.0
-                        + totalOuterScore;
+                    // Edge count is primary. The outer contour of a sheet metal part 
+                    // mathematically has a larger total length than the inner contour.
+                    double componentScore = component.Count * 1000000.0 + totalLengthMm;
                     if (componentScore > bestScore)
                     {
                         bestScore = componentScore;
@@ -5289,28 +5259,19 @@ namespace ADDIN.Commands
             List<EdgeInfo> result = new List<EdgeInfo>();
             double thicknessMm = EstimateMaterialThicknessMm(edges);
             double minLengthMm = Math.Max(3.0, thicknessMm + 0.8);
-            double centerX;
-            double centerY;
-            GetEdgeBoundsCenter(edges, out centerX, out centerY);
 
             foreach (EdgeInfo edge in edges)
             {
                 if (edge.LengthMm < minLengthMm)
                     continue;
 
-                if (HasOuterParallelMate(edge, edges, thicknessMm, centerX, centerY))
-                {
-                    Debug.WriteLine("[DIM MAT CAT] skip inner contour edge=" + EdgeSummary(edge));
-                    continue;
-                }
-
                 result.Add(edge);
-                Debug.WriteLine("[DIM MAT CAT] outer contour edge=" + EdgeSummary(edge)
+                Debug.WriteLine("[DIM MAT CAT] contour candidate edge=" + EdgeSummary(edge)
                     + ", mid=(" + MToMm(edge.MidX).ToString("0.###")
                     + "," + MToMm(edge.MidY).ToString("0.###") + ")");
             }
 
-            Debug.WriteLine("[DIM MAT CAT] outer contour minLengthMm=" + minLengthMm.ToString("0.###")
+            Debug.WriteLine("[DIM MAT CAT] contour minLengthMm=" + minLengthMm.ToString("0.###")
                 + ", candidates=" + result.Count);
             return result;
         }
@@ -5882,7 +5843,7 @@ namespace ADDIN.Commands
             double bestLeftGap = double.MaxValue;
             double bestRightGap = double.MaxValue;
 
-            // ??y l? dung sai theo k?ch th??c model, c? scale theo Drawing View.
+            // Day la dung sai theo kich thuoc model, co scale theo Drawing View.
             double joinTol = MmToViewM(18.0);
 
             foreach (EdgeInfo candidate in edges)
@@ -5890,7 +5851,7 @@ namespace ADDIN.Commands
                 if (candidate == null || !candidate.IsVertical)
                     continue;
 
-                // C?nh d?c ph?i c? v? tr? t??ng quan v?i c?nh ngang.
+                // Canh doc phai co vi tri tuong quan voi canh ngang.
                 double yGap = DistanceToRange(horizontal.MidY, candidate.MinY, candidate.MaxY);
                 if (yGap > joinTol)
                     continue;
@@ -6040,7 +6001,7 @@ namespace ADDIN.Commands
             double bestBottomGap = double.MaxValue;
             double bestTopGap = double.MaxValue;
 
-            // ??y l? dung sai theo k?ch th??c model, c? scale theo Drawing View.
+            // Day la dung sai theo kich thuoc model, co scale theo Drawing View.
             double joinTol = MmToViewM(18.0);
 
             foreach (EdgeInfo candidate in edges)
@@ -6048,7 +6009,7 @@ namespace ADDIN.Commands
                 if (candidate == null || !candidate.IsHorizontal)
                     continue;
 
-                // C?nh ngang ph?i c? v? tr? t??ng quan v?i c?nh d?c.
+                // Canh ngang phai co vi tri tuong quan voi canh doc.
                 double xGap = DistanceToRange(vertical.MidX, candidate.MinX, candidate.MaxX);
                 if (xGap > joinTol)
                     continue;
