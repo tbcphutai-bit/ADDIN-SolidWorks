@@ -11,6 +11,7 @@ using System.Windows.Automation;
 using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
+using ADDIN.Helpers;
 
 namespace ADDIN.Commands
 {
@@ -7192,24 +7193,60 @@ namespace ADDIN.Commands
             string sizeName = diameterMm.ToString("0.00", CultureInfo.InvariantCulture) + "mm";
             try
             {
-                return model.FeatureManager.HoleWizard5(
-                    genericHoleType,
-                    (int)swWzdHoleStandards_e.swStandardAnsiMetric,
-                    (int)swWzdHoleStandardFastenerTypes_e.swStandardAnsiMetricDrillSizes,
-                    sizeName,
-                    (short)swEndConditions_e.swEndCondBlind,
-                    diameter,
-                    depth,
-                    length,
-                    -1.0, -1.0, -1.0, -1.0, -1.0, -1.0,
-                    -1.0, -1.0, -1.0, -1.0, -1.0, -1.0,
-                    "",
-                    RevDir: false,
-                    FeatureScope: false,
-                    AutoSelect: false,
-                    AssemblyFeatureScope: false,
-                    AutoSelectComponents: false,
-                    PropagateFeatureToParts: false);
+                if (genericHoleType == 8 && length > 1E-06)
+                {
+                    string diagnosticMsg;
+                    using (var schemeOverride = SlotSchemeOverride.TrySetOverallScheme(swApp, out diagnosticMsg))
+                    {
+                        if (schemeOverride == null)
+                        {
+                            Debug.WriteLine("[MAKE HOLE] " + diagnosticMsg);
+                            return null;
+                        }
+
+                        Debug.WriteLine("[MAKE HOLE] " + diagnosticMsg);
+
+                        return model.FeatureManager.HoleWizard5(
+                            genericHoleType,
+                            (int)swWzdHoleStandards_e.swStandardAnsiMetric,
+                            (int)swWzdHoleStandardFastenerTypes_e.swStandardAnsiMetricDrillSizes,
+                            sizeName,
+                            (short)swEndConditions_e.swEndCondBlind,
+                            diameter,
+                            depth,
+                            length,
+                            -1.0, -1.0, -1.0, -1.0, -1.0, -1.0,
+                            -1.0, -1.0, -1.0, -1.0, -1.0, -1.0,
+                            "",
+                            RevDir: false,
+                            FeatureScope: false,
+                            AutoSelect: false,
+                            AssemblyFeatureScope: false,
+                            AutoSelectComponents: false,
+                            PropagateFeatureToParts: false);
+                    }
+                }
+                else
+                {
+                    return model.FeatureManager.HoleWizard5(
+                        genericHoleType,
+                        (int)swWzdHoleStandards_e.swStandardAnsiMetric,
+                        (int)swWzdHoleStandardFastenerTypes_e.swStandardAnsiMetricDrillSizes,
+                        sizeName,
+                        (short)swEndConditions_e.swEndCondBlind,
+                        diameter,
+                        depth,
+                        length,
+                        -1.0, -1.0, -1.0, -1.0, -1.0, -1.0,
+                        -1.0, -1.0, -1.0, -1.0, -1.0, -1.0,
+                        "",
+                        RevDir: false,
+                        FeatureScope: false,
+                        AutoSelect: false,
+                        AssemblyFeatureScope: false,
+                        AutoSelectComponents: false,
+                        PropagateFeatureToParts: false);
+                }
             }
             catch (Exception ex)
             {
@@ -10087,25 +10124,62 @@ namespace ADDIN.Commands
                 // Match the exact depth recorded by the working SolidWorks macro.
                 // EndType 2 is Through Next; keep this input identical for diagnosis.
                 const double macroDepthM = 0.002;
-                const double overallSlotLengthDimensionScheme = -1.0;
-                Feature feature = model.FeatureManager.HoleWizard5(
-                    genericHoleType,
-                    1,
-                    39,
-                    sizeName,
-                    2,
-                    diameterM,
-                    macroDepthM,
-                    slotLengthM > 1E-06 ? slotLengthM : -1.0,
-                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                    overallSlotLengthDimensionScheme, -1.0, -1.0, -1.0, -1.0,
-                    "",
-                    RevDir: false,
-                    FeatureScope: !partAllBodies,
-                    AutoSelect: !partAllBodies,
-                    AssemblyFeatureScope: !partAllBodies,
-                    AutoSelectComponents: !partAllBodies,
-                    PropagateFeatureToParts: false);
+                Feature feature = null;
+
+                if (genericHoleType == 8 && slotLengthM > 0)
+                {
+                    string diagnosticMsg;
+                    using (var schemeOverride = SlotSchemeOverride.TrySetOverallScheme(swApp, out diagnosticMsg))
+                    {
+                        if (schemeOverride == null)
+                        {
+                            Debug.WriteLine("[REPAIR HOLE] " + diagnosticMsg);
+                            return null;
+                        }
+
+                        Debug.WriteLine("[REPAIR HOLE] " + diagnosticMsg);
+
+                        feature = model.FeatureManager.HoleWizard5(
+                            genericHoleType,
+                            1,
+                            39,
+                            sizeName,
+                            2,
+                            diameterM,
+                            macroDepthM,
+                            slotLengthM > 1E-06 ? slotLengthM : -1.0,
+                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                            -1.0, -1.0, -1.0, -1.0, -1.0,
+                            "",
+                            RevDir: false,
+                            FeatureScope: !partAllBodies,
+                            AutoSelect: !partAllBodies,
+                            AssemblyFeatureScope: !partAllBodies,
+                            AutoSelectComponents: !partAllBodies,
+                            PropagateFeatureToParts: false);
+                    }
+                }
+                else
+                {
+                    feature = model.FeatureManager.HoleWizard5(
+                        genericHoleType,
+                        1,
+                        39,
+                        sizeName,
+                        2,
+                        diameterM,
+                        macroDepthM,
+                        slotLengthM > 1E-06 ? slotLengthM : -1.0,
+                        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        -1.0, -1.0, -1.0, -1.0, -1.0,
+                        "",
+                        RevDir: false,
+                        FeatureScope: !partAllBodies,
+                        AutoSelect: !partAllBodies,
+                        AssemblyFeatureScope: !partAllBodies,
+                        AutoSelectComponents: !partAllBodies,
+                        PropagateFeatureToParts: false);
+                }
                 int selectionCount = -1;
                 try
                 {
