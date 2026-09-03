@@ -46,10 +46,9 @@ namespace ADDIN.Commands
         public void ConfigureGrid()
         {
             gridBom.MultiSelect = true;
-            gridBom.SelectionMode = DataGridViewSelectionMode.CellSelect;
+            gridBom.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             ConfigureGridForContext(BomCommandContext.None);
             ResetProgress();
-            AutoFitBomGrid();
         }
 
         public void LoadBom(Func<bool> isCancellationRequested = null)
@@ -76,8 +75,6 @@ namespace ADDIN.Commands
 
             // Avoid measuring and repainting every row while COM data is loaded.
             gridBom.SuspendLayout();
-            gridBom.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-            gridBom.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
             try
             {
                 bomLoader.LoadBOMTableToGrid(gridBom, swTable, isCancellationRequested);
@@ -94,7 +91,6 @@ namespace ADDIN.Commands
             finally
             {
                 gridBom.ResumeLayout(false);
-                AutoFitBomGrid();
             }
 
             string bomLabel = LoadedBomContext == BomCommandContext.Unit
@@ -142,7 +138,6 @@ namespace ADDIN.Commands
             bomLoader?.ClearBomGrid(gridBom);
             LoadedBomContext = BomCommandContext.None;
             ConfigureGridForContext(BomCommandContext.None);
-            AutoFitBomGrid();
             lblStatus.Text = "Da xoa BOM";
         }
 
@@ -244,24 +239,6 @@ namespace ADDIN.Commands
 
         public void AutoFitBomGrid()
         {
-            gridBom.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            gridBom.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
-
-            if (gridBom.Columns.Count < 6)
-                return;
-
-            gridBom.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            gridBom.Columns[0].MinimumWidth = 45;
-            gridBom.Columns[0].Width = 45;
-
-            for (int i = 1; i <= 5; i++)
-                gridBom.Columns[i].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-
-            gridBom.Columns[1].FillWeight = 120;
-            gridBom.Columns[2].FillWeight = LoadedBomContext == BomCommandContext.Unit ? 100 : 80;
-            gridBom.Columns[3].FillWeight = 60;
-            gridBom.Columns[4].FillWeight = 60;
-            gridBom.Columns[5].FillWeight = 180;
         }
 
         public bool CheckDfTk()

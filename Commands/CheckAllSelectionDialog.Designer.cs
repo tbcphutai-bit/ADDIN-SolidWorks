@@ -21,7 +21,7 @@ namespace ADDIN.Commands
             this.lblSubtitle = new System.Windows.Forms.Label();
             this.lblTitle = new System.Windows.Forms.Label();
             this.lblInstruction = new System.Windows.Forms.Label();
-            this.pnlCheckList = new System.Windows.Forms.Panel();
+            this.pnlCheckList = new ADDIN.UI.ModernCard();
             this.lblKegakiDescription = new System.Windows.Forms.Label();
             this.lblUraDescription = new System.Windows.Forms.Label();
             this.lblDfTkDescription = new System.Windows.Forms.Label();
@@ -29,8 +29,8 @@ namespace ADDIN.Commands
             this.chkUraOmote = new System.Windows.Forms.CheckBox();
             this.chkDfTk = new System.Windows.Forms.CheckBox();
             this.lblSelectionCount = new System.Windows.Forms.Label();
-            this.btnRun = new System.Windows.Forms.Button();
-            this.btnCancel = new System.Windows.Forms.Button();
+            this.btnRun = new ADDIN.UI.ModernButton();
+            this.btnCancel = new ADDIN.UI.ModernButton();
             this.pnlHeader.SuspendLayout();
             this.pnlCheckList.SuspendLayout();
             this.SuspendLayout();
@@ -81,8 +81,9 @@ namespace ADDIN.Commands
             // 
             // pnlCheckList
             // 
-            this.pnlCheckList.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(245)))), ((int)(((byte)(251)))));
-            this.pnlCheckList.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pnlCheckList.BackColor = System.Drawing.Color.White;
+            this.pnlCheckList.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(223)))), ((int)(((byte)(221)))));
+            this.pnlCheckList.BorderRadius = 6;
             this.pnlCheckList.Controls.Add(this.lblKegakiDescription);
             this.pnlCheckList.Controls.Add(this.lblUraDescription);
             this.pnlCheckList.Controls.Add(this.chkKegaki);
@@ -96,7 +97,7 @@ namespace ADDIN.Commands
             // 
             this.lblKegakiDescription.AutoSize = true;
             this.lblKegakiDescription.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblKegakiDescription.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(104)))), ((int)(((byte)(92)))), ((int)(((byte)(112)))));
+            this.lblKegakiDescription.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(96)))), ((int)(((byte)(94)))), ((int)(((byte)(92)))));
             this.lblKegakiDescription.Location = new System.Drawing.Point(174, 49);
             this.lblKegakiDescription.Name = "lblKegakiDescription";
             this.lblKegakiDescription.Size = new System.Drawing.Size(120, 15);
@@ -107,7 +108,7 @@ namespace ADDIN.Commands
             // 
             this.lblUraDescription.AutoSize = true;
             this.lblUraDescription.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblUraDescription.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(104)))), ((int)(((byte)(92)))), ((int)(((byte)(112)))));
+            this.lblUraDescription.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(96)))), ((int)(((byte)(94)))), ((int)(((byte)(92)))));
             this.lblUraDescription.Location = new System.Drawing.Point(174, 15);
             this.lblUraDescription.Name = "lblUraDescription";
             this.lblUraDescription.Size = new System.Drawing.Size(112, 15);
@@ -118,7 +119,7 @@ namespace ADDIN.Commands
             // 
             this.lblDfTkDescription.AutoSize = true;
             this.lblDfTkDescription.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblDfTkDescription.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(104)))), ((int)(((byte)(92)))), ((int)(((byte)(112)))));
+            this.lblDfTkDescription.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(96)))), ((int)(((byte)(94)))), ((int)(((byte)(92)))));
             this.lblDfTkDescription.Location = new System.Drawing.Point(174, 15);
             this.lblDfTkDescription.Name = "lblDfTkDescription";
             this.lblDfTkDescription.Size = new System.Drawing.Size(118, 15);
@@ -130,7 +131,7 @@ namespace ADDIN.Commands
             this.chkKegaki.Checked = true;
             this.chkKegaki.CheckState = System.Windows.Forms.CheckState.Checked;
             this.chkKegaki.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.chkKegaki.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(79)))), ((int)(((byte)(40)))), ((int)(((byte)(102)))));
+            this.chkKegaki.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(32)))), ((int)(((byte)(31)))), ((int)(((byte)(30)))));
             this.chkKegaki.Location = new System.Drawing.Point(16, 41);
             this.chkKegaki.Name = "chkKegaki";
             this.chkKegaki.Size = new System.Drawing.Size(150, 28);
@@ -144,7 +145,7 @@ namespace ADDIN.Commands
             this.chkUraOmote.Checked = true;
             this.chkUraOmote.CheckState = System.Windows.Forms.CheckState.Checked;
             this.chkUraOmote.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.chkUraOmote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(79)))), ((int)(((byte)(40)))), ((int)(((byte)(102)))));
+            this.chkUraOmote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(32)))), ((int)(((byte)(31)))), ((int)(((byte)(30)))));
             this.chkUraOmote.Location = new System.Drawing.Point(16, 7);
             this.chkUraOmote.Name = "chkUraOmote";
             this.chkUraOmote.Size = new System.Drawing.Size(150, 28);
@@ -158,7 +159,7 @@ namespace ADDIN.Commands
             this.chkDfTk.Checked = true;
             this.chkDfTk.CheckState = System.Windows.Forms.CheckState.Checked;
             this.chkDfTk.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.chkDfTk.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(79)))), ((int)(((byte)(40)))), ((int)(((byte)(102)))));
+            this.chkDfTk.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(32)))), ((int)(((byte)(31)))), ((int)(((byte)(30)))));
             this.chkDfTk.Location = new System.Drawing.Point(16, 7);
             this.chkDfTk.Name = "chkDfTk";
             this.chkDfTk.Size = new System.Drawing.Size(150, 28);
@@ -171,7 +172,7 @@ namespace ADDIN.Commands
             // 
             this.lblSelectionCount.AutoSize = true;
             this.lblSelectionCount.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblSelectionCount.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(88)))), ((int)(((byte)(137)))));
+            this.lblSelectionCount.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(120)))), ((int)(((byte)(212)))));
             this.lblSelectionCount.Location = new System.Drawing.Point(20, 188);
             this.lblSelectionCount.Name = "lblSelectionCount";
             this.lblSelectionCount.Size = new System.Drawing.Size(101, 15);
@@ -180,40 +181,40 @@ namespace ADDIN.Commands
             // 
             // btnRun
             // 
-            this.btnRun.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(235)))), ((int)(((byte)(252)))));
-            this.btnRun.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(82)))), ((int)(((byte)(132)))), ((int)(((byte)(190)))));
-            this.btnRun.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(224)))), ((int)(((byte)(249)))));
-            this.btnRun.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnRun.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnRun.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(24)))), ((int)(((byte)(74)))), ((int)(((byte)(126)))));
+            this.btnRun.BorderRadius = 4;
+            this.btnRun.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnRun.ForeColor = System.Drawing.Color.White;
+            this.btnRun.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(110)))), ((int)(((byte)(190)))));
             this.btnRun.Location = new System.Drawing.Point(226, 214);
             this.btnRun.Name = "btnRun";
+            this.btnRun.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(120)))), ((int)(((byte)(212)))));
+            this.btnRun.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(90)))), ((int)(((byte)(158)))));
             this.btnRun.Size = new System.Drawing.Size(92, 30);
             this.btnRun.TabIndex = 4;
-            this.btnRun.Text = "CHAY";
+            this.btnRun.Text = "CHẠY";
             this.btnRun.UseVisualStyleBackColor = false;
             this.btnRun.Click += new System.EventHandler(this.btnRun_Click);
             // 
             // btnCancel
             // 
-            this.btnCancel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(246)))), ((int)(((byte)(247)))), ((int)(((byte)(249)))));
+            this.btnCancel.BorderRadius = 4;
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnCancel.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(204)))), ((int)(((byte)(213)))));
-            this.btnCancel.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(240)))), ((int)(((byte)(246)))));
-            this.btnCancel.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCancel.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnCancel.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(42)))), ((int)(((byte)(48)))), ((int)(((byte)(56)))));
+            this.btnCancel.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnCancel.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(32)))), ((int)(((byte)(31)))), ((int)(((byte)(30)))));
+            this.btnCancel.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(237)))), ((int)(((byte)(235)))), ((int)(((byte)(233)))));
             this.btnCancel.Location = new System.Drawing.Point(326, 214);
             this.btnCancel.Name = "btnCancel";
+            this.btnCancel.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(242)))), ((int)(((byte)(241)))));
+            this.btnCancel.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(223)))), ((int)(((byte)(221)))));
             this.btnCancel.Size = new System.Drawing.Size(92, 30);
             this.btnCancel.TabIndex = 5;
-            this.btnCancel.Text = "HUY";
+            this.btnCancel.Text = "HỦY";
             this.btnCancel.UseVisualStyleBackColor = false;
             // 
             // CheckAllSelectionDialog
             // 
             this.AcceptButton = this.btnRun;
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(251)))), ((int)(((byte)(253)))));
             this.CancelButton = this.btnCancel;
@@ -224,7 +225,7 @@ namespace ADDIN.Commands
             this.Controls.Add(this.pnlCheckList);
             this.Controls.Add(this.lblInstruction);
             this.Controls.Add(this.pnlHeader);
-            this.Font = new System.Drawing.Font("Times New Roman", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -248,7 +249,7 @@ namespace ADDIN.Commands
         private System.Windows.Forms.Label lblSubtitle;
         private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.Label lblInstruction;
-        private System.Windows.Forms.Panel pnlCheckList;
+        private ADDIN.UI.ModernCard pnlCheckList;
         private System.Windows.Forms.CheckBox chkDfTk;
         private System.Windows.Forms.CheckBox chkUraOmote;
         private System.Windows.Forms.CheckBox chkKegaki;
@@ -256,7 +257,7 @@ namespace ADDIN.Commands
         private System.Windows.Forms.Label lblUraDescription;
         private System.Windows.Forms.Label lblKegakiDescription;
         private System.Windows.Forms.Label lblSelectionCount;
-        private System.Windows.Forms.Button btnRun;
-        private System.Windows.Forms.Button btnCancel;
+        private ADDIN.UI.ModernButton btnRun;
+        private ADDIN.UI.ModernButton btnCancel;
     }
 }

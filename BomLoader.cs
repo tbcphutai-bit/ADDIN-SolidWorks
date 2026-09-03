@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -267,13 +267,17 @@ namespace ADDIN.Commands
                     AddUniquePath(bomAssemblyPathsToScan, assemblyPath);
             }
 
+            ModelDoc2 rootModel = GetRootAssemblyFromBom(swTable as IBomTableAnnotation);
+            if (rootModel == null)
+                rootModel = GetRootAssemblyFromActiveDrawing();
+
             HashSet<string> traversedAssemblyPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string assemblyPath in bomAssemblyPathsToScan)
             {
                 Application.DoEvents();
                 if (IsCancellationRequested())
                     break;
-                AddSubAssemblyRowsFromBomAssembly(gridBom, assemblyPath, rowAssemblyPaths, traversedAssemblyPaths);
+                AddSubAssemblyRowsFromBomAssembly(gridBom, assemblyPath, rowAssemblyPaths, traversedAssemblyPaths, rootModel);
             }
 
             Debug.WriteLine("[BOM LOAD] final grid rows=" + gridBom.Rows.Count + ", bomAssembliesToScan=" + bomAssemblyPathsToScan.Count);
@@ -574,10 +578,29 @@ namespace ADDIN.Commands
             DataGridView gridBom,
             string assemblyPath,
             HashSet<string> rowAssemblyPaths,
-            HashSet<string> traversedAssemblyPaths)
+            HashSet<string> traversedAssemblyPaths,
+            ModelDoc2 rootModel)
         {
-            if (!IsAssemblyPath(assemblyPath))
+            if (!IsAssemblyPath(assemblyPath) || !traversedAssemblyPaths.Add(assemblyPath))
                 return;
+
+            if (rootModel is AssemblyDoc rootAssembly)
+            {
+                object[] allComps = rootAssembly.GetComponents(true) as object[];
+                if (allComps != null)
+                {
+                    foreach (object item in allComps)
+                    {
+                        Component2 comp = item as Component2;
+                        if (comp != null && string.Equals(comp.GetPathName(), assemblyPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Debug.WriteLine("[BOM LOAD] scan -02- from root tree=" + assemblyPath);
+                            AddSubAssemblyRowsFromComponentTree(gridBom, comp, rowAssemblyPaths, traversedAssemblyPaths);
+                            return;
+                        }
+                    }
+                }
+            }
 
             ModelDoc2 model = swApp.GetOpenDocumentByName(assemblyPath) as ModelDoc2;
             if (model == null)
@@ -591,6 +614,60 @@ namespace ADDIN.Commands
 
             Debug.WriteLine("[BOM LOAD] scan -02- assembly=" + assemblyPath);
             AddSubAssemblyRowsFromModel(gridBom, model, assemblyPath, rowAssemblyPaths, traversedAssemblyPaths);
+        }
+
+        private void AddSubAssemblyRowsFromComponentTree(
+            DataGridView gridBom,
+            Component2 parentComponent,
+            HashSet<string> rowAssemblyPaths,
+            HashSet<string> traversedAssemblyPaths)
+        {
+            object[] children = parentComponent.GetChildren() as object[];
+            if (children == null) return;
+
+            foreach (object item in children)
+            {
+                Application.DoEvents();
+                if (IsCancellationRequested()) return;
+
+                Component2 child = item as Component2;
+                if (child == null) continue;
+
+                if (IsSuppressed(child) || IsEnvelopeComponent(child) || IsExcludeFromBomComponent(child))
+                    continue;
+
+                string childPath = "";
+                try { childPath = child.GetPathName(); } catch { }
+                if (!IsAssemblyPath(childPath)) continue;
+
+                if (!rowAssemblyPaths.Contains(childPath))
+                {
+                    ModelDoc2 childModel = child.GetModelDoc2() as ModelDoc2;
+                    if (childModel == null)
+                    {
+                        int sup = child.GetSuppression();
+                        if (sup == 0 || sup == 1) // Lightweight
+                        {
+                            try
+                            {
+                                child.SetSuppression2(2); // Resolved
+                                childModel = child.GetModelDoc2() as ModelDoc2;
+                            }
+                            catch { }
+                        }
+                    }
+                    if (childModel == null)
+                        childModel = OpenAssembly(childPath);
+
+                    AddComponentRow(gridBom, child, childModel, childPath, rowAssemblyPaths);
+                    Debug.WriteLine("[BOM LOAD] add sub assembly row path=" + childPath);
+                }
+
+                if (traversedAssemblyPaths.Add(childPath))
+                {
+                    AddSubAssemblyRowsFromComponentTree(gridBom, child, rowAssemblyPaths, traversedAssemblyPaths);
+                }
+            }
         }
 
         private void AddSubAssemblyRowsFromModel(
@@ -1038,7 +1115,7 @@ namespace ADDIN.Commands
                 ModelDoc2 opened = swApp.OpenDoc6(
                     assemblyPath,
                     (int)swDocumentTypes_e.swDocASSEMBLY,
-                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent | 4, // swOpenDocOptions_ViewOnly
                     "",
                     ref errors,
                     ref warnings) as ModelDoc2;
@@ -1070,7 +1147,7 @@ namespace ADDIN.Commands
                 ModelDoc2 opened = swApp.OpenDoc6(
                     partPath,
                     (int)swDocumentTypes_e.swDocPART,
-                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent | 4, // swOpenDocOptions_ViewOnly
                     "",
                     ref errors,
                     ref warnings) as ModelDoc2;

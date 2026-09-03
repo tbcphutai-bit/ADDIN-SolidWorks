@@ -16,7 +16,7 @@ namespace ADDIN
 {
     [ComVisible(true)]
     [ProgId("ADDIN.BomTaskPaneControl")]
-    public partial class BomTaskPaneControl : UserControl
+    public partial class BomTaskPaneControl : System.Windows.Forms.UserControl
     {
         private ISldWorks swApp;
         private DSldWorksEvents_Event swEvents;
@@ -111,7 +111,9 @@ namespace ADDIN
                     return true;
                 return message == 0x007B;
             }
-        }        private const string MakeHoleSizeHistoryFileName = "make-hole-sizes.txt";
+        }
+        
+        private const string MakeHoleSizeHistoryFileName = "make-hole-sizes.txt";
         private const string PropNameHinmei = "\u54c1\u540d";
         private const string PropNameBuhinmei = "\u90e8\u54c1\u540d";
         private const string PropNameMaterial = "\u6750\u8cea";
@@ -143,14 +145,16 @@ namespace ADDIN
             EnsureCheckBalloonButton();
             EnsureCheckDrawingBomButton();
             EnsureMakeHolePaintNameControls();
-            ApplyUnifiedTypography(this);
+            // ApplyUnifiedTypography(this); 
+            // ApplyModelTypography();
+            // ApplyDrawingUiStyles(); // <-- ĐÓNG HÀM NÀY ĐỂ TRẢ QUYỀN CHO DESIGNER
+            // ApplyReadableContrast();
+
             ApplyDeleteButtonIcons();
             ApplyModelPropsActionIcons();
-            ApplyModelTypography();
             SelectModelSideTab("Props");
             InitMakeHoleOptions();
             ApplyButtonIcons();
-            ApplyDrawingUiStyles();
             WireEvents();
             InitBomCommandToolTips();
             InitComponentDrawingTimer();
@@ -159,9 +163,9 @@ namespace ADDIN
             LayoutMakeHoleOptions();
             InitMakeHoleUpdateMonitor();
 
-            lblTitle.Text = "DRAWING BOM";
-            lblStatus.Text = "Dang cho ket noi...";
-            ApplyReadableContrast();
+            // lblTitle.Text = "DRAWING BOM";
+            // lblStatus.Text = "Dang cho ket noi...";
+
             UpdateBomCommandButtonState();
         }
 
@@ -201,7 +205,6 @@ namespace ADDIN
             lblStatus.Text = swApp != null
                 ? "Da ket noi SOLIDWORKS"
                 : "Dang cho ket noi...";
-            ApplyReadableContrast();
             ScheduleInitialTaskPaneLayout();
         }
 
@@ -436,7 +439,7 @@ namespace ADDIN
             if (btnCheckBalloon != null)
                 return;
 
-            btnCheckBalloon = new Button();
+            btnCheckBalloon = new ADDIN.UI.ModernButton();
             btnCheckBalloon.Name = "btnCheckBalloon";
             btnCheckBalloon.Text = "CHECK\r\nBALLOON";
             btnCheckBalloon.Size = new Size(90, 42);
@@ -450,7 +453,7 @@ namespace ADDIN
             if (btnCheckDrawingBom != null)
                 return;
 
-            btnCheckDrawingBom = new Button();
+            btnCheckDrawingBom = new ADDIN.UI.ModernButton();
 
             btnCheckDrawingBom.Name = "btnCheckDrawingBom";
             btnCheckDrawingBom.Text = "CHECK\r\nDRAWING";
@@ -640,7 +643,7 @@ namespace ADDIN
                 SetModelCommandImageIfExists(btnMakeHole, Path.Combine(imagesDir, "makehole.png"));
                 SetModelCommandImageIfExists(btnRepairHole, Path.Combine(imagesDir, "repairhole.png"));
                 SetModelCommandImageIfExists(btnPaintHoleSummary, Path.Combine(imagesDir, "counthole.png"));
-                ApplyModelCommandButtonStyles();
+                // ApplyModelCommandButtonStyles(); // <-- ĐÓNG HÀM NÀY ĐỂ TRẢ QUYỀN CHO DESIGNER
                 SetButtonImageIfExists(btnDimMatCat, Path.Combine(imagesDir, "dimmatcat.png"));
             }
             catch
@@ -728,29 +731,56 @@ namespace ADDIN
             lblStatus.ForeColor = textColor;
             chkSelectAll.Font = CreateUiFont(8.75F, FontStyle.Bold);
             chkSelectAll.ForeColor = textColor;
-            StyleBomTopButton(btnCheckDfTk);
-            StyleUnitActionButtons();
-            StyleBomTopButton(btnCheckUraOmote);
-            StyleBomTopButton(btnCheckKegaki);
-            StyleBomTopButton(btnCheckDrawingBom);
-            StyleToolButton(btnLoadBom, Color.FromArgb(246, 249, 252), Color.FromArgb(186, 200, 216), Color.FromArgb(234, 242, 250), textColor);
-            StyleToolButton(btnClearBom, Color.FromArgb(255, 246, 246), Color.FromArgb(214, 158, 158), Color.FromArgb(255, 235, 235), textColor);
-            StyleToolButton(button1, Color.FromArgb(246, 247, 249), Color.FromArgb(197, 204, 213), Color.FromArgb(235, 240, 246), textColor);
 
-            // Component Drawing visual properties are defined exclusively in the Designer.
+            // 1. NHÓM VIEW SIZE (Xanh dương)
+            Button[] primaryActionButtons = { btnGetWL, btnHorizontalAlignment, btnRotateCw, btnRotateCcw };
+            foreach (Button btn in primaryActionButtons)
+            {
+                if (btn is ADDIN.UI.ModernButton mBtn)
+                {
+                    mBtn.NormalColor = Color.FromArgb(220, 235, 252);
+                    mBtn.HoverColor = Color.FromArgb(202, 224, 249);
+                    mBtn.PressColor = Color.FromArgb(180, 210, 240);
+                    mBtn.BorderColor = Color.FromArgb(130, 170, 215);
+                    mBtn.ForeColor = Color.FromArgb(24, 74, 126);
+                }
+            }
+
+            // 2. NHÓM TEXT & BALLOON (Xanh mint)
+            Button[] textActionButtons = { btnNote, btnText, btnInsertBalloon };
+            foreach (Button btn in textActionButtons)
+            {
+                if (btn is ADDIN.UI.ModernButton mBtn)
+                {
+                    mBtn.NormalColor = Color.FromArgb(225, 245, 234);
+                    mBtn.HoverColor = Color.FromArgb(205, 235, 218);
+                    mBtn.PressColor = Color.FromArgb(185, 220, 198);
+                    mBtn.BorderColor = Color.FromArgb(130, 185, 150);
+                    mBtn.ForeColor = Color.FromArgb(20, 80, 45);
+                }
+            }
+
+            // 3. NHÓM MACRO: MỖI NÚT MỘT MÀU RIÊNG BIỆT DỄ PHÂN BIỆT
+            ConfigureUniqueButton(dimvang, Color.FromArgb(255, 243, 205), Color.FromArgb(250, 225, 150), Color.FromArgb(133, 100, 4));     // Vàng kem (Xóa dim vàng)
+            ConfigureUniqueButton(btnDimMatCat, Color.FromArgb(230, 242, 255), Color.FromArgb(205, 230, 250), Color.FromArgb(30, 90, 150));   // Xanh dương nhạt (Dim mặt cắt)
+            ConfigureUniqueButton(btnSplineToArcs, Color.FromArgb(253, 237, 236), Color.FromArgb(248, 215, 212), Color.FromArgb(146, 43, 33)); // Hồng/Đỏ nhạt (Spline -> cung R)
+            ConfigureUniqueButton(btnDimKegaki, Color.FromArgb(235, 247, 238), Color.FromArgb(210, 238, 215), Color.FromArgb(34, 112, 53));   // Xanh lá (Dim kegaki)
+            ConfigureUniqueButton(btnDimKichThuocLo, Color.FromArgb(243, 235, 247), Color.FromArgb(228, 210, 238), Color.FromArgb(94, 39, 123)); // Tím nhạt (Dim kích thước lỗ)
+            ConfigureUniqueButton(btnFixScale, Color.FromArgb(254, 239, 231), Color.FromArgb(250, 218, 201), Color.FromArgb(186, 74, 0));      // Cam nhạt (Fix tỉ lệ)
+            ConfigureUniqueButton(btnRepairDim, Color.FromArgb(255, 230, 230), Color.FromArgb(250, 200, 200), Color.FromArgb(160, 30, 30));  // Đỏ nhấn mạnh (Repair DIM)
         }
 
-        private void StyleBomTopButton(Button button)
+        // Hàm phụ trợ để gán màu riêng biệt cho từng nút
+        private void ConfigureUniqueButton(Button btn, Color normal, Color hover, Color foreColor)
         {
-            StyleToolButton(button, Color.FromArgb(235, 207, 244), Color.FromArgb(171, 96, 194), Color.FromArgb(225, 190, 238), Color.FromArgb(90, 34, 118));
-            if (button != null)
+            if (btn is ADDIN.UI.ModernButton mBtn)
             {
-                button.Image = null;
-                button.Font = CreateUiFont(8.75F, FontStyle.Bold);
-                button.ImageAlign = ContentAlignment.MiddleLeft;
-                button.TextAlign = ContentAlignment.MiddleCenter;
-                button.TextImageRelation = TextImageRelation.Overlay;
-                button.Padding = new Padding(3, 0, 3, 0);
+                mBtn.NormalColor = normal;
+                mBtn.HoverColor = hover;
+                mBtn.PressColor = ControlPaint.Dark(hover, 0.05F);
+                mBtn.BorderColor = ControlPaint.Dark(normal, 0.2F);
+                mBtn.ForeColor = foreColor;
+                mBtn.BorderRadius = 4;
             }
         }
 
@@ -759,14 +789,26 @@ namespace ADDIN
             if (button == null)
                 return;
 
-            button.BackColor = backColor;
-            button.ForeColor = textColor;
-            button.UseVisualStyleBackColor = false;
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderColor = borderColor;
-            button.FlatAppearance.BorderSize = 1;
-            button.FlatAppearance.MouseOverBackColor = hoverColor;
-            button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(hoverColor, 0.05F);
+            if (button is ADDIN.UI.ModernButton modernBtn)
+            {
+                modernBtn.NormalColor = backColor;
+                modernBtn.HoverColor = hoverColor;
+                modernBtn.PressColor = ControlPaint.Dark(hoverColor, 0.05F);
+                modernBtn.BorderRadius = 4;
+                modernBtn.ForeColor = textColor;
+            }
+            else
+            {
+                button.BackColor = backColor;
+                button.ForeColor = textColor;
+                button.UseVisualStyleBackColor = false;
+                button.FlatStyle = FlatStyle.Flat;
+                button.FlatAppearance.BorderColor = borderColor;
+                button.FlatAppearance.BorderSize = 1;
+                button.FlatAppearance.MouseOverBackColor = hoverColor;
+                button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(hoverColor, 0.05F);
+            }
+
             button.AutoEllipsis = false;
             button.UseCompatibleTextRendering = true;
             button.Font = CreateUiFont(8.75F, FontStyle.Bold);
@@ -806,14 +848,26 @@ namespace ADDIN
             if (button == null)
                 return;
 
-            button.BackColor = backColor;
-            button.UseVisualStyleBackColor = false;
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderSize = 1;
-            button.FlatAppearance.BorderColor = borderColor;
-            button.FlatAppearance.MouseOverBackColor = hoverColor;
-            button.FlatAppearance.MouseDownBackColor = downColor;
-            button.ForeColor = ControlPaint.Dark(borderColor, 0.55F);
+            if (button is ADDIN.UI.ModernButton modernBtn)
+            {
+                modernBtn.NormalColor = backColor;
+                modernBtn.HoverColor = hoverColor;
+                modernBtn.PressColor = downColor;
+                modernBtn.BorderRadius = 6;
+                modernBtn.ForeColor = ControlPaint.Dark(borderColor, 0.55F);
+            }
+            else
+            {
+                button.BackColor = backColor;
+                button.UseVisualStyleBackColor = false;
+                button.FlatStyle = FlatStyle.Flat;
+                button.FlatAppearance.BorderSize = 1;
+                button.FlatAppearance.BorderColor = borderColor;
+                button.FlatAppearance.MouseOverBackColor = hoverColor;
+                button.FlatAppearance.MouseDownBackColor = downColor;
+                button.ForeColor = ControlPaint.Dark(borderColor, 0.55F);
+            }
+
             button.Font = CreateUiFont(9.0F, FontStyle.Bold);
             button.AutoEllipsis = false;
             button.UseCompatibleTextRendering = true;
@@ -967,29 +1021,47 @@ namespace ADDIN
 
         private void ApplyReadableContrast()
         {
-            if (btnCheckDfTk != null)
-                btnCheckDfTk.Text = "CHECK\r\nDF/TK";
-            if (button2 != null)
-                button2.Text = "XEP\r\nUNIT";
-            if (btnOpenAssem != null)
-                btnOpenAssem.Text = "OPEN\r\nASSEM";
-            if (btnCheckUraOmote != null)
-                btnCheckUraOmote.Text = "CHECK\r\nウラ表";
-            if (btnCheckKegaki != null)
-                btnCheckKegaki.Text = "CHECK\r\nKEGAKI";
+            if (btnCheckDfTk != null) btnCheckDfTk.Text = "CHECK\r\nDF/TK";
+            if (btnCheckUraOmote != null) btnCheckUraOmote.Text = "CHECK\r\nウラ表";
+            if (btnCheckKegaki != null) btnCheckKegaki.Text = "CHECK\r\nKEGAKI";
+            if (btnCheckAll != null) btnCheckAll.Text = "CHECK ウラ表\r\nKEGAKI";
+            if (btnCheckRound != null) btnCheckRound.Text = "CHECK\r\nROUND";
+            if (btnCheckSamePart != null) btnCheckSamePart.Text = "CHECK\r\nSAME PART";
+            if (btnCheckDrawingBom != null) btnCheckDrawingBom.Text = "CHECK\r\nDRAWING";
+            if (button2 != null) button2.Text = "XẾP\r\nUNIT";
+            if (btnOpenAssem != null) btnOpenAssem.Text = "OPEN\r\nASSEM";
+            if (btnCheckBalloon != null) btnCheckBalloon.Text = "CHECK\r\nBALLOON";
+            if (btnLoadBom != null) btnLoadBom.Text = "CẬP NHẬT";
+            if (btnClearBom != null) btnClearBom.Text = "XÓA BẢNG";
+            if (button1 != null) button1.Text = "CANCEL";
 
-            if (btnLoadBom != null)
-                btnLoadBom.Text = "CAP NHAT";
-            if (btnClearBom != null)
-                btnClearBom.Text = "XOA BANG";
-            if (button1 != null)
-                button1.Text = "CANCEL";
+            // Nhóm Component (Tím nhạt)
+            Button[] componentButtons = { btnCheckDfTk, btnCheckUraOmote, btnCheckKegaki, btnCheckAll, btnCheckRound, btnCheckSamePart, btnCheckDrawingBom };
+            foreach (Button btn in componentButtons)
+            {
+                if (btn is ADDIN.UI.ModernButton mBtn)
+                {
+                    mBtn.NormalColor = Color.FromArgb(245, 238, 248);
+                    mBtn.HoverColor = Color.FromArgb(235, 220, 240);
+                    mBtn.PressColor = Color.FromArgb(225, 205, 232);
+                    mBtn.BorderColor = Color.FromArgb(215, 195, 225);
+                    mBtn.ForeColor = Color.FromArgb(90, 34, 118);
+                }
+            }
 
-            StyleBomTopButton(btnCheckDfTk);
-            StyleUnitActionButtons();
-            StyleBomTopButton(btnCheckUraOmote);
-            StyleBomTopButton(btnCheckKegaki);
-            StyleBomTopButton(btnCheckDrawingBom);
+            // Nhóm Unit (Xanh nhạt)
+            Button[] unitButtons = { button2, btnOpenAssem, btnCheckBalloon };
+            foreach (Button btn in unitButtons)
+            {
+                if (btn is ADDIN.UI.ModernButton mBtn)
+                {
+                    mBtn.NormalColor = Color.FromArgb(238, 244, 252);
+                    mBtn.HoverColor = Color.FromArgb(222, 235, 249);
+                    mBtn.PressColor = Color.FromArgb(205, 222, 242);
+                    mBtn.BorderColor = Color.FromArgb(190, 210, 235);
+                    mBtn.ForeColor = Color.FromArgb(24, 74, 126);
+                }
+            }
         }
 
         private Font CreateUiFont(float size, FontStyle style = FontStyle.Regular)
@@ -1014,14 +1086,7 @@ namespace ADDIN
                 ApplyUnifiedTypography(child);
             }
 
-            if (root is DataGridView grid)
-            {
-                grid.Font = CreateUiFont(8.75F);
-                grid.ColumnHeadersDefaultCellStyle.Font = CreateUiFont(8.75F, FontStyle.Bold);
-                grid.RowHeadersDefaultCellStyle.Font = CreateUiFont(8.75F);
-                grid.DefaultCellStyle.Font = CreateUiFont(8.75F);
-            }
-            else if (root is TabControl || root is TabPage || root is GroupBox)
+            if (root is TabControl || root is TabPage || root is GroupBox)
             {
                 root.Font = CreateUiFont(9.0F, FontStyle.Bold);
             }
@@ -1145,13 +1210,13 @@ namespace ADDIN
             btnCheckDfTk.Enabled = detailBomLoaded;
             button2.Enabled = unitBomLoaded;
             btnOpenAssem.Enabled = unitBomLoaded;
-            btnCheckBalloon.Enabled = hasBomRows;
+            btnCheckBalloon.Enabled = unitBomLoaded;
             btnCheckUraOmote.Enabled = detailBomLoaded;
             btnCheckKegaki.Enabled = detailBomLoaded;
             btnCheckAll.Enabled = detailBomLoaded;
             btnCheckRound.Enabled = detailBomLoaded;
             btnCheckSamePart.Enabled = detailBomLoaded;
-            btnCheckDrawingBom.Enabled = !drawingBomCommandInProgress;
+            btnCheckDrawingBom.Enabled = hasBomRows && !drawingBomCommandInProgress;
         }
 
         private void InitBomCommandToolTips()
@@ -3027,31 +3092,6 @@ namespace ADDIN
                 bomCommandToolTipFont = null;
             }
         }
-
-        private void StyleUnitActionButtons()
-        {
-            StyleBomTopButton(button2);
-            StyleToolButton(
-                button2,
-                Color.FromArgb(220, 235, 252),
-                Color.FromArgb(82, 132, 190),
-                Color.FromArgb(202, 224, 249),
-                Color.FromArgb(24, 74, 126));
-
-            StyleBomTopButton(btnOpenAssem);
-            StyleToolButton(
-                btnOpenAssem,
-                Color.FromArgb(220, 235, 252),
-                Color.FromArgb(82, 132, 190),
-                Color.FromArgb(202, 224, 249),
-                Color.FromArgb(24, 74, 126));
-            StyleBomTopButton(btnCheckBalloon);
-            StyleToolButton(
-                btnCheckBalloon,
-                Color.FromArgb(220, 235, 252),
-                Color.FromArgb(82, 132, 190),
-                Color.FromArgb(202, 224, 249),
-                Color.FromArgb(24, 74, 126));        }
 
         private void InitComponentDrawingTimer()
         {

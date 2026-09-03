@@ -344,6 +344,7 @@ namespace ADDIN.Commands
             List<Feature> curvedFeatures = new List<Feature>();
             List<double> sheetThicknesses = new List<double>();
             bool hasFoldUnfoldFeature = false;
+            double defaultBendRadiusMm = 0.0;
 
             foreach (Feature feature in features)
             {
@@ -355,6 +356,12 @@ namespace ADDIN.Commands
                         ISheetMetalFeatureData data = feature.GetDefinition() as ISheetMetalFeatureData;
                         if (data != null)
                         {
+                            try
+                            {
+                                defaultBendRadiusMm = Math.Abs(data.BendRadius * 1000.0);
+                            }
+                            catch { }
+
                             BendAllowanceInfo allowance = BendAllowanceInfo.Capture(data.GetCustomBendAllowance());
                             if (allowance != null)
                                 defaults.Add(allowance);
@@ -372,7 +379,7 @@ namespace ADDIN.Commands
                         Debug.WriteLine("[CHECK KEGAKI] SheetMetal definition ERROR: " + ex.Message);
                     }
                 }
-                else if (IsOneBendType(typeName))
+                else if (IsBendFeatureType(typeName))
                 {
                     bends.Add(feature);
                 }
@@ -444,6 +451,7 @@ namespace ADDIN.Commands
                 KegakiBendResult bendResult = CheckBend(
                     bendFeature,
                     defaults,
+                    defaultBendRadiusMm,
                     defaultSummary,
                     buhinNo,
                     bomFileName,
@@ -879,6 +887,7 @@ namespace ADDIN.Commands
         private KegakiBendResult CheckBend(
             Feature feature,
             List<BendAllowanceInfo> defaults,
+            double defaultBendRadiusMm,
             string defaultSummary,
             string buhinNo,
             string bomFileName,
@@ -891,20 +900,98 @@ namespace ADDIN.Commands
 
             try
             {
-                IOneBendFeatureData data = feature.GetDefinition() as IOneBendFeatureData;
-                if (data == null)
+                object defObj = null;
+                try { defObj = feature.GetDefinition(); } catch { }
+
+                double bendAngle = 0.0;
+                double bendRadius = 0.0;
+                bool bendDown = false;
+                bool useDefault = true;
+                object customAllowanceObj = null;
+                bool dataReadSuccess = false;
+
+                IOneBendFeatureData oneBend = defObj as IOneBendFeatureData;
+                if (oneBend != null)
+                {
+                    dataReadSuccess = true;
+                    try { bendAngle = oneBend.BendAngle; } catch { }
+                    try { bendRadius = oneBend.BendRadius; } catch { }
+                    try { bendDown = oneBend.BendDown; } catch { }
+                    try { useDefault = oneBend.UseDefaultBendAllowance; } catch { }
+                    try { customAllowanceObj = oneBend.GetCustomBendAllowance(); } catch { }
+                }
+                else
+                {
+                    IEdgeFlangeFeatureData edgeFlange = defObj as IEdgeFlangeFeatureData;
+                    if (edgeFlange != null)
+                    {
+                        dataReadSuccess = true;
+                        try { bendAngle = edgeFlange.BendAngle; } catch { }
+                        try { bendRadius = edgeFlange.BendRadius; } catch { }
+                        try { useDefault = edgeFlange.UseDefaultBendAllowance; } catch { }
+                        try { customAllowanceObj = edgeFlange.GetCustomBendAllowance(); } catch { }
+                    }
+                }
+
+                if (!dataReadSuccess && defObj != null)
+                {
+                    try
+                    {
+                        dynamic dynamicData = defObj;
+                        try { bendAngle = Convert.ToDouble(dynamicData.BendAngle); } catch { }
+                        try { bendRadius = Convert.ToDouble(dynamicData.BendRadius); } catch { }
+                        try { useDefault = Convert.ToBoolean(dynamicData.UseDefaultBendAllowance); } catch { }
+                        try { customAllowanceObj = dynamicData.GetCustomBendAllowance(); } catch { }
+                        dataReadSuccess = true;
+                    }
+                    catch { }
+                }
+
+                if (!dataReadSuccess)
                 {
                     result.Status = "CHECK";
-                    result.Note = "Khong doc duoc OneBendFeatureData";
+                    result.Note = "Khong doc duoc FeatureData cua " + SafeFeatureType(feature);
                     return result;
                 }
 
-                try { result.AngleDeg = Math.Abs(data.BendAngle * 180.0 / Math.PI); } catch { }
-                try { result.RadiusMm = Math.Abs(data.BendRadius * 1000.0); } catch { }
-                try { result.BendDown = data.BendDown; } catch { }
+                result.AngleDeg = Math.Abs(bendAngle * 180.0 / Math.PI);
+                result.RadiusMm = Math.Abs(bendRadius * 1000.0);
+                result.BendDown = bendDown;
 
-                bool useDefault = true;
-                try { useDefault = data.UseDefaultBendAllowance; } catch { }
+                BendAllowanceInfo bendAllowance = BendAllowanceInfo.Capture(customAllowanceObj);
+
+                double radiusThresholdMm = defaultBendRadiusMm + 0.1;
+                if (result.RadiusMm > radiusThresholdMm + 0.001)
+                {
+                    bool isKFactor05 = bendAllowance != null
+                        && bendAllowance.IsKFactorSetting()
+                        && Math.Abs(bendAllowance.KFactor - 0.5) <= 0.005;
+                    result.IsOverride = true;
+
+                    if (isKFactor05)
+                    {
+                        result.Status = "OK";
+                        result.BendSetting = "KFactor=0.5";
+                        result.Note = "Cung luon lon (R="
+                            + result.RadiusMm.ToString("0.###")
+                            + " > " + radiusThresholdMm.ToString("0.###")
+                            + "mm) dung K-Factor=0.5 hop le";
+                    }
+                    else
+                    {
+                        result.Status = "NG";
+                        result.BendSetting = bendAllowance != null
+                            ? bendAllowance.Summary()
+                            : "Khong xac dinh";
+                        result.Note = "Cung luon lon (R="
+                            + result.RadiusMm.ToString("0.###")
+                            + " > " + radiusThresholdMm.ToString("0.###")
+                            + "mm) bat buoc dung K-Factor=0.5 (Hien tai: "
+                            + result.BendSetting + ")";
+                    }
+                    return result;
+                }
+
                 result.IsOverride = !useDefault;
 
                 if (useDefault)
@@ -915,7 +1002,6 @@ namespace ADDIN.Commands
                     return result;
                 }
 
-                BendAllowanceInfo bendAllowance = BendAllowanceInfo.Capture(data.GetCustomBendAllowance());
                 result.BendSetting = bendAllowance == null ? "Khong doc duoc" : bendAllowance.Summary();
                 if (bendAllowance == null)
                 {
@@ -1653,9 +1739,11 @@ namespace ADDIN.Commands
             try { child = feature.GetFirstSubFeature() as Feature; } catch { }
             while (child != null)
             {
+                Feature nextChild = null;
+                try { nextChild = child.GetNextSubFeature() as Feature; } catch { }
+
                 AddFeatureAndChildren(child, result, seen, depth + 1);
-                try { child = child.GetNextSubFeature() as Feature; }
-                catch { child = null; }
+                child = nextChild;
             }
         }
 
@@ -1689,11 +1777,19 @@ namespace ADDIN.Commands
             return false;
         }
 
-        private static bool IsOneBendType(string typeName)
+        private static bool IsBendFeatureType(string typeName)
         {
             return string.Equals(typeName, "OneBend", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(typeName, "SketchBend", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(typeName, "ToroidalBend", StringComparison.OrdinalIgnoreCase);
+                || string.Equals(typeName, "ToroidalBend", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(typeName, "ProfileBend", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(typeName, "SM3dBend", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(typeName, "SMMiteredBend", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(typeName, "SweptFlange", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(typeName, "EdgeFlange", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(typeName, "MiterFlange", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(typeName, "Hem", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(typeName, "Jog", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsCurvedSheetMetalType(string typeName)
@@ -2320,11 +2416,9 @@ namespace ADDIN.Commands
                 sheet.Cells[excelRow, 14].Value = BuildClearNote(group);
 
                 if (groupStatus == "NG")
-                    sheet.Range["A" + excelRow + ":N" + excelRow].Interior.Color = Rgb(255, 199, 206);
+                    sheet.Range["A" + excelRow + ":P" + excelRow].Interior.Color = Rgb(255, 199, 206);
                 else if (groupStatus == "CHECK")
-                    sheet.Range["A" + excelRow + ":N" + excelRow].Interior.Color = Rgb(255, 235, 156);
-                else if (groupStatus == "SKIP")
-                    sheet.Range["A" + excelRow + ":N" + excelRow].Interior.Color = Rgb(217, 217, 217);
+                    sheet.Range["A" + excelRow + ":P" + excelRow].Interior.Color = Rgb(255, 235, 156);
 
                 excelRow++;
             }

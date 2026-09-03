@@ -267,13 +267,12 @@ namespace ADDIN.Commands
             // choose the dimension engine.  Each connected joint decides
             // locally whether it is a 90-degree edge case or needs a virtual
             // sharp.
-            int angledProfileCount = AddAngledOuterProfileDimensions(
+            int angledProfileCount = AddAlignedSectionDimensions(
                 model,
                 view,
                 selectData,
                 edges,
-                arcs,
-                selectedInfo);
+                arcs);
             if (angledProfileCount > 0)
             {
                 model.ClearSelection2(true);
@@ -1640,20 +1639,14 @@ namespace ADDIN.Commands
                         processedBranchEdges.Add(branchEdge.Edge);
                 }
 
-                if (branch.Count >= 2)
-                {
-                    count += AddAngledOuterProfileDimensions(
-                        model,
-                        view,
-                        selectData,
-                        allEdges,
-                        legacyArcs,
-                        seed.Line,
-                        true,
-                        tangentSeedEdges,
-                        materialThicknessMm);
-                }
             }
+
+            count += AddAlignedSectionDimensions(
+                model,
+                view,
+                selectData,
+                allEdges,
+                allArcs);
 
             Debug.WriteLine("[DIM MAT CAT CUNG] continuous tangent/envelope dimensions="
                 + count + ", tangentSeeds=" + tangentSeeds.Count);
@@ -3133,6 +3126,109 @@ namespace ADDIN.Commands
             {
                 Debug.WriteLine("[DIM MAT CAT] native virtual sharp display enable failed: " + ex.Message);
             }
+        }
+
+        private int AddAlignedSectionDimensions(
+            ModelDoc2 model,
+            SolidWorks.Interop.sldworks.View view,
+            SelectData selectData,
+            List<EdgeInfo> edges,
+            List<ArcInfo> arcs)
+        {
+            if (model == null || view == null || selectData == null
+                || edges == null || edges.Count == 0)
+                return 0;
+
+            int count = 0;
+            double offsetM = MmToViewM(DimOffsetMm);
+            EdgeInfo baseEdge = null;
+            double maxBaseLen = 0.0;
+            foreach (EdgeInfo e in edges)
+            {
+                if (e != null && e.Edge != null && e.LengthMm > maxBaseLen)
+                {
+                    maxBaseLen = e.LengthMm;
+                    baseEdge = e;
+                }
+            }
+            if (baseEdge == null)
+                return 0;
+
+            List<EdgeInfo> verticalEdges = edges.FindAll(
+                e => e != null && e.Edge != null && e.IsVertical && e.LengthMm >= 5.0);
+            if (verticalEdges.Count == 0)
+                return 0;
+
+            double centerX;
+            double centerY;
+            GetEdgeBoundsCenter(edges, out centerX, out centerY);
+            double avgVerticalX = 0.0;
+            foreach (EdgeInfo e in verticalEdges)
+                avgVerticalX += e.MidX;
+            avgVerticalX /= verticalEdges.Count;
+            bool flangeOnRight = avgVerticalX >= centerX;
+
+            EdgeInfo outerVertical = verticalEdges[0];
+            foreach (EdgeInfo e in verticalEdges)
+            {
+                if ((flangeOnRight && e.MaxX > outerVertical.MaxX)
+                    || (!flangeOnRight && e.MinX < outerVertical.MinX))
+                    outerVertical = e;
+            }
+
+            Vertex topVertex = outerVertical.Y1 >= outerVertical.Y2
+                ? outerVertical.Edge.GetStartVertex() as Vertex
+                : outerVertical.Edge.GetEndVertex() as Vertex;
+            if (topVertex == null)
+                return 0;
+
+            Vertex freeEndVertex = null;
+            double extremeX = flangeOnRight ? double.MaxValue : double.MinValue;
+            foreach (EdgeInfo e in edges)
+            {
+                if (e == null || e.Edge == null)
+                    continue;
+                Vertex v1 = e.Edge.GetStartVertex() as Vertex;
+                Vertex v2 = e.Edge.GetEndVertex() as Vertex;
+                if (flangeOnRight)
+                {
+                    if (e.X1 < extremeX) { extremeX = e.X1; freeEndVertex = v1; }
+                    if (e.X2 < extremeX) { extremeX = e.X2; freeEndVertex = v2; }
+                }
+                else
+                {
+                    if (e.X1 > extremeX) { extremeX = e.X1; freeEndVertex = v1; }
+                    if (e.X2 > extremeX) { extremeX = e.X2; freeEndVertex = v2; }
+                }
+            }
+            if (freeEndVertex == null)
+                return 0;
+
+            model.ClearSelection2(true);
+            if (SelectEdge(baseEdge.Edge, false, selectData)
+                && SelectReference(topVertex, true, selectData))
+            {
+                double textX = outerVertical.MidX
+                    + (flangeOnRight ? offsetM : -offsetM);
+                DisplayDimension hDisp = model.AddDimension2(
+                    textX, outerVertical.MidY, 0) as DisplayDimension;
+                if (hDisp != null)
+                    count++;
+            }
+
+            model.ClearSelection2(true);
+            if (SelectReference(freeEndVertex, false, selectData)
+                && SelectEdge(outerVertical.Edge, true, selectData))
+            {
+                double textX = baseEdge.MidX - baseEdge.NormX * offsetM;
+                double textY = baseEdge.MidY - baseEdge.NormY * offsetM;
+                DisplayDimension lDisp = model.AddDimension2(textX, textY, 0)
+                    as DisplayDimension;
+                if (lDisp != null)
+                    count++;
+            }
+
+            return count;
         }
 
         private int AddAngledOuterProfileDimensions(
@@ -4930,13 +5026,12 @@ namespace ADDIN.Commands
 
         private int AddSectionViewDimensions(ModelDoc2 model, SolidWorks.Interop.sldworks.View view, SelectData selectData, List<EdgeInfo> edges, List<ArcInfo> arcs)
         {
-            int angledProfileCount = AddAngledOuterProfileDimensions(
+            int angledProfileCount = AddAlignedSectionDimensions(
                 model,
                 view,
                 selectData,
                 edges,
-                arcs,
-                null);
+                arcs);
             if (angledProfileCount > 0)
                 return angledProfileCount;
 
