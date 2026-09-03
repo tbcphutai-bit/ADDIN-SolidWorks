@@ -158,6 +158,17 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="Helpers\SlotSchemeOverride.cs" />
+    <Compile Include="Helpers\ExtrudeCutRecoveryHelper.cs" />
+    <Compile Include="Helpers\TopologyEdgeMatcher.cs" />
+    <Compile Include="Helpers\SketchOperationsHelper.cs" />
+    <Compile Include="UI\UIHelper.cs" />
+    <Compile Include="UI\ModernButton.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\ModernCard.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\GridStyler.cs" />
     <Compile Include="SWAddin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

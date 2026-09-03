@@ -21,6 +21,7 @@ namespace ADDIN
     public class SwAddin : ISwAddin, ISwAddinTestFacade
     {
         public ISldWorks swApp;
+        public static ISldWorks InstanceSwApp;
         private int addinID;
         private ITaskpaneView swTaskPane;
         private BomTaskPaneControl uiControl;
@@ -33,6 +34,7 @@ namespace ADDIN
         public bool ConnectToSW(object ThisSW, int cookie)
         {
             swApp = (ISldWorks)ThisSW;
+            InstanceSwApp = swApp;
             addinID = cookie;
             swApp.SetAddinCallbackInfo(0, this, addinID);
 
