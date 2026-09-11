@@ -57,6 +57,13 @@ namespace ADDIN.Commands
             return string.Equals(anchorKey, candidateKey, StringComparison.OrdinalIgnoreCase);
         }
 
+        public static bool IsLinearEntityType(int t)
+        {
+            return t == (int)swSelectType_e.swSelEDGES ||
+                   t == (int)swSelectType_e.swSelEXTSKETCHSEGS ||
+                   t == (int)swSelectType_e.swSelSKETCHSEGS;
+        }
+
         public static ViewGeometryInfo EnumerateViewGeometry(
             ISldWorks swApp,
             SolidWorks.Interop.sldworks.View view,
@@ -154,7 +161,7 @@ namespace ADDIN.Commands
                     try
                     {
                         object edgesObj = view.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_Edge);
-                        if (edgesObj is object[] edgeArr)
+                        if (edgesObj is Array edgeArr)
                         {
                             geomInfo.VisibleEdgeCount += edgeArr.Length;
                             foreach (object edge in edgeArr)
@@ -176,7 +183,7 @@ namespace ADDIN.Commands
                     try
                     {
                         object silObj = view.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_SilhouetteEdge);
-                        if (silObj is object[] silArr)
+                        if (silObj is Array silArr)
                         {
                             geomInfo.VisibleSilhouetteCount += silArr.Length;
                             foreach (object sil in silArr)
@@ -198,7 +205,7 @@ namespace ADDIN.Commands
                     try
                     {
                         object vertObj = view.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_Vertex);
-                        if (vertObj is object[] vertArr)
+                        if (vertObj is Array vertArr)
                         {
                             geomInfo.VisibleVertexCount += vertArr.Length;
                         }
@@ -225,7 +232,7 @@ namespace ADDIN.Commands
                 try
                 {
                     object edgesObj = view.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Edge);
-                    if (edgesObj is object[] edgeArr)
+                    if (edgesObj is Array edgeArr)
                     {
                         geomInfo.VisibleEdgeCount += edgeArr.Length;
                         foreach (object edge in edgeArr)
@@ -247,7 +254,7 @@ namespace ADDIN.Commands
                 try
                 {
                     object silObj = view.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_SilhouetteEdge);
-                    if (silObj is object[] silArr)
+                    if (silObj is Array silArr)
                     {
                         geomInfo.VisibleSilhouetteCount += silArr.Length;
                         foreach (object sil in silArr)
@@ -269,7 +276,7 @@ namespace ADDIN.Commands
                 try
                 {
                     object vertObj = view.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Vertex);
-                    if (vertObj is object[] vertArr)
+                    if (vertObj is Array vertArr)
                     {
                         geomInfo.VisibleVertexCount += vertArr.Length;
                     }
@@ -380,12 +387,6 @@ namespace ADDIN.Commands
                 return;
             }
 
-            if (dimInfo.AnchorEntityType != (int)swSelectType_e.swSelEDGES)
-            {
-                dimInfo.CandidateDecision = "UNSUPPORTED_ANCHOR_TYPE";
-                return;
-            }
-
             // 3. Giới hạn Dimension Type trong giai đoạn này (Linear only)
             bool isLinearType =
                 dimInfo.DimensionType == swDimensionType_e.swLinearDimension ||
@@ -395,6 +396,13 @@ namespace ADDIN.Commands
             if (!isLinearType)
             {
                 dimInfo.CandidateDecision = "UNSUPPORTED_TYPE";
+                return;
+            }
+
+            if (!IsLinearEntityType(dimInfo.AnchorEntityType))
+            {
+                dimInfo.CandidateDecision = "DEFERRED_FULLY_LOST";
+                dimInfo.DiagnosticNotes.Add($"UNSUPPORTED_ANCHOR_TYPE_{dimInfo.AnchorEntityType}_DEFERRED_TO_FULLY_LOST");
                 return;
             }
 
@@ -493,8 +501,8 @@ namespace ADDIN.Commands
 
             if (dimInfo.AnchorPolylineMatches.Count == 0)
             {
-                dimInfo.CandidateDecision = "NO_CANDIDATE_DIAGNOSTIC";
-                dimInfo.DiagnosticNotes.Add("ROUTE_C_ANCHOR_UNRESOLVED");
+                dimInfo.CandidateDecision = "DEFERRED_FULLY_LOST";
+                dimInfo.DiagnosticNotes.Add("ROUTE_C_ANCHOR_UNRESOLVED_DEFERRED_TO_FULLY_LOST");
                 return;
             }
 
@@ -974,7 +982,7 @@ namespace ADDIN.Commands
                     cand.SheetStart[0], cand.SheetStart[1],
                     cand.SheetEnd[0], cand.SheetEnd[1]);
 
-                if (res1.DistanceMm <= 1.5)
+                if (res1.DistanceMm <= 4.0)
                 {
                     double r1_dx = profile.Witness1DimensionPoint[0] - res1.Point[0];
                     double r1_dy = profile.Witness1DimensionPoint[1] - res1.Point[1];
@@ -993,7 +1001,7 @@ namespace ADDIN.Commands
                         if (dotRay < 0.5) rayConsistent1 = false;
                     }
 
-                    double s1Score = 100.0 - (res1.DistanceMm * 20.0) - (angErr1 * 0.5);
+                    double s1Score = 100.0 - (res1.DistanceMm * 10.0) - (angErr1 * 0.5);
                     side1List.Add(new FullyLostSideCandidate
                     {
                         SideIndex = 1,
@@ -1021,7 +1029,7 @@ namespace ADDIN.Commands
                     cand.SheetStart[0], cand.SheetStart[1],
                     cand.SheetEnd[0], cand.SheetEnd[1]);
 
-                if (res2.DistanceMm <= 1.5)
+                if (res2.DistanceMm <= 4.0)
                 {
                     double r2_dx = profile.Witness2DimensionPoint[0] - res2.Point[0];
                     double r2_dy = profile.Witness2DimensionPoint[1] - res2.Point[1];
@@ -1040,7 +1048,7 @@ namespace ADDIN.Commands
                         if (dotRay < 0.5) rayConsistent2 = false;
                     }
 
-                    double s2Score = 100.0 - (res2.DistanceMm * 20.0) - (angErr2 * 0.5);
+                    double s2Score = 100.0 - (res2.DistanceMm * 10.0) - (angErr2 * 0.5);
                     side2List.Add(new FullyLostSideCandidate
                     {
                         SideIndex = 2,

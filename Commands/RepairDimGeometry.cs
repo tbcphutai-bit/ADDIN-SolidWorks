@@ -297,6 +297,40 @@ namespace ADDIN.Commands
                 }
                 catch {}
             }
+            else if (entity is ISketchSegment skSeg)
+            {
+                try
+                {
+                    ICurve skCurve = skSeg.GetCurve() as ICurve;
+                    if (skCurve != null)
+                    {
+                        if (skCurve.IsLine()) curveType = "LINE";
+                        else if (skCurve.IsCircle()) curveType = "CIRCLE";
+                        else if (skCurve.IsEllipse()) curveType = "ELLIPSE";
+                        else if (skCurve.IsBcurve()) curveType = "BCURVE";
+
+                        double startParam, endParam;
+                        bool isClosed, isPeriodic;
+                        if (skCurve.GetEndParams(out startParam, out endParam, out isClosed, out isPeriodic))
+                        {
+                            pt1 = skCurve.Evaluate2(startParam, 0) as double[];
+                            pt2 = skCurve.Evaluate2(endParam, 0) as double[];
+                        }
+                    }
+                    if (pt1 == null || pt2 == null)
+                    {
+                        if (skSeg is ISketchLine skLine)
+                        {
+                            ISketchPoint sp1 = skLine.GetStartPoint2() as ISketchPoint;
+                            ISketchPoint sp2 = skLine.GetEndPoint2() as ISketchPoint;
+                            if (sp1 != null) pt1 = new double[] { sp1.X, sp1.Y, sp1.Z };
+                            if (sp2 != null) pt2 = new double[] { sp2.X, sp2.Y, sp2.Z };
+                            curveType = "LINE";
+                        }
+                    }
+                }
+                catch {}
+            }
 
             if (pt1 == null || pt2 == null || pt1.Length < 3 || pt2.Length < 3)
             {
@@ -337,7 +371,7 @@ namespace ADDIN.Commands
             try
             {
                 object[] visibleComps = currentView.GetVisibleComponents() as object[];
-                if (visibleComps != null)
+                if (visibleComps != null && visibleComps.Length > 0)
                 {
                     foreach (object compObj in visibleComps)
                     {
@@ -347,9 +381,9 @@ namespace ADDIN.Commands
                             try { compName = comp.Name2; } catch {}
                             string compKey = RepairDimCandidateFinder.GetComponentOccurrenceKey(comp);
 
-                            object[] visibleEdges = currentView.GetVisibleEntities2(
+                            Array visibleEdges = currentView.GetVisibleEntities2(
                                 comp,
-                                (int)swViewEntityType_e.swViewEntityType_Edge) as object[];
+                                (int)swViewEntityType_e.swViewEntityType_Edge) as Array;
 
                             if (visibleEdges != null)
                             {
@@ -366,6 +400,35 @@ namespace ADDIN.Commands
                                         });
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Fallback for Part Drawing (no components)
+                    Array visibleEdges = null;
+                    try
+                    {
+                        visibleEdges = currentView.GetVisibleEntities2(
+                            null,
+                            (int)swViewEntityType_e.swViewEntityType_Edge) as Array;
+                    }
+                    catch {}
+
+                    if (visibleEdges != null)
+                    {
+                        foreach (object edgeObj in visibleEdges)
+                        {
+                            if (edgeObj != null)
+                            {
+                                entries.Add(new VisibleEdgeOwnerEntry
+                                {
+                                    Edge = edgeObj,
+                                    Component = null,
+                                    CanonicalComponentName = "Part",
+                                    CanonicalComponentKey = "Part"
+                                });
                             }
                         }
                     }
@@ -836,6 +899,32 @@ namespace ADDIN.Commands
                             }
                             catch {}
                         }
+                        else if (correspondingEntity is ISketchSegment skSeg)
+                        {
+                            try
+                            {
+                                ICurve curve = skSeg.GetCurve() as ICurve;
+                                if (curve != null)
+                                {
+                                    diag.CurveIsLine = curve.IsLine();
+                                    diag.CurveIsCircle = curve.IsCircle();
+                                    diag.CurveIsEllipse = curve.IsEllipse();
+                                    diag.CurveIsBcurve = curve.IsBcurve();
+                                    diag.CurveIsTrimmedCurve = curve.IsTrimmedCurve();
+
+                                    if (diag.CurveIsLine == true) expectedTypeFromCurve = 0;
+                                    else if (diag.CurveIsCircle == true) expectedTypeFromCurve = 1;
+                                    else if (diag.CurveIsEllipse == true) expectedTypeFromCurve = 2;
+                                    else if (diag.CurveIsBcurve == true) expectedTypeFromCurve = 3;
+                                }
+                                else if (skSeg is ISketchLine)
+                                {
+                                    diag.CurveIsLine = true;
+                                    expectedTypeFromCurve = 0;
+                                }
+                            }
+                            catch {}
+                        }
                     }
                 }
                 diag.ExpectedTypeFromCurve = expectedTypeFromCurve;
@@ -1192,12 +1281,12 @@ namespace ADDIN.Commands
                     InsideOrNearViewOutline = nearOutline
                 };
 
-                // Strict Repair Eligibility (Edge + Straight Line + Points >= 2)
-                bool isEdge = (correspondingEntity is IEdge);
-                bool isLine = (diag.CurveIsLine == true);
+                // Strict Repair Eligibility (Has Entity + Straight Line + Points >= 2)
+                bool hasEntity = (correspondingEntity != null);
+                bool isLine = (geomType == 0) || (diag.CurveIsLine == true) || (localPts.Count == 2);
                 bool hasPoints = (localPts.Count >= 2);
 
-                if (isEdge && isLine && hasPoints)
+                if (hasEntity && isLine && hasPoints)
                 {
                     info.IsEligibleForRepair = true;
                     diag.IsRepairEligible = true;
@@ -1209,7 +1298,7 @@ namespace ADDIN.Commands
                     info.IsEligibleForRepair = false;
                     diag.IsRepairEligible = false;
                     if (!hasPoints) diag.RepairIneligibleReason = "INSUFFICIENT_POLYLINE_POINTS";
-                    else if (!isEdge) diag.RepairIneligibleReason = "NOT_EDGE_ENTITY";
+                    else if (!hasEntity) diag.RepairIneligibleReason = "CORRESPONDING_ENTITY_NULL";
                     else if (!isLine) diag.RepairIneligibleReason = "UNDERLYING_CURVE_NOT_LINE";
                 }
 
@@ -1333,7 +1422,8 @@ namespace ADDIN.Commands
                 viewGeom.PolylineApiStatus = "POLYLINE_API_OK";
                 viewGeom.PolylineRootCause = "NONE";
             }
-            else if (tailSizeMatch && allAssociatedAreEllipses && tailCursor == rawDoubles.Count)
+            else if ((tailSizeMatch && tailCursor == rawDoubles.Count) ||
+                     (recordsAligned && viewGeom.RepairLineRecords.Count > 0))
             {
                 viewGeom.AuxTailAlignment = "PASS";
                 viewGeom.CursorAlignment = "PASS";
@@ -1542,6 +1632,41 @@ namespace ADDIN.Commands
                             {
                                 startModelPt = silCurve.Evaluate2(startParam, 0) as double[];
                                 endModelPt = silCurve.Evaluate2(endParam, 0) as double[];
+                            }
+                        }
+                    }
+                    catch {}
+                }
+                else if (entity is ISketchSegment skSeg)
+                {
+                    try
+                    {
+                        ICurve skCurve = skSeg.GetCurve() as ICurve;
+                        if (skCurve != null)
+                        {
+                            if (skCurve.IsLine()) info.GeometryType = "LINE";
+                            else if (skCurve.IsCircle()) info.GeometryType = "CIRCLE";
+                            else if (skCurve.IsEllipse()) info.GeometryType = "ELLIPSE";
+                            else if (skCurve.IsBcurve()) info.GeometryType = "BCURVE";
+
+                            double startParam, endParam;
+                            bool isClosed, isPeriodic;
+                            if (skCurve.GetEndParams(out startParam, out endParam, out isClosed, out isPeriodic))
+                            {
+                                startModelPt = skCurve.Evaluate2(startParam, 0) as double[];
+                                endModelPt = skCurve.Evaluate2(endParam, 0) as double[];
+                            }
+                        }
+
+                        if (startModelPt == null || endModelPt == null)
+                        {
+                            if (skSeg is ISketchLine skLine)
+                            {
+                                ISketchPoint sp1 = skLine.GetStartPoint2() as ISketchPoint;
+                                ISketchPoint sp2 = skLine.GetEndPoint2() as ISketchPoint;
+                                if (sp1 != null) startModelPt = new double[] { sp1.X, sp1.Y, sp1.Z };
+                                if (sp2 != null) endModelPt = new double[] { sp2.X, sp2.Y, sp2.Z };
+                                info.GeometryType = "LINE";
                             }
                         }
                     }

@@ -344,7 +344,7 @@ namespace ADDIN.Commands
             List<Feature> curvedFeatures = new List<Feature>();
             List<double> sheetThicknesses = new List<double>();
             bool hasFoldUnfoldFeature = false;
-            double defaultBendRadiusMm = 0.0;
+            double defaultBendRadiusMm = 0.1;
 
             foreach (Feature feature in features)
             {
@@ -451,8 +451,9 @@ namespace ADDIN.Commands
                 KegakiBendResult bendResult = CheckBend(
                     bendFeature,
                     defaults,
-                    defaultBendRadiusMm,
                     defaultSummary,
+                    materialCheck,
+                    defaultBendRadiusMm,
                     buhinNo,
                     bomFileName,
                     componentName,
@@ -612,7 +613,17 @@ namespace ADDIN.Commands
             result.BendTableName = string.Join(" | ", tableNames.ToArray());
             result.BendTableGroup = string.Join(" | ", tableGroups.ToArray());
 
-            if (string.IsNullOrWhiteSpace(result.MaterialName))
+            bool isGrooveTable = tableNames.Exists(IsGrooveBendTable);
+            if (isGrooveTable)
+            {
+                result.Status = "OK";
+                result.BendTableGroup = "溝加工";
+                if (string.IsNullOrWhiteSpace(result.MaterialGroup))
+                    result.MaterialGroup = "Đặc cách";
+                result.Note = "Bang phay ranh (" + result.BendTableName
+                    + "): Mien tru doi chieu nhom vat lieu";
+            }
+            else if (string.IsNullOrWhiteSpace(result.MaterialName))
             {
                 result.Status = "CHECK";
                 result.Note = "Khong doc duoc vat lieu cua component";
@@ -887,8 +898,9 @@ namespace ADDIN.Commands
         private KegakiBendResult CheckBend(
             Feature feature,
             List<BendAllowanceInfo> defaults,
-            double defaultBendRadiusMm,
             string defaultSummary,
+            MaterialTableCheck materialCheck,
+            double defaultBendRadiusMm,
             string buhinNo,
             string bomFileName,
             string componentName,
@@ -960,6 +972,14 @@ namespace ADDIN.Commands
 
                 BendAllowanceInfo bendAllowance = BendAllowanceInfo.Capture(customAllowanceObj);
 
+                string activeTable = bendAllowance != null && bendAllowance.HasBendTableFile()
+                    ? bendAllowance.GetBendTableFileName()
+                    : (materialCheck != null ? materialCheck.BendTableName : "");
+                bool isGroove = IsGrooveBendTable(activeTable);
+                bool isAlpolic = materialCheck != null
+                    && (materialCheck.MaterialName ?? "").IndexOf(
+                        "アルポリック", StringComparison.OrdinalIgnoreCase) >= 0;
+
                 double radiusThresholdMm = defaultBendRadiusMm + 0.1;
                 if (result.RadiusMm > radiusThresholdMm + 0.001)
                 {
@@ -990,6 +1010,56 @@ namespace ADDIN.Commands
                             + result.BendSetting + ")";
                     }
                     return result;
+                }
+
+                if (isAlpolic && !isGroove)
+                {
+                    result.Status = "NG";
+                    result.Note = "Vat lieu Alpolic bat buoc phai dung bang uon bao ranh (溝...残シ)";
+                    return result;
+                }
+
+                if (isGroove)
+                {
+                    if (Math.Abs(result.RadiusMm - 0.2) > 0.03)
+                    {
+                        result.Status = "NG";
+                        result.Note = "Dùng bảng bào rãnh (" + activeTable
+                            + ") bắt buộc vẽ R=0.2mm (Hiện tại: R="
+                            + result.RadiusMm.ToString("0.##") + "mm)";
+                        return result;
+                    }
+
+                    double remainMm = ExtractRemainThicknessFromTableName(activeTable);
+                    if (remainMm > 0.0 && materialCheck != null
+                        && materialCheck.SheetThicknessMm > 0.0
+                        && materialCheck.SheetThicknessMm <= remainMm)
+                    {
+                        result.Status = "NG";
+                        result.Note = "Tấm dày "
+                            + materialCheck.SheetThicknessMm.ToString("0.##")
+                            + "mm <= lượng phôi chừa lại " + remainMm.ToString("0.##")
+                            + "mm (" + activeTable + ")";
+                        return result;
+                    }
+                }
+                else
+                {
+                    if (Math.Abs(result.RadiusMm - 0.2) <= 0.03)
+                    {
+                        result.Status = "NG";
+                        result.Note = "Cạnh vẽ R=0.2mm (bào rãnh) nhưng gán nhầm bảng chấn thường ("
+                            + activeTable + ")";
+                        return result;
+                    }
+
+                    if (Math.Abs(result.RadiusMm - 0.1) > 0.03)
+                    {
+                        result.Status = "NG";
+                        result.Note = "Cạnh chấn thường bắt buộc vẽ R=0.1mm (Hiện tại: R="
+                            + result.RadiusMm.ToString("0.##") + "mm)";
+                        return result;
+                    }
                 }
 
                 result.IsOverride = !useDefault;
@@ -1074,6 +1144,16 @@ namespace ADDIN.Commands
                 : requestedName;
             row.BendTableGroup = NormalizeBendTableGroup(row.BendTableName);
             row.StandardBendTableName = SafeFileName(standardPath);
+
+            if (IsGrooveBendTable(row.BendTableName))
+            {
+                row.BendTableGroup = "溝加工";
+                row.Status = "OK";
+                row.Note = AppendNote(
+                    row.Note,
+                    "Bang phay ranh: mien tru doi chieu nhom vat lieu.");
+                return;
+            }
 
             if (string.IsNullOrWhiteSpace(row.MaterialGroup))
             {
@@ -1669,6 +1749,38 @@ namespace ADDIN.Commands
                 return "TI";
 
             return "";
+        }
+
+        private static bool IsGrooveBendTable(string tableName)
+        {
+            return !string.IsNullOrWhiteSpace(tableName)
+                && tableName.IndexOf("溝", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static double ExtractRemainThicknessFromTableName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return 0.0;
+
+            try
+            {
+                int start = fileName.IndexOf("溝", StringComparison.Ordinal);
+                int end = fileName.IndexOf("残", StringComparison.Ordinal);
+                if (start >= 0 && end > start)
+                {
+                    string number = fileName.Substring(start + 1, end - start - 1).Trim();
+                    double value;
+                    if (double.TryParse(
+                            number,
+                            System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            out value))
+                        return value;
+                }
+            }
+            catch { }
+
+            return 0.0;
         }
 
         private static string NormalizeBendTableGroup(string bendTableName)

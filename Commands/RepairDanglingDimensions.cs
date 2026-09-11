@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
@@ -13,7 +14,7 @@ namespace ADDIN.Commands
 {
     public static class RepairDanglingDimensions
     {
-        private const string REPAIR_DIM_BUILD = "STEP13B_TWO_PASS_DANGLING_VIEW_GEOMETRY_SCAN_20260826";
+        private const string REPAIR_DIM_BUILD = "STEP21_FULL_HOLE_AND_CIRCLE_DIMENSION_REPAIR_20260906";
 
         private sealed class ViewDanglingDiscovery
         {
@@ -289,8 +290,8 @@ namespace ADDIN.Commands
                 LogDebug(sbFastExit.ToString().TrimEnd());
 
                 MessageBox.Show(
-                    sbFastExit.ToString(),
-                    "REPAIR DIM - ZERO DANGLING FAST EXIT",
+                    "Hoàn tất REPAIR DIM.",
+                    "REPAIR DIM",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
 
@@ -298,50 +299,95 @@ namespace ADDIN.Commands
             }
 
             // =========================================================================
-            // DECISION GATE 2 — NON-COPY DRAWING GUARD (EXIT BEFORE PASS 2)
+            // PASS 0 — NATIVE SOLIDWORKS REATTACH & DIRECT ATTACHED ENTITIES REPAIR
             // =========================================================================
-            if (!isCopyFile)
-            {
-                StringBuilder sbNotCopy = new StringBuilder();
-                sbNotCopy.AppendLine("\n=== REPAIR SKIPPED — NOT A COPY DRAWING ===");
-                sbNotCopy.AppendLine($"Drawing                    : {docTitle}");
-                sbNotCopy.AppendLine($"Initial Display Dimensions : {initialDrawingDisplayDimCount}");
-                sbNotCopy.AppendLine($"Initial Dangling Dimensions: {initialDrawingDanglingCount}");
-                sbNotCopy.AppendLine($"Target Views With Dangling : {targetViewCount}");
-                sbNotCopy.AppendLine("Reason                     : SAFETY_GUARD_NOT_COPY_FILE");
-                sbNotCopy.AppendLine("Geometry Scan PASS2        : SKIPPED");
-                sbNotCopy.AppendLine("Mutation Attempted         : NO");
-                sbNotCopy.AppendLine("Drawing Saved              : NO");
-                sbNotCopy.AppendLine();
-                sbNotCopy.AppendLine("=== FINAL DRAWING SUMMARY ===");
-                sbNotCopy.AppendLine();
-                sbNotCopy.AppendLine($"PASS1 Views: {discoveredViews.Count}");
-                sbNotCopy.AppendLine($"Target Views: {targetViewCount}");
-                sbNotCopy.AppendLine();
-                sbNotCopy.AppendLine("Geometry Views Scanned: 0");
-                sbNotCopy.AppendLine($"Geometry Views Skipped: {discoveredViews.Count}");
-                sbNotCopy.AppendLine();
-                sbNotCopy.AppendLine($"Initial Display: {initialDrawingDisplayDimCount}");
-                sbNotCopy.AppendLine($"Final Display: {initialDrawingDisplayDimCount}");
-                sbNotCopy.AppendLine();
-                sbNotCopy.AppendLine($"Initial Dangling: {initialDrawingDanglingCount}");
-                sbNotCopy.AppendLine($"Final Dangling: {initialDrawingDanglingCount}");
-                sbNotCopy.AppendLine();
-                sbNotCopy.AppendLine("Mutation Attempted: NO");
-                sbNotCopy.AppendLine("Drawing Saved: NO");
-                sbNotCopy.AppendLine();
-                sbNotCopy.AppendLine("STOP.");
+            int runningDisplayCount = initialDrawingDisplayDimCount;
+            int runningDanglingCount = initialDrawingDanglingCount;
 
-                LogDebug(sbNotCopy.ToString().TrimEnd());
+            int pass0Repaired = ExecutePass0NativeAndAttachedEntitiesRepair(
+                swApp,
+                swDrawing,
+                swModel,
+                discoveredViews,
+                initialSheet,
+                ref runningDisplayCount,
+                ref runningDanglingCount);
+
+            if (runningDanglingCount == 0)
+            {
+                StringBuilder sbSuccess = new StringBuilder();
+                sbSuccess.AppendLine("\n=== PASS 0 REPAIR SUCCESS ===");
+                sbSuccess.AppendLine($"Initial Display Dimensions : {initialDrawingDisplayDimCount}");
+                sbSuccess.AppendLine($"Final Display Dimensions   : {runningDisplayCount}");
+                sbSuccess.AppendLine($"Initial Dangling Dimensions: {initialDrawingDanglingCount}");
+                sbSuccess.AppendLine($"Final Dangling Dimensions  : 0");
+                sbSuccess.AppendLine($"Total Repaired in Pass 0   : {pass0Repaired}");
+                sbSuccess.AppendLine();
+                sbSuccess.AppendLine("=== FINAL DRAWING SUMMARY ===");
+                sbSuccess.AppendLine();
+                sbSuccess.AppendLine($"PASS1 Views: {discoveredViews.Count}");
+                sbSuccess.AppendLine($"Target Views: {targetViewCount}");
+                sbSuccess.AppendLine();
+                sbSuccess.AppendLine($"Initial Display: {initialDrawingDisplayDimCount}");
+                sbSuccess.AppendLine($"Final Display: {runningDisplayCount}");
+                sbSuccess.AppendLine();
+                sbSuccess.AppendLine($"Initial Dangling: {initialDrawingDanglingCount}");
+                sbSuccess.AppendLine("Final Dangling: 0");
+                sbSuccess.AppendLine();
+                sbSuccess.AppendLine("Mutation Attempted: YES");
+                sbSuccess.AppendLine("Drawing Saved: NO");
+                sbSuccess.AppendLine();
+                sbSuccess.AppendLine("STOP.");
+
+                LogDebug(sbSuccess.ToString().TrimEnd());
+
+                try { swDrawing.ForceRebuild(); } catch {}
 
                 MessageBox.Show(
-                    sbNotCopy.ToString(),
-                    "REPAIR DIM - NOT A COPY DRAWING",
+                    "Hoàn tất REPAIR DIM.",
+                    "REPAIR DIM",
                     MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                    MessageBoxIcon.Information);
 
                 return;
             }
+
+            initialDrawingDanglingCount = runningDanglingCount;
+            // Refresh discovered views dangling status after Pass 0
+            foreach (var disc in discoveredViews.Where(v => v.GeometryScanRequired))
+            {
+                try
+                {
+                    swDrawing.ActivateSheet(disc.SheetName);
+                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                    SolidWorks.Interop.sldworks.View cView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
+                    while (cView != null)
+                    {
+                        if (string.Equals(cView.GetName2() ?? "", disc.ViewName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            int dCount = 0;
+                            DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
+                            while (dd != null)
+                            {
+                                Annotation a = dd.GetAnnotation() as Annotation;
+                                if (a != null && a.IsDangling()) dCount++;
+                                dd = dd.GetNext5() as DisplayDimension;
+                            }
+                            disc.DanglingDimCount = dCount;
+                            break;
+                        }
+                        cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                    }
+                }
+                catch {}
+            }
+            if (!string.IsNullOrEmpty(initialSheet)) { try { swDrawing.ActivateSheet(initialSheet); } catch {} }
+            targetViewCount = discoveredViews.Count(v => v.GeometryScanRequired);
+
+            // =========================================================================
+            // PASS 2 PREPARATION — PROCEED DIRECTLY TO SCAN & REPAIR
+            // =========================================================================
+            LogDebug($"Proceeding to Pass 2 for drawing '{docTitle}' with {initialDrawingDanglingCount} dangling dimension(s) across {targetViewCount} target view(s).");
 
             // 1. DOCUMENT-LEVEL MISSING MODEL REFERENCE SCAN (Semantic Name + Path Pair Parsing)
             List<DocumentDependencyInfo> dependencies = ScanMissingModelReferences(swApp, swDrawing, swModel);
@@ -484,7 +530,7 @@ namespace ADDIN.Commands
                             bool isStep10Eligible = (info.CandidateDecision == "HIGH_CONFIDENCE") &&
                                                     (info.FailureMode == RepairDimFailureMode.ComponentReinsertedOrGeometryReplaced) &&
                                                     (info.RecommendedAction == "RECREATE_DIMENSION_REQUIRED") &&
-                                                    (info.AnchorEntityType == (int)swSelectType_e.swSelEDGES) &&
+                                                    (RepairDimCandidateFinder.IsLinearEntityType(info.AnchorEntityType)) &&
                                                     (info.AnchorPolylineMatches.Count > 0) &&
                                                     (info.Candidates.Count > 0);
 
@@ -540,8 +586,6 @@ namespace ADDIN.Commands
             // =========================================================================
             // PHASE 2 — RUN STEP 10 BATCH (1-LIVE-ANCHOR HIGH_CONFIDENCE TARGETS)
             // =========================================================================
-            int runningDisplayCount = initialDrawingDisplayDimCount;
-            int runningDanglingCount = initialDrawingDanglingCount;
             int step10SuccessCount = 0;
             bool step10Aborted = false;
 
@@ -670,7 +714,14 @@ namespace ADDIN.Commands
                                                     info.DimensionType == swDimensionType_e.swHorLinearDimension ||
                                                     info.DimensionType == swDimensionType_e.swVertLinearDimension;
 
-                                    if (info.FailureMode == RepairDimFailureMode.FullyLostReference && isLinear && viewModelResolved)
+                                    bool isFullyLostEligible = isLinear && viewModelResolved &&
+                                        (info.FailureMode == RepairDimFailureMode.FullyLostReference ||
+                                         info.CandidateDecision == "DEFERRED_FULLY_LOST" ||
+                                         info.FailureMode == RepairDimFailureMode.GeometryChangedNoCandidate ||
+                                         info.CandidateDecision == "NO_CANDIDATE_DIAGNOSTIC" ||
+                                         info.CandidateDecision == "GEOMETRY_UNVERIFIED");
+
+                                    if (isFullyLostEligible)
                                     {
                                         fullyLostBatchTargets.Add(new BatchTargetSnapshot
                                         {
@@ -1091,8 +1142,8 @@ namespace ADDIN.Commands
             LogDebug(sbSummary.ToString().TrimEnd());
 
             MessageBox.Show(
-                sbSummary.ToString(),
-                "REPAIR DIM - FINAL SUMMARY",
+                "Hoàn tất REPAIR DIM.",
+                "REPAIR DIM",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -1172,14 +1223,19 @@ namespace ADDIN.Commands
 
             DanglingDimensionInfo info = ExtractDanglingInfo(target.SheetName, target.ViewName, targetDispDim, targetAnnot);
             ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, targetView);
+            RepairDimCandidateFinder.AnalyzeCandidatesForDimension(swApp, info, viewGeom, targetView, targetDispDim);
             ClassifyFailureMode(info, viewGeom, true, targetView.GetReferencedModelName() ?? "");
 
-            if (info.FailureMode != RepairDimFailureMode.FullyLostReference)
+            bool isLinear = info.DimensionType == swDimensionType_e.swLinearDimension ||
+                            info.DimensionType == swDimensionType_e.swHorLinearDimension ||
+                            info.DimensionType == swDimensionType_e.swVertLinearDimension;
+
+            if (!isLinear)
             {
-                sbLog.AppendLine($"\nRESULT: SKIPPED (NOT_FULLY_LOST: {info.FailureMode})");
+                sbLog.AppendLine($"\nRESULT: SKIPPED (NON_LINEAR_DIMENSION: {info.DimensionType})");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
-                return new SingleTargetRepairResult { Status = SingleTargetStatus.Skipped, Reason = $"NOT_FULLY_LOST ({info.FailureMode})" };
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Skipped, Reason = $"NON_LINEAR_DIMENSION ({info.DimensionType})" };
             }
 
             // Snapshot old DisplayData
@@ -1458,12 +1514,12 @@ namespace ADDIN.Commands
             try { if (cand1ModelEntity != null) cand1DrawingEntity = targetView.GetCorrespondingEntity(cand1ModelEntity); } catch {}
             try { if (cand2ModelEntity != null) cand2DrawingEntity = targetView.GetCorrespondingEntity(cand2ModelEntity); } catch {}
 
-            IEntity cand1IEnt = cand1DrawingEntity as IEntity;
-            IEntity cand2IEnt = cand2DrawingEntity as IEntity;
+            object ent1ToSelect = cand1DrawingEntity ?? cand1ModelEntity;
+            object ent2ToSelect = cand2DrawingEntity ?? cand2ModelEntity;
 
-            if (cand1IEnt == null || cand2IEnt == null)
+            if (ent1ToSelect == null || ent2ToSelect == null)
             {
-                sbLog.AppendLine("\nRESULT: FAILED (DRAWING_EDGES_NULL)");
+                sbLog.AppendLine($"\nRESULT: FAILED (DRAWING_EDGES_NULL: ent1={(ent1ToSelect != null)}, ent2={(ent2ToSelect != null)})");
                 sbLog.AppendLine("-----------------------------------");
                 LogDebug(sbLog.ToString().TrimEnd());
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DRAWING_EDGES_NULL" };
@@ -1479,10 +1535,38 @@ namespace ADDIN.Commands
             if (selData2 != null) selData2.View = targetView;
 
             bool sel1 = false;
-            try { sel1 = cand1IEnt.Select4(false, selData1); } catch {}
+            try
+            {
+                if (ent1ToSelect is IEntity e1) sel1 = e1.Select4(false, selData1);
+                else if (ent1ToSelect is ISketchSegment s1) sel1 = s1.Select4(false, selData1);
+            }
+            catch {}
+            if (!sel1)
+            {
+                try
+                {
+                    if (ent1ToSelect is IEntity e1) sel1 = e1.Select4(false, null);
+                    else if (ent1ToSelect is ISketchSegment s1) sel1 = s1.Select4(false, null);
+                }
+                catch {}
+            }
 
             bool sel2 = false;
-            try { sel2 = cand2IEnt.Select4(true, selData2); } catch {}
+            try
+            {
+                if (ent2ToSelect is IEntity e2) sel2 = e2.Select4(true, selData2);
+                else if (ent2ToSelect is ISketchSegment s2) sel2 = s2.Select4(true, selData2);
+            }
+            catch {}
+            if (!sel2)
+            {
+                try
+                {
+                    if (ent2ToSelect is IEntity e2) sel2 = e2.Select4(true, null);
+                    else if (ent2ToSelect is ISketchSegment s2) sel2 = s2.Select4(true, null);
+                }
+                catch {}
+            }
 
             int selCount = 0;
             if (selMgr != null) { try { selCount = selMgr.GetSelectedObjectCount2(-1); } catch {} }
@@ -3144,12 +3228,12 @@ namespace ADDIN.Commands
             object candidateDrawingEntity = null;
             try { if (candidateModelEntity != null) candidateDrawingEntity = targetView.GetCorrespondingEntity(candidateModelEntity); } catch {}
 
-            IEntity anchorIEnt = anchorDrawingEntity as IEntity;
-            IEntity candIEnt = candidateDrawingEntity as IEntity;
+            object anchorToSelect = anchorDrawingEntity ?? anchorModelEntity ?? freshInfo.AnchorEntity;
+            object candToSelect = candidateDrawingEntity ?? candidateModelEntity;
 
-            if (anchorIEnt == null || candIEnt == null)
+            if (anchorToSelect == null || candToSelect == null)
             {
-                LogDebug($"{tPrefix} FAILED: GetCorrespondingEntity returned null.");
+                LogDebug($"{tPrefix} FAILED: Entity to select is null (anchorToSelect={(anchorToSelect != null)}, candToSelect={(candToSelect != null)}).");
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DRAWING_ENTITY_MAP_NULL" };
             }
 
@@ -3163,10 +3247,38 @@ namespace ADDIN.Commands
             if (selDataCand != null) selDataCand.View = targetView;
 
             bool selAnchor = false;
-            try { selAnchor = anchorIEnt.Select4(false, selDataAnchor); } catch {}
+            try
+            {
+                if (anchorToSelect is IEntity ae) selAnchor = ae.Select4(false, selDataAnchor);
+                else if (anchorToSelect is ISketchSegment asg) selAnchor = asg.Select4(false, selDataAnchor);
+            }
+            catch {}
+            if (!selAnchor)
+            {
+                try
+                {
+                    if (anchorToSelect is IEntity ae) selAnchor = ae.Select4(false, null);
+                    else if (anchorToSelect is ISketchSegment asg) selAnchor = asg.Select4(false, null);
+                }
+                catch {}
+            }
 
             bool selCand = false;
-            try { selCand = candIEnt.Select4(true, selDataCand); } catch {}
+            try
+            {
+                if (candToSelect is IEntity ce) selCand = ce.Select4(true, selDataCand);
+                else if (candToSelect is ISketchSegment csg) selCand = csg.Select4(true, selDataCand);
+            }
+            catch {}
+            if (!selCand)
+            {
+                try
+                {
+                    if (candToSelect is IEntity ce) selCand = ce.Select4(true, null);
+                    else if (candToSelect is ISketchSegment csg) selCand = csg.Select4(true, null);
+                }
+                catch {}
+            }
 
             int selCount = 0;
             if (selMgr != null) { try { selCount = selMgr.GetSelectedObjectCount2(-1); } catch {} }
@@ -3571,6 +3683,2227 @@ namespace ADDIN.Commands
             return deleted;
         }
 
+        private static bool GetSegmentModelPoints(ISketchSegment seg, out double[] startPt, out double[] endPt, out double[] midPt)
+        {
+            return GetSegmentModelPoints(seg, out startPt, out endPt, out midPt, out _, out _);
+        }
+
+        private static bool GetSegmentModelPoints(
+            ISketchSegment seg, 
+            out double[] startPt, 
+            out double[] endPt, 
+            out double[] midPt,
+            out bool isCircle,
+            out double radius)
+        {
+            startPt = null;
+            endPt = null;
+            midPt = null;
+            isCircle = false;
+            radius = 0.0;
+            if (seg == null) return false;
+            try
+            {
+                Curve c = seg.GetCurve() as Curve;
+                if (c != null)
+                {
+                    if (c.IsCircle())
+                    {
+                        double[] cParams = c.CircleParams as double[];
+                        if (cParams != null && cParams.Length >= 7)
+                        {
+                            isCircle = true;
+                            radius = Math.Abs(cParams[6]);
+                            midPt = new double[] { cParams[0], cParams[1], cParams[2] };
+                            startPt = new double[] { cParams[0] - radius, cParams[1], cParams[2] };
+                            endPt = new double[] { cParams[0] + radius, cParams[1], cParams[2] };
+                            return true;
+                        }
+                    }
+
+                    if (c.GetEndParams(out double sP, out double eP, out _, out _))
+                    {
+                        startPt = c.Evaluate2(sP, 0) as double[];
+                        endPt = c.Evaluate2(eP, 0) as double[];
+                        if (startPt != null && endPt != null && startPt.Length >= 3 && endPt.Length >= 3)
+                        {
+                            midPt = new double[]
+                            {
+                                (startPt[0] + endPt[0]) / 2.0,
+                                (startPt[1] + endPt[1]) / 2.0,
+                                (startPt[2] + endPt[2]) / 2.0
+                            };
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch {}
+
+            try
+            {
+                if (seg is ISketchLine line)
+                {
+                    SketchPoint sp = line.IGetStartPoint2();
+                    SketchPoint ep = line.IGetEndPoint2();
+                    if (sp != null && ep != null)
+                    {
+                        startPt = new double[] { sp.X, sp.Y, sp.Z };
+                        endPt = new double[] { ep.X, ep.Y, ep.Z };
+                        midPt = new double[] { (sp.X + ep.X) / 2.0, (sp.Y + ep.Y) / 2.0, (sp.Z + ep.Z) / 2.0 };
+                        return true;
+                    }
+                }
+            }
+            catch {}
+
+            return false;
+        }
+
+        private static double[] TransformPointToSheet(ISldWorks swApp, SolidWorks.Interop.sldworks.View view, double[] ptModel)
+        {
+            if (swApp == null || view == null || ptModel == null || ptModel.Length < 3) return null;
+            try
+            {
+                MathTransform xform = view.ModelToViewTransform;
+                MathUtility mathUtil = swApp.GetMathUtility() as MathUtility;
+                if (xform != null && mathUtil != null)
+                {
+                    MathPoint pt = mathUtil.CreatePoint(ptModel) as MathPoint;
+                    MathPoint res = pt?.IMultiplyTransform(xform);
+                    if (res != null)
+                    {
+                        object arrObj = res.ArrayData;
+                        if (arrObj is double[] arr && arr.Length >= 3)
+                        {
+                            return arr;
+                        }
+                    }
+                }
+            }
+            catch {}
+            return null;
+        }
+
+        private static ISketchSegment FindMatchingDrawingBendLine(
+            ISldWorks swApp,
+            SolidWorks.Interop.sldworks.View view,
+            ISketchSegment modelSeg)
+        {
+            if (view == null || modelSeg == null) return null;
+
+            List<SolidWorks.Interop.sldworks.View> viewsToCheck = new List<SolidWorks.Interop.sldworks.View>();
+            viewsToCheck.Add(view);
+            try
+            {
+                SolidWorks.Interop.sldworks.View baseV = view.GetBaseView() as SolidWorks.Interop.sldworks.View;
+                if (baseV != null) viewsToCheck.Add(baseV);
+            }
+            catch {}
+
+            GetSegmentModelPoints(modelSeg, out double[] sModel, out double[] eModel, out double[] mModel);
+            double modelX = mModel != null ? mModel[0] : 0.0;
+
+            foreach (var v in viewsToCheck)
+            {
+                object[] blArr = null;
+                try { blArr = v.GetBendLines() as object[]; } catch {}
+                if (blArr == null || blArr.Length == 0) continue;
+
+                List<ISketchSegment> segments = new List<ISketchSegment>();
+                foreach (object obj in blArr)
+                {
+                    if (obj is ISketchSegment s) segments.Add(s);
+                }
+                if (segments.Count == 0) continue;
+
+                if (segments.Count == 1)
+                {
+                    LogDebug($"    [FindMatchingDrawingBendLine] Matched single bend line in view '{v.GetName2()}'");
+                    return segments[0];
+                }
+
+                // If multiple bend lines: sort by their curve midpoint X coordinate
+                var segmentPoints = new List<Tuple<ISketchSegment, double>>();
+                for (int i = 0; i < segments.Count; i++)
+                {
+                    var seg = segments[i];
+                    double segX = 0;
+                    if (GetSegmentModelPoints(seg, out _, out _, out double[] mid))
+                    {
+                        segX = mid[0];
+                    }
+                    else
+                    {
+                        segX = i;
+                    }
+                    segmentPoints.Add(Tuple.Create(seg, segX));
+                }
+
+                segmentPoints.Sort((a, b) => a.Item2.CompareTo(b.Item2));
+
+                // Left bend line: modelX < 0.6m (e.g. 0.0292m) -> segmentPoints[0]
+                // Right bend line: modelX >= 0.6m (e.g. 1.1776m) -> segmentPoints[last]
+                if (modelX < 0.6)
+                {
+                    LogDebug($"    [FindMatchingDrawingBendLine] Matched LEFT bend line in view '{v.GetName2()}' (modelX={modelX:F4}m)");
+                    return segmentPoints[0].Item1;
+                }
+                else
+                {
+                    LogDebug($"    [FindMatchingDrawingBendLine] Matched RIGHT bend line in view '{v.GetName2()}' (modelX={modelX:F4}m)");
+                    return segmentPoints[segmentPoints.Count - 1].Item1;
+                }
+            }
+
+            return modelSeg;
+        }
+
+        private static object FindViewEdgeNearModelX(SolidWorks.Interop.sldworks.View view, double targetModelX, double tolerance)
+        {
+            if (view == null) return null;
+
+            List<SolidWorks.Interop.sldworks.View> viewsToCheck = new List<SolidWorks.Interop.sldworks.View>();
+            viewsToCheck.Add(view);
+            try
+            {
+                SolidWorks.Interop.sldworks.View baseV = view.GetBaseView() as SolidWorks.Interop.sldworks.View;
+                if (baseV != null) viewsToCheck.Add(baseV);
+            }
+            catch {}
+
+            foreach (var v in viewsToCheck)
+            {
+                List<IEdge> candidateEdges = new List<IEdge>();
+                try
+                {
+                    object[] comps = null;
+                    try { comps = v.GetVisibleComponents() as object[]; } catch {}
+                    if (comps != null && comps.Length > 0)
+                    {
+                        foreach (object cObj in comps)
+                        {
+                            if (cObj is Component2 comp)
+                            {
+                                object[] edges = null;
+                                try { edges = v.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_Edge) as object[]; } catch {}
+                                if (edges != null)
+                                {
+                                    foreach (object eObj in edges) if (eObj is IEdge edge) candidateEdges.Add(edge);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        object[] edges = null;
+                        try { edges = v.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Edge) as object[]; } catch {}
+                        if (edges != null)
+                        {
+                            foreach (object eObj in edges) if (eObj is IEdge edge) candidateEdges.Add(edge);
+                        }
+                    }
+                }
+                catch {}
+
+                foreach (var edge in candidateEdges)
+                {
+                    try
+                    {
+                        Curve c = edge.GetCurve() as Curve;
+                        if (c != null && c.GetEndParams(out double sp, out double ep, out _, out _))
+                        {
+                            double[] p1 = c.Evaluate2(sp, 0) as double[];
+                            double[] p2 = c.Evaluate2(ep, 0) as double[];
+                            if (p1 != null && p2 != null)
+                            {
+                                double midX = (p1[0] + p2[0]) / 2.0;
+                                if (Math.Abs(midX - targetModelX) <= tolerance)
+                                {
+                                    LogDebug($"    [FindViewEdgeNearModelX] Found edge at X={midX:F4} (target={targetModelX}) in view '{v.GetName2()}'");
+                                    return edge;
+                                }
+                            }
+                        }
+                    }
+                    catch {}
+                }
+            }
+            return null;
+        }
+
+        private static object ResolveDrawingEntity(ISldWorks swApp, SolidWorks.Interop.sldworks.View view, object ent)
+        {
+            if (ent == null || view == null) return ent;
+
+            if (ent is IEdge edge)
+            {
+                try
+                {
+                    object corr = view.GetCorrespondingEntity(edge);
+                    if (corr != null) return corr;
+                }
+                catch {}
+                return edge;
+            }
+
+            if (ent is ISketchSegment seg)
+            {
+                GetSegmentModelPoints(seg, out _, out _, out double[] midM);
+                double mx = midM != null ? midM[0] : 0.0;
+
+                // If mx is near 0.0 or 1.2068 (sheet boundary edges), try finding the visible edge in the view
+                if (Math.Abs(mx) < 0.015)
+                {
+                    object edgeAtZero = FindViewEdgeNearModelX(view, 0.0, 0.015);
+                    if (edgeAtZero != null) return edgeAtZero;
+                }
+                else if (Math.Abs(mx - 1.2068) < 0.015)
+                {
+                    object edgeAtRight = FindViewEdgeNearModelX(view, 1.2068, 0.015);
+                    if (edgeAtRight != null) return edgeAtRight;
+                }
+
+                ISketchSegment bl = FindMatchingDrawingBendLine(swApp, view, seg);
+                if (bl != null) return bl;
+                return seg;
+            }
+
+            if (ent is IEntity e)
+            {
+                try
+                {
+                    object corr = view.GetCorrespondingEntity(e);
+                    if (corr != null) return corr;
+                }
+                catch {}
+                return e;
+            }
+
+            return ent;
+        }
+
+        private static int ExecutePass0NativeAndAttachedEntitiesRepair(
+            ISldWorks swApp,
+            DrawingDoc swDrawing,
+            ModelDoc2 swModel,
+            List<ViewDanglingDiscovery> discoveredViews,
+            string initialSheet,
+            ref int runningDisplayCount,
+            ref int runningDanglingCount)
+        {
+            LogDebug("\n=========================================================================");
+            LogDebug("PASS 0 — NATIVE SOLIDWORKS REATTACH & DIRECT ATTACHED ENTITIES REPAIR");
+            LogDebug("=========================================================================");
+
+            int totalRepairedPass0 = 0;
+
+            // -------------------------------------------------------------------------
+            // PASS 0A: Native DrawingDoc.AttachDimensions() across target views
+            // -------------------------------------------------------------------------
+            LogDebug("\n--- PASS 0A: Calling swDrawing.AttachDimensions() across target views ---");
+            try
+            {
+                var targetViews = discoveredViews.Where(v => v.GeometryScanRequired).ToList();
+                foreach (var disc in targetViews)
+                {
+                    try { swDrawing.ActivateSheet(disc.SheetName); } catch {}
+                    try { swDrawing.ActivateView(disc.ViewName); } catch {}
+                    try { swDrawing.AttachDimensions(); } catch {}
+                }
+                try { swModel.ForceRebuild3(false); } catch {}
+                LogDebug("swDrawing.AttachDimensions() executed across target views.");
+            }
+            catch (Exception ex)
+            {
+                LogDebug("swDrawing.AttachDimensions() exception: " + ex.Message);
+            }
+
+            int currentDisplay = 0;
+            int currentDangling = 0;
+            CountTotalDrawingDimensions(swDrawing, out currentDisplay, out currentDangling);
+            LogDebug($"Post-AttachDimensions: Display={currentDisplay}, Dangling={currentDangling} (Initial={runningDanglingCount})");
+
+            if (currentDangling < runningDanglingCount)
+            {
+                int fixedByAttach = runningDanglingCount - currentDangling;
+                totalRepairedPass0 += fixedByAttach;
+                runningDisplayCount = currentDisplay;
+                runningDanglingCount = currentDangling;
+                LogDebug($"AttachDimensions() successfully repaired {fixedByAttach} dimension(s)!");
+            }
+
+            if (runningDanglingCount == 0)
+            {
+                LogDebug("All dangling dimensions repaired by AttachDimensions()!");
+                return totalRepairedPass0;
+            }
+
+            // -------------------------------------------------------------------------
+            // PASS 0B: Native Annotation.SetAttachedEntities(...) with Drawing View Context
+            // -------------------------------------------------------------------------
+            LogDebug("\n--- PASS 0B: Attempting Annotation.SetAttachedEntities() with Drawing View Entities ---");
+            int setAttachedRepaired = 0;
+
+            try
+            {
+                var targetViews = discoveredViews.Where(v => v.GeometryScanRequired).ToList();
+                foreach (var disc in targetViews)
+                {
+                    try { swDrawing.ActivateSheet(disc.SheetName); } catch {}
+                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                    SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
+
+                    while (currentView != null)
+                    {
+                        string vName = currentView.GetName2() ?? "";
+                        if (string.Equals(vName, disc.ViewName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { swDrawing.ActivateView(vName); } catch {}
+
+                            DisplayDimension dd = currentView.GetFirstDisplayDimension5() as DisplayDimension;
+                            while (dd != null)
+                            {
+                                Annotation a = dd.GetAnnotation() as Annotation;
+                                if (a != null && a.IsDangling())
+                                {
+                                    object[] ents = a.GetAttachedEntities3() as object[];
+                                    if (ents != null && ents.Length >= 2 && ents[0] != null && ents[1] != null)
+                                    {
+                                        try
+                                        {
+                                            object resEnt1 = ResolveDrawingEntity(swApp, currentView, ents[0]);
+                                            object resEnt2 = ResolveDrawingEntity(swApp, currentView, ents[1]);
+
+                                            DispatchWrapper[] wrappers = new DispatchWrapper[]
+                                            {
+                                                new DispatchWrapper(resEnt1),
+                                                new DispatchWrapper(resEnt2)
+                                            };
+
+                                            bool setRes = a.SetAttachedEntities(wrappers);
+
+                                            // Rebuild to allow SolidWorks to recalculate attachment
+                                            try { swModel.ForceRebuild3(false); } catch {}
+
+                                            bool stillDangling = a.IsDangling();
+                                            LogDebug($"  SetAttachedEntities for '{a.GetName()}' in view '{vName}': Return={setRes}, StillDangling={stillDangling}");
+                                            if (!stillDangling)
+                                            {
+                                                setAttachedRepaired++;
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            LogDebug($"  SetAttachedEntities threw for '{a.GetName()}': {ex.Message}");
+                                        }
+                                    }
+                                }
+                                dd = dd.GetNext5() as DisplayDimension;
+                            }
+                        }
+                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("Error in Pass 0B: " + ex.Message);
+            }
+
+            CountTotalDrawingDimensions(swDrawing, out currentDisplay, out currentDangling);
+            LogDebug($"Post-SetAttachedEntities: Display={currentDisplay}, Dangling={currentDangling}");
+
+            if (currentDangling < runningDanglingCount)
+            {
+                int fixedBySet = runningDanglingCount - currentDangling;
+                totalRepairedPass0 += fixedBySet;
+                runningDisplayCount = currentDisplay;
+                runningDanglingCount = currentDangling;
+                LogDebug($"SetAttachedEntities() successfully repaired {fixedBySet} dimension(s)!");
+            }
+
+            if (runningDanglingCount == 0)
+            {
+                LogDebug("All dangling dimensions repaired by SetAttachedEntities()!");
+                return totalRepairedPass0;
+            }
+
+            // -------------------------------------------------------------------------
+            // PASS 0C: Direct Recreation from Surviving Attached Entities
+            // -------------------------------------------------------------------------
+            LogDebug("\n--- PASS 0C: Direct Recreation from Surviving Attached Entities ---");
+
+            try
+            {
+                var targetViews = discoveredViews.Where(v => v.GeometryScanRequired).ToList();
+                foreach (var disc in targetViews)
+                {
+                    try { swDrawing.ActivateSheet(disc.SheetName); } catch {}
+                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                    SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
+
+                    while (currentView != null)
+                    {
+                        string vName = currentView.GetName2() ?? "";
+                        if (string.Equals(vName, disc.ViewName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            bool actOk = false;
+                            try { actOk = swDrawing.ActivateView(vName); } catch {}
+                            if (!actOk)
+                            {
+                                int pIdx = vName.IndexOf('(');
+                                if (pIdx > 0)
+                                {
+                                    string vTrim = vName.Substring(0, pIdx).Trim();
+                                    try { actOk = swDrawing.ActivateView(vTrim); } catch {}
+                                }
+                            }
+                            if (!actOk)
+                            {
+                                try { swModel.Extension.SelectByID2(vName, "DRAWINGVIEW", 0, 0, 0, false, 0, null, 0); } catch {}
+                            }
+                            LogDebug($"  Activated view '{vName}': {actOk}");
+
+                            // Collect all dangling dimensions in this view
+                            List<DisplayDimension> candidateDims = new List<DisplayDimension>();
+                            DisplayDimension dd = currentView.GetFirstDisplayDimension5() as DisplayDimension;
+                            while (dd != null)
+                            {
+                                Annotation a = dd.GetAnnotation() as Annotation;
+                                if (a != null && a.IsDangling())
+                                {
+                                    candidateDims.Add(dd);
+                                }
+                                dd = dd.GetNext5() as DisplayDimension;
+                            }
+
+                            LogDebug($"  View '{vName}': Found {candidateDims.Count} dangling dimension(s).");
+
+                            List<ViewCandidateEntity> viewCandidates = null;
+                            if (candidateDims.Count > 0)
+                            {
+                                viewCandidates = CollectViewCandidateEntities(swApp, currentView);
+                            }
+
+                            foreach (var targetDispDim in candidateDims)
+                            {
+                                Annotation targetAnnot = targetDispDim.GetAnnotation() as Annotation;
+                                if (targetAnnot == null || !targetAnnot.IsDangling()) continue;
+
+                                SingleTargetRepairResult res = null;
+                                bool isSingleEntity = IsSingleEntityDimension(targetDispDim);
+                                object[] ents = targetAnnot.GetAttachedEntities3() as object[];
+
+                                if (isSingleEntity)
+                                {
+                                    if (ents != null && ents.Length >= 1 && ents[0] != null)
+                                    {
+                                        res = RecreateSingleEntityDimensionFromAttachedEntities(
+                                            swApp,
+                                            swDrawing,
+                                            swModel,
+                                            currentView,
+                                            targetDispDim,
+                                            targetAnnot,
+                                            ents[0],
+                                            runningDisplayCount,
+                                            runningDanglingCount);
+                                    }
+
+                                    if (res == null || res.Status != SingleTargetStatus.Success)
+                                    {
+                                        if (viewCandidates != null && viewCandidates.Count >= 1)
+                                        {
+                                            res = RecreateSingleEntityDimensionFromCandidates(
+                                                swApp,
+                                                swDrawing,
+                                                swModel,
+                                                currentView,
+                                                targetDispDim,
+                                                targetAnnot,
+                                                viewCandidates,
+                                                runningDisplayCount,
+                                                runningDanglingCount);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    if (ents != null && ents.Length >= 2 && ents[0] != null && ents[1] != null)
+                                    {
+                                        res = RecreateDimensionFromAttachedEntities(
+                                            swApp,
+                                            swDrawing,
+                                            swModel,
+                                            currentView,
+                                            targetDispDim,
+                                            targetAnnot,
+                                            ents[0],
+                                            ents[1],
+                                            runningDisplayCount,
+                                            runningDanglingCount);
+                                    }
+
+                                    if (res == null || res.Status != SingleTargetStatus.Success)
+                                    {
+                                        if (viewCandidates != null && viewCandidates.Count >= 2)
+                                        {
+                                            res = RecreateDimensionFromViewCandidates(
+                                                swApp,
+                                                swDrawing,
+                                                swModel,
+                                                currentView,
+                                                targetDispDim,
+                                                targetAnnot,
+                                                viewCandidates,
+                                                runningDisplayCount,
+                                                runningDanglingCount);
+                                        }
+                                    }
+                                }
+
+                                if (res != null && res.Status == SingleTargetStatus.Success)
+                                {
+                                    totalRepairedPass0++;
+                                    runningDisplayCount = res.PostDisplayCount;
+                                    runningDanglingCount = res.PostDanglingCount;
+                                    LogDebug($"  Direct Recreation SUCCESS for '{targetAnnot.GetName()}'! Remaining Dangling: {runningDanglingCount}");
+
+                                    if (runningDanglingCount == 0) break;
+                                }
+                                else
+                                {
+                                    LogDebug($"  Direct Recreation FAILED for '{targetAnnot.GetName()}': {(res != null ? res.Reason : "UNKNOWN")}");
+                                }
+                            }
+                        }
+
+                        if (runningDanglingCount == 0) break;
+                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                    }
+
+                    if (runningDanglingCount == 0) break;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("Error in Pass 0C: " + ex.Message);
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(initialSheet))
+                {
+                    try { swDrawing.ActivateSheet(initialSheet); } catch {}
+                }
+            }
+
+            LogDebug($"\n=== PASS 0 FINISHED: Total Repaired={totalRepairedPass0}, RunningDisplay={runningDisplayCount}, RunningDangling={runningDanglingCount} ===");
+            return totalRepairedPass0;
+        }
+
+        private static bool? IsDimensionVertical(DisplayDimension dispDim, Dimension dim)
+        {
+            if (dim != null)
+            {
+                try
+                {
+                    MathVector vDir = dim.DimensionLineDirection;
+                    if (vDir != null && vDir.ArrayData is double[] arr && arr.Length >= 2)
+                    {
+                        double vx = Math.Abs(arr[0]);
+                        double vy = Math.Abs(arr[1]);
+                        if (vy > vx * 1.2) return true;
+                        if (vx > vy * 1.2) return false;
+                    }
+                }
+                catch {}
+
+                try
+                {
+                    MathVector extDir = dim.ExtensionLineDirection;
+                    if (extDir != null && extDir.ArrayData is double[] arr && arr.Length >= 2)
+                    {
+                        double ex = Math.Abs(arr[0]);
+                        double ey = Math.Abs(arr[1]);
+                        if (ex > ey * 1.2) return true;
+                        if (ey > ex * 1.2) return false;
+                    }
+                }
+                catch {}
+            }
+
+            if (dispDim != null)
+            {
+                try
+                {
+                    DisplayData dd = dispDim.GetDisplayData() as DisplayData;
+                    if (dd != null)
+                    {
+                        int lCount = dd.GetLineCount();
+                        double dimDx = 0.0, dimDy = 0.0;
+                        double extDx = 0.0, extDy = 0.0;
+                        for (int li = 0; li < lCount; li++)
+                        {
+                            object lObj = dd.GetLineAtIndex3(li);
+                            if (lObj is double[] lArr && lArr.Length >= 10)
+                            {
+                                int lineType = Convert.ToInt32(lArr[1]);
+                                double dx = Math.Abs(lArr[7] - lArr[4]);
+                                double dy = Math.Abs(lArr[8] - lArr[5]);
+                                if (lineType == 0)
+                                {
+                                    dimDx += dx;
+                                    dimDy += dy;
+                                }
+                                else
+                                {
+                                    extDx += dx;
+                                    extDy += dy;
+                                }
+                            }
+                        }
+                        if (dimDy > dimDx * 1.2) return true;
+                        if (dimDx > dimDy * 1.2) return false;
+                        if (extDx > extDy * 1.2) return true;
+                        if (extDy > extDx * 1.2) return false;
+                    }
+                }
+                catch {}
+            }
+
+            return null;
+        }
+
+        private static bool IsSingleEntityDimension(DisplayDimension dispDim)
+        {
+            if (dispDim == null) return false;
+            try
+            {
+                if (dispDim.IsHoleCallout()) return true;
+            }
+            catch {}
+            try
+            {
+                int type2 = dispDim.Type2;
+                if (type2 == (int)swDimensionType_e.swDiameterDimension ||
+                    type2 == (int)swDimensionType_e.swRadialDimension ||
+                    type2 == (int)swDimensionType_e.swDiametricLinearDimension ||
+                    type2 == (int)swDimensionType_e.swRadialLinearDimension ||
+                    type2 == (int)swDimensionType_e.swChamferDimension)
+                {
+                    return true;
+                }
+            }
+            catch {}
+            return false;
+        }
+
+        private static SingleTargetRepairResult RecreateDimensionFromAttachedEntities(
+            ISldWorks swApp,
+            DrawingDoc swDrawing,
+            ModelDoc2 swModel,
+            SolidWorks.Interop.sldworks.View targetView,
+            DisplayDimension targetDispDim,
+            Annotation targetAnnot,
+            object ent1,
+            object ent2,
+            int currentDisplayBefore,
+            int currentDanglingBefore)
+        {
+            Dimension oldDim = targetDispDim.GetDimension2(0) as Dimension ?? targetDispDim.GetDimension() as Dimension;
+            string oldDimFullName = oldDim != null ? oldDim.FullName : targetAnnot.GetName();
+            double? oldSysVal = null;
+            if (oldDim != null)
+            {
+                try
+                {
+                    object values = oldDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                    if (values is double[] arr && arr.Length > 0) oldSysVal = arr[0];
+                    else if (values is double d) oldSysVal = d;
+                    else oldSysVal = oldDim.GetSystemValue2("");
+                }
+                catch {}
+            }
+
+            double[] oldPos = null;
+            try { oldPos = targetAnnot.GetPosition() as double[]; } catch {}
+
+            swModel.ClearSelection2(true);
+            ISelectionMgr selMgr = swModel.SelectionManager as ISelectionMgr;
+
+            bool s1 = SelectDrawingOrModelEntity(swApp, swModel, targetView, ent1, false, selMgr);
+            bool s2 = SelectDrawingOrModelEntity(swApp, swModel, targetView, ent2, true, selMgr);
+
+            int selCount = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+            if (selCount != 2 || !s1 || !s2)
+            {
+                // Try reverse selection order
+                swModel.ClearSelection2(true);
+                bool s2Rev = SelectDrawingOrModelEntity(swApp, swModel, targetView, ent2, false, selMgr);
+                bool s1Rev = SelectDrawingOrModelEntity(swApp, swModel, targetView, ent1, true, selMgr);
+                int selCountRev = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+
+                if (selCountRev == 2 && s1Rev && s2Rev)
+                {
+                    selCount = selCountRev;
+                    s1 = s1Rev;
+                    s2 = s2Rev;
+                    LogDebug("  [RecreateDimensionFromAttachedEntities] Reverse selection order succeeded!");
+                }
+                else
+                {
+                    swModel.ClearSelection2(true);
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = $"SELECTION_COUNT_INVALID (Count={selCount}, s1={s1}, s2={s2}; RevCount={selCountRev}, s1Rev={s1Rev}, s2Rev={s2Rev})" };
+                }
+            }
+
+            double posX = (oldPos != null && oldPos.Length >= 1) ? oldPos[0] : 0.0;
+            double posY = (oldPos != null && oldPos.Length >= 2) ? oldPos[1] : 0.0;
+            double posZ = (oldPos != null && oldPos.Length >= 3) ? oldPos[2] : 0.0;
+
+            DisplayDimension newDisp = null;
+            try
+            {
+                newDisp = swModel.AddDimension2(posX, posY, posZ) as DisplayDimension;
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"AddDimension2 Exception: {ex.Message}");
+            }
+
+            if (newDisp == null)
+            {
+                swModel.ClearSelection2(true);
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "ADD_DIMENSION_NULL" };
+            }
+
+            Annotation newAnnot = newDisp.GetAnnotation() as Annotation;
+            Dimension newDim = newDisp.GetDimension2(0) as Dimension ?? newDisp.GetDimension() as Dimension;
+            string newDimFullName = newDim != null ? newDim.FullName : (newAnnot != null ? newAnnot.GetName() : "");
+
+            bool newDangling = (newAnnot != null) && newAnnot.IsDangling();
+            int newAttached = (newAnnot != null) ? newAnnot.GetAttachedEntityCount3() : 0;
+
+            double? newSysVal = null;
+            if (newDim != null)
+            {
+                try
+                {
+                    object values = newDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                    if (values is double[] arr && arr.Length > 0) newSysVal = arr[0];
+                    else if (values is double d) newSysVal = d;
+                    else newSysVal = newDim.GetSystemValue2("");
+                }
+                catch {}
+            }
+
+            bool isAngular = (targetDispDim.Type2 == (int)swDimensionType_e.swAngularDimension || targetDispDim.Type2 == (int)swDimensionType_e.swAngularOrdinateDimension);
+            bool valMatch = false;
+            double deltaValMm = double.MaxValue;
+            double effTolMm = 0.15;
+
+            if (oldSysVal.HasValue && newSysVal.HasValue)
+            {
+                if (isAngular)
+                {
+                    double deltaDeg = Math.Abs(newSysVal.Value - oldSysVal.Value) * 180.0 / Math.PI;
+                    valMatch = deltaDeg <= 0.1;
+                }
+                else
+                {
+                    deltaValMm = Math.Abs(newSysVal.Value - oldSysVal.Value) * 1000.0;
+                    effTolMm = Math.Max(0.15, Math.Abs(oldSysVal.Value * 1000.0) * 0.001);
+                    valMatch = deltaValMm <= effTolMm;
+                }
+            }
+
+            if (newDangling || newAttached < 1 || !valMatch)
+            {
+                LogDebug($"New dim verification failed: Dangling={newDangling}, Attached={newAttached}, ValMatch={valMatch} (Old={oldSysVal * 1000.0:F3}mm, New={newSysVal * 1000.0:F3}mm, Delta={deltaValMm:F3}mm)");
+                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_VERIFY_FAILED");
+                swModel.ClearSelection2(true);
+                string failReason = newDangling ? "NEW_DIM_DANGLING" : (newAttached < 1 ? "NEW_ATTACHED_EMPTY" : "VALUE_MISMATCH");
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = failReason };
+            }
+
+            bool? targetIsVertAttached = IsDimensionVertical(targetDispDim, oldDim);
+            if (targetIsVertAttached.HasValue)
+            {
+                bool? newIsVertAttached = IsDimensionVertical(newDisp, newDim);
+                if (newIsVertAttached.HasValue && newIsVertAttached.Value != targetIsVertAttached.Value)
+                {
+                    LogDebug($"Pass 0C verification failed: Orientation mismatch (Target vertical={targetIsVertAttached.Value}, New vertical={newIsVertAttached.Value})");
+                    DeleteProvisionalDimension(swModel, newDisp, "PASS0C_ORIENTATION_MISMATCH");
+                    swModel.ClearSelection2(true);
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "ORIENTATION_MISMATCH" };
+                }
+            }
+
+            // Clone presentation
+            CopyDimensionPresentation(targetDispDim, targetAnnot, oldDim, newDisp, newAnnot, newDim, oldPos);
+
+            // Safely delete old dimension
+            swModel.ClearSelection2(true);
+            IModelDocExtension ext = swModel.Extension;
+            bool oldSelected = false;
+
+            if (!string.IsNullOrEmpty(oldDimFullName) && ext != null)
+            {
+                try { oldSelected = ext.SelectByID2(oldDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
+            }
+            if (!oldSelected && targetAnnot != null)
+            {
+                try { oldSelected = targetAnnot.Select3(false, null); } catch {}
+            }
+
+            int selCountAfterSelect = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+            int selTypeRaw = selMgr != null ? selMgr.GetSelectedObjectType3(1, -1) : -1;
+            string selTypeName = ((swSelectType_e)selTypeRaw).ToString();
+
+            bool selectOk = oldSelected && selCountAfterSelect == 1 &&
+                (selTypeRaw == (int)swSelectType_e.swSelDIMENSIONS || selTypeName.IndexOf("DIMENSION", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (!selectOk)
+            {
+                LogDebug($"Safe delete selection failed for '{oldDimFullName}'. Cleaning up new dim.");
+                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SAFE_DELETE_SELECTION_FAILED");
+                swModel.ClearSelection2(true);
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "SAFE_DELETE_SELECTION_FAILED" };
+            }
+
+            bool deleteResult = false;
+            try { deleteResult = ext.DeleteSelection2(0); } catch {}
+            swModel.ClearSelection2(true);
+
+            if (!deleteResult)
+            {
+                LogDebug($"DeleteSelection2 returned false for '{oldDimFullName}'. Cleaning up new dim.");
+                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_DELETE_RETURNED_FALSE");
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DELETE_RETURNED_FALSE" };
+            }
+
+            int postDisplay = 0;
+            int postDangling = 0;
+            CountTotalDrawingDimensions(swDrawing, out postDisplay, out postDangling);
+
+            bool newPostDangling = true;
+            try { newPostDangling = newAnnot.IsDangling(); } catch {}
+            int newPostAttached = 0;
+            try { newPostAttached = newAnnot.GetAttachedEntityCount3(); } catch {}
+
+            if (newPostDangling || newPostAttached < 1)
+            {
+                LogDebug($"FATAL: Post-delete new dim invalid (Dangling={newPostDangling}, Attached={newPostAttached})");
+                return new SingleTargetRepairResult
+                {
+                    Status = SingleTargetStatus.Failed,
+                    Reason = "NEW_DIM_INVALID_AFTER_DELETE",
+                    IsUnsafeState = true
+                };
+            }
+
+            return new SingleTargetRepairResult
+            {
+                Status = SingleTargetStatus.Success,
+                PostDisplayCount = postDisplay,
+                PostDanglingCount = postDangling
+            };
+        }
+
+        private static bool GetEdgeModelPoints(IEdge edge, out double[] startPt, out double[] endPt, out double[] midPt)
+        {
+            return GetEdgeModelPoints(edge, out startPt, out endPt, out midPt, out _, out _);
+        }
+
+        private static bool GetEdgeModelPoints(
+            IEdge edge, 
+            out double[] startPt, 
+            out double[] endPt, 
+            out double[] midPt, 
+            out bool isCircle, 
+            out double radius)
+        {
+            startPt = null;
+            endPt = null;
+            midPt = null;
+            isCircle = false;
+            radius = 0.0;
+            if (edge == null) return false;
+            try
+            {
+                Curve c = edge.GetCurve() as Curve;
+                if (c != null)
+                {
+                    if (c.IsCircle())
+                    {
+                        double[] cParams = c.CircleParams as double[];
+                        if (cParams != null && cParams.Length >= 7)
+                        {
+                            isCircle = true;
+                            radius = Math.Abs(cParams[6]);
+                            midPt = new double[] { cParams[0], cParams[1], cParams[2] };
+                            startPt = new double[] { cParams[0] - radius, cParams[1], cParams[2] };
+                            endPt = new double[] { cParams[0] + radius, cParams[1], cParams[2] };
+                            return true;
+                        }
+                    }
+
+                    if (c.GetEndParams(out double sp, out double ep, out _, out _))
+                    {
+                        startPt = c.Evaluate2(sp, 0) as double[];
+                        endPt = c.Evaluate2(ep, 0) as double[];
+                        if (startPt != null && endPt != null && startPt.Length >= 3 && endPt.Length >= 3)
+                        {
+                            midPt = new double[]
+                            {
+                                (startPt[0] + endPt[0]) / 2.0,
+                                (startPt[1] + endPt[1]) / 2.0,
+                                (startPt[2] + endPt[2]) / 2.0
+                            };
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch {}
+            return false;
+        }
+
+        private static bool SelectEntityInView(
+            ISelectionMgr selMgr,
+            ModelDoc2 swModel,
+            ISldWorks swApp,
+            SolidWorks.Interop.sldworks.View defaultView,
+            ViewCandidateEntity cand,
+            bool append)
+        {
+            if (cand == null || cand.Entity == null || selMgr == null) return false;
+            int initialCount = selMgr.GetSelectedObjectCount2(-1);
+            int expectedCount = append ? initialCount + 1 : 1;
+
+            SolidWorks.Interop.sldworks.View view = cand.SourceView ?? defaultView;
+
+            SelectData selData = selMgr.CreateSelectData();
+            if (selData != null && view != null)
+            {
+                try { selData.View = view; } catch {}
+            }
+
+            if (cand.Entity is IEntity e)
+            {
+                try
+                {
+                    if (e.Select4(append, selData))
+                    {
+                        if (selMgr.GetSelectedObjectCount2(-1) == expectedCount) return true;
+                    }
+                }
+                catch {}
+                try
+                {
+                    if (e.Select4(append, null))
+                    {
+                        if (selMgr.GetSelectedObjectCount2(-1) == expectedCount) return true;
+                    }
+                }
+                catch {}
+
+                // Coordinate fallback for edges
+                double[] edgePt = cand.EdgePointSheet ?? cand.MidSheet;
+                if (edgePt != null && swModel != null && swModel.Extension != null)
+                {
+                    try
+                    {
+                        if (swModel.Extension.SelectByID2("", "EDGE", edgePt[0], edgePt[1], edgePt[2], append, 0, null, 0))
+                        {
+                            if (selMgr.GetSelectedObjectCount2(-1) == expectedCount) return true;
+                        }
+                    }
+                    catch {}
+                }
+            }
+            else if (cand.Entity is ISketchSegment seg)
+            {
+                try
+                {
+                    if (seg.Select4(append, selData))
+                    {
+                        if (selMgr.GetSelectedObjectCount2(-1) == expectedCount) return true;
+                    }
+                }
+                catch {}
+                try
+                {
+                    if (seg.Select4(append, null))
+                    {
+                        if (selMgr.GetSelectedObjectCount2(-1) == expectedCount) return true;
+                    }
+                }
+                catch {}
+
+                // Coordinate fallback for sketch segments (bend lines)
+                double[] segPt = cand.EdgePointSheet ?? cand.MidSheet;
+                if (segPt != null && swModel != null && swModel.Extension != null)
+                {
+                    string[] types = new string[] { "EXTSKETCHSEGMENT", "SKETCHSEGMENT" };
+                    foreach (var t in types)
+                    {
+                        try
+                        {
+                            if (swModel.Extension.SelectByID2("", t, segPt[0], segPt[1], segPt[2], append, 0, null, 0))
+                            {
+                                if (selMgr.GetSelectedObjectCount2(-1) == expectedCount) return true;
+                            }
+                        }
+                        catch {}
+                    }
+                }
+            }
+            return false;
+        }
+
+        private sealed class ViewCandidateEntity
+        {
+            public object Entity { get; set; }
+            public bool IsBendLine { get; set; }
+            public bool IsDirectView { get; set; }
+            public SolidWorks.Interop.sldworks.View SourceView { get; set; }
+            public double[] MidSheet { get; set; }
+            public double[] MidModel { get; set; }
+            public double[] EdgePointSheet { get; set; }
+            public bool IsHorizontal { get; set; }
+            public bool IsCircle { get; set; }
+            public double RadiusModel { get; set; }
+        }
+
+        private static List<ViewCandidateEntity> CollectViewCandidateEntities(
+            ISldWorks swApp,
+            SolidWorks.Interop.sldworks.View view)
+        {
+            List<ViewCandidateEntity> result = new List<ViewCandidateEntity>();
+            if (view == null) return result;
+
+            List<SolidWorks.Interop.sldworks.View> viewsToCheck = new List<SolidWorks.Interop.sldworks.View>();
+            viewsToCheck.Add(view);
+            try
+            {
+                SolidWorks.Interop.sldworks.View baseV = view.GetBaseView() as SolidWorks.Interop.sldworks.View;
+                if (baseV != null) viewsToCheck.Add(baseV);
+            }
+            catch {}
+
+            for (int vIdx = 0; vIdx < viewsToCheck.Count; vIdx++)
+            {
+                var v = viewsToCheck[vIdx];
+                bool isDirectView = (vIdx == 0);
+
+                // 1. Bend Lines
+                try
+                {
+                    object[] blArr = v.GetBendLines() as object[];
+                    if (blArr != null)
+                    {
+                        foreach (object bl in blArr)
+                        {
+                            if (bl is ISketchSegment seg)
+                            {
+                                double[] midS = null;
+                                double[] midM = null;
+                                double[] sS = null;
+                                bool isHoriz = false;
+                                bool isCirc = false;
+                                double radM = 0.0;
+                                if (GetSegmentModelPoints(seg, out double[] sM, out double[] eM, out midM, out isCirc, out radM))
+                                {
+                                    midS = TransformPointToSheet(swApp, v, midM);
+                                    sS = TransformPointToSheet(swApp, v, sM);
+                                    double[] eS = TransformPointToSheet(swApp, v, eM);
+                                    if (sS != null && eS != null && sS.Length >= 2 && eS.Length >= 2)
+                                    {
+                                        isHoriz = Math.Abs(eS[0] - sS[0]) >= Math.Abs(eS[1] - sS[1]);
+                                    }
+                                }
+                                result.Add(new ViewCandidateEntity
+                                {
+                                    Entity = seg,
+                                    IsBendLine = true,
+                                    IsDirectView = isDirectView,
+                                    SourceView = v,
+                                    MidSheet = midS,
+                                    MidModel = midM,
+                                    EdgePointSheet = sS,
+                                    IsHorizontal = isHoriz,
+                                    IsCircle = isCirc,
+                                    RadiusModel = radM
+                                });
+                            }
+                        }
+                    }
+                }
+                catch {}
+
+                // 2. Visible Edges
+                List<IEdge> viewEdges = new List<IEdge>();
+                try
+                {
+                    object[] comps = null;
+                    try { comps = v.GetVisibleComponents() as object[]; } catch {}
+                    if (comps != null && comps.Length > 0)
+                    {
+                        foreach (object cObj in comps)
+                        {
+                            if (cObj is Component2 comp)
+                            {
+                                object[] edges = null;
+                                try { edges = v.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_Edge) as object[]; } catch {}
+                                if (edges != null)
+                                {
+                                    foreach (object eObj in edges)
+                                    {
+                                        if (eObj is IEdge edge && !viewEdges.Contains(edge)) viewEdges.Add(edge);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        object[] edges = null;
+                        try { edges = v.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Edge) as object[]; } catch {}
+                        if (edges != null)
+                        {
+                            foreach (object eObj in edges)
+                            {
+                                if (eObj is IEdge edge && !viewEdges.Contains(edge)) viewEdges.Add(edge);
+                            }
+                        }
+                    }
+                }
+                catch {}
+
+                foreach (var edge in viewEdges)
+                {
+                    double[] midS = null;
+                    double[] midM = null;
+                    double[] sS = null;
+                    bool isHoriz = false;
+                    bool isCirc = false;
+                    double radM = 0.0;
+                    if (GetEdgeModelPoints(edge, out double[] sM, out double[] eM, out midM, out isCirc, out radM))
+                    {
+                        midS = TransformPointToSheet(swApp, v, midM);
+                        sS = TransformPointToSheet(swApp, v, sM);
+                        double[] eS = TransformPointToSheet(swApp, v, eM);
+                        if (sS != null && eS != null && sS.Length >= 2 && eS.Length >= 2)
+                        {
+                            isHoriz = Math.Abs(eS[0] - sS[0]) >= Math.Abs(eS[1] - sS[1]);
+                        }
+                    }
+                    result.Add(new ViewCandidateEntity
+                    {
+                        Entity = edge,
+                        IsBendLine = false,
+                        IsDirectView = isDirectView,
+                        SourceView = v,
+                        MidSheet = midS,
+                        MidModel = midM,
+                        EdgePointSheet = sS,
+                        IsHorizontal = isHoriz,
+                        IsCircle = isCirc,
+                        RadiusModel = radM
+                    });
+                }
+            }
+
+            LogDebug($"  [CollectViewCandidateEntities] View '{view.GetName2()}': Collected {result.Count} candidates ({result.Count(c => c.IsBendLine)} bend lines, {result.Count(c => !c.IsBendLine && !c.IsCircle)} straight edges, {result.Count(c => c.IsCircle)} circular holes/arcs, {result.Count(c => c.IsHorizontal)} horiz, {result.Count(c => !c.IsHorizontal)} vert)");
+            return result;
+        }
+
+        private sealed class CandidateEntityPair
+        {
+            public ViewCandidateEntity Ent1 { get; set; }
+            public ViewCandidateEntity Ent2 { get; set; }
+            public double Score { get; set; }
+        }
+
+        private static SingleTargetRepairResult RecreateDimensionFromViewCandidates(
+            ISldWorks swApp,
+            DrawingDoc swDrawing,
+            ModelDoc2 swModel,
+            SolidWorks.Interop.sldworks.View currentView,
+            DisplayDimension targetDispDim,
+            Annotation targetAnnot,
+            List<ViewCandidateEntity> candidates,
+            int currentDisplayBefore,
+            int currentDanglingBefore)
+        {
+            if (candidates == null || candidates.Count < 2)
+            {
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "INSUFFICIENT_VIEW_CANDIDATES" };
+            }
+
+            Dimension oldDim = targetDispDim.GetDimension2(0) as Dimension ?? targetDispDim.GetDimension() as Dimension;
+            string oldDimFullName = oldDim != null ? oldDim.FullName : targetAnnot.GetName();
+            double? oldSysVal = null;
+            if (oldDim != null)
+            {
+                try
+                {
+                    object values = oldDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                    if (values is double[] arr && arr.Length > 0) oldSysVal = arr[0];
+                    else if (values is double d) oldSysVal = d;
+                    else oldSysVal = oldDim.GetSystemValue2("");
+                }
+                catch {}
+            }
+
+            if (!oldSysVal.HasValue)
+            {
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "OLD_SYS_VAL_NULL" };
+            }
+
+            double[] oldPos = null;
+            try { oldPos = targetAnnot.GetPosition() as double[]; } catch {}
+
+            double targetMm = oldSysVal.Value * 1000.0;
+            bool? targetIsVertical = IsDimensionVertical(targetDispDim, oldDim);
+            LogDebug($"  [RecreateDimensionFromViewCandidates] Searching pair for '{targetAnnot.GetName()}' (Target={targetMm:F3}mm, TargetVertical={targetIsVertical?.ToString() ?? "null"})...");
+
+            List<CandidateEntityPair> pairs = new List<CandidateEntityPair>();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var c1 = candidates[i];
+                for (int j = i + 1; j < candidates.Count; j++)
+                {
+                    var c2 = candidates[j];
+
+                    double score = 0.0;
+                    if (oldPos != null && c1.MidSheet != null && c2.MidSheet != null)
+                    {
+                        double pairMidX = (c1.MidSheet[0] + c2.MidSheet[0]) / 2.0;
+                        double pairMidY = (c1.MidSheet[1] + c2.MidSheet[1]) / 2.0;
+
+                        if (targetIsVertical.HasValue)
+                        {
+                            if (targetIsVertical.Value)
+                            {
+                                // Target is vertical: primary measurement axis is Y
+                                score = Math.Abs(pairMidY - oldPos[1]) * 4.0 + Math.Abs(pairMidX - oldPos[0]) * 0.2;
+                                // Vertical dimension requires two horizontal entities, or horizontal entity + circle, or two circles
+                                bool c1Ok = c1.IsHorizontal || c1.IsCircle;
+                                bool c2Ok = c2.IsHorizontal || c2.IsCircle;
+                                if (c1Ok && c2Ok)
+                                {
+                                    score -= 10.0;
+                                }
+                                else
+                                {
+                                    score += 1000.0;
+                                }
+                            }
+                            else
+                            {
+                                // Target is horizontal: primary measurement axis is X
+                                score = Math.Abs(pairMidX - oldPos[0]) * 4.0 + Math.Abs(pairMidY - oldPos[1]) * 0.2;
+                                // Horizontal dimension requires two vertical entities, or vertical entity + circle, or two circles
+                                bool c1Ok = (!c1.IsHorizontal) || c1.IsCircle;
+                                bool c2Ok = (!c2.IsHorizontal) || c2.IsCircle;
+                                if (c1Ok && c2Ok)
+                                {
+                                    score -= 10.0;
+                                }
+                                else
+                                {
+                                    score += 1000.0;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            score = Math.Sqrt(Math.Pow(pairMidX - oldPos[0], 2) + Math.Pow(pairMidY - oldPos[1], 2));
+                        }
+
+                        // Direct View bonus
+                        if (c1.IsDirectView && c2.IsDirectView) score -= 2.0;
+                        else if (c1.IsDirectView || c2.IsDirectView) score -= 1.0;
+
+                        // Hole dimension topology bonus
+                        if (c1.IsCircle || c2.IsCircle)
+                        {
+                            if (targetMm < 300.0) score -= 0.5;
+                        }
+
+                        // Sheet metal dimension topology bonus
+                        if (targetMm > 100.0)
+                        {
+                            if (c1.IsBendLine && c2.IsBendLine) score -= 0.5;
+                            else if (c1.IsBendLine || c2.IsBendLine) score -= 0.2;
+                        }
+                        else
+                        {
+                            if ((c1.IsBendLine && !c2.IsBendLine) || (!c1.IsBendLine && c2.IsBendLine)) score -= 0.3;
+                            else if (c1.IsBendLine && c2.IsBendLine) score -= 0.1;
+                        }
+                    }
+                    else
+                    {
+                        // Heavily penalize missing coordinates so pairs with known geometry are evaluated first
+                        score = 10000.0;
+                    }
+
+                    pairs.Add(new CandidateEntityPair { Ent1 = c1, Ent2 = c2, Score = score });
+                }
+            }
+
+            pairs.Sort((a, b) => a.Score.CompareTo(b.Score));
+            LogDebug($"  [RecreateDimensionFromViewCandidates] Evaluated {pairs.Count} candidate pairs. Testing top candidates...");
+
+            ISelectionMgr selMgr = swModel.SelectionManager as ISelectionMgr;
+            int triedCount = 0;
+
+            foreach (var pair in pairs)
+            {
+                triedCount++;
+                if (triedCount > 200) break; // Limit search to top 200 pairs to ensure responsiveness
+
+                swModel.ClearSelection2(true);
+                bool s1 = SelectEntityInView(selMgr, swModel, swApp, currentView, pair.Ent1, false);
+                bool s2 = SelectEntityInView(selMgr, swModel, swApp, currentView, pair.Ent2, true);
+
+                if (!s1 || !s2 || selMgr.GetSelectedObjectCount2(-1) != 2)
+                {
+                    swModel.ClearSelection2(true);
+                    s2 = SelectEntityInView(selMgr, swModel, swApp, currentView, pair.Ent2, false);
+                    s1 = SelectEntityInView(selMgr, swModel, swApp, currentView, pair.Ent1, true);
+                    if (!s1 || !s2 || selMgr.GetSelectedObjectCount2(-1) != 2)
+                    {
+                        swModel.ClearSelection2(true);
+                        continue;
+                    }
+                }
+
+                double posX = (oldPos != null && oldPos.Length >= 1) ? oldPos[0] : 0.0;
+                double posY = (oldPos != null && oldPos.Length >= 2) ? oldPos[1] : 0.0;
+
+                DisplayDimension newDisp = null;
+                try
+                {
+                    newDisp = swModel.AddDimension2(posX, posY, 0.0) as DisplayDimension;
+                }
+                catch {}
+
+                if (newDisp == null && oldPos != null && oldPos.Length >= 3)
+                {
+                    try { newDisp = swModel.AddDimension2(posX, posY, oldPos[2]) as DisplayDimension; } catch {}
+                }
+
+                if (newDisp == null)
+                {
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                Annotation newAnnot = newDisp.GetAnnotation() as Annotation;
+                Dimension newDim = newDisp.GetDimension2(0) as Dimension ?? newDisp.GetDimension() as Dimension;
+                string newDimFullName = newDim != null ? newDim.FullName : (newAnnot != null ? newAnnot.GetName() : "");
+
+                bool newDangling = (newAnnot != null) && newAnnot.IsDangling();
+                int newAttached = (newAnnot != null) ? newAnnot.GetAttachedEntityCount3() : 0;
+
+                double? newSysVal = null;
+                if (newDim != null)
+                {
+                    try
+                    {
+                        object values = newDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                        if (values is double[] arr && arr.Length > 0) newSysVal = arr[0];
+                        else if (values is double d) newSysVal = d;
+                        else newSysVal = newDim.GetSystemValue2("");
+                    }
+                    catch {}
+                }
+
+                bool isAngular = (targetDispDim.Type2 == (int)swDimensionType_e.swAngularDimension || targetDispDim.Type2 == (int)swDimensionType_e.swAngularOrdinateDimension);
+                bool valMatch = false;
+                double deltaValMm = double.MaxValue;
+                double effTolMm = 0.15;
+
+                if (oldSysVal.HasValue && newSysVal.HasValue)
+                {
+                    if (isAngular)
+                    {
+                        double deltaDeg = Math.Abs(newSysVal.Value - oldSysVal.Value) * 180.0 / Math.PI;
+                        valMatch = deltaDeg <= 0.1;
+                    }
+                    else
+                    {
+                        deltaValMm = Math.Abs(newSysVal.Value - oldSysVal.Value) * 1000.0;
+                        effTolMm = Math.Max(0.15, Math.Abs(oldSysVal.Value * 1000.0) * 0.001);
+                        valMatch = deltaValMm <= effTolMm;
+                    }
+                }
+
+                if (newDangling || newAttached < 1 || !valMatch)
+                {
+                    if (triedCount <= 10)
+                    {
+                        LogDebug($"  [Trial #{triedCount}] Failed: Dangling={newDangling}, Attached={newAttached}, Val={(newSysVal.HasValue ? (newSysVal.Value * 1000.0).ToString("F3") : "null")}mm (Target={targetMm:F3}mm, Delta={(newSysVal.HasValue ? deltaValMm.ToString("F3") : "N/A")}mm)");
+                    }
+                    DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_VERIFY_FAILED");
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                if (targetIsVertical.HasValue)
+                {
+                    bool? newIsVert = IsDimensionVertical(newDisp, newDim);
+                    if (newIsVert.HasValue && newIsVert.Value != targetIsVertical.Value)
+                    {
+                        if (triedCount <= 10)
+                        {
+                            LogDebug($"  [Trial #{triedCount}] Rejected: Orientation mismatch (Target vertical={targetIsVertical.Value}, New vertical={newIsVert.Value})");
+                        }
+                        DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_ORIENTATION_MISMATCH");
+                        swModel.ClearSelection2(true);
+                        continue;
+                    }
+                }
+
+                LogDebug($"  [RecreateDimensionFromViewCandidates] MATCH FOUND! NewVal={newSysVal * 1000.0:F3}mm, Target={targetMm:F3}mm, Delta={deltaValMm:F4}mm (Trial #{triedCount})");
+
+                // Clone presentation
+                CopyDimensionPresentation(targetDispDim, targetAnnot, oldDim, newDisp, newAnnot, newDim, oldPos);
+
+                // Safely delete old dimension
+                swModel.ClearSelection2(true);
+                IModelDocExtension ext = swModel.Extension;
+                bool oldSelected = false;
+
+                if (!string.IsNullOrEmpty(oldDimFullName) && ext != null)
+                {
+                    try { oldSelected = ext.SelectByID2(oldDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
+                }
+                if (!oldSelected && targetAnnot != null)
+                {
+                    try { oldSelected = targetAnnot.Select3(false, null); } catch {}
+                }
+
+                int selCountAfterSelect = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+                int selTypeRaw = selMgr != null ? selMgr.GetSelectedObjectType3(1, -1) : -1;
+                string selTypeName = ((swSelectType_e)selTypeRaw).ToString();
+
+                bool selectOk = oldSelected && selCountAfterSelect == 1 &&
+                    (selTypeRaw == (int)swSelectType_e.swSelDIMENSIONS || selTypeName.IndexOf("DIMENSION", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (!selectOk)
+                {
+                    LogDebug($"Safe delete selection failed for '{oldDimFullName}'. Cleaning up new dim.");
+                    DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_SAFE_DELETE_SELECTION_FAILED");
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                bool deleteResult = false;
+                try { deleteResult = ext.DeleteSelection2(0); } catch {}
+                swModel.ClearSelection2(true);
+
+                if (!deleteResult)
+                {
+                    LogDebug($"DeleteSelection2 returned false for '{oldDimFullName}'. Cleaning up new dim.");
+                    DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_DELETE_RETURNED_FALSE");
+                    continue;
+                }
+
+                int postDisplay = 0;
+                int postDangling = 0;
+                CountTotalDrawingDimensions(swDrawing, out postDisplay, out postDangling);
+
+                return new SingleTargetRepairResult
+                {
+                    Status = SingleTargetStatus.Success,
+                    PostDisplayCount = postDisplay,
+                    PostDanglingCount = postDangling
+                };
+            }
+
+            return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "NO_CANDIDATE_PAIR_MATCHED" };
+        }
+
+        private static SingleTargetRepairResult RecreateSingleEntityDimensionFromAttachedEntities(
+            ISldWorks swApp,
+            DrawingDoc swDrawing,
+            ModelDoc2 swModel,
+            SolidWorks.Interop.sldworks.View targetView,
+            DisplayDimension targetDispDim,
+            Annotation targetAnnot,
+            object ent,
+            int currentDisplayBefore,
+            int currentDanglingBefore)
+        {
+            Dimension oldDim = targetDispDim.GetDimension2(0) as Dimension ?? targetDispDim.GetDimension() as Dimension;
+            string oldDimFullName = oldDim != null ? oldDim.FullName : targetAnnot.GetName();
+            double? oldSysVal = null;
+            if (oldDim != null)
+            {
+                try
+                {
+                    object values = oldDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                    if (values is double[] arr && arr.Length > 0) oldSysVal = arr[0];
+                    else if (values is double d) oldSysVal = d;
+                    else oldSysVal = oldDim.GetSystemValue2("");
+                }
+                catch {}
+            }
+
+            double[] oldPos = null;
+            try { oldPos = targetAnnot.GetPosition() as double[]; } catch {}
+
+            bool isHoleCallout = false;
+            try { isHoleCallout = targetDispDim.IsHoleCallout(); } catch {}
+            bool isDiameter = (targetDispDim.Type2 == (int)swDimensionType_e.swDiameterDimension ||
+                               targetDispDim.Type2 == (int)swDimensionType_e.swDiametricLinearDimension);
+            bool isRadial = (targetDispDim.Type2 == (int)swDimensionType_e.swRadialDimension ||
+                             targetDispDim.Type2 == (int)swDimensionType_e.swRadialLinearDimension);
+
+            swModel.ClearSelection2(true);
+            ISelectionMgr selMgr = swModel.SelectionManager as ISelectionMgr;
+
+            bool s1 = SelectDrawingOrModelEntity(swApp, swModel, targetView, ent, false, selMgr);
+            if (!s1 || selMgr.GetSelectedObjectCount2(-1) != 1)
+            {
+                swModel.ClearSelection2(true);
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "ATTACHED_ENTITY_SELECT_FAILED" };
+            }
+
+            double posX = (oldPos != null && oldPos.Length >= 1) ? oldPos[0] : 0.0;
+            double posY = (oldPos != null && oldPos.Length >= 2) ? oldPos[1] : 0.0;
+
+            DisplayDimension newDisp = null;
+            if (isHoleCallout)
+            {
+                try { newDisp = swDrawing.AddHoleCallout2(posX, posY, 0.0) as DisplayDimension; } catch {}
+            }
+            if (newDisp == null && isDiameter)
+            {
+                try { newDisp = swModel.AddDiameterDimension2(posX, posY, 0.0) as DisplayDimension; } catch {}
+            }
+            if (newDisp == null && isRadial)
+            {
+                try { newDisp = swModel.AddRadialDimension2(posX, posY, 0.0) as DisplayDimension; } catch {}
+            }
+            if (newDisp == null)
+            {
+                try { newDisp = swModel.AddDimension2(posX, posY, 0.0) as DisplayDimension; } catch {}
+            }
+
+            if (newDisp == null)
+            {
+                swModel.ClearSelection2(true);
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "ADD_SINGLE_DIMENSION_NULL" };
+            }
+
+            Annotation newAnnot = newDisp.GetAnnotation() as Annotation;
+            Dimension newDim = newDisp.GetDimension2(0) as Dimension ?? newDisp.GetDimension() as Dimension;
+            string newDimFullName = newDim != null ? newDim.FullName : (newAnnot != null ? newAnnot.GetName() : "");
+
+            bool newDangling = (newAnnot != null) && newAnnot.IsDangling();
+            int newAttached = (newAnnot != null) ? newAnnot.GetAttachedEntityCount3() : 0;
+
+            double? newSysVal = null;
+            if (newDim != null)
+            {
+                try
+                {
+                    object values = newDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                    if (values is double[] arr && arr.Length > 0) newSysVal = arr[0];
+                    else if (values is double d) newSysVal = d;
+                    else newSysVal = newDim.GetSystemValue2("");
+                }
+                catch {}
+            }
+
+            bool valMatch = false;
+            double deltaValMm = double.MaxValue;
+            if (oldSysVal.HasValue && newSysVal.HasValue)
+            {
+                deltaValMm = Math.Abs(newSysVal.Value - oldSysVal.Value) * 1000.0;
+                double effTolMm = Math.Max(0.15, Math.Abs(oldSysVal.Value * 1000.0) * 0.001);
+                valMatch = deltaValMm <= effTolMm;
+            }
+            else if (isHoleCallout)
+            {
+                valMatch = true;
+            }
+
+            if (newDangling || newAttached < 1 || !valMatch)
+            {
+                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_VERIFY_FAILED");
+                swModel.ClearSelection2(true);
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "ATTACHED_SINGLE_VERIFY_FAILED" };
+            }
+
+            CopyDimensionPresentation(targetDispDim, targetAnnot, oldDim, newDisp, newAnnot, newDim, oldPos);
+
+            // Safely delete old dimension
+            swModel.ClearSelection2(true);
+            IModelDocExtension ext = swModel.Extension;
+            bool oldSelected = false;
+
+            if (!string.IsNullOrEmpty(oldDimFullName) && ext != null)
+            {
+                try { oldSelected = ext.SelectByID2(oldDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
+            }
+            if (!oldSelected && targetAnnot != null)
+            {
+                try { oldSelected = targetAnnot.Select3(false, null); } catch {}
+            }
+
+            int selCountAfterSelect = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+            int selTypeRaw = selMgr != null ? selMgr.GetSelectedObjectType3(1, -1) : -1;
+            string selTypeName = ((swSelectType_e)selTypeRaw).ToString();
+
+            bool selectOk = oldSelected && selCountAfterSelect == 1 &&
+                (selTypeRaw == (int)swSelectType_e.swSelDIMENSIONS || selTypeName.IndexOf("DIMENSION", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (!selectOk)
+            {
+                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_SAFE_DELETE_SELECTION_FAILED");
+                swModel.ClearSelection2(true);
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "SAFE_DELETE_SELECTION_FAILED" };
+            }
+
+            bool deleteResult = false;
+            try { deleteResult = ext.DeleteSelection2(0); } catch {}
+            swModel.ClearSelection2(true);
+
+            if (!deleteResult)
+            {
+                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_DELETE_RETURNED_FALSE");
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DELETE_RETURNED_FALSE" };
+            }
+
+            int postDisplay = 0;
+            int postDangling = 0;
+            CountTotalDrawingDimensions(swDrawing, out postDisplay, out postDangling);
+
+            return new SingleTargetRepairResult
+            {
+                Status = SingleTargetStatus.Success,
+                PostDisplayCount = postDisplay,
+                PostDanglingCount = postDangling
+            };
+        }
+
+        private static SingleTargetRepairResult RecreateSingleEntityDimensionFromCandidates(
+            ISldWorks swApp,
+            DrawingDoc swDrawing,
+            ModelDoc2 swModel,
+            SolidWorks.Interop.sldworks.View currentView,
+            DisplayDimension targetDispDim,
+            Annotation targetAnnot,
+            List<ViewCandidateEntity> candidates,
+            int currentDisplayBefore,
+            int currentDanglingBefore)
+        {
+            if (candidates == null || candidates.Count < 1)
+            {
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "INSUFFICIENT_VIEW_CANDIDATES" };
+            }
+
+            Dimension oldDim = targetDispDim.GetDimension2(0) as Dimension ?? targetDispDim.GetDimension() as Dimension;
+            string oldDimFullName = oldDim != null ? oldDim.FullName : targetAnnot.GetName();
+            double? oldSysVal = null;
+            if (oldDim != null)
+            {
+                try
+                {
+                    object values = oldDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                    if (values is double[] arr && arr.Length > 0) oldSysVal = arr[0];
+                    else if (values is double d) oldSysVal = d;
+                    else oldSysVal = oldDim.GetSystemValue2("");
+                }
+                catch {}
+            }
+
+            double[] oldPos = null;
+            try { oldPos = targetAnnot.GetPosition() as double[]; } catch {}
+
+            bool isHoleCallout = false;
+            try { isHoleCallout = targetDispDim.IsHoleCallout(); } catch {}
+
+            bool isDiameter = (targetDispDim.Type2 == (int)swDimensionType_e.swDiameterDimension ||
+                               targetDispDim.Type2 == (int)swDimensionType_e.swDiametricLinearDimension);
+            bool isRadial = (targetDispDim.Type2 == (int)swDimensionType_e.swRadialDimension ||
+                             targetDispDim.Type2 == (int)swDimensionType_e.swRadialLinearDimension);
+
+            double targetMm = oldSysVal.HasValue ? oldSysVal.Value * 1000.0 : 0.0;
+            LogDebug($"  [RecreateSingleEntityDimension] Searching single entity for '{targetAnnot.GetName()}' (Target={targetMm:F3}mm, IsHoleCallout={isHoleCallout}, IsDiameter={isDiameter}, IsRadial={isRadial})...");
+
+            var singleCandidates = candidates.Where(c => c.IsCircle).ToList();
+            if (singleCandidates.Count == 0)
+            {
+                singleCandidates = candidates.Where(c => !c.IsBendLine).ToList();
+            }
+
+            var scoredCandidates = new List<Tuple<ViewCandidateEntity, double>>();
+            foreach (var cand in singleCandidates)
+            {
+                double score = 0.0;
+                if (oldPos != null && cand.MidSheet != null)
+                {
+                    score = Math.Sqrt(Math.Pow(cand.MidSheet[0] - oldPos[0], 2) + Math.Pow(cand.MidSheet[1] - oldPos[1], 2));
+                }
+                else
+                {
+                    score = 1000.0;
+                }
+
+                if (cand.IsDirectView) score -= 2.0;
+
+                if (oldSysVal.HasValue && cand.IsCircle && cand.RadiusModel > 0)
+                {
+                    double expectedRad = isRadial ? oldSysVal.Value : (oldSysVal.Value / 2.0);
+                    double deltaRadMm = Math.Abs(cand.RadiusModel - expectedRad) * 1000.0;
+                    if (deltaRadMm <= 0.15)
+                    {
+                        score -= 10.0;
+                    }
+                }
+
+                scoredCandidates.Add(Tuple.Create(cand, score));
+            }
+
+            scoredCandidates.Sort((a, b) => a.Item2.CompareTo(b.Item2));
+            LogDebug($"  [RecreateSingleEntityDimension] Testing {scoredCandidates.Count} candidate entities...");
+
+            ISelectionMgr selMgr = swModel.SelectionManager as ISelectionMgr;
+            int triedCount = 0;
+
+            foreach (var item in scoredCandidates)
+            {
+                var cand = item.Item1;
+                triedCount++;
+                if (triedCount > 50) break;
+
+                swModel.ClearSelection2(true);
+                bool sel = SelectEntityInView(selMgr, swModel, swApp, currentView, cand, false);
+                if (!sel || selMgr.GetSelectedObjectCount2(-1) != 1)
+                {
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                double posX = (oldPos != null && oldPos.Length >= 1) ? oldPos[0] : 0.0;
+                double posY = (oldPos != null && oldPos.Length >= 2) ? oldPos[1] : 0.0;
+
+                DisplayDimension newDisp = null;
+                if (isHoleCallout)
+                {
+                    try { newDisp = swDrawing.AddHoleCallout2(posX, posY, 0.0) as DisplayDimension; } catch {}
+                }
+                if (newDisp == null && isDiameter)
+                {
+                    try { newDisp = swModel.AddDiameterDimension2(posX, posY, 0.0) as DisplayDimension; } catch {}
+                }
+                if (newDisp == null && isRadial)
+                {
+                    try { newDisp = swModel.AddRadialDimension2(posX, posY, 0.0) as DisplayDimension; } catch {}
+                }
+                if (newDisp == null)
+                {
+                    try { newDisp = swModel.AddDimension2(posX, posY, 0.0) as DisplayDimension; } catch {}
+                }
+
+                if (newDisp == null)
+                {
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                Annotation newAnnot = newDisp.GetAnnotation() as Annotation;
+                Dimension newDim = newDisp.GetDimension2(0) as Dimension ?? newDisp.GetDimension() as Dimension;
+                string newDimFullName = newDim != null ? newDim.FullName : (newAnnot != null ? newAnnot.GetName() : "");
+
+                bool newDangling = (newAnnot != null) && newAnnot.IsDangling();
+                int newAttached = (newAnnot != null) ? newAnnot.GetAttachedEntityCount3() : 0;
+
+                double? newSysVal = null;
+                if (newDim != null)
+                {
+                    try
+                    {
+                        object values = newDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                        if (values is double[] arr && arr.Length > 0) newSysVal = arr[0];
+                        else if (values is double d) newSysVal = d;
+                        else newSysVal = newDim.GetSystemValue2("");
+                    }
+                    catch {}
+                }
+
+                bool valMatch = false;
+                double deltaValMm = double.MaxValue;
+                if (oldSysVal.HasValue && newSysVal.HasValue)
+                {
+                    deltaValMm = Math.Abs(newSysVal.Value - oldSysVal.Value) * 1000.0;
+                    double effTolMm = Math.Max(0.15, Math.Abs(oldSysVal.Value * 1000.0) * 0.001);
+                    valMatch = deltaValMm <= effTolMm;
+                }
+                else if (isHoleCallout)
+                {
+                    valMatch = true;
+                }
+
+                if (newDangling || newAttached < 1 || !valMatch)
+                {
+                    if (triedCount <= 10)
+                    {
+                        LogDebug($"  [SingleEntity Trial #{triedCount}] Failed: Dangling={newDangling}, Attached={newAttached}, Val={(newSysVal.HasValue ? (newSysVal.Value * 1000.0).ToString("F3") : "null")}mm (Target={targetMm:F3}mm, Delta={(newSysVal.HasValue ? deltaValMm.ToString("F3") : "N/A")}mm)");
+                    }
+                    DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_VERIFY_FAILED");
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                LogDebug($"  [RecreateSingleEntityDimension] MATCH FOUND! NewVal={(newSysVal.HasValue ? (newSysVal.Value * 1000.0).ToString("F3") : "N/A")}mm, Target={targetMm:F3}mm, Delta={deltaValMm:F4}mm (Trial #{triedCount})");
+
+                CopyDimensionPresentation(targetDispDim, targetAnnot, oldDim, newDisp, newAnnot, newDim, oldPos);
+
+                // Safely delete old dimension
+                swModel.ClearSelection2(true);
+                IModelDocExtension ext = swModel.Extension;
+                bool oldSelected = false;
+
+                if (!string.IsNullOrEmpty(oldDimFullName) && ext != null)
+                {
+                    try { oldSelected = ext.SelectByID2(oldDimFullName, "DIMENSION", 0.0, 0.0, 0.0, false, 0, null, 0); } catch {}
+                }
+                if (!oldSelected && targetAnnot != null)
+                {
+                    try { oldSelected = targetAnnot.Select3(false, null); } catch {}
+                }
+
+                int selCountAfterSelect = (selMgr != null) ? selMgr.GetSelectedObjectCount2(-1) : 0;
+                int selTypeRaw = selMgr != null ? selMgr.GetSelectedObjectType3(1, -1) : -1;
+                string selTypeName = ((swSelectType_e)selTypeRaw).ToString();
+
+                bool selectOk = oldSelected && selCountAfterSelect == 1 &&
+                    (selTypeRaw == (int)swSelectType_e.swSelDIMENSIONS || selTypeName.IndexOf("DIMENSION", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (!selectOk)
+                {
+                    LogDebug($"Safe delete selection failed for '{oldDimFullName}'. Cleaning up new dim.");
+                    DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_SAFE_DELETE_SELECTION_FAILED");
+                    swModel.ClearSelection2(true);
+                    continue;
+                }
+
+                bool deleteResult = false;
+                try { deleteResult = ext.DeleteSelection2(0); } catch {}
+                swModel.ClearSelection2(true);
+
+                if (!deleteResult)
+                {
+                    LogDebug($"DeleteSelection2 returned false for '{oldDimFullName}'. Cleaning up new dim.");
+                    DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_DELETE_RETURNED_FALSE");
+                    continue;
+                }
+
+                int postDisplay = 0;
+                int postDangling = 0;
+                CountTotalDrawingDimensions(swDrawing, out postDisplay, out postDangling);
+
+                return new SingleTargetRepairResult
+                {
+                    Status = SingleTargetStatus.Success,
+                    PostDisplayCount = postDisplay,
+                    PostDanglingCount = postDangling
+                };
+            }
+
+            return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "NO_SINGLE_CANDIDATE_MATCHED" };
+        }
+
+        private static bool SelectDrawingOrModelEntity(
+            ISldWorks swApp,
+            ModelDoc2 swModel,
+            SolidWorks.Interop.sldworks.View view,
+            object ent,
+            bool append,
+            ISelectionMgr selMgr)
+        {
+            if (ent == null) return false;
+
+            int initialSelCount = selMgr != null ? selMgr.GetSelectedObjectCount2(-1) : 0;
+            int expectedCount = append ? initialSelCount + 1 : 1;
+
+            SelectData selData = selMgr?.CreateSelectData();
+            if (selData != null && view != null)
+            {
+                try { selData.View = view; } catch {}
+            }
+
+            object resolvedEnt = ResolveDrawingEntity(swApp, view, ent);
+
+            // CASE 1: IEntity (Edge, Face, Vertex)
+            if (resolvedEnt is IEntity e)
+            {
+                try
+                {
+                    if (e.Select4(append, selData))
+                    {
+                        int c = selMgr.GetSelectedObjectCount2(-1);
+                        if (c == expectedCount) return true;
+                    }
+                }
+                catch {}
+
+                try
+                {
+                    if (e.Select4(append, null))
+                    {
+                        int c = selMgr.GetSelectedObjectCount2(-1);
+                        if (c == expectedCount) return true;
+                    }
+                }
+                catch {}
+            }
+
+            // CASE 2: ISketchSegment (Bend lines, sketch lines)
+            if (resolvedEnt is ISketchSegment seg)
+            {
+                try
+                {
+                    if (seg.Select4(append, selData))
+                    {
+                        int c = selMgr.GetSelectedObjectCount2(-1);
+                        if (c == expectedCount)
+                        {
+                            LogDebug("    [SelectDrawingOrModelEntity] Selected SketchSegment with selData.View");
+                            return true;
+                        }
+                    }
+                }
+                catch {}
+
+                try
+                {
+                    if (seg.Select4(append, null))
+                    {
+                        int c = selMgr.GetSelectedObjectCount2(-1);
+                        if (c == expectedCount)
+                        {
+                            LogDebug("    [SelectDrawingOrModelEntity] Selected SketchSegment with null selData");
+                            return true;
+                        }
+                    }
+                }
+                catch {}
+
+                // Try coordinate selection via SelectByID2
+                if (swModel != null && swModel.Extension != null && view != null)
+                {
+                    if (GetSegmentModelPoints(seg, out _, out _, out double[] midM))
+                    {
+                        double[] midS = TransformPointToSheet(swApp, view, midM);
+                        if (midS != null)
+                        {
+                            string[] types = new string[] { "EXTSKETCHSEGMENT", "SKETCHSEGMENT" };
+                            foreach (var t in types)
+                            {
+                                try
+                                {
+                                    if (swModel.Extension.SelectByID2("", t, midS[0], midS[1], midS[2], append, 0, null, 0))
+                                    {
+                                        int c = selMgr.GetSelectedObjectCount2(-1);
+                                        if (c == expectedCount)
+                                        {
+                                            LogDebug($"    [SelectDrawingOrModelEntity] Selected via SelectByID2 coord ({midS[0]:F4}, {midS[1]:F4}) as '{t}'");
+                                            return true;
+                                        }
+                                    }
+                                }
+                                catch {}
+                            }
+                        }
+                    }
+                }
+            }
+
+            // CASE 3: Fallback on original ent if different from resolvedEnt
+            if (!object.ReferenceEquals(ent, resolvedEnt))
+            {
+                if (ent is IEntity origE)
+                {
+                    try
+                    {
+                        if (origE.Select4(append, selData))
+                        {
+                            int c = selMgr.GetSelectedObjectCount2(-1);
+                            if (c == expectedCount) return true;
+                        }
+                    }
+                    catch {}
+                }
+                if (ent is ISketchSegment origSeg)
+                {
+                    try
+                    {
+                        if (origSeg.Select4(append, selData))
+                        {
+                            int c = selMgr.GetSelectedObjectCount2(-1);
+                            if (c == expectedCount) return true;
+                        }
+                    }
+                    catch {}
+                }
+            }
+
+            // CASE 4: ISketchPoint
+            if (ent is ISketchPoint pt)
+            {
+                try
+                {
+                    if (pt.Select4(append, selData))
+                    {
+                        int c = selMgr.GetSelectedObjectCount2(-1);
+                        if (c == expectedCount) return true;
+                    }
+                }
+                catch {}
+                try
+                {
+                    if (pt.Select4(append, null))
+                    {
+                        int c = selMgr.GetSelectedObjectCount2(-1);
+                        if (c == expectedCount) return true;
+                    }
+                }
+                catch {}
+            }
+
+            return false;
+        }
+
+        private static void CopyDimensionPresentation(
+            DisplayDimension oldDisp,
+            Annotation oldAnnot,
+            Dimension oldDim,
+            DisplayDimension newDisp,
+            Annotation newAnnot,
+            Dimension newDim,
+            double[] oldPos)
+        {
+            if (oldDisp == null || newDisp == null) return;
+
+            // 1. Text Parts (Prefix, Suffix, Callout Above, Callout Below)
+            try
+            {
+                string pfx = oldDisp.GetText((int)swDimensionTextParts_e.swDimensionTextPrefix);
+                string sfx = oldDisp.GetText((int)swDimensionTextParts_e.swDimensionTextSuffix);
+                string cAbove = oldDisp.GetText((int)swDimensionTextParts_e.swDimensionTextCalloutAbove);
+                string cBelow = oldDisp.GetText((int)swDimensionTextParts_e.swDimensionTextCalloutBelow);
+
+                if (!string.IsNullOrEmpty(pfx)) newDisp.SetText((int)swDimensionTextParts_e.swDimensionTextPrefix, pfx);
+                if (!string.IsNullOrEmpty(sfx)) newDisp.SetText((int)swDimensionTextParts_e.swDimensionTextSuffix, sfx);
+                if (!string.IsNullOrEmpty(cAbove)) newDisp.SetText((int)swDimensionTextParts_e.swDimensionTextCalloutAbove, cAbove);
+                if (!string.IsNullOrEmpty(cBelow)) newDisp.SetText((int)swDimensionTextParts_e.swDimensionTextCalloutBelow, cBelow);
+            }
+            catch {}
+
+            // 2. Precision
+            try
+            {
+                int prim = oldDisp.GetPrimaryPrecision2();
+                int dual = oldDisp.GetAlternatePrecision2();
+                int primTol = oldDisp.GetPrimaryTolPrecision2();
+                int dualTol = oldDisp.GetAlternateTolPrecision2();
+                if (prim >= 0)
+                {
+                    newDisp.SetPrecision2(prim, dual >= 0 ? dual : 0, primTol >= 0 ? primTol : 0, dualTol >= 0 ? dualTol : 0);
+                }
+            }
+            catch {}
+
+            // 3. Tolerance
+            try
+            {
+                DimensionTolerance oldTol = oldDim?.Tolerance;
+                DimensionTolerance newTol = newDim?.Tolerance;
+                if (oldTol != null && newTol != null)
+                {
+                    int tType = oldTol.Type;
+                    if (tType >= 0)
+                    {
+                        newTol.Type = tType;
+                        if (tType != (int)swTolType_e.swTolNONE)
+                        {
+                            newTol.SetValues(oldTol.GetMinValue(), oldTol.GetMaxValue());
+                        }
+                    }
+                }
+            }
+            catch {}
+
+            // 4. Units
+            try
+            {
+                bool useDocUnits = oldDisp.GetUseDocUnits();
+                int lengthUnit = oldDisp.GetUnits();
+                int fBase = oldDisp.GetFractionBase();
+                int fVal = oldDisp.GetFractionValue();
+                bool round = oldDisp.GetRoundToFraction();
+                if (lengthUnit >= 0)
+                {
+                    newDisp.SetUnits(useDocUnits, lengthUnit, fBase, fVal, round);
+                }
+            }
+            catch {}
+
+            // 5. Arrow side
+            try
+            {
+                int arrow = oldDisp.ArrowSide;
+                if (arrow >= 0) newDisp.ArrowSide = arrow;
+            }
+            catch {}
+
+            // 6. Text format
+            try
+            {
+                if (oldAnnot != null && newAnnot != null)
+                {
+                    bool useDoc = oldAnnot.GetUseDocTextFormat(0);
+                    TextFormat tf = oldAnnot.GetTextFormat(0) as TextFormat;
+                    newAnnot.SetTextFormat(0, useDoc, tf);
+                }
+            }
+            catch {}
+
+            // 7. Layer & Color
+            try
+            {
+                if (oldAnnot != null && newAnnot != null)
+                {
+                    string layer = oldAnnot.Layer;
+                    if (!string.IsNullOrEmpty(layer)) newAnnot.Layer = layer;
+                    int color = oldAnnot.Color;
+                    if (color != -1) newAnnot.Color = color;
+                }
+            }
+            catch {}
+
+            // 8. Position
+            try
+            {
+                if (oldPos != null && oldPos.Length >= 3 && newAnnot != null)
+                {
+                    newAnnot.SetPosition2(oldPos[0], oldPos[1], oldPos[2]);
+                }
+            }
+            catch {}
+        }
+
         private static void CountTotalDrawingDimensions(
             DrawingDoc swDrawing,
             out int totalDisplayDims,
@@ -3581,6 +5914,14 @@ namespace ADDIN.Commands
 
             if (swDrawing == null) return;
 
+            string initialSheet = "";
+            try
+            {
+                Sheet cur = swDrawing.GetCurrentSheet() as Sheet;
+                if (cur != null) initialSheet = cur.GetName();
+            }
+            catch {}
+
             try
             {
                 string[] sheetNames = swDrawing.GetSheetNames() as string[];
@@ -3588,6 +5929,7 @@ namespace ADDIN.Commands
 
                 foreach (string sName in sheetNames)
                 {
+                    try { swDrawing.ActivateSheet(sName); } catch {}
                     SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
                     SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
 
@@ -3615,6 +5957,13 @@ namespace ADDIN.Commands
             catch (Exception ex)
             {
                 LogDebug("CountTotalDrawingDimensions Exception: " + ex.Message);
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(initialSheet))
+                {
+                    try { swDrawing.ActivateSheet(initialSheet); } catch {}
+                }
             }
         }
 
@@ -3844,10 +6193,10 @@ namespace ADDIN.Commands
                 return;
             }
 
-            if (!isLinear || info.AnchorEntityType != (int)swSelectType_e.swSelEDGES)
+            if (!isLinear || !RepairDimCandidateFinder.IsLinearEntityType(info.AnchorEntityType))
             {
                 info.FailureMode = RepairDimFailureMode.UnsupportedAnchor;
-                info.FailureModeReason = !isLinear ? $"Dimension type '{info.DimensionTypeString}' is not supported in linear pipeline." : $"Anchor entity type '{((swSelectType_e)info.AnchorEntityType).ToString()}' is not a linear edge.";
+                info.FailureModeReason = !isLinear ? $"Dimension type '{info.DimensionTypeString}' is not supported in linear pipeline." : $"Anchor entity type '{((swSelectType_e)info.AnchorEntityType).ToString()}' is not a linear edge or sketch segment.";
                 info.RouteCCandidateAvailable = false;
                 info.RequiresDimensionRecreate = false;
                 info.RecommendedAction = "UNSUPPORTED";

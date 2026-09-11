@@ -7,7 +7,7 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    public class LenhDimCanhSongSong
+    public partial class LenhDimCanhSongSong
     {
         private readonly ISldWorks swApp;
 
@@ -27,7 +27,9 @@ namespace ADDIN.Commands
             swApp = app;
         }
 
-        public void Run()
+        // Retained as a reference only. The button uses the topology planner
+        // in LenhDimCanhSongSong.Envelope.cs; never fall back to global grouping.
+        private void RunLegacy()
         {
             Debug.WriteLine("[DIM MAT CAT] build=20260824-section-R-arclength-v15");
             ModelDoc2 model = swApp?.ActiveDoc as ModelDoc2;
@@ -4541,13 +4543,10 @@ namespace ADDIN.Commands
             if (after == null || after.Count == 0)
                 return null;
 
-            if (before == null || after.Count > before.Count)
-                return after[after.Count - 1];
-
             foreach (SketchPoint candidate in after)
             {
                 bool existed = false;
-                foreach (SketchPoint oldPoint in before)
+                foreach (SketchPoint oldPoint in before ?? new List<SketchPoint>())
                 {
                     if (ReferenceEquals(candidate, oldPoint) || candidate.Equals(oldPoint))
                     {
@@ -5026,67 +5025,243 @@ namespace ADDIN.Commands
 
         private int AddSectionViewDimensions(ModelDoc2 model, SolidWorks.Interop.sldworks.View view, SelectData selectData, List<EdgeInfo> edges, List<ArcInfo> arcs)
         {
-            int angledProfileCount = AddAlignedSectionDimensions(
-                model,
-                view,
-                selectData,
-                edges,
-                arcs);
-            if (angledProfileCount > 0)
-                return angledProfileCount;
+            if (edges == null || edges.Count == 0) return 0;
+            double materialThicknessMm = EstimateMaterialThicknessMm(edges);
 
-            List<EdgeInfo> contourEdges = GetOuterContourCandidateEdges(edges);
-            if (contourEdges.Count == 0)
-                return 0;
-
-            List<VirtualCornerInfo> virtualCorners = BuildVirtualCorners(contourEdges, arcs);
-
-            int count = 0;
-            HashSet<string> dimensionedPairs = new HashSet<string>();
-            double centerX;
-            double centerY;
-            GetEdgeBoundsCenter(contourEdges, out centerX, out centerY);
-
-            contourEdges.Sort((a, b) =>
+            // NẾU BẢN VẼ CÓ GÓC VÁT NGHIÊNG -> Đi luồng cũ
+            if (HasMeaningfulAngledEdge(edges))
             {
-                int axisCompare = b.IsHorizontal.CompareTo(a.IsHorizontal);
-                if (axisCompare != 0)
-                    return axisCompare;
-                if (a.IsHorizontal)
-                    return b.MidY.CompareTo(a.MidY);
-                return a.MidX.CompareTo(b.MidX);
-            });
-
-            Debug.WriteLine("[DIM MAT CAT] native virtual sharp dimension is not available in current API path; fallback to clean edge-pair dims.");
-
-            foreach (EdgeInfo edge in contourEdges)
-            {
-                if (edge.IsAngled)
-                    continue;
-
-                DimensionPlacement placement = GetOuterPlacement(edge, centerX, centerY);
-                double offsetMm = GetOuterOffsetMm(edge, placement, centerX, centerY);
-
-                count += AddPairAroundEdge(
-                    model,
-                    selectData,
-                    edge,
-                    placement,
-                    offsetMm,
-                    edges,
-                    dimensionedPairs);
+                return AddAngledOuterProfileDimensions(
+                    model, view, selectData, edges, arcs, null, false, null, materialThicknessMm);
             }
 
-            count += AddAngularDimensionsInView(
-                model,
-                selectData,
-                contourEdges,
-                dimensionedPairs);
+            // TẤT CẢ CHI TIẾT VUÔNG GÓC XUỐNG THẲNG ĐÂY
+            return RouteOrthogonalEngine(
+                model, view, selectData, edges, arcs, null, materialThicknessMm);
+        }
 
-            Debug.WriteLine("[DIM MAT CAT] outer contour candidates=" + contourEdges.Count
-                + ", virtualCorners=" + virtualCorners.Count
-                + ", section dims created=" + count);
+        private int RouteOrthogonalEngine(
+            ModelDoc2 model,
+            SolidWorks.Interop.sldworks.View view,
+            SelectData selectData,
+            List<EdgeInfo> allEdges,
+            List<ArcInfo> arcs,
+            EdgeInfo seed,
+            double thicknessMm)
+        {
+            if (allEdges == null || allEdges.Count == 0) return 0;
 
+            // 1. Tách các cạnh ngang và dọc (bỏ qua các cạnh ngắn như mép tôn)
+            List<EdgeInfo> hEdges = new List<EdgeInfo>();
+            List<EdgeInfo> vEdges = new List<EdgeInfo>();
+            foreach (EdgeInfo e in allEdges)
+            {
+                if (e.IsHorizontal && e.LengthMm >= 3.0)
+                    hEdges.Add(e);
+                if (e.IsVertical && e.LengthMm >= 3.0)
+                    vEdges.Add(e);
+            }
+
+            if (hEdges.Count == 0 || vEdges.Count == 0) return 0;
+
+            // 2. Tìm tâm Bounding Box để làm mốc lọc mặt ngoài
+            double minX = double.MaxValue, maxX = double.MinValue;
+            double minY = double.MaxValue, maxY = double.MinValue;
+
+            foreach (EdgeInfo v in vEdges)
+            {
+                minX = Math.Min(minX, v.MinX);
+                maxX = Math.Max(maxX, v.MaxX);
+            }
+            foreach (EdgeInfo h in hEdges)
+            {
+                minY = Math.Min(minY, h.MinY);
+                maxY = Math.Max(maxY, h.MaxY);
+            }
+
+            double centerX = (minX + maxX) / 2.0;
+            double centerY = (minY + maxY) / 2.0;
+            double tol = MmToViewM(Math.Max(1.5, thicknessMm * 1.5));
+
+            // 3. LỌC VÁCH DỌC (Gom cặp và triệt tiêu mặt trong)
+            List<List<EdgeInfo>> xGroups = new List<List<EdgeInfo>>();
+            foreach (EdgeInfo v in vEdges)
+            {
+                List<EdgeInfo> group = null;
+                foreach (List<EdgeInfo> g in xGroups)
+                {
+                    if (Math.Abs(g[0].MidX - v.MidX) <= tol)
+                    {
+                        group = g;
+                        break;
+                    }
+                }
+                if (group == null)
+                {
+                    group = new List<EdgeInfo>();
+                    xGroups.Add(group);
+                }
+                group.Add(v);
+            }
+
+            List<EdgeInfo> pureVEdges = new List<EdgeInfo>();
+            foreach (List<EdgeInfo> group in xGroups)
+            {
+                EdgeInfo best = group[0];
+                double bestDist = Math.Abs(best.MidX - centerX);
+                foreach (EdgeInfo e in group)
+                {
+                    double dist = Math.Abs(e.MidX - centerX);
+                    if (dist > bestDist)
+                    {
+                        bestDist = dist;
+                        best = e;
+                    }
+                }
+                pureVEdges.Add(best);
+            }
+            pureVEdges.Sort((a, b) => a.MidX.CompareTo(b.MidX));
+
+            // 4. LỌC VÁCH NGANG (Gom cặp và triệt tiêu mặt trong)
+            List<List<EdgeInfo>> yGroups = new List<List<EdgeInfo>>();
+            foreach (EdgeInfo h in hEdges)
+            {
+                List<EdgeInfo> group = null;
+                foreach (List<EdgeInfo> g in yGroups)
+                {
+                    if (Math.Abs(g[0].MidY - h.MidY) <= tol)
+                    {
+                        group = g;
+                        break;
+                    }
+                }
+                if (group == null)
+                {
+                    group = new List<EdgeInfo>();
+                    yGroups.Add(group);
+                }
+                group.Add(h);
+            }
+
+            List<EdgeInfo> pureHEdges = new List<EdgeInfo>();
+            foreach (List<EdgeInfo> group in yGroups)
+            {
+                EdgeInfo best = group[0];
+                double bestDist = Math.Abs(best.MidY - centerY);
+                foreach (EdgeInfo e in group)
+                {
+                    double dist = Math.Abs(e.MidY - centerY);
+                    if (dist > bestDist)
+                    {
+                        bestDist = dist;
+                        best = e;
+                    }
+                }
+                pureHEdges.Add(best);
+            }
+            pureHEdges.Sort((a, b) => a.MidY.CompareTo(b.MidY));
+
+            int count = 0;
+            double offsetM = MmToM(DimOffsetMm);
+
+            // === BẮT ĐẦU ĐO KÍCH THƯỚC CHI TIẾT ===
+
+            // 5. Đo kích thước Ngang (Khoảng cách giữa các vách dọc liên tiếp)
+            for (int i = 0; i < pureVEdges.Count - 1; i++)
+            {
+                model.ClearSelection2(true);
+                if (SelectEdge(pureVEdges[i].Edge, false, selectData)
+                    && SelectEdge(pureVEdges[i + 1].Edge, true, selectData))
+                {
+                    double textX = (pureVEdges[i].MidX + pureVEdges[i + 1].MidX) / 2.0;
+                    double textY = maxY + offsetM;
+                    DisplayDimension d = model.AddDimension2(textX, textY, 0) as DisplayDimension;
+                    if (d != null && d.GetType() != (int)swDimensionType_e.swAngularDimension)
+                        count++;
+                    else if (d != null)
+                        DeleteDisplayDimension(model, d);
+                }
+            }
+
+            // 6. Đo kích thước Dọc (Khoảng cách giữa các vách ngang liên tiếp)
+            for (int i = 0; i < pureHEdges.Count - 1; i++)
+            {
+                model.ClearSelection2(true);
+                if (SelectEdge(pureHEdges[i].Edge, false, selectData)
+                    && SelectEdge(pureHEdges[i + 1].Edge, true, selectData))
+                {
+                    double textX = minX - offsetM;
+                    double textY = (pureHEdges[i].MidY + pureHEdges[i + 1].MidY) / 2.0;
+                    DisplayDimension d = model.AddDimension2(textX, textY, 0) as DisplayDimension;
+                    if (d != null && d.GetType() != (int)swDimensionType_e.swAngularDimension)
+                        count++;
+                    else if (d != null)
+                        DeleteDisplayDimension(model, d);
+                }
+            }
+
+            // 7. Đo Phủ bì tổng Ngang (Nếu có từ 3 vách đứng trở lên)
+            if (pureVEdges.Count > 2)
+            {
+                model.ClearSelection2(true);
+                if (SelectEdge(pureVEdges[0].Edge, false, selectData)
+                    && SelectEdge(pureVEdges[pureVEdges.Count - 1].Edge, true, selectData))
+                {
+                    DisplayDimension d = model.AddDimension2(
+                        (minX + maxX) / 2.0,
+                        maxY + offsetM * 2.2,
+                        0) as DisplayDimension;
+                    if (d != null && d.GetType() != (int)swDimensionType_e.swAngularDimension)
+                        count++;
+                    else if (d != null)
+                        DeleteDisplayDimension(model, d);
+                }
+            }
+
+            // 8. Chuyên trị Tai Chấn (Lip) bị lồi lên trên
+            EdgeInfo topFloor = pureHEdges[pureHEdges.Count - 1];
+            EdgeInfo topLip = null;
+            double topLipLen = 0;
+            foreach (EdgeInfo v in pureVEdges)
+            {
+                if (v.MaxY > topFloor.MidY + MmToViewM(2.0))
+                {
+                    if (topLip == null || v.LengthMm > topLipLen)
+                    {
+                        topLip = v;
+                        topLipLen = v.LengthMm;
+                    }
+                }
+            }
+
+            if (topLip != null)
+            {
+                Vertex topVertex = null;
+                if (topLip.Y1 >= topLip.Y2)
+                    topVertex = topLip.Edge.GetStartVertex() as Vertex;
+                else
+                    topVertex = topLip.Edge.GetEndVertex() as Vertex;
+
+                if (topVertex != null)
+                {
+                    model.ClearSelection2(true);
+                    if (SelectEdge(topFloor.Edge, false, selectData)
+                        && SelectReference(topVertex, true, selectData))
+                    {
+                        DisplayDimension d = model.AddDimension2(
+                            topLip.MidX - MmToM(DimOffsetMm),
+                            (topFloor.MidY + topLip.MaxY) / 2.0,
+                            0) as DisplayDimension;
+                        if (d != null && d.GetType() != (int)swDimensionType_e.swAngularDimension)
+                            count++;
+                        else if (d != null)
+                            DeleteDisplayDimension(model, d);
+                    }
+                }
+            }
+
+            Debug.WriteLine("[DIM MAT CAT] Pure Ortho Engine Done. Pure V-Edges: " + pureVEdges.Count
+                + ", Pure H-Edges: " + pureHEdges.Count + ", Dims: " + count);
             return count;
         }
 
