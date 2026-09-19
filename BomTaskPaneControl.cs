@@ -142,12 +142,21 @@ namespace ADDIN
             InitializeComponent();
             if (LicenseManager.UsageMode == LicenseUsageMode.Designtime)
                 return;
+            ADDIN.UI.GridStyler.ApplyModernStyle(this.dgvModelBom);
+            ADDIN.UI.UIHelper.EnableDoubleBuffer(this.tabComponentDrawing);
+            ADDIN.UI.UIHelper.EnableDoubleBuffer(this.tabDrawingBom);
+            ADDIN.UI.UIHelper.EnableDoubleBuffer(this.tabModel);
+            ADDIN.UI.UIHelper.EnableDoubleBuffer(this.tabModelMacroPage);
+            if (lblCheckAssemblyHoleResult != null)
+                lblCheckAssemblyHoleResult.Anchor = AnchorStyles.None;
+            if (tabModelMacroPage != null)
+                tabModelMacroPage.AutoScroll = true;
             EnsureCheckBalloonButton();
             EnsureCheckDrawingBomButton();
             EnsureMakeHolePaintNameControls();
             // ApplyUnifiedTypography(this); 
             // ApplyModelTypography();
-            // ApplyDrawingUiStyles(); // <-- ĐÓNG HÀM NÀY ĐỂ TRẢ QUYỀN CHO DESIGNER
+            ApplyDrawingUiStyles();
             // ApplyReadableContrast();
 
             ApplyDeleteButtonIcons();
@@ -160,6 +169,7 @@ namespace ADDIN
             InitComponentDrawingTimer();
             LayoutDrawingBomTab();
             LayoutModelCommandButtons();
+            LayoutModelMacroButtons();
             LayoutMakeHoleOptions();
             InitMakeHoleUpdateMonitor();
 
@@ -194,6 +204,7 @@ namespace ADDIN
             drawingBomChecker = new CheckDrawingBom(swApp, dgvModelBom);
             actions = new ThaoTacBomTaskPane(swApp, bomLoader, dgvModelBom, chkSelectAll, lblStatus, progressCheck, this);
             actions.ConfigureGrid();
+            ADDIN.UI.GridStyler.ConfigureColumns(this.dgvModelBom);
             AttachSolidWorksEvents();
             SwitchTabByActiveDocument();
             if (IsActiveModelDocument())
@@ -396,9 +407,11 @@ namespace ADDIN
                 tabModel?.PerformLayout();
                 tabModelPages?.PerformLayout();
                 tabModelEditPage?.PerformLayout();
+                tabModelMacroPage?.PerformLayout();
                 panelModelCommands?.PerformLayout();
                 LayoutDrawingBomTab();
                 LayoutModelCommandButtons();
+                LayoutModelMacroButtons();
                 LayoutMakeHoleOptions();
                 LayoutComponentViewSize();
                 ApplyReadableContrast();
@@ -516,6 +529,11 @@ namespace ADDIN
             btnModelUpdateProps.Click += btnModelUpdateProps_Click;
             btnModelResetProps.Click += btnModelResetProps_Click;
             tabBom.SelectedIndexChanged += tabBom_SelectedIndexChanged;
+            if (button2 != null)
+            {
+                button2.Click -= btnXepUnit_Click;
+                button2.Click += btnXepUnit_Click;
+            }
             WireXepUnitButton(this);
             btnOpenAssem.Click += btnOpenAssem_Click;
             btnCheckBalloon.Click += btnCheckBalloon_Click;
@@ -531,6 +549,21 @@ namespace ADDIN
             dgvModelBom.KeyDown += dgvModelBom_KeyDown;
             dgvModelBom.SizeChanged += dgvModelBom_SizeChanged;
             tabComponentDrawing.Resize += tabComponentDrawing_Resize;
+            tabComponentDrawing.Scroll += (s, e) => { tabComponentDrawing.Invalidate(true); };
+            tabDrawingBom.Scroll += (s, e) => { tabDrawingBom.Invalidate(true); };
+            if (tabModelMacroPage != null)
+            {
+                tabModelMacroPage.Resize += (s, e) => LayoutModelMacroButtons();
+                tabModelMacroPage.Scroll += (s, e) => { tabModelMacroPage.Invalidate(true); };
+            }
+            if (tabModelPages != null)
+            {
+                tabModelPages.SelectedIndexChanged += (s, e) =>
+                {
+                    LayoutModelCommandButtons();
+                    LayoutModelMacroButtons();
+                };
+            }
             pnlMakeHoleDiagram.Paint += pnlMakeHoleDiagram_Paint;
             Resize += BomTaskPaneControl_Resize;
             panelModelCommands.SizeChanged += PanelModelCommands_SizeChanged;
@@ -575,6 +608,33 @@ namespace ADDIN
             }
         }
 
+        private void btnEdgeToEqualSpline_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (swApp == null)
+                {
+                    MessageBox.Show(
+                        "Chưa kết nối SOLIDWORKS.",
+                        "AUTO SPLINE",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var command = new ADDIN.Commands.EdgeToEqualSplineCommand(swApp);
+                command.Run(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Lỗi khởi chạy AUTO SPLINE:\n" + ex.Message,
+                    "AUTO SPLINE",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
         private void ApplyDeleteButtonIcons()
         {
             ApplyDeleteButtonIcon(btnDeleteNote);
@@ -597,7 +657,7 @@ namespace ADDIN
         {
             Bitmap bitmap = new Bitmap(size, size);
             using (Graphics graphics = Graphics.FromImage(bitmap))
-            using (Pen pen = new Pen(Color.SeaGreen, 1.7f))
+            using (Pen pen = new Pen(Color.FromArgb(20, 60, 115), 1.7f))
             {
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 graphics.Clear(Color.Transparent);
@@ -719,12 +779,15 @@ namespace ADDIN
 
         private void ApplyDrawingUiStyles()
         {
-            Color pageBack = Color.FromArgb(250, 251, 253);
+            Color pageBack = Color.FromArgb(240, 243, 246);
             Color titleColor = Color.FromArgb(229, 83, 12);
-            Color textColor = Color.FromArgb(18, 22, 28);
+            Color textColor = Color.FromArgb(30, 41, 59);
 
             tabDrawingBom.BackColor = pageBack;
             tabDrawingBom.UseVisualStyleBackColor = false;
+            tabComponentDrawing.BackColor = pageBack;
+            tabComponentDrawing.UseVisualStyleBackColor = false;
+
             lblTitle.Font = CreateUiFont(9.25F, FontStyle.Bold);
             lblTitle.ForeColor = titleColor;
             lblStatus.Font = CreateUiFont(8.75F, FontStyle.Bold);
@@ -732,53 +795,70 @@ namespace ADDIN
             chkSelectAll.Font = CreateUiFont(8.75F, FontStyle.Bold);
             chkSelectAll.ForeColor = textColor;
 
-            // 1. NHÓM VIEW SIZE (Xanh dương)
+            // 1. NHÓM VIEW SIZE (Xanh Slate kỹ thuật dịu mắt)
             Button[] primaryActionButtons = { btnGetWL, btnHorizontalAlignment, btnRotateCw, btnRotateCcw };
             foreach (Button btn in primaryActionButtons)
             {
                 if (btn is ADDIN.UI.ModernButton mBtn)
                 {
-                    mBtn.NormalColor = Color.FromArgb(220, 235, 252);
-                    mBtn.HoverColor = Color.FromArgb(202, 224, 249);
-                    mBtn.PressColor = Color.FromArgb(180, 210, 240);
-                    mBtn.BorderColor = Color.FromArgb(130, 170, 215);
-                    mBtn.ForeColor = Color.FromArgb(24, 74, 126);
+                    mBtn.NormalColor = Color.FromArgb(238, 244, 250);
+                    mBtn.HoverColor = Color.FromArgb(224, 235, 248);
+                    mBtn.PressColor = Color.FromArgb(208, 224, 244);
+                    mBtn.BorderColor = Color.FromArgb(176, 198, 224);
+                    mBtn.ForeColor = Color.FromArgb(20, 55, 110);
+                    mBtn.BorderRadius = 4;
                 }
             }
 
-            // 2. NHÓM TEXT & BALLOON (Xanh mint)
+            // 2. NHÓM TEXT & BALLOON (Slate trung tính thanh lịch)
             Button[] textActionButtons = { btnNote, btnText, btnInsertBalloon };
             foreach (Button btn in textActionButtons)
             {
                 if (btn is ADDIN.UI.ModernButton mBtn)
                 {
-                    mBtn.NormalColor = Color.FromArgb(225, 245, 234);
-                    mBtn.HoverColor = Color.FromArgb(205, 235, 218);
-                    mBtn.PressColor = Color.FromArgb(185, 220, 198);
-                    mBtn.BorderColor = Color.FromArgb(130, 185, 150);
-                    mBtn.ForeColor = Color.FromArgb(20, 80, 45);
+                    mBtn.NormalColor = Color.FromArgb(240, 244, 249);
+                    mBtn.HoverColor = Color.FromArgb(228, 236, 246);
+                    mBtn.PressColor = Color.FromArgb(214, 225, 238);
+                    mBtn.BorderColor = Color.FromArgb(186, 200, 218);
+                    mBtn.ForeColor = Color.FromArgb(25, 45, 75);
+                    mBtn.BorderRadius = 4;
                 }
             }
 
-            // 3. NHÓM MACRO: MỖI NÚT MỘT MÀU RIÊNG BIỆT DỄ PHÂN BIỆT
-            ConfigureUniqueButton(dimvang, Color.FromArgb(255, 243, 205), Color.FromArgb(250, 225, 150), Color.FromArgb(133, 100, 4));     // Vàng kem (Xóa dim vàng)
-            ConfigureUniqueButton(btnDimMatCat, Color.FromArgb(230, 242, 255), Color.FromArgb(205, 230, 250), Color.FromArgb(30, 90, 150));   // Xanh dương nhạt (Dim mặt cắt)
-            ConfigureUniqueButton(btnSplineToArcs, Color.FromArgb(253, 237, 236), Color.FromArgb(248, 215, 212), Color.FromArgb(146, 43, 33)); // Hồng/Đỏ nhạt (Spline -> cung R)
-            ConfigureUniqueButton(btnDimKegaki, Color.FromArgb(235, 247, 238), Color.FromArgb(210, 238, 215), Color.FromArgb(34, 112, 53));   // Xanh lá (Dim kegaki)
-            ConfigureUniqueButton(btnDimKichThuocLo, Color.FromArgb(243, 235, 247), Color.FromArgb(228, 210, 238), Color.FromArgb(94, 39, 123)); // Tím nhạt (Dim kích thước lỗ)
-            ConfigureUniqueButton(btnFixScale, Color.FromArgb(254, 239, 231), Color.FromArgb(250, 218, 201), Color.FromArgb(186, 74, 0));      // Cam nhạt (Fix tỉ lệ)
-            ConfigureUniqueButton(btnRepairDim, Color.FromArgb(255, 230, 230), Color.FromArgb(250, 200, 200), Color.FromArgb(160, 30, 30));  // Đỏ nhấn mạnh (Repair DIM)
+            Button[] deleteButtons = { btnDeleteNote, btnDeleteText };
+            foreach (Button btn in deleteButtons)
+            {
+                if (btn is ADDIN.UI.ModernButton mBtn)
+                {
+                    mBtn.NormalColor = Color.FromArgb(245, 247, 250);
+                    mBtn.HoverColor = Color.FromArgb(254, 235, 235);
+                    mBtn.PressColor = Color.FromArgb(254, 210, 210);
+                    mBtn.BorderColor = Color.FromArgb(210, 216, 225);
+                    mBtn.ForeColor = Color.FromArgb(100, 116, 139);
+                    mBtn.BorderRadius = 4;
+                }
+            }
+
+            // 3. NHÓM MACRO: MÀU KỸ THUẬT ĐẰM MẮT (MUTED HARMONIOUS ENGINEERING PALETTE)
+            // Màu nền dịu, viền sắc nét, chữ đậm rõ ràng, không gây chói, không lòe loẹt
+            ConfigureUniqueButton(dimvang, Color.FromArgb(255, 248, 231), Color.FromArgb(255, 240, 206), Color.FromArgb(240, 207, 133), Color.FromArgb(140, 83, 2));        // Hổ phách dịu (Xóa dim vàng)
+            ConfigureUniqueButton(btnDimMatCat, Color.FromArgb(232, 246, 248), Color.FromArgb(212, 239, 244), Color.FromArgb(142, 208, 220), Color.FromArgb(13, 91, 110));     // Cyan/Teal kỹ thuật (Dim mặt cắt)
+            ConfigureUniqueButton(btnSplineToArcs, Color.FromArgb(237, 243, 252), Color.FromArgb(219, 232, 250), Color.FromArgb(158, 192, 238), Color.FromArgb(21, 70, 150)); // Xanh thép CAD (Spline -> cung R)
+            ConfigureUniqueButton(btnDimKegaki, Color.FromArgb(244, 239, 251), Color.FromArgb(232, 220, 247), Color.FromArgb(189, 163, 232), Color.FromArgb(94, 43, 150));    // Tím iris đằm (Dim kegaki)
+            ConfigureUniqueButton(btnDimKichThuocLo, Color.FromArgb(234, 246, 238), Color.FromArgb(213, 240, 220), Color.FromArgb(151, 212, 168), Color.FromArgb(18, 100, 53)); // Xanh sage mát mắt (Dim kích thước lỗ)
+            ConfigureUniqueButton(btnFixScale, Color.FromArgb(254, 242, 232), Color.FromArgb(252, 228, 208), Color.FromArgb(238, 178, 130), Color.FromArgb(158, 67, 11));     // Cam đất dịu (Fix tỉ lệ)
+            ConfigureUniqueButton(btnRepairDim, Color.FromArgb(254, 236, 239), Color.FromArgb(254, 217, 223), Color.FromArgb(237, 166, 178), Color.FromArgb(168, 28, 50));    // Đỏ hoa hồng nhạt (Repair DIM)
         }
 
         // Hàm phụ trợ để gán màu riêng biệt cho từng nút
-        private void ConfigureUniqueButton(Button btn, Color normal, Color hover, Color foreColor)
+        private void ConfigureUniqueButton(Button btn, Color normal, Color hover, Color border, Color foreColor)
         {
             if (btn is ADDIN.UI.ModernButton mBtn)
             {
                 mBtn.NormalColor = normal;
                 mBtn.HoverColor = hover;
                 mBtn.PressColor = ControlPaint.Dark(hover, 0.05F);
-                mBtn.BorderColor = ControlPaint.Dark(normal, 0.2F);
+                mBtn.BorderColor = border;
                 mBtn.ForeColor = foreColor;
                 mBtn.BorderRadius = 4;
             }
@@ -810,7 +890,7 @@ namespace ADDIN
             }
 
             button.AutoEllipsis = false;
-            button.UseCompatibleTextRendering = true;
+            button.UseCompatibleTextRendering = false;
             button.Font = CreateUiFont(8.75F, FontStyle.Bold);
             button.TextAlign = ContentAlignment.MiddleCenter;
             button.ImageAlign = ContentAlignment.MiddleLeft;
@@ -870,7 +950,7 @@ namespace ADDIN
 
             button.Font = CreateUiFont(9.0F, FontStyle.Bold);
             button.AutoEllipsis = false;
-            button.UseCompatibleTextRendering = true;
+            button.UseCompatibleTextRendering = false;
             button.Padding = new Padding(0, 4, 0, 4);
             button.ImageAlign = ContentAlignment.TopCenter;
             button.TextAlign = ContentAlignment.BottomCenter;
@@ -901,14 +981,6 @@ namespace ADDIN
             button.ImageAlign = ContentAlignment.TopCenter;
             button.TextAlign = ContentAlignment.BottomCenter;
             button.TextImageRelation = TextImageRelation.ImageAboveText;
-            button.ForeColor = Color.FromArgb(28, 65, 105);
-            button.Font = CreateUiFont(9.0F, FontStyle.Bold);
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderSize = 0;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(238, 244, 250);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 235, 246);
-            button.UseVisualStyleBackColor = false;
-            button.BackColor = Color.Transparent;
             button.Padding = new Padding(0, 4, 0, 3);
         }
         private void EnsureMakeHolePaintNameControls()
@@ -1021,47 +1093,7 @@ namespace ADDIN
 
         private void ApplyReadableContrast()
         {
-            if (btnCheckDfTk != null) btnCheckDfTk.Text = "CHECK\r\nDF/TK";
-            if (btnCheckUraOmote != null) btnCheckUraOmote.Text = "CHECK\r\nウラ表";
-            if (btnCheckKegaki != null) btnCheckKegaki.Text = "CHECK\r\nKEGAKI";
-            if (btnCheckAll != null) btnCheckAll.Text = "CHECK ウラ表\r\nKEGAKI";
-            if (btnCheckRound != null) btnCheckRound.Text = "CHECK\r\nROUND";
-            if (btnCheckSamePart != null) btnCheckSamePart.Text = "CHECK\r\nSAME PART";
-            if (btnCheckDrawingBom != null) btnCheckDrawingBom.Text = "CHECK\r\nDRAWING";
-            if (button2 != null) button2.Text = "XẾP\r\nUNIT";
-            if (btnOpenAssem != null) btnOpenAssem.Text = "OPEN\r\nASSEM";
-            if (btnCheckBalloon != null) btnCheckBalloon.Text = "CHECK\r\nBALLOON";
-            if (btnLoadBom != null) btnLoadBom.Text = "CẬP NHẬT";
-            if (btnClearBom != null) btnClearBom.Text = "XÓA BẢNG";
-            if (button1 != null) button1.Text = "CANCEL";
-
-            // Nhóm Component (Tím nhạt)
-            Button[] componentButtons = { btnCheckDfTk, btnCheckUraOmote, btnCheckKegaki, btnCheckAll, btnCheckRound, btnCheckSamePart, btnCheckDrawingBom };
-            foreach (Button btn in componentButtons)
-            {
-                if (btn is ADDIN.UI.ModernButton mBtn)
-                {
-                    mBtn.NormalColor = Color.FromArgb(245, 238, 248);
-                    mBtn.HoverColor = Color.FromArgb(235, 220, 240);
-                    mBtn.PressColor = Color.FromArgb(225, 205, 232);
-                    mBtn.BorderColor = Color.FromArgb(215, 195, 225);
-                    mBtn.ForeColor = Color.FromArgb(90, 34, 118);
-                }
-            }
-
-            // Nhóm Unit (Xanh nhạt)
-            Button[] unitButtons = { button2, btnOpenAssem, btnCheckBalloon };
-            foreach (Button btn in unitButtons)
-            {
-                if (btn is ADDIN.UI.ModernButton mBtn)
-                {
-                    mBtn.NormalColor = Color.FromArgb(238, 244, 252);
-                    mBtn.HoverColor = Color.FromArgb(222, 235, 249);
-                    mBtn.PressColor = Color.FromArgb(205, 222, 242);
-                    mBtn.BorderColor = Color.FromArgb(190, 210, 235);
-                    mBtn.ForeColor = Color.FromArgb(24, 74, 126);
-                }
-            }
+            // Trả toàn bộ quyền thiết lập màu sắc, phông chữ và text cho Visual Studio Designer
         }
 
         private Font CreateUiFont(float size, FontStyle style = FontStyle.Regular)
@@ -1863,6 +1895,79 @@ namespace ADDIN
             grpMakeHoleOptions.Location = new Point(left, rowBottom + 16);
         }
 
+        private void LayoutModelMacroButtons()
+        {
+            if (tabModelMacroPage == null)
+                return;
+
+            Button[] buttons =
+            {
+                btnCheckAssemblyHole,
+                btnMirrorPart,
+                btnEdgeToEqualSpline
+            };
+
+            int width = tabModelMacroPage.ClientSize.Width;
+            if (width <= 0)
+                return;
+
+            int margin = width < 340 ? 12 : 16;
+            int gap = width < 340 ? 8 : 10;
+            int top = 16;
+            int availableWidth = Math.Max(100, width - margin * 2);
+
+            // Calculate number of columns that can comfortably fit
+            // Each button has icon/2-line text and needs at least ~100px to avoid truncation
+            int minBtnWidth = 100;
+            int cols = Math.Max(1, Math.Min(buttons.Length, (availableWidth + gap) / (minBtnWidth + gap)));
+
+            int btnWidth;
+            if (cols >= buttons.Length)
+            {
+                // All 3 fit on 1 row: evenly distribute available space up to max 130px
+                btnWidth = Math.Min(130, (availableWidth - (buttons.Length - 1) * gap) / buttons.Length);
+            }
+            else if (cols == 2)
+            {
+                // 2 columns fit on row 1, 3rd button wraps to row 2
+                btnWidth = Math.Min(145, (availableWidth - gap) / 2);
+            }
+            else
+            {
+                // 1 column: stack vertically
+                btnWidth = Math.Min(200, availableWidth);
+            }
+
+            int btnHeight = 48;
+            int curX = margin;
+            int curY = top;
+            int rowBottom = curY + btnHeight;
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button btn = buttons[i];
+                if (btn == null)
+                    continue;
+
+                if (curX > margin && curX + btnWidth > width - margin)
+                {
+                    curX = margin;
+                    curY += btnHeight + gap;
+                }
+
+                btn.SetBounds(curX, curY, btnWidth, btnHeight);
+                rowBottom = Math.Max(rowBottom, curY + btnHeight);
+                curX += btnWidth + gap;
+            }
+
+            if (lblCheckAssemblyHoleResult != null)
+            {
+                int lblTop = rowBottom + 12;
+                int lblHeight = Math.Max(40, tabModelMacroPage.ClientSize.Height - lblTop - margin);
+                lblCheckAssemblyHoleResult.SetBounds(margin, lblTop, availableWidth, lblHeight);
+            }
+        }
+
         private void InitializeMakeHoleSizeOptions()
         {
             if (cboRepairHoleDiameter == null)
@@ -2289,12 +2394,18 @@ namespace ADDIN
 
         private void SelectModelSideTab(string tabName)
         {
-            bool isProps = string.Equals(tabName, "Props", StringComparison.OrdinalIgnoreCase);
-
             if (tabModelPages == null)
                 return;
 
-            tabModelPages.SelectedTab = isProps ? tabModelPropsPage : tabModelEditPage;
+            if (string.Equals(tabName, "Props", StringComparison.OrdinalIgnoreCase))
+                tabModelPages.SelectedTab = tabModelPropsPage;
+            else if (string.Equals(tabName, "Macro", StringComparison.OrdinalIgnoreCase))
+                tabModelPages.SelectedTab = tabModelMacroPage;
+            else
+                tabModelPages.SelectedTab = tabModelEditPage;
+
+            LayoutModelCommandButtons();
+            LayoutModelMacroButtons();
         }
 
         private void LoadModelPropsFromSelectedComponent(bool showMessage)
@@ -2907,11 +3018,14 @@ namespace ADDIN
             foreach (Control child in parent.Controls)
             {
                 Button button = child as Button;
-                if (button != null &&
-                    NormalizeButtonText(button.Text).Contains("XEPUNIT"))
+                if (button != null)
                 {
-                    button.Click -= btnXepUnit_Click;
-                    button.Click += btnXepUnit_Click;
+                    string norm = NormalizeButtonText(button.Text);
+                    if (button == button2 || norm.Contains("XEPUNIT") || norm.Contains("XẾPUNIT") || norm.Contains("XEP") || norm.Contains("XẾP"))
+                    {
+                        button.Click -= btnXepUnit_Click;
+                        button.Click += btnXepUnit_Click;
+                    }
                 }
 
                 WireXepUnitButton(child);
@@ -2964,6 +3078,7 @@ namespace ADDIN
             LayoutComponentViewSize();
             LayoutDrawingBomTab();
             LayoutModelCommandButtons();
+            LayoutModelMacroButtons();
             LayoutMakeHoleOptions();
             ApplyReadableContrast();
         }
@@ -3010,7 +3125,7 @@ namespace ADDIN
             int desiredTopLeft = pageWidth >= 430 ? margin + 150 : margin + Math.Max(0, (pageWidth - topGridWidth) / 2);
             int maxTopLeft = margin + Math.Max(0, pageWidth - topGridWidth);
             int topLeft = Math.Min(desiredTopLeft, maxTopLeft);
-            int topTop = pageWidth >= 430 ? 12 : 66;
+            int topTop = pageWidth >= 430 ? 12 : 70;
             int topBottom = topTop;
 
             for (int i = 0; i < topButtons.Length; i++)
@@ -3230,44 +3345,58 @@ namespace ADDIN
 
             int pageMargin = 6;
             int pageWidth = Math.Max(230, tabComponentDrawing.ClientSize.Width - (pageMargin * 2));
-            int margin = 13;
-            int gap = 10;
+            int margin = 12;
+            int gap = 8;
             bool narrow = pageWidth < 430;
-            int buttonWidth = narrow ? 72 : 92;
+            int buttonWidth = narrow ? 76 : 92;
 
-            grpComponentSize.SetBounds(pageMargin, 6, pageWidth, narrow ? 190 : 148);
+            int cardHeight = narrow ? 180 : 144;
+            grpComponentSize.SetBounds(pageMargin, 6, pageWidth, cardHeight);
 
             int groupWidth = narrow
-                ? Math.Max(90, grpComponentSize.ClientSize.Width - margin - buttonWidth - gap - 12)
-                : Math.Max(160, grpComponentSize.ClientSize.Width - margin - buttonWidth - gap - 18);
+                ? Math.Max(90, grpComponentSize.ClientSize.Width - margin - buttonWidth - gap - 10)
+                : Math.Max(160, grpComponentSize.ClientSize.Width - margin - buttonWidth - gap - 14);
 
-            groupBox1.SetBounds(margin, 19, groupWidth, 42);
-            groupBox2.SetBounds(margin, 65, groupWidth, 42);
+            int fieldH = 28;
+            int row1Y = 34;
+            int row2Y = row1Y + fieldH + 4; // 66
 
-            txtWidth.SetBounds(9, 17, Math.Max(40, groupBox1.ClientSize.Width - 18), 24);
-            txtLength.SetBounds(9, 17, Math.Max(40, groupBox2.ClientSize.Width - 18), 24);
+            groupBox1.SetBounds(margin, row1Y, groupWidth, fieldH);
+            groupBox2.SetBounds(margin, row2Y, groupWidth, fieldH);
+
+            int labelW = 48;
+            txtWidth.SetBounds(labelW, 2, Math.Max(40, groupBox1.ClientSize.Width - labelW - 2), 24);
+            txtLength.SetBounds(labelW, 2, Math.Max(40, groupBox2.ClientSize.Width - labelW - 2), 24);
+            txtWidth.BackColor = Color.White;
+            txtWidth.ForeColor = Color.FromArgb(20, 30, 45);
+            txtLength.BackColor = Color.White;
+            txtLength.ForeColor = Color.FromArgb(20, 30, 45);
 
             int availableWidth = grpComponentSize.ClientSize.Width - (margin * 2);
+            int getWLHeight = row2Y + fieldH - row1Y; // 60px
+
             if (narrow)
             {
-                btnGetWL.SetBounds(margin + groupWidth + gap, 19, buttonWidth, 88);
+                btnGetWL.SetBounds(margin + groupWidth + gap, row1Y, buttonWidth, getWLHeight);
 
                 int rotateWidth = Math.Max(70, (availableWidth - gap) / 2);
-                btnHorizontalAlignment.SetBounds(margin, 111, availableWidth, 30);
-                btnRotateCw.SetBounds(margin, 153, rotateWidth, 30);
-                btnRotateCcw.SetBounds(margin + rotateWidth + gap, 153, rotateWidth, 30);
+                btnHorizontalAlignment.SetBounds(margin, 102, availableWidth, 30);
+                btnRotateCw.SetBounds(margin, 138, rotateWidth, 30);
+                btnRotateCcw.SetBounds(margin + rotateWidth + gap, 138, rotateWidth, 30);
             }
             else
             {
-                btnGetWL.SetBounds(margin + groupWidth + gap, 19, buttonWidth, 72);
+                btnGetWL.SetBounds(margin + groupWidth + gap, row1Y, buttonWidth, getWLHeight);
 
                 int horizontalWidth = Math.Min(173, Math.Max(120, availableWidth / 3));
                 int rotateWidth = Math.Min(92, Math.Max(70, (availableWidth - horizontalWidth - (gap * 2)) / 2));
 
-                btnHorizontalAlignment.SetBounds(margin, 112, horizontalWidth, 30);
-                btnRotateCw.SetBounds(margin + horizontalWidth + gap, 111, rotateWidth, 30);
-                btnRotateCcw.SetBounds(margin + horizontalWidth + gap + rotateWidth + gap, 111, rotateWidth, 30);
+                btnHorizontalAlignment.SetBounds(margin, 102, horizontalWidth, 30);
+                btnRotateCw.SetBounds(margin + horizontalWidth + gap, 102, rotateWidth, 30);
+                btnRotateCcw.SetBounds(margin + horizontalWidth + gap + rotateWidth + gap, 102, rotateWidth, 30);
             }
+
+            grpComponentSize.Invalidate(true);
 
             LayoutComponentTextGroup(pageMargin, pageWidth, gap, narrow);
             LayoutComponentMacroGroup(pageMargin, pageWidth, gap, narrow);
@@ -3276,47 +3405,50 @@ namespace ADDIN
 
         private void LayoutComponentTextGroup(int pageMargin, int pageWidth, int gap, bool narrow)
         {
-            int groupTop = grpComponentSize.Bottom + 6;
-            grpComponentBom.SetBounds(pageMargin, groupTop, pageWidth, 139);
+            int groupTop = grpComponentSize.Bottom + 8;
+            int cardHeight = 138;
+            grpComponentBom.SetBounds(pageMargin, groupTop, pageWidth, cardHeight);
 
             int margin = 12;
-            int buttonWidth = narrow ? 68 : 105;
+            int buttonWidth = narrow ? 72 : 105;
             int deleteWidth = 28;
 
-            if (narrow)
-            {
-                btnNote.Text = "Note";
-                btnText.Text = "Text";
-                btnInsertBalloon.Text = "Balloon";
-            }
-            else
-            {
-                btnNote.Text = "Note";
-                btnText.Text = "Text";
-                btnInsertBalloon.Text = "Insert Balloon";
-            }
+            btnNote.Text = "Note";
+            btnText.Text = "Text";
+            btnInsertBalloon.Text = narrow ? "Balloon" : "Insert Balloon";
 
             int rightGap = narrow ? 6 : margin;
             int smallGap = narrow ? 6 : gap;
             int buttonX = Math.Max(margin + 80, grpComponentBom.ClientSize.Width - rightGap - buttonWidth);
             int deleteX = buttonX - smallGap - deleteWidth;
-            int comboWidth = Math.Max(120, deleteX - margin - gap);
+            int comboWidth = Math.Max(110, deleteX - margin - gap);
+            int comboBalloonWidth = buttonX - margin - smallGap;
 
-            cboBendLine.SetBounds(margin, 26, comboWidth, 24);
-            cboSide.SetBounds(margin, 61, comboWidth, 24);
-            cboBalloonProperty.SetBounds(margin, 96, comboWidth, 24);
+            int row1Y = 34;
+            int row2Y = 68;
+            int row3Y = 102;
+            int inputH = 24;
+            int btnH = 26;
 
-            btnDeleteNote.SetBounds(deleteX, 23, deleteWidth, 28);
-            btnDeleteText.SetBounds(deleteX, 58, deleteWidth, 28);
-            btnNote.SetBounds(buttonX, 23, buttonWidth, 28);
-            btnText.SetBounds(buttonX, 58, buttonWidth, 28);
-            btnInsertBalloon.SetBounds(buttonX, 93, buttonWidth, 28);
+            cboBendLine.SetBounds(margin, row1Y, comboWidth, inputH);
+            cboSide.SetBounds(margin, row2Y, comboWidth, inputH);
+            cboBalloonProperty.SetBounds(margin, row3Y, comboBalloonWidth, inputH);
+            cboBalloonProperty.FlatStyle = FlatStyle.Flat;
+
+            btnDeleteNote.SetBounds(deleteX, row1Y, deleteWidth, btnH);
+            btnDeleteText.SetBounds(deleteX, row2Y, deleteWidth, btnH);
+
+            btnNote.SetBounds(buttonX, row1Y, buttonWidth, btnH);
+            btnText.SetBounds(buttonX, row2Y, buttonWidth, btnH);
+            btnInsertBalloon.SetBounds(buttonX, row3Y, buttonWidth, btnH);
+
+            grpComponentBom.Invalidate(true);
         }
 
         private void LayoutComponentMacroGroup(int pageMargin, int pageWidth, int gap, bool narrow)
         {
-            int groupTop = grpComponentBom.Bottom + 6;
-            int minHeight = narrow ? 238 : 202;
+            int groupTop = grpComponentBom.Bottom + 8;
+            int minHeight = 232;
             int remainingHeight = tabComponentDrawing.ClientSize.Height - groupTop - pageMargin;
             groupBox3.SetBounds(pageMargin, groupTop, pageWidth, Math.Max(minHeight, remainingHeight));
 
@@ -3340,13 +3472,13 @@ namespace ADDIN
             };
 
             int innerLeft = 12;
-            int innerTop = 24;
-            int innerGap = 10;
+            int innerTop = 34;
+            int innerGap = 8;
             int availableWidth = Math.Max(120, groupBox3.ClientSize.Width - (innerLeft * 2));
-            int tileWidth = Math.Min(126, Math.Max(104, (availableWidth - innerGap) / 2));
+            int tileWidth = Math.Min(132, Math.Max(104, (availableWidth - innerGap) / 2));
             int columnCount = availableWidth >= (tileWidth * 2 + innerGap) ? 2 : 1;
-            int buttonWidth = columnCount == 1 ? Math.Min(126, availableWidth) : tileWidth;
-            int buttonHeight = 44;
+            int buttonWidth = columnCount == 1 ? Math.Min(132, availableWidth) : tileWidth;
+            int buttonHeight = 40;
 
             for (int i = 0; i < buttons.Length; i++)
             {
@@ -3360,8 +3492,11 @@ namespace ADDIN
                 int gridLeft = innerLeft + Math.Max(0, (availableWidth - gridWidth) / 2);
                 int x = gridLeft + column * (buttonWidth + innerGap);
                 int y = innerTop + row * (buttonHeight + innerGap);
+
                 button.SetBounds(x, y, buttonWidth, buttonHeight);
             }
+
+            groupBox3.Invalidate(true);
         }
 
         private void ConfigureMacroButton(Button button)

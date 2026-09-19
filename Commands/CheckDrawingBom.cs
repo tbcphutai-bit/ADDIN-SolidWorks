@@ -83,6 +83,16 @@ namespace ADDIN.Commands
         public string DrawingViewName { get; set; } = "";
     }
 
+    internal sealed class ModelPropertyLinkAudit
+    {
+        public string PropertyName { get; set; } = "";
+        public string RawExpression { get; set; } = "";
+        public string ResolvedValue { get; set; } = "";
+        public string Scope { get; set; } = "";
+        public bool Exists { get; set; }
+        public bool IsLinked { get; set; }
+    }
+
     internal sealed class DrawingCheckItemResult
     {
         public int BomRowIndex { get; set; } = -1;
@@ -135,12 +145,46 @@ namespace ADDIN.Commands
 
     internal class CheckDrawingBom
     {
+        // TABLE PARSING RULES (2026-09):
+        // - Không dùng tọa độ để NHẬN DIỆN table/cell.
+        // - Nhận diện bằng header + row + column + linked property.
+        // - X/Y chỉ dùng sau cùng cho Navigate NG.
+        // - Part Drawing hỗ trợ 2 dạng 合番/数量:
+        //     A) 合番 | 数量 với nhiều data row.
+        //     B) 合番 | BR-02:35枚.
+        // - Assembly summary không hard-code row=1.
+        // - 数量 của cả COMPONENT và UNIT: Drawing ↔ đúng dòng SolidWorks BOM.
+        //   Không dùng Custom Property 数量/Qty của 3D Part/Assembly làm Expected.
         private readonly ISldWorks swApp;
         private readonly DataGridView bomGrid;
 
         private const double NumericTolerance = 0.01; // 0.01 mm tolerance cho W, L, 板厚
         private const double HeaderYBandTolerance = 0.010; // 10mm band độ chênh Y giữa các Header
         private const double ValueMaxYDistance = 0.025; // 25mm khoảng cách tối đa bên dưới Header
+
+        // FRAME SCOPE V2: Note lọc theo vị trí Note; Table lọc theo table anchor.
+        // Chỉ đọc dữ liệu nằm TRONG phạm vi Sheet hiện tại.
+        // Không hard-code A4/A3/A2: width/height lấy trực tiếp từ ISheet.
+        private const double DrawingFrameEpsilon = 0.0002; // 0.2 mm, chống sai số số thực ở biên
+
+        private sealed class SheetFrameBounds
+        {
+            public bool IsValid { get; set; }
+            public double MinX { get; set; }
+            public double MinY { get; set; }
+            public double MaxX { get; set; }
+            public double MaxY { get; set; }
+            public string Source { get; set; } = "";
+
+            public bool Contains(double x, double y)
+            {
+                if (!IsValid) return true;
+                return x >= MinX - DrawingFrameEpsilon &&
+                       x <= MaxX + DrawingFrameEpsilon &&
+                       y >= MinY - DrawingFrameEpsilon &&
+                       y <= MaxY + DrawingFrameEpsilon;
+            }
+        }
 
         private sealed class NgNavigationTarget
         {
@@ -353,9 +397,14 @@ namespace ADDIN.Commands
         {
             string buhinNoBom = GetCellText(bomRow, 1);
             string fileNameBom = GetCellText(bomRow, 5);
+            string bomQuantity = GetBomQuantityFromRow(bomRow);
             string componentName = Path.GetFileNameWithoutExtension(fileNameBom);
             if (string.IsNullOrWhiteSpace(componentName))
                 componentName = fileNameBom;
+
+            LogDebug(
+                $"[BOM QTY ROW] row={((bomRow != null) ? bomRow.Index : -1)} " +
+                $"component=\"{componentName}\" partNo=\"{buhinNoBom}\" quantity=\"{bomQuantity}\"");
 
             DrawingCheckItemResult itemResult = new DrawingCheckItemResult
             {
@@ -390,16 +439,31 @@ namespace ADDIN.Commands
                 $"[SHEET RESOLVE] sheet=\"{sheetName}\" " +
                 $"filter={(string.IsNullOrWhiteSpace(sheetName) ? "ALL_VIEWS" : "CURRENT_SHEET")}");
 
-            // 1. Quét Notes và Tables trên Sheet hiện tại.
-            // Nếu SolidWorks trả tên sheet rỗng/space khi Drawing mở silent,
-            // scanner sẽ quét toàn bộ view thay vì loại hết view.
-            List<NoteDiagnosticInfo> notes = ScanCurrentSheetNotes(drawing, sheetName);
-            List<TableDiagnosticInfo> tables = ScanCurrentSheetTables(drawing, sheetName, drawingModel);
+            // 1. Refresh Drawing trước khi đọc Note/Table.
+            // Batch mở Drawing bằng Silent + ReadOnly nên DisplayedText/Table có thể
+            // vẫn giữ giá trị cache cũ nếu chưa rebuild. ForceRebuild3 chỉ rebuild
+            // trong memory; command này không Save Drawing.
+            RefreshDrawingBeforeCheck(
+                drawingModel,
+                drawing,
+                sheetName);
 
-            // 2. Trích xuất toàn bộ giá trị Displayed Text từ khung tên
+            // 2. Chỉ quét Notes/Tables nằm TRONG phạm vi khung Sheet hiện tại.
+            // Nếu SolidWorks trả tên sheet rỗng/space khi Drawing mở silent,
+            // scanner vẫn quét view nhưng mọi candidate ngoài khung sẽ bị loại.
+            SheetFrameBounds frameBounds = ResolveSheetFrameBounds(activeSheet);
+            LogSheetFrameBounds(sheetName, frameBounds);
+
+            List<NoteDiagnosticInfo> notes =
+                ScanCurrentSheetNotes(drawing, sheetName, frameBounds);
+
+            List<TableDiagnosticInfo> tables =
+                ScanCurrentSheetTables(drawing, sheetName, drawingModel, frameBounds);
+
+            // 3. Trích xuất toàn bộ giá trị Displayed Text từ khung tên
             DrawingDisplayedData drawingData = ExtractAllTitleBlockValues(notes, tables, drawingModel);
 
-            // 3. Xác định Drawing đang tham chiếu Part hay Assembly.
+            // 4. Xác định Drawing đang tham chiếu Part hay Assembly.
             //    Với Assembly Drawing, KHÔNG bắt buộc phải có 部品番号.
             ModelDoc2 referencedModel;
             string referencedConfiguration;
@@ -424,10 +488,11 @@ namespace ADDIN.Commands
                     referencedModel,
                     referencedConfiguration,
                     partPath,
-                    fileNameBom);
+                    fileNameBom,
+                    bomQuantity);
             }
 
-            // 4. PART DRAWING: giữ nguyên rule cũ, phải nhận diện được khung tên + 部品番号.
+            // 5. PART DRAWING: giữ nguyên rule cũ, phải nhận diện được khung tên + 部品番号.
             if (!drawingData.HeaderFound || string.IsNullOrWhiteSpace(drawingData.PartNumber))
             {
                 itemResult.Status = DrawingBomCheckStatus.Warning;
@@ -443,8 +508,13 @@ namespace ADDIN.Commands
                 return itemResult;
             }
 
-            // 5. Đọc các giá trị tương ứng từ BOM và Part Custom Properties
-            string bomQty = GetCellText(bomRow, 4);
+            // 6. Đọc các giá trị tương ứng từ BOM và Part Custom Properties.
+            // QUAN TRỌNG: 数量 của COMPONENT lấy trực tiếp từ đúng dòng BOM
+            // mà SOLIDWORKS đã list từ Assembly lớn. Không dùng Custom Property
+            // 数量/Qty của 3D Part làm nguồn chuẩn số lượng.
+            LogDebug(
+                $"[PART QTY BOM] component=\"{componentName}\" drawing=\"{drawingData.Quantity}\" bom=\"{bomQuantity}\"");
+
             string bomMaterial = GetCellText(bomRow, 2);
             string bomThickness = GetCellText(bomRow, 3);
             string bomGoban = "";
@@ -454,6 +524,9 @@ namespace ADDIN.Commands
             string bomTehaiNo = "";
             string bomSiteName = "";
             string bomProductName = "";
+
+            Dictionary<string, ModelPropertyLinkAudit> propertyLinkAudits =
+                new Dictionary<string, ModelPropertyLinkAudit>(StringComparer.OrdinalIgnoreCase);
 
             ReadBomAndComponentProperties(
                 bomRow,
@@ -466,7 +539,8 @@ namespace ADDIN.Commands
                 ref bomJobNo,
                 ref bomTehaiNo,
                 ref bomSiteName,
-                ref bomProductName);
+                ref bomProductName,
+                propertyLinkAudits);
 
             string expectedDxf = "";
             string tehaiToUse = !string.IsNullOrWhiteSpace(bomTehaiNo)
@@ -478,13 +552,24 @@ namespace ADDIN.Commands
             else if (!string.IsNullOrWhiteSpace(buhinNoBom))
                 expectedDxf = buhinNoBom;
 
-            // 6. So sánh 12 trường Part hiện tại
+            // 7. So sánh 12 trường Part hiện tại
             itemResult.Fields.Add(ComparePartNumber(drawingData.PartNumber, buhinNoBom, drawingData.PartNumberSource));
-            itemResult.Fields.Add(CompareNumericField("W", drawingData.Width, bomW, drawingData.WidthSource));
-            itemResult.Fields.Add(CompareNumericField("L", drawingData.Length, bomL, drawingData.LengthSource));
-            itemResult.Fields.Add(CompareQuantityField(drawingData.Quantity, bomQty, drawingData.QuantitySource));
-            itemResult.Fields.Add(CompareMaterialField(drawingData.Material, bomMaterial));
-            itemResult.Fields.Add(CompareThicknessField(drawingData.Thickness, bomThickness));
+            itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
+                CompareNumericField("W", drawingData.Width, bomW, drawingData.WidthSource),
+                GetPropertyLinkAudit(propertyLinkAudits, "W")));
+            itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
+                CompareNumericField("L", drawingData.Length, bomL, drawingData.LengthSource),
+                GetPropertyLinkAudit(propertyLinkAudits, "L")));
+            itemResult.Fields.Add(CompareQuantityField(
+                drawingData.Quantity,
+                bomQuantity,
+                "BOM_QUANTITY"));
+            itemResult.Fields.Add(ApplyStrictPropertyLinkAudit(
+                CompareMaterialField(drawingData.Material, bomMaterial),
+                GetPropertyLinkAudit(propertyLinkAudits, "材質")));
+            itemResult.Fields.Add(ApplyStrictPropertyLinkAudit(
+                CompareThicknessField(drawingData.Thickness, bomThickness),
+                GetPropertyLinkAudit(propertyLinkAudits, "板厚")));
             itemResult.Fields.Add(CompareGobanField(drawingData.Goban, bomGoban));
             itemResult.Fields.Add(CompareFileNameField(drawingData.PartFileName, componentName));
             itemResult.Fields.Add(CompareDxfField(drawingData.DxfFileName, expectedDxf));
@@ -692,29 +777,14 @@ namespace ADDIN.Commands
             }
 
             // =========================================================================
-            // CỤM 2: GÓC DƯỚI BÊN PHẢI (Bảng 合番: Table [01] R0 C1)
+            // CỤM 2: BẢNG 合番 CỦA DRAWING CHI TIẾT
             // =========================================================================
-            if (tables != null)
-            {
-                foreach (var table in tables)
-                {
-                    for (int r = 0; r < table.RowCount; r++)
-                    {
-                        for (int c = 0; c < table.ColumnCount; c++)
-                        {
-                            string cellText = NormalizeText(table.Cells.Find(x => x.Row == r && x.Column == c)?.DisplayedText ?? "");
-                            if (cellText == "合番" && c + 1 < table.ColumnCount)
-                            {
-                                string val = (table.Cells.Find(x => x.Row == r && x.Column == c + 1)?.DisplayedText ?? "").Trim();
-                                if (!string.IsNullOrWhiteSpace(val))
-                                {
-                                    data.Goban = val;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            // QUAN TRỌNG: parser này CHỈ dùng để đọc 合番.
+            // Không được ghi đè data.Quantity từ bảng 合番, kể cả khi trong bảng
+            // có số như G-5B:1, M-5B:1 hoặc BR-02:35枚.
+            // 数量 của COMPONENT phải lấy đúng ô 数量 trong title block ở CỤM 1,
+            // sau đó so với 数量 của đúng dòng Component trong SolidWorks BOM.
+            ApplyPartGobanQuantityTableData(data, tables);
 
             // =========================================================================
             // CỤM 3: GÓC DƯỚI BÊN TRÁI (Bottom-Left Block: DXFファイル名 & Part-ファイル名)
@@ -849,21 +919,391 @@ namespace ADDIN.Commands
                 }
             }
 
-            // Fallback resolve từ model properties nếu trường nào trên drawing còn thiếu
-            DrawingDoc drw = drawingDoc as DrawingDoc;
-            if (drw != null)
-            {
-                if (string.IsNullOrWhiteSpace(data.Goban)) data.Goban = ResolvePropertyFromDrawingViews(drw, "合番");
-                if (string.IsNullOrWhiteSpace(data.Material)) data.Material = ResolvePropertyFromDrawingViews(drw, "材質");
-                if (string.IsNullOrWhiteSpace(data.Thickness)) data.Thickness = ResolvePropertyFromDrawingViews(drw, "板厚");
-                if (string.IsNullOrWhiteSpace(data.JobNo)) data.JobNo = ResolvePropertyFromDrawingViews(drw, "工事番号");
-                if (string.IsNullOrWhiteSpace(data.TehaiNo)) data.TehaiNo = ResolvePropertyFromDrawingViews(drw, "手配番号");
-                if (string.IsNullOrWhiteSpace(data.SiteName)) data.SiteName = ResolvePropertyFromDrawingViews(drw, "現場名");
-                if (string.IsNullOrWhiteSpace(data.ProductName)) data.ProductName = ResolvePropertyFromDrawingViews(drw, "品名");
-                if (string.IsNullOrWhiteSpace(data.Finish)) data.Finish = ResolvePropertyFromDrawingViews(drw, "仕上げ");
-            }
+            // Không fallback từ 3D để lấp Drawing Value còn thiếu.
+            // Drawing Value phải thật sự đến từ Note/Table nằm trong khung bản vẽ.
+            // Nếu không tìm thấy trong khung, field giữ trống để checker báo Warning/NG đúng bản chất.
 
             return data;
+        }
+
+        private sealed class PartGobanQuantityEntry
+        {
+            public string Goban { get; set; } = "";
+            public string Quantity { get; set; } = "";
+            // Text đúng như Drawing hiển thị. Với TYPE B, ví dụ "P2 : 100"
+            // phải được giữ nguyên thay vì chỉ xuất phần mã "P2".
+            public string DisplayText { get; set; } = "";
+            public TableDiagnosticInfo Table { get; set; }
+            public TableCellDiagnosticInfo GobanCell { get; set; }
+            public TableCellDiagnosticInfo QuantityCell { get; set; }
+        }
+
+        private void ApplyPartGobanQuantityTableData(
+            DrawingDisplayedData data,
+            List<TableDiagnosticInfo> tables)
+        {
+            if (data == null || tables == null || tables.Count == 0)
+                return;
+
+            List<PartGobanQuantityEntry> entries =
+                ReadPartGobanQuantityEntries(tables);
+
+            if (entries.Count == 0)
+                return;
+
+            // Hợp nhất 合番 theo đúng thứ tự xuất hiện, KHÔNG làm mất 数量 đi kèm.
+            // Ví dụ:
+            //   TYPE A: G-5B | 1 ; M-5B | 1  ->  "G-5B : 1 / M-5B : 1"
+            //   TYPE B: 合番 | P2 : 100         ->  "P2 : 100"
+            // 数量 ở đây chỉ là phần của chuỗi 合番; 数量 chính của COMPONENT vẫn
+            // được so sánh riêng Drawing ↔ 3D Custom Property.
+            List<string> gobanDisplays = new List<string>();
+            HashSet<string> seenGobanPairs =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            double quantityTotal = 0.0;
+            bool hasNumericQuantity = false;
+            bool allQuantitiesNumeric = true;
+
+            foreach (PartGobanQuantityEntry entry in entries)
+            {
+                if (entry == null)
+                    continue;
+
+                string goban = CleanTableCellText(entry.Goban);
+                string qtyText = CleanTableCellText(entry.Quantity);
+
+                if (!string.IsNullOrWhiteSpace(goban))
+                {
+                    string pairKey =
+                        NormalizeGobanToken(goban) + "|" + NormalizeQuantityToken(qtyText);
+
+                    if (seenGobanPairs.Add(pairKey))
+                    {
+                        string display = CleanTableCellText(entry.DisplayText);
+                        if (string.IsNullOrWhiteSpace(display))
+                        {
+                            display = string.IsNullOrWhiteSpace(qtyText)
+                                ? goban
+                                : goban + " : " + qtyText.Replace("枚", "").Trim();
+                        }
+
+                        gobanDisplays.Add(display);
+                    }
+                }
+
+                double qty;
+                if (TryParseQuantityNumber(qtyText, out qty))
+                {
+                    quantityTotal += qty;
+                    hasNumericQuantity = true;
+                }
+                else if (!string.IsNullOrWhiteSpace(qtyText))
+                {
+                    allQuantitiesNumeric = false;
+                }
+
+                LogDebug(
+                    $"[PART GOBAN TABLE] table={entry.Table?.Index ?? -1} " +
+                    $"display=\"{entry.DisplayText}\" goban=\"{entry.Goban}\" qty=\"{entry.Quantity}\" " +
+                    $"gobanRow={entry.GobanCell?.Row ?? -1} gobanCol={entry.GobanCell?.Column ?? -1} " +
+                    $"qtyRow={entry.QuantityCell?.Row ?? -1} qtyCol={entry.QuantityCell?.Column ?? -1}");
+            }
+
+            if (gobanDisplays.Count > 0)
+            {
+                data.Goban = string.Join(" / ", gobanDisplays);
+                LogDebug($"[PART GOBAN DISPLAY] drawing=\"{data.Goban}\"");
+
+                PartGobanQuantityEntry firstGobanEntry =
+                    entries.Find(e =>
+                        e != null &&
+                        e.GobanCell != null &&
+                        !string.IsNullOrWhiteSpace(e.Goban));
+
+                if (firstGobanEntry != null)
+                {
+                    SaveDrawingTableValueLocation(
+                        data,
+                        "合番",
+                        firstGobanEntry.Table,
+                        firstGobanEntry.GobanCell);
+                }
+            }
+
+            // 数量 ở bảng 合番 chỉ là thông tin phụ của 合番, KHÔNG phải nguồn
+            // so sánh 数量 của COMPONENT. Giữ lại debug để chẩn đoán nhưng không
+            // ghi đè data.Quantity/data.QuantitySource/data.ValueLocations["数量"].
+            if (hasNumericQuantity && allQuantitiesNumeric)
+            {
+                LogDebug(
+                    $"[PART GOBAN TABLE INFO] goban=\"{data.Goban}\" " +
+                    $"parsedQtyTotal=\"{FormatQuantityNumber(quantityTotal)}\" " +
+                    $"drawingTitleQty=\"{data.Quantity}\" entries={entries.Count}");
+            }
+        }
+
+        private static List<PartGobanQuantityEntry> ReadPartGobanQuantityEntries(
+            List<TableDiagnosticInfo> tables)
+        {
+            List<PartGobanQuantityEntry> result =
+                new List<PartGobanQuantityEntry>();
+
+            if (tables == null)
+                return result;
+
+            HashSet<string> dedupe =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.Cells == null || table.Cells.Count == 0)
+                    continue;
+
+                bool foundTypeAInTable = false;
+
+                // -------------------------------------------------------------
+                // TYPE A
+                //   合番 | 数量
+                //   G-5B | 1
+                //   M-5B | 1
+                // Header có thể nằm ở bất kỳ row/column nào.
+                // -------------------------------------------------------------
+                for (int headerRow = 0; headerRow < table.RowCount; headerRow++)
+                {
+                    int gobanCol = FindHeaderColumnInRow(table, headerRow, "合番");
+                    int qtyCol = FindHeaderColumnInRow(table, headerRow, "数量");
+
+                    if (gobanCol < 0 || qtyCol < 0 || gobanCol == qtyCol)
+                        continue;
+
+                    bool foundData = false;
+
+                    for (int r = headerRow + 1; r < table.RowCount; r++)
+                    {
+                        TableCellDiagnosticInfo gobanCell =
+                            FindTableCell(table, r, gobanCol);
+                        TableCellDiagnosticInfo qtyCell =
+                            FindTableCell(table, r, qtyCol);
+
+                        string goban =
+                            CleanTableCellText(gobanCell?.DisplayedText ?? "");
+                        string qty =
+                            CleanTableCellText(qtyCell?.DisplayedText ?? "");
+
+                        // Nếu đã vào vùng data mà gặp một row trống hoàn toàn,
+                        // coi như block 合番 đã kết thúc để không ăn sang block khác.
+                        if (string.IsNullOrWhiteSpace(goban) &&
+                            string.IsNullOrWhiteSpace(qty))
+                        {
+                            if (foundData)
+                                break;
+
+                            continue;
+                        }
+
+                        // Bỏ qua row header lặp lại hoặc row không có 合番.
+                        if (string.IsNullOrWhiteSpace(goban) ||
+                            HeaderMatchesLogicalName(goban, "合番"))
+                        {
+                            continue;
+                        }
+
+                        AddPartGobanQuantityEntry(
+                            result,
+                            dedupe,
+                            new PartGobanQuantityEntry
+                            {
+                                Goban = goban,
+                                Quantity = qty,
+                                DisplayText = string.IsNullOrWhiteSpace(qty)
+                                    ? goban
+                                    : goban + " : " + qty.Replace("枚", "").Trim(),
+                                Table = table,
+                                GobanCell = gobanCell,
+                                QuantityCell = qtyCell
+                            });
+
+                        foundData = true;
+                        foundTypeAInTable = true;
+                    }
+
+                    if (foundTypeAInTable)
+                        break;
+                }
+
+                if (foundTypeAInTable)
+                    continue;
+
+                // -------------------------------------------------------------
+                // TYPE B
+                //   合番 | BR-02:35枚
+                // Không quan tâm chữ ghi chú khác trong/ngoài bảng.
+                // Không dùng tọa độ; chỉ tìm cell "合番" rồi parse cell cùng row.
+                // -------------------------------------------------------------
+                foreach (TableCellDiagnosticInfo headerCell in table.Cells)
+                {
+                    if (headerCell == null ||
+                        !HeaderMatchesLogicalName(
+                            CleanTableCellText(headerCell.DisplayedText),
+                            "合番"))
+                    {
+                        continue;
+                    }
+
+                    for (int c = headerCell.Column + 1; c < table.ColumnCount; c++)
+                    {
+                        TableCellDiagnosticInfo valueCell =
+                            FindTableCell(table, headerCell.Row, c);
+
+                        string combined =
+                            CleanTableCellText(valueCell?.DisplayedText ?? "");
+
+                        string goban;
+                        string qty;
+                        if (!TryParseCombinedGobanQuantity(
+                                combined,
+                                out goban,
+                                out qty))
+                        {
+                            continue;
+                        }
+
+                        AddPartGobanQuantityEntry(
+                            result,
+                            dedupe,
+                            new PartGobanQuantityEntry
+                            {
+                                Goban = goban,
+                                Quantity = qty,
+                                // Giữ nguyên text của cell Drawing, ví dụ "P2 : 100".
+                                DisplayText = combined,
+                                Table = table,
+                                GobanCell = valueCell,
+                                QuantityCell = valueCell
+                            });
+
+                        break;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private static void AddPartGobanQuantityEntry(
+            List<PartGobanQuantityEntry> result,
+            HashSet<string> dedupe,
+            PartGobanQuantityEntry entry)
+        {
+            if (result == null || dedupe == null || entry == null)
+                return;
+
+            string goban = CleanTableCellText(entry.Goban);
+            string qty = CleanTableCellText(entry.Quantity);
+
+            if (string.IsNullOrWhiteSpace(goban))
+                return;
+
+            string key =
+                NormalizeGobanToken(goban) + "|" +
+                NormalizeText(qty);
+
+            if (!dedupe.Add(key))
+                return;
+
+            entry.Goban = goban;
+            entry.Quantity = qty;
+            entry.DisplayText = CleanTableCellText(entry.DisplayText);
+            result.Add(entry);
+        }
+
+        private static bool TryParseCombinedGobanQuantity(
+            string text,
+            out string goban,
+            out string quantity)
+        {
+            goban = "";
+            quantity = "";
+
+            string value = CleanTableCellText(text);
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            Match match = Regex.Match(
+                value,
+                @"^\s*(.+?)\s*[:：]\s*(\d+(?:[\.,]\d+)?)\s*枚?\s*$",
+                RegexOptions.IgnoreCase);
+
+            if (!match.Success)
+                return false;
+
+            goban = (match.Groups[1].Value ?? "").Trim();
+            quantity = (match.Groups[2].Value ?? "").Trim();
+
+            return
+                !string.IsNullOrWhiteSpace(goban) &&
+                !string.IsNullOrWhiteSpace(quantity);
+        }
+
+        private static bool TryParseQuantityNumber(
+            string text,
+            out double value)
+        {
+            value = 0.0;
+
+            string cleaned =
+                CleanTableCellText(text)
+                .Replace("枚", "")
+                .Replace(",", ".")
+                .Trim();
+
+            return double.TryParse(
+                cleaned,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value);
+        }
+
+        private static string FormatQuantityNumber(double value)
+        {
+            double rounded = Math.Round(value);
+            if (Math.Abs(value - rounded) <= 0.0000001)
+            {
+                return ((long)rounded).ToString(CultureInfo.InvariantCulture);
+            }
+
+            return value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private static string NormalizeGobanToken(string text)
+        {
+            return NormalizeText(text ?? "")
+                .Replace(" ", "")
+                .Replace("　", "")
+                .Replace("：", ":")
+                .Trim();
+        }
+
+        private static string NormalizeQuantityToken(string text)
+        {
+            string cleaned = CleanTableCellText(text ?? "")
+                .Replace("枚", "")
+                .Replace("，", ".")
+                .Replace(",", ".")
+                .Trim();
+
+            double numeric;
+            if (double.TryParse(
+                    cleaned,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out numeric))
+            {
+                return FormatQuantityNumber(numeric);
+            }
+
+            return NormalizeText(cleaned);
         }
 
         private static string ResolvePropertyFromDrawingViews(DrawingDoc drawingDoc, string propName)
@@ -933,6 +1373,69 @@ namespace ADDIN.Commands
             };
         }
 
+        private static ModelPropertyLinkAudit GetPropertyLinkAudit(
+            Dictionary<string, ModelPropertyLinkAudit> audits,
+            string propertyName)
+        {
+            ModelPropertyLinkAudit audit;
+            return audits != null &&
+                   audits.TryGetValue(propertyName, out audit)
+                ? audit
+                : null;
+        }
+
+        private static DrawingBomFieldResult ApplyRequiredPropertyLinkAudit(
+            DrawingBomFieldResult field,
+            ModelPropertyLinkAudit audit)
+        {
+            if (field == null || audit == null || !audit.Exists || audit.IsLinked)
+                return field;
+
+            string linkMessage =
+                "Custom Property '" + audit.PropertyName +
+                "' đang là giá trị nhập tay, đã mất link. Cần kiểm tra trong file chi tiết.";
+
+            if (field.Status == DrawingBomCheckStatus.OK)
+                field.Status = DrawingBomCheckStatus.Warning;
+
+            field.Source = "MODEL_PROPERTY_MANUAL";
+            field.Message = string.IsNullOrWhiteSpace(field.Message)
+                ? linkMessage
+                : field.Message + " | " + linkMessage;
+
+            LogDebug(
+                "[PROPERTY LINK WARNING] property=\"" + audit.PropertyName +
+                "\" scope=\"" + audit.Scope +
+                "\" raw=\"" + audit.RawExpression + "\"");
+
+            return field;
+        }
+
+        private static DrawingBomFieldResult ApplyStrictPropertyLinkAudit(
+            DrawingBomFieldResult field,
+            ModelPropertyLinkAudit audit)
+        {
+            if (field == null || audit == null || !audit.Exists || audit.IsLinked)
+                return field;
+
+            string linkMessage =
+                "Custom Property '" + audit.PropertyName +
+                "' bắt buộc phải LINK nhưng hiện đang là giá trị nhập tay / đã mất link.";
+
+            field.Status = DrawingBomCheckStatus.NG;
+            field.Source = "MODEL_PROPERTY_LINK_REQUIRED";
+            field.Message = string.IsNullOrWhiteSpace(field.Message)
+                ? linkMessage
+                : field.Message + " | " + linkMessage;
+
+            LogDebug(
+                "[PROPERTY LINK NG] property=\"" + audit.PropertyName +
+                "\" scope=\"" + audit.Scope +
+                "\" raw=\"" + audit.RawExpression + "\"");
+
+            return field;
+        }
+
         private static DrawingBomFieldResult CompareNumericField(string fieldName, string drawVal, string bomVal, string source)
         {
             if (string.IsNullOrWhiteSpace(drawVal))
@@ -983,7 +1486,10 @@ namespace ADDIN.Commands
                         DrawingValue = formattedDraw,
                         BomValue = formattedBom,
                         Source = source,
-                        Status = DrawingBomCheckStatus.OK
+                        Status = DrawingBomCheckStatus.OK,
+                        Message = (fieldName == "W" || fieldName == "L")
+                            ? "Giá trị 2D và 3D giống nhau."
+                            : ""
                     };
                 }
                 else
@@ -1011,7 +1517,10 @@ namespace ADDIN.Commands
                     DrawingValue = rawFormatDraw,
                     BomValue = rawFormatBom,
                     Source = source,
-                    Status = DrawingBomCheckStatus.OK
+                    Status = DrawingBomCheckStatus.OK,
+                    Message = (fieldName == "W" || fieldName == "L")
+                        ? "Giá trị 2D và 3D giống nhau."
+                        : ""
                 };
             }
 
@@ -1072,7 +1581,7 @@ namespace ADDIN.Commands
                     BomValue = "(Trống)",
                     Source = source,
                     Status = DrawingBomCheckStatus.Warning,
-                    Message = "Không có 数量 trong BOM."
+                    Message = "Không có 数量 trong dòng tương ứng của SolidWorks BOM."
                 };
             }
 
@@ -1138,7 +1647,7 @@ namespace ADDIN.Commands
                             BomValue = bomVal,
                             Source = source,
                             Status = DrawingBomCheckStatus.NG,
-                            Message = $"Số lượng lẻ không khớp ({dValDouble} != {bValDouble})"
+                            Message = $"Số lượng lẻ không khớp: Drawing={dValDouble} != BOM={bValDouble}"
                         };
                     }
                 }
@@ -1234,23 +1743,76 @@ namespace ADDIN.Commands
             if (string.IsNullOrWhiteSpace(nBom))
                 return new DrawingBomFieldResult { FieldName = "合番", DrawingValue = drawVal, BomValue = "(Trống)", Status = DrawingBomCheckStatus.Warning, Message = "Không có 合番 trong BOM" };
 
-            // 1. So khớp trực tiếp chuỗi
+            // 1. So khớp trực tiếp / normalized text.
             if (string.Equals(nDraw, nBom, StringComparison.OrdinalIgnoreCase))
-                return new DrawingBomFieldResult { FieldName = "合番", DrawingValue = drawVal, BomValue = bomVal, Status = DrawingBomCheckStatus.OK };
+                return CreateGobanOk(drawVal, bomVal);
 
-            // 2. Bỏ khoảng trắng & chuẩn hóa dấu :
-            string sDraw = nDraw.Replace(" ", "").Replace("：", ":");
-            string sBom = nBom.Replace(" ", "").Replace("：", ":");
+            string sDraw = NormalizeGobanToken(nDraw);
+            string sBom = NormalizeGobanToken(nBom);
             if (string.Equals(sDraw, sBom, StringComparison.OrdinalIgnoreCase))
-                return new DrawingBomFieldResult { FieldName = "合番", DrawingValue = drawVal, BomValue = bomVal, Status = DrawingBomCheckStatus.OK };
+                return CreateGobanOk(drawVal, bomVal);
 
-            // 3. So khớp phần tiền tố/mã Unit (ví dụ: "sb1" hoặc "sa1" hoặc "CB3-13C")
-            string unitDraw = ExtractGobanUnit(sDraw);
-            string unitBom = ExtractGobanUnit(sBom);
-            if (!string.IsNullOrEmpty(unitDraw) && !string.IsNullOrEmpty(unitBom) &&
-                string.Equals(unitDraw, unitBom, StringComparison.OrdinalIgnoreCase))
+            // 2. Nếu 合番 có kèm 数量 (P2:100, G-5B:1 / M-5B:1...),
+            //    bắt buộc so sánh CẢ mã + số lượng. Không được bỏ suffix 数量.
+            Dictionary<string, string> drawPairs = ParseGobanQuantityPairs(drawVal);
+            Dictionary<string, string> bomPairs = ParseGobanQuantityPairs(bomVal);
+
+            if (drawPairs.Count > 0 || bomPairs.Count > 0)
             {
-                return new DrawingBomFieldResult { FieldName = "合番", DrawingValue = drawVal, BomValue = bomVal, Status = DrawingBomCheckStatus.OK };
+                if (drawPairs.Count == 0 || bomPairs.Count == 0)
+                {
+                    return new DrawingBomFieldResult
+                    {
+                        FieldName = "合番",
+                        DrawingValue = drawVal,
+                        BomValue = bomVal,
+                        Status = DrawingBomCheckStatus.NG,
+                        Message = $"合番 không khớp đầy đủ mã + 数量: Drawing='{drawVal}' != BOM='{bomVal}'"
+                    };
+                }
+
+                if (GobanQuantityPairsEqual(drawPairs, bomPairs))
+                {
+                    return new DrawingBomFieldResult
+                    {
+                        FieldName = "合番",
+                        DrawingValue = drawVal,
+                        BomValue = bomVal,
+                        Status = DrawingBomCheckStatus.OK,
+                        Message = "合番 và số lượng đi kèm giống nhau."
+                    };
+                }
+
+                return new DrawingBomFieldResult
+                {
+                    FieldName = "合番",
+                    DrawingValue = drawVal,
+                    BomValue = bomVal,
+                    Status = DrawingBomCheckStatus.NG,
+                    Message = $"合番 hoặc số lượng đi kèm không khớp: Drawing='{drawVal}' != BOM='{bomVal}'"
+                };
+            }
+
+            // 3. Trường hợp chỉ có mã 合番, có thể nhiều mã, so sánh theo tập mã.
+            HashSet<string> drawSet = ParseGobanSet(drawVal);
+            HashSet<string> bomSet = ParseGobanSet(bomVal);
+
+            if (drawSet.Count > 0 && drawSet.SetEquals(bomSet))
+                return CreateGobanOk(drawVal, bomVal);
+
+            // 4. Compatibility cũ chỉ áp dụng khi CẢ HAI phía KHÔNG chứa dấu ':' quantity.
+            //    Tránh lỗi P2 được coi bằng P2:100.
+            if (!ContainsGobanQuantitySyntax(drawVal) &&
+                !ContainsGobanQuantitySyntax(bomVal))
+            {
+                string unitDraw = ExtractGobanUnit(sDraw);
+                string unitBom = ExtractGobanUnit(sBom);
+                if (!string.IsNullOrEmpty(unitDraw) &&
+                    !string.IsNullOrEmpty(unitBom) &&
+                    string.Equals(unitDraw, unitBom, StringComparison.OrdinalIgnoreCase))
+                {
+                    return CreateGobanOk(drawVal, bomVal);
+                }
             }
 
             return new DrawingBomFieldResult
@@ -1261,6 +1823,107 @@ namespace ADDIN.Commands
                 Status = DrawingBomCheckStatus.NG,
                 Message = $"合番 không khớp: Drawing='{drawVal}' != BOM='{bomVal}'"
             };
+        }
+
+        private static DrawingBomFieldResult CreateGobanOk(string drawVal, string bomVal)
+        {
+            return new DrawingBomFieldResult
+            {
+                FieldName = "合番",
+                DrawingValue = drawVal,
+                BomValue = bomVal,
+                Status = DrawingBomCheckStatus.OK,
+                Message = "Giá trị 合番 giống nhau."
+            };
+        }
+
+        private static Dictionary<string, string> ParseGobanQuantityPairs(string text)
+        {
+            Dictionary<string, string> result =
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            string value = NormalizeText(text ?? "");
+            if (string.IsNullOrWhiteSpace(value))
+                return result;
+
+            MatchCollection matches = Regex.Matches(
+                value,
+                @"(?<goban>[^:：/／,，、;；\r\n]+?)\s*[:：]\s*(?<qty>\d+(?:[\.,]\d+)?)\s*枚?",
+                RegexOptions.IgnoreCase);
+
+            foreach (Match match in matches)
+            {
+                if (match == null || !match.Success)
+                    continue;
+
+                string goban = NormalizeGobanToken(match.Groups["goban"].Value);
+                string qty = NormalizeQuantityToken(match.Groups["qty"].Value);
+
+                // Khi các pair nối nhau chỉ bằng khoảng trắng (vd "I.J-5B:2 K-5B:1"),
+                // regex có thể nhận phần đầu của match tiếp theo với leading spaces; Trim ở trên xử lý.
+                if (string.IsNullOrWhiteSpace(goban) || string.IsNullOrWhiteSpace(qty))
+                    continue;
+
+                result[goban] = qty;
+            }
+
+            return result;
+        }
+
+        private static bool GobanQuantityPairsEqual(
+            Dictionary<string, string> left,
+            Dictionary<string, string> right)
+        {
+            if (left == null || right == null || left.Count != right.Count)
+                return false;
+
+            foreach (KeyValuePair<string, string> pair in left)
+            {
+                string rightQty;
+                if (!right.TryGetValue(pair.Key, out rightQty))
+                    return false;
+
+                if (!string.Equals(
+                        NormalizeQuantityToken(pair.Value),
+                        NormalizeQuantityToken(rightQty),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool ContainsGobanQuantitySyntax(string text)
+        {
+            return Regex.IsMatch(
+                NormalizeText(text ?? ""),
+                @"[:：]\s*\d+(?:[\.,]\d+)?\s*枚?",
+                RegexOptions.IgnoreCase);
+        }
+
+        private static HashSet<string> ParseGobanSet(string text)
+        {
+            HashSet<string> result =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            string value = NormalizeText(text ?? "");
+            if (string.IsNullOrWhiteSpace(value))
+                return result;
+
+            string[] parts = Regex.Split(
+                value,
+                @"\s*(?:,|，|、|;|；|/|／|\r?\n)\s*");
+
+            foreach (string part in parts)
+            {
+                string token = NormalizeGobanToken(part);
+                if (!string.IsNullOrWhiteSpace(token))
+                    result.Add(token);
+            }
+
+            return result;
         }
 
         private static string ExtractGobanUnit(string text)
@@ -1351,7 +2014,8 @@ namespace ADDIN.Commands
             ModelDoc2 referencedModel,
             string referencedConfiguration,
             string resolvedModelPath,
-            string fileNameBom)
+            string fileNameBom,
+            string bomQuantity)
         {
             bool openedAssemblyByCommand = false;
             ModelDoc2 assemblyModel = referencedModel;
@@ -1406,6 +2070,12 @@ namespace ADDIN.Commands
                     drawingData,
                     notes,
                     tables,
+                    assemblyModel,
+                    configurationName,
+                    bomQuantity);
+
+                ApplyAssemblyMassLinkAudit(
+                    itemResult,
                     assemblyModel,
                     configurationName);
 
@@ -1954,19 +2624,35 @@ namespace ADDIN.Commands
             if (itemResult == null)
                 return;
 
-            string expected =
-                NormalizeText(
+            // Compare bằng canonical label để các cách ghi tương đương
+            // (ví dụ "Sub-ユニット図" và "サブユニット") đều được coi là OK.
+            string expectedCanonical =
+                ExtractDrawingTypeLabel(
                     expectedLabel);
 
-            string actual =
-                NormalizeText(
+            if (string.IsNullOrWhiteSpace(expectedCanonical))
+            {
+                expectedCanonical =
+                    NormalizeText(
+                        expectedLabel);
+            }
+
+            string actualCanonical =
+                ExtractDrawingTypeLabel(
                     actualLabel);
 
+            if (string.IsNullOrWhiteSpace(actualCanonical))
+            {
+                actualCanonical =
+                    NormalizeText(
+                        actualLabel);
+            }
+
             bool ok =
-                !string.IsNullOrWhiteSpace(actual) &&
+                !string.IsNullOrWhiteSpace(actualCanonical) &&
                 string.Equals(
-                    actual,
-                    expected,
+                    actualCanonical,
+                    expectedCanonical,
                     StringComparison.OrdinalIgnoreCase);
 
             itemResult.Fields.Add(
@@ -2050,9 +2736,30 @@ namespace ADDIN.Commands
                 return "出荷状態";
             }
 
+            // ---------------------------------------------------------
+            // Drawing type -03-:
+            // "Sub-ユニット図", "Sub-ユニット" và "サブユニット"
+            // được coi là CÙNG một loại Drawing.
+            // Canonical value dùng để compare = "サブユニット".
+            // ---------------------------------------------------------
             if (compact.IndexOf(
                     "サブユニット",
                     StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "サブユニット";
+            }
+
+            bool containsEnglishSub =
+                compact.IndexOf(
+                    "Sub",
+                    StringComparison.OrdinalIgnoreCase) >= 0;
+
+            bool containsUnit =
+                compact.IndexOf(
+                    "ユニット",
+                    StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (containsEnglishSub && containsUnit)
             {
                 return "サブユニット";
             }
@@ -2309,7 +3016,8 @@ namespace ADDIN.Commands
             List<NoteDiagnosticInfo> notes,
             List<TableDiagnosticInfo> tables,
             ModelDoc2 assemblyModel,
-            string configurationName)
+            string configurationName,
+            string bomQuantity)
         {
             if (itemResult == null ||
                 drawingData == null ||
@@ -2413,6 +3121,13 @@ namespace ADDIN.Commands
                 if (string.IsNullOrWhiteSpace(propertyName))
                     continue;
 
+                // 数量/Qty của UNIT không dùng Custom Property của 3D Assembly
+                // làm Expected. Nguồn chuẩn là 数量 của đúng dòng UNIT trong
+                // SolidWorks BOM. Bỏ qua linked note quantity ở vòng này để
+                // summary-table check bên dưới xử lý bằng BOM_QUANTITY.
+                if (IsBomQuantityPropertyName(propertyName))
+                    continue;
+
                 // ---------------------------------------------------------
                 // SOLIDWORKS system property:
                 // SW-ﾌｧｲﾙ名(File Name)
@@ -2495,7 +3210,8 @@ namespace ADDIN.Commands
                 tables,
                 assemblyModel,
                 configurationName,
-                checkedLogicalNames);
+                checkedLogicalNames,
+                bomQuantity);
 
             AttachAssemblyDrawingLocations(
                 itemResult,
@@ -2510,7 +3226,8 @@ namespace ADDIN.Commands
             List<TableDiagnosticInfo> tables,
             ModelDoc2 assemblyModel,
             string configurationName,
-            HashSet<string> checkedLogicalNames)
+            HashSet<string> checkedLogicalNames,
+            string bomQuantity)
         {
             if (itemResult == null ||
                 drawingData == null ||
@@ -2535,6 +3252,7 @@ namespace ADDIN.Commands
                 assemblyModel,
                 configurationName,
                 checkedLogicalNames,
+                bomQuantity,
                 "合番");
 
             added += AddAssemblySummaryTableField(
@@ -2544,6 +3262,17 @@ namespace ADDIN.Commands
                 assemblyModel,
                 configurationName,
                 checkedLogicalNames,
+                bomQuantity,
+                "重量");
+
+            added += AddAssemblySummaryTableField(
+                itemResult,
+                drawingData,
+                summaryTable,
+                assemblyModel,
+                configurationName,
+                checkedLogicalNames,
+                bomQuantity,
                 "数量");
 
             return added;
@@ -2556,6 +3285,7 @@ namespace ADDIN.Commands
             ModelDoc2 assemblyModel,
             string configurationName,
             HashSet<string> checkedLogicalNames,
+            string bomQuantity,
             string logicalName)
         {
             if (table == null ||
@@ -2570,18 +3300,38 @@ namespace ADDIN.Commands
                 return 0;
             }
 
+            int headerRow = FindAssemblySummaryHeaderRow(table);
+            if (headerRow < 0)
+                return 0;
+
             int column =
                 FindTableHeaderColumn(
                     table,
-                    logicalName);
+                    logicalName,
+                    headerRow);
 
             if (column < 0)
+                return 0;
+
+            string expectedGoban =
+                GetModelCustomProperty(
+                    assemblyModel,
+                    configurationName,
+                    "合番");
+
+            int dataRow =
+                FindAssemblySummaryDataRow(
+                    table,
+                    headerRow,
+                    expectedGoban);
+
+            if (dataRow < 0)
                 return 0;
 
             TableCellDiagnosticInfo valueCell =
                 FindTableCell(
                     table,
-                    1,
+                    dataRow,
                     column);
 
             if (valueCell == null)
@@ -2591,20 +3341,56 @@ namespace ADDIN.Commands
                 CleanTableCellText(
                     valueCell.DisplayedText);
 
-            string assemblyValue =
-                GetModelCustomProperty(
-                    assemblyModel,
-                    configurationName,
-                    logicalName);
+            bool isQuantity =
+                string.Equals(logicalName, "数量", StringComparison.OrdinalIgnoreCase);
 
-            if (string.IsNullOrWhiteSpace(assemblyValue))
+            string assemblyValue =
+                isQuantity
+                    ? (bomQuantity ?? "").Trim()
+                    : GetModelCustomProperty(
+                        assemblyModel,
+                        configurationName,
+                        logicalName);
+
+            // Với 数量, kể cả BOM quantity bị trống vẫn tạo field Warning để
+            // người dùng thấy rõ BOM không có số lượng cho UNIT này.
+            if (!isQuantity && string.IsNullOrWhiteSpace(assemblyValue))
                 return 0;
 
+            LogDebug(
+                $"[ASM TABLE FIELD] field=\"{logicalName}\" " +
+                $"table={table.Index} headerRow={headerRow} row={dataRow} col={column} " +
+                $"drawing=\"{drawingValue}\" expected=\"{assemblyValue}\" " +
+                $"expectedSource=\"{(isQuantity ? "BOM_QUANTITY" : "ASSEMBLY_PROPERTY")}\" " +
+                $"source=\"{valueCell.ValueSource}\" " +
+                $"apiDisplayed=\"{valueCell.ApiDisplayedText}\" " +
+                $"apiDisplayedHidden=\"{valueCell.ApiDisplayedTextWithHidden}\" " +
+                $"raw=\"{valueCell.RawText}\" " +
+                $"X={valueCell.X:F6} Y={valueCell.Y:F6}");
+
+            // X/Y chỉ lưu sau khi đã xác định đúng table/row/column bằng cấu trúc.
             SaveDrawingTableValueLocation(
                 drawingData,
                 logicalName,
                 table,
                 valueCell);
+
+            if (isQuantity)
+            {
+                DrawingBomFieldResult quantityField =
+                    CompareQuantityField(
+                        drawingValue,
+                        assemblyValue,
+                        "BOM_QUANTITY");
+
+                quantityField.FieldName = "ASM:数量";
+                itemResult.Fields.Add(quantityField);
+
+                LogDebug(
+                    $"[ASM QTY BOM] drawing=\"{drawingValue}\" bom=\"{assemblyValue}\" status={quantityField.Status}");
+
+                return 1;
+            }
 
             return AddAssemblyPropertyComparison(
                 itemResult,
@@ -2614,6 +3400,7 @@ namespace ADDIN.Commands
                 "ASSEMBLY_TABLE_PROPERTY");
         }
 
+
         private static TableDiagnosticInfo FindAssemblySummaryTable(
             List<TableDiagnosticInfo> tables)
         {
@@ -2622,50 +3409,108 @@ namespace ADDIN.Commands
 
             foreach (TableDiagnosticInfo table in tables)
             {
-                if (table == null ||
-                    table.RowCount < 2 ||
-                    table.ColumnCount < 3)
-                {
+                if (table == null || table.RowCount < 2)
                     continue;
-                }
 
-                string h0 =
-                    CleanTableCellText(
-                        GetTableCellText(
-                            table,
-                            0,
-                            0));
-
-                string h1 =
-                    CleanTableCellText(
-                        GetTableCellText(
-                            table,
-                            0,
-                            1));
-
-                string h2 =
-                    CleanTableCellText(
-                        GetTableCellText(
-                            table,
-                            0,
-                            2));
-
-                if (h0.Contains("合番") &&
-                    h1.Contains("重量") &&
-                    h2.Contains("数量"))
-                {
+                if (FindAssemblySummaryHeaderRow(table) >= 0)
                     return table;
-                }
             }
 
             return null;
         }
 
+        private static int FindAssemblySummaryHeaderRow(
+            TableDiagnosticInfo table)
+        {
+            if (table == null)
+                return -1;
+
+            for (int r = 0; r < table.RowCount; r++)
+            {
+                int gobanCol = FindHeaderColumnInRow(table, r, "合番");
+                int qtyCol = FindHeaderColumnInRow(table, r, "数量");
+                int weightCol = FindHeaderColumnInRow(table, r, "重量");
+
+                if (gobanCol >= 0 && qtyCol >= 0 && weightCol >= 0)
+                    return r;
+            }
+
+            return -1;
+        }
+
+        private static int FindAssemblySummaryDataRow(
+            TableDiagnosticInfo table,
+            int headerRow,
+            string expectedGoban)
+        {
+            if (table == null || headerRow < 0)
+                return -1;
+
+            int gobanCol = FindTableHeaderColumn(table, "合番", headerRow);
+            int qtyCol = FindTableHeaderColumn(table, "数量", headerRow);
+
+            if (gobanCol < 0 && qtyCol < 0)
+                return -1;
+
+            string normalizedExpected = NormalizeGobanToken(expectedGoban);
+            int firstDataRow = -1;
+
+            for (int r = headerRow + 1; r < table.RowCount; r++)
+            {
+                string goban =
+                    gobanCol >= 0
+                        ? CleanTableCellText(GetTableCellText(table, r, gobanCol))
+                        : "";
+
+                string qty =
+                    qtyCol >= 0
+                        ? CleanTableCellText(GetTableCellText(table, r, qtyCol))
+                        : "";
+
+                if (string.IsNullOrWhiteSpace(goban) &&
+                    string.IsNullOrWhiteSpace(qty))
+                {
+                    if (firstDataRow >= 0)
+                        break;
+
+                    continue;
+                }
+
+                if (firstDataRow < 0)
+                    firstDataRow = r;
+
+                if (!string.IsNullOrWhiteSpace(normalizedExpected) &&
+                    string.Equals(
+                        NormalizeGobanToken(goban),
+                        normalizedExpected,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return r;
+                }
+            }
+
+            return firstDataRow;
+        }
+
         private static int FindTableHeaderColumn(
             TableDiagnosticInfo table,
+            string logicalName,
+            int headerRow)
+        {
+            return FindHeaderColumnInRow(
+                table,
+                headerRow,
+                logicalName);
+        }
+
+        private static int FindHeaderColumnInRow(
+            TableDiagnosticInfo table,
+            int row,
             string logicalName)
         {
             if (table == null ||
+                row < 0 ||
+                row >= table.RowCount ||
                 string.IsNullOrWhiteSpace(logicalName))
             {
                 return -1;
@@ -2677,20 +3522,56 @@ namespace ADDIN.Commands
                     CleanTableCellText(
                         GetTableCellText(
                             table,
-                            0,
+                            row,
                             c));
 
-                if (string.Equals(
-                        NormalizeText(header),
-                        NormalizeText(logicalName),
-                        StringComparison.OrdinalIgnoreCase))
-                {
+                if (HeaderMatchesLogicalName(header, logicalName))
                     return c;
-                }
             }
 
             return -1;
         }
+
+        private static bool HeaderMatchesLogicalName(
+            string header,
+            string logicalName)
+        {
+            string h = NormalizeText(header ?? "")
+                .Replace(" ", "")
+                .Replace("　", "")
+                .Trim();
+
+            string target = NormalizeText(logicalName ?? "")
+                .Replace(" ", "")
+                .Replace("　", "")
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(h) ||
+                string.IsNullOrWhiteSpace(target))
+            {
+                return false;
+            }
+
+            if (string.Equals(
+                    h,
+                    target,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // Một số template ghi "重量/ユニット" hoặc thêm đơn vị vào header.
+            if ((target == "重量" || target == "数量" || target == "合番") &&
+                h.IndexOf(target, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+
+
 
         private static TableCellDiagnosticInfo FindTableCell(
             TableDiagnosticInfo table,
@@ -2903,7 +3784,8 @@ namespace ADDIN.Commands
             string drawingValue,
             string assemblyValue)
         {
-            if (string.Equals(logicalName, "板厚", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(logicalName, "板厚", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase))
             {
                 string d = Regex.Replace(drawingValue ?? "", @"[tTmM\s]", "").Trim();
                 string a = Regex.Replace(assemblyValue ?? "", @"[tTmM\s]", "").Trim();
@@ -2924,6 +3806,50 @@ namespace ADDIN.Commands
                 normDrawing,
                 normAssembly,
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void ApplyAssemblyMassLinkAudit(
+            DrawingCheckItemResult itemResult,
+            ModelDoc2 assemblyModel,
+            string configurationName)
+        {
+            if (itemResult == null || assemblyModel == null)
+                return;
+
+            ModelPropertyLinkAudit audit = ReadModelPropertyLinkAudit(
+                assemblyModel,
+                configurationName,
+                "重量");
+
+            if (audit == null || !audit.Exists || audit.IsLinked)
+                return;
+
+            DrawingBomFieldResult massField = null;
+            foreach (DrawingBomFieldResult field in itemResult.Fields)
+            {
+                if (field != null &&
+                    string.Equals(field.FieldName, "ASM:重量", StringComparison.OrdinalIgnoreCase))
+                {
+                    massField = field;
+                    break;
+                }
+            }
+
+            if (massField == null)
+            {
+                massField = new DrawingBomFieldResult
+                {
+                    FieldName = "ASM:重量",
+                    DrawingValue = "(Không đọc được từ Drawing)",
+                    BomValue = string.IsNullOrWhiteSpace(audit.ResolvedValue)
+                        ? audit.RawExpression
+                        : audit.ResolvedValue,
+                    Status = DrawingBomCheckStatus.OK
+                };
+                itemResult.Fields.Add(massField);
+            }
+
+            ApplyRequiredPropertyLinkAudit(massField, audit);
         }
 
         private static void AttachAssemblyDrawingLocations(
@@ -3165,7 +4091,8 @@ namespace ADDIN.Commands
             ref string jobNo,
             ref string tehaiNo,
             ref string siteName,
-            ref string productName)
+            ref string productName,
+            Dictionary<string, ModelPropertyLinkAudit> propertyLinkAudits)
         {
             if (row != null && row.DataGridView != null)
             {
@@ -3194,6 +4121,12 @@ namespace ADDIN.Commands
                             if (compModel != null)
                             {
                                 string cfg = comp.ReferencedConfiguration ?? "";
+
+                                CaptureRequiredPropertyLinkAudits(
+                                    compModel,
+                                    cfg,
+                                    propertyLinkAudits);
+
                                 if (string.IsNullOrWhiteSpace(w)) w = GetModelCustomProperty(compModel, cfg, "W");
                                 if (string.IsNullOrWhiteSpace(l)) l = GetModelCustomProperty(compModel, cfg, "L");
                                 if (string.IsNullOrWhiteSpace(material)) material = GetModelCustomProperty(compModel, cfg, "材質");
@@ -3224,6 +4157,151 @@ namespace ADDIN.Commands
                     if (string.IsNullOrWhiteSpace(jobNo)) jobNo = GetModelCustomProperty(activeDoc, "", "工事番号");
                 }
             }
+        }
+
+        private static void CaptureRequiredPropertyLinkAudits(
+            ModelDoc2 model,
+            string configurationName,
+            Dictionary<string, ModelPropertyLinkAudit> audits)
+        {
+            if (model == null || audits == null)
+                return;
+
+            string[] requiredProperties = { "W", "L", "材質", "板厚" };
+            foreach (string propertyName in requiredProperties)
+            {
+                ModelPropertyLinkAudit audit = ReadModelPropertyLinkAudit(
+                    model,
+                    configurationName,
+                    propertyName);
+
+                ModelPropertyLinkAudit current;
+                bool hasCurrent = audits.TryGetValue(propertyName, out current);
+                if (audit != null && audit.Exists &&
+                    (!hasCurrent || (current.IsLinked && !audit.IsLinked)))
+                {
+                    audits[propertyName] = audit;
+                }
+            }
+        }
+
+        private static ModelPropertyLinkAudit ReadModelPropertyLinkAudit(
+            ModelDoc2 model,
+            string configurationName,
+            string propertyName)
+        {
+            ModelPropertyLinkAudit audit = ReadModelPropertyLinkAuditAtScope(
+                model,
+                configurationName ?? "",
+                propertyName);
+
+            if (audit != null && audit.Exists)
+                return audit;
+
+            if (!string.IsNullOrWhiteSpace(configurationName))
+                return ReadModelPropertyLinkAuditAtScope(model, "", propertyName);
+
+            return audit;
+        }
+
+        private static ModelPropertyLinkAudit ReadModelPropertyLinkAuditAtScope(
+            ModelDoc2 model,
+            string scope,
+            string propertyName)
+        {
+            ModelPropertyLinkAudit audit = new ModelPropertyLinkAudit
+            {
+                PropertyName = propertyName,
+                Scope = string.IsNullOrWhiteSpace(scope) ? "DOCUMENT" : "CONFIG:" + scope
+            };
+
+            if (model == null || string.IsNullOrWhiteSpace(propertyName))
+                return audit;
+
+            try
+            {
+                CustomPropertyManager manager =
+                    model.Extension.get_CustomPropertyManager(scope ?? "");
+
+                string raw;
+                string resolved;
+                bool wasResolved;
+                bool linkedToParent;
+                int getResult = manager.Get6(
+                    propertyName,
+                    false,
+                    out raw,
+                    out resolved,
+                    out wasResolved,
+                    out linkedToParent);
+
+                audit.RawExpression = raw ?? "";
+                audit.ResolvedValue = resolved ?? "";
+                audit.Exists = getResult ==
+                    (int)swCustomInfoGetResult_e.swCustomInfoGetResult_ResolvedValue;
+
+                if (!audit.Exists)
+                {
+                    audit.Exists =
+                        !string.IsNullOrWhiteSpace(audit.RawExpression) ||
+                        !string.IsNullOrWhiteSpace(audit.ResolvedValue);
+                }
+
+                audit.IsLinked =
+                    audit.Exists &&
+                    (linkedToParent ||
+                     LooksLikePropertyExpression(audit.RawExpression));
+            }
+            catch (Exception ex)
+            {
+                LogDebug(
+                    "[PROPERTY LINK AUDIT ERROR] property=\"" + propertyName +
+                    "\" scope=\"" + audit.Scope + "\" error=" + ex.Message);
+            }
+
+            return audit;
+        }
+
+        private static bool LooksLikePropertyExpression(string rawValue)
+        {
+            string raw = (rawValue ?? "").Trim();
+            if (raw.Length == 0)
+                return false;
+
+            return raw.IndexOf("$PRP", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   raw.IndexOf("$PRPSHEET", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   raw.IndexOf("$PRPMODEL", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   raw.IndexOf("SW-", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   (raw.IndexOf('@') >= 0 && raw.IndexOf('"') >= 0);
+        }
+
+        /// <summary>
+        /// Helper đọc số lượng từ Custom Property của 3D model.
+        /// LƯU Ý: CHECK DRAWING không còn dùng helper này làm nguồn chuẩn 数量.
+        /// Nguồn chuẩn của 数量 cho cả COMPONENT và UNIT là SolidWorks BOM row.
+        /// Giữ helper để tương thích với các logic khác nếu cần.
+        /// </summary>
+        private static string GetModelQuantityProperty(ModelDoc2 model, string configurationName)
+        {
+            if (model == null)
+                return "";
+
+            string quantity =
+                GetModelCustomProperty(
+                    model,
+                    configurationName,
+                    "数量");
+
+            if (string.IsNullOrWhiteSpace(quantity))
+            {
+                quantity =
+                    GetModelCustomProperty(
+                        model,
+                        configurationName,
+                        "Qty");
+            }
+
+            return (quantity ?? "").Trim();
         }
 
         private static string GetModelCustomProperty(ModelDoc2 model, string configurationName, string propName)
@@ -3396,6 +4474,53 @@ namespace ADDIN.Commands
             return directories;
         }
 
+        private void RefreshDrawingBeforeCheck(
+            ModelDoc2 drawingModel,
+            DrawingDoc drawing,
+            string sheetName)
+        {
+            if (drawingModel == null)
+                return;
+
+            try
+            {
+                // Bảo đảm đúng sheet đang được kiểm tra là active trước rebuild.
+                if (drawing != null &&
+                    !string.IsNullOrWhiteSpace(sheetName))
+                {
+                    try
+                    {
+                        drawing.ActivateSheet(sheetName);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                drawingModel.ForceRebuild3(false);
+
+                try
+                {
+                    drawingModel.GraphicsRedraw2();
+                }
+                catch
+                {
+                }
+
+                LogDebug(
+                    $"[DRAWING REFRESH] sheet=\"{sheetName}\" " +
+                    "ForceRebuild3=DONE");
+            }
+            catch (Exception ex)
+            {
+                // Không dừng batch chỉ vì rebuild thất bại.
+                // Scanner vẫn tiếp tục đọc dữ liệu hiện có và log sẽ cho biết.
+                LogDebug(
+                    $"[DRAWING REFRESH WARNING] sheet=\"{sheetName}\" " +
+                    $"message=\"{ex.Message}\"");
+            }
+        }
+
         private ModelDoc2 OpenDrawingDocumentSilent(string drawingPath, out bool openedByCommand)
         {
             openedByCommand = false;
@@ -3447,7 +4572,8 @@ namespace ADDIN.Commands
 
         private List<NoteDiagnosticInfo> ScanCurrentSheetNotes(
             DrawingDoc drawing,
-            string targetSheetName)
+            string targetSheetName,
+            SheetFrameBounds frameBounds)
         {
             List<NoteDiagnosticInfo> result =
                 new List<NoteDiagnosticInfo>();
@@ -3460,6 +4586,7 @@ namespace ADDIN.Commands
                     StringComparer.OrdinalIgnoreCase);
 
             int noteCounter = 1;
+            int outsideFrameSkipped = 0;
 
             // PASS 1:
             // Normal notes owned by Drawing Views / Sheet View.
@@ -3500,10 +4627,14 @@ namespace ADDIN.Commands
                                             targetSheetName,
                                             noteCounter);
 
-                                    if (TryAddUniqueNote(
-                                            result,
-                                            seen,
-                                            info))
+                                    if (!IsNoteInsideFrame(info, frameBounds))
+                                    {
+                                        outsideFrameSkipped++;
+                                    }
+                                    else if (TryAddUniqueNote(
+                                                 result,
+                                                 seen,
+                                                 info))
                                     {
                                         noteCounter++;
                                     }
@@ -3563,10 +4694,14 @@ namespace ADDIN.Commands
                                         targetSheetName,
                                         noteCounter);
 
-                                if (TryAddUniqueNote(
-                                        result,
-                                        seen,
-                                        info))
+                                if (!IsNoteInsideFrame(info, frameBounds))
+                                {
+                                    outsideFrameSkipped++;
+                                }
+                                else if (TryAddUniqueNote(
+                                             result,
+                                             seen,
+                                             info))
                                 {
                                     noteCounter++;
                                 }
@@ -3596,7 +4731,7 @@ namespace ADDIN.Commands
             LogDebug(
                 $"[NOTE SCAN] sheet=\"" +
                 $"{(string.IsNullOrWhiteSpace(targetSheetName) ? "<ALL_VIEWS>" : targetSheetName)}\" " +
-                $"count={result.Count}");
+                $"count={result.Count} outsideFrameSkipped={outsideFrameSkipped}");
 
             return result;
         }
@@ -3654,6 +4789,7 @@ namespace ADDIN.Commands
 
             double x = 0;
             double y = 0;
+            bool hasPosition = false;
             string annName = "";
 
             if (ann != null)
@@ -3666,26 +4802,17 @@ namespace ADDIN.Commands
                     {
                         x = pos[0];
                         y = pos[1];
+                        hasPosition = true;
                     }
                 }
                 catch { }
             }
 
+            // Không dùng dynamic IsBomBalloon()/IsBalloon() ở đây.
+            // Một số phiên bản SOLIDWORKS Interop không expose các member này
+            // qua runtime binder và tạo hàng loạt RuntimeBinderException trong Output.
+            // Type chỉ dùng cho diagnostic, không ảnh hưởng logic kiểm tra.
             string objType = "Note";
-            try
-            {
-                bool isBalloon = false;
-                try { isBalloon = ((dynamic)note).IsBomBalloon(); }
-                catch { }
-                if (!isBalloon)
-                {
-                    try { isBalloon = ((dynamic)note).IsBalloon(); }
-                    catch { }
-                }
-                if (isBalloon)
-                    objType = "Balloon Note";
-            }
-            catch { }
 
             string source = "MANUAL_OR_STATIC";
             if (!string.IsNullOrEmpty(rawText) &&
@@ -3709,6 +4836,7 @@ namespace ADDIN.Commands
                 DisplayedText = displayedText,
                 RawText = rawText,
                 Source = source,
+                HasPosition = hasPosition,
                 X = x,
                 Y = y
             };
@@ -3763,7 +4891,8 @@ namespace ADDIN.Commands
         private List<TableDiagnosticInfo> ScanCurrentSheetTables(
             DrawingDoc drawing,
             string targetSheetName,
-            ModelDoc2 drawingModel)
+            ModelDoc2 drawingModel,
+            SheetFrameBounds frameBounds)
         {
             List<TableDiagnosticInfo> result = new List<TableDiagnosticInfo>();
             HashSet<ITableAnnotation> visited = new HashSet<ITableAnnotation>();
@@ -3791,7 +4920,13 @@ namespace ADDIN.Commands
                                     ITableAnnotation table = obj as ITableAnnotation;
                                     if (table != null && visited.Add(table))
                                     {
-                                        TableDiagnosticInfo info = ExtractTableInfo(table, viewName, targetSheetName, tableCounter, drawingModel);
+                                        TableDiagnosticInfo info = ExtractTableInfo(
+                                            table,
+                                            viewName,
+                                            targetSheetName,
+                                            tableCounter,
+                                            drawingModel,
+                                            frameBounds);
                                         if (info != null)
                                         {
                                             result.Add(info);
@@ -3811,12 +4946,57 @@ namespace ADDIN.Commands
             return result;
         }
 
+        private static string ResolveLinkedTableProperty(
+            ModelDoc2 drawingModel,
+            string rawExpression,
+            string propertyName)
+        {
+            if (drawingModel == null ||
+                string.IsNullOrWhiteSpace(propertyName))
+            {
+                return "";
+            }
+
+            string raw = rawExpression ?? "";
+
+            // $PRP:"..." thường là property của chính Drawing document.
+            // Thử Drawing trước, rồi mới fallback sang model được Drawing tham chiếu.
+            if (raw.IndexOf("$PRP:", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                raw.IndexOf("$PRPSHEET", StringComparison.OrdinalIgnoreCase) < 0 &&
+                raw.IndexOf("$PRPMODEL", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                string drawingValue =
+                    GetModelCustomProperty(
+                        drawingModel,
+                        "",
+                        propertyName);
+
+                if (!string.IsNullOrWhiteSpace(drawingValue))
+                    return drawingValue;
+            }
+
+            DrawingDoc drawing = drawingModel as DrawingDoc;
+            if (drawing != null)
+            {
+                string referencedValue =
+                    ResolvePropertyFromDrawingViews(
+                        drawing,
+                        propertyName);
+
+                if (!string.IsNullOrWhiteSpace(referencedValue))
+                    return referencedValue;
+            }
+
+            return "";
+        }
+
         private TableDiagnosticInfo ExtractTableInfo(
             ITableAnnotation table,
             string viewName,
             string sheetName,
             int index,
-            ModelDoc2 drawingModel)
+            ModelDoc2 drawingModel,
+            SheetFrameBounds frameBounds)
         {
             if (table == null)
                 return null;
@@ -3830,6 +5010,7 @@ namespace ADDIN.Commands
 
                 double tableX = 0.0;
                 double tableY = 0.0;
+                bool tableHasPosition = false;
 
                 try
                 {
@@ -3840,10 +5021,47 @@ namespace ADDIN.Commands
                     {
                         tableX = pos[0];
                         tableY = pos[1];
+                        tableHasPosition = true;
                     }
                 }
                 catch
                 {
+                }
+
+                // IMPORTANT — FRAME FILTER FOR TABLES:
+                // Annotation.GetPosition() là ANCHOR của bảng, không bảo đảm là góc trái-trên.
+                // Nếu tự cộng/trừ width/height để suy ra tâm từng cell, bảng neo BottomRight/TopRight
+                // có thể bị tính X/Y ra ngoài Sheet dù bảng đang nằm hoàn toàn trong khung.
+                // Vì vậy phạm vi Sheet của TABLE được quyết định bằng chính anchor của table.
+                // X/Y của từng cell chỉ dùng cho navigation và cũng fallback về anchor,
+                // KHÔNG dùng để quyết định cell có nằm trong khung hay không.
+                if (frameBounds != null && frameBounds.IsValid)
+                {
+                    if (tableHasPosition)
+                    {
+                        bool tableAnchorInside =
+                            frameBounds.Contains(tableX, tableY);
+
+                        LogDebug(
+                            $"[TABLE FRAME] table={index} " +
+                            $"anchorX={tableX:F6} anchorY={tableY:F6} " +
+                            $"inside={tableAnchorInside} rows={rowCount} cols={colCount}");
+
+                        if (!tableAnchorInside)
+                        {
+                            LogDebug(
+                                $"[TABLE FRAME FILTER] table={index} " +
+                                "SKIP_TABLE reason=ANCHOR_OUTSIDE_SHEET");
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        // Không có position thì không được tự loại bảng, tránh false NG.
+                        LogDebug(
+                            $"[TABLE FRAME WARNING] table={index} " +
+                            "không đọc được anchor; giữ bảng để tránh false NG.");
+                    }
                 }
 
                 TableDiagnosticInfo tableInfo = new TableDiagnosticInfo
@@ -3854,6 +5072,7 @@ namespace ADDIN.Commands
                     SheetName = sheetName,
                     RowCount = rowCount,
                     ColumnCount = colCount,
+                    HasPosition = tableHasPosition,
                     X = tableX,
                     Y = tableY
                 };
@@ -3862,87 +5081,91 @@ namespace ADDIN.Commands
                 {
                     for (int c = 0; c < colCount; c++)
                     {
+                        // IMPORTANT:
+                        // Do not trust get_DisplayedText2() as the only source.
+                        // In linked General Tables SOLIDWORKS can return a stale cached
+                        // displayed value (for example 数量=1) even while the drawing
+                        // visibly shows the current linked value (for example 数量=2).
+                        // Always inspect the raw cell expression first.  If the cell is
+                        // linked with $PRP/$PRPSHEET/$PRPMODEL, resolve that property
+                        // directly from the drawing's referenced model.
+                        string apiDisplayedText = "";
+                        string apiDisplayedTextWithHidden = "";
+                        string rawText = "";
                         string displayText = "";
-                        try { displayText = table.get_DisplayedText2(r, c, false); } catch { }
-                        if (string.IsNullOrWhiteSpace(displayText) || displayText.StartsWith("$PRP"))
-                        {
-                            try { displayText = table.get_Text(r, c) ?? ""; } catch { }
-                        }
+                        string valueSource = "DISPLAYED_TEXT2";
 
-                        if (!string.IsNullOrWhiteSpace(displayText) && displayText.StartsWith("$PRP"))
+                        try { apiDisplayedText = table.get_DisplayedText2(r, c, false) ?? ""; } catch { }
+                        try { apiDisplayedTextWithHidden = table.get_DisplayedText2(r, c, true) ?? ""; } catch { }
+                        try { rawText = table.get_Text(r, c) ?? ""; } catch { }
+
+                        displayText = apiDisplayedText;
+
+                        Match linkedPropertyMatch = Regex.Match(
+                            rawText ?? "",
+                            @"\$PRP(?:SHEET|MODEL)?\s*:\s*""([^""]+)""",
+                            RegexOptions.IgnoreCase);
+
+                        if (linkedPropertyMatch.Success)
                         {
-                            Match m = Regex.Match(displayText, @"\$PRP(?:SHEET|MODEL)?:\s*""([^""]+)""");
-                            if (m.Success)
+                            string propName =
+                                (linkedPropertyMatch.Groups[1].Value ?? "").Trim();
+
+                            string resolved =
+                                ResolveLinkedTableProperty(
+                                    drawingModel,
+                                    rawText,
+                                    propName);
+
+                            if (!string.IsNullOrWhiteSpace(resolved))
                             {
-                                string propName = m.Groups[1].Value;
-                                string resolved = ResolvePropertyFromDrawingViews(drawingModel as DrawingDoc, propName);
-                                if (!string.IsNullOrWhiteSpace(resolved))
-                                    displayText = resolved;
+                                displayText = resolved;
+                                valueSource = "LINK_RESOLVED";
                             }
                         }
+                        else if (!string.IsNullOrWhiteSpace(rawText) &&
+                                 !rawText.TrimStart().StartsWith("$", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Static/general-table text: the raw cell text is the source of truth.
+                            displayText = rawText;
+                            valueSource = "RAW_TEXT";
+                        }
 
+                        if (string.IsNullOrWhiteSpace(displayText) &&
+                            !string.IsNullOrWhiteSpace(apiDisplayedTextWithHidden))
+                        {
+                            displayText = apiDisplayedTextWithHidden;
+                            valueSource = "DISPLAYED_TEXT2_INCLUDE_HIDDEN";
+                        }
+
+                        // Không suy diễn vị trí cell từ table anchor.
+                        // AnchorType của SolidWorks có thể là TopLeft/TopRight/BottomLeft/BottomRight;
+                        // phép cộng/trừ width/height cũ làm sai tọa độ và loại nhầm toàn bộ table.
+                        // Dùng anchor làm vị trí navigation ổn định cho mọi cell.
                         double cellX = tableX;
                         double cellY = tableY;
-
-                        try
-                        {
-                            dynamic dynTable = table;
-
-                            double xOffset = 0.0;
-                            for (int cc = 0; cc < c; cc++)
-                            {
-                                xOffset += Convert.ToDouble(
-                                    dynTable.GetColumnWidth(cc),
-                                    CultureInfo.InvariantCulture);
-                            }
-
-                            double columnWidth =
-                                Convert.ToDouble(
-                                    dynTable.GetColumnWidth(c),
-                                    CultureInfo.InvariantCulture);
-
-                            double yOffset = 0.0;
-                            for (int rr = 0; rr < r; rr++)
-                            {
-                                yOffset += Convert.ToDouble(
-                                    dynTable.GetRowHeight(rr),
-                                    CultureInfo.InvariantCulture);
-                            }
-
-                            double rowHeight =
-                                Convert.ToDouble(
-                                    dynTable.GetRowHeight(r),
-                                    CultureInfo.InvariantCulture);
-
-                            // Best effort: Annotation.GetPosition() is used as
-                            // the table insertion point. For normal general tables
-                            // this gives a useful center position per cell.
-                            cellX =
-                                tableX +
-                                xOffset +
-                                (columnWidth / 2.0);
-
-                            cellY =
-                                tableY -
-                                yOffset -
-                                (rowHeight / 2.0);
-                        }
-                        catch
-                        {
-                            // Fallback to table annotation position.
-                            cellX = tableX;
-                            cellY = tableY;
-                        }
 
                         tableInfo.Cells.Add(new TableCellDiagnosticInfo
                         {
                             Row = r,
                             Column = c,
                             DisplayedText = displayText,
+                            ApiDisplayedText = apiDisplayedText,
+                            ApiDisplayedTextWithHidden = apiDisplayedTextWithHidden,
+                            RawText = rawText,
+                            ValueSource = valueSource,
                             X = cellX,
                             Y = cellY
                         });
                     }
+                }
+
+                if (frameBounds != null && frameBounds.IsValid)
+                {
+                    LogDebug(
+                        $"[TABLE FRAME RESULT] table={index} " +
+                        $"keptCells={tableInfo.Cells.Count} " +
+                        $"anchorX={tableX:F6} anchorY={tableY:F6}");
                 }
 
                 return tableInfo;
@@ -3950,6 +5173,125 @@ namespace ADDIN.Commands
             catch
             {
                 return null;
+            }
+        }
+
+        private static bool IsNoteInsideFrame(
+            NoteDiagnosticInfo info,
+            SheetFrameBounds frameBounds)
+        {
+            if (info == null)
+                return false;
+
+            if (frameBounds == null || !frameBounds.IsValid)
+                return true;
+
+            if (!info.HasPosition)
+                return false;
+
+            return frameBounds.Contains(info.X, info.Y);
+        }
+
+        private static SheetFrameBounds ResolveSheetFrameBounds(Sheet sheet)
+        {
+            SheetFrameBounds bounds = new SheetFrameBounds();
+            if (sheet == null)
+                return bounds;
+
+            double width = 0.0;
+            double height = 0.0;
+
+            try
+            {
+                dynamic dynSheet = sheet;
+                int paperSize = 0;
+                double w = 0.0;
+                double h = 0.0;
+                dynSheet.GetSize(ref paperSize, ref w, ref h);
+
+                if (w > 0.0 && h > 0.0)
+                {
+                    width = w;
+                    height = h;
+                    bounds.Source = "ISheet.GetSize";
+                }
+            }
+            catch
+            {
+            }
+
+            if (width <= 0.0 || height <= 0.0)
+            {
+                object propsObj = null;
+                try
+                {
+                    dynamic dynSheet = sheet;
+                    propsObj = dynSheet.GetProperties2();
+                    bounds.Source = "ISheet.GetProperties2";
+                }
+                catch
+                {
+                    try
+                    {
+                        dynamic dynSheet = sheet;
+                        propsObj = dynSheet.GetProperties();
+                        bounds.Source = "ISheet.GetProperties";
+                    }
+                    catch
+                    {
+                        propsObj = null;
+                    }
+                }
+
+                try
+                {
+                    if (propsObj is double[] d && d.Length >= 7)
+                    {
+                        width = d[5];
+                        height = d[6];
+                    }
+                    else if (propsObj is object[] o && o.Length >= 7)
+                    {
+                        width = Convert.ToDouble(o[5], CultureInfo.InvariantCulture);
+                        height = Convert.ToDouble(o[6], CultureInfo.InvariantCulture);
+                    }
+                }
+                catch
+                {
+                    width = 0.0;
+                    height = 0.0;
+                }
+            }
+
+            if (width > 0.0 && height > 0.0)
+            {
+                bounds.IsValid = true;
+                bounds.MinX = 0.0;
+                bounds.MinY = 0.0;
+                bounds.MaxX = width;
+                bounds.MaxY = height;
+            }
+
+            return bounds;
+        }
+
+        private static void LogSheetFrameBounds(
+            string sheetName,
+            SheetFrameBounds bounds)
+        {
+            if (bounds != null && bounds.IsValid)
+            {
+                LogDebug(
+                    $"[SHEET FRAME] sheet=\"{sheetName}\" " +
+                    $"X=[{bounds.MinX:F6},{bounds.MaxX:F6}] " +
+                    $"Y=[{bounds.MinY:F6},{bounds.MaxY:F6}] " +
+                    $"source={bounds.Source}");
+            }
+            else
+            {
+                LogDebug(
+                    $"[SHEET FRAME WARNING] sheet=\"{sheetName}\" " +
+                    "không đọc được kích thước Sheet; frame filter được bỏ qua để tránh false NG.");
             }
         }
 
@@ -4078,6 +5420,67 @@ namespace ADDIN.Commands
             string s = text.Replace('\u3000', ' ').Trim();
             s = Regex.Replace(s, @"\s+", " ");
             return s;
+        }
+
+        /// <summary>
+        /// 数量 nguồn chuẩn cho cả COMPONENT và UNIT:
+        /// lấy trực tiếp từ đúng dòng DataGridView đã được SolidWorks BOM list ra.
+        /// Ưu tiên nhận diện cột bằng HeaderText; fallback index 4 để tương thích
+        /// layout grid hiện tại: [0]=select, [1]=部品番号, [2]=材質,
+        /// [3]=板厚, [4]=数量, [5]=file name.
+        /// </summary>
+        private static string GetBomQuantityFromRow(DataGridViewRow row)
+        {
+            if (row == null)
+                return "";
+
+            try
+            {
+                DataGridView grid = row.DataGridView;
+                if (grid != null)
+                {
+                    foreach (DataGridViewColumn column in grid.Columns)
+                    {
+                        if (column == null)
+                            continue;
+
+                        string header =
+                            NormalizeText(column.HeaderText ?? "")
+                            .Replace(" ", "")
+                            .Trim();
+
+                        if (string.Equals(header, "数量", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(header, "Qty", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(header, "QTY", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(header, "Quantity", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return GetCellText(row, column.Index);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            // Fallback cho layout BOM grid hiện tại.
+            if (row.Cells != null && row.Cells.Count > 4)
+                return GetCellText(row, 4);
+
+            return "";
+        }
+
+        private static bool IsBomQuantityPropertyName(string propertyName)
+        {
+            string n =
+                NormalizeText(propertyName ?? "")
+                .Replace(" ", "")
+                .Trim();
+
+            return string.Equals(n, "数量", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(n, "Qty", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(n, "QTY", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(n, "Quantity", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string GetCellText(DataGridViewRow row, int colIndex)
@@ -4944,6 +6347,7 @@ namespace ADDIN.Commands
             public string DisplayedText { get; set; }
             public string RawText { get; set; }
             public string Source { get; set; }
+            public bool HasPosition { get; set; }
             public double X { get; set; }
             public double Y { get; set; }
         }
@@ -4956,6 +6360,7 @@ namespace ADDIN.Commands
             public string SheetName { get; set; }
             public int RowCount { get; set; }
             public int ColumnCount { get; set; }
+            public bool HasPosition { get; set; }
             public double X { get; set; }
             public double Y { get; set; }
             public List<TableCellDiagnosticInfo> Cells { get; } = new List<TableCellDiagnosticInfo>();
@@ -4965,7 +6370,16 @@ namespace ADDIN.Commands
         {
             public int Row { get; set; }
             public int Column { get; set; }
+
+            // Effective value used by the checker.
             public string DisplayedText { get; set; }
+
+            // Diagnostic values returned directly by the SOLIDWORKS table API.
+            public string ApiDisplayedText { get; set; }
+            public string ApiDisplayedTextWithHidden { get; set; }
+            public string RawText { get; set; }
+            public string ValueSource { get; set; }
+
             public double X { get; set; }
             public double Y { get; set; }
         }

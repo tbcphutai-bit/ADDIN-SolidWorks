@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
@@ -11,6 +12,9 @@ namespace ADDIN.Commands
         private class BendInfo
         {
             public object Geometry;
+            // Persistent reference dung de lay lai dung entity sau khi Drawing View refresh/rebuild.
+            // Neu SolidWorks khong ho tro persist ref cho entity nay thi se tu dong fallback
+            // sang tim lai theo hinh hoc, khong lam thay doi logic DIM.
             public bool IsEdge;
             public double AngleGroup;
             public double SortKey;
@@ -40,7 +44,7 @@ namespace ADDIN.Commands
 
         public void GenerateKegakiDimensions()
         {
-            string currentStep = "[00] Khoi tao";
+            string currentStep = "[00] ActiveDoc";
             ModelDoc2 model = null;
             bool undoStarted = false;
 
@@ -54,6 +58,7 @@ namespace ADDIN.Commands
                     return;
                 }
 
+                currentStep = "[01] Lay Drawing View";
                 SelectionMgr selMgr = model.SelectionManager as SelectionMgr;
                 SolidWorks.Interop.sldworks.View view = GetSelectedDrawingView(selMgr);
 
@@ -63,27 +68,61 @@ namespace ADDIN.Commands
                     return;
                 }
 
+                // Giu lai ten View de co the lay lai COM object moi sau cac thao tac
+                // co kha nang lam SolidWorks refresh/rebuild Drawing View.
+                string selectedViewName = SafeGetViewName(view);
+
+                currentStep = "[02] Bat dau Undo";
                 model.Extension.StartRecordingUndoObject();
                 undoStarted = true;
 
+                currentStep = "[03] Xoa DIM cu";
                 DeleteAllDimensionsInView(model, view);
 
+                // Xoa annotation co the lam View refresh. Lay lai View theo ten de tranh
+                // tiep tuc dung COM proxy cu.
+                DrawingDoc drawing = model as DrawingDoc;
+                view = ReacquireViewByName(drawing, selectedViewName) ?? view;
+
+                currentStep = "[04] Hien Bend-Line va BBox";
+                // ShowSketchFromTree co ClearSelection/UnblankSketch va co the lam drawing
+                // refresh. Hien tat ca sketch truoc, sau do moi lay geometry.
+                ShowSketchFromTree(model, "ﾍﾞﾝﾄﾞ-ﾗｲﾝ", "ベンド-ライン", "Bend-Line");
+                Feature boundingBoxFeature =
+                    ShowSketchFromTree(model, "境界ﾎﾞｯｸｽ", "境界ボックス", "Bounding-Box");
+
+                // Dua Drawing ve trang thai rebuild on dinh TRUOC KHI lay Bend-Line.
+                // Muc dich la de DIM bam vao entity cua lan rebuild hien tai, thay vi bam vao
+                // SketchSegment tam vua bi SolidWorks thay the. Khong thay doi hinh hoc/logic DIM.
+                currentStep = "[05] Rebuild View truoc khi lay reference";
+                try
+                {
+                    model.ForceRebuild3(false);
+                }
+                catch (COMException)
+                {
+                    // Neu SolidWorks dang ban, tiep tuc bang view hien tai; cac ham select
+                    // phia duoi van co co che reacquire entity.
+                }
+
+                // Rebuild co the thay COM proxy cua View/Feature, nen bat buoc lay lai.
+                view = ReacquireViewByName(drawing, selectedViewName) ?? view;
+                boundingBoxFeature = FindFeatureFromTree(
+                    model,
+                    "境界ﾎﾞｯｸｽ", "境界ボックス", "Bounding-Box");
+
+                currentStep = "[06] Lay Transform";
                 MathUtility mathUtil = swApp.IGetMathUtility();
                 MathTransform viewTransform = view.ModelToViewTransform;
                 if (mathUtil == null || viewTransform == null)
                     return;
 
-                currentStep = "[01] Lay duong chan va BBox";
+                currentStep = "[07] Lay Bend-Line va BBox";
                 List<BendInfo> bends = new List<BendInfo>();
-
-                ShowSketchFromTree(model, "ﾍﾞﾝﾄﾞ-ﾗｲﾝ", "ベンド-ライン", "Bend-Line");
                 AddBendLines(view.GetBendLines(), mathUtil, viewTransform, false, bends);
 
                 List<BendInfo> outerEdges = GetOuterVisibleEdges(view, mathUtil, viewTransform);
                 bends.AddRange(outerEdges);
-
-                Feature boundingBoxFeature =
-                    ShowSketchFromTree(model, "境界ﾎﾞｯｸｽ", "境界ボックス", "Bounding-Box");
 
                 List<BendInfo> boundingBoxLines = new List<BendInfo>();
                 if (boundingBoxFeature != null)
@@ -93,18 +132,18 @@ namespace ADDIN.Commands
                         AddSketchSegments(boundingBoxSketch.GetSketchSegments(), mathUtil, viewTransform, true, boundingBoxLines);
                 }
 
-                SelectData selectData = selMgr.CreateSelectData() as SelectData;
+                currentStep = "[08] Tao SelectData";
+                // SelectionMgr/SelectData cung lay lai sau cac thao tac refresh o tren.
+                selMgr = model.SelectionManager as SelectionMgr;
+                SelectData selectData = selMgr?.CreateSelectData() as SelectData;
                 if (selectData == null)
                     return;
 
                 selectData.View = view;
                 model.ClearSelection2(true);
 
-                DrawingDoc drawing = model as DrawingDoc;
-                Sheet sheet = drawing?.GetCurrentSheet() as Sheet;
-                if (drawing != null && sheet != null)
-                    drawing.ActivateSheet(sheet.GetName());
-
+                // Khong ActivateSheet lai chinh current sheet o day.
+                // ActivateSheet sau khi da lay GetBendLines co the invalidate SketchSegment.
                 if (!HasRealBendLine(bends))
                 {
                     List<BendInfo> overallLines = boundingBoxLines.Count > 0
@@ -119,6 +158,7 @@ namespace ADDIN.Commands
                     if (!TryGetBounds(overallLines, out overallMinX, out overallMaxX, out overallMinY, out overallMaxY))
                         return;
 
+                    currentStep = "[09] Tao DIM Overall";
                     int overallCount = CreateOverallDimensions(
                         model,
                         overallLines,
@@ -142,7 +182,7 @@ namespace ADDIN.Commands
                 if (bends.Count < 2)
                     return;
 
-                currentStep = "[02] Sap xep";
+                currentStep = "[10] Sap xep";
                 bends.Sort(CompareBends);
                 List<BendInfo> chainLines = new List<BendInfo>();
                 foreach (BendInfo bend in bends)
@@ -169,7 +209,7 @@ namespace ADDIN.Commands
                 double centerX = (minX + maxX) / 2.0;
                 double centerY = (minY + maxY) / 2.0;
 
-                currentStep = "[03] Tao DIM";
+                currentStep = "[11] Tao DIM";
                 List<string> createdDistanceKeys = new List<string>();
                 int dimensionCount = CreateDimensions(
                     model,
@@ -210,6 +250,16 @@ namespace ADDIN.Commands
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
+            catch (COMException ex)
+            {
+                MessageBox.Show(
+                    "Loi COM tai buoc: " + currentStep + System.Environment.NewLine +
+                    "HRESULT: 0x" + ex.ErrorCode.ToString("X8") + System.Environment.NewLine +
+                    ex.Message,
+                    "dim kegaki",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
             catch (Exception ex)
             {
                 MessageBox.Show(
@@ -221,7 +271,17 @@ namespace ADDIN.Commands
             finally
             {
                 if (undoStarted && model != null)
-                    model.Extension.FinishRecordingUndoObject("dim kegaki");
+                {
+                    try
+                    {
+                        model.Extension.FinishRecordingUndoObject("dim kegaki");
+                    }
+                    catch (COMException)
+                    {
+                        // Neu document/view vua bi SolidWorks rebuild/disconnect thi khong de
+                        // cleanup Undo che mat loi goc.
+                    }
+                }
             }
         }
 
@@ -255,6 +315,49 @@ namespace ADDIN.Commands
                 0.01);
         }
 
+        private string SafeGetViewName(SolidWorks.Interop.sldworks.View view)
+        {
+            if (view == null)
+                return null;
+
+            try
+            {
+                return view.GetName2();
+            }
+            catch (COMException)
+            {
+                return null;
+            }
+        }
+
+        private SolidWorks.Interop.sldworks.View ReacquireViewByName(
+            DrawingDoc drawing,
+            string viewName)
+        {
+            if (drawing == null || string.IsNullOrEmpty(viewName))
+                return null;
+
+            try
+            {
+                SolidWorks.Interop.sldworks.View current =
+                    drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+
+                while (current != null)
+                {
+                    string currentName = SafeGetViewName(current);
+                    if (string.Equals(currentName, viewName, StringComparison.OrdinalIgnoreCase))
+                        return current;
+
+                    current = current.GetNextView() as SolidWorks.Interop.sldworks.View;
+                }
+            }
+            catch (COMException)
+            {
+            }
+
+            return null;
+        }
+
         private SolidWorks.Interop.sldworks.View GetSelectedDrawingView(SelectionMgr selMgr)
         {
             if (selMgr == null)
@@ -280,25 +383,64 @@ namespace ADDIN.Commands
             ModelDoc2 drawingModel,
             SolidWorks.Interop.sldworks.View view)
         {
-            Array annotations = view.GetAnnotations() as Array;
+            if (drawingModel == null || view == null)
+                return;
+
+            Array annotations;
+            try
+            {
+                annotations = view.GetAnnotations() as Array;
+            }
+            catch (COMException)
+            {
+                return;
+            }
+
             if (annotations == null)
                 return;
+
+            // QUAN TRONG: khong EditDelete() ngay trong luc dang foreach GetAnnotations().
+            // Xoa tung annotation co the lam SolidWorks rebuild collection va lam cac
+            // COM proxy con lai bi RPC_E_DISCONNECTED.
+            drawingModel.ClearSelection2(true);
+            bool hasSelection = false;
 
             foreach (object item in annotations)
             {
                 Annotation annotation = item as Annotation;
-                if (annotation == null ||
-                    annotation.GetType() != (int)swAnnotationType_e.swDisplayDimension)
+                if (annotation == null)
                     continue;
 
-                if (IsHoleRelatedDimension(annotation))
-                    continue;
+                try
+                {
+                    if (annotation.GetType() != (int)swAnnotationType_e.swDisplayDimension)
+                        continue;
 
-                drawingModel.ClearSelection2(true);
-                if (!annotation.Select3(false, null))
-                    continue;
+                    if (IsHoleRelatedDimension(annotation))
+                        continue;
 
-                drawingModel.EditDelete();
+                    if (annotation.Select3(hasSelection, null))
+                        hasSelection = true;
+                }
+                catch (COMException)
+                {
+                    // Annotation da bi SolidWorks invalidate trong luc refresh.
+                    // Bo qua object nay, khong lam thay doi logic chon DIM can xoa.
+                    continue;
+                }
+            }
+
+            if (hasSelection)
+            {
+                try
+                {
+                    // Xoa 1 lan sau khi da ket thuc viec duyet collection.
+                    drawingModel.EditDelete();
+                }
+                catch (COMException)
+                {
+                    // De caller tiep tuc va lay lai View/geometry moi.
+                }
             }
 
             drawingModel.ClearSelection2(true);
@@ -529,7 +671,7 @@ namespace ADDIN.Commands
             double normalX = -Math.Sin(angle);
             double normalY = Math.Cos(angle);
 
-            bends.Add(new BendInfo
+            BendInfo info = new BendInfo
             {
                 Geometry = segment,
                 IsEdge = false,
@@ -547,7 +689,9 @@ namespace ADDIN.Commands
                 EndX = p2[0],
                 EndY = p2[1],
                 Length = length
-            });
+            };
+
+            bends.Add(info);
         }
 
         private int CreateDimensions(
@@ -561,7 +705,6 @@ namespace ADDIN.Commands
             SolidWorks.Interop.sldworks.View view,
             List<string> createdDistanceKeys)
         {
-            double[] shifts = { 0, 0.018, -0.018, 0.036, -0.036, 0.054, -0.054 };
             int dimensionCount = 0;
             int groupStart = 0;
 
@@ -569,86 +712,81 @@ namespace ADDIN.Commands
             {
                 bool isGroupEnd =
                     i == bends.Count - 1 ||
-                    Math.Abs(bends[i + 1].AngleGroup - bends[i].AngleGroup) > 0.1;
+                    GetUndirectedAngleDifference(bends[i + 1].AngleGroup, bends[i].AngleGroup) > 0.1;
 
                 if (!isGroupEnd)
                     continue;
 
-                bool hasRealBend = false;
+                // Moi group chi gom Bend-Line that. Sap xep lai tren truc normal chuan
+                // de tao chain lien tuc, khong phu thuoc X/Y tuyet doi cua Drawing Sheet.
+                List<BendInfo> group = new List<BendInfo>();
                 for (int k = groupStart; k <= i; k++)
                 {
-                    if (!bends[k].IsBoundingBox)
-                    {
-                        hasRealBend = true;
-                        break;
-                    }
+                    if (!bends[k].IsBoundingBox && !bends[k].IsEdge)
+                        group.Add(bends[k]);
                 }
 
-                if (hasRealBend)
+                if (group.Count >= 2)
                 {
-                    double normalX = bends[groupStart].NormalX;
-                    double normalY = bends[groupStart].NormalY;
-                    bool isHorizontalDimension =
-                        Math.Abs(normalX) >
-                        Math.Abs(normalY);
-                    bool isDiagonal =
-                        Math.Abs(normalX) > 0.15 &&
-                        Math.Abs(normalY) > 0.15;
+                    double tangentX;
+                    double tangentY;
+                    double normalX;
+                    double normalY;
+                    GetCanonicalAxes(
+                        group[0].AngleGroup,
+                        out tangentX,
+                        out tangentY,
+                        out normalX,
+                        out normalY);
 
-                    int verticalStagger = 0;
-
-                    for (int k = groupStart; k < i; k++)
+                    group.Sort(delegate (BendInfo a, BendInfo b)
                     {
-                        if (bends[k].IsBoundingBox &&
-                            bends[k + 1].IsBoundingBox)
+                        double pa = ProjectPoint(a.MidX, a.MidY, normalX, normalY);
+                        double pb = ProjectPoint(b.MidX, b.MidY, normalX, normalY);
+                        return pa.CompareTo(pb);
+                    });
+
+                    // Mot chain chi dung MOT vi tri theo truc tangent.
+                    // Vi tri nay duoc tinh tu chinh cac Bend-Line trong group,
+                    // nen khi keo/rotate Drawing View, logic chain van giu nguyen.
+                    double chainT = GetChainTangentCoordinate(
+                        group,
+                        group[0].AngleGroup,
+                        tangentX,
+                        tangentY);
+
+                    for (int k = 0; k < group.Count - 1; k++)
+                    {
+                        BendInfo first = group[k];
+                        BendInfo second = group[k + 1];
+
+                        double n1 = ProjectPoint(first.MidX, first.MidY, normalX, normalY);
+                        double n2 = ProjectPoint(second.MidX, second.MidY, normalX, normalY);
+                        double distance = Math.Abs(n2 - n1);
+                        if (distance <= 0.001)
                             continue;
 
-                        if (Math.Abs(bends[k + 1].SortKey - bends[k].SortKey) <= 0.001)
-                            continue;
+                        // Tat ca DIM trong group nam tren cung 1 chain line.
+                        double chainN = (n1 + n2) / 2.0;
+                        double dimensionX = tangentX * chainT + normalX * chainN;
+                        double dimensionY = tangentY * chainT + normalY * chainN;
 
-                        double distance = Math.Abs(bends[k + 1].SortKey - bends[k].SortKey);
-                        double measureX = (bends[k].MidX + bends[k + 1].MidX) / 2.0;
-                        double measureY = (bends[k].MidY + bends[k + 1].MidY) / 2.0;
-                        double dimensionX;
-                        double dimensionY;
-
-                        if (isDiagonal)
-                        {
-                            double fromCenterX = measureX - centerX;
-                            double fromCenterY = measureY - centerY;
-                            double direction =
-                                fromCenterX * normalX + fromCenterY * normalY >= 0
-                                    ? 1.0
-                                    : -1.0;
-
-                            double offset = 0.02;
-                            dimensionX = measureX + direction * normalX * offset;
-                            dimensionY = measureY + direction * normalY * offset;
-                        }
-                        else if (isHorizontalDimension)
-                        {
-                            dimensionX = measureX;
-                            dimensionY = minY - 0.01;
-                        }
-                        else
-                        {
-                            dimensionX = centerX + shifts[verticalStagger % shifts.Length];
-                            dimensionY = measureY;
-                            verticalStagger++;
-                        }
-
-                        if (!TryRegisterDimensionDistance(
+                        // Dang ky theo CAP HINH HOC thay vi theo gia tri distance.
+                        // Nhu vay 2 doan co cung gia tri (vd 27.4, 27.4) van duoc tao day du.
+                        if (!TryRegisterProjectedPair(
                             createdDistanceKeys,
-                            bends[groupStart].AngleGroup,
-                            distance,
-                            dimensionX,
-                            dimensionY,
-                            IsCenterAxisDimension(dimensionX, dimensionY, centerX, centerY)))
+                            first.AngleGroup,
+                            n1,
+                            n2))
                             continue;
 
                         model.ClearSelection2(true);
-                        SelectGeometry(view, bends[k], false, selectData);
-                        SelectGeometry(view, bends[k + 1], true, selectData);
+                        if (!SelectGeometry(view, first, false, selectData) ||
+                            !SelectGeometry(view, second, true, selectData))
+                        {
+                            model.ClearSelection2(true);
+                            continue;
+                        }
 
                         if (AddLinearDimensionOnly(model, dimensionX, dimensionY))
                             dimensionCount++;
@@ -776,7 +914,7 @@ namespace ADDIN.Commands
                 if (ReferenceEquals(edge.Geometry, candidate.Geometry))
                     return;
 
-                if (Math.Abs(edge.AngleGroup - candidate.AngleGroup) <= 0.1 &&
+                if (GetUndirectedAngleDifference(edge.AngleGroup, candidate.AngleGroup) <= 0.1 &&
                     Math.Abs(edge.SortKey - candidate.SortKey) <= 0.000001)
                     return;
             }
@@ -806,16 +944,16 @@ namespace ADDIN.Commands
 
                 if (createsHorizontalDimension)
                 {
-                    if (left == null || edge.SortKey < left.SortKey)
+                    if (left == null || edge.MidX < left.MidX)
                         left = edge;
-                    if (right == null || edge.SortKey > right.SortKey)
+                    if (right == null || edge.MidX > right.MidX)
                         right = edge;
                 }
                 else
                 {
-                    if (bottom == null || edge.SortKey < bottom.SortKey)
+                    if (bottom == null || edge.MidY < bottom.MidY)
                         bottom = edge;
-                    if (top == null || edge.SortKey > top.SortKey)
+                    if (top == null || edge.MidY > top.MidY)
                         top = edge;
                 }
             }
@@ -824,18 +962,18 @@ namespace ADDIN.Commands
             if (left != null && right != null)
             {
                 model.ClearSelection2(true);
-                SelectGeometry(view, left, false, selectData);
-                SelectGeometry(view, right, true, selectData);
-                if (AddLinearDimensionOnly(model, (minX + maxX) / 2.0, minY - 0.025))
+                if (SelectGeometry(view, left, false, selectData) &&
+                    SelectGeometry(view, right, true, selectData) &&
+                    AddLinearDimensionOnly(model, (minX + maxX) / 2.0, minY - 0.025))
                     count++;
             }
 
             if (bottom != null && top != null)
             {
                 model.ClearSelection2(true);
-                SelectGeometry(view, bottom, false, selectData);
-                SelectGeometry(view, top, true, selectData);
-                if (AddLinearDimensionOnly(model, maxX + 0.025, (minY + maxY) / 2.0))
+                if (SelectGeometry(view, bottom, false, selectData) &&
+                    SelectGeometry(view, top, true, selectData) &&
+                    AddLinearDimensionOnly(model, maxX + 0.025, (minY + maxY) / 2.0))
                     count++;
             }
 
@@ -908,7 +1046,7 @@ namespace ADDIN.Commands
                 if (ReferenceEquals(candidate, bend) ||
                     candidate.IsBoundingBox ||
                     candidate.IsEdge ||
-                    Math.Abs(candidate.AngleGroup - bend.AngleGroup) > ParallelAngleTolerance)
+                    GetUndirectedAngleDifference(candidate.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
                     continue;
 
                 double candidateSide =
@@ -941,7 +1079,7 @@ namespace ADDIN.Commands
                 if (ReferenceEquals(candidate, bend) ||
                     candidate.IsBoundingBox ||
                     candidate.IsEdge ||
-                    Math.Abs(candidate.AngleGroup - bend.AngleGroup) > ParallelAngleTolerance)
+                    GetUndirectedAngleDifference(candidate.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
                     continue;
 
                 double candidateSide =
@@ -981,7 +1119,7 @@ namespace ADDIN.Commands
                         continue;
 
                     string sideKey =
-                        Math.Round(bend.AngleGroup, 1).ToString("0.0") +
+                        Math.Round(GetAngleSortKey(bend.AngleGroup), 1).ToString("0.0") +
                         ":" +
                         (direction > 0 ? "P" : "N");
                     if (processedSides.Contains(sideKey))
@@ -997,8 +1135,25 @@ namespace ADDIN.Commands
                     if (outerEdge == null)
                         continue;
 
-                    if (Math.Abs(outerEdge.AngleGroup - bend.AngleGroup) > ParallelAngleTolerance)
+                    if (GetUndirectedAngleDifference(outerEdge.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
                         continue;
+
+                    double tangentX;
+                    double tangentY;
+                    double normalX;
+                    double normalY;
+                    GetCanonicalAxes(
+                        bend.AngleGroup,
+                        out tangentX,
+                        out tangentY,
+                        out normalX,
+                        out normalY);
+
+                    double chainT = GetChainTangentCoordinate(
+                        bends,
+                        bend.AngleGroup,
+                        tangentX,
+                        tangentY);
 
                     int created = CreateEdgeToBendLineDimension(
                         model,
@@ -1006,8 +1161,11 @@ namespace ADDIN.Commands
                         selectData,
                         outerEdge,
                         bend,
-                        centerX,
-                        centerY,
+                        chainT,
+                        tangentX,
+                        tangentY,
+                        normalX,
+                        normalY,
                         createdDistanceKeys);
 
                     if (created > 0)
@@ -1031,7 +1189,7 @@ namespace ADDIN.Commands
             {
                 if (!item.IsBoundingBox &&
                     !item.IsEdge &&
-                    Math.Abs(item.AngleGroup - bend.AngleGroup) <= ParallelAngleTolerance)
+                    GetUndirectedAngleDifference(item.AngleGroup, bend.AngleGroup) <= ParallelAngleTolerance)
                     group.Add(item);
             }
 
@@ -1040,10 +1198,14 @@ namespace ADDIN.Commands
 
             group.Sort(CompareBends);
 
-            double targetDistance = Math.Abs(edge.SortKey - bend.SortKey);
+            double targetDistance = Math.Abs(
+                (edge.MidX - bend.MidX) * bend.NormalX +
+                (edge.MidY - bend.MidY) * bend.NormalY);
             for (int i = 0; i < group.Count - 1; i++)
             {
-                double chainDistance = Math.Abs(group[i + 1].SortKey - group[i].SortKey);
+                double chainDistance = Math.Abs(
+                    (group[i + 1].MidX - group[i].MidX) * group[i].NormalX +
+                    (group[i + 1].MidY - group[i].MidY) * group[i].NormalY);
                 if (Math.Abs(chainDistance - targetDistance) <= 0.002)
                     return true;
             }
@@ -1094,26 +1256,29 @@ namespace ADDIN.Commands
             SelectData selectData,
             BendInfo edge,
             BendInfo bend,
-            double centerX,
-            double centerY,
+            double chainT,
+            double tangentX,
+            double tangentY,
+            double normalX,
+            double normalY,
             List<string> createdDistanceKeys)
         {
-            double measureX = (edge.MidX + bend.MidX) / 2.0;
-            double measureY = (edge.MidY + bend.MidY) / 2.0;
-            bool createsHorizontalDimension =
-                Math.Abs(edge.NormalX) > Math.Abs(edge.NormalY);
+            double edgeN = ProjectPoint(edge.MidX, edge.MidY, normalX, normalY);
+            double bendN = ProjectPoint(bend.MidX, bend.MidY, normalX, normalY);
+            double distance = Math.Abs(edgeN - bendN);
+            if (distance <= 0.001)
+                return 0;
 
-            double dimensionX = createsHorizontalDimension ? measureX : centerX;
-            double dimensionY = createsHorizontalDimension ? centerY : measureY;
-            double distance = Math.Abs(edge.SortKey - bend.SortKey);
+            // Edge -> Bend dau/cuoi nam tren dung chain line cua group Bend-Line.
+            double chainN = (edgeN + bendN) / 2.0;
+            double dimensionX = tangentX * chainT + normalX * chainN;
+            double dimensionY = tangentY * chainT + normalY * chainN;
 
-            if (!TryRegisterDimensionDistance(
+            if (!TryRegisterProjectedPair(
                 createdDistanceKeys,
                 bend.AngleGroup,
-                distance,
-                dimensionX,
-                dimensionY,
-                IsCenterAxisDimension(dimensionX, dimensionY, centerX, centerY)))
+                edgeN,
+                bendN))
                 return 0;
 
             model.ClearSelection2(true);
@@ -1142,6 +1307,12 @@ namespace ADDIN.Commands
 
             foreach (BendInfo line in lines)
             {
+                // Chi xet canh song song voi bend line ngay tu dau.
+                // Neu loc sau khi da chon outermost, canh ngang/cheo co the
+                // chiem vi tri ung vien va lam bo qua bend line doc.
+                if (GetUndirectedAngleDifference(line.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
+                    continue;
+
                 double alongDistance = GetClosestAlongDistance(line, bend, tangentX, tangentY);
                 if (alongDistance > alongLimit)
                     continue;
@@ -1323,7 +1494,7 @@ namespace ADDIN.Commands
             {
                 if (!bend.IsBoundingBox &&
                     !bend.IsEdge &&
-                    Math.Abs(bend.AngleGroup - angle) <= ParallelAngleTolerance)
+                    GetUndirectedAngleDifference(bend.AngleGroup, angle) <= ParallelAngleTolerance)
                     count++;
             }
 
@@ -1357,7 +1528,7 @@ namespace ADDIN.Commands
             {
                 if (bend.IsBoundingBox ||
                     bend.IsEdge ||
-                    Math.Abs(line.AngleGroup - bend.AngleGroup) <= ParallelAngleTolerance)
+                    GetUndirectedAngleDifference(line.AngleGroup, bend.AngleGroup) <= ParallelAngleTolerance)
                     continue;
 
                 double dx = bend.MidX - line.MidX;
@@ -1452,6 +1623,85 @@ namespace ADDIN.Commands
             return Math.Sqrt(dx * dx + dy * dy);
         }
 
+        private void GetCanonicalAxes(
+            double angleDegrees,
+            out double tangentX,
+            out double tangentY,
+            out double normalX,
+            out double normalY)
+        {
+            double angle = angleDegrees % 180.0;
+            if (angle < 0)
+                angle += 180.0;
+
+            // Line la vo huong: 179.9 do va -0.1 do phai cho cung mot he truc.
+            if (angle >= 90.0)
+                angle -= 180.0;
+
+            double radians = angle * Math.PI / 180.0;
+            tangentX = Math.Cos(radians);
+            tangentY = Math.Sin(radians);
+            normalX = -tangentY;
+            normalY = tangentX;
+        }
+
+        private double ProjectPoint(
+            double x,
+            double y,
+            double axisX,
+            double axisY)
+        {
+            return x * axisX + y * axisY;
+        }
+
+        private double GetChainTangentCoordinate(
+            List<BendInfo> bends,
+            double angleGroup,
+            double tangentX,
+            double tangentY)
+        {
+            double sum = 0.0;
+            int count = 0;
+
+            foreach (BendInfo bend in bends)
+            {
+                if (bend == null || bend.IsBoundingBox || bend.IsEdge)
+                    continue;
+
+                if (GetUndirectedAngleDifference(bend.AngleGroup, angleGroup) > 0.1)
+                    continue;
+
+                sum += ProjectPoint(bend.MidX, bend.MidY, tangentX, tangentY);
+                count++;
+            }
+
+            return count > 0 ? sum / count : 0.0;
+        }
+
+        private bool TryRegisterProjectedPair(
+            List<string> createdKeys,
+            double angle,
+            double projectionA,
+            double projectionB)
+        {
+            double minProjection = Math.Min(projectionA, projectionB);
+            double maxProjection = Math.Max(projectionA, projectionB);
+
+            string key =
+                "PAIR:" +
+                Math.Round(GetAngleSortKey(angle), 1).ToString("0.0") +
+                ":" +
+                Math.Round(minProjection * 1000.0, 2).ToString("0.00") +
+                ":" +
+                Math.Round(maxProjection * 1000.0, 2).ToString("0.00");
+
+            if (createdKeys.Contains(key))
+                return false;
+
+            createdKeys.Add(key);
+            return true;
+        }
+
         private bool TryRegisterDimensionDistance(
             List<string> createdKeys,
             double angle,
@@ -1506,10 +1756,12 @@ namespace ADDIN.Commands
             foreach (BendInfo line in lines)
             {
                 if ((diagonalOnly && !IsDiagonalEdge(line)) ||
-                    Math.Abs(line.AngleGroup - bend.AngleGroup) > ParallelAngleTolerance)
+                    GetUndirectedAngleDifference(line.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
                     continue;
 
-                double distance = Math.Abs(line.SortKey - bend.SortKey);
+                double distance = Math.Abs(
+                    (line.MidX - bend.MidX) * bend.NormalX +
+                    (line.MidY - bend.MidY) * bend.NormalY);
                 if (distance > 0.001 && distance < nearestDistance)
                 {
                     nearest = line;
@@ -1529,9 +1781,11 @@ namespace ADDIN.Commands
             {
                 if (!bend.IsBoundingBox &&
                     !bend.IsEdge &&
-                    Math.Abs(edge.AngleGroup - bend.AngleGroup) <= ParallelAngleTolerance)
+                    GetUndirectedAngleDifference(edge.AngleGroup, bend.AngleGroup) <= ParallelAngleTolerance)
                 {
-                    double distance = Math.Abs(edge.SortKey - bend.SortKey);
+                    double distance = Math.Abs(
+                (edge.MidX - bend.MidX) * bend.NormalX +
+                (edge.MidY - bend.MidY) * bend.NormalY);
                     if (distance > 0.001 && distance < nearestDistance)
                     {
                         nearest = bend;
@@ -1562,7 +1816,7 @@ namespace ADDIN.Commands
                 if (diagonalOnly && !IsDiagonalEdge(line))
                     continue;
 
-                double angleDiff = Math.Abs(line.AngleGroup - bend.AngleGroup);
+                double angleDiff = GetUndirectedAngleDifference(line.AngleGroup, bend.AngleGroup);
                 if (angleDiff > ParallelAngleTolerance)
                     continue;
 
@@ -1588,7 +1842,7 @@ namespace ADDIN.Commands
         {
             foreach (BendInfo processed in processedEdges)
             {
-                if (Math.Abs(processed.AngleGroup - edge.AngleGroup) <= 0.1 &&
+                if (GetUndirectedAngleDifference(processed.AngleGroup, edge.AngleGroup) <= 0.1 &&
                     Math.Abs(processed.SortKey - edge.SortKey) <= 0.001)
                     return true;
             }
@@ -1623,11 +1877,228 @@ namespace ADDIN.Commands
             bool append,
             SelectData selectData)
         {
-            if (bend.IsEdge)
-                return view.SelectEntity(bend.Geometry, append);
+            if (view == null || bend == null)
+                return false;
 
-            SketchSegment segment = bend.Geometry as SketchSegment;
-            return segment != null && segment.Select4(append, selectData);
+            try
+            {
+                // Edge cua model van giu nguyen cach select cu.
+                if (bend.IsEdge)
+                    return view.SelectEntity(bend.Geometry, append);
+
+                if (selectData == null)
+                    return false;
+
+                // Luon gan lai context View ngay truoc moi lan select. SelectData la COM object
+                // va context cua no co the bi SolidWorks thay doi sau ClearSelection/rebuild.
+                selectData.View = view;
+
+                SketchSegment segment;
+
+                if (!bend.IsBoundingBox)
+                {
+                    // Bend-Line: luon reacquire entity hien tai tu view.GetBendLines()
+                    // va match bang hinh hoc; khong giu COM SketchSegment cu qua rebuild.
+                    segment = ResolveCurrentBendSegment(view, bend);
+                }
+                else
+                {
+                    // Bounding-box sketch khong phai bend line auto-generated; giu logic cu.
+                    segment = bend.Geometry as SketchSegment;
+                }
+
+                return segment != null && segment.Select4(append, selectData);
+            }
+            catch (COMException)
+            {
+                // Neu COM object vua bi invalidate dung luc select, thu reacquire Bend-Line
+                // mot lan cuoi. Khong thay doi cap entity hay vi tri DIM.
+                if (bend.IsEdge || bend.IsBoundingBox || selectData == null)
+                    return false;
+
+                SketchSegment refreshed = FindCurrentBendSegment(view, bend);
+                if (refreshed == null)
+                    return false;
+
+                bend.Geometry = refreshed;
+
+                try
+                {
+                    selectData.View = view;
+                    return refreshed.Select4(append, selectData);
+                }
+                catch (COMException)
+                {
+                    return false;
+                }
+            }
+        }
+
+        private SketchSegment ResolveCurrentBendSegment(
+            SolidWorks.Interop.sldworks.View view,
+            BendInfo target)
+        {
+            if (view == null || target == null)
+                return null;
+
+            // Bend-Line trong Drawing co the bi SolidWorks tao lai sau rebuild.
+            // Khong dung dynamic persistent-reference nua vi mot so version khong expose
+            // cac method do cho Drawing SketchSegment va gay RuntimeBinderException.
+            // Moi lan select, lay lai Bend-Line hien tai va match bang hinh hoc.
+            SketchSegment refreshed = FindCurrentBendSegment(view, target);
+            if (refreshed != null)
+                target.Geometry = refreshed;
+
+            return refreshed;
+        }
+
+        private BendInfo CreateTemporaryBendInfo(
+            SolidWorks.Interop.sldworks.View view,
+            SketchSegment segment)
+        {
+            SketchLine line = segment as SketchLine;
+            if (view == null || line == null)
+                return null;
+
+            MathUtility mathUtil = swApp.IGetMathUtility();
+            MathTransform viewTransform = view.ModelToViewTransform;
+            Sketch sketch = segment.GetSketch();
+            MathTransform sketchTransform = sketch?.ModelToSketchTransform?.Inverse() as MathTransform;
+            SketchPoint start = line.GetStartPoint2() as SketchPoint;
+            SketchPoint end = line.GetEndPoint2() as SketchPoint;
+
+            if (mathUtil == null || viewTransform == null || sketchTransform == null ||
+                start == null || end == null)
+                return null;
+
+            double[] p1 = TransformPoint(
+                mathUtil, sketchTransform, viewTransform,
+                start.X, start.Y, start.Z);
+            double[] p2 = TransformPoint(
+                mathUtil, sketchTransform, viewTransform,
+                end.X, end.Y, end.Z);
+
+            if (p1 == null || p2 == null)
+                return null;
+
+            double dx = p2[0] - p1[0];
+            double dy = p2[1] - p1[1];
+            double length = Math.Sqrt(dx * dx + dy * dy);
+            if (length <= 0.001)
+                return null;
+
+            double angle = Math.Atan2(dy, dx);
+            if (angle < 0)
+                angle += Math.PI;
+            if (angle >= Math.PI)
+                angle -= Math.PI;
+
+            double midX = (p1[0] + p2[0]) / 2.0;
+            double midY = (p1[1] + p2[1]) / 2.0;
+            double normalX = -Math.Sin(angle);
+            double normalY = Math.Cos(angle);
+
+            return new BendInfo
+            {
+                Geometry = segment,
+                IsEdge = false,
+                AngleGroup = Math.Round(angle * 180.0 / Math.PI, 1),
+                SortKey = midX * normalX + midY * normalY,
+                MidX = midX,
+                MidY = midY,
+                NormalX = normalX,
+                NormalY = normalY,
+                IsBoundingBox = false,
+                StartPoint = start,
+                EndPoint = end,
+                StartX = p1[0],
+                StartY = p1[1],
+                EndX = p2[0],
+                EndY = p2[1],
+                Length = length
+            };
+        }
+
+        private SketchSegment FindCurrentBendSegment(
+            SolidWorks.Interop.sldworks.View view,
+            BendInfo target)
+        {
+            if (view == null || target == null)
+                return null;
+
+            try
+            {
+                Array items = view.GetBendLines() as Array;
+                if (items == null)
+                    return null;
+
+                SketchSegment best = null;
+                double bestScore = double.MaxValue;
+
+                foreach (object item in items)
+                {
+                    SketchSegment segment = item as SketchSegment;
+                    if (segment == null)
+                        continue;
+
+                    BendInfo probe = CreateTemporaryBendInfo(view, segment);
+                    if (probe == null)
+                        continue;
+
+                    // QUAN TRONG: line la entity VO HUONG. 0 do va 180 do la cung huong.
+                    // Truoc day Math.Abs(Angle1-Angle2) lam bend ngang 179.9 do
+                    // khong match voi bend 0.1 do, nen SelectGeometry fail va DIM doc khong tao.
+                    double angleDiff = GetUndirectedAngleDifference(
+                        probe.AngleGroup,
+                        target.AngleGroup);
+
+                    if (angleDiff > ParallelAngleTolerance)
+                        continue;
+
+                    double midDx = probe.MidX - target.MidX;
+                    double midDy = probe.MidY - target.MidY;
+                    double midDistance = Math.Sqrt(midDx * midDx + midDy * midDy);
+                    double lengthDiff = Math.Abs(probe.Length - target.Length);
+
+                    // So sanh endpoint khong phu thuoc thu tu Start/End.
+                    double sameOrder =
+                        GetDistance(probe.StartX, probe.StartY, target.StartX, target.StartY) +
+                        GetDistance(probe.EndX, probe.EndY, target.EndX, target.EndY);
+                    double reverseOrder =
+                        GetDistance(probe.StartX, probe.StartY, target.EndX, target.EndY) +
+                        GetDistance(probe.EndX, probe.EndY, target.StartX, target.StartY);
+                    double endpointDistance = Math.Min(sameOrder, reverseOrder);
+
+                    // Khong dung SortKey de match vi normal co the doi dau khi 0/180 do.
+                    double score =
+                        midDistance +
+                        lengthDiff +
+                        endpointDistance * 0.25 +
+                        angleDiff * 0.00001;
+
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        best = segment;
+                    }
+                }
+
+                // Cho phep sai so hinh hoc nho sau rebuild, nhung van du chat de
+                // khong nham sang bend line khac.
+                return bestScore <= 0.008 ? best : null;
+            }
+            catch (COMException)
+            {
+                return null;
+            }
+        }
+
+        private double GetUndirectedAngleDifference(double angleA, double angleB)
+        {
+            double diff = Math.Abs(angleA - angleB) % 180.0;
+            if (diff > 90.0)
+                diff = 180.0 - diff;
+            return diff;
         }
 
         private class PointInfo
@@ -1635,6 +2106,23 @@ namespace ADDIN.Commands
             public SketchPoint Point;
             public double X;
             public double Y;
+        }
+
+        private Feature FindFeatureFromTree(ModelDoc2 model, params string[] names)
+        {
+            if (model == null)
+                return null;
+
+            try
+            {
+                TreeControlItem root = model.FeatureManager.GetFeatureTreeRootItem2(1);
+                TreeControlItem hit = FindTreeItemByText(root, names);
+                return hit?.Object as Feature;
+            }
+            catch (COMException)
+            {
+                return null;
+            }
         }
 
         private Feature ShowSketchFromTree(ModelDoc2 model, params string[] names)
@@ -1705,11 +2193,32 @@ namespace ADDIN.Commands
 
         private int CompareBends(BendInfo left, BendInfo right)
         {
-            int angleCompare = left.AngleGroup.CompareTo(right.AngleGroup);
+            double leftAngle = GetAngleSortKey(left.AngleGroup);
+            double rightAngle = GetAngleSortKey(right.AngleGroup);
+
+            int angleCompare = leftAngle.CompareTo(rightAngle);
             if (angleCompare != 0)
                 return angleCompare;
 
-            return left.SortKey.CompareTo(right.SortKey);
+            // Sort theo projection tren normal cua left thay vi SortKey cua tung line.
+            // Nhu vay endpoint dao chieu (0/180 do) khong lam thu tu bi lat.
+            double leftProjection = left.MidX * left.NormalX + left.MidY * left.NormalY;
+            double rightProjection = right.MidX * left.NormalX + right.MidY * left.NormalY;
+            return leftProjection.CompareTo(rightProjection);
+        }
+
+        private double GetAngleSortKey(double angleDegrees)
+        {
+            double angle = angleDegrees % 180.0;
+            if (angle < 0)
+                angle += 180.0;
+
+            // Dat seam tai 157.5 do de 0/180, 90 va 135 do deu nam trong
+            // vung lien tuc - phu hop drawing sheet-metal H/V/45/135 thong dung.
+            if (angle >= 157.5)
+                angle -= 180.0;
+
+            return Math.Round(angle, 1);
         }
 
     }

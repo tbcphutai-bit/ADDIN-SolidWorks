@@ -1,4 +1,4 @@
-﻿# Build results
+# Build results
 [Bb]in/
 [Oo]bj/
 build/
@@ -55,3 +55,7 @@ _ReSharper*/
 # Local inspection and temporary patch workspaces
 interop-inspect/
 patch-src/
+_codex_backup/
+backups/
+scratch_*
+/CreateMirrorPartPackage.cs

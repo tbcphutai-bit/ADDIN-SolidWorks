@@ -8,9 +8,20 @@ namespace ADDIN.UI
 {
     public class ModernButton : Button
     {
+        private int borderRadius = 5;
+
         [Category("Appearance")]
         [Description("Bán kính bo tròn góc (pixel)")]
-        public int BorderRadius { get; set; } = 4;
+        public int BorderRadius
+        {
+            get => borderRadius;
+            set
+            {
+                borderRadius = Math.Max(0, value);
+                UpdateRegion();
+                Invalidate();
+            }
+        }
 
         [Browsable(false)]
         public new bool UseVisualStyleBackColor
@@ -28,39 +39,44 @@ namespace ADDIN.UI
 
         [Category("Appearance")]
         [Description("Màu nền trạng thái bình thường")]
-        public Color NormalColor { get; set; } = Color.FromArgb(248, 249, 250);
+        public Color NormalColor { get; set; } = Color.FromArgb(246, 248, 250);
 
         [Category("Appearance")]
         [Description("Màu nền khi rê chuột (Hover)")]
-        public Color HoverColor { get; set; } = Color.FromArgb(235, 240, 246);
+        public Color HoverColor { get; set; } = Color.FromArgb(234, 240, 247);
 
         [Category("Appearance")]
         [Description("Màu nền khi nhấn giữ chuột (Pressed)")]
-        public Color PressColor { get; set; } = Color.FromArgb(220, 230, 240);
+        public Color PressColor { get; set; } = Color.FromArgb(220, 228, 238);
 
         [Category("Appearance")]
         [Description("Màu viền bo góc")]
-        public Color BorderColor { get; set; } = Color.FromArgb(190, 195, 200);
+        public Color BorderColor { get; set; } = Color.FromArgb(210, 216, 224);
 
         private bool isHovered = false;
         private bool isPressed = false;
 
         public ModernButton()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true);
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
+            FlatAppearance.BorderColor = Color.FromArgb(0, 255, 255, 255);
             BackColor = Color.Transparent;
             UseVisualStyleBackColor = false;
-            ForeColor = Color.FromArgb(32, 31, 30);
-            Font = new Font("Segoe UI", 9.0F, FontStyle.Bold);
+            ForeColor = Color.FromArgb(30, 41, 59);
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             Cursor = Cursors.Hand;
         }
 
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            // Force the region to the full client rectangle so Button base class doesn't clip corners!
+            UpdateRegion();
+        }
+
+        private void UpdateRegion()
+        {
             if (this.Region != null)
             {
                 this.Region.Dispose();
@@ -68,25 +84,25 @@ namespace ADDIN.UI
             }
         }
 
-        // 1. NGỤY TRANG GÓC ĐEN TRONG SOLIDWORKS
         protected override bool ShowFocusCues => false;
 
         protected override void OnPaintBackground(PaintEventArgs pevent)
         {
-            // Traverse parents to find the actual solid background color
-            Color bgColor = Color.White; // Default to White for SolidWorks TaskPane
+            Color bgColor = Color.Transparent;
             Control p = this.Parent;
             while (p != null)
             {
                 if (p.BackColor != Color.Transparent && p.BackColor.A > 0)
                 {
                     bgColor = p.BackColor;
-                    // Skip generic control color if possible to find the real tab/panel color
-                    if (bgColor != SystemColors.Control && bgColor.Name != "0")
-                        break;
+                    break;
                 }
                 p = p.Parent;
             }
+
+            if (bgColor.A == 0)
+                bgColor = Color.FromArgb(248, 249, 251);
+
             pevent.Graphics.Clear(bgColor);
         }
 
@@ -100,15 +116,38 @@ namespace ADDIN.UI
         {
             Graphics g = pevent.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            Color current = !Enabled ? Color.FromArgb(200, 198, 196) : (isPressed ? PressColor : (isHovered ? HoverColor : NormalColor));
-            
-            Rectangle rect = ClientRectangle;
-            using (var path = UIHelper.GetRoundPath(rect, BorderRadius))
+            // Xóa sạch nền bằng màu nền của container cha để 4 góc bo mịn tuyệt đối, không đọng viền đen
+            Color bgColor = Color.Transparent;
+            Control p = this.Parent;
+            while (p != null)
             {
-                using (var brush = new SolidBrush(current)) g.FillPath(brush, path);
-                using (var pen = new Pen(BorderColor, 1F)) g.DrawPath(pen, path);
+                if (p.BackColor != Color.Transparent && p.BackColor.A > 0)
+                {
+                    bgColor = p.BackColor;
+                    break;
+                }
+                p = p.Parent;
+            }
+
+            if (bgColor.A == 0)
+                bgColor = Color.FromArgb(248, 249, 251);
+
+            g.Clear(bgColor);
+
+            Color current = !Enabled ? Color.FromArgb(244, 245, 247) : (isPressed ? PressColor : (isHovered ? HoverColor : NormalColor));
+            Color border = !Enabled ? Color.FromArgb(224, 227, 232) : BorderColor;
+            
+            Rectangle rect = new Rectangle(0, 0, Width - 1, Height - 1);
+            using (var path = UIHelper.GetRoundPath(rect, borderRadius))
+            {
+                using (var brush = new SolidBrush(current))
+                    g.FillPath(brush, path);
+                using (var pen = new Pen(border, 1F))
+                    g.DrawPath(pen, path);
             }
 
             Rectangle imgRect = Rectangle.Empty;
@@ -131,12 +170,20 @@ namespace ADDIN.UI
                 {
                     imgRect = new Rectangle(rect.X + (rect.Width - imgW) / 2, rect.Y + (rect.Height - imgH) / 2, imgW, imgH);
                 }
-                g.DrawImage(Image, imgRect);
+
+                if (!Enabled)
+                {
+                    ControlPaint.DrawImageDisabled(g, Image, imgRect.X, imgRect.Y, current);
+                }
+                else
+                {
+                    g.DrawImage(Image, imgRect);
+                }
             }
 
             if (!string.IsNullOrEmpty(Text))
             {
-                Color txtColor = Enabled ? ForeColor : Color.FromArgb(161, 159, 157);
+                Color txtColor = Enabled ? ForeColor : Color.FromArgb(160, 165, 175);
                 TextRenderer.DrawText(g, Text, Font, txtRect, txtColor, 
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
             }

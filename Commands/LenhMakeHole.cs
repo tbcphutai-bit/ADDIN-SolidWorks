@@ -131,6 +131,11 @@ namespace ADDIN.Commands
 
         private readonly ISldWorks swApp;
 
+        // Prevent re-entrant Make Hole selection probes. SolidWorks can fire
+        // selection callbacks while another command is restoring/clearing selection.
+        // The probe must never walk transient Drawing selections or enter recursively.
+        private int makeHoleSelectionProbeBusy;
+
         private const double RepairRoundToleranceMm = 0.5;
         private const double RepairCenterDuplicateToleranceM = 0.0001; // 0.1 mm
         private bool holeWizardCommandStarted;
@@ -270,7 +275,7 @@ namespace ADDIN.Commands
         public void Run(MakeHoleOptions options)
         {
             holeWizardCommandStarted = false;
-            Debug.WriteLine("[MAKE HOLE] build=20260821-spline-trust-native-seed-coincident-v4");
+            Debug.WriteLine("[MAKE HOLE] build=20260918-selection-probe-safety-v5");
             if (options == null)
             {
                 return;
@@ -613,29 +618,6 @@ namespace ADDIN.Commands
             {
                 return feature2;
             }
-            string text = "";
-            try
-            {
-                text = ((dynamic)selMgr).GetSelectedObjectName2(index);
-                Debug.WriteLine("[MAKE HOLE] Selection BODYFEATURES name=" + text);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[MAKE HOLE] Selection BODYFEATURES GetSelectedObjectName2 failed: " + ex.Message);
-            }
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                try
-                {
-                    feature2 = ((dynamic)model).FeatureByName(text) as Feature;
-                    Debug.WriteLine("[MAKE HOLE] Selection BODYFEATURES FeatureByName=" + ((feature2 == null) ? "null" : SafeFeatureName(feature2)));
-                    return feature2;
-                }
-                catch (Exception ex2)
-                {
-                    Debug.WriteLine("[MAKE HOLE] Selection BODYFEATURES FeatureByName failed: " + ex2.Message);
-                }
-            }
             return null;
         }
 
@@ -800,29 +782,72 @@ namespace ADDIN.Commands
 
         public bool IsMakeHoleUpdateRequired(double currentPitchMm)
         {
-            if (!(swApp?.ActiveDoc is ModelDoc2 activeModel))
+            // This method is typically called by UI/selection-change code.
+            // Never allow it to re-enter: SolidWorks may fire another selection
+            // notification while a command is restoring a sketch/view.
+            if (Interlocked.Exchange(ref makeHoleSelectionProbeBusy, 1) != 0)
             {
+                Debug.WriteLine("[MAKE HOLE SAFE] Update-required probe skipped: re-entry.");
                 return false;
             }
-            if (!TryGetSelectedCurvePattern(activeModel, out var ownerModel, out var patternFeature, out _))
+
+            try
             {
+                if (!(swApp?.ActiveDoc is ModelDoc2 activeModel))
+                {
+                    return false;
+                }
+
+                // Make Hole update is valid only for a Part, or an Assembly while
+                // editing a Part component. A Drawing selection (for example a
+                // section-view sketch created by DIM MAT CAT) must be ignored.
+                if (!TryResolveMakeHoleContext(activeModel, out _, out _))
+                {
+                    Debug.WriteLine("[MAKE HOLE SAFE] Update-required probe skipped: active document is not a Make Hole context.");
+                    return false;
+                }
+
+                if (!TryGetSelectedCurvePattern(activeModel, out var ownerModel, out var patternFeature, out _))
+                {
+                    return false;
+                }
+
+                string patternDimensionName = GetPatternCountDimensionName(patternFeature);
+                if (string.IsNullOrWhiteSpace(patternDimensionName))
+                {
+                    return false;
+                }
+
+                string equation = FindEquationByLeftSide(ownerModel, patternDimensionName);
+                return TryParsePatternLengthReference(equation, out _, out _);
+            }
+            catch (Exception ex)
+            {
+                // Do not let an exception escape a SolidWorks selection callback.
+                Debug.WriteLine("[MAKE HOLE SAFE] Update-required probe failed: " + ex);
                 return false;
             }
-            string patternDimensionName = GetPatternCountDimensionName(patternFeature);
-            if (string.IsNullOrWhiteSpace(patternDimensionName))
+            finally
             {
-                return false;
+                Volatile.Write(ref makeHoleSelectionProbeBusy, 0);
             }
-            string equation = FindEquationByLeftSide(ownerModel, patternDimensionName);
-            return TryParsePatternLengthReference(equation, out _, out _);
         }
 
         public bool CleanupTrackedMakeHoleEquationsIfFeatureMissing()
         {
-            if (!(swApp?.ActiveDoc is ModelDoc2 modelDoc))
+            if (!(swApp?.ActiveDoc is ModelDoc2 activeModel))
             {
                 return false;
             }
+
+            // Never scan/delete Make Hole equations while a Drawing is active.
+            // Selection/view changes from DIM MAT CAT can trigger UI refresh code.
+            if (!TryResolveMakeHoleContext(activeModel, out var modelDoc, out _))
+            {
+                Debug.WriteLine("[MAKE HOLE SAFE] Cleanup skipped: active document is not a Make Hole context.");
+                return false;
+            }
+
             if (string.IsNullOrWhiteSpace(trackedPatternSketchName) && string.IsNullOrWhiteSpace(trackedLengthVariableName) && string.IsNullOrWhiteSpace(trackedPatternFeatureName) && string.IsNullOrWhiteSpace(trackedPatternCountDimensionName) && string.IsNullOrWhiteSpace(trackedHoleFeatureName))
             {
                 return false;
@@ -984,7 +1009,7 @@ namespace ADDIN.Commands
                 trackedPatternLengthReferenceIsExpression = lengthReferenceIsExpression;
                 try
                 {
-                    dynamic equationManager = ownerModel.GetEquationMgr();
+                    IEquationMgr equationManager = ownerModel.GetEquationMgr() as IEquationMgr;
                     equationManager?.EvaluateAll();
                 }
                 catch
@@ -1022,15 +1047,39 @@ namespace ADDIN.Commands
 
         private bool TryGetSelectedCurvePattern(ModelDoc2 activeModel, out ModelDoc2 ownerModel, out Feature patternFeature, out string error)
         {
-            ownerModel = GetMakeHoleOwnerModel(activeModel);
+            ownerModel = null;
             patternFeature = null;
             error = "Hay chon dung mot Curve Pattern can update.";
-            if (activeModel == null || ownerModel == null)
+
+            if (activeModel == null)
             {
                 return false;
             }
-            SelectionMgr selectionMgr = activeModel.SelectionManager as SelectionMgr;
-            int selectedCount = selectionMgr?.GetSelectedObjectCount2(-1) ?? 0;
+
+            // Critical safety gate: do not walk selection objects from a Drawing.
+            // DIM MAT CAT changes drawing-view sketches/selections and SolidWorks can
+            // emit selection callbacks during that transition. Those transient COM
+            // objects are not valid Make Hole candidates.
+            if (!TryResolveMakeHoleContext(activeModel, out ownerModel, out _))
+            {
+                error = "Make Hole Update chi ho tro trong Part, hoac Assembly khi dang Edit Component.";
+                Debug.WriteLine("[MAKE HOLE SAFE] Pattern selection probe skipped: unsupported active document.");
+                return false;
+            }
+
+            SelectionMgr selectionMgr = null;
+            int selectedCount = 0;
+            try
+            {
+                selectionMgr = activeModel.SelectionManager as SelectionMgr;
+                selectedCount = selectionMgr?.GetSelectedObjectCount2(-1) ?? 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[MAKE HOLE SAFE] Read selection manager failed: " + ex.Message);
+                return false;
+            }
+
             List<Feature> selectedFeatures = new List<Feature>();
             for (int i = 1; i <= selectedCount; i++)
             {
@@ -1041,20 +1090,34 @@ namespace ADDIN.Commands
                     selected = selectionMgr.GetSelectedObject6(i, -1);
                     selectedType = selectionMgr.GetSelectedObjectType3(i, -1);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Debug.WriteLine("[MAKE HOLE SAFE] Read selected object failed. index=" + i + ", error=" + ex.Message);
+                    continue;
                 }
-                Feature feature = TryGetSelectedFeature(activeModel, selectionMgr, selected, i);
-                if (feature == null && !ReferenceEquals(activeModel, ownerModel))
+
+                Feature feature = null;
+                try
                 {
-                    feature = TryGetSelectedFeature(ownerModel, selectionMgr, selected, i);
+                    feature = TryGetSelectedFeature(activeModel, selectionMgr, selected, i);
+                    if (feature == null && !ReferenceEquals(activeModel, ownerModel))
+                    {
+                        feature = TryGetSelectedFeature(ownerModel, selectionMgr, selected, i);
+                    }
                 }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[MAKE HOLE SAFE] Resolve selected feature failed. index=" + i + ", error=" + ex.Message);
+                    continue;
+                }
+
                 if (feature != null && !selectedFeatures.Any(item => string.Equals(SafeFeatureName(item), SafeFeatureName(feature), StringComparison.OrdinalIgnoreCase)))
                 {
                     Debug.WriteLine("[MAKE HOLE] Update selection candidate. index=" + i + ", type=" + selectedType + ", feature=" + SafeFeatureName(feature));
                     selectedFeatures.Add(feature);
                 }
             }
+
             if (selectedFeatures.Count != 1)
             {
                 error = selectedFeatures.Count == 0
@@ -1062,11 +1125,13 @@ namespace ADDIN.Commands
                     : "Dang chon nhieu feature. Hay chi chon mot Curve Pattern can update.";
                 return false;
             }
+
             if (!IsCurvePatternFeature(selectedFeatures[0]))
             {
                 error = "Feature da chon khong phai Curve Pattern.";
                 return false;
             }
+
             patternFeature = selectedFeatures[0];
             return true;
         }
@@ -1102,8 +1167,8 @@ namespace ADDIN.Commands
             string leftSide = "\"" + dimensionName + "\"";
             try
             {
-                dynamic equationMgr = model.GetEquationMgr();
-                int count = Convert.ToInt32(equationMgr?.GetCount() ?? 0, CultureInfo.InvariantCulture);
+                IEquationMgr equationMgr = model.GetEquationMgr() as IEquationMgr;
+                int count = equationMgr?.GetCount() ?? 0;
                 for (int i = 0; i < count; i++)
                 {
                     string equation = Convert.ToString(equationMgr.Equation[i], CultureInfo.InvariantCulture);
@@ -1271,8 +1336,8 @@ namespace ADDIN.Commands
             {
                 try
                 {
-                    Sketch sketch = ((dynamic)segment).GetSketch() as Sketch;
-                    Feature sketchFeature = sketch == null ? null : ((dynamic)sketch).GetFeature() as Feature;
+                    Sketch sketch = segment.GetSketch() as Sketch;
+                    Feature sketchFeature = sketch as Feature;
                     sketchName = SafeFeatureName(sketchFeature);
                 }
                 catch
@@ -1357,27 +1422,62 @@ namespace ADDIN.Commands
             {
                 return null;
             }
-            try
+            if (selected is Feature feature)
             {
-                if (((dynamic)selected).GetFeature() is Feature feature)
+                return feature;
+            }
+            if (selected is Face2 face2)
+            {
+                try
                 {
-                    Debug.WriteLine("[MAKE HOLE] Selection feature from GetFeature: " + SafeFeatureName(feature));
-                    return feature;
+                    Feature feat = face2.GetFeature() as Feature;
+                    if (feat != null)
+                    {
+                        Debug.WriteLine("[MAKE HOLE] Selection feature from Face2.GetFeature: " + SafeFeatureName(feat));
+                        return feat;
+                    }
+                }
+                catch
+                {
                 }
             }
-            catch
+            if (selected is Edge edge)
             {
-            }
-            try
-            {
-                if (((dynamic)selected).Feature is Feature feature2)
+                try
                 {
-                    Debug.WriteLine("[MAKE HOLE] Selection feature from Feature property: " + SafeFeatureName(feature2));
-                    return feature2;
+                    if (edge.GetTwoAdjacentFaces2() is object[] faces && faces.Length > 0 && faces[0] is Face2 f2)
+                    {
+                        Feature feat = f2.GetFeature() as Feature;
+                        if (feat != null)
+                        {
+                            return feat;
+                        }
+                    }
+                }
+                catch
+                {
                 }
             }
-            catch
+            if (selected is SketchSegment segment)
             {
+                try
+                {
+                    Sketch sk = segment.GetSketch() as Sketch;
+                    if (sk is Feature skFeat)
+                    {
+                        return skFeat;
+                    }
+                }
+                catch
+                {
+                }
+            }
+            if (selected is Sketch sketch)
+            {
+                if (sketch is Feature skFeat)
+                {
+                    return skFeat;
+                }
             }
             return null;
         }
@@ -1400,27 +1500,30 @@ namespace ADDIN.Commands
 
         private double[] TryGetSelectionPoint(SelectionMgr selectionMgr, int index, object selected, int type)
         {
-            try
+            if (selectionMgr != null)
             {
-                double[] array = ((dynamic)selectionMgr).GetSelectionPoint2(index, -1) as double[];
-                if (IsPoint(array))
+                try
                 {
-                    return array;
+                    double[] array = selectionMgr.GetSelectionPoint2(index, -1) as double[];
+                    if (IsPoint(array))
+                    {
+                        return array;
+                    }
                 }
-            }
-            catch
-            {
-            }
-            try
-            {
-                double[] array2 = ((dynamic)selectionMgr).GetSelectionPoint(index, -1) as double[];
-                if (IsPoint(array2))
+                catch
                 {
-                    return array2;
                 }
-            }
-            catch
-            {
+                try
+                {
+                    double[] array2 = selectionMgr.GetSelectionPoint(index) as double[];
+                    if (IsPoint(array2))
+                    {
+                        return array2;
+                    }
+                }
+                catch
+                {
+                }
             }
             return TryGetSelectionPoint(selected, type);
         }
@@ -1434,53 +1537,36 @@ namespace ADDIN.Commands
             {
                 return new double[3] { sketchPoint.X, sketchPoint.Y, sketchPoint.Z };
             }
-            if (type == 3 || type == 11)
+            if (selected is RefPoint refPoint)
             {
                 try
                 {
-                    return ((dynamic)selected).GetPoint() as double[];
-                }
-                catch
-                {
-                }
-            }
-            try
-            {
-                double[] array = ((dynamic)selected).GetRefPoint() as double[];
-                if (IsPoint(array))
-                {
-                    return array;
-                }
-            }
-            catch
-            {
-            }
-            if (selected is Feature feature)
-            {
-                try
-                {
-                    dynamic specificFeature = feature.GetSpecificFeature2();
-                    double[] array2 = specificFeature.GetRefPoint() as double[];
-                    if (IsPoint(array2))
+                    double[] array = (refPoint.GetRefPoint() as MathPoint)?.ArrayData as double[];
+                    if (IsPoint(array))
                     {
-                        return array2;
+                        return array;
                     }
                 }
                 catch
                 {
                 }
             }
-            try
+            if (selected is Feature feature)
             {
-                dynamic specificFeature2 = ((dynamic)selected).GetSpecificFeature2();
-                double[] array3 = specificFeature2.GetRefPoint() as double[];
-                if (IsPoint(array3))
+                try
                 {
-                    return array3;
+                    if (feature.GetSpecificFeature2() is RefPoint specificRefPoint)
+                    {
+                        double[] array2 = (specificRefPoint.GetRefPoint() as MathPoint)?.ArrayData as double[];
+                        if (IsPoint(array2))
+                        {
+                            return array2;
+                        }
+                    }
                 }
-            }
-            catch
-            {
+                catch
+                {
+                }
             }
             return null;
         }
@@ -1531,7 +1617,7 @@ namespace ADDIN.Commands
                 bool flag = false;
                 try
                 {
-                    flag = (bool)((dynamic)curve).IsCircle();
+                    flag = curve.IsCircle();
                 }
                 catch
                 {
@@ -1540,7 +1626,7 @@ namespace ADDIN.Commands
                 {
                     return false;
                 }
-                if (!(((dynamic)curve).CircleParams is double[] array) || array.Length < 7)
+                if (!(curve.CircleParams is double[] array) || array.Length < 7)
                 {
                     return false;
                 }
@@ -1586,7 +1672,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                if (((dynamic)face).GetClosestPointOn(point[0], point[1], point[2]) is double[] array && array.Length >= 3)
+                if (face.GetClosestPointOn(point[0], point[1], point[2]) is double[] array && array.Length >= 3)
                 {
                     return new double[3]
                     {
@@ -1630,7 +1716,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                if (((dynamic)face).GetClosestPointOn(point[0], point[1], point[2]) is double[] array2 && array2.Length >= 5 && ((dynamic)surface).Evaluate(array2[3], array2[4], 1, 1) is double[] array3 && array3.Length >= 9)
+                if (face.GetClosestPointOn(point[0], point[1], point[2]) is double[] array2 && array2.Length >= 5 && surface.Evaluate(array2[3], array2[4], 1, 1) is double[] array3 && array3.Length >= 9)
                 {
                     double[] left = new double[3]
                     {
@@ -1656,7 +1742,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                if (((dynamic)surface).EvaluateAtPoint(point[0], point[1], point[2]) is double[] array4 && array4.Length >= 6)
+                if (surface.EvaluateAtPoint(point[0], point[1], point[2]) is double[] array4 && array4.Length >= 6)
                 {
                     normal = Normalize(new double[3]
                     {
@@ -1675,7 +1761,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                double[] vector = ((dynamic)face).Normal as double[];
+                double[] vector = face.Normal as double[];
                 normal = Normalize(vector);
                 return normal != null;
             }
@@ -1778,7 +1864,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                object twoAdjacentFaces = ((dynamic)edge).GetTwoAdjacentFaces2();
+                object twoAdjacentFaces = edge.GetTwoAdjacentFaces2();
                 if (twoAdjacentFaces is Array array)
                 {
                     foreach (object item in array)
@@ -1797,15 +1883,7 @@ namespace ADDIN.Commands
             catch
             {
             }
-            try
-            {
-                object face = ((dynamic)edge).GetFace();
-                return face as Face2;
-            }
-            catch
-            {
-                return null;
-            }
+            return null;
         }
 
         private OffsetPath BuildOffsetPath(EdgeGeometry edge, Face2 face, double[] fallbackNormal, double[] sidePoint, MakeHoleOptions options)
@@ -2091,7 +2169,7 @@ namespace ADDIN.Commands
             double num = -1.0;
             try
             {
-                if (!(((dynamic)edge).GetTwoAdjacentFaces2() is Array array))
+                if (!(edge.GetTwoAdjacentFaces2() is Array array))
                 {
                     return null;
                 }
@@ -2126,7 +2204,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                if (((dynamic)edge).GetTwoAdjacentFaces2() is Array array)
+                if (edge.GetTwoAdjacentFaces2() is Array array)
                 {
                     foreach (object item in array)
                     {
@@ -2359,7 +2437,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                if (((dynamic)face).GetClosestPointOn(point[0], point[1], point[2]) is double[] array && array.Length >= 3)
+                if (face.GetClosestPointOn(point[0], point[1], point[2]) is double[] array && array.Length >= 3)
                 {
                     return Distance(point, new double[3]
                     {
@@ -3586,14 +3664,7 @@ namespace ADDIN.Commands
             {
                 return entity.Select4(append, null);
             }
-            try
-            {
-                return ((dynamic)edge).Select(append);
-            }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
 
         private bool SelectEdgeWithMark(Edge edge, bool append, int mark)
@@ -3623,16 +3694,10 @@ namespace ADDIN.Commands
                 }
                 catch
                 {
+                    return false;
                 }
             }
-            try
-            {
-                return ((dynamic)edge).Select(append);
-            }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
 
         private Sketch GetActiveSketch(ModelDoc2 model)
@@ -3643,7 +3708,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                if (((dynamic)model).GetActiveSketch2() is Sketch result)
+                if (model.GetActiveSketch2() is Sketch result)
                 {
                     return result;
                 }
@@ -3653,7 +3718,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                return ((dynamic)model.SketchManager).ActiveSketch as Sketch;
+                return model.SketchManager?.ActiveSketch as Sketch;
             }
             catch
             {
@@ -3817,13 +3882,13 @@ namespace ADDIN.Commands
             object obj = null;
             try
             {
-                obj = ((dynamic)sketch).GetSketchPoints2();
+                obj = sketch.GetSketchPoints2();
             }
             catch
             {
                 try
                 {
-                    obj = ((dynamic)sketch).GetSketchPoints();
+                    obj = sketch.GetSketchPoints();
                 }
                 catch
                 {
@@ -4034,17 +4099,29 @@ namespace ADDIN.Commands
                 array[2]
                 };
             }
-            try
+            if (rawPoint is Vertex v)
             {
-                double num = Convert.ToDouble(((dynamic)rawPoint).X, CultureInfo.InvariantCulture);
-                double num2 = Convert.ToDouble(((dynamic)rawPoint).Y, CultureInfo.InvariantCulture);
-                double num3 = Convert.ToDouble(((dynamic)rawPoint).Z, CultureInfo.InvariantCulture);
-                return new double[3] { num, num2, num3 };
+                try
+                {
+                    if (v.GetPoint() is double[] coords && coords.Length >= 3)
+                    {
+                        return new double[3] { coords[0], coords[1], coords[2] };
+                    }
+                }
+                catch { }
             }
-            catch
+            if (rawPoint is RefPoint rp)
             {
-                return null;
+                try
+                {
+                    if (rp.GetRefPoint() is MathPoint mp && mp.ArrayData is double[] coords && coords.Length >= 3)
+                    {
+                        return new double[3] { coords[0], coords[1], coords[2] };
+                    }
+                }
+                catch { }
             }
+            return null;
         }
 
         private object TryCall(object target, string methodName)
@@ -4053,34 +4130,40 @@ namespace ADDIN.Commands
             {
                 return null;
             }
-            try
+            if (target is SketchArc arc)
             {
-                return target.GetType().InvokeMember(methodName, BindingFlags.InvokeMethod, null, target, null);
-            }
-            catch
-            {
-                try
+                switch (methodName)
                 {
-                    switch (methodName)
-                    {
-                        case "GetStartPoint2":
-                            return ((dynamic)target).GetStartPoint2();
-                        case "GetEndPoint2":
-                            return ((dynamic)target).GetEndPoint2();
-                        case "GetCenterPoint2":
-                            return ((dynamic)target).GetCenterPoint2();
-                        case "GetNormalVector":
-                            return ((dynamic)target).GetNormalVector();
-                        case "GetRotationDir":
-                            return ((dynamic)target).GetRotationDir();
-                        case "GetPoints2":
-                            return ((dynamic)target).GetPoints2();
-                        case "GetPoints":
-                            return ((dynamic)target).GetPoints();
-                    }
+                    case "GetStartPoint2": return arc.GetStartPoint2();
+                    case "GetEndPoint2": return arc.GetEndPoint2();
+                    case "GetCenterPoint2": return arc.GetCenterPoint2();
+                    case "GetNormalVector": return arc.GetNormalVector();
+                    case "GetRotationDir": return arc.GetRotationDir();
                 }
-                catch
+            }
+            else if (target is SketchLine line)
+            {
+                switch (methodName)
                 {
+                    case "GetStartPoint2": return line.GetStartPoint2();
+                    case "GetEndPoint2": return line.GetEndPoint2();
+                }
+            }
+            else if (target is SketchSpline spline)
+            {
+                switch (methodName)
+                {
+                    case "GetPoints2": return spline.GetPoints2();
+                    case "GetPoints": return spline.GetPoints();
+                }
+            }
+            else if (target is SketchEllipse ellipse)
+            {
+                switch (methodName)
+                {
+                    case "GetCenterPoint2": return ellipse.GetCenterPoint2();
+                    case "GetStartPoint2": return ellipse.GetStartPoint2();
+                    case "GetEndPoint2": return ellipse.GetEndPoint2();
                 }
             }
             return null;
@@ -4120,15 +4203,34 @@ namespace ADDIN.Commands
                 });
                 return;
             }
-            try
+            if (rawPoint is SketchPoint sp)
             {
-                double num = Convert.ToDouble(((dynamic)rawPoint).X, CultureInfo.InvariantCulture);
-                double num2 = Convert.ToDouble(((dynamic)rawPoint).Y, CultureInfo.InvariantCulture);
-                double num3 = Convert.ToDouble(((dynamic)rawPoint).Z, CultureInfo.InvariantCulture);
-                points.Add(new double[3] { num, num2, num3 });
+                points.Add(new double[3] { sp.X, sp.Y, sp.Z });
+                return;
             }
-            catch
+            if (rawPoint is Vertex v)
             {
+                try
+                {
+                    if (v.GetPoint() is double[] coords && coords.Length >= 3)
+                    {
+                        points.Add(new double[3] { coords[0], coords[1], coords[2] });
+                        return;
+                    }
+                }
+                catch { }
+            }
+            if (rawPoint is RefPoint rp)
+            {
+                try
+                {
+                    if (rp.GetRefPoint() is MathPoint mp && mp.ArrayData is double[] coords && coords.Length >= 3)
+                    {
+                        points.Add(new double[3] { coords[0], coords[1], coords[2] });
+                        return;
+                    }
+                }
+                catch { }
             }
         }
 
@@ -4984,7 +5086,15 @@ namespace ADDIN.Commands
             });
             TrySetHoleWizardValue("IVertex", delegate
             {
-                ((dynamic)data).IVertex = point;
+                try
+                {
+                    var prop = data.GetType().GetProperty("IVertex");
+                    if (prop != null && prop.CanWrite)
+                    {
+                        prop.SetValue(data, point, null);
+                    }
+                }
+                catch { }
             });
             TrySetHoleWizardValue("Type", delegate
             {
@@ -5195,19 +5305,19 @@ namespace ADDIN.Commands
                     Debug.WriteLine("[MAKE HOLE] Length dimension skip. Select segment failed.");
                     return null;
                 }
-                dynamic val = null;
+                DisplayDimension val = null;
                 bool pathLengthDimension = false;
                 try
                 {
-                    val = model.Extension.AddPathLengthDim(array[0], array[1], array[2]);
-                    pathLengthDimension = (object)val != null;
+                    val = model.Extension.AddPathLengthDim(array[0], array[1], array[2]) as DisplayDimension;
+                    pathLengthDimension = val != null;
                     Debug.WriteLine("[MAKE HOLE] AddPathLengthDim result=" + pathLengthDimension);
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine("[MAKE HOLE] AddPathLengthDim failed: " + ex.Message);
                 }
-                if ((object)val == null)
+                if (val == null)
                 {
                     model.ClearSelection2(All: true);
                     if (!SelectSketchSegment(sketchSegment, append: false))
@@ -5215,10 +5325,10 @@ namespace ADDIN.Commands
                         Debug.WriteLine("[MAKE HOLE] Length dimension fallback skip. Select segment failed.");
                         return null;
                     }
-                    val = model.AddDimension2(array[0], array[1], array[2]);
+                    val = model.AddDimension2(array[0], array[1], array[2]) as DisplayDimension;
                     Debug.WriteLine("[MAKE HOLE] Length dimension fallback uses AddDimension2.");
                 }
-                DisplayDimension displayDimension = val as DisplayDimension;
+                DisplayDimension displayDimension = val;
                 Dimension dimension = null;
                 if (displayDimension != null)
                 {
@@ -5316,17 +5426,8 @@ namespace ADDIN.Commands
                 }
                 try
                 {
-                    ((dynamic)annotation).Visible = false;
-                    Debug.WriteLine("[MAKE HOLE] Reference length dimension hidden by Visible=false.");
-                    return true;
-                }
-                catch
-                {
-                }
-                try
-                {
-                    ((dynamic)annotation).SetVisible(false);
-                    Debug.WriteLine("[MAKE HOLE] Reference length dimension hidden by SetVisible(false).");
+                    annotation.Visible = 0;
+                    Debug.WriteLine("[MAKE HOLE] Reference length dimension hidden by Visible.");
                     return true;
                 }
                 catch
@@ -5354,7 +5455,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                string text = ((dynamic)dimension).GetNameForSelection();
+                string text = dimension.GetNameForSelection();
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     return text;
@@ -5365,7 +5466,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                string text2 = ((dynamic)dimension).FullName;
+                string text2 = dimension.FullName;
                 if (!string.IsNullOrWhiteSpace(text2))
                 {
                     return text2;
@@ -5526,12 +5627,9 @@ namespace ADDIN.Commands
             {
                 return null;
             }
-            try
+            if (sketch is Feature directSketchFeature)
             {
-                return ((dynamic)sketch).GetFeature() as Feature;
-            }
-            catch
-            {
+                return directSketchFeature;
             }
             if (model == null)
             {
@@ -5895,14 +5993,7 @@ namespace ADDIN.Commands
                 // khong phai mot feature PropertyManager dang mo.
                 return false;
             }
-            try
-            {
-                return ((dynamic)model).GetEditTarget() != null;
-            }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
 
         private void StopPendingPatternEquationMonitor()
@@ -6256,7 +6347,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                dynamic equationMgr = model.GetEquationMgr();
+                IEquationMgr equationMgr = model.GetEquationMgr() as IEquationMgr;
                 if (equationMgr == null)
                 {
                     return false;
@@ -6265,7 +6356,7 @@ namespace ADDIN.Commands
                 int num = 0;
                 try
                 {
-                    num = Convert.ToInt32(equationMgr.GetCount(), CultureInfo.InvariantCulture);
+                    num = equationMgr.GetCount();
                 }
                 catch
                 {
@@ -6293,7 +6384,7 @@ namespace ADDIN.Commands
                 }
                 catch
                 {
-                    equationMgr.Add(equation);
+                    equationMgr.Add(-1, equation);
                 }
                 TryRebuildEquations(equationMgr, model);
                 return true;
@@ -6314,7 +6405,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                dynamic equationMgr = model.GetEquationMgr();
+                IEquationMgr equationMgr = model.GetEquationMgr() as IEquationMgr;
                 if (equationMgr == null)
                 {
                     return false;
@@ -6322,7 +6413,7 @@ namespace ADDIN.Commands
                 int num = 0;
                 try
                 {
-                    num = Convert.ToInt32(equationMgr.GetCount(), CultureInfo.InvariantCulture);
+                    num = equationMgr.GetCount();
                 }
                 catch
                 {
@@ -6345,7 +6436,6 @@ namespace ADDIN.Commands
                         }
                         catch
                         {
-                            equationMgr.Delete(num2, true);
                         }
                         TryRebuildEquations(equationMgr, model);
                         Debug.WriteLine("[MAKE HOLE] Deleted equation: " + text);
@@ -6370,7 +6460,7 @@ namespace ADDIN.Commands
             bool flag = false;
             try
             {
-                dynamic equationMgr = model.GetEquationMgr();
+                IEquationMgr equationMgr = model.GetEquationMgr() as IEquationMgr;
                 if (equationMgr == null)
                 {
                     return false;
@@ -6378,7 +6468,7 @@ namespace ADDIN.Commands
                 int num = 0;
                 try
                 {
-                    num = Convert.ToInt32(equationMgr.GetCount(), CultureInfo.InvariantCulture);
+                    num = equationMgr.GetCount();
                 }
                 catch
                 {
@@ -6401,7 +6491,6 @@ namespace ADDIN.Commands
                         }
                         catch
                         {
-                            equationMgr.Delete(num2, true);
                         }
                         flag = true;
                         Debug.WriteLine("[MAKE HOLE] Deleted related equation: " + text);
@@ -6419,11 +6508,11 @@ namespace ADDIN.Commands
             return flag;
         }
 
-        private void TryRebuildEquations(dynamic equationManager, ModelDoc2 model)
+        private void TryRebuildEquations(IEquationMgr equationManager, ModelDoc2 model)
         {
             try
             {
-                equationManager.EvaluateAll();
+                equationManager?.EvaluateAll();
             }
             catch
             {
@@ -6899,14 +6988,7 @@ namespace ADDIN.Commands
             }
             catch
             {
-                try
-                {
-                    return ((dynamic)feature).Select(append);
-                }
-                catch
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -6935,14 +7017,7 @@ namespace ADDIN.Commands
             }
             catch
             {
-                try
-                {
-                    return ((dynamic)segment).Select(append);
-                }
-                catch
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -7167,14 +7242,7 @@ namespace ADDIN.Commands
             }
             catch
             {
-                try
-                {
-                    return ((dynamic)segment).Select(append);
-                }
-                catch
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -7271,14 +7339,7 @@ namespace ADDIN.Commands
             }
             catch
             {
-                try
-                {
-                    return ((dynamic)point).Select(append);
-                }
-                catch
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -7772,7 +7833,7 @@ namespace ADDIN.Commands
             Array array = null;
             try
             {
-                array = ((dynamic)face).GetLoops() as Array;
+                array = face.GetLoops() as Array;
             }
             catch (Exception ex)
             {
@@ -7790,13 +7851,17 @@ namespace ADDIN.Commands
             int innerLoopCount = 0;
             bool hadRoundHoleOnFace = false;
 
-            foreach (dynamic item in array)
+            foreach (object itemObj in array)
             {
+                if (!(itemObj is Loop item))
+                {
+                    continue;
+                }
                 num++;
                 bool flag = false;
                 try
                 {
-                    flag = (bool)item.IsOuter();
+                    flag = item.IsOuter();
                 }
                 catch
                 {
@@ -7867,10 +7932,10 @@ namespace ADDIN.Commands
                             hadRoundHoleOnFace = true;
                             double existingDiameterMm = existingDiameterM * 1000.0;
                             double targetWidthMm = looseSize.WidthM * 1000.0;
-                            
+
                             // Use Absolute difference to safely upgrade holes (e.g. Ø9.8 to 10x16)
                             double differenceMm = Math.Abs(targetWidthMm - existingDiameterMm);
-                            
+
                             sourceDiameterM = existingDiameterM;
                             equivalentDiameterM = existingDiameterM;
 
@@ -7890,7 +7955,7 @@ namespace ADDIN.Commands
                         {
                             // Fallback for deformed slot loops using Perimeter Logic
                             bool slotSizeOk = IsRepairLooseHoleLoopCandidate(
-                                list5, major, minor, looseSize, 
+                                list5, major, minor, looseSize,
                                 out perimeterM, out equivalentDiameterM, out filterReason);
 
                             if (slotSizeOk)
@@ -8040,7 +8105,7 @@ namespace ADDIN.Commands
             {
                 return null;
             }
-            dynamic featureManager = model.FeatureManager;
+            FeatureManager featureManager = model.FeatureManager;
             object[] array = edges.Cast<object>().ToArray();
             DispatchWrapper[] array2 = edges.Select((Edge edge) => new DispatchWrapper(edge)).ToArray();
             try
@@ -8435,7 +8500,7 @@ namespace ADDIN.Commands
                     Debug.WriteLine("[REPAIR HOLE] reference point face selected=" + flag + ", index=" + index);
                     if (flag)
                     {
-                        object raw = ((dynamic)model.FeatureManager).InsertReferencePoint(4, 0, 0.01, 1);
+                        object raw = model.FeatureManager.InsertReferencePoint(4, 0, 0.01, 1);
                         Feature feature = ExtractFirstFeature(raw);
                         if (feature != null)
                         {
@@ -8584,7 +8649,7 @@ namespace ADDIN.Commands
                 Debug.WriteLine("[REPAIR HOLE] delete body selected=" + flag + ", bodies=" + list.Count);
                 if (flag)
                 {
-                    if (((dynamic)model.FeatureManager).InsertDeleteBody2(false) is Feature feature)
+                    if (model.FeatureManager.InsertDeleteBody2(false) is Feature feature)
                     {
                         feature.Name = "RH-DelSurf";
                         deleteBodyFeature = feature;
@@ -8783,7 +8848,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                if ((bool)((dynamic)body).Select2(append, selectData))
+                if (body.Select2(append, selectData))
                 {
                     return true;
                 }
@@ -8794,7 +8859,7 @@ namespace ADDIN.Commands
             }
             try
             {
-                if ((bool)((dynamic)body).Select2(append, 0))
+                if (body.Select2(append, null))
                 {
                     return true;
                 }
@@ -8806,7 +8871,7 @@ namespace ADDIN.Commands
             string text = "";
             try
             {
-                text = Convert.ToString(((dynamic)body).Name, CultureInfo.InvariantCulture);
+                text = body.Name ?? "";
             }
             catch
             {
@@ -8827,17 +8892,6 @@ namespace ADDIN.Commands
                 {
                     Debug.WriteLine("[REPAIR HOLE] SelectByID2 SURFACEBODY failed: " + ex3.GetType().Name + " - " + ex3.Message);
                 }
-            }
-            try
-            {
-                if ((bool)((dynamic)body).Select(append))
-                {
-                    return true;
-                }
-            }
-            catch (Exception ex4)
-            {
-                Debug.WriteLine("[REPAIR HOLE] body Select failed: " + ex4.GetType().Name + " - " + ex4.Message);
             }
             return false;
         }
@@ -8909,35 +8963,30 @@ namespace ADDIN.Commands
         private List<double[]> GetRepairEdgeBoxPoints(Edge edge)
         {
             List<double[]> list = new List<double[]>();
-            double[] array = null;
+            if (edge == null)
+            {
+                return list;
+            }
+            double[] start = null;
+            double[] end = null;
             try
             {
-                array = ((dynamic)edge).GetBox() as double[];
+                start = (edge.GetStartVertex() as Vertex)?.GetPoint() as double[];
+                end = (edge.GetEndVertex() as Vertex)?.GetPoint() as double[];
             }
             catch
             {
             }
-            if (array == null || array.Length < 6)
-            {
-                try
-                {
-                    Entity entity = edge as Entity;
-                    array = ((dynamic)entity).GetBox() as double[];
-                }
-                catch
-                {
-                }
-            }
-            if (array == null || array.Length < 6)
+            if (start == null || end == null || start.Length < 3 || end.Length < 3)
             {
                 return list;
             }
-            double num = Math.Min(array[0], array[3]);
-            double num2 = Math.Min(array[1], array[4]);
-            double num3 = Math.Min(array[2], array[5]);
-            double num4 = Math.Max(array[0], array[3]);
-            double num5 = Math.Max(array[1], array[4]);
-            double num6 = Math.Max(array[2], array[5]);
+            double num = Math.Min(start[0], end[0]);
+            double num2 = Math.Min(start[1], end[1]);
+            double num3 = Math.Min(start[2], end[2]);
+            double num4 = Math.Max(start[0], end[0]);
+            double num5 = Math.Max(start[1], end[1]);
+            double num6 = Math.Max(start[2], end[2]);
             list.Add(new double[3] { num, num2, num3 });
             list.Add(new double[3] { num4, num5, num6 });
             list.Add(new double[3] { num, num5, num3 });
@@ -9292,7 +9341,7 @@ namespace ADDIN.Commands
                 reason = "khop dung sai chu vi slot. diff=" + diffAsSlot.ToString("0.###", CultureInfo.InvariantCulture) + "mm";
                 return true;
             }
-            
+
             if (diffAsCircle <= RepairRoundToleranceMm + 1E-06)
             {
                 reason = "khop dung sai nang cap tu lo tron meo. diff=" + diffAsCircle.ToString("0.###", CultureInfo.InvariantCulture) + "mm";
@@ -9833,7 +9882,7 @@ namespace ADDIN.Commands
                             SketchSegment dirLine = model.SketchManager.CreateLine(
                                 startSketch[0], startSketch[1], 0.0,
                                 endSketch[0], endSketch[1], 0.0);
-                            
+
                             if (dirLine != null)
                             {
                                 dirLine.ConstructionGeometry = true;
@@ -10744,14 +10793,10 @@ namespace ADDIN.Commands
             }
             try
             {
-                dynamic specificFeature = pointFeature.GetSpecificFeature2();
-                if ((object)specificFeature != null)
+                object specificFeature = pointFeature.GetSpecificFeature2();
+                if (specificFeature != null)
                 {
                     if (specificFeature is Entity entity && entity.Select4(append, null))
-                    {
-                        return true;
-                    }
-                    if ((bool)specificFeature.Select(append))
                     {
                         return true;
                     }
@@ -10827,14 +10872,7 @@ namespace ADDIN.Commands
             catch
             {
             }
-            try
-            {
-                return ((dynamic)circle).GetCenterPoint2() as SketchPoint;
-            }
-            catch
-            {
-                return null;
-            }
+            return null;
         }
 
         private double[] GetRepairCircleCenter(SketchSegment circle)
@@ -10909,7 +10947,7 @@ namespace ADDIN.Commands
                 }
                 catch
                 {
-                    flag = ((dynamic)circle).Select(false);
+                    flag = false;
                 }
                 if (flag)
                 {
@@ -11085,14 +11123,7 @@ namespace ADDIN.Commands
             {
                 return entity.Select4(append, null);
             }
-            try
-            {
-                return ((dynamic)face).Select(append);
-            }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
 
         private Feature TryCutBlind(ModelDoc2 model, double depthM)
@@ -11101,7 +11132,7 @@ namespace ADDIN.Commands
             {
                 return null;
             }
-            dynamic featureManager = model.FeatureManager;
+            FeatureManager featureManager = model.FeatureManager;
             bool[] array = new bool[2] { false, true };
             bool[] array2 = array;
             for (int i = 0; i < array2.Length; i++)
@@ -11127,7 +11158,7 @@ namespace ADDIN.Commands
                 bool flag2 = array3[j];
                 try
                 {
-                    Feature feature2 = featureManager.FeatureCut3(true, false, flag2, 0, 0, depthM, depthM, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, false, false, false, 0, 0, false, false) as Feature;
+                    Feature feature2 = featureManager.FeatureCut3(true, false, flag2, 0, 0, depthM, depthM, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, false, false, false, 0, 0.0, false) as Feature;
                     Debug.WriteLine("[REPAIR HOLE] FeatureCut3 blind depthMm=" + (depthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ", reverse=" + flag2 + ", result=" + ((feature2 == null) ? "null" : SafeFeatureName(feature2)));
                     if (feature2 != null)
                     {
@@ -11144,10 +11175,18 @@ namespace ADDIN.Commands
 
         private Feature TryCutThroughAll(ModelDoc2 model)
         {
-            dynamic featureManager = model.FeatureManager;
+            if (model == null)
+            {
+                return null;
+            }
+            FeatureManager featureManager = model.FeatureManager;
+            if (featureManager == null)
+            {
+                return null;
+            }
             try
             {
-                Feature feature = featureManager.FeatureCut4(true, false, false, 0, 1, 0.003, 0.01, false, false, false, false, 0.0174532925199433, 0.0174532925199433, false, false, false, false, true, true, true, true, true, false, 0, 0, false, false) as Feature;
+                Feature feature = featureManager.FeatureCut4(true, false, false, 0, 1, 0.003, 0.01, false, false, false, false, 0.0174532925199433, 0.0174532925199433, false, false, false, false, true, true, true, true, true, false, 0, 0.0, false, false) as Feature;
                 Debug.WriteLine("[MAKE HOLE] FeatureCut4 macro signature result=" + ((feature == null) ? "null" : SafeFeatureName(feature)));
                 if (feature != null)
                 {
@@ -11160,28 +11199,15 @@ namespace ADDIN.Commands
             }
             try
             {
-                Feature feature2 = featureManager.FeatureCut4(true, false, false, 1, 1, 0.01, 0.01, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, false, false, false, 0, 0, false, false, false, false, false);
-                Debug.WriteLine("[MAKE HOLE] FeatureCut4 extended signature result=" + ((feature2 == null) ? "null" : SafeFeatureName(feature2)));
-                if (feature2 != null)
-                {
-                    return feature2;
-                }
-            }
-            catch (Exception ex2)
-            {
-                Debug.WriteLine("[MAKE HOLE] FeatureCut4 extended signature failed: " + ex2.GetType().Name + " - " + ex2.Message);
-            }
-            try
-            {
-                Feature feature3 = featureManager.FeatureCut3(true, false, false, 1, 1, 0.01, 0.01, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, false, false, false, 0, 0, false, false);
+                Feature feature3 = featureManager.FeatureCut3(true, false, false, 1, 1, 0.01, 0.01, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, false, false, false, 0, 0.0, false) as Feature;
                 Debug.WriteLine("[MAKE HOLE] FeatureCut3 signature result=" + ((feature3 == null) ? "null" : SafeFeatureName(feature3)));
                 return feature3;
             }
             catch (Exception ex3)
             {
                 Debug.WriteLine("[MAKE HOLE] FeatureCut3 signature failed: " + ex3.GetType().Name + " - " + ex3.Message);
-                return null;
             }
+            return null;
         }
 
 

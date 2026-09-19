@@ -43,6 +43,7 @@ namespace ADDIN.Commands
         public string BomFileName { get; set; }
         public string ComponentName { get; set; }
         public string PartPath { get; set; }
+        public List<string> AssemblyPaths { get; } = new List<string>();
         public string Configuration { get; set; }
         public string FlatConfiguration { get; set; }
         public string Material { get; set; }
@@ -121,6 +122,7 @@ namespace ADDIN.Commands
         public string BomFileName { get; set; }
         public string ComponentName { get; set; }
         public string PartPath { get; set; }
+        public string AssemblyPath { get; set; }
         public string Configuration { get; set; }
         public string Material { get; set; }
         public string Thickness { get; set; }
@@ -132,6 +134,7 @@ namespace ADDIN.Commands
         private readonly DataGridView gridBom;
         private readonly SamePartToleranceOptions toleranceOptions;
         private readonly List<string> debugLines = new List<string>();
+        private string topLevelAssemblyPath = "";
 
         public CheckSamePartRunner(
             ISldWorks app,
@@ -151,8 +154,10 @@ namespace ADDIN.Commands
             SamePartCheckResult result = new SamePartCheckResult();
             debugLines.Clear();
             ModelDoc2 originalDocument = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+            topLevelAssemblyPath = GetAssemblyPath(originalDocument);
             bool oldCommandInProgress = false;
-            HashSet<string> processedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, SamePartItemResult> processedTargets =
+                new Dictionary<string, SamePartItemResult>(StringComparer.OrdinalIgnoreCase);
             List<SamePartItemResult> items = new List<SamePartItemResult>();
 
             try
@@ -195,10 +200,19 @@ namespace ADDIN.Commands
 
                         string key = ((target.PartPath ?? "").Trim() + "|" +
                             (target.Configuration ?? "").Trim()).ToUpperInvariant();
-                        if (key == "|" || !processedTargets.Add(key))
+                        if (key == "|")
                             continue;
 
+                        SamePartItemResult existingItem;
+                        if (processedTargets.TryGetValue(key, out existingItem))
+                        {
+                            AddAssemblyPath(existingItem, target.AssemblyPath);
+                            continue;
+                        }
+
                         SamePartItemResult item = CheckTarget(target, isCancellationRequested);
+                        AddAssemblyPath(item, target.AssemblyPath);
+                        processedTargets[key] = item;
                         if (!string.IsNullOrWhiteSpace(item.Error))
                         {
                             result.Errors.Add(item);
@@ -253,6 +267,7 @@ namespace ADDIN.Commands
                 Thickness = target.Thickness ?? "",
                 ThicknessKey = NormalizeThickness(target.Thickness)
             };
+            AddAssemblyPath(item, target.AssemblyPath);
 
             string partPath = (target.PartPath ?? "").Trim();
             if (partPath.Length == 0 || !File.Exists(partPath) ||
@@ -758,23 +773,26 @@ namespace ADDIN.Commands
                 string path = "";
                 string configuration = "";
                 string name = "";
+                string assemblyPath = "";
                 try { path = component.GetPathName() ?? ""; } catch { }
                 try { configuration = component.ReferencedConfiguration ?? ""; } catch { }
                 try { name = component.Name2 ?? ""; } catch { }
-                targets.Add(CreateTarget(row, path, configuration, name));
+                assemblyPath = GetContainingAssemblyPath(component);
+                targets.Add(CreateTarget(row, path, configuration, name, assemblyPath));
                 return;
             }
 
             string pathText = source as string;
             if (!string.IsNullOrWhiteSpace(pathText))
-                targets.Add(CreateTarget(row, pathText, "", GetCellText(row, 5)));
+                targets.Add(CreateTarget(row, pathText, "", GetCellText(row, 5), topLevelAssemblyPath));
         }
 
         private SamePartCheckTarget CreateTarget(
             DataGridViewRow row,
             string path,
             string configuration,
-            string componentName)
+            string componentName,
+            string assemblyPath)
         {
             return new SamePartCheckTarget
             {
@@ -785,8 +803,63 @@ namespace ADDIN.Commands
                 BomFileName = GetCellText(row, 5),
                 ComponentName = componentName ?? "",
                 PartPath = path ?? "",
+                AssemblyPath = assemblyPath ?? "",
                 Configuration = configuration ?? ""
             };
+        }
+
+        private string GetContainingAssemblyPath(Component2 component)
+        {
+            if (component == null)
+                return topLevelAssemblyPath ?? "";
+
+            try
+            {
+                Component2 parent = component.GetParent() as Component2;
+                while (parent != null)
+                {
+                    string parentPath = "";
+                    try { parentPath = parent.GetPathName() ?? ""; } catch { }
+                    if (string.Equals(Path.GetExtension(parentPath), ".SLDASM",
+                        StringComparison.OrdinalIgnoreCase))
+                        return parentPath;
+
+                    try { parent = parent.GetParent() as Component2; }
+                    catch { parent = null; }
+                }
+            }
+            catch
+            {
+            }
+
+            return topLevelAssemblyPath ?? "";
+        }
+
+        private static string GetAssemblyPath(ModelDoc2 model)
+        {
+            if (model == null)
+                return "";
+            try
+            {
+                string path = model.GetPathName() ?? "";
+                return string.Equals(Path.GetExtension(path), ".SLDASM",
+                    StringComparison.OrdinalIgnoreCase) ? path : "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private static void AddAssemblyPath(SamePartItemResult item, string assemblyPath)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(assemblyPath))
+                return;
+
+            string path = assemblyPath.Trim();
+            if (!item.AssemblyPaths.Any(existing =>
+                string.Equals(existing, path, StringComparison.OrdinalIgnoreCase)))
+                item.AssemblyPaths.Add(path);
         }
 
         private SamePartItemResult CreateErrorFromRow(DataGridViewRow row, string error)
@@ -1003,6 +1076,7 @@ namespace ADDIN.Commands
             if (item == null)
                 return;
             Log("PART: " + item.BuhinNo + " | " + item.PartPath);
+            Log("  Assembly: " + string.Join(" | ", item.AssemblyPaths));
             Log("  Config gap: " + item.Configuration);
             Log("  Config flat: " + item.FlatConfiguration);
             Log("  Material/Thickness: " + item.MaterialKey + " / " + item.ThicknessKey);
@@ -1891,19 +1965,19 @@ namespace ADDIN.Commands
                 return "AMBIG";
 
             for (int a = 0; a < unique.Count - 3; a++)
-            for (int b = a + 1; b < unique.Count - 2; b++)
-            for (int c = b + 1; c < unique.Count - 1; c++)
-            for (int d = c + 1; d < unique.Count; d++)
-            {
-                ThrowIfCanceled(isCancellationRequested);
-                double volume6 = SignedVolume6(
-                    unique[a].Item2,
-                    unique[b].Item2,
-                    unique[c].Item2,
-                    unique[d].Item2);
-                if (Math.Abs(volume6) > 1e-15)
-                    return volume6 > 0 ? "POS" : "NEG";
-            }
+                for (int b = a + 1; b < unique.Count - 2; b++)
+                    for (int c = b + 1; c < unique.Count - 1; c++)
+                        for (int d = c + 1; d < unique.Count; d++)
+                        {
+                            ThrowIfCanceled(isCancellationRequested);
+                            double volume6 = SignedVolume6(
+                                unique[a].Item2,
+                                unique[b].Item2,
+                                unique[c].Item2,
+                                unique[d].Item2);
+                            if (Math.Abs(volume6) > 1e-15)
+                                return volume6 > 0 ? "POS" : "NEG";
+                        }
             return "PLANAR";
         }
 
@@ -2298,7 +2372,7 @@ namespace ADDIN.Commands
                 {
                     "\u90e8\u54c1\u756a\u53f7", "Nh\u00f3m", "S\u1ed1 chi ti\u1ebft", "V\u1eadt li\u1ec7u", "B\u1ec1 d\u00e0y",
                     "C\u1ea5u h\u00ecnh", "C\u1ea5u h\u00ecnh tr\u1ea3i", "Gi\u00e1 tr\u1ecb kh\u00e1c nhau",
-                    "Ghi ch\u00fa", "K\u1ebft qu\u1ea3", "\u0110\u01b0\u1eddng d\u1eabn"
+                    "Ghi ch\u00fa", "K\u1ebft qu\u1ea3", "\u0110\u01b0\u1eddng d\u1eabn", "Assembly ch\u1ee9a Part"
                 };
                 for (int column = 0; column < headers.Length; column++)
                     sheet.Cells[1, column + 1] = headers[column];
@@ -2318,6 +2392,7 @@ namespace ADDIN.Commands
                     sheet.Cells[row, 10] = FormatStatusForExcel(group.Status);
                     sheet.Cells[row, 11] = string.Join(System.Environment.NewLine,
                         group.Items.Select(item => item.PartPath).Distinct(StringComparer.OrdinalIgnoreCase));
+                    sheet.Cells[row, 12] = FormatAssemblyLocations(group.Items);
                     ApplyRowColor(sheet, row, group.Status);
                     row++;
                 }
@@ -2335,6 +2410,7 @@ namespace ADDIN.Commands
                     sheet.Cells[row, 9] = FormatErrorForExcel(error.Error);
                     sheet.Cells[row, 10] = "KI\u1ec2M TRA";
                     sheet.Cells[row, 11] = error.PartPath;
+                    sheet.Cells[row, 12] = FormatAssemblyLocations(new[] { error });
                     ApplyRowColor(sheet, row, "CHECK");
                     row++;
                 }
@@ -2351,9 +2427,11 @@ namespace ADDIN.Commands
                 sheet.Columns[8].ColumnWidth = Math.Min(65, Math.Max(30, sheet.Columns[8].ColumnWidth));
                 sheet.Columns[9].ColumnWidth = Math.Min(48, Math.Max(24, sheet.Columns[9].ColumnWidth));
                 sheet.Columns[11].ColumnWidth = Math.Min(60, Math.Max(28, sheet.Columns[11].ColumnWidth));
+                sheet.Columns[12].ColumnWidth = Math.Min(60, Math.Max(28, sheet.Columns[12].ColumnWidth));
                 sheet.Columns[8].WrapText = true;
                 sheet.Columns[9].WrapText = true;
                 sheet.Columns[11].WrapText = true;
+                sheet.Columns[12].WrapText = true;
                 sheet.Application.ActiveWindow.SplitRow = 1;
                 sheet.Application.ActiveWindow.FreezePanes = true;
 
@@ -2381,6 +2459,35 @@ namespace ADDIN.Commands
                 ReleaseCom(workbook);
                 ReleaseCom(excel);
             }
+        }
+
+        private static string FormatAssemblyLocations(IEnumerable<SamePartItemResult> items)
+        {
+            if (items == null)
+                return "";
+
+            List<string> lines = new List<string>();
+            foreach (SamePartItemResult item in items)
+            {
+                if (item == null || item.AssemblyPaths == null || item.AssemblyPaths.Count == 0)
+                    continue;
+
+                string partLabel = (item.BuhinNo ?? "").Trim();
+                if (partLabel.Length == 0)
+                {
+                    try { partLabel = Path.GetFileName(item.PartPath ?? ""); }
+                    catch { partLabel = item.PartPath ?? ""; }
+                }
+
+                string assemblies = string.Join(" | ", item.AssemblyPaths
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase));
+                if (assemblies.Length > 0)
+                    lines.Add((partLabel.Length > 0 ? partLabel + ": " : "") + assemblies);
+            }
+
+            return string.Join(System.Environment.NewLine,
+                lines.Distinct(StringComparer.OrdinalIgnoreCase));
         }
 
         private static string ResolveOutputDirectory(string outputDirectory)

@@ -2457,14 +2457,35 @@ namespace ADDIN.Commands
             double dy = p2[1] - p1[1];
             double absDx = Math.Abs(dx);
             double absDy = Math.Abs(dy);
-            double tol = MmToM(OrthoTolMm);
-
-            bool isHorizontal = absDy <= tol && absDx > tol;
-            bool isVertical = absDx <= tol && absDy > tol;
-
             double lengthView = Math.Sqrt(dx * dx + dy * dy);
-            if (lengthView <= tol)
+
+            // IMPORTANT:
+            // p1/p2 are already in Drawing-View coordinates, so any tolerance
+            // expressed in model millimetres must be scaled to the view before
+            // comparing against dx/dy/lengthView.
+            //
+            // The old code used MmToM(OrthoTolMm) (= 0.5 mm on the sheet) both
+            // for H/V classification and as a minimum edge length. At small view
+            // scales this deleted perfectly valid short model edges. Example from
+            // a small-scale debug case: a real 4 mm edge at scale 1:15 became 0.266667 mm
+            // on the sheet and was rejected by the old fixed 0.5 mm threshold.
+            double orthoTolView = MmToViewM(OrthoTolMm);
+
+            // Only reject a truly degenerate line. Keep this independent from
+            // OrthoTolMm so short thickness/end-cap edges are never discarded.
+            double minEdgeLengthView = Math.Max(MmToViewM(0.001), 1e-12);
+            if (lengthView <= minEdgeLengthView)
+            {
+                Debug.WriteLine(
+                    "[DIM MAT CAT GEO] DROP DEGENERATE LINE"
+                    + ", sheetLen=" + (lengthView * 1000.0).ToString("0.######") + " mm"
+                    + ", modelLen=" + MToMm(lengthView).ToString("0.######") + " mm"
+                    + ", scale=" + viewScale.ToString("0.######"));
                 return null;
+            }
+
+            bool isHorizontal = absDy <= orthoTolView && absDx > minEdgeLengthView;
+            bool isVertical = absDx <= orthoTolView && absDy > minEdgeLengthView;
 
             double dirX = dx / lengthView;
             double dirY = dy / lengthView;
@@ -3433,7 +3454,7 @@ namespace ADDIN.Commands
                             {
                                 double thkMm = knownThicknessMm > 0.001 ? knownThicknessMm : EstimateMaterialThicknessMm(edges);
                                 EdgeInfo outerMate = FindParallelMateAtThickness(perpendicularEdge, edges, thkMm);
-                                
+
                                 double boundX = otherJoint.X;
                                 double boundY = otherJoint.Y;
 

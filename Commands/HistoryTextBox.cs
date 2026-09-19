@@ -36,17 +36,21 @@ namespace ADDIN.Commands
             dropDownButton.Margin = new Padding(0);
             dropDownButton.Padding = new Padding(0);
             dropDownButton.TabStop = false;
-            dropDownButton.Text = "\u25BC";
-            dropDownButton.Width = 22;
+            dropDownButton.Text = "▼";
+            dropDownButton.Font = new Font("Segoe UI", 6.5F, FontStyle.Regular);
+            dropDownButton.ForeColor = Color.FromArgb(100, 116, 139);
+            dropDownButton.BackColor = Color.FromArgb(246, 248, 250);
+            dropDownButton.Cursor = Cursors.Hand;
+            dropDownButton.Width = 20;
             dropDownButton.Click += DropDownButton_Click;
 
             historyMenu = new ContextMenuStrip();
             historyMenu.ShowImageMargin = false;
 
-            BackColor = SystemColors.Window;
+            BackColor = Color.White;
             BorderStyle = BorderStyle.FixedSingle;
             MinimumSize = new Size(40, 23);
-            Padding = new Padding(3, 3, 0, 2);
+            Padding = new Padding(3, 2, 0, 2);
             Size = new Size(180, 23);
 
             Controls.Add(inputTextBox);

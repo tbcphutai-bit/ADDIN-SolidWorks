@@ -955,10 +955,12 @@ namespace ADDIN.Commands
 
             foreach (ITableAnnotation table in GetTables(drawingModel))
             {
-                int buhinNoCol = FindBuhinNoSortColumnIndex(table);
+                int headerRow;
+                int buhinNoCol = FindBuhinNoSortColumnIndex(table, out headerRow);
                 if (buhinNoCol < 0)
                 {
-                    Debug.WriteLine("[XEP UNIT] Skip table: cannot find BuhinNo column");
+                    Debug.WriteLine("[XEP UNIT] Skip table: cannot find 部品番号 / Part No. / Part № column");
+                    DebugTableHeaderCandidates(table);
                     continue;
                 }
 
@@ -969,14 +971,14 @@ namespace ADDIN.Commands
                     continue;
                 }
 
-                if (SortBomTableByBuhinNo(bomTable, buhinNoCol))
+                if (SortBomTableByBuhinNo(bomTable, buhinNoCol, headerRow))
                     sortedTables++;
             }
 
             return sortedTables;
         }
 
-        private bool SortBomTableByBuhinNo(IBomTableAnnotation bomTable, int buhinNoCol)
+        private bool SortBomTableByBuhinNo(IBomTableAnnotation bomTable, int buhinNoCol, int headerRow)
         {
             try
             {
@@ -997,18 +999,20 @@ namespace ADDIN.Commands
                 TryForceRenumberItemNumbers(sortData);
 
                 ITableAnnotation table = bomTable as ITableAnnotation;
-                Debug.WriteLine("[XEP UNIT] Sort before. column=" + buhinNoCol + ", preview=" + GetBomSortPreview(table, buhinNoCol));
+                Debug.WriteLine("[XEP UNIT] Sort before. headerRow=" + headerRow + ", column=" + buhinNoCol + ", preview=" + GetBomSortPreview(table, buhinNoCol, headerRow));
                 bool sorted = bomTable.Sort(sortData);
-                bool manualSorted = SortTableRowsManually(table, buhinNoCol);
+                bool manualSorted = SortTableRowsManually(table, buhinNoCol, headerRow);
 
                 Debug.WriteLine("[XEP UNIT] Sort result="
                     + sorted
                     + ", manualSorted="
                     + manualSorted
+                    + ", headerRow="
+                    + headerRow
                     + ", column="
                     + buhinNoCol
                     + ", previewAfter="
-                    + GetBomSortPreview(table, buhinNoCol));
+                    + GetBomSortPreview(table, buhinNoCol, headerRow));
                 return sorted || manualSorted;
             }
             catch (Exception ex)
@@ -1018,16 +1022,20 @@ namespace ADDIN.Commands
             }
         }
 
-        private bool SortTableRowsManually(ITableAnnotation table, int sortColumn)
+        private bool SortTableRowsManually(ITableAnnotation table, int sortColumn, int headerRow)
         {
-            if (table == null || sortColumn < 0 || table.RowCount <= 2)
+            int firstDataRow = Math.Max(0, headerRow + 1);
+            if (table == null || sortColumn < 0 || firstDataRow >= table.RowCount)
                 return false;
 
             try
             {
                 List<string> desiredKeys = new List<string>();
-                for (int row = 1; row < table.RowCount; row++)
-                    desiredKeys.Add((table.get_Text(row, sortColumn) ?? "").Trim());
+                for (int row = firstDataRow; row < table.RowCount; row++)
+                    desiredKeys.Add(GetNormalizedSortCellText(table, row, sortColumn));
+
+                if (desiredKeys.Count <= 1)
+                    return false;
 
                 List<string> sortedKeys = new List<string>(desiredKeys);
                 sortedKeys.Sort(CompareNaturalValues);
@@ -1049,9 +1057,9 @@ namespace ADDIN.Commands
                 }
 
                 bool movedAny = false;
-                for (int targetRow = 1; targetRow < table.RowCount; targetRow++)
+                for (int targetRow = firstDataRow; targetRow < table.RowCount; targetRow++)
                 {
-                    string targetKey = sortedKeys[targetRow - 1];
+                    string targetKey = sortedKeys[targetRow - firstDataRow];
                     int currentRow = FindCurrentRowBySortKey(table, sortColumn, targetKey, targetRow);
                     if (currentRow < 0 || currentRow == targetRow)
                         continue;
@@ -1086,12 +1094,34 @@ namespace ADDIN.Commands
         {
             for (int row = startRow; row < table.RowCount; row++)
             {
-                string key = (table.get_Text(row, sortColumn) ?? "").Trim();
+                string key = GetNormalizedSortCellText(table, row, sortColumn);
                 if (string.Equals(key, targetKey, StringComparison.Ordinal))
                     return row;
             }
 
             return -1;
+        }
+
+        private string GetNormalizedSortCellText(ITableAnnotation table, int row, int column)
+        {
+            if (table == null || row < 0 || column < 0 || column >= table.ColumnCount)
+                return "";
+
+            string text = table.get_Text(row, column) ?? "";
+
+            // SolidWorks may return rich-text tags such as:
+            // <FONT size=12PTS>22
+            // The visible value is 22, but sorting the raw text would put it
+            // after normal numeric rows. Strip all annotation formatting first.
+            text = NormalizeHeaderText(text);
+
+            // Normalize spaces that can be present in English/Japanese templates.
+            text = text
+                .Replace("\u00A0", " ")   // non-breaking space
+                .Replace("\u3000", " ")   // full-width Japanese space
+                .Trim();
+
+            return text;
         }
 
         private int CompareNaturalValues(string left, string right)
@@ -1180,7 +1210,7 @@ namespace ADDIN.Commands
             }
         }
 
-        private string GetBomSortPreview(ITableAnnotation table, int sortColumn)
+        private string GetBomSortPreview(ITableAnnotation table, int sortColumn, int headerRow)
         {
             if (table == null || sortColumn < 0)
                 return "";
@@ -1188,12 +1218,13 @@ namespace ADDIN.Commands
             try
             {
                 List<string> values = new List<string>();
-                int maxRow = Math.Min(table.RowCount, 6);
-                for (int row = 1; row < maxRow; row++)
+                int firstDataRow = Math.Max(0, headerRow + 1);
+                int maxRow = Math.Min(table.RowCount, firstDataRow + 5);
+                for (int row = firstDataRow; row < maxRow; row++)
                 {
-                    string itemNo = table.ColumnCount > 0 ? table.get_Text(row, 0) : "";
-                    string sortValue = table.get_Text(row, sortColumn);
-                    values.Add((itemNo ?? "").Trim() + ":" + (sortValue ?? "").Trim());
+                    string itemNo = table.ColumnCount > 0 ? GetNormalizedSortCellText(table, row, 0) : "";
+                    string sortValue = GetNormalizedSortCellText(table, row, sortColumn);
+                    values.Add(itemNo + ":" + sortValue);
                 }
 
                 return string.Join(" | ", values.ToArray());
@@ -1291,16 +1322,103 @@ namespace ADDIN.Commands
             return tables;
         }
 
-        private int FindBuhinNoSortColumnIndex(ITableAnnotation table)
+        private int FindBuhinNoSortColumnIndex(ITableAnnotation table, out int headerRow)
         {
-            const string rawBuhinNoHeader = "<FONT size=12PTS>\u90e8\u54c1\u756a\u53f7";
-            const string buhinNoHeader = "\u90e8\u54c1\u756a\u53f7";
+            headerRow = -1;
+            if (table == null)
+                return -1;
 
-            int rawIndex = FindColumnIndex(table, rawBuhinNoHeader, true);
-            if (rawIndex >= 0)
-                return rawIndex;
+            // Some English templates have a merged/title row above the real
+            // header row. Therefore do not assume the header is always row 0.
+            int rowsToScan = Math.Min(table.RowCount, 6);
+            for (int row = 0; row < rowsToScan; row++)
+            {
+                for (int col = 0; col < table.ColumnCount; col++)
+                {
+                    string header = table.get_Text(row, col);
+                    string normalized = NormalizeHeaderText(header);
+                    string key = NormalizePartNoHeaderKey(normalized);
 
-            return FindColumnIndex(table, buhinNoHeader, false);
+                    if (key == "部品番号" ||
+                        key == "PARTNO" ||
+                        key == "PARTNUMBER")
+                    {
+                        headerRow = row;
+                        Debug.WriteLine(
+                            "[XEP UNIT] Sort column detected. header=" + normalized +
+                            ", headerRow=" + row +
+                            ", column=" + col);
+                        return col;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        private string NormalizePartNoHeaderKey(string value)
+        {
+            string text = NormalizeHeaderText(value);
+            if (string.IsNullOrWhiteSpace(text))
+                return "";
+
+            // English templates may use several different glyphs for "No.":
+            // Part No. / Part  № / Part Nº / Part N° / Part Number.
+            // Convert those glyphs to the same token before stripping spacing/punctuation.
+            text = text
+                .Replace("№", "NO")     // Unicode NUMERO SIGN (U+2116)
+                .Replace("º", "O")      // masculine ordinal used in Nº
+                .Replace("°", "O");     // degree sign sometimes used in N°
+
+            // Ignore spaces, line breaks and punctuation so all variants normalize to PARTNO.
+            text = text
+                .Replace(" ", "")
+                .Replace("\t", "")
+                .Replace("\r", "")
+                .Replace("\n", "")
+                .Replace("\u00A0", "")
+                .Replace("\u3000", "")
+                .Replace(".", "")
+                .Replace("．", "")
+                .Replace("-", "")
+                .Replace("_", "")
+                .Replace(":", "")
+                .Replace("#", "NO");
+
+            return text.ToUpperInvariant();
+        }
+
+        private void DebugTableHeaderCandidates(ITableAnnotation table)
+        {
+            if (table == null)
+                return;
+
+            try
+            {
+                int maxRows = Math.Min(table.RowCount, 4);
+                for (int row = 0; row < maxRows; row++)
+                {
+                    List<string> cells = new List<string>();
+                    for (int col = 0; col < table.ColumnCount; col++)
+                    {
+                        string raw = table.get_Text(row, col) ?? "";
+                        string normalized = NormalizeHeaderText(raw)
+                            .Replace("\r", " ")
+                            .Replace("\n", " ")
+                            .Trim();
+
+                        if (!string.IsNullOrWhiteSpace(normalized))
+                            cells.Add("C" + col + "='" + normalized + "'");
+                    }
+
+                    if (cells.Count > 0)
+                        Debug.WriteLine("[XEP UNIT] Header scan row " + row + ": " + string.Join(" | ", cells.ToArray()));
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[XEP UNIT] Header scan failed: " + ex.Message);
+            }
         }
 
         private int FindColumnIndex(ITableAnnotation table, string headerName, bool exactText)

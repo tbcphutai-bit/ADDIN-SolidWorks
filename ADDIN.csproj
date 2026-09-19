@@ -91,6 +91,56 @@
     </Compile>
     <Compile Include="BomLoader.cs" />
     <Compile Include="Commands\CreateMirrorPartPackage.cs" />
+    <Compile Include="Commands\MirrorV7\BipartiteEquivalenceMatcherV7.cs" />
+    <Compile Include="Commands\MirrorV7\BodyMirrorVerifierV7.cs" />
+    <Compile Include="Commands\MirrorV7\CanonicalPartMirrorPlaneV7.cs" />
+    <Compile Include="Commands\MirrorV7\CrossDocumentReferenceAuditV7.cs" />
+    <Compile Include="Commands\MirrorV7\FeatureDefinitionCaptureV7.cs" />
+    <Compile Include="Commands\MirrorV7\FeatureReconstructionInventoryV7.cs" />
+    <Compile Include="Commands\MirrorV7\FeatureTreeScannerV7.cs" />
+    <Compile Include="Commands\MirrorV7\FeatureTypeHelperV7.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Core\MirrorInPlaceModels.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Core\MirrorInPlaceOrchestrator.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Diagnostics\BaseFeatureDiagnosticEngine.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Handlers\FeatureDispatcher.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Mutation\BaseSketchMutationEngine.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\RollbackReplayEngine.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Validation\SemanticValidator.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorSourceBaselineV7.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorV7Context.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorV7Diagnostics.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorV7Plane.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorV7Types.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorWorkingCopyV7.cs" />
+    <Compile Include="Commands\MirrorV7\NativePartMirrorV7.cs" />
+    <Compile Include="Commands\MirrorV7\PartCapabilityAuditV7.cs" />
+    <Compile Include="Commands\MirrorV7\PartMirrorEngineV7.cs" />
+    <Compile Include="Commands\MirrorV7\PartReflectionTransformV7.cs" />
+    <Compile Include="Commands\MirrorV7\PersistReferenceV7.cs" />
+    <Compile Include="Commands\MirrorV7\PersistentReferenceAuditResultV7.cs" />
+    <Compile Include="Commands\MirrorV7\PersistentReferenceAuditV7.cs" />
+    <Compile Include="Commands\MirrorV7\PersistentReferenceServiceV7.cs" />
+    <Compile Include="Commands\MirrorV7\ReflectionApiTransformV7.cs" />
+    <Compile Include="Commands\MirrorV7\ReflectionMathSelfTestV7.cs" />
+    <Compile Include="Commands\MirrorV7\SingleSketchMutationServiceV7.cs" />
+    <Compile Include="Commands\MirrorV7\SingleSketchMutationV7Types.cs" />
+    <Compile Include="Commands\MirrorV7\SingleSketchMutationVerifierV7.cs" />
+    <Compile Include="Commands\MirrorV7\SingleSketchTargetBuilderV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchIntegrityValidatorV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchMirrorPlanV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchMirrorPlannerV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchMutationGuardV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchMutationMathV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchOwnershipGuardV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchOwnershipResolverV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSelectionResultV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSnapshotAuditResultV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSnapshotAuditV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSnapshotServiceV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSnapshotV7.cs" />
+    <Compile Include="Commands\MirrorV7\SlotCopyComparisonV7.cs" />
+    <Compile Include="Commands\MirrorV7\UnconstrainedLineSketchReflectionV7.cs" />
+    <Compile Include="Commands\MirrorV7\WorkingCopyEquivalenceAuditV7.cs" />
     <Compile Include="Commands\DeleteYellowAnnotationsDialog.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -147,6 +197,8 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Commands\DimKichThuocLo.cs" />
+    <Compile Include="Commands\LenhDimCanhSongSong.Envelope.cs" />
+    <Compile Include="Commands\SectionProfilePlanner.cs" />
     <Compile Include="Commands\RepairDimModels.cs" />
     <Compile Include="Commands\RepairDimGeometry.cs" />
     <Compile Include="Commands\RepairDimCandidateFinder.cs" />
@@ -161,16 +213,25 @@
     <Compile Include="Helpers\ExtrudeCutRecoveryHelper.cs" />
     <Compile Include="Helpers\TopologyEdgeMatcher.cs" />
     <Compile Include="Helpers\SketchOperationsHelper.cs" />
+    <Compile Include="Helpers\EdgeFlangeRepairManager.cs" />
+    <Compile Include="Helpers\FeatureOptionsCaptureHelper.cs" />
     <Compile Include="UI\UIHelper.cs" />
     <Compile Include="UI\ModernButton.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\ModernFieldBox.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="UI\ModernCard.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="UI\ModernTabControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="UI\GridStyler.cs" />
     <Compile Include="SWAddin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Commands\EdgeToEqualSplineCommand.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="tai.snk" />

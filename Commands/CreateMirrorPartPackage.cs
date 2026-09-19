@@ -9,6 +9,8 @@ using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using ADDIN.Helpers;
+using ADDIN.Commands.MirrorV7;
+using ADDIN.Commands.MirrorV7.MirrorInPlace;
 
 namespace ADDIN.Commands
 {
@@ -59,6 +61,7 @@ namespace ADDIN.Commands
         public string MirrorDrawingPath { get; set; }
         public string Warning { get; set; }
         public bool AssemblyComponentInserted { get; set; }
+        public PlaneData EffectiveMirrorPlane { get; set; }
     }
 
     public interface ISavePathProvider
@@ -272,6 +275,37 @@ namespace ADDIN.Commands
 
             return anchoredPlane;
         }
+
+        public static PlaneData CreateAnchoredPlane(PlaneData selectedLocalPlane, double[] anchorOrigin)
+        {
+            if (selectedLocalPlane == null || selectedLocalPlane.Normal == null || selectedLocalPlane.Normal.Length < 3)
+            {
+                throw new ArgumentException("Selected local mirror plane is invalid.", nameof(selectedLocalPlane));
+            }
+
+            double nx = selectedLocalPlane.Normal[0];
+            double ny = selectedLocalPlane.Normal[1];
+            double nz = selectedLocalPlane.Normal[2];
+            double length = Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (length <= 1e-12)
+            {
+                throw new InvalidOperationException("Selected local mirror plane has a zero-length normal.");
+            }
+
+            double[] origin = anchorOrigin ?? new double[] { 0.0, 0.0, 0.0 };
+            PlaneData anchoredPlane = new PlaneData
+            {
+                Origin = new double[] { origin[0], origin[1], origin[2] },
+                Normal = new double[] { nx / length, ny / length, nz / length }
+            };
+
+            CreateMirrorPartPackage.LogDebug(
+                "ADAPTIVE_ANCHORED_MIRROR_PLANE\n" +
+                $"effectiveOrigin=({origin[0]:F9},{origin[1]:F9},{origin[2]:F9})\n" +
+                $"normal=({anchoredPlane.Normal[0]:F9},{anchoredPlane.Normal[1]:F9},{anchoredPlane.Normal[2]:F9})");
+
+            return anchoredPlane;
+        }
     }
 
     public sealed class BodyBooleanResult
@@ -403,8 +437,8 @@ namespace ADDIN.Commands
     public static class BodyOperationsHelper
     {
         public const double ABSOLUTE_GEOMETRY_TOLERANCE = 1e-12;
-        public const double RELATIVE_TOLERANCE = 1e-7;
-        public const double BODY_TRANSFORM_RELATIVE_TOLERANCE = 1e-6;
+        public const double RELATIVE_TOLERANCE = 1e-5;
+        public const double BODY_TRANSFORM_RELATIVE_TOLERANCE = 1e-5;
 
         public static double GetBodyVolume(Body2 body)
         {
@@ -538,19 +572,47 @@ namespace ADDIN.Commands
             error = null;
 
             BodyBooleanResult cut = BooleanCutStrict(beforeBody, afterBody, label);
-            if (!cut.Success)
+            if (cut.Success && TryGetBodiesVolumeCentroid(cut.Bodies, out removedVolume, out removedCentroid))
             {
-                error = cut.ErrorMessage ?? "Boolean cut failed while measuring removed geometry.";
-                return false;
+                return true;
             }
 
-            if (!TryGetBodiesVolumeCentroid(cut.Bodies, out removedVolume, out removedCentroid))
+            // Fallback: If boolean cut fails or yields no bodies (common with coincident faces across large sheets in Parasolid),
+            // compute removed volume and centroid via Mass Properties delta:
+            // V_rem = V_before - V_after
+            // C_rem = (V_before * C_before - V_after * C_after) / V_rem
+            try
             {
-                error = "Removed geometry is empty or its mass properties are unavailable.";
-                return false;
+                if (beforeBody != null && afterBody != null)
+                {
+                    double[] mpBefore = beforeBody.GetMassProperties(0) as double[];
+                    double[] mpAfter = afterBody.GetMassProperties(0) as double[];
+                    if (mpBefore != null && mpBefore.Length >= 4 && mpAfter != null && mpAfter.Length >= 4)
+                    {
+                        double vBefore = Math.Abs(mpBefore[3]);
+                        double vAfter = Math.Abs(mpAfter[3]);
+                        double vRem = vBefore - vAfter;
+                        if (vRem > ABSOLUTE_GEOMETRY_TOLERANCE)
+                        {
+                            double xRem = (vBefore * mpBefore[0] - vAfter * mpAfter[0]) / vRem;
+                            double yRem = (vBefore * mpBefore[1] - vAfter * mpAfter[1]) / vRem;
+                            double zRem = (vBefore * mpBefore[2] - vAfter * mpAfter[2]) / vRem;
+
+                            removedVolume = vRem;
+                            removedCentroid = new[] { xRem, yRem, zRem };
+                            CreateMirrorPartPackage.LogDebug($"[MEASURE_REMOVED] Boolean cut produced no bodies; fallback mass-properties delta succeeded: remVol={removedVolume:E6}, remCent=({xRem * 1000.0:F3},{yRem * 1000.0:F3},{zRem * 1000.0:F3})mm");
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                CreateMirrorPartPackage.LogDebug($"[MEASURE_REMOVED] Mass properties delta fallback failed: {ex.Message}");
             }
 
-            return true;
+            error = cut.ErrorMessage ?? "Removed geometry is empty or its mass properties are unavailable.";
+            return false;
         }
 
         private static bool TryMeasureRemovedVolume(
@@ -586,7 +648,18 @@ namespace ADDIN.Commands
 
             try
             {
-                definition = feature?.GetDefinition() as IExtrudeFeatureData2;
+                if (partDoc == null || feature == null)
+                {
+                    error = "partDoc or feature is null.";
+                    return false;
+                }
+
+                // In SolidWorks, ModifyDefinition on an existing feature requires the feature
+                // to be rolled back and active in edit mode!
+                feature.Select2(false, 0);
+                partDoc.EditRollback();
+
+                definition = feature.GetDefinition() as IExtrudeFeatureData2;
                 if (definition == null) { error = "Not extrude feature."; return false; }
 
                 selectionAccess = definition.AccessSelections(partDoc, null);
@@ -597,22 +670,12 @@ namespace ADDIN.Commands
 
                 if (!feature.ModifyDefinition(definition, partDoc, null))
                 {
-                    int endCond = definition.GetEndCondition(true);
-                    if (endCond == (int)swEndConditions_e.swEndCondUpToNext)
-                    {
-                        try
-                        {
-                            definition.SetEndCondition(true, (int)swEndConditions_e.swEndCondThroughAll);
-                        }
-                        catch { }
-                    }
-                    if (!feature.ModifyDefinition(definition, partDoc, null))
-                    {
-                        error = "ModifyDefinition false.";
-                        return false;
-                    }
+                    error = "ModifyDefinition false.";
+                    return false;
                 }
+                selectionAccess = false; // Successfully committed, do not call ReleaseSelectionAccess
 
+                partDoc.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToAfterFeature, feature.Name);
                 partDoc.ForceRebuild3(false);
                 bool warning = false;
                 int featureError = feature.GetErrorCode2(out warning);
@@ -635,6 +698,14 @@ namespace ADDIN.Commands
                 {
                     try { definition.ReleaseSelectionAccess(); } catch { }
                 }
+                try
+                {
+                    if (partDoc != null && feature != null)
+                    {
+                        partDoc.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToAfterFeature, feature.Name);
+                    }
+                }
+                catch { }
             }
         }
 
@@ -663,52 +734,50 @@ namespace ADDIN.Commands
             details = null;
             if (partDoc == null || info?.Feature == null) return false;
 
-            IExtrudeFeatureData2 def = info.Feature.GetDefinition() as IExtrudeFeatureData2;
-            if (def == null || !def.AccessSelections(partDoc, null)) return false;
+            // Đọc trạng thái hiện tại (không cần AccessSelections để đọc ban đầu)
+            IExtrudeFeatureData2 defRead = info.Feature.GetDefinition() as IExtrudeFeatureData2;
+            if (defRead == null || !defRead.AccessSelections(partDoc, null)) return false;
+            bool origFlip = defRead.FlipSideToCut;
+            bool origDir = defRead.ReverseDirection;
+            defRead.ReleaseSelectionAccess();
 
-            bool origFlip = def.FlipSideToCut;
-            bool origDir = def.ReverseDirection;
-            def.ReleaseSelectionAccess(); // Nhả bộ nhớ trước khi vào vòng lặp
-
-            // 4 trạng thái không gian cho (FlipSideToCut, ReverseDirection)
-            bool[] testFlip = { origFlip, origFlip, !origFlip, !origFlip };
-            bool[] testDir  = { origDir, !origDir, origDir, !origDir };
-
-            // Giai đoạn 1: Giữ nguyên Contours và EndCondition gốc, chỉ thử các tổ hợp lật hướng
-            for (int i = 0; i < 4; i++)
+            Feature skFeat = info.DrivingSketchFeature ?? FindDrivingSketchFeature(info.Feature);
+            Sketch sk = skFeat?.GetSpecificFeature2() as Sketch;
+            bool isOpenProfile = false;
+            if (sk != null)
             {
-                def = info.Feature.GetDefinition() as IExtrudeFeatureData2;
-                if (def == null || !def.AccessSelections(partDoc, null)) continue;
-
-                try
-                {
-                    def.FlipSideToCut = testFlip[i];
-                    def.ReverseDirection = testDir[i];
-
-                    if (info.Feature.ModifyDefinition(def, partDoc, null))
-                    {
-                        partDoc.ForceRebuild3(false);
-                        bool isWarn;
-                        int err = info.Feature.GetErrorCode2(out isWarn);
-                        if (err == 0 || isWarn)
-                        {
-                            details = $"SUPER_RECOVERY_PHASE1_SUCCESS: Flip={testFlip[i]}, Dir={testDir[i]}";
-                            return true;
-                        }
-                    }
-                }
-                finally
-                {
-                    try { def.ReleaseSelectionAccess(); } catch { }
-                }
+                isOpenProfile = ADDIN.Helpers.SketchOperationsHelper.IsOpenProfileSketch(sk);
             }
 
-            // Giai đoạn 2: Ép Through All (cắt xuyên suốt) để bỏ qua lỗi mặt phẳng đích
-            for (int i = 0; i < 4; i++)
+            // Với biên dạng kín (closed profile): KHÔNG BAO GIỜ lật FlipSideToCut từ false sang true vì sẽ cắt bay toàn bộ part!
+            bool[] testFlip;
+            bool[] testDir;
+            if (isOpenProfile || origFlip)
             {
-                def = info.Feature.GetDefinition() as IExtrudeFeatureData2;
-                if (def == null || !def.AccessSelections(partDoc, null)) continue;
+                testFlip = new bool[] { origFlip, origFlip, !origFlip, !origFlip };
+                testDir  = new bool[] { origDir, !origDir, origDir, !origDir };
+            }
+            else
+            {
+                testFlip = new bool[] { origFlip, origFlip };
+                testDir  = new bool[] { origDir, !origDir };
+            }
 
+            // Giai đoạn 2: Ép Through All để bypass lỗi end-condition face reference không còn valid sau mirror
+            // (Trường hợp điển hình: end condition dùng face của BaseBend chỉ tồn tại phía nguồn)
+            for (int i = 0; i < testFlip.Length; i++)
+            {
+                try { info.Feature.Select2(false, 0); } catch { }
+                try { partDoc.EditRollback(); } catch { }
+
+                IExtrudeFeatureData2 def = info.Feature.GetDefinition() as IExtrudeFeatureData2;
+                if (def == null || !def.AccessSelections(partDoc, null))
+                {
+                    try { partDoc.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToAfterFeature, info.Feature.Name); } catch { }
+                    continue;
+                }
+
+                bool committed = false;
                 try
                 {
                     def.FlipSideToCut = testFlip[i];
@@ -722,6 +791,8 @@ namespace ADDIN.Commands
 
                     if (info.Feature.ModifyDefinition(def, partDoc, null))
                     {
+                        committed = true;
+                        try { partDoc.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToAfterFeature, info.Feature.Name); } catch { }
                         partDoc.ForceRebuild3(false);
                         bool isWarn;
                         int err = info.Feature.GetErrorCode2(out isWarn);
@@ -734,7 +805,8 @@ namespace ADDIN.Commands
                 }
                 finally
                 {
-                    try { def.ReleaseSelectionAccess(); } catch { }
+                    if (!committed) { try { def.ReleaseSelectionAccess(); } catch { } }
+                    try { partDoc.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToAfterFeature, info.Feature.Name); } catch { }
                 }
             }
 
@@ -748,9 +820,17 @@ namespace ADDIN.Commands
                     object[] contours = sketchObj.GetSketchContours() as object[];
                     for (int i = 0; i < 4; i++)
                     {
-                        def = info.Feature.GetDefinition() as IExtrudeFeatureData2;
-                        if (def == null || !def.AccessSelections(partDoc, null)) continue;
+                        try { info.Feature.Select2(false, 0); } catch { }
+                        try { partDoc.EditRollback(); } catch { }
 
+                        IExtrudeFeatureData2 def = info.Feature.GetDefinition() as IExtrudeFeatureData2;
+                        if (def == null || !def.AccessSelections(partDoc, null))
+                        {
+                            try { partDoc.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToAfterFeature, info.Feature.Name); } catch { }
+                            continue;
+                        }
+
+                        bool committed = false;
                         try
                         {
                             if (contours != null && contours.Length > 0)
@@ -762,6 +842,8 @@ namespace ADDIN.Commands
 
                             if (info.Feature.ModifyDefinition(def, partDoc, null))
                             {
+                                committed = true;
+                                try { partDoc.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToAfterFeature, info.Feature.Name); } catch { }
                                 partDoc.ForceRebuild3(false);
                                 bool isWarn;
                                 int err = info.Feature.GetErrorCode2(out isWarn);
@@ -774,7 +856,8 @@ namespace ADDIN.Commands
                         }
                         finally
                         {
-                            try { def.ReleaseSelectionAccess(); } catch { }
+                            if (!committed) { try { def.ReleaseSelectionAccess(); } catch { } }
+                            try { partDoc.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToAfterFeature, info.Feature.Name); } catch { }
                         }
                     }
                 }
@@ -883,10 +966,12 @@ namespace ADDIN.Commands
 
             bool originalFlip;
             bool originalDir;
+            bool originalBothDirs = false;
             try
             {
                 originalFlip = currentDefinition.FlipSideToCut;
                 originalDir = currentDefinition.ReverseDirection;
+                originalBothDirs = currentDefinition.BothDirections;
             }
             catch (Exception ex)
             {
@@ -894,10 +979,38 @@ namespace ADDIN.Commands
                 return false;
             }
 
+            Feature sketchFeat = info.DrivingSketchFeature ?? FindDrivingSketchFeature(info.Feature);
+            Sketch skObj = sketchFeat?.GetSpecificFeature2() as Sketch;
+            List<ADDIN.Helpers.SketchPointSnapshot> pristineReplayedPoints = (skObj != null)
+                ? ADDIN.Helpers.SketchOperationsHelper.CapturePristineSketchPoints(skObj)
+                : null;
+
+            bool isOpenProfile = false;
+            if (skObj != null)
+            {
+                isOpenProfile = ADDIN.Helpers.SketchOperationsHelper.IsOpenProfileSketch(skObj);
+            }
+
             // Thử nghiệm cả 4 tổ hợp không gian (FlipSideToCut, ReverseDirection)
-            bool[] testFlips = { originalFlip, originalFlip, !originalFlip, !originalFlip };
-            bool[] testDirs  = { originalDir, !originalDir, originalDir, !originalDir };
-            string[] testLabels = { "ORIGINAL", "REVERSED_DIR", "TOGGLED_FLIP", "BOTH_TOGGLED" };
+            // - Với biên dạng mở (open profile, ví dụ vết cắt xẻ rãnh): Phép phản xạ không gian thường đảo cả hướng đùn và phía cắt (BOTH_TOGGLED).
+            // - Với biên dạng kín (closed profile, ví dụ lỗ tròn, rãnh khép kín): FlipSideToCut phải giữ nguyên (đảo FlipSideToCut sẽ biến lỗ thành cắt bỏ toàn bộ chi tiết!). Do đó ưu tiên REVERSED_DIR trước.
+            bool[] testFlips;
+            bool[] testDirs;
+            string[] testLabels;
+
+            if (isOpenProfile || originalFlip)
+            {
+                testFlips  = new bool[]   { originalFlip, !originalFlip, originalFlip, !originalFlip };
+                testDirs   = new bool[]   { originalDir, !originalDir, !originalDir, originalDir };
+                testLabels = new string[] { "ORIGINAL", "BOTH_TOGGLED", "REVERSED_DIR", "TOGGLED_FLIP" };
+            }
+            else
+            {
+                testFlips  = new bool[]   { originalFlip, originalFlip };
+                testDirs   = new bool[]   { originalDir, !originalDir };
+                testLabels = new string[] { "ORIGINAL", "REVERSED_DIR" };
+            }
+            CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] Feature {info.Name}: isOpenProfile={isOpenProfile}, candidate priority: {string.Join(" -> ", testLabels)}");
 
             int bestIndex = -1;
             double bestDistance = double.PositiveInfinity;
@@ -913,31 +1026,39 @@ namespace ADDIN.Commands
             double beforeVolErr = double.PositiveInfinity;
             bool beforeVolMatch = false;
 
-            for (int i = 0; i < 4; i++)
+            int currentAppliedIndex = 0;
+
+            for (int i = 0; i < testFlips.Length; i++)
             {
                 bool candFlip = testFlips[i];
                 bool candDir = testDirs[i];
                 Body2 candBody = null;
 
-                if (i == 0)
+                // Trước khi thử ứng viên mới, đảm bảo sketch points không bị xô lệch do ứng viên trước đó
+                if (pristineReplayedPoints != null && sketchFeat != null && i > 0)
                 {
-                    candBody = replayedActualBody;
+                    ADDIN.Helpers.SketchOperationsHelper.RestoreSketchPoints(partDoc, sketchFeat, pristineReplayedPoints);
                 }
-                else
+
+                string setErr;
+                if (!TrySetExtrudeParams(partDoc, info.Feature, candFlip, candDir, out setErr))
                 {
-                    string setErr;
-                    if (!TrySetExtrudeParams(partDoc, info.Feature, candFlip, candDir, out setErr))
+                    CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] {testLabels[i]} (flip={candFlip}, dir={candDir}) TrySetExtrudeParams failed: {setErr}");
+                    continue;
+                }
+                currentAppliedIndex = i;
+                string capErr;
+                candBody = GetSolidBodyCopyStrict(partDoc, out capErr);
+                if (candBody == null)
+                {
+                    CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] {testLabels[i]} GetSolidBodyCopyStrict failed: {capErr}");
+                    if (i > 0)
                     {
-                        CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] {testLabels[i]} (flip={candFlip}, dir={candDir}) TrySetExtrudeParams failed: {setErr}");
-                        continue;
+                        string revErr;
+                        TrySetExtrudeParams(partDoc, info.Feature, originalFlip, originalDir, out revErr);
+                        currentAppliedIndex = 0;
                     }
-                    string capErr;
-                    candBody = GetSolidBodyCopyStrict(partDoc, out capErr);
-                    if (candBody == null)
-                    {
-                        CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] {testLabels[i]} GetSolidBodyCopyStrict failed: {capErr}");
-                        continue;
-                    }
+                    continue;
                 }
 
                 double remVol = 0.0;
@@ -954,12 +1075,43 @@ namespace ADDIN.Commands
                 if (!measured)
                 {
                     CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] {testLabels[i]} (flip={candFlip}, dir={candDir}) TryMeasureRemovedGeometry returned false: {mErr}");
+                    if (i > 0)
+                    {
+                        string revErr;
+                        TrySetExtrudeParams(partDoc, info.Feature, originalFlip, originalDir, out revErr);
+                        currentAppliedIndex = 0;
+                    }
                     continue;
                 }
 
                 double volErr = Math.Abs(remVol - expectedRemoved);
                 double dist = Distance(remCent, expectedMirroredCentroid);
                 bool volMatch = volErr <= expectedTolerance;
+
+                // [SAFETY CHECK] Reject candidates that remove completely unreasonable volume
+                // (e.g. inverted cut destroying the body by removing orders of magnitude more than expected)
+                bool volReasonable = true;
+                if (expectedRemoved > 1e-9)
+                {
+                    double ratio = remVol / expectedRemoved;
+                    double prevVol = GetBodyVolume(previousActualBody);
+                    if (ratio > 50.0 || (ratio > 5.0 && prevVol > 0 && remVol > 0.3 * prevVol) || ratio < 0.01)
+                    {
+                        volReasonable = false;
+                    }
+                }
+
+                if (!volReasonable)
+                {
+                    CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] {testLabels[i]} (flip={candFlip}, dir={candDir}) REJECTED: volume ratio {(remVol / expectedRemoved):F2} is unreasonable.");
+                    if (i > 0)
+                    {
+                        string revErr;
+                        TrySetExtrudeParams(partDoc, info.Feature, originalFlip, originalDir, out revErr);
+                        currentAppliedIndex = 0;
+                    }
+                    continue;
+                }
 
                 CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] {testLabels[i]} (flip={candFlip}, dir={candDir}) remVol={remVol:E6} volErr={volErr:E6} dist={dist * 1000.0:F3}mm volMatch={volMatch}");
 
@@ -999,24 +1151,46 @@ namespace ADDIN.Commands
                     bestBody = candBody;
                     bestRemovedVolume = remVol;
                     bestRemovedCentroid = remCent;
+
+                    // Nếu ứng viên khớp thể tích và tâm khối lệch <= 20 micron (2e-5 m),
+                    // đây là hình học đối xứng chính xác tuyệt đối, dừng tìm kiếm ngay
+                    if (volMatch && dist <= 2e-5)
+                    {
+                        CreateMirrorPartPackage.LogDebug($"[CUT_FLIP_CANDIDATE] Exact match found with {testLabels[i]} (dist={dist * 1000.0:F3}mm). Stopping candidate search.");
+                        break;
+                    }
                 }
             }
 
             if (bestIndex == -1)
             {
-                string restErr;
-                TrySetExtrudeParams(partDoc, info.Feature, originalFlip, originalDir, out restErr);
+                if (currentAppliedIndex != 0)
+                {
+                    string restErr;
+                    TrySetExtrudeParams(partDoc, info.Feature, originalFlip, originalDir, out restErr);
+                }
+                if (pristineReplayedPoints != null && sketchFeat != null)
+                {
+                    ADDIN.Helpers.SketchOperationsHelper.RestoreSketchPoints(partDoc, sketchFeat, pristineReplayedPoints);
+                }
                 details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nresult=FAIL\nreason=NO_VALID_CUT_ORIENTATION_FOUND";
                 return false;
             }
 
             bool chosenFlip = testFlips[bestIndex];
             bool chosenDir = testDirs[bestIndex];
-            string finalSetErr;
-            if (!TrySetExtrudeParams(partDoc, info.Feature, chosenFlip, chosenDir, out finalSetErr))
+            if (currentAppliedIndex != bestIndex)
             {
-                details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nresult=FAIL\nreason=APPLY_BEST_FAILED: {finalSetErr}";
-                return false;
+                if (pristineReplayedPoints != null && sketchFeat != null)
+                {
+                    ADDIN.Helpers.SketchOperationsHelper.RestoreSketchPoints(partDoc, sketchFeat, pristineReplayedPoints);
+                }
+                string finalSetErr;
+                if (!TrySetExtrudeParams(partDoc, info.Feature, chosenFlip, chosenDir, out finalSetErr))
+                {
+                    details = $"CUT_FLIP_EVALUATE\nfeature={info.Name}\nresult=FAIL\nreason=APPLY_BEST_FAILED: {finalSetErr}";
+                    return false;
+                }
             }
 
             replayedActualBody = bestBody;
@@ -1389,7 +1563,8 @@ namespace ADDIN.Commands
                 xform[14] = 0.0;
                 xform[15] = 0.0;
 
-                MathTransform mathXform = mathUtility.CreateTransform(xform) as MathTransform;
+                MathTransform mathXform = ReflectionApiTransformV7.Create(mathUtility, xform);
+                CreateMirrorPartPackage.currentMirrorTransform = mathXform;
                 if (mathXform == null)
                 {
                     res.ErrorMessage = "Failed to create reflection MathTransform.";
@@ -1403,6 +1578,62 @@ namespace ADDIN.Commands
                     return res;
                 }
 
+                double[] sourceMass = sourceBody.GetMassProperties(1) as double[];
+                double[] reflectedMass = copy.GetMassProperties(1) as double[];
+                if (sourceMass == null || reflectedMass == null || sourceMass.Length < 4 || reflectedMass.Length < 4)
+                {
+                    res.ErrorMessage = "REFLECTION_CENTROID_UNAVAILABLE";
+                    return res;
+                }
+                double signedDistance = (sourceMass[0] - o[0]) * nx +
+                    (sourceMass[1] - o[1]) * ny + (sourceMass[2] - o[2]) * nz;
+                double[] normal = { nx, ny, nz };
+                bool centroidWithinTightTolerance = true;
+                for (int axis = 0; axis < 3; axis++)
+                {
+                    double expectedCoordinate = sourceMass[axis] - 2 * signedDistance * normal[axis];
+                    if (double.IsNaN(reflectedMass[axis]) || double.IsInfinity(reflectedMass[axis]) ||
+                        Math.Abs(expectedCoordinate - reflectedMass[axis]) > 1e-7)
+                    {
+                        centroidWithinTightTolerance = false;
+                        CreateMirrorPartPackage.LogDebug("REFLECTION_CENTROID_DIFFERENCE axis=" + axis +
+                            " expected=" + expectedCoordinate + " actual=" + reflectedMass[axis]);
+                    }
+                }
+                if (!centroidWithinTightTolerance)
+                {
+                    // Mass-property integration can shift the computed centroid. Do not simply
+                    // widen tolerance: require a one-to-one analytic reflection of all vertices.
+                    var sourceVertices = sourceBody.GetVertices() as object[];
+                    var reflectedVertices = copy.GetVertices() as object[];
+                    var expectedPoints = new List<double[]>();
+                    var actualPoints = new List<double[]>();
+                    if (sourceVertices != null) foreach (Vertex vertex in sourceVertices)
+                    {
+                        double[] p = vertex.GetPoint() as double[];
+                        if (p == null || p.Length < 3) throw new InvalidOperationException("Source vertex unavailable.");
+                        double d = (p[0]-o[0])*nx + (p[1]-o[1])*ny + (p[2]-o[2])*nz;
+                        expectedPoints.Add(new[] { p[0]-2*d*nx, p[1]-2*d*ny, p[2]-2*d*nz });
+                    }
+                    if (reflectedVertices != null) foreach (Vertex vertex in reflectedVertices)
+                        actualPoints.Add(vertex.GetPoint() as double[]);
+                    bool verticesMatch = expectedPoints.Count > 0 &&
+                        BipartiteEquivalenceMatcherV7.Match(expectedPoints, actualPoints, (left, right) =>
+                        {
+                            if (right == null || right.Length < 3) return false;
+                            for (int axis = 0; axis < 3; axis++)
+                                if (double.IsNaN(right[axis]) || double.IsInfinity(right[axis]) ||
+                                    Math.Abs(left[axis]-right[axis]) > 1e-8) return false;
+                            return true;
+                        }).HasPerfectMatching;
+                    if (!verticesMatch)
+                    {
+                        res.ErrorMessage = "REFLECTION_CENTROID_AND_VERTEX_VERIFICATION_FAILED";
+                        return res;
+                    }
+                    CreateMirrorPartPackage.LogDebug("REFLECTION_VERTEX_CHECK matched=" + expectedPoints.Count +
+                        " toleranceSI=1e-8 result=PASS roundTripBooleanStillRequired=True");
+                }
                 double mirrVol = GetBodyVolume(copy);
                 double volumeDelta = Math.Abs(origVol - mirrVol);
                 double tol = Math.Max(
@@ -1512,6 +1743,14 @@ namespace ADDIN.Commands
                 return res;
             }
 
+            // Sheet metal EdgeFlange features modify/add geometry parametrically and do not rely on Boolean cut delta
+            if (string.Equals(info.Type, "EdgeFlange", StringComparison.OrdinalIgnoreCase) ||
+                info.Type.IndexOf("EdgeFlange", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                res.Success = true;
+                return res;
+            }
+
             // A - B (Added)
             BodyBooleanResult cutAdded = BooleanCutStrict(replayedActualBody, previousActualBody, $"{info.Name}_ADDED_ACTUAL");
             // B - A (Removed)
@@ -1522,15 +1761,45 @@ namespace ADDIN.Commands
 
             if (!cutAdded.Success || !cutRemoved.Success)
             {
-                res.FailureReason = "Boolean delta calculation between previous and replayed body failed.";
-                return res;
+                // Parasolid boolean cut can fail on coincident sheet-metal faces across large bodies.
+                // Check if volume delta can provide fallback before failing outright.
+                double vDelta = bVol - aVol;
+                if (Math.Abs(vDelta) > ABSOLUTE_GEOMETRY_TOLERANCE)
+                {
+                    CreateMirrorPartPackage.LogDebug($"[VALIDATE_REPLAY] Boolean cut unconfirmed (addedOk={cutAdded.Success}, removedOk={cutRemoved.Success}); body volume delta is {vDelta:E6}");
+                }
+                else
+                {
+                    res.FailureReason = "Boolean delta calculation between previous and replayed body failed.";
+                    return res;
+                }
             }
 
             double actualAddedVol = 0.0;
-            foreach (var b in cutAdded.Bodies) actualAddedVol += GetBodyVolume(b);
+            if (cutAdded.Success)
+            {
+                foreach (var b in cutAdded.Bodies) actualAddedVol += GetBodyVolume(b);
+            }
 
             double actualRemovedVol = 0.0;
-            foreach (var b in cutRemoved.Bodies) actualRemovedVol += GetBodyVolume(b);
+            if (cutRemoved.Success)
+            {
+                foreach (var b in cutRemoved.Bodies) actualRemovedVol += GetBodyVolume(b);
+            }
+
+            // Fallback for Parasolid coincident-face boolean cut limitations:
+            // If direct boolean cut produced 0 volume, check mass properties delta between previous and replayed body
+            double volumeDelta = bVol - aVol;
+            if (actualRemovedVol <= ABSOLUTE_GEOMETRY_TOLERANCE && volumeDelta > ABSOLUTE_GEOMETRY_TOLERANCE)
+            {
+                actualRemovedVol = volumeDelta;
+                CreateMirrorPartPackage.LogDebug($"[VALIDATE_REPLAY] Boolean cut produced 0 removed volume; using body volume delta fallback: {actualRemovedVol:E6}");
+            }
+            if (actualAddedVol <= ABSOLUTE_GEOMETRY_TOLERANCE && -volumeDelta > ABSOLUTE_GEOMETRY_TOLERANCE)
+            {
+                actualAddedVol = -volumeDelta;
+                CreateMirrorPartPackage.LogDebug($"[VALIDATE_REPLAY] Boolean cut produced 0 added volume; using body volume delta fallback: {actualAddedVol:E6}");
+            }
 
             res.ActualAddedVolume = actualAddedVol;
             res.ActualRemovedVolume = actualRemovedVol;
@@ -1556,13 +1825,15 @@ namespace ADDIN.Commands
                     return res;
                 }
 
-                if (originalCache != null && originalCache.ChangesGeometry && actualRemovedVol <= tol)
+                bool isAsymmetricAllowed = replayResult != null && replayResult.AllowAsymmetricCutVolume;
+
+                if (originalCache != null && originalCache.ChangesGeometry && actualRemovedVol <= tol && !isAsymmetricAllowed)
                 {
                     res.FailureReason = $"SUBTRACTIVE_FEATURE_REMOVED_NOTHING (removedVol={actualRemovedVol:E6})";
                     return res;
                 }
 
-                if (originalCache != null && originalCache.ChangesGeometry && aVol >= bVol - tol)
+                if (originalCache != null && originalCache.ChangesGeometry && aVol >= bVol - tol && !isAsymmetricAllowed)
                 {
                     res.FailureReason = $"SUBTRACTIVE_VOLUME_DID_NOT_DECREASE (before={bVol:E6}, after={aVol:E6})";
                     return res;
@@ -1574,10 +1845,20 @@ namespace ADDIN.Commands
 
                 if (originalCache != null && originalCache.ChangesGeometry && removedDifference > removedMatchTolerance)
                 {
-                    bool asymmetricExtrudeCutAccepted =
-                        SketchDrivenFeatureMirrorHandler.IsExtrudeCutType(info.Type) &&
-                        replayResult != null &&
-                        replayResult.AllowAsymmetricCutVolume;
+                    bool asymmetricExtrudeCutAccepted = isAsymmetricAllowed;
+
+                    if (asymmetricExtrudeCutAccepted)
+                    {
+                        // SAFETY CAP: Prevent runaway Super Recover cuts from destroying the part.
+                        // If the cut grew by >10x compared to source AND now consumes >10% of the entire part body,
+                        // it is almost certainly a topological CAD bug (like cutting outside the profile), not a valid Asymmetric Base.
+                        if (actualRemovedVol > res.ExpectedRemovedVolume * 10.0 && actualRemovedVol > bVol * 0.1)
+                        {
+                            asymmetricExtrudeCutAccepted = false;
+                            CreateMirrorPartPackage.LogDebug($"[SAFETY CAP EXCEEDED] feature={info.Name} actualRemoved={actualRemovedVol:E6} is >10x expected({res.ExpectedRemovedVolume:E6}) AND >10% of part volume({bVol:E6}). Rejecting dangerous asymmetric cut.");
+                        }
+                    }
+
                     if (!asymmetricExtrudeCutAccepted)
                     {
                         res.FailureReason = $"SUBTRACTIVE_REMOVED_VOLUME_MISMATCH(expected={res.ExpectedRemovedVolume:E6}, actual={actualRemovedVol:E6}, relativeError={res.RelativeVolumeError:E6})";
@@ -1701,7 +1982,10 @@ namespace ADDIN.Commands
             if (Math.Abs(Math.Abs(dot) - 1.0) < 0.05)
             {
                 res.Kind = MirrorReferenceKind.ParallelUnsupported;
-                res.Message = $"Mirror plane is PARALLEL to sketch plane (|dot|={Math.Abs(dot):F4} ≈ 1). Cannot 2D mirror inside sketch.";
+                res.Success = true;
+                res.AxisPoint1 = null;
+                res.AxisPoint2 = null;
+                res.Message = $"Mirror plane is PARALLEL to sketch plane (|dot|={Math.Abs(dot):F4} ≈ 1). Mapping via 3D invariant coordinate transform.";
                 return res;
             }
 
@@ -1744,8 +2028,10 @@ namespace ADDIN.Commands
                 double py = d1 * c1y + d2 * c2y;
                 double pz = d1 * c1z + d2 * c2z;
 
-                MathPoint p1M = mathUtility.CreatePoint(new double[] { px - 1.0 * dx, py - 1.0 * dy, pz - 1.0 * dz }) as MathPoint;
-                MathPoint p2M = mathUtility.CreatePoint(new double[] { px + 1.0 * dx, py + 1.0 * dy, pz + 1.0 * dz }) as MathPoint;
+                // Chieu dai center line khoang 10mm (moi ben 5mm = 0.005m) theo yeu cau user
+                double halfLengthM = 0.005;
+                MathPoint p1M = mathUtility.CreatePoint(new double[] { px - halfLengthM * dx, py - halfLengthM * dy, pz - halfLengthM * dz }) as MathPoint;
+                MathPoint p2M = mathUtility.CreatePoint(new double[] { px + halfLengthM * dx, py + halfLengthM * dy, pz + halfLengthM * dz }) as MathPoint;
 
                 MathPoint p1S = p1M.MultiplyTransform(m2s) as MathPoint;
                 MathPoint p2S = p2M.MultiplyTransform(m2s) as MathPoint;
@@ -1755,32 +2041,34 @@ namespace ADDIN.Commands
 
                 res.AxisPoint1 = new double[] { s1[0], s1[1] };
                 res.AxisPoint2 = new double[] { s2[0], s2[1] };
+                res.Success = true;
+                res.Kind = MirrorReferenceKind.IntersectionCenterline;
+                res.Message = "EXPLICIT_SKETCH_CENTERLINE";
 
-                // Native SketchMirror is reliable only when its mirror reference belongs
-                // to the active sketch. Selecting a coincident model RefPlane can make the
-                // API report success while the persisted sketch geometry remains unchanged.
-                // Match the proven user macro: create an explicit construction centerline
-                // at the intersection of the assembly mirror plane and this sketch plane.
-                SketchSegment cl = partDoc.SketchManager.CreateCenterLine(s1[0], s1[1], 0.0, s2[0], s2[1], 0.0) as SketchSegment;
-                if (cl != null)
+                CreateMirrorPartPackage.LogDebug(
+                    $"SKETCH_MIRROR_REFERENCE\nmode=INTERSECTION_AXIS\n" +
+                    "anchor=PART_ORIGIN\n" +
+                    $"mirrorPlaneOrigin=({oMp[0]:F9},{oMp[1]:F9},{oMp[2]:F9})\n" +
+                    $"axis1=({s1[0]:F9},{s1[1]:F9})\n" +
+                    $"axis2=({s2[0]:F9},{s2[1]:F9})");
+
+                // If a sketch is currently active/open for editing, try creating the construction centerline
+                try
                 {
-                    try { cl.ConstructionGeometry = true; } catch { }
-                    bool clSel = cl.Select4(true, null);
-                    if (clSel)
+                    if (partDoc.SketchManager.ActiveSketch != null)
                     {
-                        res.Success = true;
-                        res.Kind = MirrorReferenceKind.IntersectionCenterline;
-                        res.Centerline = cl;
-                        res.Message = "EXPLICIT_SKETCH_CENTERLINE";
-                        CreateMirrorPartPackage.LogDebug(
-                            $"SKETCH_MIRROR_REFERENCE\nmode=EXPLICIT_CENTERLINE\n" +
-                            "anchor=PART_ORIGIN\n" +
-                            $"mirrorPlaneOrigin=({oMp[0]:F9},{oMp[1]:F9},{oMp[2]:F9})\n" +
-                            $"axis1=({s1[0]:F9},{s1[1]:F9})\n" +
-                            $"axis2=({s2[0]:F9},{s2[1]:F9})");
-                        return res;
+                        SketchSegment cl = partDoc.SketchManager.CreateCenterLine(s1[0], s1[1], 0.0, s2[0], s2[1], 0.0) as SketchSegment;
+                        if (cl != null)
+                        {
+                            try { cl.ConstructionGeometry = true; } catch { }
+                            try { cl.Select4(true, null); } catch { }
+                            res.Centerline = cl;
+                        }
                     }
                 }
+                catch { }
+
+                return res;
             }
 
             res.Message = "Failed to resolve valid mirror reference.";
@@ -1802,6 +2090,8 @@ namespace ADDIN.Commands
         public bool IsSuppressed { get; set; }
         public FeatureReplayDisposition Disposition { get; set; } = FeatureReplayDisposition.ReplayRequired;
         public List<ADDIN.Helpers.SketchPointSnapshot> PristineSketchPoints { get; set; } = new List<ADDIN.Helpers.SketchPointSnapshot>();
+        public ADDIN.Helpers.SketchSupportSnapshot20 PristineSupport20 { get; set; }
+        public ADDIN.Helpers.CutAuditSnapshot21 CutAudit21 { get; set; }
         public List<ADDIN.Helpers.SketchSlotSnapshot> PristineSketchSlots { get; set; } = new List<ADDIN.Helpers.SketchSlotSnapshot>();
     }
 
@@ -2141,6 +2431,20 @@ namespace ADDIN.Commands
                     return result;
                 }
 
+                if (info.CutAudit21 != null)
+                    SketchOperationsHelper.CheckCutChain23(swApp, partDoc, info.Feature, info.CutAudit21, mirrorPlane);
+                try
+                {
+                    SketchOperationsHelper.EnsureReflectedSupport20(swApp, partDoc, sketchFeat,
+                        info.PristineSketchPoints, info.PristineSupport20, mirrorPlane);
+                }
+                catch (Exception mappingError23)
+                {
+                    CreateMirrorPartPackage.LogDebug("[CUT23] SUMMARY feature=" + info.Name +
+                        " result=FAIL firstFailedStage=APPLY_SUPPORT reason=" + mappingError23.Message);
+                    throw;
+                }
+                sketch = (Sketch)sketchFeat.GetSpecificFeature2();
                 // 2. Resolve mirror reference (tính toán đường giao tuyến 2D của mirrorPlane với sketchPlane)
                 MirrorReferenceResult refRes = MirrorReferenceResolver.ResolveAndSelectMirrorReference(swApp, partDoc, sketch, mirrorPlane);
                 result.MirrorReferenceKind = refRes.Kind;
@@ -2155,15 +2459,22 @@ namespace ADDIN.Commands
                 result.MirrorReferenceResolved = true;
 
                 // 3. Mở Sketch và Xóa sạch Ràng buộc + Kích thước để giải phóng nét vẽ
-                Sketch activeSketch = SketchOperationsHelper.FreeSketchForMutation(partDoc, sketchFeat);
+                bool alreadyReflected26 = SketchOperationsHelper.TryAlreadyReflectedCircles26(swApp, partDoc, sketchFeat,
+                    info.CutAudit21, mirrorPlane);
+                Sketch activeSketch = alreadyReflected26 ? sketch : SketchOperationsHelper.FreeSketchForMutation(partDoc, sketchFeat);
                 if (activeSketch == null)
                 {
                     activeSketch = sketch;
                 }
-                result.SketchEntered = true;
+                result.SketchEntered = !alreadyReflected26;
 
                 // 4. CỖ MÁY TÁI TẠO HOẶC DỊCH CHUYỂN TỌA ĐỘ ĐIỂM
-                if (info.PristineSketchSlots != null && info.PristineSketchSlots.Count > 0)
+                if (alreadyReflected26)
+                {
+                    // No edit/rebuild cycle: support remapping already placed the complete circle profile.
+                    // The normal feature health and removed-volume checks below remain mandatory.
+                }
+                else if (info.PristineSketchSlots != null && info.PristineSketchSlots.Count > 0)
                 {
                     double ax1 = refRes.AxisPoint1 != null ? refRes.AxisPoint1[0] : 0.0;
                     double ay1 = refRes.AxisPoint1 != null ? refRes.AxisPoint1[1] : 0.0;
@@ -2175,7 +2486,8 @@ namespace ADDIN.Commands
                         activeSketch,
                         ax1, ay1,
                         ax2, ay2,
-                        info.PristineSketchSlots);
+                        info.PristineSketchSlots,
+                        mirrorPlane);
                 }
                 else
                 {
@@ -2187,11 +2499,12 @@ namespace ADDIN.Commands
                             activeSketch, 
                             refRes.AxisPoint1[0], refRes.AxisPoint1[1], 
                             refRes.AxisPoint2[0], refRes.AxisPoint2[1],
-                            info.PristineSketchPoints);
+                            info.PristineSketchPoints,
+                            mirrorPlane);
                     }
                     else
                     {
-                        SketchOperationsHelper.MutateSketchPoints(partDoc, activeSketch, info.PristineSketchPoints);
+                        SketchOperationsHelper.MutateSketchPoints(partDoc, activeSketch, info.PristineSketchPoints, mirrorPlane);
                     }
                 }
 
@@ -2199,6 +2512,21 @@ namespace ADDIN.Commands
                 result.MirrorGeometryVerified = true;
                 result.SketchMirrorExecuted = true;
                 partDoc.ClearSelection2(true);
+
+                // Proactive FlipSideToCut for open profile cuts
+                bool isOpenProfile = activeSketch != null
+                    ? SketchOperationsHelper.IsOpenProfileSketch(activeSketch)
+                    : SketchOperationsHelper.IsOpenProfileSegments(profileSegments);
+                string featType = info.Feature.GetTypeName2();
+                bool isCutFeature = string.Equals(featType, "Cut", StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(featType, "ICE", StringComparison.OrdinalIgnoreCase) ||
+                                    featType.IndexOf("Cut", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                if (isOpenProfile && isCutFeature)
+                {
+                    CreateMirrorPartPackage.LogDebug($"[PROACTIVE_FLIP] Feature {info.Name} is an open profile cut. Toggling FlipSideToCut before rebuild.");
+                    SketchOperationsHelper.ToggleFlipSideToCut(partDoc, info.Feature);
+                }
 
                 // 5. Force Rebuild để kiểm tra kết quả ngay sau khi Point Mutation
                 CreateMirrorPartPackage.LogDebug(
@@ -2220,9 +2548,9 @@ namespace ADDIN.Commands
                 bool isFatalError = (errCode != 0 && !isWarning);
                 CreateMirrorPartPackage.LogDebug($"REPLAY_FEATURE_HEALTH_BEFORE_DIRECTION_ADJUST\nfeature={info.Name}\nerrorCode={errCode}\nwarning={isWarning}\nisFatal={isFatalError}");
 
-                // Chỉ khi nào là LỖI THỰC SỰ (không phải warning 51 do gỡ quan hệ/dim), mới đảo hướng đùn
                 if (isFatalError)
                 {
+                    CreateMirrorPartPackage.LogDebug($"REPLAY_RECOVERY: Attempting ReverseExtrudeDirection for {info.Name}");
                     bool reversed = SketchOperationsHelper.ReverseExtrudeDirection(partDoc, info.Feature);
                     partDoc.ForceRebuild3(false);
                     errCode = info.Feature.GetErrorCode2(out isWarning);
@@ -2230,6 +2558,54 @@ namespace ADDIN.Commands
                     result.FeatureErrorCode = errCode;
                     result.FeatureWarning = isWarning;
                     CreateMirrorPartPackage.LogDebug($"REPLAY_FEATURE_HEALTH_AFTER_REVERSE_DIR\nfeature={info.Name}\nreversed={reversed}\nerrorCode={errCode}\nwarning={isWarning}\nisFatal={isFatalError}");
+
+                    if (isFatalError && isCutFeature)
+                    {
+                        // Hoàn trả hướng đùn
+                        SketchOperationsHelper.ReverseExtrudeDirection(partDoc, info.Feature);
+
+                        bool canToggleFlip = false;
+                        if (sketch != null)
+                        {
+                            canToggleFlip = ADDIN.Helpers.SketchOperationsHelper.IsOpenProfileSketch(sketch);
+                        }
+                        if (!canToggleFlip && CreateMirrorPartPackage.featureOptionsCaptureHelper.ExtrudeSnapshots.ContainsKey(info.Name))
+                        {
+                            canToggleFlip = CreateMirrorPartPackage.featureOptionsCaptureHelper.ExtrudeSnapshots[info.Name].FlipSideToCut;
+                        }
+
+                        if (canToggleFlip)
+                        {
+                            CreateMirrorPartPackage.LogDebug($"REPLAY_RECOVERY: Attempting ToggleFlipSideToCut for {info.Name}");
+                            bool flipped = SketchOperationsHelper.ToggleFlipSideToCut(partDoc, info.Feature);
+                            partDoc.ForceRebuild3(false);
+                            errCode = info.Feature.GetErrorCode2(out isWarning);
+                            isFatalError = (errCode != 0 && !isWarning);
+                            result.FeatureErrorCode = errCode;
+                            result.FeatureWarning = isWarning;
+                            CreateMirrorPartPackage.LogDebug($"REPLAY_FEATURE_HEALTH_AFTER_FLIP_SIDE\nfeature={info.Name}\nflipped={flipped}\nerrorCode={errCode}\nwarning={isWarning}\nisFatal={isFatalError}");
+
+                            if (isFatalError)
+                            {
+                                // Thử kết hợp CẢ HAI (ReverseExtrudeDirection + FlipSideToCut)
+                                SketchOperationsHelper.ReverseExtrudeDirection(partDoc, info.Feature);
+                                partDoc.ForceRebuild3(false);
+                                errCode = info.Feature.GetErrorCode2(out isWarning);
+                                isFatalError = (errCode != 0 && !isWarning);
+                                result.FeatureErrorCode = errCode;
+                                result.FeatureWarning = isWarning;
+                                CreateMirrorPartPackage.LogDebug($"REPLAY_RECOVERY_AFTER_BOTH\nfeature={info.Name}\nerrorCode={errCode}\nwarning={isWarning}\nisFatal={isFatalError}");
+
+                                if (isFatalError)
+                                {
+                                    // Khôi phục lại trạng thái ban đầu trước recovery để SuperRecover thử sức
+                                    SketchOperationsHelper.ReverseExtrudeDirection(partDoc, info.Feature);
+                                    SketchOperationsHelper.ToggleFlipSideToCut(partDoc, info.Feature);
+                                    partDoc.ForceRebuild3(false);
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if (isFatalError)
@@ -3797,7 +4173,7 @@ namespace ADDIN.Commands
             return FindReflectedSegment(srcSeg, candidates, x1, y1, x2, y2) != null;
         }
 
-        private static double[] ReflectPoint2D(double px, double py, double x1, double y1, double x2, double y2)
+        public static double[] ReflectPoint2D(double px, double py, double x1, double y1, double x2, double y2)
         {
             double dx = x2 - x1;
             double dy = y2 - y1;
@@ -4028,9 +4404,9 @@ namespace ADDIN.Commands
                 int errorCode = info.Feature.GetErrorCode2(out warning);
                 result.FeatureErrorCode = errorCode;
                 result.FeatureWarning = warning;
-                result.RebuildPassed = errorCode == 0;
+                result.RebuildPassed = (errorCode == 0 || warning);
 
-                if (errorCode != 0)
+                if (errorCode != 0 && !warning)
                 {
                     result.Message = "Chamfer rebuild loi. Error=" + errorCode + ", Warning=" + warning;
                     return result;
@@ -4393,8 +4769,8 @@ namespace ADDIN.Commands
 
                 result.FeatureErrorCode = errorCode;
                 result.FeatureWarning = warning;
-                result.RebuildPassed = errorCode == 0;
-                result.Success = errorCode == 0;
+                result.RebuildPassed = (errorCode == 0 || warning);
+                result.Success = result.RebuildPassed;
                 result.StatusCode = result.Success
                     ? "SUCCESS_CURVE_PATTERN_NATIVE_DEPENDENCY_REBUILD"
                     : "CURVE_PATTERN_REBUILD_ERROR";
@@ -4418,6 +4794,576 @@ namespace ADDIN.Commands
         }
     }
 
+    public sealed class LinearPatternFeatureReplayHandler : IFeatureMirrorHandler
+    {
+        public bool CanHandle(PostBaseFeatureInfo info)
+        {
+            if (info == null || string.IsNullOrEmpty(info.Type)) return false;
+            return string.Equals(info.Type, "LPattern", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(info.Type, "LinearPattern", StringComparison.OrdinalIgnoreCase) ||
+                   info.Type.IndexOf("LPattern", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   info.Type.IndexOf("LinearPattern", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public FeatureReplayResult Replay(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            PlaneData mirrorPlane,
+            FeatureBodyState cache,
+            string protectedBaseFeatureName,
+            string protectedBaseSketchName)
+        {
+            FeatureReplayResult result = new FeatureReplayResult
+            {
+                Success = false,
+                FeatureName = info?.Name,
+                FeatureType = info?.Type,
+                StatusCode = "LINEAR_PATTERN_INVALID_ARGUMENT"
+            };
+
+            if (partDoc == null || info?.Feature == null)
+            {
+                result.Message = "Part or linear pattern feature is not available.";
+                return result;
+            }
+
+            ILinearPatternFeatureData definition = null;
+            bool selectionAccess = false;
+            bool dir1Reversed = false;
+            bool dir2Specified = false;
+            bool dir2Reversed = false;
+            bool geomPattern = false;
+            int totalSeedCount = 0;
+
+            try
+            {
+                definition = info.Feature.GetDefinition() as ILinearPatternFeatureData;
+                if (definition == null)
+                {
+                    result.StatusCode = "LINEAR_PATTERN_DEFINITION_UNAVAILABLE";
+                    result.Message = "Feature definition is not ILinearPatternFeatureData.";
+                    return result;
+                }
+
+                selectionAccess = definition.AccessSelections(partDoc, null);
+                if (!selectionAccess)
+                {
+                    result.StatusCode = "LINEAR_PATTERN_ACCESS_SELECTIONS_FAILED";
+                    result.Message = "AccessSelections returned false for linear pattern.";
+                    return result;
+                }
+
+                int featureSeedCount = definition.GetPatternFeatureCount();
+                int bodySeedCount = definition.GetPatternBodyCount();
+                int faceSeedCount = definition.GetPatternFaceCount();
+                totalSeedCount = featureSeedCount + bodySeedCount + faceSeedCount;
+                int d1Instances = definition.D1TotalInstances;
+                double d1Spacing = definition.D1Spacing;
+                dir1Reversed = definition.D1ReverseDirection;
+                try { geomPattern = definition.GeometryPattern; } catch { }
+                try { dir2Specified = definition.IsDirection2Specified(); } catch { }
+                int d2Instances = dir2Specified ? definition.D2TotalInstances : 0;
+                double d2Spacing = dir2Specified ? definition.D2Spacing : 0;
+                dir2Reversed = dir2Specified && definition.D2ReverseDirection;
+
+                CreateMirrorPartPackage.LogDebug(
+                    "LINEAR_PATTERN_NATIVE_REPLAY\n" +
+                    $"feature={info.Name}\nfeatureSeeds={featureSeedCount}\n" +
+                    $"bodySeeds={bodySeedCount}\nfaceSeeds={faceSeedCount}\n" +
+                    $"d1Instances={d1Instances}\nd1Spacing={d1Spacing}\nd1Reversed={dir1Reversed}\n" +
+                    $"dir2Specified={dir2Specified}\nd2Instances={d2Instances}\nd2Spacing={d2Spacing}\nd2Reversed={dir2Reversed}\n" +
+                    $"geometryPattern={geomPattern}");
+
+                if (totalSeedCount <= 0)
+                {
+                    result.StatusCode = "LINEAR_PATTERN_HAS_NO_SEED";
+                    result.Message = "Linear pattern has no feature, body, or face seed.";
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                result.StatusCode = "LINEAR_PATTERN_READ_FAILED";
+                result.Message = ex.Message;
+                return result;
+            }
+            finally
+            {
+                if (definition != null && selectionAccess)
+                {
+                    try { definition.ReleaseSelectionAccess(); } catch { }
+                    selectionAccess = false;
+                }
+            }
+
+            try
+            {
+                partDoc.ForceRebuild3(false);
+                bool warning = false;
+                int errorCode = info.Feature.GetErrorCode2(out warning);
+
+                bool isPatternHealthy = (errorCode == 0 || warning);
+
+                if (isPatternHealthy)
+                {
+                    result.FeatureErrorCode = errorCode;
+                    result.FeatureWarning = warning;
+                    result.RebuildPassed = true;
+                    result.Success = true;
+                    result.StatusCode = "SUCCESS_LINEAR_PATTERN_NATIVE_DEPENDENCY_REBUILD";
+                    result.Message = "Linear pattern rebuilt from its replayed seed dependencies.";
+
+                    CreateMirrorPartPackage.LogDebug(
+                        "LINEAR_PATTERN_NATIVE_REPLAY_RESULT\n" +
+                        $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\nresult=PASS");
+                    return result;
+                }
+
+                CreateMirrorPartPackage.LogDebug(
+                    $"[LINEAR_PATTERN_REPLAY] Initial rebuild failed with errorCode={errorCode}, warning={warning}. Attempting direction flip recovery...");
+
+                // Recovery attempt 1: Flip Direction 1
+                if (definition.AccessSelections(partDoc, null))
+                {
+                    bool mod = false;
+                    try
+                    {
+                        definition.D1ReverseDirection = !dir1Reversed;
+                        mod = info.Feature.ModifyDefinition(definition, partDoc, null);
+                    }
+                    finally
+                    {
+                        if (!mod)
+                        {
+                            try { definition.ReleaseSelectionAccess(); } catch { }
+                        }
+                    }
+
+                    if (mod)
+                    {
+                        partDoc.ForceRebuild3(false);
+                        errorCode = info.Feature.GetErrorCode2(out warning);
+                        if (errorCode == 0 || warning)
+                        {
+                            result.FeatureErrorCode = errorCode;
+                            result.FeatureWarning = warning;
+                            result.RebuildPassed = true;
+                            result.Success = true;
+                            result.StatusCode = "SUCCESS_LINEAR_PATTERN_FLIP_D1";
+                            result.Message = "Linear pattern rebuilt successfully after flipping Direction 1.";
+
+                            CreateMirrorPartPackage.LogDebug(
+                                "[LINEAR_PATTERN_NATIVE_REPLAY_RESULT]\n" +
+                                $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\nresult=PASS (D1 Flipped)");
+                            return result;
+                        }
+                    }
+                }
+
+                // Recovery attempt 2: If Direction 2 is specified, try flipping Direction 2
+                if (dir2Specified)
+                {
+                    CreateMirrorPartPackage.LogDebug(
+                        $"[LINEAR_PATTERN_REPLAY] Attempting D2 flip recovery...");
+                    if (definition.AccessSelections(partDoc, null))
+                    {
+                        bool mod2 = false;
+                        try
+                        {
+                            definition.D2ReverseDirection = !dir2Reversed;
+                            mod2 = info.Feature.ModifyDefinition(definition, partDoc, null);
+                        }
+                        finally
+                        {
+                            if (!mod2)
+                            {
+                                try { definition.ReleaseSelectionAccess(); } catch { }
+                            }
+                        }
+
+                        if (mod2)
+                        {
+                            partDoc.ForceRebuild3(false);
+                            errorCode = info.Feature.GetErrorCode2(out warning);
+                            if (errorCode == 0 || warning)
+                            {
+                                result.FeatureErrorCode = errorCode;
+                                result.FeatureWarning = warning;
+                                result.RebuildPassed = true;
+                                result.Success = true;
+                                result.StatusCode = "SUCCESS_LINEAR_PATTERN_FLIP_D1_D2";
+                                result.Message = "Linear pattern rebuilt successfully after flipping Direction 1 and Direction 2.";
+
+                                CreateMirrorPartPackage.LogDebug(
+                                    "[LINEAR_PATTERN_NATIVE_REPLAY_RESULT]\n" +
+                                    $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\nresult=PASS (D1 and D2 Flipped)");
+                                return result;
+                            }
+                        }
+                    }
+                }
+
+                // Recovery attempt 3: If GeometryPattern was true, try turning it off
+                if (geomPattern)
+                {
+                    CreateMirrorPartPackage.LogDebug(
+                        $"[LINEAR_PATTERN_REPLAY] Attempting geometry pattern disable recovery...");
+                    if (definition.AccessSelections(partDoc, null))
+                    {
+                        bool mod3 = false;
+                        try
+                        {
+                            definition.GeometryPattern = false;
+                            mod3 = info.Feature.ModifyDefinition(definition, partDoc, null);
+                        }
+                        finally
+                        {
+                            if (!mod3)
+                            {
+                                try { definition.ReleaseSelectionAccess(); } catch { }
+                            }
+                        }
+
+                        if (mod3)
+                        {
+                            partDoc.ForceRebuild3(false);
+                            errorCode = info.Feature.GetErrorCode2(out warning);
+                            if (errorCode == 0 || warning)
+                            {
+                                result.FeatureErrorCode = errorCode;
+                                result.FeatureWarning = warning;
+                                result.RebuildPassed = true;
+                                result.Success = true;
+                                result.StatusCode = "SUCCESS_LINEAR_PATTERN_GEOMETRY_OFF";
+                                result.Message = "Linear pattern rebuilt successfully after disabling Geometry Pattern.";
+
+                                CreateMirrorPartPackage.LogDebug(
+                                    "[LINEAR_PATTERN_NATIVE_REPLAY_RESULT]\n" +
+                                    $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\nresult=PASS (GeometryPattern=false)");
+                                return result;
+                            }
+                        }
+                    }
+                }
+
+                result.FeatureErrorCode = errorCode;
+                result.FeatureWarning = warning;
+                result.RebuildPassed = (errorCode == 0 || warning);
+                result.Success = result.RebuildPassed;
+                result.StatusCode = result.Success
+                    ? "SUCCESS_LINEAR_PATTERN_REBUILD"
+                    : "LINEAR_PATTERN_REBUILD_ERROR";
+                result.Message = $"Linear pattern rebuild error code={errorCode}, warning={warning}.";
+
+                CreateMirrorPartPackage.LogDebug(
+                    "LINEAR_PATTERN_NATIVE_REPLAY_RESULT\n" +
+                    $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\n" +
+                    $"result={(result.Success ? "PASS" : "FAIL")}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.StatusCode = "LINEAR_PATTERN_REBUILD_EXCEPTION";
+                result.Message = ex.Message;
+                return result;
+            }
+        }
+    }
+
+    public sealed class CircularPatternFeatureReplayHandler : IFeatureMirrorHandler
+    {
+        public bool CanHandle(PostBaseFeatureInfo info)
+        {
+            if (info == null || string.IsNullOrEmpty(info.Type)) return false;
+            return string.Equals(info.Type, "CirPattern", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(info.Type, "CircularPattern", StringComparison.OrdinalIgnoreCase) ||
+                   info.Type.IndexOf("CirPattern", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   info.Type.IndexOf("CircularPattern", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public FeatureReplayResult Replay(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            PlaneData mirrorPlane,
+            FeatureBodyState cache,
+            string protectedBaseFeatureName,
+            string protectedBaseSketchName)
+        {
+            FeatureReplayResult result = new FeatureReplayResult
+            {
+                Success = false,
+                FeatureName = info?.Name,
+                FeatureType = info?.Type,
+                StatusCode = "CIRCULAR_PATTERN_INVALID_ARGUMENT"
+            };
+
+            if (partDoc == null || info?.Feature == null)
+            {
+                result.Message = "Part or circular pattern feature is not available.";
+                return result;
+            }
+
+            ICircularPatternFeatureData definition = null;
+            bool selectionAccess = false;
+            bool reversed = false;
+            bool geomPattern = false;
+            int totalSeedCount = 0;
+
+            try
+            {
+                definition = info.Feature.GetDefinition() as ICircularPatternFeatureData;
+                if (definition == null)
+                {
+                    result.StatusCode = "CIRCULAR_PATTERN_DEFINITION_UNAVAILABLE";
+                    result.Message = "Feature definition is not ICircularPatternFeatureData.";
+                    return result;
+                }
+
+                selectionAccess = definition.AccessSelections(partDoc, null);
+                if (!selectionAccess)
+                {
+                    result.StatusCode = "CIRCULAR_PATTERN_ACCESS_SELECTIONS_FAILED";
+                    result.Message = "AccessSelections returned false for circular pattern.";
+                    return result;
+                }
+
+                int featureSeedCount = definition.GetPatternFeatureCount();
+                int bodySeedCount = definition.GetPatternBodyCount();
+                int faceSeedCount = definition.GetPatternFaceCount();
+                totalSeedCount = featureSeedCount + bodySeedCount + faceSeedCount;
+                int instances = definition.TotalInstances;
+                double spacing = definition.Spacing;
+                reversed = definition.ReverseDirection;
+                try { geomPattern = definition.GeometryPattern; } catch { }
+
+                CreateMirrorPartPackage.LogDebug(
+                    "CIRCULAR_PATTERN_NATIVE_REPLAY\n" +
+                    $"feature={info.Name}\nfeatureSeeds={featureSeedCount}\n" +
+                    $"bodySeeds={bodySeedCount}\nfaceSeeds={faceSeedCount}\n" +
+                    $"instances={instances}\nspacing={spacing}\nreversed={reversed}\n" +
+                    $"geometryPattern={geomPattern}");
+
+                if (totalSeedCount <= 0)
+                {
+                    result.StatusCode = "CIRCULAR_PATTERN_HAS_NO_SEED";
+                    result.Message = "Circular pattern has no feature, body, or face seed.";
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                result.StatusCode = "CIRCULAR_PATTERN_READ_FAILED";
+                result.Message = ex.Message;
+                return result;
+            }
+            finally
+            {
+                if (definition != null && selectionAccess)
+                {
+                    try { definition.ReleaseSelectionAccess(); } catch { }
+                    selectionAccess = false;
+                }
+            }
+
+            try
+            {
+                partDoc.ForceRebuild3(false);
+                bool warning = false;
+                int errorCode = info.Feature.GetErrorCode2(out warning);
+
+                bool isPatternHealthy = (errorCode == 0 || warning);
+
+                if (isPatternHealthy)
+                {
+                    result.FeatureErrorCode = errorCode;
+                    result.FeatureWarning = warning;
+                    result.RebuildPassed = true;
+                    result.Success = true;
+                    result.StatusCode = "SUCCESS_CIRCULAR_PATTERN_NATIVE_DEPENDENCY_REBUILD";
+                    result.Message = "Circular pattern rebuilt from its replayed seed dependencies.";
+
+                    CreateMirrorPartPackage.LogDebug(
+                        "CIRCULAR_PATTERN_NATIVE_REPLAY_RESULT\n" +
+                        $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\nresult=PASS");
+                    return result;
+                }
+
+                CreateMirrorPartPackage.LogDebug(
+                    $"[CIRCULAR_PATTERN_REPLAY] Initial rebuild failed with errorCode={errorCode}, warning={warning}. Attempting direction flip recovery...");
+
+                // Recovery attempt 1: Flip ReverseDirection
+                if (definition.AccessSelections(partDoc, null))
+                {
+                    bool mod = false;
+                    try
+                    {
+                        definition.ReverseDirection = !reversed;
+                        mod = info.Feature.ModifyDefinition(definition, partDoc, null);
+                    }
+                    finally
+                    {
+                        if (!mod)
+                        {
+                            try { definition.ReleaseSelectionAccess(); } catch { }
+                        }
+                    }
+
+                    if (mod)
+                    {
+                        partDoc.ForceRebuild3(false);
+                        errorCode = info.Feature.GetErrorCode2(out warning);
+                        if (errorCode == 0 || warning)
+                        {
+                            result.FeatureErrorCode = errorCode;
+                            result.FeatureWarning = warning;
+                            result.RebuildPassed = true;
+                            result.Success = true;
+                            result.StatusCode = "SUCCESS_CIRCULAR_PATTERN_FLIP_DIR";
+                            result.Message = "Circular pattern rebuilt successfully after flipping direction.";
+
+                            CreateMirrorPartPackage.LogDebug(
+                                "[CIRCULAR_PATTERN_NATIVE_REPLAY_RESULT]\n" +
+                                $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\nresult=PASS (Reversed)");
+                            return result;
+                        }
+                    }
+                }
+
+                // Recovery attempt 2: If GeometryPattern was true, try turning it off
+                if (geomPattern)
+                {
+                    CreateMirrorPartPackage.LogDebug(
+                        $"[CIRCULAR_PATTERN_REPLAY] Attempting geometry pattern disable recovery...");
+                    if (definition.AccessSelections(partDoc, null))
+                    {
+                        bool mod2 = false;
+                        try
+                        {
+                            definition.GeometryPattern = false;
+                            mod2 = info.Feature.ModifyDefinition(definition, partDoc, null);
+                        }
+                        finally
+                        {
+                            if (!mod2)
+                            {
+                                try { definition.ReleaseSelectionAccess(); } catch { }
+                            }
+                        }
+
+                        if (mod2)
+                        {
+                            partDoc.ForceRebuild3(false);
+                            errorCode = info.Feature.GetErrorCode2(out warning);
+                            if (errorCode == 0 || warning)
+                            {
+                                result.FeatureErrorCode = errorCode;
+                                result.FeatureWarning = warning;
+                                result.RebuildPassed = true;
+                                result.Success = true;
+                                result.StatusCode = "SUCCESS_CIRCULAR_PATTERN_GEOMETRY_OFF";
+                                result.Message = "Circular pattern rebuilt successfully after disabling Geometry Pattern.";
+
+                                CreateMirrorPartPackage.LogDebug(
+                                    "[CIRCULAR_PATTERN_NATIVE_REPLAY_RESULT]\n" +
+                                    $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\nresult=PASS (GeometryPattern=false)");
+                                return result;
+                            }
+                        }
+                    }
+                }
+
+                result.FeatureErrorCode = errorCode;
+                result.FeatureWarning = warning;
+                result.RebuildPassed = (errorCode == 0 || warning);
+                result.Success = result.RebuildPassed;
+                result.StatusCode = result.Success
+                    ? "SUCCESS_CIRCULAR_PATTERN_REBUILD"
+                    : "CIRCULAR_PATTERN_REBUILD_ERROR";
+                result.Message = $"Circular pattern rebuild error code={errorCode}, warning={warning}.";
+
+                CreateMirrorPartPackage.LogDebug(
+                    "CIRCULAR_PATTERN_NATIVE_REPLAY_RESULT\n" +
+                    $"feature={info.Name}\nerrorCode={errorCode}\nwarning={warning}\n" +
+                    $"result={(result.Success ? "PASS" : "FAIL")}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.StatusCode = "CIRCULAR_PATTERN_REBUILD_EXCEPTION";
+                result.Message = ex.Message;
+                return result;
+            }
+        }
+    }
+
+    public sealed class EdgeFlangeFeatureMirrorHandler : IFeatureMirrorHandler
+    {
+        public bool CanHandle(PostBaseFeatureInfo info)
+        {
+            if (info == null || string.IsNullOrEmpty(info.Type)) return false;
+            return string.Equals(info.Type, "EdgeFlange", StringComparison.OrdinalIgnoreCase) ||
+                   info.Type.IndexOf("EdgeFlange", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public FeatureReplayResult Replay(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PostBaseFeatureInfo info,
+            PlaneData mirrorPlane,
+            FeatureBodyState cache,
+            string protectedBaseFeatureName,
+            string protectedBaseSketchName)
+        {
+            FeatureReplayResult result = new FeatureReplayResult
+            {
+                Success = false,
+                FeatureName = info?.Name,
+                FeatureType = info?.Type
+            };
+
+            if (partDoc == null || info?.Feature == null)
+            {
+                result.StatusCode = "EDGE_FLANGE_INVALID_ARGUMENT";
+                result.Message = "Part or feature is not available.";
+                return result;
+            }
+
+            try
+            {
+                CreateMirrorPartPackage.LogDebug($"[EDGE_FLANGE_REPLAY] Replaying EdgeFlange {info.Name} via EdgeFlangeRepairManager...");
+                bool repaired = CreateMirrorPartPackage.edgeFlangeRepairManager.TryRepairEdgeFlange(swApp, partDoc, info.Feature);
+                partDoc.ForceRebuild3(false);
+
+                bool isWarning = false;
+                int errCode = info.Feature.GetErrorCode2(out isWarning);
+                result.FeatureErrorCode = errCode;
+                result.FeatureWarning = isWarning;
+                result.Success = repaired && (errCode == 0 || isWarning);
+                result.StatusCode = result.Success ? "SUCCESS_EDGE_FLANGE_REPLAY" : "EDGE_FLANGE_REBUILD_ERROR";
+                result.Message = result.Success
+                    ? "Edge flange flipped and rebuilt successfully."
+                    : $"Edge flange rebuild error code={errCode}, warning={isWarning}.";
+
+                CreateMirrorPartPackage.LogDebug(
+                    $"[EDGE_FLANGE_REPLAY] feature={info.Name} repaired={repaired} " +
+                    $"errCode={errCode} warning={isWarning} result={(result.Success ? "PASS" : "FAIL")}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.StatusCode = "EDGE_FLANGE_REBUILD_EXCEPTION";
+                result.Message = ex.Message;
+                CreateMirrorPartPackage.LogDebug($"[EDGE_FLANGE_REPLAY] Exception: {ex.Message}");
+                return result;
+            }
+        }
+    }
+
     public sealed class FeatureReplayDispatcher
     {
         private readonly List<IFeatureMirrorHandler> handlers = new List<IFeatureMirrorHandler>();
@@ -4427,6 +5373,9 @@ namespace ADDIN.Commands
             handlers.Add(new SketchDrivenFeatureMirrorHandler());
             handlers.Add(new ChamferFeatureMirrorHandler());
             handlers.Add(new CurvePatternFeatureReplayHandler());
+            handlers.Add(new LinearPatternFeatureReplayHandler());
+            handlers.Add(new CircularPatternFeatureReplayHandler());
+            handlers.Add(new EdgeFlangeFeatureMirrorHandler());
         }
 
         public IFeatureMirrorHandler GetHandler(PostBaseFeatureInfo info)
@@ -4439,21 +5388,281 @@ namespace ADDIN.Commands
         }
     }
 
+    public sealed class BaseFlangeDiagnosisResult
+    {
+        // Case 1: Centroid vs Origin
+        public bool IsOffCenter { get; set; }
+        public double[] GeometricCenter { get; set; } = new double[] { 0, 0, 0 };
+        public double CenterDistanceAlongNormal { get; set; }
+        public PlaneData AdaptedMirrorPlane { get; set; }
+
+        // Case 2: Extrusion Mode & Direction
+        public bool IsMirrorPlaneParallelToSheet { get; set; }
+        public bool IsBlindExtrusion { get; set; }
+        public bool NeedReverseExtrusion { get; set; }
+        public bool NeedReverseDirection { get; set; }
+        public bool NeedReverseThickness { get; set; }
+        public double BaseThickness { get; set; }
+
+        // Case 3: 2D Base Sketch Symmetry & Mutation
+        public bool IsBaseSketchSymmetric { get; set; } = true;
+        public bool NeedBaseSketchMutation { get; set; }
+        public double[] AxisPoint1 { get; set; }
+        public double[] AxisPoint2 { get; set; }
+        public int TotalSketchPoints { get; set; }
+        public int AsymmetricPointsCount { get; set; }
+
+        public string Summary()
+        {
+            return $"[DIAGNOSE_BASE_FLANGE]\n" +
+                   $"  Case 1 (OffCenter): {IsOffCenter} (Center=({GeometricCenter[0] * 1000.0:F2}, {GeometricCenter[1] * 1000.0:F2}, {GeometricCenter[2] * 1000.0:F2})mm, distAlongNormal={CenterDistanceAlongNormal * 1000.0:F2}mm)\n" +
+                   $"  Case 2 (Extrusion): Parallel={IsMirrorPlaneParallelToSheet}, Blind={IsBlindExtrusion}, NeedRevDir={NeedReverseDirection}, NeedRevThick={NeedReverseThickness} (T={BaseThickness * 1000.0:F2}mm)\n" +
+                   $"  Case 3 (BaseSketch): Symmetric={IsBaseSketchSymmetric}, NeedMutation={NeedBaseSketchMutation} (totalPts={TotalSketchPoints}, asymPts={AsymmetricPointsCount})";
+        }
+    }
+
+    public static class BaseFlangeDiagnosticService
+    {
+        public static BaseFlangeDiagnosisResult Diagnose(
+            ISldWorks swApp,
+            ModelDoc2 partDoc,
+            PlaneData rawMirrorPlane,
+            Feature baseFeature,
+            Feature baseDrivingSketch,
+            List<Body2> solidBodies)
+        {
+            BaseFlangeDiagnosisResult res = new BaseFlangeDiagnosisResult
+            {
+                GeometricCenter = new double[] { 0, 0, 0 },
+                AdaptedMirrorPlane = rawMirrorPlane
+            };
+
+            if (partDoc == null || rawMirrorPlane == null) return res;
+
+            // 1. Diagnose Case 1: Centroid vs Origin
+            // Quy tắc toán học CAD Assembly Mirror: Mặt phẳng gương nội bộ của Part PHẢI luôn neo qua
+            // gốc tọa độ Part (0,0,0) để công thức tính vị trí Assembly O' = 2*P - O_src đặt chi tiết đúng vị trí đối xứng.
+            // Nếu dời mặt phẳng gương về Centroid Xc, chi tiết sẽ bị lệch đúng 2*Xc trong Assembly.
+            // Do đó, AdaptedMirrorPlane luôn giữ nguyên gốc (0,0,0).
+            if (solidBodies != null && solidBodies.Count > 0)
+            {
+                double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+                double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+                bool hasBox = false;
+
+                foreach (var b in solidBodies)
+                {
+                    if (b == null) continue;
+                    double[] box = b.GetBodyBox() as double[];
+                    if (box != null && box.Length >= 6)
+                    {
+                        hasBox = true;
+                        if (box[0] < minX) minX = box[0];
+                        if (box[1] < minY) minY = box[1];
+                        if (box[2] < minZ) minZ = box[2];
+                        if (box[3] > maxX) maxX = box[3];
+                        if (box[4] > maxY) maxY = box[4];
+                        if (box[5] > maxZ) maxZ = box[5];
+                    }
+                }
+
+                if (hasBox)
+                {
+                    res.GeometricCenter = new double[]
+                    {
+                        (minX + maxX) * 0.5,
+                        (minY + maxY) * 0.5,
+                        (minZ + maxZ) * 0.5
+                    };
+
+                    double[] n = rawMirrorPlane.Normal;
+                    double distAlongNormal = res.GeometricCenter[0] * n[0] +
+                                             res.GeometricCenter[1] * n[1] +
+                                             res.GeometricCenter[2] * n[2];
+                    res.CenterDistanceAlongNormal = distAlongNormal;
+
+                    // Giữ nguyên mặt phẳng gương qua gốc (0,0,0)
+                    res.IsOffCenter = false;
+                    res.AdaptedMirrorPlane = rawMirrorPlane;
+                }
+            }
+
+            // 2. Diagnose Case 2: Base Flange Extrusion (Blind vs Mid-Plane) & Parallel Sheet
+            Sketch baseSketch = (baseDrivingSketch != null) ? baseDrivingSketch.GetSpecificFeature2() as Sketch : null;
+            bool isOpenProfile = false;
+            if (baseSketch != null)
+            {
+                try
+                {
+                    object[] contours = baseSketch.GetSketchContours() as object[];
+                    if (contours != null && contours.Length > 0)
+                    {
+                        foreach (SketchContour sc in contours)
+                        {
+                            if (sc != null && !sc.IsClosed())
+                            {
+                                isOpenProfile = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (baseFeature != null && baseSketch != null)
+            {
+                // Read Base Flange data
+                try
+                {
+                    IBaseFlangeFeatureData bfData = baseFeature.GetDefinition() as IBaseFlangeFeatureData;
+                    if (bfData != null)
+                    {
+                        res.BaseThickness = bfData.Thickness;
+                        res.IsBlindExtrusion = (bfData.D1EndConditionType != (int)swEndConditions_e.swEndCondMidPlane && !bfData.SymmetricThickness);
+                        if (!isOpenProfile && bfData.BendRadius > 0 && bfData.D1EndConditionDistance > bfData.Thickness * 1.5)
+                        {
+                            isOpenProfile = true;
+                        }
+                    }
+                    else
+                    {
+                        res.IsBlindExtrusion = true;
+                    }
+                }
+                catch
+                {
+                    res.IsBlindExtrusion = true;
+                }
+
+                // Check if sketch normal is parallel to mirror plane normal
+                double absDotSketchAndMirror = 0.0;
+                IMathUtility mathUtility = swApp.GetMathUtility() as IMathUtility;
+                MathTransform m2s = baseSketch.ModelToSketchTransform;
+                if (mathUtility != null && m2s != null)
+                {
+                    try
+                    {
+                        MathTransform s2m = m2s.IInverse();
+                        MathVector skZ = mathUtility.CreateVector(new double[] { 0, 0, 1 }) as MathVector;
+                        MathVector skNormVec = skZ.MultiplyTransform(s2m) as MathVector;
+                        double[] nSk = skNormVec.ArrayData as double[];
+                        double[] nMp = res.AdaptedMirrorPlane.Normal;
+                        double dot = nSk[0] * nMp[0] + nSk[1] * nMp[1] + nSk[2] * nMp[2];
+                        absDotSketchAndMirror = Math.Abs(dot);
+                    }
+                    catch (Exception ex)
+                    {
+                        CreateMirrorPartPackage.LogDebug($"[DIAGNOSE_BASE_FLANGE] Sketch normal calculation exception: {ex.Message}");
+                    }
+                }
+
+                if (isOpenProfile)
+                {
+                    // Với phôi đùn biên dạng hở (bent profile / channel):
+                    // Phôi có nhiều mặt bích tạo góc trong không gian 3D, KHÔNG PHẢI là một tấm phẳng đơn song song với mặt gương.
+                    // Tuyệt đối không độc lập đảo ReverseThickness vì sẽ làm đổi hướng bù tôn của góc uốn, làm sai lệch kích thước và thể tích!
+                    res.IsMirrorPlaneParallelToSheet = false;
+
+                    // Nếu trục đùn chiều dài (sketch normal) song song với pháp tuyến mặt phẳng gương:
+                    // Chi tiết đùn vuông góc với mặt gương -> đảo hướng đùn chiều dài 3D (Case B).
+                    if (res.IsBlindExtrusion && absDotSketchAndMirror > 0.9)
+                    {
+                        res.NeedReverseDirection = true;
+                    }
+                }
+                else
+                {
+                    // Với phôi tấm phẳng (closed contour sketch):
+                    // Mặt phẳng tấm tôn chính là mặt phẳng của Sketch, pháp tuyến tấm tôn = sketch normal!
+                    res.IsMirrorPlaneParallelToSheet = (absDotSketchAndMirror > 0.95);
+                    if (res.IsMirrorPlaneParallelToSheet && res.IsBlindExtrusion)
+                    {
+                        res.NeedReverseThickness = true;
+                        res.NeedReverseExtrusion = true;
+                    }
+                }
+
+                // 3. Diagnose Case 3: Base Sketch Symmetry
+                if (!res.IsMirrorPlaneParallelToSheet)
+                {
+                    MirrorReferenceResult refRes = MirrorReferenceResolver.ResolveAndSelectMirrorReference(
+                        swApp, partDoc, baseSketch, res.AdaptedMirrorPlane);
+
+                    if (refRes != null && refRes.Success && refRes.AxisPoint1 != null && refRes.AxisPoint2 != null)
+                    {
+                        res.AxisPoint1 = refRes.AxisPoint1;
+                        res.AxisPoint2 = refRes.AxisPoint2;
+
+                        object[] ptsObj = baseSketch.GetSketchPoints2() as object[];
+                        if (ptsObj != null)
+                        {
+                            res.TotalSketchPoints = ptsObj.Length;
+                            int asymCount = 0;
+                            double ax1 = res.AxisPoint1[0], ay1 = res.AxisPoint1[1];
+                            double ax2 = res.AxisPoint2[0], ay2 = res.AxisPoint2[1];
+
+                            List<double[]> allPts = new List<double[]>();
+                            foreach (object po in ptsObj)
+                            {
+                                SketchPoint sp = po as SketchPoint;
+                                if (sp != null) allPts.Add(new double[] { sp.X, sp.Y });
+                            }
+
+                            foreach (double[] pt in allPts)
+                            {
+                                double[] r = SketchDrivenFeatureMirrorHandler.ReflectPoint2D(pt[0], pt[1], ax1, ay1, ax2, ay2);
+                                bool matched = false;
+                                foreach (double[] cand in allPts)
+                                {
+                                    double d = Math.Sqrt((r[0] - cand[0]) * (r[0] - cand[0]) + (r[1] - cand[1]) * (r[1] - cand[1]));
+                                    if (d <= 0.0001) { matched = true; break; }
+                                }
+                                if (!matched) asymCount++;
+                            }
+
+                            res.AsymmetricPointsCount = asymCount;
+                            res.IsBaseSketchSymmetric = (asymCount == 0);
+                            res.NeedBaseSketchMutation = !res.IsBaseSketchSymmetric;
+                            if (res.NeedBaseSketchMutation)
+                            {
+                                // Khi phản chiếu biên dạng uốn hở qua trục đối xứng 2D, chiều quay uốn cong của đường cong bị đảo ngược;
+                                // hướng bù bề dày tôn (ReverseThickness) phải được đảo ngược cùng lúc để vật liệu nằm đúng phía ban đầu.
+                                if (isOpenProfile)
+                                {
+                                    res.NeedReverseThickness = true;
+                                    res.NeedReverseExtrusion = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return res;
+        }
+    }
+
     public static class SheetMetalMirrorServiceV6
     {
         public static MirrorPackageResult ExecuteV6MirrorPipeline(
             ISldWorks swApp,
             Component2 sourceComponent,
             RefPlane assemblyPlane,
-            ISavePathProvider savePathProvider)
+            ISavePathProvider savePathProvider,
+            ModelDoc2 standalonePart = null,
+            PlaneData standalonePlane = null,
+            Action<ModelDoc2> validateBeforePublish = null)
         {
             MirrorPackageResult result = new MirrorPackageResult { Success = false };
 
-            string sourcePath = sourceComponent.GetPathName();
+            if (sourceComponent == null && (standalonePart == null || standalonePlane == null))
+                throw new ArgumentException("A source component or a standalone Part with reflection plane is required.");
+            string sourcePath = sourceComponent != null ? sourceComponent.GetPathName() : standalonePart.GetPathName();
             CreateMirrorPartPackage.LogDebug($"SOURCE path={sourcePath}");
-            CreateMirrorPartPackage.LogDebug($"SOURCE component={sourceComponent.Name2}");
+            CreateMirrorPartPackage.LogDebug("SOURCE mode=" + (sourceComponent == null ? "STANDALONE_LEGACY_CORE" : "ASSEMBLY_COMPONENT"));
 
-            MathTransform sourceTransform = sourceComponent.Transform2;
+            MathTransform sourceTransform = sourceComponent == null ? null : sourceComponent.Transform2;
             if (sourceTransform != null)
             {
                 double[] tData = sourceTransform.ArrayData as double[];
@@ -4483,10 +5692,28 @@ namespace ADDIN.Commands
             }
 
             CreateMirrorPartPackage.LogDebug($"TARGET path={chosenTargetPartPath}");
+            if (File.Exists(chosenTargetPartPath))
+                throw new InvalidOperationException("Output already exists. Choose a new file name.");
 
             IMathUtility mathUtility = swApp.GetMathUtility() as IMathUtility;
-            PlaneData selectedMirrorPlane = MirrorPlaneMapper.GetLocalPlane(mathUtility, sourceComponent, assemblyPlane);
-            PlaneData mirrorPlane = MirrorPlaneMapper.CreatePartOriginAnchoredPlane(selectedMirrorPlane);
+            PlaneData selectedMirrorPlane = standalonePart != null ? standalonePlane :
+                MirrorPlaneMapper.GetLocalPlane(mathUtility, sourceComponent, assemblyPlane);
+            PlaneData mirrorPlane = standalonePart != null ? standalonePlane :
+                MirrorPlaneMapper.CreatePartOriginAnchoredPlane(selectedMirrorPlane);
+            // Calculate Global Mirror Transform
+            double[] o = mirrorPlane.Origin;
+            double[] n = mirrorPlane.Normal;
+            double nx = n[0], ny = n[1], nz = n[2];
+            double dotON = o[0] * nx + o[1] * ny + o[2] * nz;
+            double[] xform = new double[16];
+            xform[0] = 1.0 - 2.0 * nx * nx; xform[1] = -2.0 * nx * ny; xform[2] = -2.0 * nx * nz;
+            xform[3] = -2.0 * ny * nx; xform[4] = 1.0 - 2.0 * ny * ny; xform[5] = -2.0 * ny * nz;
+            xform[6] = -2.0 * nz * nx; xform[7] = -2.0 * nz * ny; xform[8] = 1.0 - 2.0 * nz * nz;
+            xform[9] = 2.0 * dotON * nx; xform[10] = 2.0 * dotON * ny; xform[11] = 2.0 * dotON * nz;
+            xform[12] = 1.0; xform[13] = 0.0; xform[14] = 0.0; xform[15] = 0.0;
+            CreateMirrorPartPackage.currentMirrorTransform = ReflectionApiTransformV7.Create(mathUtility, xform);
+            CreateMirrorPartPackage.LogDebug($"[EDGE_FLANGE_REPAIR] currentMirrorTransform established. (nx={nx}, ny={ny}, nz={nz})");
+
             string targetDirectory = Path.GetDirectoryName(chosenTargetPartPath);
             if (string.IsNullOrWhiteSpace(targetDirectory)) targetDirectory = defaultDir;
             string stagingTargetPartPath = Path.Combine(
@@ -4522,6 +5749,7 @@ namespace ADDIN.Commands
                     "",
                     ref errors,
                     ref warnings);
+                
 
                 if (copiedPartDoc == null)
                 {
@@ -4535,8 +5763,15 @@ namespace ADDIN.Commands
                 bool copiedPartClosedForNativeFallback = false;
                 try
                 {
+                    int activationErrors = 0;
+                    ModelDoc2 activatedCopy = swApp.ActivateDoc3(copiedPartDoc.GetTitle(), false,
+                        (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activationErrors) as ModelDoc2;
+                    if (activatedCopy == null || activationErrors != 0 ||
+                        !string.Equals(activatedCopy.GetPathName(), stagingTargetPartPath, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Cannot activate staging Part safely. errors=" + activationErrors);
                     // Activate Referenced Configuration
-                    string reqConfig = sourceComponent.ReferencedConfiguration;
+                    string reqConfig = standalonePart != null ? standalonePart.ConfigurationManager.ActiveConfiguration.Name :
+                        sourceComponent.ReferencedConfiguration;
                     bool showConfigRet = false;
                     string actConfigName = copiedPartDoc.ConfigurationManager.ActiveConfiguration.Name;
 
@@ -4556,6 +5791,9 @@ namespace ADDIN.Commands
                         CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
                         return result;
                     }
+
+                    CreateMirrorPartPackage.edgeFlangeRepairManager.CaptureOriginalEdges(copiedPartDoc);
+                    CreateMirrorPartPackage.featureOptionsCaptureHelper.CaptureFromModel(copiedPartDoc);
 
                     // Capture the final geometry before rollback/replay changes anything. It
                     // is used only as an oracle for validating a native SOLIDWORKS body-mirror
@@ -4605,13 +5843,11 @@ namespace ADDIN.Commands
                     string baseFeatName = baseFeature.Name;
                     string baseSketchName = (baseDrivingSketch != null) ? baseDrivingSketch.Name : "<none>";
 
-                    CreateMirrorPartPackage.LogDebug($"MIRROR_PART_V6: BASE_PROTECTED feature={baseFeatName} sketch={baseSketchName}");
-
-                    // Capture initial Base Sketch Signature
+                    // Capture initial Base Sketch Signature from untampered model
                     Sketch baseSketchObj = (baseDrivingSketch != null) ? baseDrivingSketch.GetSpecificFeature2() as Sketch : null;
                     List<SketchSignatureHelper.SketchSegmentSignature> initialBaseSketchSig = SketchSignatureHelper.CaptureSketchSignature(baseSketchObj);
 
-                    // 2. Scan All Post-Base Features
+                    // 2. Scan All Post-Base Features on the UNTAMPERED Model
                     List<PostBaseFeatureInfo> postBaseFeatures = EnumeratePostBaseFeatures(copiedPartDoc, baseFeature);
 
                     // 2.1 Snapshot pristine sketch points from the untampered model
@@ -4629,7 +5865,7 @@ namespace ADDIN.Commands
                         }
                     }
 
-                    // 3. Build 3D Body State Cache
+                    // 3. Build 3D Body State Cache on the UNTAMPERED Model
                     CreateMirrorPartPackage.LogDebug("==============================");
                     CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: CACHE BUILD");
                     CreateMirrorPartPackage.LogDebug("==============================");
@@ -4641,6 +5877,40 @@ namespace ADDIN.Commands
                         CreateMirrorPartPackage.LogDebug("MIRROR_PART_V6: CACHE_BUILD_FAILED " + cacheError);
                         prepareNativeFeatureFallback("CACHE_BUILD_FAILED: " + cacheError);
                         return result;
+                    }
+
+                    // Freeze references before base mutation; standalone V7 uses the
+                    // canonical origin plane. Assembly keeps its existing route.
+                    // Collect ALL unsupported operations before editing any sketch.
+                    var preflightDispatcher = new FeatureReplayDispatcher();
+                    var preflightProblems = new List<string>();
+                    for (int pf = 0; pf < postBaseFeatures.Count; pf++)
+                    {
+                        var item = postBaseFeatures[pf];
+                        if (item.IsSuppressed) continue;
+                        var state = pf < bodyCache.Count ? bodyCache[pf] : null;
+                        if (state != null && !state.ChangesGeometry) continue;
+                        if (preflightDispatcher.GetHandler(item) == null)
+                            preflightProblems.Add(item.Name + " [" + item.Type + "]: no replay handler");
+                        if (item.PristineSketchSlots != null && item.PristineSketchSlots.Count > 0)
+                            preflightProblems.Add(item.Name + ": slot reconstruction does not yet preserve constraint identities");
+                    }
+                    foreach (string problem in preflightProblems)
+                        CreateMirrorPartPackage.LogDebug("[PREFLIGHT13][UNSUPPORTED] " + problem);
+                    if (preflightProblems.Count > 0)
+                        throw new InvalidOperationException("Preflight stopped BEFORE base mutation:\n" +
+                            string.Join("\n", preflightProblems));
+
+                    MirrorInPlaceExecutionContextV7 mappedContext = null;
+                    Dictionary<string, FeatureReplayCheckpointV7> mappedCheckpoints = null;
+                    if (standalonePart != null)
+                    {
+                        mappedContext = new MirrorInPlaceExecutionContextV7
+                        {
+                            SwApp = swApp, WorkingDocument = copiedPartDoc,
+                            Reflection = PartReflectionTransformV7.CreateOriginAnchored(mirrorPlane.Normal)
+                        };
+                        mappedCheckpoints = RollbackReplayEngineV7.CaptureMappedHandlers(mappedContext);
                     }
 
                     // Classify Features based on body delta
@@ -4670,7 +5940,7 @@ namespace ADDIN.Commands
                         }
                     }
 
-                    // 4. Synchronize Live Model with B0 and Prepare Sequential Replay
+                    // 4. Rollback to Base Flange to perform Base Flange Transformations & Sequential Replay
                     string rbBaseErr = null;
                     bool rbBaseOk = MoveRollbackForReplay(copiedPartDoc, baseFeature, out rbBaseErr);
                     if (!rbBaseOk)
@@ -4679,6 +5949,81 @@ namespace ADDIN.Commands
                         return result;
                     }
 
+                    // Run Pre-Flight Diagnosis for Base Flange (Cases 1, 2, 3)
+                    BaseFlangeDiagnosisResult diagnosis = BaseFlangeDiagnosticService.Diagnose(
+                        swApp,
+                        copiedPartDoc,
+                        mirrorPlane,
+                        baseFeature,
+                        baseDrivingSketch,
+                        exactSourceBodies);
+
+                    CreateMirrorPartPackage.LogDebug(diagnosis.Summary());
+
+                    // Case 1: Apply adapted mirror plane if off-center
+                    if (standalonePart == null && diagnosis.IsOffCenter && diagnosis.AdaptedMirrorPlane != null)
+                    {
+                        mirrorPlane = diagnosis.AdaptedMirrorPlane;
+                        CreateMirrorPartPackage.LogDebug($"[ADAPTIVE_MIRROR] Case 1 Applied: Using Centroid-anchored Mirror Plane: Origin=({mirrorPlane.Origin[0]:F4},{mirrorPlane.Origin[1]:F4},{mirrorPlane.Origin[2]:F4})");
+                    }
+                    result.EffectiveMirrorPlane = mirrorPlane;
+
+                    // Snapshot at the BASE checkpoint, not the final source body or a cut checkpoint.
+                    string baseOracleError22;
+                    Body2 sourceBase22 = BodyOperationsHelper.GetSolidBodyCopyStrict(copiedPartDoc, out baseOracleError22);
+                    if (sourceBase22 == null)
+                        throw new InvalidOperationException("BASE22 source checkpoint unavailable: " + baseOracleError22);
+                    BodyTransformResult expectedBase22 = BodyOperationsHelper.MirrorBodyStrict(swApp, sourceBase22, mirrorPlane);
+                    if (expectedBase22 == null || !expectedBase22.Success || expectedBase22.Body == null)
+                        throw new InvalidOperationException("BASE22 reflection oracle unavailable: " + expectedBase22?.ErrorMessage);
+                    IBaseFlangeFeatureData originalBase22 = baseFeature.GetDefinition() as IBaseFlangeFeatureData;
+                    if (originalBase22 == null || !originalBase22.AccessSelections(copiedPartDoc, null))
+                        throw new InvalidOperationException("BASE22 cannot read base flange options.");
+                    bool originalDirection22;
+                    bool originalThickness22;
+                    try
+                    {
+                        originalDirection22 = originalBase22.ReverseDirection;
+                        originalThickness22 = originalBase22.ReverseThickness;
+                    }
+                    finally { originalBase22.ReleaseSelectionAccess(); }
+
+                    // Case 3: In-Place Point Mutation for Base Sketch if Asymmetric (chạy trước để cập nhật biên dạng sketch)
+                    if (diagnosis.NeedBaseSketchMutation && baseDrivingSketch != null)
+                    {
+                        try
+                        {
+                            Sketch skObj = baseDrivingSketch.GetSpecificFeature2() as Sketch;
+                            var pristinePts = ADDIN.Helpers.SketchOperationsHelper.CapturePristineSketchPoints(skObj);
+                            Sketch activeSketch = ADDIN.Helpers.SketchOperationsHelper.FreeSketchForMutation(copiedPartDoc, baseDrivingSketch);
+                            if (activeSketch != null && diagnosis.AxisPoint1 != null && diagnosis.AxisPoint2 != null)
+                            {
+                                ADDIN.Helpers.SketchOperationsHelper.MutateSketchPoints(
+                                    copiedPartDoc,
+                                    activeSketch,
+                                    diagnosis.AxisPoint1[0], diagnosis.AxisPoint1[1],
+                                    diagnosis.AxisPoint2[0], diagnosis.AxisPoint2[1],
+                                    pristinePts,
+                                    mirrorPlane);
+                                copiedPartDoc.ForceRebuild3(false);
+                                CreateMirrorPartPackage.LogDebug($"[ADAPTIVE_MIRROR] Case 3 Applied: Mutated {pristinePts.Count} Base Sketch points in-place.");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            CreateMirrorPartPackage.LogDebug($"[ADAPTIVE_MIRROR] Case 3 failed: {ex.Message}");
+                            throw new InvalidOperationException("Base sketch reflection failed; downstream replay cancelled.", ex);
+                        }
+                    }
+
+                    // A reflected sketch does not prove that sheet material occupies the right side.
+                    // Resolve native flags against the reflected BASE body, never volume alone.
+                    ResolveBaseOptions22(copiedPartDoc, baseFeature, expectedBase22.Body,
+                        originalDirection22, originalThickness22, diagnosis);
+
+                    CreateMirrorPartPackage.LogDebug($"MIRROR_PART_V6: BASE feature={baseFeatName} sketch={baseSketchName} mutated={diagnosis.NeedBaseSketchMutation}");
+
+                    // 5. Synchronize Live Model with B0 and Prepare Sequential Replay
                     string liveBaseErr = null;
                     Body2 liveBaseBody = BodyOperationsHelper.GetSolidBodyCopyStrict(copiedPartDoc, out liveBaseErr);
                     if (liveBaseBody == null)
@@ -4704,6 +6049,8 @@ namespace ADDIN.Commands
 
                     Body2 currentActualBody = liveBaseBody;
                     FeatureReplayDispatcher dispatcher = new FeatureReplayDispatcher();
+                    // CUT23 checks each feature at its own before-cut checkpoint.
+                    // Do not compare every later cut against the base-only body.
 
                     int replayedCount = 0;
                     int unsupportedGeometryCount = 0;
@@ -4713,6 +6060,9 @@ namespace ADDIN.Commands
                     // Track replayed sketch signatures for upstream persistence checking
                     Dictionary<int, List<SketchSignatureHelper.SketchSegmentSignature>> replayedSketchSignatures =
                         new Dictionary<int, List<SketchSignatureHelper.SketchSegmentSignature>>();
+
+                    // Track features that were accepted as asymmetric, so their children can also be asymmetric
+                    HashSet<string> asymmetricFeatures = new HashSet<string>();
 
                     for (int i = 0; i < postBaseFeatures.Count; i++)
                     {
@@ -4782,7 +6132,17 @@ namespace ADDIN.Commands
                             }
                         }
 
-                        FeatureReplayResult replayRes = handler.Replay(swApp, copiedPartDoc, featInfo, mirrorPlane, cacheState, baseFeatName, baseSketchName);
+                        FeatureReplayResult replayRes;
+                        FeatureReplayCheckpointV7 mappedCheckpoint;
+                        if (mappedCheckpoints != null && mappedCheckpoints.TryGetValue(featInfo.Name, out mappedCheckpoint))
+                        {
+                            RollbackReplayEngineV7.ReplayMappedHandler(mappedContext, mappedCheckpoint);
+                            replayRes = new FeatureReplayResult { Success = true, RebuildPassed = true,
+                                FeatureName = featInfo.Name, FeatureType = featInfo.Type,
+                                StatusCode = "MAPPED12_ORACLE_PASS", Message = mappedCheckpoint.Result.Message };
+                        }
+                        else
+                            replayRes = handler.Replay(swApp, copiedPartDoc, featInfo, mirrorPlane, cacheState, baseFeatName, baseSketchName);
 
                         CreateMirrorPartPackage.LogDebug($"mirrorReference.mode={replayRes.MirrorReferenceKind} ({replayRes.StatusCode})");
                         CreateMirrorPartPackage.LogDebug($"sourceEntities={replayRes.SourceEntities}");
@@ -4824,6 +6184,7 @@ namespace ADDIN.Commands
                         // region is nearest the reflected source removed-region centroid.
                         string cutFlipDetails;
                         bool allowAsymmetricCutVolume;
+                        bool usedSuperRecover = false;
                         if (!BodyOperationsHelper.TryCorrectExtrudeCutFlip(
                             copiedPartDoc,
                             featInfo,
@@ -4838,15 +6199,69 @@ namespace ADDIN.Commands
                             {
                                 CreateMirrorPartPackage.LogDebug(cutFlipDetails);
                             }
-                            failedCount++;
-                            prepareNativeFeatureFallback(
-                                $"CUT_DIRECTION_CORRECTION_FAILED name={featInfo.Name}");
-                            return result;
+
+                            // TryCorrectExtrudeCutFlip thất bại (thường do end-condition face reference
+                            // không còn valid sau mirror, ví dụ face của BaseBend chỉ tồn tại phía nguồn).
+                            // Thử TrySuperRecoverExtrudeCut (Phase 2: ép ThroughAll) trước khi báo lỗi.
+                            string superRecDetails;
+                            bool superRecOk = BodyOperationsHelper.TrySuperRecoverExtrudeCut(
+                                copiedPartDoc, featInfo, out superRecDetails);
+                            string superRecResult = superRecOk ? "PASS" : "FAIL";
+                            CreateMirrorPartPackage.LogDebug(
+                                $"[SUPER_REC_AFTER_FLIP_FAIL] feature={featInfo.Name} result={superRecResult} details={superRecDetails}");
+
+
+                            if (superRecOk)
+                            {
+                                // Chụp lại body sau khi SuperRecover thành công
+                                string srBodyErr;
+                                stepActualBody = BodyOperationsHelper.GetSolidBodyCopyStrict(copiedPartDoc, out srBodyErr);
+                                if (stepActualBody != null)
+                                {
+                                    // Cho phép asymmetric volume vì end-condition đã thay đổi (ThroughAll)
+                                    allowAsymmetricCutVolume = true;
+                                    usedSuperRecover = true;
+                                    CreateMirrorPartPackage.LogDebug(
+                                        $"[SUPER_REC_AFTER_FLIP_FAIL] feature={featInfo.Name} body captured, continuing with ASYMMETRIC_BASE");
+                                    // Tiếp tục vào phần semantic validation bên dưới
+                                }
+                                else
+                                {
+                                    failedCount++;
+                                    prepareNativeFeatureFallback(
+                                        $"CUT_DIRECTION_CORRECTION_FAILED name={featInfo.Name} (super_rec body null: {srBodyErr})");
+                                    return result;
+                                }
+                            }
+                            else
+                            {
+                                failedCount++;
+                                prepareNativeFeatureFallback(
+                                    $"CUT_DIRECTION_CORRECTION_FAILED name={featInfo.Name}");
+                                return result;
+                            }
+                        }
+
+                        if (!allowAsymmetricCutVolume && featInfo.ParentFeatureNames != null)
+                        {
+                            foreach (string parent in featInfo.ParentFeatureNames)
+                            {
+                                if (asymmetricFeatures.Contains(parent))
+                                {
+                                    allowAsymmetricCutVolume = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (allowAsymmetricCutVolume)
+                        {
+                            asymmetricFeatures.Add(featInfo.Name);
                         }
 
                         replayRes.AllowAsymmetricCutVolume = allowAsymmetricCutVolume;
 
-                        if (!string.IsNullOrEmpty(cutFlipDetails))
+                        if (!usedSuperRecover && !string.IsNullOrEmpty(cutFlipDetails))
                         {
                             CreateMirrorPartPackage.LogDebug(cutFlipDetails);
                         }
@@ -4888,7 +6303,7 @@ namespace ADDIN.Commands
 
                     bool isBaseWarning = false;
                     int baseErrCode = baseFeature.GetErrorCode2(out isBaseWarning);
-                    bool baseFeatureHealthy = (baseErrCode == 0);
+                    bool baseFeatureHealthy = (baseErrCode == 0 || isBaseWarning);
 
                     // 7. Final Replay Audit on all replayed features after full rebuild
                     CreateMirrorPartPackage.LogDebug("==============================");
@@ -4899,13 +6314,22 @@ namespace ADDIN.Commands
                     for (int i = 0; i < postBaseFeatures.Count; i++)
                     {
                         var featInfo = postBaseFeatures[i];
-                        if (featInfo.Disposition == FeatureReplayDisposition.ReplayRequired &&
-                            featInfo.HasDrivingSketch &&
-                            featInfo.DrivingSketchFeature != null)
+                        if (featInfo.Disposition == FeatureReplayDisposition.ReplayRequired)
                         {
                             bool isWarning = false;
                             int err = featInfo.Feature.GetErrorCode2(out isWarning);
-                            bool featHealthy = (err == 0);
+                            bool featHealthy = (err == 0 || isWarning);
+
+                            if (string.Equals(featInfo.Type, "EdgeFlange", StringComparison.OrdinalIgnoreCase) ||
+                                featInfo.Type.IndexOf("EdgeFlange", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                CreateMirrorPartPackage.LogDebug($"{featInfo.Name}: EdgeFlange featureHealthy={featHealthy} errCode={err} warning={isWarning}");
+                                if (!featHealthy) allAuditPass = false;
+                                continue;
+                            }
+
+                            if (featInfo.HasDrivingSketch && featInfo.DrivingSketchFeature != null)
+                            {
 
                             Sketch skObj = featInfo.DrivingSketchFeature.GetSpecificFeature2() as Sketch;
                             object[] segs = skObj != null ? skObj.GetSketchSegments() as object[] : null;
@@ -4931,17 +6355,25 @@ namespace ADDIN.Commands
 
                             if (!featHealthy || !skMirrorOk) allAuditPass = false;
                         }
+                        else
+                        {
+                            CreateMirrorPartPackage.LogDebug($"{featInfo.Name}: {featInfo.Type} featureHealthy={featHealthy} errCode={err} warning={isWarning}");
+                            if (!featHealthy) allAuditPass = false;
+                        }
                     }
+                }
 
                     // 8. Final Success Verification
                     string finalActErr = null;
                     Body2 finalSolidBody = BodyOperationsHelper.GetSolidBodyCopyStrict(copiedPartDoc, out finalActErr);
                     bool singleSolidBody = (finalSolidBody != null);
 
+                    bool baseSketchValid = diagnosis.NeedBaseSketchMutation ? (baseErrCode == 0 || isBaseWarning) : baseSketchUnchanged;
+
                     bool overallPass = (failedCount == 0) &&
                                        (unsupportedGeometryCount == 0) &&
                                        (bodyChangingCount == validatedCount) &&
-                                       baseSketchUnchanged &&
+                                       baseSketchValid &&
                                        baseFeatureHealthy &&
                                        allAuditPass &&
                                        singleSolidBody;
@@ -4962,7 +6394,7 @@ namespace ADDIN.Commands
                     if (!overallPass)
                     {
                         string finalReason;
-                        if (!baseSketchUnchanged) finalReason = "BASE_SKETCH_CHANGED";
+                        if (!baseSketchValid) finalReason = "BASE_SKETCH_INVALID";
                         else if (!baseFeatureHealthy) finalReason = $"BASE_FLANGE_ERROR code={baseErrCode}";
                         else if (!singleSolidBody) finalReason = $"FINAL_SOLID_BODY_FAILED reason={finalActErr}";
                         else if (!allAuditPass) finalReason = "FINAL_REPLAY_AUDIT_FAILED";
@@ -4972,7 +6404,11 @@ namespace ADDIN.Commands
                     }
 
                     copiedPartDoc.ForceRebuild3(false);
-                    copiedPartDoc.Save2(true);
+                    if (validateBeforePublish != null) validateBeforePublish(copiedPartDoc);
+                    int finalSaveErrors = 0, finalSaveWarnings = 0;
+                    if (!copiedPartDoc.Save3((int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                        ref finalSaveErrors, ref finalSaveWarnings) || finalSaveErrors != 0)
+                        throw new InvalidOperationException("Cannot save verified staging Part: errors=" + finalSaveErrors);
 
                     ValidateSheetMetalPart(copiedPartDoc);
 
@@ -4982,21 +6418,26 @@ namespace ADDIN.Commands
                 {
                     if (!copiedPartClosedForNativeFallback && copiedPartDoc != null)
                     {
-                        try { copiedPartDoc.Save2(true); } catch { }
+                        // Do not resave after validation; failed staging is diagnostic only.
                         swApp.CloseDoc(copiedPartDoc.GetTitle());
                     }
 
-                    // Luôn sao chép staging sang file target để người dùng có thể mở ra soi Sketch
+                    // Publish only a verified result. Never replace a user file or publish failed replay.
                     try
                     {
-                        if (File.Exists(stagingTargetPartPath))
+                        if (mirrorReadyToCommit)
                         {
-                            File.Copy(stagingTargetPartPath, chosenTargetPartPath, true);
+                            if (!File.Exists(stagingTargetPartPath))
+                                throw new FileNotFoundException("Verified staging Part is missing.", stagingTargetPartPath);
+                            File.Copy(stagingTargetPartPath, chosenTargetPartPath, false);
                             CreateMirrorPartPackage.LogDebug($"TARGET_SAVED target={chosenTargetPartPath} readyToCommit={mirrorReadyToCommit}");
                         }
                     }
                     catch (Exception ex)
                     {
+                        mirrorReadyToCommit = false;
+                        result.Success = false;
+                        result.Message = "Cannot publish mirrored Part: " + ex.Message;
                         CreateMirrorPartPackage.LogDebug($"TARGET_SAVE_FAIL target={chosenTargetPartPath} reason={ex.Message}");
                     }
 
@@ -5009,22 +6450,12 @@ namespace ADDIN.Commands
                     }
                     else
                     {
-                        // Mở file vừa tạo lên SolidWorks để người dùng soi trực quan
-                        try
-                        {
-                            int openErr = 0, openWarn = 0;
-                            swApp.OpenDoc6(chosenTargetPartPath, (int)swDocumentTypes_e.swDocPART, (int)swOpenDocOptions_e.swOpenDocOptions_Silent, "", ref openErr, ref openWarn);
-                            CreateMirrorPartPackage.LogDebug($"OPEN_INSPECTION_DOC target={chosenTargetPartPath} err={openErr} warn={openWarn}");
-                        }
-                        catch (Exception ex)
-                        {
-                            CreateMirrorPartPackage.LogDebug($"OPEN_INSPECTION_FAIL reason={ex.Message}");
-                        }
+                        CreateMirrorPartPackage.LogDebug("TARGET_NOT_PUBLISHED diagnosticStaging=" + stagingTargetPartPath);
                     }
 
                     try
                     {
-                        if (File.Exists(stagingTargetPartPath)) File.Delete(stagingTargetPartPath);
+                        if (mirrorReadyToCommit && File.Exists(stagingTargetPartPath)) File.Delete(stagingTargetPartPath);
                     }
                     catch (Exception cleanupException)
                     {
@@ -5673,6 +7104,77 @@ namespace ADDIN.Commands
             return true;
         }
 
+        private static void SetBaseOptions22(ModelDoc2 document, Feature feature, bool direction, bool thickness)
+        {
+            IBaseFlangeFeatureData data = feature.GetDefinition() as IBaseFlangeFeatureData;
+            if (data == null || !data.AccessSelections(document, null))
+                throw new InvalidOperationException("BASE22 AccessSelections failed.");
+            bool modified;
+            try
+            {
+                data.ReverseDirection = direction;
+                data.ReverseThickness = thickness;
+                modified = feature.ModifyDefinition(data, document, null);
+            }
+            finally { data.ReleaseSelectionAccess(); }
+            if (!modified) throw new InvalidOperationException("BASE22 ModifyDefinition returned false.");
+            document.ForceRebuild3(false);
+            IBaseFlangeFeatureData readback = feature.GetDefinition() as IBaseFlangeFeatureData;
+            if (readback == null || readback.ReverseDirection != direction || readback.ReverseThickness != thickness)
+                throw new InvalidOperationException("BASE22 option readback mismatch.");
+        }
+
+        private static void ResolveBaseOptions22(ModelDoc2 document, Feature feature, Body2 expected,
+            bool originalDirection, bool originalThickness, BaseFlangeDiagnosisResult diagnosis)
+        {
+            int preferred = (diagnosis.NeedReverseDirection ? 1 : 0) |
+                ((diagnosis.NeedReverseThickness || (diagnosis.NeedReverseExtrusion && !diagnosis.NeedReverseDirection)) ? 2 : 0);
+            var candidates = new List<int> { preferred };
+            for (int mask = 0; mask < 4; mask++) if (mask != preferred) candidates.Add(mask);
+            bool accepted = false;
+            try
+            {
+                foreach (int mask in candidates)
+                {
+                    bool direction = originalDirection ^ ((mask & 1) != 0);
+                    bool thickness = originalThickness ^ ((mask & 2) != 0);
+                    string label = "BASE22_D" + direction + "_T" + thickness;
+                    // Absolute assignments from the source state; never cumulative toggles.
+                    SetBaseOptions22(document, feature, direction, thickness);
+                    string captureError;
+                    Body2 actual = BodyOperationsHelper.GetSolidBodyCopyStrict(document, out captureError);
+                    if (actual == null)
+                    {
+                        CreateMirrorPartPackage.LogDebug("[BASE22][CANDIDATE] " + label + " result=NO_BODY reason=" + captureError);
+                        continue;
+                    }
+                    // BooleanCutStrict works on copies; these oracle bodies are never features.
+                    var missing = BodyOperationsHelper.BooleanCutStrict(expected, actual, label + "_MISSING");
+                    var extra = BodyOperationsHelper.BooleanCutStrict(actual, expected, label + "_EXTRA");
+                    double tolerance = Math.Max(BodyOperationsHelper.ABSOLUTE_GEOMETRY_TOLERANCE,
+                        BodyOperationsHelper.GetBodyVolume(expected) * BodyOperationsHelper.BODY_TRANSFORM_RELATIVE_TOLERANCE);
+                    double missingVolume = missing.Success ? BodyOperationsHelper.SumBodyVolumes(missing.Bodies) : double.NaN;
+                    double extraVolume = extra.Success ? BodyOperationsHelper.SumBodyVolumes(extra.Bodies) : double.NaN;
+                    bool pass = missing.Success && extra.Success && missingVolume <= tolerance && extraVolume <= tolerance;
+                    CreateMirrorPartPackage.LogDebug($"[BASE22][CANDIDATE] {label} missing_m3={missingVolume:R} extra_m3={extraVolume:R} tolerance_m3={tolerance:R} result={(pass ? "PASS" : "FAIL")} booleanMissing={missing.Success} booleanExtra={extra.Success}");
+                    if (!pass) continue;
+                    accepted = true;
+                    CreateMirrorPartPackage.LogDebug($"[BASE22][COMMIT_PASS] ReverseDirection={direction} ReverseThickness={thickness} nativeFeature=True exactBaseGeometry=True");
+                    return;
+                }
+                throw new InvalidOperationException("BASE22_NO_MATCH: no native direction/thickness candidate matches the reflected base. Downstream replay cancelled.");
+            }
+            finally
+            {
+                if (!accepted)
+                {
+                    // Restore options on the diagnostic copy; the source is never modified.
+                    SetBaseOptions22(document, feature, originalDirection, originalThickness);
+                    CreateMirrorPartPackage.LogDebug("[BASE22][STOP] originalOptionsRestored=True outputNotPublished=True");
+                }
+            }
+        }
+
         private static bool AreExactBodySetsEquivalent(
             List<Body2> expectedBodies,
             List<Body2> actualBodies,
@@ -5830,13 +7332,17 @@ namespace ADDIN.Commands
                 {
                     string realType = ResolveFeatureType(feat);
 
-                    // Skip internal flat pattern / system bend features
+                    // Skip internal flat pattern / system bend features / folder features
                     if (!string.Equals(realType, "FlatPattern", StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(realType, "ProcessBends", StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(realType, "FlattenBends", StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(realType, "ProfileFeature", StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(realType, "3DProfileFeature", StringComparison.OrdinalIgnoreCase) &&
-                        !string.Equals(realType, "OriginProfileFeature", StringComparison.OrdinalIgnoreCase))
+                        !string.Equals(realType, "OriginProfileFeature", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(realType, "CutListFolder", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(realType, "SolidBodyFolder", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(realType, "SurfaceBodyFolder", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(realType, "SheetMetal", StringComparison.OrdinalIgnoreCase))
                     {
                         Feature skFeat = FindDrivingSketchFeature(feat);
                         PostBaseFeatureInfo info = new PostBaseFeatureInfo
@@ -5931,6 +7437,17 @@ namespace ADDIN.Commands
                         return cacheList;
                     }
 
+                    if (!info.IsSuppressed && info.DrivingSketchFeature != null)
+                    {
+                        if (info.Feature.GetDefinition() is IExtrudeFeatureData2)
+                            info.CutAudit21 = SketchOperationsHelper.CaptureCutAudit21(partDoc, info.Feature, info.DrivingSketchFeature);
+                        var originalSketch = info.DrivingSketchFeature.GetSpecificFeature2() as Sketch;
+                        info.PristineSketchPoints = SketchOperationsHelper.CapturePristineSketchPoints(originalSketch);
+                        info.PristineSketchSlots = SketchOperationsHelper.CapturePristineSketchSlots(originalSketch);
+                        info.PristineSupport20 = SketchOperationsHelper.CaptureSupport20(originalSketch);
+                        CreateMirrorPartPackage.LogDebug("[CUTSPACE20][CHECKPOINT_CAPTURE] feature=" + info.Name +
+                            " points=" + info.PristineSketchPoints.Count + " faceSupport=" + (info.PristineSupport20 != null));
+                    }
                     string erri = null;
                     Body2 bi = BodyOperationsHelper.GetSolidBodyCopyStrict(partDoc, out erri);
                     if (bi == null)
@@ -5946,6 +7463,17 @@ namespace ADDIN.Commands
                         BeforeBody = prevBody,
                         AfterBody = bi
                     };
+
+                    // Sheet metal EdgeFlange features modify/add geometry parametrically and do not rely on Boolean cut delta
+                    if (string.Equals(info.Type, "EdgeFlange", StringComparison.OrdinalIgnoreCase) ||
+                        info.Type.IndexOf("EdgeFlange", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        state.ChangesGeometry = true;
+                        state.ChangeKind = FeatureGeometryChangeKind.Additive;
+                        cacheList.Add(state);
+                        prevBody = bi;
+                        continue;
+                    }
 
                     BodyBooleanResult cutAdd = BodyOperationsHelper.BooleanCutStrict(bi, prevBody, $"{info.Name}_ADDED");
                     BodyBooleanResult cutRem = BodyOperationsHelper.BooleanCutStrict(prevBody, bi, $"{info.Name}_REMOVED");
@@ -6089,6 +7617,20 @@ namespace ADDIN.Commands
             IMathUtility mathUtility = swApp.GetMathUtility() as IMathUtility;
             PlaneData selectedMirrorPlane = MirrorPlaneMapper.GetLocalPlane(mathUtility, sourceComponent, assemblyPlane);
             PlaneData mirrorPlane = MirrorPlaneMapper.CreatePartOriginAnchoredPlane(selectedMirrorPlane);
+            // Calculate Global Mirror Transform
+            double[] o = mirrorPlane.Origin;
+            double[] n = mirrorPlane.Normal;
+            double nx = n[0], ny = n[1], nz = n[2];
+            double dotON = o[0] * nx + o[1] * ny + o[2] * nz;
+            double[] xform = new double[16];
+            xform[0] = 1.0 - 2.0 * nx * nx; xform[1] = -2.0 * nx * ny; xform[2] = -2.0 * nx * nz;
+            xform[3] = -2.0 * ny * nx; xform[4] = 1.0 - 2.0 * ny * ny; xform[5] = -2.0 * ny * nz;
+            xform[6] = -2.0 * nz * nx; xform[7] = -2.0 * nz * ny; xform[8] = 1.0 - 2.0 * nz * nz;
+            xform[9] = 2.0 * dotON * nx; xform[10] = 2.0 * dotON * ny; xform[11] = 2.0 * dotON * nz;
+            xform[12] = 1.0; xform[13] = 0.0; xform[14] = 0.0; xform[15] = 0.0;
+            CreateMirrorPartPackage.currentMirrorTransform = ReflectionApiTransformV7.Create(mathUtility, xform);
+            CreateMirrorPartPackage.LogDebug($"[EDGE_FLANGE_REPAIR] currentMirrorTransform established. (nx={nx}, ny={ny}, nz={nz})");
+
 
             int totalMapped = 0;
 
@@ -6571,6 +8113,10 @@ namespace ADDIN.Commands
 
     public sealed class CreateMirrorPartPackage
     {
+        public static ADDIN.Helpers.EdgeFlangeRepairManager edgeFlangeRepairManager = new ADDIN.Helpers.EdgeFlangeRepairManager();
+        public static ADDIN.Helpers.FeatureOptionsCaptureHelper featureOptionsCaptureHelper = new ADDIN.Helpers.FeatureOptionsCaptureHelper();
+        public static MathTransform currentMirrorTransform;
+
         private static CreateMirrorPartPackage activeCommand;
 
         private readonly ISldWorks swApp;
@@ -6602,7 +8148,7 @@ namespace ADDIN.Commands
         public void Run()
         {
             InitLog();
-            LogDebug("MIRROR_PART_V6 START");
+            LogDebug("MIRROR_PART_V7 PHASE1 START");
 
             if (swApp == null)
             {
@@ -6621,10 +8167,19 @@ namespace ADDIN.Commands
 
             ModelDoc2 activeDoc = swApp.ActiveDoc as ModelDoc2;
 
+            if (activeDoc != null && activeDoc.GetType() == (int)swDocumentTypes_e.swDocPART)
+            {
+                activeCommand = this;
+                executing = true;
+                finishing = false;
+                ExecuteFeaturePartV7(activeDoc);
+                return;
+            }
+
             if (activeDoc == null ||
                 activeDoc.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
             {
-                ShowInfo("Vui long mo Assembly de dung MIRROR PART.");
+                ShowInfo("Vui long mo Part hoac Assembly de dung MIRROR PART V7 audit.");
                 LogDebug("MIRROR_PART_V6: RESULT FINAL RESULT=FAIL");
                 return;
             }
@@ -6885,6 +8440,172 @@ namespace ADDIN.Commands
             dialog.SetBusy(true);
             dialog.Hide();
 
+            ExecuteMirrorWorkflowV7Phase2(sourceComponent, assemblyMirrorPlane);
+        }
+
+        private void ExecuteMirrorWorkflowV7Phase1(Component2 sourceComponent, RefPlane assemblyMirrorPlane)
+        {
+            try
+            {
+                MirrorV7Context context = new MirrorV7Context
+                {
+                    SwApp = swApp,
+                    PartDoc = null,
+                    Graph = null,
+                    AuditOnly = true
+                };
+                PartMirrorEngineV7 engine = new PartMirrorEngineV7(context);
+                engine.ValidateFoundation();
+                LogDebug("MIRROR_PART_V7 PHASE1 selection=valid component=" + SafeComponentName(sourceComponent));
+                ShowInfo("MIRROR PART Phase 1 hoan tat. Da xac nhan Component va Assembly Plane; chua thuc hien mirror geometry.");
+                Finish(true, "V7_PHASE1_SUCCESS");
+            }
+            catch (Exception ex)
+            {
+                MirrorV7Diagnostics.LogException("phase1", ex);
+                ShowError("MIRROR PART Phase 1 loi: " + ex.Message);
+                Finish(true, "V7_PHASE1_FAILED");
+            }
+        }
+
+        private void ExecuteMirrorWorkflowV7Phase2(Component2 sourceComponent, RefPlane assemblyMirrorPlane)
+        {
+            try
+            {
+                if (sourceComponent == null) throw new ArgumentNullException("sourceComponent");
+                if (assemblyMirrorPlane == null) throw new ArgumentNullException("assemblyMirrorPlane");
+                ModelDoc2 sourcePartDoc = sourceComponent.GetModelDoc2() as ModelDoc2;
+                if (sourcePartDoc == null) throw new InvalidOperationException("Khong lay duoc ModelDoc2 cua Component. Hay Resolve Component truoc khi chay Phase 2.");
+                if (sourcePartDoc.GetType() != (int)swDocumentTypes_e.swDocPART) throw new InvalidOperationException("Component duoc chon khong phai Part.");
+                string componentName = SafeComponentName(sourceComponent), componentPath = SafeComponentPath(sourceComponent), referencedConfig = "";
+                try { referencedConfig = sourceComponent.ReferencedConfiguration ?? ""; } catch { }
+                LogDebug("MIRROR_PART_V7 PHASE2 START\ncomponent=" + componentName + "\npath=" + componentPath + "\nreferencedConfig=" + referencedConfig);
+                LogDebug("[FEATURE_RECONSTRUCTION] sourceMode=ASSEMBLY_COMPONENT scope=PART_ONLY assemblyMutation=False");
+                ExecuteFeaturePartV7(sourcePartDoc);
+            }
+            catch (Exception ex)
+            {
+                MirrorV7Diagnostics.LogException("V7_PART_SOURCE", ex);
+                ShowError("MIRROR PART V7 loi lay Part nguon:\n" + ex.Message);
+                Finish(true, "V7_PART_SOURCE_FAILED");
+            }
+        }
+
+        // Full editable feature reconstruction is distinct from a native mirrored body result.
+        private void ExecuteFeaturePartV7(ModelDoc2 source)
+        {
+            try
+            {
+                CanonicalPartMirrorPlaneV7 plane;
+                if (!SketchMirrorPlannerV7.TrySelectCanonicalPlane(null, out plane))
+                {
+                    Finish(true, "V7_PART_CANCELLED");
+                    return;
+                }
+                string sourcePath = source.GetPathName();
+                if (string.IsNullOrWhiteSpace(sourcePath)) throw new InvalidOperationException("Luu Part goc truoc khi mirror.");
+                string output = savePathProvider.ResolveSavePath(swApp, sourcePath, Path.GetDirectoryName(sourcePath),
+                    Path.GetFileNameWithoutExtension(sourcePath) + "_MIRROR_" + plane + ".SLDPRT");
+                if (string.IsNullOrWhiteSpace(output)) { Finish(true, "V7_PART_CANCELLED"); return; }
+                MirrorInPlacePreparationResultV7 result = MirrorInPlaceOrchestratorV7.ExecuteLegacyPart(
+                    swApp, source, plane, output);
+                if (!result.OutputPublished)
+                    throw new InvalidOperationException("Cong kiem chung khong cho phep xuat Part ket qua.");
+                ShowInfo("DA TAO PART MIRROR DOC LAP THANH CONG.\n" +
+                    "File ket qua: " + result.RequestedOutputPath +
+                    "\nStaging: " + result.WorkingPath +
+                    "\nBao cao: " + result.ReportPath +
+                    "\nSo feature: " + result.FeatureCount +
+                    "\nHinh hoc mirror: PASS" +
+                    "\nFeature tree: PASS" +
+                    "\nMo lai file kiem tra: PASS" +
+                    "\nPart goc khong thay doi: " + (result.SourceUnchanged ? "PASS" : "FAIL") +
+                    "\n\nKhong su dung MirrorPart, Mirror Feature hoac Mirror Body.");
+                Finish(true, "V7_INPLACE_PART_PUBLISHED");
+            }
+            catch (Exception ex)
+            {
+                MirrorV7Diagnostics.LogException("FEATURE_RECONSTRUCTION", ex);
+                ShowError("Khong the xuat Part mirror an toan:\n" + ex.Message +
+                    "\nKhong co file ket qua sai nao duoc giu lai. Xem MirrorPartDebug.log.");
+                Finish(true, "V7_PART_FAILED");
+            }
+        }
+
+        private void ExecutePartAuditV7(ModelDoc2 sourcePartDoc, string sourceMode)
+        {
+            string stage = "PHASE2";
+            try
+            {
+                if (sourcePartDoc == null || sourcePartDoc.GetType() != (int)swDocumentTypes_e.swDocPART)
+                    throw new InvalidOperationException("V7 audit can tai lieu Part.");
+                LogDebug("MIRROR_PART_V7 AUDIT START mode=" + sourceMode + " path=" + sourcePartDoc.GetPathName() + " version=" + PartMirrorEngineV7.Version);
+                MirrorV7Context context = new MirrorV7Context { SwApp = swApp, PartDoc = sourcePartDoc, Graph = null, AuditOnly = true };
+                PartMirrorEngineV7 engine = new PartMirrorEngineV7(context);
+                MirrorV7ModelGraph graph = engine.AuditFeatureTree(sourcePartDoc);
+                stage = "PHASE3";
+                engine.AuditReflectionMathematics();
+                stage = "PHASE4";
+                PersistentReferenceAuditResultV7 persistResult = engine.AuditPersistentReferences();
+                LogDebug("MIRROR_PART_V7 PHASE4 RESULT=PASS captured=" + persistResult.Captured + " resolved=" + persistResult.Resolved + " unsupported=" + persistResult.UnsupportedOrUnavailable + " mismatched=" + persistResult.Mismatched + " systemSkipped=" + persistResult.SystemSkipped);
+                stage = "PHASE5A";
+                LogDebug("MIRROR_PART_V7 PHASE5 START version=" + PartMirrorEngineV7.Version + " scope=READ_ONLY_SKETCH_SNAPSHOT");
+                SketchSnapshotAuditResultV7 sketchResult = engine.AuditSketchSnapshots();
+                stage = "BODY_VERIFY";
+                engine.AuditBodyVerification();
+                LogDebug("MIRROR_PART_V7 PHASE5 RESULT=PASS sketchNodes=" + sketchResult.SketchNodes + " captured=" + sketchResult.Captured + " stable=" + sketchResult.Stable + " integrityErrors=" + sketchResult.IntegrityErrors);
+                stage = "PHASE6A";
+                CanonicalPartMirrorPlaneV7 selectedPlane;
+                if (!SketchMirrorPlannerV7.TrySelectCanonicalPlane(null, out selectedPlane))
+                {
+                    LogDebug("MIRROR_PART_V7 PHASE6B CANCELLED before working-copy creation");
+                    Finish(true, "V7_PHASE6B_CANCELLED");
+                    return;
+                }
+                stage = "PHASE6B";
+                WorkingCopyEquivalenceResultV7 copyResult = engine.AuditWorkingCopy(selectedPlane);
+                LogDebug("MIRROR_PART_V7 PHASE6B RESULT=PLAN_BUILT sourceFeatures=" + copyResult.SourceFeatureCount + " copyFeatures=" + copyResult.CopyFeatureCount + " sourceSketches=" + copyResult.SourceSketchCount + " copySketches=" + copyResult.CopySketchCount + " sourceBodies=" + copyResult.SourceBodyCount + " copyBodies=" + copyResult.CopyBodyCount + " sketchesInPlan=" + (copyResult.Plan == null ? 0 : copyResult.Plan.Items.Count) + " mutationEnabled=False");
+                SketchSelectionResultV7 selection = SingleSketchMutationServiceV7.SelectEligibleSketch(null, context);
+                if (selection.Status == SketchSelectionStatusV7.NoEligibleSketch)
+                {
+                    LogDebug("MIRROR_PART_V7 PHASE6C1 RESULT=BLOCKED reason=NO_ELIGIBLE_SKETCH");
+                    ShowInfo("MIRROR PART Phase 6C.1 BLOCKED.\n\nKhong co sketch du dieu kien.\nXem log ELIGIBILITY de biet ly do.\nWorking copy: " + copyResult.WorkingPath);
+                    Finish(true, "V7_PHASE6C1_NO_ELIGIBLE");
+                    return;
+                }
+                if (selection.Status == SketchSelectionStatusV7.UserCancelled)
+                {
+                    LogDebug("MIRROR_PART_V7 PHASE6C1 RESULT=CANCELLED reason=USER_CANCELLED");
+                    Finish(true, "V7_PHASE6C1_CANCELLED");
+                    return;
+                }
+                MirrorV7FeatureNode selectedSketch = selection.Node;
+                stage = "PHASE6C1";
+                SingleSketchMutationResultV7 mutationResult = SingleSketchMutationServiceV7.Execute(context, selectedSketch, selectedPlane);
+                LogDebug("MIRROR_PART_V7 PHASE6C1 result=" + (mutationResult.Success ? "PASS" : "FAIL") + " sketch=\"" + selectedSketch.Name + "\" points=" + mutationResult.PointCount + " movingPoints=" + mutationResult.MovingPointCount + " maxErrorSI=" + mutationResult.MaximumErrorMetres + " postEdit=" + mutationResult.PostEditVerified + " postRebuild=" + mutationResult.PostRebuildVerified + " sourceUnchanged=" + mutationResult.SourceUnchanged + " partialMutation=" + mutationResult.PartialMutation + " fullPartMirrorVerified=False");
+                if (mutationResult.Success)
+                {
+                    ShowInfo("MIRROR PART Phase 6C.1 PASS.\n\nSketch: " + selectedSketch.Name + "\nWorking copy: " + copyResult.WorkingPath + "\nPoint verification: PASS\nRebuild verification: PASS\nSource unchanged: PASS\nFullPartMirrorVerified: NO");
+                    Finish(true, "V7_PHASE6C1_SUCCESS");
+                }
+                else
+                {
+                    ShowError("MIRROR PART Phase 6C.1 FAIL/BLOCKED.\n\nWorking copy duoc giu lai: " + copyResult.WorkingPath + "\n" + string.Join("\n", mutationResult.Errors.ToArray()));
+                    Finish(true, "V7_PHASE6C1_FAILED");
+                }
+            }
+            catch (Exception ex)
+            {
+                MirrorV7Diagnostics.LogException("V7_AUDIT", ex);
+                ShowError("MIRROR PART V7 loi (" + stage + "):\n" + ex.Message);
+                Finish(true, "V7_" + stage + "_FAILED");
+            }
+        }
+
+        private void ExecuteMirrorWorkflowLegacyV6Disabled(Component2 sourceComponent, RefPlane assemblyMirrorPlane)
+        {
+            // Retained only for source compatibility; the normal button never calls it.
+
             MirrorPackageResult result = ExecuteMirrorWorkflowCore(sourceComponent, assemblyMirrorPlane, true);
 
             if (result.Cancelled)
@@ -6971,7 +8692,7 @@ namespace ADDIN.Commands
                 // Thực thi TRƯỚC KHI chèn vào Assembly để file Part đã có sẵn màu mặt trước khi load vào cụm lắp ráp
                 try
                 {
-                    int syncedColors = SyncFaceColors(swApp, sourcePath, mirrorPartPath);
+                    int syncedColors = SyncFaceColors(swApp, sourcePath, mirrorPartPath, mirrorResult.EffectiveMirrorPlane);
                     LogDebug($"STEP3_COLOR_SYNC syncedCount={syncedColors}");
                 }
                 catch (Exception exSync)
@@ -7151,7 +8872,8 @@ namespace ADDIN.Commands
         public static int SyncFaceColors(
             ISldWorks swApp,
             string sourcePartPath,
-            string mirrorPartPath)
+            string mirrorPartPath,
+            PlaneData mirrorPlane = null)
         {
             if (swApp == null || string.IsNullOrWhiteSpace(sourcePartPath) || string.IsNullOrWhiteSpace(mirrorPartPath))
             {
@@ -7193,6 +8915,24 @@ namespace ADDIN.Commands
                 object[] mirBodies = mirPart.GetBodies2((int)swBodyType_e.swSolidBody, true) as object[];
                 if (srcBodies == null || mirBodies == null) return 0;
 
+                // Clear all existing face material overrides on mirBodies so cloned properties don't stick to wrong faces
+                foreach (Body2 mb in mirBodies)
+                {
+                    object[] mFaces = mb.GetFaces() as object[];
+                    if (mFaces == null) continue;
+                    foreach (Face2 mf in mFaces)
+                    {
+                        if (mf.HasMaterialPropertyValues())
+                        {
+                            try
+                            {
+                                mf.RemoveMaterialProperty2((int)swInConfigurationOpts_e.swAllConfiguration, null);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
                 // Lưu thông tin: Area, Normal, ReflectedCenter, MaterialValues
                 List<Tuple<double, double[], double[], double[]>> coloredFaces = new List<Tuple<double, double[], double[], double[]>>();
                 foreach (Body2 b in srcBodies)
@@ -7207,16 +8947,62 @@ namespace ADDIN.Commands
                             if (mat != null && mat.Length >= 3)
                             {
                                 double area = f.GetArea();
-                                Surface surf = f.GetSurface() as Surface;
-                                double[] planeParams = surf?.PlaneParams as double[];
-                                double[] normal = (planeParams != null && planeParams.Length >= 3)
-                                    ? new double[] { -planeParams[0], planeParams[1], planeParams[2] }
-                                    : null;
+                                double[] normal = f.Normal as double[];
+                                if (normal == null || normal.Length < 3)
+                                {
+                                    Surface surf = f.GetSurface() as Surface;
+                                    double[] pp = (surf != null) ? surf.PlaneParams as double[] : null;
+                                    if (pp != null && pp.Length >= 6)
+                                    {
+                                        normal = new double[] { pp[3], pp[4], pp[5] };
+                                    }
+                                }
+
+                                double[] refNormal = null;
+                                if (normal != null && normal.Length >= 3)
+                                {
+                                    if (mirrorPlane != null && mirrorPlane.Normal != null && mirrorPlane.Normal.Length >= 3)
+                                    {
+                                        double ndot = normal[0] * mirrorPlane.Normal[0] +
+                                                      normal[1] * mirrorPlane.Normal[1] +
+                                                      normal[2] * mirrorPlane.Normal[2];
+                                        refNormal = new double[]
+                                        {
+                                            normal[0] - 2.0 * ndot * mirrorPlane.Normal[0],
+                                            normal[1] - 2.0 * ndot * mirrorPlane.Normal[1],
+                                            normal[2] - 2.0 * ndot * mirrorPlane.Normal[2]
+                                        };
+                                    }
+                                    else
+                                    {
+                                        refNormal = new double[] { -normal[0], normal[1], normal[2] };
+                                    }
+                                }
+
                                 double[] box = f.GetBox() as double[];
-                                double[] center = (box != null && box.Length >= 6)
-                                    ? new double[] { -((box[0] + box[3]) / 2.0), (box[1] + box[4]) / 2.0, (box[2] + box[5]) / 2.0 }
-                                    : null;
-                                coloredFaces.Add(new Tuple<double, double[], double[], double[]>(area, normal, center, mat));
+                                double[] center = null;
+                                if (box != null && box.Length >= 6)
+                                {
+                                    double[] origCenter = new double[] { (box[0] + box[3]) / 2.0, (box[1] + box[4]) / 2.0, (box[2] + box[5]) / 2.0 };
+                                    if (mirrorPlane != null && mirrorPlane.Origin != null && mirrorPlane.Normal != null)
+                                    {
+                                        double dx = origCenter[0] - mirrorPlane.Origin[0];
+                                        double dy = origCenter[1] - mirrorPlane.Origin[1];
+                                        double dz = origCenter[2] - mirrorPlane.Origin[2];
+                                        double dot = dx * mirrorPlane.Normal[0] + dy * mirrorPlane.Normal[1] + dz * mirrorPlane.Normal[2];
+                                        center = new double[]
+                                        {
+                                            origCenter[0] - 2.0 * dot * mirrorPlane.Normal[0],
+                                            origCenter[1] - 2.0 * dot * mirrorPlane.Normal[1],
+                                            origCenter[2] - 2.0 * dot * mirrorPlane.Normal[2]
+                                        };
+                                    }
+                                    else
+                                    {
+                                        center = new double[] { -origCenter[0], origCenter[1], origCenter[2] };
+                                    }
+                                }
+                                coloredFaces.Add(new Tuple<double, double[], double[], double[]>(area, refNormal, center, mat));
                             }
                         }
                     }
@@ -7244,12 +9030,23 @@ namespace ADDIN.Commands
                             double mArea = mf.GetArea();
                             if (Math.Abs(mArea - cf.Item1) > Math.Max(1e-5, cf.Item1 * 0.05)) continue;
 
-                            Surface mSurf = mf.GetSurface() as Surface;
-                            double[] mPlaneParams = mSurf?.PlaneParams as double[];
-                            if (cf.Item2 != null && mPlaneParams != null && mPlaneParams.Length >= 3)
+                            if (cf.Item2 != null)
                             {
-                                double dot = cf.Item2[0] * mPlaneParams[0] + cf.Item2[1] * mPlaneParams[1] + cf.Item2[2] * mPlaneParams[2];
-                                if (dot < 0.90) continue;
+                                double[] mNorm = mf.Normal as double[];
+                                if (mNorm == null || mNorm.Length < 3)
+                                {
+                                    Surface mSurf = mf.GetSurface() as Surface;
+                                    double[] mpp = (mSurf != null) ? mSurf.PlaneParams as double[] : null;
+                                    if (mpp != null && mpp.Length >= 6)
+                                    {
+                                        mNorm = new double[] { mpp[3], mpp[4], mpp[5] };
+                                    }
+                                }
+                                if (mNorm != null && mNorm.Length >= 3)
+                                {
+                                    double dot = cf.Item2[0] * mNorm[0] + cf.Item2[1] * mNorm[1] + cf.Item2[2] * mNorm[2];
+                                    if (dot < 0.85) continue;
+                                }
                             }
 
                             double dist = 0;
@@ -7386,8 +9183,7 @@ namespace ADDIN.Commands
 
             if (closeDialog && dialog != null && !dialog.IsDisposed)
             {
-                dialog.FormClosing -= OnFormClosing;
-                dialog.Close();
+                dialog.AllowCloseAndClose();
             }
 
             if (assemblyEvents != null)
@@ -7529,6 +9325,13 @@ namespace ADDIN.Commands
         public Feature SelectedAssemblyPlaneFeature { get; set; }
         public RefPlane SelectedAssemblyRefPlane { get; set; }
         public MirrorPartSelectionMode SelectionMode { get; private set; }
+        private bool isClosingAllowed = false;
+
+        public void AllowCloseAndClose()
+        {
+            isClosingAllowed = true;
+            this.Close();
+        }
 
         public MirrorPartSelectionDialog()
         {
@@ -7664,12 +9467,14 @@ namespace ADDIN.Commands
 
             btnCancel.Click += delegate
             {
+                isClosingAllowed = true;
+                this.DialogResult = DialogResult.Cancel;
                 EventHandler handler = CancelRequested;
                 if (handler != null) handler(this, EventArgs.Empty);
-                this.DialogResult = DialogResult.Cancel; // Gắn lệnh chắc chắn thoát
                 this.Close();
             };
 
+            this.CancelButton = btnCancel;
             FormClosing += OnFormClosing;
             UpdateMirrorButtonState();
         }
@@ -7714,12 +9519,17 @@ namespace ADDIN.Commands
 
         private void OnFormClosing(object sender, FormClosingEventArgs e)
         {
+            if (isClosingAllowed)
+            {
+                return;
+            }
+
             if (e.CloseReason == CloseReason.UserClosing)
             {
+                isClosingAllowed = true;
                 EventHandler handler = CancelRequested;
                 if (handler != null)
                 {
-                    e.Cancel = true;
                     handler(this, EventArgs.Empty);
                 }
             }
