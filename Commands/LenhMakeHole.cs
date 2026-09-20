@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Automation;
 using System.Windows.Forms;
+using System.Drawing;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using ADDIN.Helpers;
@@ -72,6 +73,44 @@ namespace ADDIN.Commands
             public double[] MajorDirection;
 
             public bool IsFromRoundHole;
+
+            // New scan information
+            public bool IsOuter;
+
+            public bool IsExactCircle;
+
+            public double DetectedDiameterM;
+
+            public double PerimeterM;
+
+            public double EquivalentDiameterM;
+
+            public string DetectedType;
+
+            public string DisplaySize;
+        }
+
+        private class RepairHoleGroup
+        {
+            public string Type;
+
+            public double DiameterMm;
+
+            public double WidthMm;
+
+            public double LengthMm;
+
+            public string DisplaySize;
+
+            public readonly List<RepairHoleLoopCandidate> Candidates = new List<RepairHoleLoopCandidate>();
+
+            public int Count
+            {
+                get
+                {
+                    return Candidates.Count;
+                }
+            }
         }
 
         private class SelectionInfo
@@ -137,6 +176,7 @@ namespace ADDIN.Commands
         private int makeHoleSelectionProbeBusy;
 
         private const double RepairRoundToleranceMm = 0.5;
+        private const double RepairGroupingToleranceMm = 0.02;
         private const double RepairCenterDuplicateToleranceM = 0.0001; // 0.1 mm
         private bool holeWizardCommandStarted;
         private double[] pendingHoleWizardSeedPoint;
@@ -462,8 +502,11 @@ namespace ADDIN.Commands
                 {
                     if (!TryRepairHolesFromPlanarFace(modelDoc, selection.Face, selection.PickPoint, num, num2, repairLooseSize, options, out var repairedCount, out var message))
                     {
-                        Debug.WriteLine("[REPAIR HOLE] face mode failed. message=" + message);
-                        MessageBox.Show(message, "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                        Debug.WriteLine("[REPAIR HOLE] face mode failed or cancelled. message=" + message);
+                        if (!string.IsNullOrEmpty(message) && !message.Contains("da huy"))
+                        {
+                            MessageBox.Show(message, "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                        }
                         return;
                     }
                     modelDoc.GraphicsRedraw2();
@@ -7558,6 +7601,442 @@ namespace ADDIN.Commands
             return feature;
         }
 
+        private class RepairHoleSourceSelectionDialog : Form
+        {
+            private ListView listView;
+            private Label lblTarget;
+            private Button btnRepair;
+            private Button btnCancel;
+
+            public RepairHoleGroup SelectedGroup { get; private set; }
+
+            public RepairHoleSourceSelectionDialog(List<RepairHoleGroup> groups, string targetDescription)
+            {
+                InitializeUI(groups, targetDescription);
+            }
+
+            private void InitializeUI(List<RepairHoleGroup> groups, string targetDescription)
+            {
+                Text = "Repair Hole - Select Source Holes";
+                Size = new System.Drawing.Size(420, 390);
+                MinimumSize = new System.Drawing.Size(380, 340);
+                StartPosition = FormStartPosition.CenterScreen;
+                FormBorderStyle = FormBorderStyle.FixedDialog;
+                MaximizeBox = false;
+                MinimizeBox = false;
+                ShowInTaskbar = false;
+                Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular);
+
+                Label lblHeader = new Label
+                {
+                    Text = "Chon nhom lo nguon can repair (Select source hole group):",
+                    Location = new System.Drawing.Point(16, 12),
+                    Size = new System.Drawing.Size(370, 24),
+                    AutoSize = false
+                };
+                Controls.Add(lblHeader);
+
+                listView = new ListView
+                {
+                    Location = new System.Drawing.Point(16, 40),
+                    Size = new System.Drawing.Size(370, 200),
+                    View = System.Windows.Forms.View.Details,
+                    FullRowSelect = true,
+                    MultiSelect = false,
+                    GridLines = true,
+                    HideSelection = false
+                };
+                listView.Columns.Add("Kich thuoc hien co (Current Size)", 220);
+                listView.Columns.Add("So luong (Count)", 120);
+
+                if (groups != null)
+                {
+                    foreach (RepairHoleGroup g in groups)
+                    {
+                        ListViewItem item = new ListViewItem(g.DisplaySize);
+                        item.SubItems.Add(g.Count.ToString());
+                        item.Tag = g;
+                        listView.Items.Add(item);
+                    }
+                }
+
+                listView.DoubleClick += (s, e) =>
+                {
+                    if (listView.SelectedItems.Count > 0)
+                    {
+                        SelectedGroup = (RepairHoleGroup)listView.SelectedItems[0].Tag;
+                        DialogResult = DialogResult.OK;
+                        Close();
+                    }
+                };
+                Controls.Add(listView);
+
+                lblTarget = new Label
+                {
+                    Text = "Target: " + targetDescription,
+                    Location = new System.Drawing.Point(16, 252),
+                    Size = new System.Drawing.Size(370, 28),
+                    Font = new System.Drawing.Font("Segoe UI", 10.5f, System.Drawing.FontStyle.Bold),
+                    ForeColor = System.Drawing.Color.FromArgb(24, 72, 160)
+                };
+                Controls.Add(lblTarget);
+
+                btnRepair = new Button
+                {
+                    Text = "Repair",
+                    Location = new System.Drawing.Point(190, 295),
+                    Size = new System.Drawing.Size(95, 32),
+                    UseVisualStyleBackColor = true
+                };
+                btnRepair.Click += (s, e) =>
+                {
+                    if (listView.SelectedItems.Count == 0)
+                    {
+                        MessageBox.Show("Vui long chon 1 nhom lo can repair.", "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                    SelectedGroup = (RepairHoleGroup)listView.SelectedItems[0].Tag;
+                    DialogResult = DialogResult.OK;
+                    Close();
+                };
+                Controls.Add(btnRepair);
+
+                btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    Location = new System.Drawing.Point(295, 295),
+                    Size = new System.Drawing.Size(95, 32),
+                    DialogResult = DialogResult.Cancel,
+                    UseVisualStyleBackColor = true
+                };
+                Controls.Add(btnCancel);
+
+                AcceptButton = btnRepair;
+                CancelButton = btnCancel;
+            }
+        }
+
+        private List<RepairHoleLoopCandidate> ScanRepairHoleLoops(
+            Face2 face,
+            out string message)
+        {
+            message = "";
+            List<RepairHoleLoopCandidate> candidates = new List<RepairHoleLoopCandidate>();
+            if (face == null)
+            {
+                message = "Khong co mat de scan.";
+                return candidates;
+            }
+
+            Array loopArray = null;
+            try
+            {
+                loopArray = face.GetLoops() as Array;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[REPAIR HOLE SCAN] GetLoops failed: " + ex.Message);
+            }
+
+            if (loopArray == null)
+            {
+                message = "Khong lay duoc danh sach loop tren mat da chon.";
+                return candidates;
+            }
+
+            FacePlaneFrame facePlaneFrame = CreateFacePlaneFrame(face);
+            int loopIndex = 0;
+
+            foreach (object itemObj in loopArray)
+            {
+                if (!(itemObj is Loop loop))
+                {
+                    continue;
+                }
+
+                loopIndex++;
+                bool isOuter = false;
+                try
+                {
+                    isOuter = loop.IsOuter();
+                }
+                catch
+                {
+                }
+
+                if (isOuter)
+                {
+                    continue;
+                }
+
+                List<double[]> sampledPoints = new List<double[]>();
+                List<double[]> circularCenters = new List<double[]>();
+                List<Edge> edges = new List<Edge>();
+
+                Array edgeArray = null;
+                try
+                {
+                    edgeArray = loop.GetEdges() as Array;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[REPAIR HOLE SCAN] loop " + loopIndex + " GetEdges failed: " + ex.Message);
+                }
+
+                if (edgeArray != null)
+                {
+                    foreach (object edgeObj in edgeArray)
+                    {
+                        if (edgeObj is Edge edge)
+                        {
+                            edges.Add(edge);
+                            if (TryGetCircularEdgeData(edge, out var cCenter, out var _))
+                            {
+                                circularCenters.Add(cCenter);
+                            }
+                            if (TryGetEdgeGeometry(edge, out var geometry))
+                            {
+                                sampledPoints.AddRange(SampleCurve(geometry, 16));
+                            }
+                            else
+                            {
+                                sampledPoints.AddRange(SampleRepairEdge(edge, 32));
+                            }
+                        }
+                    }
+                }
+
+                if (!TryGetLoopCenter(sampledPoints, circularCenters, facePlaneFrame, out var center, out var width, out var height))
+                {
+                    Debug.WriteLine("[REPAIR HOLE SCAN] loop " + loopIndex + " skipped: no center");
+                    continue;
+                }
+
+                double major = Math.Max(width, height);
+                double minor = Math.Min(width, height);
+                double perimeterM = GetRepairLoopPerimeter(edges);
+                double equivalentDiameterM = perimeterM > 1E-06 ? (perimeterM / Math.PI) : 0.0;
+
+                bool isExactCircle = TryGetCompleteCircularRepairLoop(
+                    edges,
+                    major,
+                    minor,
+                    out var detectedDiameterM,
+                    out var circleCenter,
+                    out var circlePerimeter);
+
+                if (isExactCircle && IsPoint(circleCenter))
+                {
+                    center = circleCenter;
+                    if (circlePerimeter > 1E-06)
+                    {
+                        perimeterM = circlePerimeter;
+                    }
+                    equivalentDiameterM = detectedDiameterM;
+                }
+
+                string detectedType;
+                string displaySize;
+                double[] majorDirection;
+
+                if (isExactCircle)
+                {
+                    detectedType = "Circle";
+                    double diaMm = detectedDiameterM * 1000.0;
+                    displaySize = "Ø" + diaMm.ToString("0.###", CultureInfo.InvariantCulture);
+                    majorDirection = facePlaneFrame?.AxisU;
+                }
+                else
+                {
+                    detectedType = "Loose/Irregular";
+                    double minorMm = minor * 1000.0;
+                    double majorMm = major * 1000.0;
+                    displaySize = minorMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + " x " + majorMm.ToString("0.###", CultureInfo.InvariantCulture);
+                    majorDirection = GetRepairLoopMajorDirection(sampledPoints, facePlaneFrame, width, height);
+                }
+
+                candidates.Add(new RepairHoleLoopCandidate
+                {
+                    Index = loopIndex,
+                    Edges = edges,
+                    FallbackCenter = center,
+                    Width = width,
+                    Height = height,
+                    MajorDirection = majorDirection,
+                    IsFromRoundHole = isExactCircle,
+                    IsOuter = false,
+                    IsExactCircle = isExactCircle,
+                    DetectedDiameterM = detectedDiameterM,
+                    PerimeterM = perimeterM,
+                    EquivalentDiameterM = equivalentDiameterM,
+                    DetectedType = detectedType,
+                    DisplaySize = displaySize
+                });
+
+                Debug.WriteLine("[REPAIR HOLE SCAN] loop " + loopIndex
+                    + " type=" + detectedType
+                    + ", size=" + displaySize
+                    + ", center=(" + (center[0] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
+                    + (center[1] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
+                    + (center[2] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ")");
+            }
+
+            Debug.WriteLine("[REPAIR HOLE SCAN] total inner loop candidates=" + candidates.Count);
+            return candidates;
+        }
+
+        private List<RepairHoleGroup> GroupRepairHoleCandidates(
+            List<RepairHoleLoopCandidate> candidates)
+        {
+            List<RepairHoleGroup> groups = new List<RepairHoleGroup>();
+            if (candidates == null || candidates.Count == 0)
+            {
+                return groups;
+            }
+
+            foreach (RepairHoleLoopCandidate candidate in candidates)
+            {
+                RepairHoleGroup matchedGroup = null;
+
+                if (candidate.IsExactCircle)
+                {
+                    double candidateDiaMm = candidate.DetectedDiameterM * 1000.0;
+                    foreach (RepairHoleGroup group in groups)
+                    {
+                        if (group.Type == "Circle" &&
+                            Math.Abs(group.DiameterMm - candidateDiaMm) <= RepairGroupingToleranceMm)
+                        {
+                            matchedGroup = group;
+                            break;
+                        }
+                    }
+
+                    if (matchedGroup == null)
+                    {
+                        matchedGroup = new RepairHoleGroup
+                        {
+                            Type = "Circle",
+                            DiameterMm = candidateDiaMm,
+                            WidthMm = candidateDiaMm,
+                            LengthMm = candidateDiaMm,
+                            DisplaySize = candidate.DisplaySize
+                        };
+                        groups.Add(matchedGroup);
+                    }
+                }
+                else
+                {
+                    double candidateMinorMm = Math.Min(candidate.Width, candidate.Height) * 1000.0;
+                    double candidateMajorMm = Math.Max(candidate.Width, candidate.Height) * 1000.0;
+
+                    foreach (RepairHoleGroup group in groups)
+                    {
+                        if (group.Type != "Circle" &&
+                            Math.Abs(group.WidthMm - candidateMinorMm) <= RepairGroupingToleranceMm &&
+                            Math.Abs(group.LengthMm - candidateMajorMm) <= RepairGroupingToleranceMm)
+                        {
+                            matchedGroup = group;
+                            break;
+                        }
+                    }
+
+                    if (matchedGroup == null)
+                    {
+                        matchedGroup = new RepairHoleGroup
+                        {
+                            Type = candidate.DetectedType,
+                            DiameterMm = candidate.EquivalentDiameterM * 1000.0,
+                            WidthMm = candidateMinorMm,
+                            LengthMm = candidateMajorMm,
+                            DisplaySize = candidate.DisplaySize
+                        };
+                        groups.Add(matchedGroup);
+                    }
+                }
+
+                matchedGroup.Candidates.Add(candidate);
+            }
+
+            groups.Sort((a, b) =>
+            {
+                bool aIsCircle = a.Type == "Circle";
+                bool bIsCircle = b.Type == "Circle";
+                if (aIsCircle && !bIsCircle) return -1;
+                if (!aIsCircle && bIsCircle) return 1;
+                if (aIsCircle && bIsCircle)
+                {
+                    return a.DiameterMm.CompareTo(b.DiameterMm);
+                }
+                int widthComp = a.WidthMm.CompareTo(b.WidthMm);
+                if (widthComp != 0) return widthComp;
+                return a.LengthMm.CompareTo(b.LengthMm);
+            });
+
+            return groups;
+        }
+
+        private bool TryBuildRepairReferencesForCandidates(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            List<RepairHoleLoopCandidate> candidates,
+            out List<double[]> centers,
+            out List<double[]> directions,
+            out List<Feature> fillFeatures,
+            out string message)
+        {
+            centers = new List<double[]>();
+            directions = new List<double[]>();
+            fillFeatures = new List<Feature>();
+            message = "";
+
+            if (model == null || sourceFace == null || candidates == null || candidates.Count == 0)
+            {
+                message = "Khong co du lieu ung vien de tao Fill Surface.";
+                return false;
+            }
+
+            FacePlaneFrame frame = CreateFacePlaneFrame(sourceFace);
+
+            foreach (RepairHoleLoopCandidate candidate in candidates)
+            {
+                if (!TryCreateRepairFillSurfaceCenter(
+                        model,
+                        candidate,
+                        frame,
+                        out Feature fillFeature,
+                        out double[] center)
+                    || fillFeature == null
+                    || !IsPoint(center))
+                {
+                    Debug.WriteLine("[REPAIR HOLE] STOP: Fill Surface creation failed for candidate index=" + candidate.Index);
+                    CleanupFailedRepairHole(model, null, null, fillFeatures);
+                    message = "Khong tao duoc Fill Surface cho loop #" + candidate.Index + ". Repair Hole da dung.";
+                    return false;
+                }
+
+                fillFeatures.Add(fillFeature);
+                centers.Add(center);
+                directions.Add(candidate.MajorDirection ?? frame?.AxisU);
+
+                Debug.WriteLine("[REPAIR HOLE] candidate #" + candidate.Index
+                    + " Fill Surface created. center=("
+                    + (center[0] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
+                    + (center[1] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
+                    + (center[2] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ")");
+            }
+
+            if (fillFeatures.Count != candidates.Count || centers.Count != candidates.Count)
+            {
+                Debug.WriteLine("[REPAIR HOLE] STOP: mapping mismatch in TryBuildRepairReferencesForCandidates.");
+                CleanupFailedRepairHole(model, null, null, fillFeatures);
+                message = "Mapping Fill Surface khong hop le. Repair Hole da dung.";
+                return false;
+            }
+
+            return true;
+        }
+
         private bool TryRepairHolesFromPlanarFace(
             ModelDoc2 model,
             Face2 face,
@@ -7589,50 +8068,69 @@ namespace ADDIN.Commands
                 return false;
             }
 
-            List<Feature> temporaryFillFeatures;
-            List<double[]> looseDirections;
-            string scanNoMatchMessage;
-            List<double[]> repairHoleCentersFromFace = GetRepairHoleCentersFromFace(
+            // 1. READ-ONLY scan of all inner loops on selected face
+            List<RepairHoleLoopCandidate> allCandidates = ScanRepairHoleLoops(face, out string scanMessage);
+            if (allCandidates == null || allCandidates.Count == 0)
+            {
+                message = !string.IsNullOrWhiteSpace(scanMessage)
+                    ? scanMessage
+                    : "Khong tim thay loop lo tren mat phang da chon.";
+                Debug.WriteLine("[REPAIR HOLE] STOP: no inner loops found on face.");
+                return false;
+            }
+
+            // 2. Group detected holes by measured size
+            List<RepairHoleGroup> groups = GroupRepairHoleCandidates(allCandidates);
+            if (groups == null || groups.Count == 0)
+            {
+                message = "Khong phan nhom duoc lo nao tren mat da chon.";
+                Debug.WriteLine("[REPAIR HOLE] STOP: grouping produced 0 groups.");
+                return false;
+            }
+
+            // 3. Format target description for dialog
+            string targetDescription = looseSize != null
+                ? ("Loose " + (looseSize.WidthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                    + " x " + (looseSize.LengthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture))
+                : ("Ø" + (diameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture));
+
+            // 4. Show modal selection popup
+            RepairHoleGroup selectedGroup = null;
+            using (RepairHoleSourceSelectionDialog dialog = new RepairHoleSourceSelectionDialog(groups, targetDescription))
+            {
+                DialogResult dialogResult = dialog.ShowDialog();
+                if (dialogResult != DialogResult.OK || dialog.SelectedGroup == null)
+                {
+                    message = "Nguoi dung da huy chon nhom lo Repair.";
+                    Debug.WriteLine("[REPAIR HOLE] user cancelled source group selection.");
+                    return false;
+                }
+                selectedGroup = dialog.SelectedGroup;
+            }
+
+            List<RepairHoleLoopCandidate> selectedCandidates = selectedGroup.Candidates;
+            Debug.WriteLine("[REPAIR HOLE] selected source group: " + selectedGroup.DisplaySize
+                + ", count=" + selectedCandidates.Count
+                + ", target=" + targetDescription);
+
+            // 5. Create Fill Surfaces ONLY for selected candidates
+            if (!TryBuildRepairReferencesForCandidates(
                 model,
                 face,
-                diameterM,
-                looseSize,
-                out temporaryFillFeatures,
-                out looseDirections,
-                out scanNoMatchMessage);
+                selectedCandidates,
+                out List<double[]> repairHoleCentersFromFace,
+                out List<double[]> looseDirections,
+                out List<Feature> temporaryFillFeatures,
+                out string buildRefMessage))
+            {
+                message = buildRefMessage;
+                return false;
+            }
+
             Debug.WriteLine("[REPAIR HOLE] kept fill surfaces=" + (temporaryFillFeatures?.Count ?? 0));
             Debug.WriteLine("[REPAIR HOLE] face scan centers=" + repairHoleCentersFromFace.Count
                 + ", type=" + ((looseSize == null) ? "Circle" : "Loose")
                 + ", directions=" + looseDirections.Count);
-            if (repairHoleCentersFromFace.Count == 0)
-            {
-                message = !string.IsNullOrWhiteSpace(scanNoMatchMessage)
-                    ? scanNoMatchMessage
-                    : "Khong tim thay loop lo tren mat phang da chon. Hay xem log [REPAIR HOLE] trong Output.";
-                return false;
-            }
-
-            if (temporaryFillFeatures == null
-                || temporaryFillFeatures.Count != repairHoleCentersFromFace.Count
-                || temporaryFillFeatures.Any(f => f == null))
-            {
-                CleanupFailedRepairHole(
-                    model,
-                    null,
-                    null,
-                    temporaryFillFeatures);
-
-                message =
-                    "Mapping Fill Surface / tam lo khong hop le. "
-                    + "Repair Hole da dung.";
-
-                Debug.WriteLine(
-                    "[REPAIR HOLE] STOP: invalid center <-> Fill Surface mapping."
-                    + " centers=" + repairHoleCentersFromFace.Count
-                    + ", fills=" + (temporaryFillFeatures?.Count ?? 0));
-
-                return false;
-            }
 
             List<Feature> repairPointFeatures = TryCreateRepairReferencePoints(model, temporaryFillFeatures);
             bool referencePointsOk =
