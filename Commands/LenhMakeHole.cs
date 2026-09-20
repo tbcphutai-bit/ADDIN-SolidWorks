@@ -7577,6 +7577,18 @@ namespace ADDIN.Commands
                 return false;
             }
             object facePersistReference = TryGetRepairPersistentReference(model, face);
+            if (facePersistReference == null)
+            {
+                message =
+                    "Khong tao duoc persistent reference cua mat goc. "
+                    + "Repair Hole da dung de tranh chon nham mat.";
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE] STOP: source face persistent reference=null");
+
+                return false;
+            }
+
             List<Feature> temporaryFillFeatures;
             List<double[]> looseDirections;
             string scanNoMatchMessage;
@@ -7588,7 +7600,7 @@ namespace ADDIN.Commands
                 out temporaryFillFeatures,
                 out looseDirections,
                 out scanNoMatchMessage);
-            Debug.WriteLine("[REPAIR HOLE] kept fill surfaces=" + temporaryFillFeatures.Count);
+            Debug.WriteLine("[REPAIR HOLE] kept fill surfaces=" + (temporaryFillFeatures?.Count ?? 0));
             Debug.WriteLine("[REPAIR HOLE] face scan centers=" + repairHoleCentersFromFace.Count
                 + ", type=" + ((looseSize == null) ? "Circle" : "Loose")
                 + ", directions=" + looseDirections.Count);
@@ -7599,11 +7611,125 @@ namespace ADDIN.Commands
                     : "Khong tim thay loop lo tren mat phang da chon. Hay xem log [REPAIR HOLE] trong Output.";
                 return false;
             }
+
+            if (temporaryFillFeatures == null
+                || temporaryFillFeatures.Count != repairHoleCentersFromFace.Count
+                || temporaryFillFeatures.Any(f => f == null))
+            {
+                CleanupFailedRepairHole(
+                    model,
+                    null,
+                    null,
+                    temporaryFillFeatures);
+
+                message =
+                    "Mapping Fill Surface / tam lo khong hop le. "
+                    + "Repair Hole da dung.";
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE] STOP: invalid center <-> Fill Surface mapping."
+                    + " centers=" + repairHoleCentersFromFace.Count
+                    + ", fills=" + (temporaryFillFeatures?.Count ?? 0));
+
+                return false;
+            }
+
             List<Feature> repairPointFeatures = TryCreateRepairReferencePoints(model, temporaryFillFeatures);
+            bool referencePointsOk =
+                repairPointFeatures != null
+                && repairPointFeatures.Count == temporaryFillFeatures.Count
+                && repairPointFeatures.All(p => p != null);
+
+            if (!referencePointsOk)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE] STOP: RH-P creation incomplete."
+                    + " expected=" + temporaryFillFeatures.Count
+                    + ", actual="
+                    + (repairPointFeatures == null
+                        ? 0
+                        : repairPointFeatures.Count(p => p != null)));
+
+                CleanupFailedRepairHole(
+                    model,
+                    null,
+                    repairPointFeatures,
+                    temporaryFillFeatures);
+
+                message =
+                    "Co tam lo khong tao duoc Reference Point RH-P. "
+                    + "Repair Hole da dung de tranh sai vi tri.";
+
+                return false;
+            }
+
             Feature deleteFillBodiesFeature = TryInsertDeleteBodyForRepairFillSurfaces(
                 model,
                 temporaryFillFeatures);
-            Face2 currentFace = TryRestoreRepairFace(model, facePersistReference) ?? face;
+
+            if (deleteFillBodiesFeature == null)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE] STOP: RH-DelSurf creation failed.");
+
+                CleanupFailedRepairHole(
+                    model,
+                    null,
+                    repairPointFeatures,
+                    temporaryFillFeatures);
+
+                message =
+                    "Khong an/xoa duoc temporary Fill Surface body. "
+                    + "Repair Hole da dung de tranh Hole Wizard chon nham surface.";
+
+                return false;
+            }
+
+            try
+            {
+                model.EditRebuild3();
+            }
+            catch
+            {
+            }
+
+            Face2 currentFace = TryRestoreRepairFace(model, facePersistReference);
+            if (currentFace == null)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE] STOP: cannot restore original source face.");
+
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    repairPointFeatures,
+                    temporaryFillFeatures);
+
+                message =
+                    "Khong khoi phuc duoc mat goc sau khi tao "
+                    + "Fill Surface / RH-P. Repair Hole da dung.";
+
+                return false;
+            }
+
+            if (!IsPlanarFace(currentFace))
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE] STOP: restored source face is not planar.");
+
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    repairPointFeatures,
+                    temporaryFillFeatures);
+
+                message =
+                    "Mat goc sau khi restore khong con la planar face. "
+                    + "Repair Hole da dung.";
+
+                return false;
+            }
+
             int createdCount;
             Feature feature;
             if (looseSize == null)
@@ -7628,9 +7754,11 @@ namespace ADDIN.Commands
                 else
                 {
                     Debug.WriteLine("[REPAIR HOLE] Hole Wizard failed. reason=" + wizardMessage);
-                    TryDeleteRepairFeature(model, deleteFillBodiesFeature, includeAbsorbed: true);
-                    DeleteTemporaryRepairFillFeatures(model, repairPointFeatures);
-                    DeleteTemporaryRepairFillFeatures(model, temporaryFillFeatures);
+                    CleanupFailedRepairHole(
+                        model,
+                        deleteFillBodiesFeature,
+                        repairPointFeatures,
+                        temporaryFillFeatures);
                     message = "Khong tao duoc Hole Wizard: " + wizardMessage;
                     return false;
                 }
@@ -7653,9 +7781,11 @@ namespace ADDIN.Commands
                 if (feature == null)
                 {
                     Debug.WriteLine("[REPAIR HOLE] Loose Hole Wizard failed. reason=" + wizardMessage);
-                    TryDeleteRepairFeature(model, deleteFillBodiesFeature, includeAbsorbed: true);
-                    DeleteTemporaryRepairFillFeatures(model, repairPointFeatures);
-                    DeleteTemporaryRepairFillFeatures(model, temporaryFillFeatures);
+                    CleanupFailedRepairHole(
+                        model,
+                        deleteFillBodiesFeature,
+                        repairPointFeatures,
+                        temporaryFillFeatures);
                     message = "Khong tao duoc Loose Hole Wizard: " + wizardMessage;
                     return false;
                 }
@@ -7663,6 +7793,11 @@ namespace ADDIN.Commands
             }
             if (feature == null)
             {
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    repairPointFeatures,
+                    temporaryFillFeatures);
                 message = "Da tim thay tam lo nhung chua tao duoc Hole Wizard/Extrude Cut. Hay xem log [REPAIR HOLE] trong Output.";
                 return false;
             }
@@ -8431,6 +8566,67 @@ namespace ADDIN.Commands
             }
             center = planeFrame.ToModel((num + num2) * 0.5, (num3 + num4) * 0.5, num5 / (double)num6);
             return true;
+        }
+
+        private void CleanupFailedRepairHole(
+            ModelDoc2 model,
+            Feature deleteFillBodiesFeature,
+            List<Feature> repairPointFeatures,
+            List<Feature> temporaryFillFeatures)
+        {
+            if (model == null)
+            {
+                return;
+            }
+
+            try
+            {
+                model.ClearSelection2(All: true);
+
+                if (deleteFillBodiesFeature != null)
+                {
+                    TryDeleteRepairFeature(
+                        model,
+                        deleteFillBodiesFeature,
+                        includeAbsorbed: true);
+                }
+
+                // Delete reference points BEFORE deleting the fill surfaces
+                // because RH-P depends on Fill Surface geometry.
+                DeleteTemporaryRepairFillFeatures(
+                    model,
+                    repairPointFeatures);
+
+                DeleteTemporaryRepairFillFeatures(
+                    model,
+                    temporaryFillFeatures);
+
+                try
+                {
+                    model.EditRebuild3();
+                }
+                catch
+                {
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE] cleanup failed: "
+                    + ex.GetType().Name
+                    + " - "
+                    + ex.Message);
+            }
+            finally
+            {
+                try
+                {
+                    model.ClearSelection2(All: true);
+                }
+                catch
+                {
+                }
+            }
         }
 
         private void DeleteTemporaryRepairFillFeatures(ModelDoc2 model, List<Feature> features)
@@ -10049,14 +10245,19 @@ namespace ADDIN.Commands
             foreach (string sizeName in sizeNames)
             {
                 model.ClearSelection2(All: true);
-                bool selectedByRay = TrySelectRepairHoleWizardFaceAtPoint(
-                    model,
-                    face,
-                    wizardPickPoint,
-                    diameterM);
-                if (!selectedByRay && !SelectFace(face, append: false))
+                bool selectedDirect = SelectFace(face, append: false);
+                bool selectedByRay = false;
+                if (!selectedDirect)
                 {
-                    message = "Khong chon duoc mat cho Hole Wizard.";
+                    selectedByRay = TrySelectRepairHoleWizardFaceAtPoint(
+                        model,
+                        face,
+                        wizardPickPoint,
+                        diameterM);
+                }
+                if (!selectedDirect && !selectedByRay)
+                {
+                    message = "Khong chon duoc mat goc cho Hole Wizard.";
                     return null;
                 }
                 int selectionCount = 0;
@@ -10075,7 +10276,9 @@ namespace ADDIN.Commands
                 catch
                 {
                 }
-                Debug.WriteLine("[REPAIR HOLE] Hole Wizard face selection. byRay=" + selectedByRay
+                Debug.WriteLine("[REPAIR HOLE] Hole Wizard face selection."
+                    + " direct=" + selectedDirect
+                    + ", rayFallback=" + selectedByRay
                     + ", count=" + selectionCount
                     + ", type=" + selectionType
                     + ", pickMm=" + FormatRepairPoint(wizardPickPoint));
@@ -10098,14 +10301,19 @@ namespace ADDIN.Commands
                 // HoleWizard5 can consume the face selection even when it returns null.
                 // Select the face again before retrying with Part-specific body scope.
                 model.ClearSelection2(All: true);
-                bool fallbackSelectedByRay = TrySelectRepairHoleWizardFaceAtPoint(
-                    model,
-                    face,
-                    wizardPickPoint,
-                    diameterM);
-                if (!fallbackSelectedByRay && !SelectFace(face, append: false))
+                bool fallbackSelectedDirect = SelectFace(face, append: false);
+                bool fallbackSelectedByRay = false;
+                if (!fallbackSelectedDirect)
                 {
-                    message = "Khong chon lai duoc mat cho Hole Wizard (Part fallback).";
+                    fallbackSelectedByRay = TrySelectRepairHoleWizardFaceAtPoint(
+                        model,
+                        face,
+                        wizardPickPoint,
+                        diameterM);
+                }
+                if (!fallbackSelectedDirect && !fallbackSelectedByRay)
+                {
+                    message = "Khong chon lai duoc mat goc cho Hole Wizard (Part fallback).";
                     return null;
                 }
                 feature = TryCallRepairHoleWizard5(
@@ -10118,7 +10326,8 @@ namespace ADDIN.Commands
                     partAllBodies: true);
                 Debug.WriteLine("[REPAIR HOLE] Hole Wizard seed (Part all bodies). type=" + genericHoleType
                     + ", size=" + sizeName
-                    + ", selectedByRay=" + fallbackSelectedByRay
+                    + ", direct=" + fallbackSelectedDirect
+                    + ", rayFallback=" + fallbackSelectedByRay
                     + ", result=" + ((feature == null) ? "null" : SafeFeatureName(feature)));
                 if (feature != null)
                 {
