@@ -93,6 +93,14 @@ namespace ADDIN.Commands
                 new List<RepairHoleLoopCandidate>();
 
             public int Count => Candidates.Count;
+
+            // NEW
+            public double? RecommendedSourceNominalMm;
+
+            public List<double> RecommendedRepairDiametersMm =
+                new List<double>();
+
+            public string RecommendedDisplayText;
         }
 
         private class SelectionInfo
@@ -7588,23 +7596,26 @@ namespace ADDIN.Commands
 
         private class RepairHoleSourceSelectionDialog : Form
         {
-            private ListView listView;
-            private Label lblTarget;
+            private DataGridView grid;
+            private ComboBox cboSourceDia;
+            private ComboBox cboRepairDia;
+            private Label lblRecommend;
             private Button btnRepair;
             private Button btnCancel;
 
             public RepairHoleGroup SelectedGroup { get; private set; }
+            public double SelectedRepairDiameterMm { get; private set; }
 
-            public RepairHoleSourceSelectionDialog(List<RepairHoleGroup> groups, string targetDescription)
+            public RepairHoleSourceSelectionDialog(List<RepairHoleGroup> groups, double defaultRepairDiaMm, LooseSize looseSize)
             {
-                InitializeUI(groups, targetDescription);
+                InitializeUI(groups, defaultRepairDiaMm, looseSize);
             }
 
-            private void InitializeUI(List<RepairHoleGroup> groups, string targetDescription)
+            private void InitializeUI(List<RepairHoleGroup> groups, double defaultRepairDiaMm, LooseSize looseSize)
             {
                 Text = "Repair Hole - Select Source Holes";
-                Size = new System.Drawing.Size(420, 390);
-                MinimumSize = new System.Drawing.Size(380, 340);
+                Size = new System.Drawing.Size(530, 470);
+                MinimumSize = new System.Drawing.Size(490, 430);
                 StartPosition = FormStartPosition.CenterScreen;
                 FormBorderStyle = FormBorderStyle.FixedDialog;
                 MaximizeBox = false;
@@ -7614,73 +7625,146 @@ namespace ADDIN.Commands
 
                 Label lblHeader = new Label
                 {
-                    Text = "Chon nhom lo nguon can repair (Select source hole group):",
+                    Text = "Detected holes:",
                     Location = new System.Drawing.Point(16, 12),
-                    Size = new System.Drawing.Size(370, 24),
-                    AutoSize = false
+                    Size = new System.Drawing.Size(480, 20),
+                    Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold)
                 };
                 Controls.Add(lblHeader);
 
-                listView = new ListView
+                grid = new DataGridView
                 {
-                    Location = new System.Drawing.Point(16, 40),
-                    Size = new System.Drawing.Size(370, 200),
-                    View = System.Windows.Forms.View.Details,
-                    FullRowSelect = true,
+                    Location = new System.Drawing.Point(16, 36),
+                    Size = new System.Drawing.Size(480, 190),
+                    AllowUserToAddRows = false,
+                    AllowUserToDeleteRows = false,
+                    AllowUserToResizeRows = false,
+                    ReadOnly = true,
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                     MultiSelect = false,
-                    GridLines = true,
-                    HideSelection = false
+                    RowHeadersVisible = false,
+                    BackgroundColor = System.Drawing.SystemColors.Window,
+                    BorderStyle = BorderStyle.Fixed3D
                 };
-                listView.Columns.Add("Kich thuoc hien co (Current Size)", 220);
-                listView.Columns.Add("So luong (Count)", 120);
+
+                grid.Columns.Clear();
+                grid.Columns.Add("CurrentSize", "Current Size");
+                grid.Columns.Add("Count", "Count");
+                grid.Columns.Add("Recommend", "Recommend");
+
+                grid.Columns["CurrentSize"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                grid.Columns["Count"].Width = 65;
+                grid.Columns["Recommend"].Width = 140;
+
+                grid.Columns["Count"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                grid.Columns["Recommend"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
 
                 if (groups != null)
                 {
-                    foreach (RepairHoleGroup g in groups)
+                    foreach (RepairHoleGroup group in groups)
                     {
-                        ListViewItem item = new ListViewItem(g.DisplayText);
-                        item.SubItems.Add(g.Count.ToString());
-                        item.Tag = g;
-                        listView.Items.Add(item);
+                        int rowIndex = grid.Rows.Add(
+                            group.DisplayText,
+                            group.Count.ToString(CultureInfo.InvariantCulture),
+                            group.RecommendedDisplayText);
+
+                        grid.Rows[rowIndex].Tag = group;
                     }
                 }
 
-                listView.DoubleClick += (s, e) =>
+                grid.SelectionChanged += grid_SelectionChanged;
+                grid.DoubleClick += (s, e) =>
                 {
-                    if (listView.SelectedItems.Count > 0)
+                    if (btnRepair.Enabled)
                     {
-                        SelectedGroup = (RepairHoleGroup)listView.SelectedItems[0].Tag;
-                        DialogResult = DialogResult.OK;
-                        Close();
+                        btnRepair.PerformClick();
                     }
                 };
-                Controls.Add(listView);
+                Controls.Add(grid);
 
-                lblTarget = new Label
+                int currentY = 242;
+
+                Label lblSource = new Label
                 {
-                    Text = "Target: " + targetDescription,
-                    Location = new System.Drawing.Point(16, 252),
-                    Size = new System.Drawing.Size(370, 28),
-                    Font = new System.Drawing.Font("Segoe UI", 10.5f, System.Drawing.FontStyle.Bold),
+                    Text = "Selected source:",
+                    Location = new System.Drawing.Point(16, currentY + 3),
+                    Size = new System.Drawing.Size(115, 24)
+                };
+                Controls.Add(lblSource);
+
+                cboSourceDia = new ComboBox
+                {
+                    Location = new System.Drawing.Point(135, currentY),
+                    Size = new System.Drawing.Size(100, 26),
+                    DropDownStyle = ComboBoxStyle.DropDownList
+                };
+                Controls.Add(cboSourceDia);
+
+                currentY += 36;
+
+                Label lblRepair = new Label
+                {
+                    Text = "Repair Dia:",
+                    Location = new System.Drawing.Point(16, currentY + 3),
+                    Size = new System.Drawing.Size(115, 24),
+                    Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold)
+                };
+                Controls.Add(lblRepair);
+
+                cboRepairDia = new ComboBox
+                {
+                    Location = new System.Drawing.Point(135, currentY),
+                    Size = new System.Drawing.Size(100, 26),
+                    DropDownStyle = ComboBoxStyle.DropDown
+                };
+                cboRepairDia.TextChanged += (s, e) =>
+                {
+                    btnRepair.Enabled = !string.IsNullOrWhiteSpace(cboRepairDia.Text);
+                };
+                Controls.Add(cboRepairDia);
+
+                lblRecommend = new Label
+                {
+                    Text = "Recommend: -",
+                    Location = new System.Drawing.Point(245, currentY + 3),
+                    Size = new System.Drawing.Size(250, 24),
+                    Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold),
                     ForeColor = System.Drawing.Color.FromArgb(24, 72, 160)
                 };
-                Controls.Add(lblTarget);
+                Controls.Add(lblRecommend);
+
+                currentY += 50;
 
                 btnRepair = new Button
                 {
                     Text = "Repair",
-                    Location = new System.Drawing.Point(190, 295),
-                    Size = new System.Drawing.Size(95, 32),
+                    Location = new System.Drawing.Point(286, currentY),
+                    Size = new System.Drawing.Size(100, 34),
                     UseVisualStyleBackColor = true
                 };
                 btnRepair.Click += (s, e) =>
                 {
-                    if (listView.SelectedItems.Count == 0)
+                    if (grid.SelectedRows.Count == 0 || SelectedGroup == null)
                     {
                         MessageBox.Show("Vui long chon 1 nhom lo can repair.", "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
-                    SelectedGroup = (RepairHoleGroup)listView.SelectedItems[0].Tag;
+
+                    string text = cboRepairDia.Text?.Trim();
+                    if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double repairDiaMm)
+                        && !double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out repairDiaMm))
+                    {
+                        MessageBox.Show("Vui long nhap hoac chon Repair Dia hop le.", "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    if (repairDiaMm <= 1E-06)
+                    {
+                        MessageBox.Show("Repair Dia phai lon hon 0.", "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    SelectedRepairDiameterMm = repairDiaMm;
                     DialogResult = DialogResult.OK;
                     Close();
                 };
@@ -7689,8 +7773,8 @@ namespace ADDIN.Commands
                 btnCancel = new Button
                 {
                     Text = "Cancel",
-                    Location = new System.Drawing.Point(295, 295),
-                    Size = new System.Drawing.Size(95, 32),
+                    Location = new System.Drawing.Point(396, currentY),
+                    Size = new System.Drawing.Size(100, 34),
                     DialogResult = DialogResult.Cancel,
                     UseVisualStyleBackColor = true
                 };
@@ -7698,6 +7782,67 @@ namespace ADDIN.Commands
 
                 AcceptButton = btnRepair;
                 CancelButton = btnCancel;
+
+                if (grid.Rows.Count > 0)
+                {
+                    grid.Rows[0].Selected = true;
+                    UpdateSelectionUI((RepairHoleGroup)grid.Rows[0].Tag, defaultRepairDiaMm);
+                }
+            }
+
+            private void grid_SelectionChanged(object sender, EventArgs e)
+            {
+                if (grid.SelectedRows.Count == 0)
+                {
+                    SelectedGroup = null;
+                    btnRepair.Enabled = false;
+                    return;
+                }
+
+                RepairHoleGroup group = grid.SelectedRows[0].Tag as RepairHoleGroup;
+                if (group == null)
+                {
+                    SelectedGroup = null;
+                    btnRepair.Enabled = false;
+                    return;
+                }
+
+                UpdateSelectionUI(group, 0.0);
+            }
+
+            private void UpdateSelectionUI(RepairHoleGroup group, double defaultRepairDiaMm)
+            {
+                SelectedGroup = group;
+                cboSourceDia.Items.Clear();
+                cboRepairDia.Items.Clear();
+
+                if (group.RecommendedSourceNominalMm.HasValue)
+                {
+                    cboSourceDia.Items.Add(group.RecommendedSourceNominalMm.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                    cboSourceDia.SelectedIndex = 0;
+                }
+                else
+                {
+                    cboSourceDia.Items.Add("-");
+                    cboSourceDia.SelectedIndex = 0;
+                }
+
+                foreach (double value in group.RecommendedRepairDiametersMm)
+                {
+                    cboRepairDia.Items.Add(value.ToString("0.###", CultureInfo.InvariantCulture));
+                }
+
+                if (cboRepairDia.Items.Count > 0)
+                {
+                    cboRepairDia.SelectedIndex = 0;
+                }
+                else if (defaultRepairDiaMm > 1E-06)
+                {
+                    cboRepairDia.Text = defaultRepairDiaMm.ToString("0.###", CultureInfo.InvariantCulture);
+                }
+
+                lblRecommend.Text = "Recommend: " + group.RecommendedDisplayText;
+                btnRepair.Enabled = cboRepairDia.Items.Count > 0 || !string.IsNullOrWhiteSpace(cboRepairDia.Text);
             }
         }
 
@@ -7876,16 +8021,9 @@ namespace ADDIN.Commands
 
                 if (matchedGroup == null)
                 {
-                    string displayText;
-                    if (candIsRound)
-                    {
-                        displayText = "Ø" + candEqDiaMm.ToString("0.##", CultureInfo.InvariantCulture);
-                    }
-                    else
-                    {
-                        displayText = candMinMm.ToString("0.##", CultureInfo.InvariantCulture)
-                            + " x " + candMaxMm.ToString("0.##", CultureInfo.InvariantCulture);
-                    }
+                    string displayText = "Eq Ø" + candEqDiaMm.ToString("0.##", CultureInfo.InvariantCulture)
+                        + " [" + candMinMm.ToString("0.##", CultureInfo.InvariantCulture)
+                        + " x " + candMaxMm.ToString("0.##", CultureInfo.InvariantCulture) + "]";
 
                     matchedGroup = new RepairHoleGroup
                     {
@@ -7894,6 +8032,28 @@ namespace ADDIN.Commands
                         HeightMm = candidate.MeasuredHeightMm,
                         DisplayText = displayText
                     };
+
+                    if (TryResolveRecommendedSourceNominalDiameterMm(
+                            matchedGroup.EquivalentDiameterMm,
+                            out double sourceNominalMm))
+                    {
+                        matchedGroup.RecommendedSourceNominalMm = sourceNominalMm;
+                        matchedGroup.RecommendedRepairDiametersMm =
+                            GetRecommendedRepairDiametersMm(sourceNominalMm);
+
+                        matchedGroup.RecommendedDisplayText =
+                            FormatRecommendedRepairDiameters(
+                                matchedGroup.RecommendedRepairDiametersMm);
+                    }
+                    else
+                    {
+                        matchedGroup.RecommendedSourceNominalMm = null;
+                        matchedGroup.RecommendedRepairDiametersMm =
+                            new List<double>();
+
+                        matchedGroup.RecommendedDisplayText = "-";
+                    }
+
                     groups.Add(matchedGroup);
                 }
 
@@ -7923,6 +8083,78 @@ namespace ADDIN.Commands
             });
 
             return groups;
+        }
+
+        private bool TryResolveRecommendedSourceNominalDiameterMm(
+            double measuredEquivalentDiameterMm,
+            out double sourceNominalMm)
+        {
+            sourceNominalMm = 0.0;
+
+            if (Math.Abs(measuredEquivalentDiameterMm - 3.0) <= 0.35)
+            {
+                sourceNominalMm = 3.0;
+                return true;
+            }
+
+            if (Math.Abs(measuredEquivalentDiameterMm - 4.0) <= 0.35)
+            {
+                sourceNominalMm = 4.0;
+                return true;
+            }
+
+            if (Math.Abs(measuredEquivalentDiameterMm - 5.0) <= 0.40)
+            {
+                sourceNominalMm = 5.0;
+                return true;
+            }
+
+            if (Math.Abs(measuredEquivalentDiameterMm - 6.0) <= 0.45)
+            {
+                sourceNominalMm = 6.0;
+                return true;
+            }
+
+            return false;
+        }
+
+        private List<double> GetRecommendedRepairDiametersMm(
+            double sourceNominalMm)
+        {
+            if (Math.Abs(sourceNominalMm - 3.0) <= 0.01)
+            {
+                return new List<double> { 3.3 };
+            }
+
+            if (Math.Abs(sourceNominalMm - 4.0) <= 0.01)
+            {
+                return new List<double> { 4.1, 4.2 };
+            }
+
+            if (Math.Abs(sourceNominalMm - 5.0) <= 0.01)
+            {
+                return new List<double> { 5.1, 5.2, 5.5 };
+            }
+
+            if (Math.Abs(sourceNominalMm - 6.0) <= 0.01)
+            {
+                return new List<double> { 6.2, 6.5 };
+            }
+
+            return new List<double>();
+        }
+
+        private string FormatRecommendedRepairDiameters(
+            List<double> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return "-";
+            }
+
+            return string.Join(
+                " / ",
+                values.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture)));
         }
 
         private bool TryBuildRepairReferencesForCandidates(
@@ -8037,15 +8269,10 @@ namespace ADDIN.Commands
                 return false;
             }
 
-            // 3. Format target description for dialog
-            string targetDescription = looseSize != null
-                ? ("Loose " + (looseSize.WidthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
-                    + " x " + (looseSize.LengthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture))
-                : ("Ø" + (diameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture));
-
-            // 4. Show modal selection popup
+            // 3. Show modal selection popup
             RepairHoleGroup selectedGroup = null;
-            using (RepairHoleSourceSelectionDialog dialog = new RepairHoleSourceSelectionDialog(groups, targetDescription))
+            double chosenRepairDiaM = diameterM;
+            using (RepairHoleSourceSelectionDialog dialog = new RepairHoleSourceSelectionDialog(groups, diameterM * 1000.0, looseSize))
             {
                 DialogResult dialogResult = dialog.ShowDialog();
                 if (dialogResult != DialogResult.OK || dialog.SelectedGroup == null)
@@ -8055,12 +8282,22 @@ namespace ADDIN.Commands
                     return false;
                 }
                 selectedGroup = dialog.SelectedGroup;
+                if (dialog.SelectedRepairDiameterMm > 1E-06)
+                {
+                    chosenRepairDiaM = dialog.SelectedRepairDiameterMm / 1000.0;
+                }
+            }
+
+            diameterM = chosenRepairDiaM;
+            if (looseSize != null && chosenRepairDiaM > 1E-06)
+            {
+                looseSize.WidthM = chosenRepairDiaM;
             }
 
             List<RepairHoleLoopCandidate> selectedCandidates = selectedGroup.Candidates;
             Debug.WriteLine("[REPAIR HOLE] selected source group: " + selectedGroup.DisplayText
                 + ", count=" + selectedCandidates.Count
-                + ", target=" + targetDescription);
+                + ", chosen repairDia=" + (diameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm");
 
             // 5. Create Fill Surfaces ONLY for selected candidates
             if (!TryBuildRepairReferencesForCandidates(
