@@ -497,6 +497,10 @@ namespace ADDIN.Commands
 
             int row = 2;
             string previousComponentKey = null;
+            int componentIndex = -1;
+            int pastelColorA = Rgb(235, 244, 252); // Soft Pastel Sky/Ice Blue (#EBF4FC)
+            int pastelColorB = Rgb(255, 255, 255); // Pure White (#FFFFFF)
+
             if (result != null)
             {
                 foreach (KegakiBendResult item in result.Results)
@@ -508,6 +512,16 @@ namespace ADDIN.Commands
                         previousComponentKey,
                         componentKey,
                         StringComparison.OrdinalIgnoreCase);
+
+                    if (firstBendOfComponent)
+                    {
+                        componentIndex++;
+                        previousComponentKey = componentKey;
+                    }
+
+                    int rowBg = (componentIndex % 2 == 0) ? pastelColorA : pastelColorB;
+                    dynamic fullRow = sheet.Range["A" + row + ":P" + row];
+                    fullRow.Interior.Color = rowBg;
 
                     sheet.Cells[row, 1].Value =
                         firstBendOfComponent ? item.BuhinNo : "";
@@ -539,8 +553,9 @@ namespace ADDIN.Commands
                     sheet.Cells[row, 14].Value = item.DefaultSetting;
                     sheet.Cells[row, 15].Value = item.BendSetting;
                     sheet.Cells[row, 16].Value = item.Note;
-                    ApplyStatusColor(sheet.Range["A" + row + ":P" + row], item.Status);
-                    previousComponentKey = componentKey;
+
+                    ApplyKegakiStatusCell(sheet.Cells[row, 2], item.Status);
+
                     row++;
                 }
             }
@@ -633,6 +648,30 @@ namespace ADDIN.Commands
                 range.Interior.Color = Rgb(255, 199, 206);
             else if (normalized == "CHECK" || normalized == "SKIP")
                 range.Interior.Color = Rgb(255, 235, 156);
+        }
+
+        private static void ApplyKegakiStatusCell(dynamic cell, string status)
+        {
+            string normalized = Normalize(status);
+            if (normalized == "NG")
+            {
+                cell.Interior.Color = Rgb(255, 199, 206);
+                cell.Font.Color = Rgb(156, 0, 6);
+                cell.Font.Bold = true;
+            }
+            else if (normalized == "CHECK" || normalized == "SKIP")
+            {
+                cell.Interior.Color = Rgb(255, 235, 156);
+                cell.Font.Color = Rgb(156, 87, 0);
+                cell.Font.Bold = true;
+            }
+            else if (normalized == "OK")
+            {
+                cell.Interior.Color = Rgb(198, 239, 206);
+                cell.Font.Color = Rgb(0, 97, 0);
+                cell.Font.Bold = true;
+            }
+            cell.HorizontalAlignment = -4108; // Center
         }
 
         private static string OverallStatus(SummaryRow row)

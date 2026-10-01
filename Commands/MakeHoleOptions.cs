@@ -17,6 +17,7 @@
         public bool Paint;
         public string HoleSizeText;
         public string PaintNameText;
+        public string HoleLabel;
     }
 }
 

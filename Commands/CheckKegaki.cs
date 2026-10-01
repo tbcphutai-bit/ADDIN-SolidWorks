@@ -88,6 +88,27 @@ namespace ADDIN.Commands
                     + result.Results.Count + ", canceled=" + result.Canceled);
             }
 
+            List<string> stockWarnings = new List<string>();
+            int stockWarningCount = 0;
+            foreach (KegakiBendResult row in result.Results)
+            {
+                if (!row.IsPurchasedStockBendWarning)
+                    continue;
+                stockWarningCount++;
+                if (stockWarnings.Count < 10)
+                    stockWarnings.Add((string.IsNullOrWhiteSpace(row.Component) ? row.PartPath : row.Component)
+                        + ": " + row.BendName);
+            }
+            if (stockWarningCount > 0)
+            {
+                MessageBox.Show("Phát hiện " + stockWarningCount
+                    + " chi tiết định hình/mua sẵn có bend line.\n"
+                    + "Hãy kiểm tra lại vật liệu hoặc feature bend line.\n\n"
+                    + string.Join("\n", stockWarnings.ToArray())
+                    + (stockWarningCount > stockWarnings.Count ? "\nXem đầy đủ trong kết quả CHECK KEGAKI." : ""),
+                    "CHECK KEGAKI - Cảnh báo chi tiết định hình",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
             return result;
         }
 
@@ -339,12 +360,17 @@ namespace ADDIN.Commands
             }
 
             List<Feature> features = CollectFeatures(model);
+            string materialDatabase;
+            string materialCategory;
+            string materialName = ReadComponentMaterialName(model, out materialDatabase, out materialCategory);
+            if (IsPurchasedStockMaterial(materialName))
+                return CheckPurchasedStock(features, materialName, materialCategory,
+                    buhinNo, bomFileName, componentName, partPath);
+
             List<BendAllowanceInfo> defaults = new List<BendAllowanceInfo>();
             List<Feature> bends = new List<Feature>();
             List<Feature> curvedFeatures = new List<Feature>();
             List<double> sheetThicknesses = new List<double>();
-            bool hasFoldUnfoldFeature = false;
-            double defaultBendRadiusMm = 0.1;
 
             foreach (Feature feature in features)
             {
@@ -356,12 +382,6 @@ namespace ADDIN.Commands
                         ISheetMetalFeatureData data = feature.GetDefinition() as ISheetMetalFeatureData;
                         if (data != null)
                         {
-                            try
-                            {
-                                defaultBendRadiusMm = Math.Abs(data.BendRadius * 1000.0);
-                            }
-                            catch { }
-
                             BendAllowanceInfo allowance = BendAllowanceInfo.Capture(data.GetCustomBendAllowance());
                             if (allowance != null)
                                 defaults.Add(allowance);
@@ -388,7 +408,7 @@ namespace ADDIN.Commands
                     // RuledBend and UiFreeformBend are the Fold/Unfold pair
                     // generated for the same geometry. They are not separate
                     // production bends and must not be exported or counted.
-                    hasFoldUnfoldFeature = true;
+                    continue;
                 }
                 else if (IsCurvedSheetMetalType(typeName) && !IsFeatureSuppressed(feature))
                 {
@@ -397,11 +417,11 @@ namespace ADDIN.Commands
             }
 
             bool hasCurvedGeometry = false;
-            if (!hasFoldUnfoldFeature
-                && defaults.Count > 0
+            double curvedRadiusMm = 0.0;
+            if (defaults.Count > 0
                 && bends.Count == 0
                 && curvedFeatures.Count == 0)
-                hasCurvedGeometry = HasPairedCurvedMainFaces(model, sheetThicknesses);
+                hasCurvedGeometry = HasPairedCurvedMainFaces(model, sheetThicknesses, out curvedRadiusMm);
 
             if (defaults.Count == 0
                 && bends.Count == 0
@@ -411,9 +431,12 @@ namespace ADDIN.Commands
 
             string defaultSummary = JoinDefaultSummaries(defaults);
             MaterialTableCheck materialCheck = CheckMaterialAgainstDefaultBendTables(
-                model,
+                materialName,
+                materialDatabase,
+                materialCategory,
                 defaults,
-                sheetThicknesses);
+                sheetThicknesses,
+                bends.Count == 0 && curvedFeatures.Count == 0 && !hasCurvedGeometry);
             if (bends.Count == 0 && curvedFeatures.Count == 0)
             {
                 foreach (Feature feature in features)
@@ -427,12 +450,14 @@ namespace ADDIN.Commands
                 summaryRow.BendName = "Sheet-Metal default";
                 summaryRow.DefaultSetting = defaultSummary;
                 summaryRow.BendSetting = defaultSummary;
-                if (hasCurvedGeometry)
+                summaryRow.RadiusMm = curvedRadiusMm;
+                if (hasCurvedGeometry && IsLargeRadius(curvedRadiusMm))
                 {
                     CurvedAllowanceCheck curvedCheck = EvaluateCurvedAllowance(defaults);
                     summaryRow.BendName = "Curved geometry confirmed";
                     summaryRow.Status = curvedCheck.Status;
-                    summaryRow.Note = "Xac nhan cap mat cong theo be day; " + curvedCheck.Note;
+                    summaryRow.Note = "Cung R=" + curvedRadiusMm.ToString("0.###")
+                        + "mm > 0.2mm, khong can bend line; " + curvedCheck.Note;
                     CopyMaterialIdentity(summaryRow, materialCheck);
                     return new List<KegakiBendResult> { summaryRow };
                 }
@@ -453,12 +478,24 @@ namespace ADDIN.Commands
                     defaults,
                     defaultSummary,
                     materialCheck,
-                    defaultBendRadiusMm,
                     buhinNo,
                     bomFileName,
                     componentName,
                     partPath);
-                if (bendResult.IsOverride
+                if (bendResult.IsLargeRadiusBend)
+                {
+                    // This bend is validated against K-Factor=0.5, not the
+                    // Sheet-Metal default Bend Table used by ordinary bends.
+                    CopyMaterialIdentity(bendResult, materialCheck);
+                    if (string.IsNullOrWhiteSpace(bendResult.MaterialName)
+                        || string.IsNullOrWhiteSpace(bendResult.MaterialGroup))
+                    {
+                        bendResult.Status = MergeStatus(bendResult.Status, "CHECK");
+                        bendResult.Note = AppendNote(bendResult.Note,
+                            "Khong xac dinh duoc nhom vat lieu");
+                    }
+                }
+                else if (bendResult.IsOverride
                     && !string.IsNullOrWhiteSpace(bendResult.OverrideBendTablePath))
                 {
                     ApplyOverrideBendTableCheck(bendResult, materialCheck);
@@ -575,22 +612,18 @@ namespace ADDIN.Commands
         }
 
         private MaterialTableCheck CheckMaterialAgainstDefaultBendTables(
-            ModelDoc2 model,
+            string materialName,
+            string materialDatabase,
+            string materialCategory,
             List<BendAllowanceInfo> defaults,
-            List<double> sheetThicknesses)
+            List<double> sheetThicknesses,
+            bool isFlatSheet)
         {
             MaterialTableCheck result = new MaterialTableCheck();
-            string materialDatabase;
-            string materialCategory;
-            result.MaterialName = ReadComponentMaterialName(
-                model,
-                out materialDatabase,
-                out materialCategory);
+            result.MaterialName = materialName;
             result.MaterialDatabase = materialDatabase;
             result.MaterialCategory = materialCategory;
-            result.MaterialGroup = NormalizeMaterialGroup(materialCategory);
-            if (string.IsNullOrWhiteSpace(result.MaterialGroup))
-                result.MaterialGroup = NormalizeMaterialGroup(result.MaterialName);
+            result.MaterialGroup = ResolveMaterialGroup(result.MaterialName, materialCategory);
 
             List<string> tableNames = new List<string>();
             List<string> tableGroups = new List<string>();
@@ -614,7 +647,44 @@ namespace ADDIN.Commands
             result.BendTableGroup = string.Join(" | ", tableGroups.ToArray());
 
             bool isGrooveTable = tableNames.Exists(IsGrooveBendTable);
-            if (isGrooveTable)
+            if (isFlatSheet)
+            {
+                if (IsAlpolicMaterial(result.MaterialName))
+                    result.MaterialGroup = "AL";
+
+                if (string.IsNullOrWhiteSpace(result.MaterialName)
+                    || string.IsNullOrWhiteSpace(result.MaterialGroup)
+                    || defaults == null || defaults.Count == 0)
+                {
+                    result.Status = "CHECK";
+                    result.Note = "Tam phang: chua du thong tin vat lieu/Bend Table de doi chieu";
+                }
+                else
+                {
+                    bool correctTable = defaults.TrueForAll(allowance => allowance != null
+                        && allowance.HasBendTableFile()
+                        && IsFlatSheetBendTable(result.MaterialGroup, allowance.GetBendTableFileName()));
+                    result.Status = correctTable ? "OK" : "NG";
+                    result.Note = "Tam phang " + result.MaterialName + " -> " + result.MaterialGroup
+                        + "; Bend Table " + result.BendTableName
+                        + (correctTable ? ": khop vat lieu" : ": KHONG KHOP vat lieu");
+                }
+            }
+            else if (IsAlpolicMaterial(result.MaterialName))
+            {
+                bool correctTable = defaults != null && defaults.Count > 0
+                    && defaults.TrueForAll(allowance => allowance != null
+                        && allowance.HasBendTableFile()
+                        && IsAlpolicBendTable(allowance.GetBendTableFileName()));
+                result.Status = correctTable ? "OK" : "NG";
+                result.BendTableGroup = isGrooveTable ? "溝加工" : result.BendTableGroup;
+                if (string.IsNullOrWhiteSpace(result.MaterialGroup))
+                    result.MaterialGroup = "Đặc cách";
+                result.Note = correctTable
+                    ? "Bend Table mac dinh Alpolic 0.8 hop le"
+                    : "Alpolic bat buoc dung Bend Table bao ranh 0.8 (溝0.8残シ)";
+            }
+            else if (isGrooveTable)
             {
                 result.Status = "OK";
                 result.BendTableGroup = "溝加工";
@@ -900,7 +970,6 @@ namespace ADDIN.Commands
             List<BendAllowanceInfo> defaults,
             string defaultSummary,
             MaterialTableCheck materialCheck,
-            double defaultBendRadiusMm,
             string buhinNo,
             string bomFileName,
             string componentName,
@@ -977,12 +1046,12 @@ namespace ADDIN.Commands
                     : (materialCheck != null ? materialCheck.BendTableName : "");
                 bool isGroove = IsGrooveBendTable(activeTable);
                 bool isAlpolic = materialCheck != null
-                    && (materialCheck.MaterialName ?? "").IndexOf(
-                        "アルポリック", StringComparison.OrdinalIgnoreCase) >= 0;
+                    && IsAlpolicMaterial(materialCheck.MaterialName);
 
-                double radiusThresholdMm = defaultBendRadiusMm + 0.1;
-                if (result.RadiusMm > radiusThresholdMm + 0.001)
+                const double radiusThresholdMm = 0.2;
+                if (IsLargeRadius(result.RadiusMm))
                 {
+                    result.IsLargeRadiusBend = true;
                     bool isKFactor05 = bendAllowance != null
                         && bendAllowance.IsKFactorSetting()
                         && Math.Abs(bendAllowance.KFactor - 0.5) <= 0.005;
@@ -1012,10 +1081,35 @@ namespace ADDIN.Commands
                     return result;
                 }
 
-                if (isAlpolic && !isGroove)
+                // Alpolic at R <= 0.2 uses the 0.8 groove table.
+                // Large-radius bends have already used the existing K-factor rule.
+                if (isAlpolic)
                 {
-                    result.Status = "NG";
-                    result.Note = "Vat lieu Alpolic bat buoc phai dung bang uon bao ranh (溝...残シ)";
+                    result.IsOverride = !useDefault;
+                    result.BendSetting = useDefault
+                        ? defaultSummary
+                        : (bendAllowance == null ? "Khong doc duoc" : bendAllowance.Summary());
+                    if (useDefault)
+                    {
+                        result.Status = "OK"; // Validated by the default material/table check.
+                        result.Note = "Alpolic dung thiet lap mac dinh; khong bat buoc R=0.2";
+                    }
+                    else if (bendAllowance == null)
+                    {
+                        result.Status = "CHECK";
+                        result.Note = "Khong doc duoc Bend Table rieng cua Alpolic";
+                    }
+                    else
+                    {
+                        bool correctTable = bendAllowance.HasBendTableFile()
+                            && IsAlpolicBendTable(bendAllowance.GetBendTableFileName());
+                        result.Status = correctTable ? "OK" : "NG";
+                        result.Note = correctTable
+                            ? "Alpolic dung Bend Table 0.8 hop le; khong bat buoc R=0.2"
+                            : "Alpolic bat buoc dung Bend Table bao ranh 0.8 (溝0.8残シ)";
+                        if (bendAllowance.HasBendTableFile())
+                            result.OverrideBendTablePath = bendAllowance.GetBendTableFilePath();
+                    }
                     return result;
                 }
 
@@ -1148,7 +1242,7 @@ namespace ADDIN.Commands
             if (IsGrooveBendTable(row.BendTableName))
             {
                 row.BendTableGroup = "溝加工";
-                row.Status = "OK";
+                row.Status = MergeStatus(row.Status, "OK");
                 row.Note = AppendNote(
                     row.Note,
                     "Bang phay ranh: mien tru doi chieu nhom vat lieu.");
@@ -1665,6 +1759,72 @@ namespace ADDIN.Commands
             return "";
         }
 
+        private static bool IsPurchasedStockMaterial(string materialName)
+        {
+            string identity = NormalizeMaterialIdentity(materialName);
+            return !string.IsNullOrWhiteSpace(identity)
+                && !identity.EndsWith("-", StringComparison.Ordinal);
+        }
+
+        private static List<KegakiBendResult> CheckPurchasedStock(
+            List<Feature> features, string materialName, string materialCategory,
+            string buhinNo, string bomFileName, string componentName, string partPath)
+        {
+            List<string> bendLineFeatures = new List<string>();
+            bool scanIncomplete = false;
+            foreach (Feature feature in features)
+            {
+                string type = SafeFeatureType(feature);
+                if (!string.Equals(type, "ProfileFeature", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(type, "3DProfileFeature", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                try
+                {
+                    Sketch sketch = feature.GetSpecificFeature2() as Sketch;
+                    if (sketch == null)
+                    {
+                        scanIncomplete = true;
+                        continue;
+                    }
+                    Array segments = sketch.GetSketchSegments() as Array;
+                    if (segments == null)
+                        continue;
+                    foreach (object item in segments)
+                    {
+                        SketchSegment segment = item as SketchSegment;
+                        if (segment != null && segment.IsBendLine())
+                        {
+                            bendLineFeatures.Add(SafeFeatureName(feature));
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    scanIncomplete = true;
+                    Debug.WriteLine("[CHECK KEGAKI] Purchased-stock bend-line scan ERROR: "
+                        + SafeFeatureName(feature) + ": " + ex.Message);
+                }
+            }
+
+            KegakiBendResult row = NewResult(buhinNo, bomFileName, componentName, partPath);
+            row.MaterialName = materialName;
+            row.MaterialGroup = ResolveMaterialGroup(materialName, materialCategory);
+            row.IsPurchasedStockBendWarning = bendLineFeatures.Count > 0;
+            row.BendName = string.Join(" | ", bendLineFeatures.ToArray());
+            row.Status = row.IsPurchasedStockBendWarning || scanIncomplete ? "CHECK" : "SKIP";
+            row.Note = row.IsPurchasedStockBendWarning
+                ? "CẢNH BÁO: Vật liệu định hình/mua sẵn " + materialName
+                    + " không có dấu '-' cuối tên nhưng phát hiện bend line tại " + row.BendName
+                : (scanIncomplete
+                    ? "Chi tiết định hình/mua sẵn: chưa đọc đủ sketch để xác nhận không có bend line"
+                    : "Chi tiết định hình/mua sẵn; không có bend line; bỏ qua kiểm tra Bend Table/K-Factor");
+            Debug.WriteLine("[CHECK KEGAKI] purchasedStock=" + materialName
+                + ", status=" + row.Status + ", bendLineFeatures=" + row.BendName);
+            return new List<KegakiBendResult> { row };
+        }
+
         private static string NormalizeMaterialIdentity(string value)
         {
             value = (value ?? "")
@@ -1698,8 +1858,65 @@ namespace ADDIN.Commands
             }
         }
 
+        // Material names confirmed by the user from the St材, SUS材, AL材 and Cu材 libraries.
+        // Keep exact aliases here so unknown names are not guessed from the table.
+        private static readonly Dictionary<string, string> MaterialGroupAliases =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "ST", "ST" },
+                { "PEN", "ST" },
+                { "BON", "ST" },
+                { "STKU", "ST" },
+                { "STMI", "ST" },
+                { "ZAM", "ST" },
+                { "NSD", "ST" },
+                { "STSA", "ST" },
+                { "SUSNO.4", "SUS" },
+                { "SUSPHL", "SUS" },
+                { "SUSM400", "SUS" },
+                { "NSS445", "SUS" },
+                { "SUS", "SUS" },
+                { "SUS316HL", "SUS" },
+                { "SUS3162B", "SUS" },
+                { "SUS2D", "SUS" },
+                { "SUSNO.1", "SUS" },
+                { "SUSBA", "SUS" },
+                { "SUSM800", "SUS" },
+                { "SUSHL", "SUS" },
+                { "SUS2B", "SUS" },
+                { "SUSVB.BK.FG3", "SUS" },
+                { "SUSM800.BK", "SUS" },
+                { "SUSHL.BK", "SUS" },
+                { "SUSVB.BK", "SUS" },
+                { "AL", "AL" },
+                { "A1100", "AL" },
+                { "A3003", "AL" },
+                { "A5052", "AL" },
+                { "ALSKY", "AL" },
+                { "アルマイト", "AL" },
+                { "CU", "CU" },
+                { "BS", "CU" },
+                { "RBS", "CU" }
+            };
+
+        private static string ResolveMaterialGroup(string materialName, string materialCategory)
+        {
+            string group;
+            string identity = NormalizeMaterialIdentity(materialName).TrimEnd('-').TrimEnd();
+            if (MaterialGroupAliases.TryGetValue(identity, out group))
+                return group;
+
+            group = NormalizeMaterialGroup(materialCategory);
+            return !string.IsNullOrWhiteSpace(group) ? group : NormalizeMaterialGroup(materialName);
+        }
+
         private static string NormalizeMaterialGroup(string materialName)
         {
+            string knownGroup;
+            if (MaterialGroupAliases.TryGetValue(
+                NormalizeMaterialIdentity(materialName).TrimEnd('-').TrimEnd(), out knownGroup))
+                return knownGroup;
+
             string value = NormalizeLookupText(materialName);
             if (string.IsNullOrWhiteSpace(value))
                 return "";
@@ -1749,6 +1966,26 @@ namespace ADDIN.Commands
                 return "TI";
 
             return "";
+        }
+
+        private static bool IsAlpolicMaterial(string materialName)
+        {
+            return (materialName ?? "").IndexOf("アルポリック",
+                StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsFlatSheetBendTable(string materialGroup, string tableName)
+        {
+            return !string.IsNullOrWhiteSpace(materialGroup)
+                && !IsGrooveBendTable(tableName)
+                && string.Equals(materialGroup, NormalizeBendTableGroup(tableName),
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsAlpolicBendTable(string tableName)
+        {
+            return IsGrooveBendTable(tableName)
+                && Math.Abs(ExtractRemainThicknessFromTableName(tableName) - 0.8) <= 0.001;
         }
 
         private static bool IsGrooveBendTable(string tableName)
@@ -1924,10 +2161,17 @@ namespace ADDIN.Commands
             catch { return false; }
         }
 
+        private static bool IsLargeRadius(double radiusMm)
+        {
+            return radiusMm > 0.2 + 0.001;
+        }
+
         private static bool HasPairedCurvedMainFaces(
             ModelDoc2 model,
-            List<double> sheetThicknesses)
+            List<double> sheetThicknesses,
+            out double innerRadiusMm)
         {
+            innerRadiusMm = 0.0;
             if (sheetThicknesses == null || sheetThicknesses.Count == 0)
                 return false;
 
@@ -2012,10 +2256,14 @@ namespace ADDIN.Commands
                                 + ", radius2Mm=" + (second.Radius * 1000.0).ToString("0.###")
                                 + ", area1=" + first.Area.ToString("0.######")
                                 + ", area2=" + second.Area.ToString("0.######"));
-                            return true;
+                            innerRadiusMm = Math.Max(innerRadiusMm,
+                                Math.Min(first.Radius, second.Radius) * 1000.0);
                         }
                     }
                 }
+
+                if (innerRadiusMm > 0.0)
+                    return true;
 
                 Debug.WriteLine("[CHECK KEGAKI] curvedMainFacePair=False, cylinders="
                     + cylinders.Count + ", maxArea=" + maximumFaceArea.ToString("0.######"));
@@ -2375,6 +2623,8 @@ namespace ADDIN.Commands
         public double RadiusMm { get; set; }
         public bool BendDown { get; set; }
         public bool IsOverride { get; set; }
+        public bool IsLargeRadiusBend { get; set; }
+        public bool IsPurchasedStockBendWarning { get; set; }
         public string DefaultSetting { get; set; }
         public string BendSetting { get; set; }
         public string OverrideBendTablePath { get; set; }

@@ -1,34 +1,33 @@
-namespace ADDIN
-{
-    partial class BomTaskPaneControl
-    {
-        /// <summary> 
-        /// Required designer variable.
-        /// </summary>
-        private System.ComponentModel.IContainer components = null;
-
-        /// <summary> 
-        /// Clean up any resources being used.
-        /// </summary>
-        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-            base.Dispose(disposing);
-        }
-
-        #region Component Designer generated code
-
-        /// <summary> 
-        /// Required method for Designer support - do not modify 
-        /// the contents of this method with the code editor.
-        /// </summary>
-        private void InitializeComponent()
-        {
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+namespace ADDIN
+{
+    partial class BomTaskPaneControl
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             this.tabBom = new ADDIN.UI.ModernTabControl();
@@ -61,6 +60,7 @@ namespace ADDIN
             this.groupBox3 = new ADDIN.UI.ModernCard();
             this.btnDimKichThuocLo = new ADDIN.UI.ModernButton();
             this.btnRepairDim = new ADDIN.UI.ModernButton();
+            this.btnVCutSection = new ADDIN.UI.ModernButton();
             this.btnDimKegaki = new ADDIN.UI.ModernButton();
             this.btnFixScale = new ADDIN.UI.ModernButton();
             this.btnSplineToArcs = new ADDIN.UI.ModernButton();
@@ -132,8 +132,12 @@ namespace ADDIN
             this.btnMakeHoleUpdate = new ADDIN.UI.ModernButton();
             this.btnMakeHolePattern = new ADDIN.UI.ModernButton();
             this.btnMakeHoleReset = new ADDIN.UI.ModernButton();
+            this.elementHostRepairHole = new System.Windows.Forms.Integration.ElementHost();
             this.tabModelMacroPage = new System.Windows.Forms.TabPage();
+            this.vCutBendAssignmentControl = new ADDIN.UI.VCutBendAssignmentControl();
+            this.btnVCutPropertySetup = new ADDIN.UI.ModernButton();
             this.lblCheckAssemblyHoleResult = new System.Windows.Forms.Label();
+            this.btnRepair3DSpline = new ADDIN.UI.ModernButton();
             this.btnEdgeToEqualSpline = new ADDIN.UI.ModernButton();
             this.btnMirrorPart = new ADDIN.UI.ModernButton();
             this.btnCheckAssemblyHole = new ADDIN.UI.ModernButton();
@@ -280,7 +284,7 @@ namespace ADDIN
             this.dgvModelBom.AllowUserToDeleteRows = false;
             this.dgvModelBom.AllowUserToOrderColumns = true;
             this.dgvModelBom.AllowUserToResizeRows = false;
-            dataGridViewCellStyle1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(250)))), ((int)(((byte)(253)))));
+            dataGridViewCellStyle1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(234)))), ((int)(((byte)(242)))), ((int)(((byte)(250)))));
             this.dgvModelBom.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
             this.dgvModelBom.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
@@ -663,6 +667,7 @@ namespace ADDIN
             this.groupBox3.BorderRadius = 6;
             this.groupBox3.Controls.Add(this.btnDimKichThuocLo);
             this.groupBox3.Controls.Add(this.btnRepairDim);
+            this.groupBox3.Controls.Add(this.btnVCutSection);
             this.groupBox3.Controls.Add(this.btnDimKegaki);
             this.groupBox3.Controls.Add(this.btnFixScale);
             this.groupBox3.Controls.Add(this.btnSplineToArcs);
@@ -674,7 +679,7 @@ namespace ADDIN
             this.groupBox3.Location = new System.Drawing.Point(6, 341);
             this.groupBox3.Name = "groupBox3";
             this.groupBox3.ShowHeaderDivider = true;
-            this.groupBox3.Size = new System.Drawing.Size(281, 238);
+            this.groupBox3.Size = new System.Drawing.Size(213, 238);
             this.groupBox3.TabIndex = 2;
             this.groupBox3.Text = "MACRO TOOLS";
             // 
@@ -690,10 +695,12 @@ namespace ADDIN
             this.btnDimKichThuocLo.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnDimKichThuocLo.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(80)))), ((int)(((byte)(45)))));
             this.btnDimKichThuocLo.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(234)))), ((int)(((byte)(205)))));
+            this.btnDimKichThuocLo.Image = global::ADDIN.Properties.Resources.DimKichThuocLo;
+            this.btnDimKichThuocLo.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.btnDimKichThuocLo.Location = new System.Drawing.Point(186, 132);
             this.btnDimKichThuocLo.Name = "btnDimKichThuocLo";
             this.btnDimKichThuocLo.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(208)))), ((int)(((byte)(244)))), ((int)(((byte)(222)))));
-            this.btnDimKichThuocLo.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+            this.btnDimKichThuocLo.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.btnDimKichThuocLo.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(162)))), ((int)(((byte)(222)))), ((int)(((byte)(186)))));
             this.btnDimKichThuocLo.Size = new System.Drawing.Size(126, 44);
             this.btnDimKichThuocLo.TabIndex = 6;
@@ -713,16 +720,39 @@ namespace ADDIN
             this.btnRepairDim.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnRepairDim.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(22)))), ((int)(((byte)(45)))));
             this.btnRepairDim.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(195)))), ((int)(((byte)(208)))));
-            this.btnRepairDim.Location = new System.Drawing.Point(50, 186);
+            this.btnRepairDim.Location = new System.Drawing.Point(50, 178);
             this.btnRepairDim.Name = "btnRepairDim";
             this.btnRepairDim.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(224)))));
             this.btnRepairDim.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
             this.btnRepairDim.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(175)))), ((int)(((byte)(190)))));
-            this.btnRepairDim.Size = new System.Drawing.Size(126, 44);
+            this.btnRepairDim.Size = new System.Drawing.Size(126, 40);
             this.btnRepairDim.TabIndex = 8;
             this.btnRepairDim.Text = "REPAIR DIM";
             this.btnRepairDim.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
             this.btnRepairDim.UseVisualStyleBackColor = false;
+            // 
+            // btnVCutSection
+            // 
+            this.btnVCutSection.BackColor = System.Drawing.Color.Transparent;
+            this.btnVCutSection.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(210)))), ((int)(((byte)(216)))), ((int)(((byte)(224)))));
+            this.btnVCutSection.BorderRadius = 5;
+            this.btnVCutSection.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnVCutSection.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnVCutSection.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnVCutSection.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+            this.btnVCutSection.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(234)))), ((int)(((byte)(240)))), ((int)(((byte)(247)))));
+            this.btnVCutSection.Image = global::ADDIN.Properties.Resources.VCutSection;
+            this.btnVCutSection.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.btnVCutSection.Location = new System.Drawing.Point(186, 178);
+            this.btnVCutSection.Name = "btnVCutSection";
+            this.btnVCutSection.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(246)))), ((int)(((byte)(248)))), ((int)(((byte)(250)))));
+            this.btnVCutSection.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.btnVCutSection.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(228)))), ((int)(((byte)(238)))));
+            this.btnVCutSection.Size = new System.Drawing.Size(126, 40);
+            this.btnVCutSection.TabIndex = 9;
+            this.btnVCutSection.Text = "V-CUT\r\nSECTION";
+            this.btnVCutSection.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+            this.btnVCutSection.UseVisualStyleBackColor = false;
             // 
             // btnDimKegaki
             // 
@@ -786,10 +816,12 @@ namespace ADDIN
             this.btnSplineToArcs.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnSplineToArcs.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(60)))), ((int)(((byte)(118)))));
             this.btnSplineToArcs.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(215)))), ((int)(((byte)(248)))));
+            this.btnSplineToArcs.Image = global::ADDIN.Properties.Resources.SplineToArcs;
+            this.btnSplineToArcs.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.btnSplineToArcs.Location = new System.Drawing.Point(50, 132);
             this.btnSplineToArcs.Name = "btnSplineToArcs";
             this.btnSplineToArcs.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
-            this.btnSplineToArcs.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+            this.btnSplineToArcs.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.btnSplineToArcs.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(158)))), ((int)(((byte)(200)))), ((int)(((byte)(242)))));
             this.btnSplineToArcs.Size = new System.Drawing.Size(126, 44);
             this.btnSplineToArcs.TabIndex = 7;
@@ -869,7 +901,7 @@ namespace ADDIN
             this.grpComponentBom.Location = new System.Drawing.Point(6, 196);
             this.grpComponentBom.Name = "grpComponentBom";
             this.grpComponentBom.ShowHeaderDivider = true;
-            this.grpComponentBom.Size = new System.Drawing.Size(281, 139);
+            this.grpComponentBom.Size = new System.Drawing.Size(213, 139);
             this.grpComponentBom.TabIndex = 1;
             this.grpComponentBom.Text = "TEXT & BALLOON";
             // 
@@ -887,7 +919,7 @@ namespace ADDIN
             this.btnInsertBalloon.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnInsertBalloon.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
             this.btnInsertBalloon.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnInsertBalloon.Location = new System.Drawing.Point(203, 93);
+            this.btnInsertBalloon.Location = new System.Drawing.Point(135, 93);
             this.btnInsertBalloon.Name = "btnInsertBalloon";
             this.btnInsertBalloon.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
             this.btnInsertBalloon.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
@@ -908,7 +940,7 @@ namespace ADDIN
             "合番"});
             this.cboBalloonProperty.Location = new System.Drawing.Point(12, 96);
             this.cboBalloonProperty.Name = "cboBalloonProperty";
-            this.cboBalloonProperty.Size = new System.Drawing.Size(147, 23);
+            this.cboBalloonProperty.Size = new System.Drawing.Size(79, 23);
             this.cboBalloonProperty.TabIndex = 6;
             // 
             // btnDeleteText
@@ -925,7 +957,7 @@ namespace ADDIN
             this.btnDeleteText.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnDeleteText.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
             this.btnDeleteText.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnDeleteText.Location = new System.Drawing.Point(169, 58);
+            this.btnDeleteText.Location = new System.Drawing.Point(101, 58);
             this.btnDeleteText.Name = "btnDeleteText";
             this.btnDeleteText.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
             this.btnDeleteText.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
@@ -947,7 +979,7 @@ namespace ADDIN
             this.btnText.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnText.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
             this.btnText.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnText.Location = new System.Drawing.Point(203, 58);
+            this.btnText.Location = new System.Drawing.Point(135, 58);
             this.btnText.Name = "btnText";
             this.btnText.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
             this.btnText.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
@@ -968,7 +1000,7 @@ namespace ADDIN
             this.cboSide.MinimumSize = new System.Drawing.Size(40, 23);
             this.cboSide.Name = "cboSide";
             this.cboSide.Padding = new System.Windows.Forms.Padding(3, 3, 0, 2);
-            this.cboSide.Size = new System.Drawing.Size(147, 23);
+            this.cboSide.Size = new System.Drawing.Size(79, 23);
             this.cboSide.TabIndex = 4;
             // 
             // btnDeleteNote
@@ -985,7 +1017,7 @@ namespace ADDIN
             this.btnDeleteNote.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnDeleteNote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
             this.btnDeleteNote.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnDeleteNote.Location = new System.Drawing.Point(169, 23);
+            this.btnDeleteNote.Location = new System.Drawing.Point(101, 23);
             this.btnDeleteNote.Name = "btnDeleteNote";
             this.btnDeleteNote.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
             this.btnDeleteNote.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
@@ -1007,7 +1039,7 @@ namespace ADDIN
             this.btnNote.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnNote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
             this.btnNote.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnNote.Location = new System.Drawing.Point(203, 23);
+            this.btnNote.Location = new System.Drawing.Point(135, 23);
             this.btnNote.Name = "btnNote";
             this.btnNote.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
             this.btnNote.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
@@ -1028,7 +1060,7 @@ namespace ADDIN
             this.cboBendLine.MinimumSize = new System.Drawing.Size(40, 23);
             this.cboBendLine.Name = "cboBendLine";
             this.cboBendLine.Padding = new System.Windows.Forms.Padding(3, 3, 0, 2);
-            this.cboBendLine.Size = new System.Drawing.Size(147, 23);
+            this.cboBendLine.Size = new System.Drawing.Size(79, 23);
             this.cboBendLine.TabIndex = 2;
             // 
             // grpComponentSize
@@ -1051,7 +1083,7 @@ namespace ADDIN
             this.grpComponentSize.Location = new System.Drawing.Point(6, 6);
             this.grpComponentSize.Name = "grpComponentSize";
             this.grpComponentSize.ShowHeaderDivider = true;
-            this.grpComponentSize.Size = new System.Drawing.Size(349, 180);
+            this.grpComponentSize.Size = new System.Drawing.Size(281, 180);
             this.grpComponentSize.TabIndex = 0;
             this.grpComponentSize.Text = "VIEW SIZE";
             // 
@@ -1350,21 +1382,21 @@ namespace ADDIN
             // 
             this.txtModelFinish.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelFinish.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelFinish.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtModelFinish.Location = new System.Drawing.Point(45, 334);
+            this.txtModelFinish.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.txtModelFinish.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+            this.txtModelFinish.Location = new System.Drawing.Point(36, 384);
             this.txtModelFinish.Name = "txtModelFinish";
-            this.txtModelFinish.Size = new System.Drawing.Size(276, 23);
+            this.txtModelFinish.Size = new System.Drawing.Size(294, 25);
             this.txtModelFinish.TabIndex = 11;
             // 
             // lblModelFinish
             // 
             this.lblModelFinish.AutoSize = true;
-            this.lblModelFinish.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelFinish.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblModelFinish.Location = new System.Drawing.Point(45, 317);
+            this.lblModelFinish.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.lblModelFinish.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+            this.lblModelFinish.Location = new System.Drawing.Point(36, 362);
             this.lblModelFinish.Name = "lblModelFinish";
-            this.lblModelFinish.Size = new System.Drawing.Size(42, 15);
+            this.lblModelFinish.Size = new System.Drawing.Size(48, 18);
             this.lblModelFinish.TabIndex = 10;
             this.lblModelFinish.Text = "仕上げ";
             // 
@@ -1372,21 +1404,21 @@ namespace ADDIN
             // 
             this.txtModelQty.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelQty.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelQty.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtModelQty.Location = new System.Drawing.Point(45, 291);
+            this.txtModelQty.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.txtModelQty.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+            this.txtModelQty.Location = new System.Drawing.Point(36, 330);
             this.txtModelQty.Name = "txtModelQty";
-            this.txtModelQty.Size = new System.Drawing.Size(276, 23);
+            this.txtModelQty.Size = new System.Drawing.Size(294, 25);
             this.txtModelQty.TabIndex = 9;
             // 
             // lblModelQty
             // 
             this.lblModelQty.AutoSize = true;
-            this.lblModelQty.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelQty.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblModelQty.Location = new System.Drawing.Point(45, 274);
+            this.lblModelQty.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.lblModelQty.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+            this.lblModelQty.Location = new System.Drawing.Point(36, 308);
             this.lblModelQty.Name = "lblModelQty";
-            this.lblModelQty.Size = new System.Drawing.Size(31, 15);
+            this.lblModelQty.Size = new System.Drawing.Size(36, 18);
             this.lblModelQty.TabIndex = 8;
             this.lblModelQty.Text = "数量";
             // 
@@ -1394,21 +1426,21 @@ namespace ADDIN
             // 
             this.txtModelGoban.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelGoban.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelGoban.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtModelGoban.Location = new System.Drawing.Point(45, 248);
+            this.txtModelGoban.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.txtModelGoban.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+            this.txtModelGoban.Location = new System.Drawing.Point(36, 276);
             this.txtModelGoban.Name = "txtModelGoban";
-            this.txtModelGoban.Size = new System.Drawing.Size(276, 23);
+            this.txtModelGoban.Size = new System.Drawing.Size(294, 25);
             this.txtModelGoban.TabIndex = 7;
             // 
             // lblModelGoban
             // 
             this.lblModelGoban.AutoSize = true;
-            this.lblModelGoban.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelGoban.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblModelGoban.Location = new System.Drawing.Point(45, 231);
+            this.lblModelGoban.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.lblModelGoban.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+            this.lblModelGoban.Location = new System.Drawing.Point(36, 254);
             this.lblModelGoban.Name = "lblModelGoban";
-            this.lblModelGoban.Size = new System.Drawing.Size(31, 15);
+            this.lblModelGoban.Size = new System.Drawing.Size(36, 18);
             this.lblModelGoban.TabIndex = 6;
             this.lblModelGoban.Text = "合番";
             // 
@@ -1416,21 +1448,21 @@ namespace ADDIN
             // 
             this.txtModelThickness.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelThickness.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelThickness.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtModelThickness.Location = new System.Drawing.Point(45, 205);
+            this.txtModelThickness.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.txtModelThickness.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+            this.txtModelThickness.Location = new System.Drawing.Point(36, 222);
             this.txtModelThickness.Name = "txtModelThickness";
-            this.txtModelThickness.Size = new System.Drawing.Size(276, 23);
+            this.txtModelThickness.Size = new System.Drawing.Size(294, 25);
             this.txtModelThickness.TabIndex = 5;
             // 
             // lblModelThickness
             // 
             this.lblModelThickness.AutoSize = true;
-            this.lblModelThickness.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelThickness.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblModelThickness.Location = new System.Drawing.Point(45, 188);
+            this.lblModelThickness.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.lblModelThickness.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+            this.lblModelThickness.Location = new System.Drawing.Point(36, 200);
             this.lblModelThickness.Name = "lblModelThickness";
-            this.lblModelThickness.Size = new System.Drawing.Size(31, 15);
+            this.lblModelThickness.Size = new System.Drawing.Size(36, 18);
             this.lblModelThickness.TabIndex = 4;
             this.lblModelThickness.Text = "板厚";
             // 
@@ -1438,21 +1470,21 @@ namespace ADDIN
             // 
             this.txtModelMaterial.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelMaterial.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelMaterial.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtModelMaterial.Location = new System.Drawing.Point(45, 162);
+            this.txtModelMaterial.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.txtModelMaterial.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+            this.txtModelMaterial.Location = new System.Drawing.Point(36, 168);
             this.txtModelMaterial.Name = "txtModelMaterial";
-            this.txtModelMaterial.Size = new System.Drawing.Size(276, 23);
+            this.txtModelMaterial.Size = new System.Drawing.Size(294, 25);
             this.txtModelMaterial.TabIndex = 3;
             // 
             // lblModelMaterial
             // 
             this.lblModelMaterial.AutoSize = true;
-            this.lblModelMaterial.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelMaterial.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblModelMaterial.Location = new System.Drawing.Point(45, 145);
+            this.lblModelMaterial.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.lblModelMaterial.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+            this.lblModelMaterial.Location = new System.Drawing.Point(36, 146);
             this.lblModelMaterial.Name = "lblModelMaterial";
-            this.lblModelMaterial.Size = new System.Drawing.Size(31, 15);
+            this.lblModelMaterial.Size = new System.Drawing.Size(36, 18);
             this.lblModelMaterial.TabIndex = 2;
             this.lblModelMaterial.Text = "材質";
             // 
@@ -1460,21 +1492,21 @@ namespace ADDIN
             // 
             this.txtModelName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelName.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtModelName.Location = new System.Drawing.Point(45, 119);
+            this.txtModelName.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.txtModelName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+            this.txtModelName.Location = new System.Drawing.Point(36, 114);
             this.txtModelName.Name = "txtModelName";
-            this.txtModelName.Size = new System.Drawing.Size(276, 23);
+            this.txtModelName.Size = new System.Drawing.Size(294, 25);
             this.txtModelName.TabIndex = 1;
             // 
             // lblModelName
             // 
             this.lblModelName.AutoSize = true;
-            this.lblModelName.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblModelName.Location = new System.Drawing.Point(45, 102);
+            this.lblModelName.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.lblModelName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+            this.lblModelName.Location = new System.Drawing.Point(36, 92);
             this.lblModelName.Name = "lblModelName";
-            this.lblModelName.Size = new System.Drawing.Size(31, 15);
+            this.lblModelName.Size = new System.Drawing.Size(36, 18);
             this.lblModelName.TabIndex = 0;
             this.lblModelName.Text = "品名";
             // 
@@ -1591,6 +1623,8 @@ namespace ADDIN
             // 
             // grpMakeHoleOptions
             // 
+            this.grpMakeHoleOptions.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.grpMakeHoleOptions.Controls.Add(this.pnlMakeHoleDiagram);
             this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleDirection);
             this.grpMakeHoleOptions.Controls.Add(this.cboMakeHoleDirection);
@@ -1614,11 +1648,12 @@ namespace ADDIN
             this.grpMakeHoleOptions.Controls.Add(this.btnMakeHoleUpdate);
             this.grpMakeHoleOptions.Controls.Add(this.btnMakeHolePattern);
             this.grpMakeHoleOptions.Controls.Add(this.btnMakeHoleReset);
+            this.grpMakeHoleOptions.Controls.Add(this.elementHostRepairHole);
             this.grpMakeHoleOptions.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.grpMakeHoleOptions.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
             this.grpMakeHoleOptions.Location = new System.Drawing.Point(18, 110);
             this.grpMakeHoleOptions.Name = "grpMakeHoleOptions";
-            this.grpMakeHoleOptions.Size = new System.Drawing.Size(336, 516);
+            this.grpMakeHoleOptions.Size = new System.Drawing.Size(268, 516);
             this.grpMakeHoleOptions.TabIndex = 4;
             this.grpMakeHoleOptions.TabStop = false;
             this.grpMakeHoleOptions.Text = "Make Hole";
@@ -1940,10 +1975,25 @@ namespace ADDIN
             this.btnMakeHoleReset.Text = "Reset";
             this.btnMakeHoleReset.UseVisualStyleBackColor = false;
             // 
+            // elementHostRepairHole
+            // 
+            this.elementHostRepairHole.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.elementHostRepairHole.Location = new System.Drawing.Point(12, 22);
+            this.elementHostRepairHole.Name = "elementHostRepairHole";
+            this.elementHostRepairHole.Size = new System.Drawing.Size(244, 380);
+            this.elementHostRepairHole.TabIndex = 20;
+            this.elementHostRepairHole.Text = "elementHostRepairHole";
+            this.elementHostRepairHole.Visible = false;
+            this.elementHostRepairHole.Child = null;
+            // 
             // tabModelMacroPage
             // 
             this.tabModelMacroPage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
+            this.tabModelMacroPage.Controls.Add(this.vCutBendAssignmentControl);
+            this.tabModelMacroPage.Controls.Add(this.btnVCutPropertySetup);
             this.tabModelMacroPage.Controls.Add(this.lblCheckAssemblyHoleResult);
+            this.tabModelMacroPage.Controls.Add(this.btnRepair3DSpline);
             this.tabModelMacroPage.Controls.Add(this.btnEdgeToEqualSpline);
             this.tabModelMacroPage.Controls.Add(this.btnMirrorPart);
             this.tabModelMacroPage.Controls.Add(this.btnCheckAssemblyHole);
@@ -1955,6 +2005,40 @@ namespace ADDIN
             this.tabModelMacroPage.TabIndex = 2;
             this.tabModelMacroPage.Text = "Macro";
             // 
+            // vCutBendAssignmentControl
+            // 
+            this.vCutBendAssignmentControl.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
+            this.vCutBendAssignmentControl.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.vCutBendAssignmentControl.Font = new System.Drawing.Font("Meiryo UI", 9F);
+            this.vCutBendAssignmentControl.Location = new System.Drawing.Point(3, 3);
+            this.vCutBendAssignmentControl.Name = "vCutBendAssignmentControl";
+            this.vCutBendAssignmentControl.Size = new System.Drawing.Size(372, 489);
+            this.vCutBendAssignmentControl.TabIndex = 21;
+            this.vCutBendAssignmentControl.Visible = false;
+            // 
+            // btnVCutPropertySetup
+            // 
+            this.btnVCutPropertySetup.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(242)))), ((int)(((byte)(240)))));
+            this.btnVCutPropertySetup.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(119)))), ((int)(((byte)(177)))), ((int)(((byte)(169)))));
+            this.btnVCutPropertySetup.BorderRadius = 5;
+            this.btnVCutPropertySetup.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnVCutPropertySetup.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnVCutPropertySetup.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.btnVCutPropertySetup.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(27)))), ((int)(((byte)(93)))), ((int)(((byte)(87)))));
+            this.btnVCutPropertySetup.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(229)))), ((int)(((byte)(226)))));
+            this.btnVCutPropertySetup.Image = global::ADDIN.Properties.Resources.SetBendLine3D;
+            this.btnVCutPropertySetup.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.btnVCutPropertySetup.Location = new System.Drawing.Point(18, 132);
+            this.btnVCutPropertySetup.Name = "btnVCutPropertySetup";
+            this.btnVCutPropertySetup.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(242)))), ((int)(((byte)(240)))));
+            this.btnVCutPropertySetup.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
+            this.btnVCutPropertySetup.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(217)))), ((int)(((byte)(213)))));
+            this.btnVCutPropertySetup.Size = new System.Drawing.Size(145, 48);
+            this.btnVCutPropertySetup.TabIndex = 20;
+            this.btnVCutPropertySetup.Text = "Set Bend line\r\n曲げ線設定";
+            this.btnVCutPropertySetup.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+            this.btnVCutPropertySetup.UseVisualStyleBackColor = false;
+            // 
             // lblCheckAssemblyHoleResult
             // 
             this.lblCheckAssemblyHoleResult.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
@@ -1962,11 +2046,38 @@ namespace ADDIN
             | System.Windows.Forms.AnchorStyles.Right)));
             this.lblCheckAssemblyHoleResult.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.lblCheckAssemblyHoleResult.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(35)))), ((int)(((byte)(45)))), ((int)(((byte)(55)))));
-            this.lblCheckAssemblyHoleResult.Location = new System.Drawing.Point(18, 80);
+            this.lblCheckAssemblyHoleResult.Location = new System.Drawing.Point(18, 132);
             this.lblCheckAssemblyHoleResult.Name = "lblCheckAssemblyHoleResult";
             this.lblCheckAssemblyHoleResult.Padding = new System.Windows.Forms.Padding(8, 6, 8, 6);
             this.lblCheckAssemblyHoleResult.Size = new System.Drawing.Size(342, 195);
             this.lblCheckAssemblyHoleResult.TabIndex = 0;
+            // 
+            // btnRepair3DSpline
+            // 
+            this.btnRepair3DSpline.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
+            this.btnRepair3DSpline.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(195)))));
+            this.btnRepair3DSpline.BorderRadius = 3;
+            this.btnRepair3DSpline.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnRepair3DSpline.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(195)))));
+            this.btnRepair3DSpline.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(215)))), ((int)(((byte)(205)))));
+            this.btnRepair3DSpline.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+            this.btnRepair3DSpline.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnRepair3DSpline.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+            this.btnRepair3DSpline.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(75)))), ((int)(((byte)(72)))));
+            this.btnRepair3DSpline.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+            this.btnRepair3DSpline.Image = global::ADDIN.Properties.Resources.RepairSpline3D;
+            this.btnRepair3DSpline.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.btnRepair3DSpline.Location = new System.Drawing.Point(126, 72);
+            this.btnRepair3DSpline.Name = "btnRepair3DSpline";
+            this.btnRepair3DSpline.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
+            this.btnRepair3DSpline.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
+            this.btnRepair3DSpline.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(215)))), ((int)(((byte)(205)))));
+            this.btnRepair3DSpline.Size = new System.Drawing.Size(108, 48);
+            this.btnRepair3DSpline.TabIndex = 3;
+            this.btnRepair3DSpline.Text = "REPAIR 3D\r\nSPLINE";
+            this.btnRepair3DSpline.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+            this.btnRepair3DSpline.UseVisualStyleBackColor = false;
+            this.btnRepair3DSpline.Click += new System.EventHandler(this.btnRepair3DSpline_Click);
             // 
             // btnEdgeToEqualSpline
             // 
@@ -1981,6 +2092,8 @@ namespace ADDIN
             this.btnEdgeToEqualSpline.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
             this.btnEdgeToEqualSpline.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(75)))), ((int)(((byte)(72)))));
             this.btnEdgeToEqualSpline.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+            this.btnEdgeToEqualSpline.Image = global::ADDIN.Properties.Resources.AutoSpline3D;
+            this.btnEdgeToEqualSpline.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.btnEdgeToEqualSpline.Location = new System.Drawing.Point(246, 16);
             this.btnEdgeToEqualSpline.Name = "btnEdgeToEqualSpline";
             this.btnEdgeToEqualSpline.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
@@ -1989,6 +2102,7 @@ namespace ADDIN
             this.btnEdgeToEqualSpline.Size = new System.Drawing.Size(108, 48);
             this.btnEdgeToEqualSpline.TabIndex = 2;
             this.btnEdgeToEqualSpline.Text = "AUTO\r\nSPLINE";
+            this.btnEdgeToEqualSpline.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
             this.btnEdgeToEqualSpline.UseVisualStyleBackColor = false;
             this.btnEdgeToEqualSpline.Click += new System.EventHandler(this.btnEdgeToEqualSpline_Click);
             // 
@@ -2131,116 +2245,121 @@ namespace ADDIN
             this.tabModelMacroPage.ResumeLayout(false);
             this.ResumeLayout(false);
 
-        }
-
-        #endregion
-        private ADDIN.UI.ModernTabControl tabBom;
-        private System.Windows.Forms.TabPage tabDrawing;
-        private ADDIN.UI.ModernTabControl tabDrawingPages;
-        private System.Windows.Forms.TabPage tabDrawingBom;
-        private System.Windows.Forms.TabPage tabComponentDrawing;
-        private ADDIN.UI.ModernCard grpComponentSize;
-        private ADDIN.UI.ModernButton btnGetWL;
-        private ADDIN.UI.ModernButton btnRotateCcw;
-        private ADDIN.UI.ModernButton btnRotateCw;
-        private ADDIN.UI.ModernButton btnHorizontalAlignment;
-        private ADDIN.UI.ModernCard grpComponentBom;
-        private ADDIN.UI.ModernButton btnInsertBalloon;
-        private System.Windows.Forms.ComboBox cboBalloonProperty;
-        private ADDIN.UI.ModernButton btnDeleteText;
-        private ADDIN.UI.ModernButton btnText;
-        private ADDIN.Commands.HistoryTextBox cboSide;
-        private ADDIN.UI.ModernButton btnDeleteNote;
-        private ADDIN.UI.ModernButton btnNote;
-        private ADDIN.Commands.HistoryTextBox cboBendLine;
-        private System.Windows.Forms.TabPage tabModel;
-        private System.Windows.Forms.DataGridView dgvModelBom;
-        private ADDIN.UI.ModernButton btnLoadBom;
-        private ADDIN.UI.ModernButton btnClearBom;
-        private System.Windows.Forms.Label lblTitle;
-        private System.Windows.Forms.Label lblStatus;
-        private ADDIN.UI.ModernButton btnCheckDfTk;
-        private ADDIN.UI.ModernButton btnCheckUraOmote;
-        private ADDIN.UI.ModernButton btnCheckKegaki;
-        private System.Windows.Forms.ProgressBar progressCheck;
-        private System.Windows.Forms.DataGridViewCheckBoxColumn Column5;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column1;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column3;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column6;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column4;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column2;
-        private System.Windows.Forms.CheckBox chkSelectAll;
-        private ADDIN.UI.ModernButton button1;
-        private ADDIN.UI.ModernFieldBox groupBox2;
-        private ADDIN.UI.ModernFieldBox groupBox1;
-        private System.Windows.Forms.TextBox txtWidth;
-        private System.Windows.Forms.TextBox txtLength;
-        private ADDIN.UI.ModernCard groupBox3;
-        private ADDIN.UI.ModernButton btnDimKegaki;
-        private ADDIN.UI.ModernButton btnDimKichThuocLo;
-        private ADDIN.UI.ModernButton btnFixScale;
-        private ADDIN.UI.ModernButton dimvang;
-        private ADDIN.UI.ModernButton button2;
-        private ADDIN.UI.ModernButton btnOpenAssem;
-        private ADDIN.UI.ModernButton btnCheckBalloon;
-        private ADDIN.UI.ModernButton btnCheckAll;
-        private ADDIN.UI.ModernButton btnCheckRound;
-        private ADDIN.UI.ModernButton btnCheckSamePart;
-        private ADDIN.UI.ModernButton btnCheckDrawingBom;
-        private ADDIN.UI.ModernButton btnMakeHole;
-        private System.Windows.Forms.Panel panelModelCommands;
-        private ADDIN.UI.ModernButton btnRepairHole;
-        private System.Windows.Forms.GroupBox grpMakeHoleOptions;
-        private System.Windows.Forms.Panel pnlMakeHoleDiagram;
-        private System.Windows.Forms.Label lblMakeHoleDirection;
-        private System.Windows.Forms.ComboBox cboMakeHoleDirection;
-        private System.Windows.Forms.Label lblMakeHoleEdgeOffset;
-        private System.Windows.Forms.TextBox txtMakeHoleEdgeOffset;
-        private System.Windows.Forms.Label lblMakeHoleLeftOffset;
-        private System.Windows.Forms.TextBox txtMakeHoleLeftOffset;
-        private System.Windows.Forms.Label lblMakeHoleRightOffset;
-        private System.Windows.Forms.TextBox txtMakeHoleRightOffset;
-        private System.Windows.Forms.Label lblMakeHolePitch;
-        private System.Windows.Forms.TextBox txtMakeHolePitch;
-        private System.Windows.Forms.Label lblRepairHoleType;
-        private System.Windows.Forms.ComboBox cboRepairHoleType;
-        private System.Windows.Forms.Label lblRepairHoleDiameter;
-        private System.Windows.Forms.ComboBox cboRepairHoleDiameter;
-        private ADDIN.UI.ModernButton btnDeleteMakeHoleSize;
-        private System.Windows.Forms.CheckBox chkMakeHolePaint;
-        private ADDIN.UI.ModernButton btnMakeHoleUpdate;
-        private ADDIN.UI.ModernButton btnMakeHoleAccept;
-        private ADDIN.UI.ModernButton btnMakeHolePattern;
-        private ADDIN.UI.ModernButton btnMakeHoleReset;
-        private ADDIN.UI.ModernButton btnPaintHoleSummary;
-        private ADDIN.UI.ModernTabControl tabModelPages;
-        private System.Windows.Forms.TabPage tabModelPropsPage;
-        private System.Windows.Forms.TabPage tabModelEditPage;
-        private System.Windows.Forms.TabPage tabModelMacroPage;
-        private System.Windows.Forms.Label lblCheckAssemblyHoleResult;
-        private ADDIN.UI.ModernButton btnCheckAssemblyHole;
-        private ADDIN.UI.ModernButton btnMirrorPart;
-        private ADDIN.UI.ModernButton btnEdgeToEqualSpline;
-        private System.Windows.Forms.Panel panelModelProps;
-        private ADDIN.UI.ModernButton btnModelApplyProps;
-        private ADDIN.UI.ModernButton btnModelResetProps;
-        private ADDIN.UI.ModernButton btnModelUpdateProps;
-        private System.Windows.Forms.TextBox txtModelFinish;
-        private System.Windows.Forms.Label lblModelFinish;
-        private System.Windows.Forms.TextBox txtModelQty;
-        private System.Windows.Forms.Label lblModelQty;
-        private System.Windows.Forms.TextBox txtModelGoban;
-        private System.Windows.Forms.Label lblModelGoban;
-        private System.Windows.Forms.TextBox txtModelThickness;
-        private System.Windows.Forms.Label lblModelThickness;
-        private System.Windows.Forms.TextBox txtModelMaterial;
-        private System.Windows.Forms.Label lblModelMaterial;
-        private System.Windows.Forms.TextBox txtModelName;
-        private System.Windows.Forms.Label lblModelName;
-        private ADDIN.UI.ModernButton btnDimMatCat;
-        private ADDIN.UI.ModernButton btnSplineToArcs;
-        private ADDIN.UI.ModernButton btnRepairDim;
-    }
-}
-
-
+        }
+
+        #endregion
+        private ADDIN.UI.ModernTabControl tabBom;
+        private System.Windows.Forms.TabPage tabDrawing;
+        private ADDIN.UI.ModernTabControl tabDrawingPages;
+        private System.Windows.Forms.TabPage tabDrawingBom;
+        private System.Windows.Forms.TabPage tabComponentDrawing;
+        private ADDIN.UI.ModernCard grpComponentSize;
+        private ADDIN.UI.ModernButton btnGetWL;
+        private ADDIN.UI.ModernButton btnRotateCcw;
+        private ADDIN.UI.ModernButton btnRotateCw;
+        private ADDIN.UI.ModernButton btnHorizontalAlignment;
+        private ADDIN.UI.ModernCard grpComponentBom;
+        private ADDIN.UI.ModernButton btnInsertBalloon;
+        private System.Windows.Forms.ComboBox cboBalloonProperty;
+        private ADDIN.UI.ModernButton btnDeleteText;
+        private ADDIN.UI.ModernButton btnText;
+        private ADDIN.Commands.HistoryTextBox cboSide;
+        private ADDIN.UI.ModernButton btnDeleteNote;
+        private ADDIN.UI.ModernButton btnNote;
+        private ADDIN.Commands.HistoryTextBox cboBendLine;
+        private System.Windows.Forms.TabPage tabModel;
+        private System.Windows.Forms.DataGridView dgvModelBom;
+        private ADDIN.UI.ModernButton btnLoadBom;
+        private ADDIN.UI.ModernButton btnClearBom;
+        private System.Windows.Forms.Label lblTitle;
+        private System.Windows.Forms.Label lblStatus;
+        private ADDIN.UI.ModernButton btnCheckDfTk;
+        private ADDIN.UI.ModernButton btnCheckUraOmote;
+        private ADDIN.UI.ModernButton btnCheckKegaki;
+        private System.Windows.Forms.ProgressBar progressCheck;
+        private System.Windows.Forms.DataGridViewCheckBoxColumn Column5;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column1;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column3;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column6;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column4;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column2;
+        private System.Windows.Forms.CheckBox chkSelectAll;
+        private ADDIN.UI.ModernButton button1;
+        private ADDIN.UI.ModernFieldBox groupBox2;
+        private ADDIN.UI.ModernFieldBox groupBox1;
+        private System.Windows.Forms.TextBox txtWidth;
+        private System.Windows.Forms.TextBox txtLength;
+        private ADDIN.UI.ModernCard groupBox3;
+        private ADDIN.UI.ModernButton btnDimKegaki;
+        private ADDIN.UI.ModernButton btnDimKichThuocLo;
+        private ADDIN.UI.ModernButton btnFixScale;
+        private ADDIN.UI.ModernButton dimvang;
+        private ADDIN.UI.ModernButton button2;
+        private ADDIN.UI.ModernButton btnOpenAssem;
+        private ADDIN.UI.ModernButton btnCheckBalloon;
+        private ADDIN.UI.ModernButton btnCheckAll;
+        private ADDIN.UI.ModernButton btnCheckRound;
+        private ADDIN.UI.ModernButton btnCheckSamePart;
+        private ADDIN.UI.ModernButton btnCheckDrawingBom;
+        private ADDIN.UI.ModernButton btnMakeHole;
+        private System.Windows.Forms.Panel panelModelCommands;
+        private ADDIN.UI.ModernButton btnRepairHole;
+        private System.Windows.Forms.GroupBox grpMakeHoleOptions;
+        private System.Windows.Forms.Panel pnlMakeHoleDiagram;
+        private System.Windows.Forms.Label lblMakeHoleDirection;
+        private System.Windows.Forms.ComboBox cboMakeHoleDirection;
+        private System.Windows.Forms.Label lblMakeHoleEdgeOffset;
+        private System.Windows.Forms.TextBox txtMakeHoleEdgeOffset;
+        private System.Windows.Forms.Label lblMakeHoleLeftOffset;
+        private System.Windows.Forms.TextBox txtMakeHoleLeftOffset;
+        private System.Windows.Forms.Label lblMakeHoleRightOffset;
+        private System.Windows.Forms.TextBox txtMakeHoleRightOffset;
+        private System.Windows.Forms.Label lblMakeHolePitch;
+        private System.Windows.Forms.TextBox txtMakeHolePitch;
+        private System.Windows.Forms.Label lblRepairHoleType;
+        private System.Windows.Forms.ComboBox cboRepairHoleType;
+        private System.Windows.Forms.Label lblRepairHoleDiameter;
+        private System.Windows.Forms.ComboBox cboRepairHoleDiameter;
+        private ADDIN.UI.ModernButton btnDeleteMakeHoleSize;
+        private System.Windows.Forms.CheckBox chkMakeHolePaint;
+        private ADDIN.UI.ModernButton btnMakeHoleUpdate;
+        private ADDIN.UI.ModernButton btnMakeHoleAccept;
+        private ADDIN.UI.ModernButton btnMakeHolePattern;
+        private ADDIN.UI.ModernButton btnMakeHoleReset;
+        private ADDIN.UI.ModernButton btnPaintHoleSummary;
+        private ADDIN.UI.ModernTabControl tabModelPages;
+        private System.Windows.Forms.TabPage tabModelPropsPage;
+        private System.Windows.Forms.TabPage tabModelEditPage;
+        private System.Windows.Forms.TabPage tabModelMacroPage;
+        private ADDIN.UI.VCutBendAssignmentControl vCutBendAssignmentControl;
+        private ADDIN.UI.ModernButton btnVCutPropertySetup;
+        private System.Windows.Forms.Label lblCheckAssemblyHoleResult;
+        private ADDIN.UI.ModernButton btnCheckAssemblyHole;
+        private ADDIN.UI.ModernButton btnMirrorPart;
+        private ADDIN.UI.ModernButton btnEdgeToEqualSpline;
+        private ADDIN.UI.ModernButton btnRepair3DSpline;
+        private System.Windows.Forms.Panel panelModelProps;
+        private ADDIN.UI.ModernButton btnModelApplyProps;
+        private ADDIN.UI.ModernButton btnModelResetProps;
+        private ADDIN.UI.ModernButton btnModelUpdateProps;
+        private System.Windows.Forms.TextBox txtModelFinish;
+        private System.Windows.Forms.Label lblModelFinish;
+        private System.Windows.Forms.TextBox txtModelQty;
+        private System.Windows.Forms.Label lblModelQty;
+        private System.Windows.Forms.TextBox txtModelGoban;
+        private System.Windows.Forms.Label lblModelGoban;
+        private System.Windows.Forms.TextBox txtModelThickness;
+        private System.Windows.Forms.Label lblModelThickness;
+        private System.Windows.Forms.TextBox txtModelMaterial;
+        private System.Windows.Forms.Label lblModelMaterial;
+        private System.Windows.Forms.TextBox txtModelName;
+        private System.Windows.Forms.Label lblModelName;
+        private ADDIN.UI.ModernButton btnDimMatCat;
+        private ADDIN.UI.ModernButton btnSplineToArcs;
+        private ADDIN.UI.ModernButton btnRepairDim;
+        private ADDIN.UI.ModernButton btnVCutSection;
+        private System.Windows.Forms.Integration.ElementHost elementHostRepairHole;
+    }
+}
+
+

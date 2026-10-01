@@ -1,0 +1,232 @@
+<UserControl x:Class="ADDIN.UI.RepairHoleTaskPaneView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:ADDIN.UI"
+             mc:Ignorable="d" 
+             d:DesignWidth="265" d:DesignHeight="400"
+             d:DataContext="{d:DesignInstance local:RepairHoleViewModel, IsDesignTimeCreatable=True}"
+             FontFamily="Meiryo UI, Segoe UI, sans-serif" FontSize="12.5">
+    <UserControl.Resources>
+        <!-- DataGrid Header Style: Single-line bold, compact padding -->
+        <Style x:Key="ColumnHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#EBF2FA" />
+            <Setter Property="Foreground" Value="#0D3560" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="2,4" />
+            <Setter Property="BorderBrush" Value="#C4D1DF" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+        </Style>
+
+        <!-- Center Cell Text Style -->
+        <Style x:Key="CenterTextStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="#1A1A1A" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Bold Number/Size Cell Style -->
+        <Style x:Key="CenterNumberStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="#0A2540" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+
+        <!-- Flat Button Style -->
+        <Style x:Key="ModernButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="1">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Step 1: Prompt & Scan Button -->
+        <TextBlock Grid.Row="0"
+                   Text="Chọn 1 mặt phẳng trong SOLIDWORKS:"
+                   Foreground="#0D3560"
+                   FontWeight="Bold"
+                   FontSize="12.5"
+                   TextTrimming="CharacterEllipsis"
+                   Margin="2,2,2,4" />
+
+        <Button Grid.Row="1"
+                Content="Xác nhận"
+                Command="{Binding ScanCommand}"
+                Style="{StaticResource ModernButtonStyle}"
+                Background="#E1EEFB"
+                BorderBrush="#5B9BD5"
+                Foreground="#0D3560"
+                FontWeight="Bold"
+                FontSize="12.5"
+                Height="28"
+                Margin="2,0,2,6" />
+
+        <!-- Step 2: Table & Repair Action (Hidden until Scan succeeds) -->
+        <Grid Grid.Row="2"
+              Visibility="{Binding TableVisibility}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Table of Malformed Holes -->
+            <DataGrid Grid.Row="0"
+                      ItemsSource="{Binding Rows}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      CanUserResizeRows="False"
+                      CanUserSortColumns="False"
+                      SelectionMode="Single"
+                      SelectionUnit="Cell"
+                      GridLinesVisibility="All"
+                      HorizontalGridLinesBrush="#D2DCE6"
+                      VerticalGridLinesBrush="#D2DCE6"
+                      HeadersVisibility="Column"
+                      ColumnHeaderStyle="{StaticResource ColumnHeaderStyle}"
+                      RowHeaderWidth="0"
+                      RowHeight="28"
+                      MinHeight="90"
+                      MaxHeight="270"
+                      BorderThickness="1"
+                      BorderBrush="#BCC8D4"
+                      Background="White"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+                <DataGrid.Columns>
+                    <!-- Column 1: Loại (Méo / Slot / Tròn) -->
+                    <DataGridTextColumn Header="Loại"
+                                        Binding="{Binding HoleTypeText}"
+                                        IsReadOnly="True"
+                                        Width="44"
+                                        ElementStyle="{StaticResource CenterTextStyle}" />
+
+                    <!-- Column 2: Hiện tại (Ø4.00, 5x25) -->
+                    <DataGridTextColumn Header="Hiện tại"
+                                        Binding="{Binding CurrentSizeText}"
+                                        IsReadOnly="True"
+                                        Width="56"
+                                        ElementStyle="{StaticResource CenterNumberStyle}" />
+
+                    <!-- Column 3: SL (11, 1) -->
+                    <DataGridTextColumn Header="SL"
+                                        Binding="{Binding Count}"
+                                        IsReadOnly="True"
+                                        Width="28"
+                                        ElementStyle="{StaticResource CenterNumberStyle}" />
+
+                    <!-- Column 4: RCM (4.1 / 4.2) -->
+                    <DataGridTextColumn Header="RCM"
+                                        Binding="{Binding RecommendationText}"
+                                        IsReadOnly="True"
+                                        Width="62"
+                                        ElementStyle="{StaticResource CenterNumberStyle}" />
+
+                    <!-- Column 5: Repair (input) -->
+                    <DataGridTemplateColumn Header="Repair"
+                                            Width="*"
+                                            MinWidth="58">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding RepairInput, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="#FFFFDC"
+                                         BorderBrush="#BDBDBD"
+                                         BorderThickness="1"
+                                         FontWeight="Bold"
+                                         FontSize="12.5"
+                                         Foreground="#0A2540"
+                                         HorizontalContentAlignment="Center"
+                                         VerticalContentAlignment="Center"
+                                         Padding="1"
+                                         Margin="1"
+                                         Height="24" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- Guide Note -->
+            <TextBlock Grid.Row="1"
+                       Text="RCM chỉ để tham khảo. Nhập 4.2 (tròn), 5x25 (slot), để trống = bỏ qua."
+                       Foreground="#444444"
+                       FontSize="11.5"
+                       TextWrapping="Wrap"
+                       Margin="2,4,2,6" />
+
+            <!-- Action Buttons: Repair, Reset & Hủy -->
+            <Grid Grid.Row="2" Margin="2,0,2,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="70" />
+                    <ColumnDefinition Width="70" />
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Content="Repair"
+                        Command="{Binding RepairCommand}"
+                        Style="{StaticResource ModernButtonStyle}"
+                        Background="#144173"
+                        BorderBrush="#0D2E54"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        FontSize="12.5"
+                        Height="30"
+                        Margin="0,0,4,0" />
+
+                <Button Grid.Column="1"
+                        Content="Reset"
+                        Command="{Binding ResetCommand}"
+                        ToolTip="Xóa dữ liệu tạm Repair Hole để chọn mặt và quét lại"
+                        Style="{StaticResource ModernButtonStyle}"
+                        Background="#E1EEFB"
+                        BorderBrush="#5B9BD5"
+                        Foreground="#0D3560"
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Height="30"
+                        Margin="4,0,4,0" />
+
+                <Button Grid.Column="2"
+                        Content="Hủy"
+                        Command="{Binding CancelCommand}"
+                        Style="{StaticResource ModernButtonStyle}"
+                        Background="#F0F2F5"
+                        BorderBrush="#CCD0D5"
+                        Foreground="#333333"
+                        FontSize="12"
+                        FontWeight="SemiBold"
+                        Height="30"
+                        Margin="4,0,0,0" />
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

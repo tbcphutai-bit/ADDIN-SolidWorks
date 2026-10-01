@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -12,12 +12,12 @@ namespace ADDIN.Commands
     /// Layout:
     /// 1) TỔNG HỢP
     ///    - Chỉ COMPONENT / Part Drawing
-    ///    - Cột đầu tiên là № = 1..N
+    ///    - Cột đầu tiên là INo gốc từ BOM
     ///    - Field columns only show OK / NG / Warning
     ///
     /// 2) CHI TIẾT KIỂM TRA
     ///    - 1 checked field = 1 row
-    ///    - Drawing Value / Expected(BOM or Assembly) / Status / Source / X / Y
+    ///    - Drawing Value / Expected(BOM or Assembly) / Status / Ghi chú
     ///
     /// COMPONENT nằm ở TỔNG HỢP + CHI TIẾT.
     /// UNIT chỉ nằm ở CHI TIẾT KIỂM TRA.
@@ -171,7 +171,7 @@ namespace ADDIN.Commands
             List<string> headers =
                 new List<string>
                 {
-                    "№",
+                    "INo",
                     "Component",
                     "Drawing File",
                     "Kết quả",
@@ -208,14 +208,6 @@ namespace ADDIN.Commands
                     DrawingCheckItemResult item =
                         items[i];
 
-                    int componentNo =
-                        i + 1;
-
-                    bool partNoSequenceMismatch =
-                        IsPartNumberSequenceMismatch(
-                            componentNo,
-                            item);
-
                     string drawingFile =
                         string.IsNullOrWhiteSpace(
                             item.DrawingPath)
@@ -225,11 +217,10 @@ namespace ADDIN.Commands
 
                     string overallStatus =
                         GetEffectiveSummaryStatus(
-                            item,
-                            partNoSequenceMismatch);
+                            item);
 
                     data[i, 0] =
-                        componentNo;
+                        item.BomItemNumber;
 
                     data[i, 1] =
                         item.Component ?? "";
@@ -256,8 +247,7 @@ namespace ADDIN.Commands
                             field != null
                                 ? GetEffectiveFieldStatus(
                                     fieldOrder[f],
-                                    field,
-                                    partNoSequenceMismatch)
+                                    field)
                                 : "-";
                     }
                 }
@@ -279,21 +269,12 @@ namespace ADDIN.Commands
                     int row =
                         i + 2;
 
-                    int componentNo =
-                        i + 1;
-
                     DrawingCheckItemResult item =
                         items[i];
 
-                    bool partNoSequenceMismatch =
-                        IsPartNumberSequenceMismatch(
-                            componentNo,
-                            item);
-
                     string overallStatus =
                         GetEffectiveSummaryStatus(
-                            item,
-                            partNoSequenceMismatch);
+                            item);
 
                     ApplyStatusColor(
                         sheet.Cells[row, 4],
@@ -314,8 +295,7 @@ namespace ADDIN.Commands
                         string effectiveFieldStatus =
                             GetEffectiveFieldStatus(
                                 fieldOrder[f],
-                                field,
-                                partNoSequenceMismatch);
+                                field);
 
                         ApplyStatusColor(
                             sheet.Cells[
@@ -352,10 +332,12 @@ namespace ADDIN.Commands
             // TỔNG HỢP chỉ dành cho COMPONENT / Part Drawing.
             string[] preferred =
             {
+                "INo ↔ 部品番号 (BOM)",
                 "部品番号",
                 "W",
                 "L",
                 "数量",
+                "合番合計 ↔ 数量 (BOM)",
                 "材質",
                 "板厚",
                 "合番",
@@ -477,76 +459,15 @@ namespace ADDIN.Commands
                        StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsPartNumberSequenceMismatch(
-            int componentNo,
-            DrawingCheckItemResult item)
+        private static string GetEffectiveSummaryStatus(DrawingCheckItemResult item)
         {
-            if (componentNo <= 0 ||
-                item == null)
-            {
-                return false;
-            }
-
-            DrawingBomFieldResult partNumberField =
-                GetField(
-                    item.Fields,
-                    "部品番号");
-
-            if (partNumberField == null)
-                return false;
-
-            int drawingPartNumber;
-            if (!int.TryParse(
-                    (partNumberField.DrawingValue ?? "").Trim(),
-                    out drawingPartNumber))
-            {
-                // Không ép Warning nếu 部品番号 không phải số nguyên.
-                return false;
-            }
-
-            return drawingPartNumber != componentNo;
-        }
-
-        private static string GetEffectiveSummaryStatus(
-            DrawingCheckItemResult item,
-            bool partNoSequenceMismatch)
-        {
-            if (item == null)
-                return DrawingBomCheckStatus.Warning.ToString();
-
-            if (item.Status == DrawingBomCheckStatus.NG)
-                return DrawingBomCheckStatus.NG.ToString();
-
-            if (item.Status == DrawingBomCheckStatus.Warning ||
-                partNoSequenceMismatch)
-            {
-                return DrawingBomCheckStatus.Warning.ToString();
-            }
-
-            return DrawingBomCheckStatus.OK.ToString();
+            return (item?.Status ?? DrawingBomCheckStatus.Warning).ToString();
         }
 
         private static string GetEffectiveFieldStatus(
-            string fieldName,
-            DrawingBomFieldResult field,
-            bool partNoSequenceMismatch)
+            string fieldName, DrawingBomFieldResult field)
         {
-            if (field == null)
-                return "-";
-
-            if (field.Status == DrawingBomCheckStatus.NG)
-                return DrawingBomCheckStatus.NG.ToString();
-
-            if (string.Equals(
-                    fieldName,
-                    "部品番号",
-                    StringComparison.OrdinalIgnoreCase) &&
-                partNoSequenceMismatch)
-            {
-                return DrawingBomCheckStatus.Warning.ToString();
-            }
-
-            return field.Status.ToString();
+            return field == null ? "-" : field.Status.ToString();
         }
 
         private static bool ContainsField(
@@ -664,15 +585,9 @@ namespace ADDIN.Commands
                     if (item == null)
                         continue;
 
-                    bool partNoSequenceMismatch =
-                        IsPartNumberSequenceMismatch(
-                            i + 1,
-                            item);
-
                     string effectiveStatus =
                         GetEffectiveSummaryStatus(
-                            item,
-                            partNoSequenceMismatch);
+                            item);
 
                     if (string.Equals(
                             effectiveStatus,
@@ -772,7 +687,7 @@ namespace ADDIN.Commands
             dynamic sheet,
             List<DrawingCheckItemResult> items)
         {
-            const int colCount = 8;
+            const int colCount = 5;
 
             // Main title.
             dynamic mainTitleRange =
@@ -799,7 +714,6 @@ namespace ADDIN.Commands
             sheet.Rows[1].RowHeight = 28.0;
 
             int currentRow = 3;
-            int componentSequence = 0;
 
             if (items != null)
             {
@@ -826,19 +740,9 @@ namespace ADDIN.Commands
                     bool isUnit =
                         IsUnitItem(item);
 
-                    if (!isUnit)
-                        componentSequence++;
-
-                    bool partNoSequenceMismatch =
-                        !isUnit &&
-                        IsPartNumberSequenceMismatch(
-                            componentSequence,
-                            item);
-
                     string effectiveStatus =
                         GetEffectiveSummaryStatus(
-                            item,
-                            partNoSequenceMismatch);
+                            item);
 
                     int ngCount =
                         CountNgFields(item);
@@ -859,7 +763,7 @@ namespace ADDIN.Commands
                     string blockPrefix =
                         isUnit
                             ? "UNIT"
-                            : "COMPONENT №" + componentSequence;
+                            : "COMPONENT INo " + item.BomItemNumber;
 
                     string unitTitle =
                         blockPrefix + ": " + component +
@@ -912,10 +816,7 @@ namespace ADDIN.Commands
                         "Drawing Value",
                         "Expected / BOM / Assembly",
                         "Status",
-                        "Source",
-                        "Ghi chú",
-                        "X",
-                        "Y"
+                        "Ghi chú"
                     };
 
                     for (int c = 0;
@@ -963,59 +864,6 @@ namespace ADDIN.Commands
                     int firstFieldRow =
                         currentRow;
 
-                    // COMPONENT: № là kiểm tra chéo với 部品番号.
-                    // Nếu lệch, chỉ Warning (không tự nâng thành NG).
-                    if (partNoSequenceMismatch)
-                    {
-                        DrawingBomFieldResult partNumberField =
-                            GetField(
-                                item.Fields,
-                                "部品番号");
-
-                        sheet.Cells[currentRow, 1].Value =
-                            "№ ↔ 部品番号";
-
-                        sheet.Cells[currentRow, 2].Value =
-                            partNumberField != null
-                                ? (partNumberField.DrawingValue ?? "")
-                                : "";
-
-                        sheet.Cells[currentRow, 3].Value =
-                            componentSequence.ToString();
-
-                        sheet.Cells[currentRow, 4].Value =
-                            "Warning";
-
-                        sheet.Cells[currentRow, 5].Value =
-                            "COMPONENT_SEQUENCE";
-
-                        sheet.Cells[currentRow, 6].Value =
-                            "Số thứ tự № không khớp với 部品番号 trên Drawing. Cần kiểm tra lại.";
-
-                        dynamic sequenceRow =
-                            sheet.Range[
-                                sheet.Cells[currentRow, 1],
-                                sheet.Cells[currentRow, colCount]];
-
-                        sequenceRow.Borders.LineStyle =
-                            XlContinuous;
-
-                        sequenceRow.VerticalAlignment =
-                            XlTop;
-
-                        sequenceRow.WrapText =
-                            true;
-
-                        sequenceRow.Interior.Color =
-                            Rgb(255, 242, 204);
-
-                        ApplyStatusColor(
-                            sheet.Cells[currentRow, 4],
-                            "Warning");
-
-                        currentRow++;
-                    }
-
                     // ----------------------------------------------------
                     // FIELD ROWS
                     // ----------------------------------------------------
@@ -1046,8 +894,7 @@ namespace ADDIN.Commands
                             string displayedFieldStatus =
                                 GetEffectiveFieldStatus(
                                     field.FieldName,
-                                    field,
-                                    partNoSequenceMismatch);
+                                    field);
 
                             sheet.Cells[
                                 currentRow,
@@ -1057,35 +904,7 @@ namespace ADDIN.Commands
                             sheet.Cells[
                                 currentRow,
                                 5].Value =
-                                field.Source ?? "";
-
-                            sheet.Cells[
-                                currentRow,
-                                6].Value =
                                 field.Message ?? "";
-
-                            if (field.HasDrawingLocation)
-                            {
-                                sheet.Cells[
-                                    currentRow,
-                                    7].Value =
-                                    field.DrawingX;
-
-                                sheet.Cells[
-                                    currentRow,
-                                    8].Value =
-                                    field.DrawingY;
-
-                                sheet.Cells[
-                                    currentRow,
-                                    7].NumberFormat =
-                                    "0.000000";
-
-                                sheet.Cells[
-                                    currentRow,
-                                    8].NumberFormat =
-                                    "0.000000";
-                            }
 
                             dynamic rowRange =
                                 sheet.Range[
@@ -1198,10 +1017,7 @@ namespace ADDIN.Commands
             sheet.Columns[2].ColumnWidth = 24.0;
             sheet.Columns[3].ColumnWidth = 27.0;
             sheet.Columns[4].ColumnWidth = 11.0;
-            sheet.Columns[5].ColumnWidth = 31.0;
-            sheet.Columns[6].ColumnWidth = 48.0;
-            sheet.Columns[7].ColumnWidth = 13.0;
-            sheet.Columns[8].ColumnWidth = 13.0;
+            sheet.Columns[5].ColumnWidth = 60.0;
 
             sheet.Range[
                 sheet.Cells[1, 1],
@@ -1209,7 +1025,7 @@ namespace ADDIN.Commands
                 .VerticalAlignment =
                     XlTop;
 
-            // Center Field/Status/X/Y for readability.
+            // Center Field and Status for readability.
             sheet.Range[
                 sheet.Cells[3, 1],
                 sheet.Cells[lastRow, 1]]
@@ -1219,12 +1035,6 @@ namespace ADDIN.Commands
             sheet.Range[
                 sheet.Cells[3, 4],
                 sheet.Cells[lastRow, 4]]
-                .HorizontalAlignment =
-                    XlCenter;
-
-            sheet.Range[
-                sheet.Cells[3, 7],
-                sheet.Cells[lastRow, 8]]
                 .HorizontalAlignment =
                     XlCenter;
 

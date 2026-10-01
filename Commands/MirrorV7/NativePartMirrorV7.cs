@@ -32,7 +32,7 @@ namespace ADDIN.Commands.MirrorV7
     /// </summary>
     public static class NativePartMirrorV7
     {
-        public const string Version = "V7-NATIVE-PART-3";
+        public const string Version = "V7-NATIVE-PART-4-EXTERNAL-BREAK";
 
         public static NativePartMirrorResultV7 Execute(ISldWorks app, ModelDoc2 source,
             CanonicalPartMirrorPlaneV7 plane, string outputPath)
@@ -93,7 +93,7 @@ namespace ADDIN.Commands.MirrorV7
                     throw new InvalidOperationException("MirrorPart2 did not return a separate Part document.");
                 Activate(app, mirrored);
                 stage = "VERIFY_CREATED";
-                Verify(mirrored, expected, sourceGraph, result);
+                Verify(mirrored, expected, sourceGraph, result, source, true);
                 result.GeometryVerified = true;
                 baseline.AssertUnchanged(source);
                 // Save to a private staging path, reopen and verify before publishing anything.
@@ -113,7 +113,7 @@ namespace ADDIN.Commands.MirrorV7
                     (int)swOpenDocOptions_e.swOpenDocOptions_Silent, "", ref errors, ref warnings);
                 if (mirrored == null || errors != 0) throw new InvalidOperationException("Reopen failed errors=" + errors);
                 Activate(app, mirrored);
-                Verify(mirrored, expected, sourceGraph, result);
+                Verify(mirrored, expected, sourceGraph, result, source, false);
                 result.ReopenVerified = true;
                 stage = "MAP_OUTPUT";
                 string candidateMap = WriteAndVerifyMapping(source, mirrored, candidate);
@@ -152,15 +152,27 @@ namespace ADDIN.Commands.MirrorV7
         }
 
         private static void Verify(ModelDoc2 model, List<Body2> expected, MirrorV7ModelGraph sourceGraph,
-            NativePartMirrorResultV7 result)
+            NativePartMirrorResultV7 result, ModelDoc2 source, bool allowReferenceBreak)
         {
             if (!model.EditRebuild3()) throw new InvalidOperationException("Output rebuild failed.");
             var graph = FeatureTreeScannerV7.Scan(model);
             CheckFeatureErrors(graph);
-            object dependencies = model.Extension.GetDependencies(true, false, false, false, false);
-            var depArray = dependencies as Array;
-            if (depArray != null && depArray.Length != 0)
-                throw new InvalidOperationException("Output still has file dependencies; independent Part not verified.");
+            ExternalDependencyAuditResultV7 dependencyAudit = ExternalDependencyAuditV7.Run(model);
+            if (!dependencyAudit.Success && allowReferenceBreak)
+            {
+                ExternalReferenceBreakResultV7 breakResult = ExternalReferenceBreakServiceV7.Run(model, source);
+                if (breakResult.Executed)
+                {
+                    graph = FeatureTreeScannerV7.Scan(model);
+                    CheckFeatureErrors(graph);
+                    dependencyAudit = ExternalDependencyAuditV7.Run(model);
+                    Log("POST_BREAK_VERIFY featureTree=True dependencies=" +
+                        (dependencyAudit.Success ? "PASS" : "FAIL"));
+                }
+            }
+            if (!dependencyAudit.Success)
+                throw new InvalidOperationException("Output still has forbidden file dependencies; independent Part not verified. forbidden=" +
+                    dependencyAudit.Forbidden + ". See [PHASE6B][DEPENDENCY_FORBIDDEN] in MirrorPartDebug.log.");
             result.IndependentVerified = true;
             var actual = Solids(model);
             if (!BipartiteEquivalenceMatcherV7.Match(expected, actual, SameSolid).HasPerfectMatching)

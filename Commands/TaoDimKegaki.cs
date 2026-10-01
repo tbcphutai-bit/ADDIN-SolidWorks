@@ -1,4 +1,7 @@
-using System;
+﻿using System;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -34,6 +37,52 @@ namespace ADDIN.Commands
             public double Length;
         }
 
+        private string diagnosticPath;
+        private int diagnosticSequence;
+
+        private void BeginDiagnostics()
+        {
+            diagnosticSequence = 0;
+            diagnosticPath = null;
+            try
+            {
+                string folder = Path.Combine(Path.GetTempPath(), "ADDIN", "DimKegaki");
+                Directory.CreateDirectory(folder);
+                diagnosticPath = Path.Combine(folder, "DimKegaki_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + "_" + Guid.NewGuid().ToString("N") + ".log");
+            }
+            catch (Exception ex) { Trace.WriteLine("[DIM KEGAKI] Cannot initialize file log: " + ex); }
+            LogDiagnostic("BEGIN build=kegaki-direct-view-bbox-20261001 assembly=" + typeof(TaoDimKegaki).Assembly.Location
+                + " mvid=" + typeof(TaoDimKegaki).Module.ModuleVersionId + " log=" + diagnosticPath);
+            LogDiagnostic("Coordinates/distances below are drawing-sheet metres, AFTER view transform; cutoff=0.001 sheet m.");
+        }
+
+        private void LogDiagnostic(string message)
+        {
+            try
+            {
+                string line = "[DIM KEGAKI] " + DateTime.Now.ToString("O") + " #" + (++diagnosticSequence) + " " + message;
+                Trace.WriteLine(line);
+                if (diagnosticPath != null) File.AppendAllText(diagnosticPath, line + System.Environment.NewLine);
+            }
+            catch (Exception) { /* Diagnostics must never interrupt dimension creation. */ }
+        }
+
+        private string Describe(BendInfo item)
+        {
+            if (item == null) return "null";
+            return string.Format(CultureInfo.InvariantCulture,
+                "{0} angle={1:F3} start=({2:G9},{3:G9}) end=({4:G9},{5:G9}) mid=({6:G9},{7:G9}) length={8:G9} sort={9:G9}",
+                item.IsEdge ? "EDGE" : item.IsBoundingBox ? "BBOX" : "BEND",
+                item.AngleGroup, item.StartX, item.StartY, item.EndX, item.EndY,
+                item.MidX, item.MidY, item.Length, item.SortKey);
+        }
+
+        private void LogGeometry(string label, List<BendInfo> items)
+        {
+            LogDiagnostic(label + " count=" + items.Count);
+            for (int i = 0; i < items.Count; i++) LogDiagnostic(label + "[" + i + "] " + Describe(items[i]));
+        }
+
         private readonly ISldWorks swApp;
         private const double ParallelAngleTolerance = 10.0;
 
@@ -44,7 +93,9 @@ namespace ADDIN.Commands
 
         public void GenerateKegakiDimensions()
         {
+            BeginDiagnostics();
             string currentStep = "[00] ActiveDoc";
+            LogDiagnostic(currentStep);
             ModelDoc2 model = null;
             bool undoStarted = false;
 
@@ -59,6 +110,7 @@ namespace ADDIN.Commands
                 }
 
                 currentStep = "[01] Lay Drawing View";
+                LogDiagnostic(currentStep);
                 SelectionMgr selMgr = model.SelectionManager as SelectionMgr;
                 SolidWorks.Interop.sldworks.View view = GetSelectedDrawingView(selMgr);
 
@@ -71,12 +123,15 @@ namespace ADDIN.Commands
                 // Giu lai ten View de co the lay lai COM object moi sau cac thao tac
                 // co kha nang lam SolidWorks refresh/rebuild Drawing View.
                 string selectedViewName = SafeGetViewName(view);
+                LogDiagnostic("VIEW name=" + selectedViewName + " scale=" + view.ScaleDecimal.ToString("G9", CultureInfo.InvariantCulture));
 
                 currentStep = "[02] Bat dau Undo";
+                LogDiagnostic(currentStep);
                 model.Extension.StartRecordingUndoObject();
                 undoStarted = true;
 
                 currentStep = "[03] Xoa DIM cu";
+                LogDiagnostic(currentStep);
                 DeleteAllDimensionsInView(model, view);
 
                 // Xoa annotation co the lam View refresh. Lay lai View theo ten de tranh
@@ -85,6 +140,7 @@ namespace ADDIN.Commands
                 view = ReacquireViewByName(drawing, selectedViewName) ?? view;
 
                 currentStep = "[04] Hien Bend-Line va BBox";
+                LogDiagnostic(currentStep);
                 // ShowSketchFromTree co ClearSelection/UnblankSketch va co the lam drawing
                 // refresh. Hien tat ca sketch truoc, sau do moi lay geometry.
                 ShowSketchFromTree(model, "ﾍﾞﾝﾄﾞ-ﾗｲﾝ", "ベンド-ライン", "Bend-Line");
@@ -95,6 +151,7 @@ namespace ADDIN.Commands
                 // Muc dich la de DIM bam vao entity cua lan rebuild hien tai, thay vi bam vao
                 // SketchSegment tam vua bi SolidWorks thay the. Khong thay doi hinh hoc/logic DIM.
                 currentStep = "[05] Rebuild View truoc khi lay reference";
+                LogDiagnostic(currentStep);
                 try
                 {
                     model.ForceRebuild3(false);
@@ -107,21 +164,24 @@ namespace ADDIN.Commands
 
                 // Rebuild co the thay COM proxy cua View/Feature, nen bat buoc lay lai.
                 view = ReacquireViewByName(drawing, selectedViewName) ?? view;
-                boundingBoxFeature = FindFeatureFromTree(
-                    model,
-                    "境界ﾎﾞｯｸｽ", "境界ボックス", "Bounding-Box");
+                LogViewBoundingBoxes(view);
+                boundingBoxFeature = ResolveBoundingBoxFeature(model, view);
 
                 currentStep = "[06] Lay Transform";
+                LogDiagnostic(currentStep);
                 MathUtility mathUtil = swApp.IGetMathUtility();
                 MathTransform viewTransform = view.ModelToViewTransform;
                 if (mathUtil == null || viewTransform == null)
                     return;
 
                 currentStep = "[07] Lay Bend-Line va BBox";
+                LogDiagnostic(currentStep);
                 List<BendInfo> bends = new List<BendInfo>();
                 AddBendLines(view.GetBendLines(), mathUtil, viewTransform, false, bends);
 
                 List<BendInfo> outerEdges = GetOuterVisibleEdges(view, mathUtil, viewTransform);
+                LogGeometry("BENDS", bends);
+                LogGeometry("OUTER_EDGES", outerEdges);
                 bends.AddRange(outerEdges);
 
                 List<BendInfo> boundingBoxLines = new List<BendInfo>();
@@ -129,10 +189,24 @@ namespace ADDIN.Commands
                 {
                     Sketch boundingBoxSketch = boundingBoxFeature.GetSpecificFeature2() as Sketch;
                     if (boundingBoxSketch != null)
+                    {
+                        LogDiagnostic("BBOX sketch found; reading segments");
                         AddSketchSegments(boundingBoxSketch.GetSketchSegments(), mathUtil, viewTransform, true, boundingBoxLines);
+                    }
+                    else
+                    {
+                        LogDiagnostic("BBOX feature found but GetSpecificFeature2 is not a Sketch: "
+                            + boundingBoxFeature.Name + " type=" + boundingBoxFeature.GetTypeName2());
+                    }
                 }
 
+                LogGeometry("BBOX_SKETCH_FEATURE", boundingBoxLines);
+                List<BendInfo> viewBoundingBoxLines = GetSelectableViewBoundingBoxLines(model, view);
+                if (viewBoundingBoxLines.Count >= 4)
+                    boundingBoxLines = viewBoundingBoxLines;
+                LogGeometry("BBOX_SELECTED_FOR_DIM", boundingBoxLines);
                 currentStep = "[08] Tao SelectData";
+                LogDiagnostic(currentStep);
                 // SelectionMgr/SelectData cung lay lai sau cac thao tac refresh o tren.
                 selMgr = model.SelectionManager as SelectionMgr;
                 SelectData selectData = selMgr?.CreateSelectData() as SelectData;
@@ -146,6 +220,7 @@ namespace ADDIN.Commands
                 // ActivateSheet sau khi da lay GetBendLines co the invalidate SketchSegment.
                 if (!HasRealBendLine(bends))
                 {
+                    LogDiagnostic("BRANCH no real bend: overall W/L only");
                     List<BendInfo> overallLines = boundingBoxLines.Count > 0
                         ? boundingBoxLines
                         : outerEdges;
@@ -159,6 +234,7 @@ namespace ADDIN.Commands
                         return;
 
                     currentStep = "[09] Tao DIM Overall";
+                LogDiagnostic(currentStep);
                     int overallCount = CreateOverallDimensions(
                         model,
                         overallLines,
@@ -167,7 +243,8 @@ namespace ADDIN.Commands
                         overallMinX,
                         overallMaxX,
                         overallMinY,
-                        overallMaxY);
+                        overallMaxY,
+                        boundingBoxLines.Count > 0 ? outerEdges : null);
 
                     model.ClearSelection2(true);
                     model.GraphicsRedraw2();
@@ -183,6 +260,7 @@ namespace ADDIN.Commands
                     return;
 
                 currentStep = "[10] Sap xep";
+                LogDiagnostic(currentStep);
                 bends.Sort(CompareBends);
                 List<BendInfo> chainLines = new List<BendInfo>();
                 foreach (BendInfo bend in bends)
@@ -192,6 +270,8 @@ namespace ADDIN.Commands
                 }
 
                 chainLines.Sort(CompareBends);
+                LogGeometry("CHAIN", chainLines);
+                LogDiagnostic("ACTIVE PASSES: bend chain, overall, outer edge-to-bend. Flap/transition passes are not called.");
 
                 double minX = double.MaxValue;
                 double maxX = double.MinValue;
@@ -210,6 +290,7 @@ namespace ADDIN.Commands
                 double centerY = (minY + maxY) / 2.0;
 
                 currentStep = "[11] Tao DIM";
+                LogDiagnostic(currentStep);
                 List<string> createdDistanceKeys = new List<string>();
                 int dimensionCount = CreateDimensions(
                     model,
@@ -222,6 +303,7 @@ namespace ADDIN.Commands
                     view,
                     createdDistanceKeys);
 
+                LogDiagnostic("CHAIN created=" + dimensionCount);
                 dimensionCount += CreateOverallDimensions(
                     model,
                     boundingBoxLines.Count > 0 ? boundingBoxLines : outerEdges,
@@ -230,8 +312,10 @@ namespace ADDIN.Commands
                     minX,
                     maxX,
                     minY,
-                    maxY);
+                    maxY,
+                    boundingBoxLines.Count > 0 ? outerEdges : null);
 
+                LogDiagnostic("CHAIN+OVERALL created=" + dimensionCount);
                 dimensionCount += CreateSingleBendEdgePointDimensions(
                     model,
                     chainLines,
@@ -244,6 +328,7 @@ namespace ADDIN.Commands
 
                 model.ClearSelection2(true);
                 model.GraphicsRedraw2();
+                LogDiagnostic("TOTAL created=" + dimensionCount);
                 MessageBox.Show(
                     "Hoan tat! Da tao " + dimensionCount + " kich thuoc chuan Form.",
                     "dim kegaki",
@@ -252,6 +337,7 @@ namespace ADDIN.Commands
             }
             catch (COMException ex)
             {
+                LogDiagnostic("ERROR step=" + currentStep + " " + ex);
                 MessageBox.Show(
                     "Loi COM tai buoc: " + currentStep + System.Environment.NewLine +
                     "HRESULT: 0x" + ex.ErrorCode.ToString("X8") + System.Environment.NewLine +
@@ -262,6 +348,7 @@ namespace ADDIN.Commands
             }
             catch (Exception ex)
             {
+                LogDiagnostic("ERROR step=" + currentStep + " " + ex);
                 MessageBox.Show(
                     "Loi tai buoc: " + currentStep + System.Environment.NewLine + ex.Message,
                     "dim kegaki",
@@ -270,6 +357,7 @@ namespace ADDIN.Commands
             }
             finally
             {
+                LogDiagnostic("END lastStep=" + currentStep);
                 if (undoStarted && model != null)
                 {
                     try
@@ -451,9 +539,10 @@ namespace ADDIN.Commands
             DisplayDimension displayDimension =
                 annotation.GetSpecificAnnotation() as DisplayDimension;
             if (displayDimension == null)
-                return false;
+            { LogDiagnostic("ADD_DIM FAILED returned null; registered key remains reserved"); return false; }
 
             int dimensionType = displayDimension.GetType();
+            LogDiagnostic("ADD_DIM returned type=" + dimensionType);
             if (dimensionType == (int)swDimensionType_e.swDiameterDimension ||
                 dimensionType == (int)swDimensionType_e.swRadialDimension)
                 return true;
@@ -658,7 +747,7 @@ namespace ADDIN.Commands
             double dy = p2[1] - p1[1];
             double length = Math.Sqrt(dx * dx + dy * dy);
             if (length <= 0.001)
-                return;
+            { LogDiagnostic("SKIP sketch segment length <= 0.001 sheet m: " + length); return; }
 
             double angle = Math.Atan2(dy, dx);
             if (angle < 0)
@@ -726,6 +815,7 @@ namespace ADDIN.Commands
                         group.Add(bends[k]);
                 }
 
+                LogGeometry("ANGLE_GROUP", group);
                 if (group.Count >= 2)
                 {
                     double tangentX;
@@ -763,16 +853,16 @@ namespace ADDIN.Commands
                         double n1 = ProjectPoint(first.MidX, first.MidY, normalX, normalY);
                         double n2 = ProjectPoint(second.MidX, second.MidY, normalX, normalY);
                         double distance = Math.Abs(n2 - n1);
+                        LogDiagnostic("CHAIN_PAIR distance=" + distance.ToString("G9", CultureInfo.InvariantCulture) + " A=" + Describe(first) + " B=" + Describe(second));
                         if (distance <= 0.001)
-                            continue;
+                        { LogDiagnostic("SKIP chain distance <= 0.001 sheet m"); continue; }
 
                         // Tat ca DIM trong group nam tren cung 1 chain line.
                         double chainN = (n1 + n2) / 2.0;
                         double dimensionX = tangentX * chainT + normalX * chainN;
                         double dimensionY = tangentY * chainT + normalY * chainN;
 
-                        // Dang ky theo CAP HINH HOC thay vi theo gia tri distance.
-                        // Nhu vay 2 doan co cung gia tri (vd 27.4, 27.4) van duoc tao day du.
+                        // Kiem tra cap hinh hoc; chi ghi nhan sau khi DIM tao thanh cong.
                         if (!TryRegisterProjectedPair(
                             createdDistanceKeys,
                             first.AngleGroup,
@@ -789,7 +879,10 @@ namespace ADDIN.Commands
                         }
 
                         if (AddLinearDimensionOnly(model, dimensionX, dimensionY))
+                        {
+                            CommitProjectedPair(createdDistanceKeys, first.AngleGroup, n1, n2);
                             dimensionCount++;
+                        }
                     }
                 }
 
@@ -870,7 +963,7 @@ namespace ADDIN.Commands
             double dy = p2[1] - p1[1];
             double length = Math.Sqrt(dx * dx + dy * dy);
             if (length <= 0.001)
-                return null;
+            { LogDiagnostic("SKIP edge length <= 0.001 sheet m: " + length); return null; }
 
             double angle = Math.Atan2(dy, dx);
             if (angle < 0)
@@ -914,9 +1007,18 @@ namespace ADDIN.Commands
                 if (ReferenceEquals(edge.Geometry, candidate.Geometry))
                     return;
 
-                if (GetUndirectedAngleDifference(edge.AngleGroup, candidate.AngleGroup) <= 0.1 &&
-                    Math.Abs(edge.SortKey - candidate.SortKey) <= 0.000001)
+                // Hai doan cung duong thang nhung cach nhau qua ranh/cutout
+                // la hai edge rieng; chi bo trung khi hai dau trung nhau.
+                bool sameEndpoints =
+                    (GetDistance(edge.StartX, edge.StartY, candidate.StartX, candidate.StartY) <= 0.000001 &&
+                     GetDistance(edge.EndX, edge.EndY, candidate.EndX, candidate.EndY) <= 0.000001) ||
+                    (GetDistance(edge.StartX, edge.StartY, candidate.EndX, candidate.EndY) <= 0.000001 &&
+                     GetDistance(edge.EndX, edge.EndY, candidate.StartX, candidate.StartY) <= 0.000001);
+                if (sameEndpoints)
+                {
+                    LogDiagnostic("EDGE_MERGED collinear kept=" + Describe(edge) + " dropped=" + Describe(candidate));
                     return;
+                }
             }
 
             edges.Add(candidate);
@@ -924,60 +1026,196 @@ namespace ADDIN.Commands
 
         private int CreateOverallDimensions(
             ModelDoc2 model,
-            List<BendInfo> outerEdges,
+            List<BendInfo> primaryLines,
             SolidWorks.Interop.sldworks.View view,
             SelectData selectData,
             double minX,
             double maxX,
             double minY,
-            double maxY)
+            double maxY,
+            List<BendInfo> fallbackEdges)
         {
             BendInfo left = null;
             BendInfo right = null;
             BendInfo bottom = null;
             BendInfo top = null;
+            FindOverallSides(primaryLines, out left, out right, out bottom, out top);
 
-            foreach (BendInfo edge in outerEdges)
+            int count = 0;
+            bool horizontalCreated = TryCreateHorizontalOverall(
+                model, view, selectData, left, right, minX, maxX, minY);
+            if (!horizontalCreated && fallbackEdges != null)
             {
-                bool createsHorizontalDimension =
-                    Math.Abs(edge.NormalX) > Math.Abs(edge.NormalY);
+                LogDiagnostic("OVERALL_HORIZONTAL bbox failed; fallback visible edges");
+                BendInfo fallbackLeft, fallbackRight, fallbackBottom, fallbackTop;
+                FindOverallSides(fallbackEdges,
+                    out fallbackLeft, out fallbackRight, out fallbackBottom, out fallbackTop);
+                horizontalCreated = TryCreateHorizontalOverall(
+                    model, view, selectData, fallbackLeft, fallbackRight, minX, maxX, minY);
+            }
+            if (horizontalCreated) count++;
 
-                if (createsHorizontalDimension)
+            bool verticalCreated = TryCreateVerticalOverall(
+                model, view, selectData, primaryLines, bottom, top, maxX, minY, maxY);
+            if (!verticalCreated && fallbackEdges != null)
+            {
+                LogDiagnostic("OVERALL_VERTICAL bbox failed; fallback visible edges");
+                BendInfo fallbackLeft, fallbackRight, fallbackBottom, fallbackTop;
+                FindOverallSides(fallbackEdges,
+                    out fallbackLeft, out fallbackRight, out fallbackBottom, out fallbackTop);
+                verticalCreated = TryCreateVerticalOverall(
+                    model, view, selectData, fallbackEdges,
+                    fallbackBottom, fallbackTop, maxX, minY, maxY);
+            }
+            if (verticalCreated) count++;
+
+            return count;
+        }
+
+        private static void FindOverallSides(
+            List<BendInfo> lines,
+            out BendInfo left, out BendInfo right,
+            out BendInfo bottom, out BendInfo top)
+        {
+            left = right = bottom = top = null;
+            if (lines == null) return;
+            foreach (BendInfo edge in lines)
+            {
+                if (Math.Abs(edge.NormalX) > Math.Abs(edge.NormalY))
                 {
-                    if (left == null || edge.MidX < left.MidX)
-                        left = edge;
-                    if (right == null || edge.MidX > right.MidX)
-                        right = edge;
+                    if (left == null || edge.MidX < left.MidX) left = edge;
+                    if (right == null || edge.MidX > right.MidX) right = edge;
                 }
                 else
                 {
-                    if (bottom == null || edge.MidY < bottom.MidY)
-                        bottom = edge;
-                    if (top == null || edge.MidY > top.MidY)
-                        top = edge;
+                    if (bottom == null || edge.MidY < bottom.MidY) bottom = edge;
+                    if (top == null || edge.MidY > top.MidY) top = edge;
                 }
             }
+        }
 
-            int count = 0;
-            if (left != null && right != null)
+        private bool TryCreateHorizontalOverall(
+            ModelDoc2 model, SolidWorks.Interop.sldworks.View view,
+            SelectData selectData, BendInfo left, BendInfo right,
+            double minX, double maxX, double minY)
+        {
+            if (left == null || right == null || ReferenceEquals(left, right))
+                return false;
+            model.ClearSelection2(true);
+            return SelectGeometry(view, left, false, selectData) &&
+                SelectGeometry(view, right, true, selectData) &&
+                AddLinearDimensionOnly(model, (minX + maxX) / 2.0, minY - 0.025);
+        }
+
+        private bool TryCreateVerticalOverall(
+            ModelDoc2 model, SolidWorks.Interop.sldworks.View view,
+            SelectData selectData, List<BendInfo> lines,
+            BendInfo bottom, BendInfo top,
+            double maxX, double minY, double maxY)
+        {
+            if (bottom == null || top == null || ReferenceEquals(bottom, top))
+                return false;
+
+            // A sloped visible edge pair would create an angular dimension.
+            // The actual bounding-box sketch has parallel sides and is selected directly.
+            bool useExtremeVertices = bottom.IsEdge && top.IsEdge &&
+                GetUndirectedAngleDifference(bottom.AngleGroup, top.AngleGroup) > 0.1;
+            LogDiagnostic("OVERALL_VERTICAL bottom=" + Describe(bottom) + " top=" + Describe(top)
+                + " useExtremeVertices=" + useExtremeVertices);
+            if (useExtremeVertices)
+                return TryCreateVerticalOverallFromVertices(
+                    model, view, lines, maxX, minY, maxY);
+
+            model.ClearSelection2(true);
+            return SelectGeometry(view, bottom, false, selectData) &&
+                SelectGeometry(view, top, true, selectData) &&
+                AddLinearDimensionOnly(model, maxX + 0.025, (minY + maxY) / 2.0);
+        }
+
+        private bool TryCreateVerticalOverallFromVertices(
+            ModelDoc2 model,
+            SolidWorks.Interop.sldworks.View view,
+            List<BendInfo> edges,
+            double maxX,
+            double minY,
+            double maxY)
+        {
+            object bottomVertex = null;
+            object topVertex = null;
+            double bottomY = double.MaxValue;
+            double topY = double.MinValue;
+            double bottomX = double.MinValue;
+            double topX = double.MinValue;
+
+            foreach (BendInfo edge in edges)
             {
-                model.ClearSelection2(true);
-                if (SelectGeometry(view, left, false, selectData) &&
-                    SelectGeometry(view, right, true, selectData) &&
-                    AddLinearDimensionOnly(model, (minX + maxX) / 2.0, minY - 0.025))
-                    count++;
+                if (!edge.IsEdge)
+                    continue;
+
+                ConsiderVerticalExtreme(edge.StartVertex, edge.StartX, edge.StartY,
+                    ref bottomVertex, ref bottomX, ref bottomY,
+                    ref topVertex, ref topX, ref topY);
+                ConsiderVerticalExtreme(edge.EndVertex, edge.EndX, edge.EndY,
+                    ref bottomVertex, ref bottomX, ref bottomY,
+                    ref topVertex, ref topX, ref topY);
             }
 
-            if (bottom != null && top != null)
+            if (bottomVertex == null || topVertex == null || topY - bottomY <= 0.000001)
             {
-                model.ClearSelection2(true);
-                if (SelectGeometry(view, bottom, false, selectData) &&
-                    SelectGeometry(view, top, true, selectData) &&
-                    AddLinearDimensionOnly(model, maxX + 0.025, (minY + maxY) / 2.0))
-                    count++;
+                LogDiagnostic("OVERALL_VERTICAL vertex extrema unavailable");
+                return false;
             }
 
-            return count;
+            LogDiagnostic("OVERALL_VERTICAL extrema bottom=(" + bottomX + "," + bottomY
+                + ") top=(" + topX + "," + topY + ") projectedSheetHeight=" + (topY - bottomY));
+            model.ClearSelection2(true);
+            bool bottomSelected = view.SelectEntity(bottomVertex, false);
+            bool topSelected = bottomSelected && view.SelectEntity(topVertex, true);
+            LogDiagnostic("OVERALL_VERTICAL select bottom=" + bottomSelected + " top=" + topSelected);
+            if (!topSelected)
+            {
+                model.ClearSelection2(true);
+                return false;
+            }
+
+            DisplayDimension dimension = model.AddVerticalDimension2(
+                maxX + 0.025, (minY + maxY) / 2.0, 0) as DisplayDimension;
+            if (dimension == null)
+            {
+                LogDiagnostic("OVERALL_VERTICAL AddVerticalDimension2 returned null");
+                model.ClearSelection2(true);
+                return false;
+            }
+
+            LogDiagnostic("OVERALL_VERTICAL created type=" + dimension.GetType()
+                + " expectedModelMm=" + ((topY - bottomY) * 1000.0 / view.ScaleDecimal));
+            return true;
+        }
+
+        private static void ConsiderVerticalExtreme(
+            object vertex, double x, double y,
+            ref object bottomVertex, ref double bottomX, ref double bottomY,
+            ref object topVertex, ref double topX, ref double topY)
+        {
+            if (vertex == null)
+                return;
+
+            // Prefer the right-hand corner when both ends share the same Y.
+            if (y < bottomY - 0.000001 ||
+                (Math.Abs(y - bottomY) <= 0.000001 && x > bottomX))
+            {
+                bottomVertex = vertex;
+                bottomX = x;
+                bottomY = y;
+            }
+
+            if (y > topY + 0.000001 ||
+                (Math.Abs(y - topY) <= 0.000001 && x > topX))
+            {
+                topVertex = vertex;
+                topX = x;
+                topY = y;
+            }
         }
 
         private int CreateOuterOrthogonalDimensions(
@@ -1049,6 +1287,9 @@ namespace ADDIN.Commands
                     GetUndirectedAngleDifference(candidate.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
                     continue;
 
+                if (!HasTangentOverlap(candidate, bend, bend.NormalY, -bend.NormalX))
+                    continue;
+
                 double candidateSide =
                     (candidate.MidX - centerX) * bend.NormalX +
                     (candidate.MidY - centerY) * bend.NormalY;
@@ -1082,6 +1323,9 @@ namespace ADDIN.Commands
                     GetUndirectedAngleDifference(candidate.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
                     continue;
 
+                if (!HasTangentOverlap(candidate, bend, bend.NormalY, -bend.NormalX))
+                    continue;
+
                 double candidateSide =
                     (candidate.MidX - centerX) * bend.NormalX +
                     (candidate.MidY - centerY) * bend.NormalY;
@@ -1104,8 +1348,6 @@ namespace ADDIN.Commands
             List<string> createdDistanceKeys)
         {
             int count = 0;
-            List<string> processedSides = new List<string>();
-
             foreach (BendInfo bend in bends)
             {
                 if (bend.IsBoundingBox ||
@@ -1115,15 +1357,9 @@ namespace ADDIN.Commands
                 for (int side = -1; side <= 1; side += 2)
                 {
                     double direction = side;
+                    LogDiagnostic("SIDE direction=" + direction + " " + Describe(bend));
                     if (HasOuterParallelRealBend(bend, bends, centerX, centerY, direction))
-                        continue;
-
-                    string sideKey =
-                        Math.Round(GetAngleSortKey(bend.AngleGroup), 1).ToString("0.0") +
-                        ":" +
-                        (direction > 0 ? "P" : "N");
-                    if (processedSides.Contains(sideKey))
-                        continue;
+                    { LogDiagnostic("SKIP another parallel bend is farther outward"); continue; }
 
                     BendInfo outerEdge = FindOutermostLineByBendDirection(
                         bend,
@@ -1132,8 +1368,9 @@ namespace ADDIN.Commands
                         centerY,
                         direction);
 
+                    LogDiagnostic("CHOSEN_OUTER " + Describe(outerEdge));
                     if (outerEdge == null)
-                        continue;
+                    { LogDiagnostic("SKIP no eligible outer edge"); continue; }
 
                     if (GetUndirectedAngleDifference(outerEdge.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
                         continue;
@@ -1149,11 +1386,10 @@ namespace ADDIN.Commands
                         out normalX,
                         out normalY);
 
-                    double chainT = GetChainTangentCoordinate(
-                        bends,
-                        bend.AngleGroup,
-                        tangentX,
-                        tangentY);
+                    // Vi tri dim nam trong doan overlap cua chinh cap edge/bend.
+                    // ChainT toan cuc co the dat DIM vao mot khu vuc khac.
+                    double chainT = GetPairTangentCoordinate(
+                        bend, outerEdge, tangentX, tangentY);
 
                     int created = CreateEdgeToBendLineDimension(
                         model,
@@ -1168,11 +1404,10 @@ namespace ADDIN.Commands
                         normalY,
                         createdDistanceKeys);
 
+                    LogDiagnostic("EDGE_BEND created=" + created + " bend=" + Describe(bend)
+                        + " edge=" + Describe(outerEdge));
                     if (created > 0)
-                    {
-                        processedSides.Add(sideKey);
                         count += created;
-                    }
                 }
             }
 
@@ -1267,7 +1502,7 @@ namespace ADDIN.Commands
             double bendN = ProjectPoint(bend.MidX, bend.MidY, normalX, normalY);
             double distance = Math.Abs(edgeN - bendN);
             if (distance <= 0.001)
-                return 0;
+            { LogDiagnostic("SKIP edge/bend distance <= 0.001 sheet m: " + distance); return 0; }
 
             // Edge -> Bend dau/cuoi nam tren dung chain line cua group Bend-Line.
             double chainN = (edgeN + bendN) / 2.0;
@@ -1286,7 +1521,11 @@ namespace ADDIN.Commands
                 !SelectGeometry(view, bend, true, selectData))
                 return 0;
 
-            return AddLinearDimensionOnly(model, dimensionX, dimensionY) ? 1 : 0;
+            if (!AddLinearDimensionOnly(model, dimensionX, dimensionY))
+                return 0;
+
+            CommitProjectedPair(createdDistanceKeys, bend.AngleGroup, edgeN, bendN);
+            return 1;
         }
 
         private BendInfo FindOutermostLineByBendDirection(
@@ -1303,7 +1542,6 @@ namespace ADDIN.Commands
                 (bend.MidY - centerY) * bend.NormalY;
             double tangentX = bend.NormalY;
             double tangentY = -bend.NormalX;
-            double alongLimit = Math.Max(bend.Length * 2.5, 0.03);
 
             foreach (BendInfo line in lines)
             {
@@ -1313,17 +1551,17 @@ namespace ADDIN.Commands
                 if (GetUndirectedAngleDifference(line.AngleGroup, bend.AngleGroup) > ParallelAngleTolerance)
                     continue;
 
-                double alongDistance = GetClosestAlongDistance(line, bend, tangentX, tangentY);
-                if (alongDistance > alongLimit)
-                    continue;
+                if (!HasTangentOverlap(line, bend, tangentX, tangentY))
+                { LogDiagnostic("OUTER_REJECT no tangent overlap " + Describe(line)); continue; }
 
                 double lineSide =
                     (line.MidX - centerX) * bend.NormalX +
                     (line.MidY - centerY) * bend.NormalY;
                 double score = (lineSide - bendSide) * direction;
 
+                LogDiagnostic("OUTER_CANDIDATE score=" + score + " best=" + bestScore + " " + Describe(line));
                 if (score <= 0.001 || score <= bestScore)
-                    continue;
+                { LogDiagnostic("OUTER_REJECT score <= cutoff or not farther than best"); continue; }
 
                 outermost = line;
                 bestScore = score;
@@ -1356,6 +1594,26 @@ namespace ADDIN.Commands
                 Math.Abs((line.EndX - bend.EndX) * tangentX + (line.EndY - bend.EndY) * tangentY));
 
             return best;
+        }
+
+        private bool HasTangentOverlap(BendInfo first, BendInfo second, double tangentX, double tangentY)
+        {
+            double a1 = ProjectPoint(first.StartX, first.StartY, tangentX, tangentY);
+            double a2 = ProjectPoint(first.EndX, first.EndY, tangentX, tangentY);
+            double b1 = ProjectPoint(second.StartX, second.StartY, tangentX, tangentY);
+            double b2 = ProjectPoint(second.EndX, second.EndY, tangentX, tangentY);
+            return Math.Min(Math.Max(a1, a2), Math.Max(b1, b2)) -
+                Math.Max(Math.Min(a1, a2), Math.Min(b1, b2)) > 0.000001;
+        }
+
+        private double GetPairTangentCoordinate(BendInfo bend, BendInfo edge, double tangentX, double tangentY)
+        {
+            double a1 = ProjectPoint(bend.StartX, bend.StartY, tangentX, tangentY);
+            double a2 = ProjectPoint(bend.EndX, bend.EndY, tangentX, tangentY);
+            double b1 = ProjectPoint(edge.StartX, edge.StartY, tangentX, tangentY);
+            double b2 = ProjectPoint(edge.EndX, edge.EndY, tangentX, tangentY);
+            return (Math.Max(Math.Min(a1, a2), Math.Min(b1, b2)) +
+                Math.Min(Math.Max(a1, a2), Math.Max(b1, b2))) / 2.0;
         }
 
         private int CreateEdgeToBendPointDimension(
@@ -1600,14 +1858,17 @@ namespace ADDIN.Commands
 
         private bool AddLinearDimensionOnly(ModelDoc2 model, double x, double y)
         {
+            LogDiagnostic("ADD_DIM position=(" + x + "," + y + ")");
             DisplayDimension displayDimension = model.AddDimension2(x, y, 0) as DisplayDimension;
             if (displayDimension == null)
-                return false;
+            { LogDiagnostic("ADD_DIM FAILED returned null; registered key remains reserved"); return false; }
 
             int dimensionType = displayDimension.GetType();
+            LogDiagnostic("ADD_DIM returned type=" + dimensionType);
             if (dimensionType != (int)swDimensionType_e.swAngularDimension)
                 return true;
 
+            LogDiagnostic("ADD_DIM REJECT angular dimension; deleting");
             Annotation annotation = displayDimension.GetAnnotation() as Annotation;
             if (annotation != null && annotation.Select3(false, null))
                 model.EditDelete();
@@ -1696,10 +1957,20 @@ namespace ADDIN.Commands
                 Math.Round(maxProjection * 1000.0, 2).ToString("0.00");
 
             if (createdKeys.Contains(key))
-                return false;
+            { LogDiagnostic("SKIP duplicate key=" + key); return false; }
 
-            createdKeys.Add(key);
+            LogDiagnostic("CANDIDATE key=" + key);
             return true;
+        }
+
+        private void CommitProjectedPair(List<string> createdKeys, double angle, double projectionA, double projectionB)
+        {
+            string key = "PAIR:" +
+                Math.Round(GetAngleSortKey(angle), 1).ToString("0.0") + ":" +
+                Math.Round(Math.Min(projectionA, projectionB) * 1000.0, 2).ToString("0.00") + ":" +
+                Math.Round(Math.Max(projectionA, projectionB) * 1000.0, 2).ToString("0.00");
+            createdKeys.Add(key);
+            LogDiagnostic("COMMIT key=" + key);
         }
 
         private bool TryRegisterDimensionDistance(
@@ -1729,8 +2000,9 @@ namespace ADDIN.Commands
             }
 
             if (createdKeys.Contains(key))
-                return false;
+            { LogDiagnostic("SKIP duplicate key=" + key); return false; }
 
+            LogDiagnostic("REGISTER before creation key=" + key);
             createdKeys.Add(key);
             return true;
         }
@@ -1884,7 +2156,11 @@ namespace ADDIN.Commands
             {
                 // Edge cua model van giu nguyen cach select cu.
                 if (bend.IsEdge)
-                    return view.SelectEntity(bend.Geometry, append);
+                {
+                    bool selected = view.SelectEntity(bend.Geometry, append);
+                    LogDiagnostic("SELECT edge result=" + selected + " append=" + append + " " + Describe(bend));
+                    return selected;
+                }
 
                 if (selectData == null)
                     return false;
@@ -1907,7 +2183,9 @@ namespace ADDIN.Commands
                     segment = bend.Geometry as SketchSegment;
                 }
 
-                return segment != null && segment.Select4(append, selectData);
+                bool selectedSegment = segment != null && segment.Select4(append, selectData);
+                LogDiagnostic("SELECT sketch result=" + selectedSegment + " resolved=" + (segment != null) + " append=" + append + " " + Describe(bend));
+                return selectedSegment;
             }
             catch (COMException)
             {
@@ -1925,7 +2203,9 @@ namespace ADDIN.Commands
                 try
                 {
                     selectData.View = view;
-                    return refreshed.Select4(append, selectData);
+                    bool retried = refreshed.Select4(append, selectData);
+                    LogDiagnostic("SELECT retry result=" + retried + " " + Describe(bend));
+                    return retried;
                 }
                 catch (COMException)
                 {
@@ -1985,7 +2265,7 @@ namespace ADDIN.Commands
             double dy = p2[1] - p1[1];
             double length = Math.Sqrt(dx * dx + dy * dy);
             if (length <= 0.001)
-                return null;
+            { LogDiagnostic("SKIP edge length <= 0.001 sheet m: " + length); return null; }
 
             double angle = Math.Atan2(dy, dx);
             if (angle < 0)
@@ -2117,12 +2397,310 @@ namespace ADDIN.Commands
             {
                 TreeControlItem root = model.FeatureManager.GetFeatureTreeRootItem2(1);
                 TreeControlItem hit = FindTreeItemByText(root, names);
+                LogDiagnostic("BBOX drawing tree hit=" + (hit == null ? "none" : hit.Text)
+                    + " objectType=" + (hit == null || hit.Object == null ? "null" : hit.Object.GetType().FullName));
                 return hit?.Object as Feature;
             }
             catch (COMException)
             {
                 return null;
             }
+        }
+
+        private void LogViewBoundingBoxes(SolidWorks.Interop.sldworks.View view)
+        {
+            if (view == null)
+            {
+                LogDiagnostic("VIEW_BBOX view=null");
+                return;
+            }
+
+            // The view outline and a flat-pattern boundary-box sketch are view data,
+            // not necessarily named Feature objects in either document's feature tree.
+            try
+            {
+                double[] outline = view.GetOutline() as double[];
+                if (outline != null && outline.Length >= 4)
+                {
+                    LogDiagnostic("VIEW_OUTLINE sheetM min=("
+                        + outline[0].ToString("G17", CultureInfo.InvariantCulture) + ","
+                        + outline[1].ToString("G17", CultureInfo.InvariantCulture) + ") max=("
+                        + outline[2].ToString("G17", CultureInfo.InvariantCulture) + ","
+                        + outline[3].ToString("G17", CultureInfo.InvariantCulture) + ")");
+                }
+                else
+                {
+                    LogDiagnostic("VIEW_OUTLINE unavailable");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDiagnostic("VIEW_OUTLINE error: " + ex.Message);
+            }
+
+            try
+            {
+                DisplayData display = view.GetSMBoundaryBoxDisplayData2() as DisplayData;
+                LogDiagnostic("VIEW_SM_BOUNDARY_BOX lines="
+                    + (display == null ? "null" : display.GetLineCount().ToString(CultureInfo.InvariantCulture)));
+            }
+            catch (Exception ex)
+            {
+                LogDiagnostic("VIEW_SM_BOUNDARY_BOX error: " + ex.Message);
+            }
+        }
+
+        private List<BendInfo> GetSelectableViewBoundingBoxLines(
+            ModelDoc2 model, SolidWorks.Interop.sldworks.View view)
+        {
+            List<BendInfo> lines = new List<BendInfo>();
+            if (model == null || view == null)
+                return lines;
+
+            try
+            {
+                DisplayData display = view.GetSMBoundaryBoxDisplayData2() as DisplayData;
+                int count = display == null ? 0 : display.GetLineCount();
+                LogDiagnostic("VIEW_BBOX_DIM displayLines=" + count);
+                if (count < 4)
+                    return lines;
+                double[] outline = view.GetOutline() as double[];
+
+                for (int i = 0; i < count; i++)
+                {
+                    // DisplayData line format: color, line type, two reserved values,
+                    // followed by start XYZ and end XYZ in drawing-sheet coordinates.
+                    double[] data = display.GetLineAtIndex2(i) as double[];
+                    if (data == null || data.Length < 10)
+                    {
+                        LogDiagnostic("VIEW_BBOX_DIM line[" + i + "] data unavailable");
+                        lines.Clear();
+                        break;
+                    }
+
+                    BendInfo line = CreateDisplayBoundingBoxLine(data);
+                    if (line == null)
+                    {
+                        LogDiagnostic("VIEW_BBOX_DIM line[" + i + "] degenerate");
+                        lines.Clear();
+                        break;
+                    }
+                    if (outline != null && outline.Length >= 4 &&
+                        !IsLineInsideViewOutline(line, outline))
+                    {
+                        LogDiagnostic("VIEW_BBOX_DIM line[" + i + "] outside view outline; coordinate frame mismatch");
+                        lines.Clear();
+                        break;
+                    }
+
+                    LogDiagnostic("VIEW_BBOX_DIM display[" + i + "] " + Describe(line));
+                    SketchSegment segment = SelectVisibleBoundingBoxSegment(model, line, data[6], data[9]);
+                    if (segment == null)
+                    {
+                        LogDiagnostic("VIEW_BBOX_DIM line[" + i + "] not selectable as boundary-box sketch segment");
+                        lines.Clear();
+                        break;
+                    }
+
+                    line.Geometry = segment;
+                    lines.Add(line);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDiagnostic("VIEW_BBOX_DIM error: " + ex.Message);
+                lines.Clear();
+            }
+            finally
+            {
+                model.ClearSelection2(true);
+            }
+
+            LogDiagnostic("VIEW_BBOX_DIM selectableLines=" + lines.Count);
+            return lines;
+        }
+
+        private static BendInfo CreateDisplayBoundingBoxLine(double[] data)
+        {
+            double x1 = data[4];
+            double y1 = data[5];
+            double x2 = data[7];
+            double y2 = data[8];
+            if (double.IsNaN(x1) || double.IsNaN(y1) ||
+                double.IsNaN(x2) || double.IsNaN(y2) ||
+                double.IsInfinity(x1) || double.IsInfinity(y1) ||
+                double.IsInfinity(x2) || double.IsInfinity(y2))
+                return null;
+            double dx = x2 - x1;
+            double dy = y2 - y1;
+            double length = Math.Sqrt(dx * dx + dy * dy);
+            if (length <= 0.001)
+                return null;
+
+            double angle = Math.Atan2(dy, dx);
+            if (angle < 0) angle += Math.PI;
+            if (angle >= Math.PI) angle -= Math.PI;
+            double midX = (x1 + x2) / 2.0;
+            double midY = (y1 + y2) / 2.0;
+            double normalX = -Math.Sin(angle);
+            double normalY = Math.Cos(angle);
+            return new BendInfo
+            {
+                IsBoundingBox = true,
+                AngleGroup = Math.Round(angle * 180.0 / Math.PI, 1),
+                SortKey = midX * normalX + midY * normalY,
+                MidX = midX,
+                MidY = midY,
+                NormalX = normalX,
+                NormalY = normalY,
+                StartX = x1,
+                StartY = y1,
+                EndX = x2,
+                EndY = y2,
+                Length = length
+            };
+        }
+
+        private static bool IsLineInsideViewOutline(BendInfo line, double[] outline)
+        {
+            const double tolerance = 0.001;
+            return line.StartX >= outline[0] - tolerance &&
+                line.StartX <= outline[2] + tolerance &&
+                line.EndX >= outline[0] - tolerance &&
+                line.EndX <= outline[2] + tolerance &&
+                line.StartY >= outline[1] - tolerance &&
+                line.StartY <= outline[3] + tolerance &&
+                line.EndY >= outline[1] - tolerance &&
+                line.EndY <= outline[3] + tolerance;
+        }
+
+        private SketchSegment SelectVisibleBoundingBoxSegment(
+            ModelDoc2 model, BendInfo line, double startZ, double endZ)
+        {
+            SelectionMgr selection = model.SelectionManager as SelectionMgr;
+            if (selection == null)
+                return null;
+
+            string[] types = { "EXTSKETCHSEGMENT", "SKETCHSEGMENT" };
+            double[] fractions = { 0.5, 0.25, 0.75 };
+            foreach (string type in types)
+            {
+                foreach (double fraction in fractions)
+                {
+                    model.ClearSelection2(true);
+                    double x = line.StartX + (line.EndX - line.StartX) * fraction;
+                    double y = line.StartY + (line.EndY - line.StartY) * fraction;
+                    double z = startZ + (endZ - startZ) * fraction;
+                    try
+                    {
+                        if (!model.Extension.SelectByID2("", type, x, y, z, false, 0, null, 0))
+                            continue;
+
+                        SketchSegment segment = selection.GetSelectedObject6(1, -1) as SketchSegment;
+                        Sketch sketch = segment?.GetSketch() as Sketch;
+                        if (sketch != null && sketch.IsBoundaryBoxSketch())
+                        {
+                            LogDiagnostic("VIEW_BBOX_DIM selected type=" + type + " fraction=" + fraction);
+                            return segment;
+                        }
+                    }
+                    catch (COMException ex)
+                    {
+                        LogDiagnostic("VIEW_BBOX_DIM selection error: " + ex.Message);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private Feature ResolveBoundingBoxFeature(ModelDoc2 drawing, SolidWorks.Interop.sldworks.View view)
+        {
+            string[] names = { "境界ﾎﾞｯｸｽ", "境界ボックス", "Bounding-Box" };
+            Feature drawingFeature = FindFeatureFromTree(drawing, names);
+            LogDiagnostic("BBOX lookup drawing tree: " + (drawingFeature == null ? "none" : drawingFeature.Name));
+            try
+            {
+                if (drawingFeature != null && drawingFeature.GetSpecificFeature2() is Sketch)
+                    return drawingFeature;
+            }
+            catch (COMException ex)
+            {
+                LogDiagnostic("BBOX drawing feature is stale: " + ex.Message);
+            }
+
+            ModelDoc2 referencedModel = null;
+            try { referencedModel = view.ReferencedDocument as ModelDoc2; }
+            catch (COMException ex) { LogDiagnostic("BBOX referenced document error: " + ex.Message); }
+
+            if (referencedModel == null)
+            {
+                LogDiagnostic("BBOX referenced document unavailable");
+                return drawingFeature;
+            }
+
+            try
+            {
+                LogDiagnostic("BBOX referenced model: " + referencedModel.GetTitle());
+                int visited = 0;
+                Feature referencedFeature = FindNamedSketchFeature(
+                    referencedModel.FirstFeature() as Feature, names, 0, ref visited);
+                LogDiagnostic("BBOX lookup referenced model: "
+                    + (referencedFeature == null ? "none" : referencedFeature.Name)
+                    + " featuresVisited=" + visited);
+                return referencedFeature ?? drawingFeature;
+            }
+            catch (COMException ex)
+            {
+                LogDiagnostic("BBOX referenced-model search error: " + ex.Message);
+                return drawingFeature;
+            }
+        }
+
+        private Feature FindNamedSketchFeature(
+            Feature first, string[] names, int depth, ref int visited)
+        {
+            if (depth > 24)
+                return null;
+
+            for (Feature feature = first; feature != null && visited < 10000;
+                feature = depth == 0 ? feature.GetNextFeature() as Feature : feature.GetNextSubFeature() as Feature)
+            {
+                visited++;
+                string featureName = feature.Name ?? string.Empty;
+                string featureType = feature.GetTypeName2() ?? string.Empty;
+                if (visited <= 200 && (featureType.IndexOf("Sketch", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    featureType.IndexOf("ProfileFeature", StringComparison.OrdinalIgnoreCase) >= 0))
+                    LogDiagnostic("BBOX model sketch candidate name=" + featureName + " type=" + featureType);
+                bool nameMatches = false;
+                foreach (string name in names)
+                {
+                    if (featureName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        nameMatches = true;
+                        break;
+                    }
+                }
+
+                if (nameMatches)
+                {
+                    Sketch sketch = feature.GetSpecificFeature2() as Sketch;
+                    LogDiagnostic("BBOX referenced candidate name=" + featureName
+                        + " type=" + featureType + " isSketch=" + (sketch != null));
+                    if (sketch != null)
+                        return feature;
+                }
+
+                Feature child = feature.GetFirstSubFeature() as Feature;
+                if (child == null)
+                    continue;
+
+                Feature match = FindNamedSketchFeature(child, names, depth + 1, ref visited);
+                if (match != null)
+                    return match;
+            }
+
+            return null;
         }
 
         private Feature ShowSketchFromTree(ModelDoc2 model, params string[] names)

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -69,8 +69,14 @@
       <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.swpublished.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsFormsIntegration" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="UIAutomationClient" />
@@ -81,6 +87,7 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Runtime.Serialization" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BomTaskPaneControl.cs">
@@ -89,8 +96,18 @@
     <Compile Include="BomTaskPaneControl.Designer.cs">
       <DependentUpon>BomTaskPaneControl.cs</DependentUpon>
     </Compile>
+    <Compile Include="UI\AutoSplinePropertyManagerPage.cs" />
+    <Compile Include="UI\VCutBendAssignmentControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\VCutBendAssignmentControl.Designer.cs">
+      <DependentUpon>VCutBendAssignmentControl.cs</DependentUpon>
+    </Compile>
     <Compile Include="BomLoader.cs" />
+    <Compile Include="BomOccurrenceCounter.cs" />
     <Compile Include="Commands\CreateMirrorPartPackage.cs" />
+    <Compile Include="Commands\Repair3DSplineCommand.cs" />
+    <Compile Include="Diagnostics\SketchReferenceDiagnostic.cs" />
     <Compile Include="Commands\MirrorV7\BipartiteEquivalenceMatcherV7.cs" />
     <Compile Include="Commands\MirrorV7\BodyMirrorVerifierV7.cs" />
     <Compile Include="Commands\MirrorV7\CanonicalPartMirrorPlaneV7.cs" />
@@ -105,6 +122,12 @@
     <Compile Include="Commands\MirrorV7\MirrorInPlace\Handlers\FeatureDispatcher.cs" />
     <Compile Include="Commands\MirrorV7\MirrorInPlace\Mutation\BaseSketchMutationEngine.cs" />
     <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\RollbackReplayEngine.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\DependencyScope64.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\DependencyReplay64.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\EdgeFlangeReplay.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\FlangeGuideGeometry61.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\FlangeGuideSketch61.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\ChiralFeatureReplay45.cs" />
     <Compile Include="Commands\MirrorV7\MirrorInPlace\Validation\SemanticValidator.cs" />
     <Compile Include="Commands\MirrorV7\MirrorSourceBaselineV7.cs" />
     <Compile Include="Commands\MirrorV7\MirrorV7Context.cs" />
@@ -154,6 +177,16 @@
     <Compile Include="Commands\XoaBalloonMauVang.cs" />
     <Compile Include="Commands\XoaDimMauVang.cs" />
     <Compile Include="Commands\TaoDimKegaki.cs" />
+    <Compile Include="Commands\AutoVCutSectionCommand.cs" />
+    <Compile Include="Commands\VCutPropertySetupCommand.cs" />
+    <Compile Include="Commands\BendTableCellReader.cs" />
+    <Compile Include="Commands\VCutFeatureTagStore.cs" />
+    <Compile Include="UI\VCutNoticeDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\VCutNoticeDialog.Designer.cs">
+      <DependentUpon>VCutNoticeDialog.cs</DependentUpon>
+    </Compile>
     <Compile Include="Commands\HistoryTextBox.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -204,6 +237,12 @@
     <Compile Include="Commands\RepairDimCandidateFinder.cs" />
     <Compile Include="Commands\RepairDanglingDimensions.cs" />
     <Compile Include="Commands\PaintHoleSummaryCommand.cs" />
+    <Compile Include="Commands\ChangeHoleNameCommand.cs" />
+    <Compile Include="HoleManagement\HoleNamePresetManager.cs" />
+    <Compile Include="HoleManagement\HoleFeatureClassifier.cs" />
+    <Compile Include="HoleManagement\HoleMetadataService.cs" />
+    <Compile Include="HoleManagement\HoleGeometryAnalyzer.cs" />
+    <Compile Include="HoleManagement\HoleFamilyResolver.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -213,6 +252,9 @@
     <Compile Include="Helpers\ExtrudeCutRecoveryHelper.cs" />
     <Compile Include="Helpers\TopologyEdgeMatcher.cs" />
     <Compile Include="Helpers\SketchOperationsHelper.cs" />
+    <Compile Include="Helpers\SketchPointMatcher47.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Core\FeatureTreeLayout50.cs" />
+    <Compile Include="Helpers\ExtrudeCutReplay44.cs" />
     <Compile Include="Helpers\EdgeFlangeRepairManager.cs" />
     <Compile Include="Helpers\FeatureOptionsCaptureHelper.cs" />
     <Compile Include="UI\UIHelper.cs" />
@@ -229,12 +271,24 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="UI\GridStyler.cs" />
+    <Compile Include="UI\RelayCommand.cs" />
+    <Compile Include="UI\RepairHoleRowViewModel.cs" />
+    <Compile Include="UI\RepairHoleViewModel.cs" />
+    <Compile Include="UI\RepairHoleTaskPaneView.xaml.cs">
+      <DependentUpon>RepairHoleTaskPaneView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="SWAddin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Commands\EdgeToEqualSplineCommand.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="tai.snk" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="UI\RepairHoleTaskPaneView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="BomTaskPaneControl.resx">
@@ -252,6 +306,15 @@
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Blocks\プレーナー○印.sldblk">
+      <LogicalName>ADDIN.Blocks.Circle.sldblk</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Blocks\プレーナー◎印.sldblk">
+      <LogicalName>ADDIN.Blocks.DoubleCircle.sldblk</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Blocks\プレーナー●印.sldblk">
+      <LogicalName>ADDIN.Blocks.FilledCircle.sldblk</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -284,6 +347,24 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Images\repairhole.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\setbendline3d.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\autospline3d.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\repairspline3d.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\splinetoarcs.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\dimkichthuoclo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\vcutsection.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

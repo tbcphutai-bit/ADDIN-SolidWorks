@@ -19,6 +19,24 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
         public BaseFeaturePrescriptionV7 BasePrescription { get; set; }
         public BaseMutationResultV7 BaseMutation { get; set; }
         public FeatureReplayCheckpointV7 ReplayCheckpoint { get; set; }
+        internal DependencyJournal64 Dependencies64 { get; set; }
+        // Only explicitly recreated native features enter this run-scoped ledger.
+        // Source persistent references remain untouched for source-to-output reporting.
+        public Dictionary<int, PersistReferenceV7> ReplacementReferences { get; private set; }
+        // Only explicitly registered replacement sketches may use a generated name.
+        public Dictionary<int, string> ReplacementTargetNames { get; private set; }
+        // Source profile order -> source native Edge Flange order. The replacement
+        // sketch is a top-level driver inserted immediately before its flange.
+        public Dictionary<int, int> ExternalFlangeProfiles { get; private set; }
+        // Explicit regenerated OneBend -> EdgeFlange and UiBend -> OneBend relationships.
+        public Dictionary<int, int> GeneratedBendOwners { get; private set; }
+        public MirrorInPlaceExecutionContextV7()
+        {
+            ReplacementReferences = new Dictionary<int, PersistReferenceV7>();
+            ReplacementTargetNames = new Dictionary<int, string>();
+            ExternalFlangeProfiles = new Dictionary<int, int>();
+            GeneratedBendOwners = new Dictionary<int, int>();
+        }
     }
 
     public sealed class MirrorInPlacePreparationResultV7

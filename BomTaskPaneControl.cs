@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using ADDIN.Commands;
+using ADDIN.HoleManagement;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -28,15 +29,26 @@ namespace ADDIN
         private DimKichThuocLo holeDimensionCommand;
         private LenhDimCanhSongSong sectionEdgeDimensionCommand;
         private SplineToArcsCommand splineToArcsCommand;
+        private ADDIN.UI.AutoSplinePropertyManagerPage autoSplinePage;
         private LenhNoteTextBalloon drawingTextAnnotationCommands;
         private CheckBalloon balloonChecker;
         private CheckDrawingBom drawingBomChecker;
         private XepUnitDrawing xepUnitDrawing;
         private LenhMakeHole makeHoleCommand;
         private PaintHoleSummaryCommand paintHoleSummaryCommand;
+        private ChangeHoleNameCommand changeHoleNameCommand;
+        private HoleNamePresetManager holeNamePresetManager;
+        private List<string> holeNamePresets = new List<string>();
+        private Label lblHoleType;
+        private ComboBox cboHoleType;
+        private Button btnManageHoleTypes;
+        private Button btnChangeHoleName;
+        private VCutPropertySetupCommand vCutPropertySetupCommand;
         private Timer componentDrawingTimer;
         private Timer makeHoleUpdateTimer;
         private Timer initialLayoutTimer;
+        private bool initialLayoutQueued;
+        private Size initialLayoutObservedSize;
         private ToolTip bomCommandToolTip;
         private Font bomCommandToolTipFont;
         private string manualBomCommandToolTipText;
@@ -53,6 +65,8 @@ namespace ADDIN
         private string lastSelectedViewKey;
         private bool solidWorksClosing;
         private bool repairHolePanelMode;
+        private ADDIN.UI.RepairHoleViewModel repairHoleViewModel;
+        private ADDIN.UI.RepairHoleTaskPaneView repairHoleTaskPaneView;
         private Label lblMakeHolePaintName;
         private TextBox txtMakeHolePaintName;
         private const string AppUiFontName = "Meiryo UI";
@@ -112,7 +126,7 @@ namespace ADDIN
                 return message == 0x007B;
             }
         }
-        
+
         private const string MakeHoleSizeHistoryFileName = "make-hole-sizes.txt";
         private const string PropNameHinmei = "\u54c1\u540d";
         private const string PropNameBuhinmei = "\u90e8\u54c1\u540d";
@@ -154,6 +168,7 @@ namespace ADDIN
             EnsureCheckBalloonButton();
             EnsureCheckDrawingBomButton();
             EnsureMakeHolePaintNameControls();
+            InitializeHoleTypeControls();
             // ApplyUnifiedTypography(this); 
             // ApplyModelTypography();
             ApplyDrawingUiStyles();
@@ -193,7 +208,9 @@ namespace ADDIN
             splineToArcsCommand = new SplineToArcsCommand(swApp);
             xepUnitDrawing = new XepUnitDrawing(swApp);
             makeHoleCommand = new LenhMakeHole(swApp);
+            BindRepairHoleViewModelToMakeHoleCommand();
             paintHoleSummaryCommand = new PaintHoleSummaryCommand(swApp);
+            changeHoleNameCommand = new ChangeHoleNameCommand(swApp);
             drawingTextAnnotationCommands = new LenhNoteTextBalloon(
                 swApp,
                 this,
@@ -222,6 +239,8 @@ namespace ADDIN
         public void ShutdownFromSolidWorks()
         {
             solidWorksClosing = true;
+            autoSplinePage?.Dismiss();
+            autoSplinePage = null;
             actions?.RequestCancel();
             EndSolidWorksInputLock();
             DisposeComponentDrawingTimer();
@@ -238,8 +257,14 @@ namespace ADDIN
             splineToArcsCommand = null;
             drawingTextAnnotationCommands = null;
             xepUnitDrawing = null;
+            if (repairHoleViewModel != null)
+            {
+                repairHoleViewModel.Initialize(null, null);
+                repairHoleViewModel.ResetPanel();
+            }
             makeHoleCommand = null;
             paintHoleSummaryCommand = null;
+            vCutPropertySetupCommand = null;
             drawingBomChecker = null;
             swApp = null;
         }
@@ -336,13 +361,17 @@ namespace ADDIN
 
         private void ScheduleInitialTaskPaneLayout()
         {
-            if (!IsHandleCreated || IsDisposed)
+            if (!IsHandleCreated || IsDisposed || Disposing || initialLayoutQueued)
                 return;
 
+            initialLayoutQueued = true;
             BeginInvoke((Action)(() =>
             {
+                initialLayoutQueued = false;
+                if (IsDisposed || Disposing || !IsHandleCreated)
+                    return;
+                SyncSizeWithTaskPaneHost();
                 ForceTaskPaneLayout();
-                BeginInvoke((Action)ForceTaskPaneLayout);
                 StartInitialLayoutTimer();
             }));
         }
@@ -361,8 +390,12 @@ namespace ADDIN
 
             // The SOLIDWORKS host assigns the final TaskPane size asynchronously.
             // Repeat layout briefly so the user does not have to drag the pane first.
-            initialLayoutPassesRemaining = 12;
-            initialLayoutTimer.Start();
+            if (!initialLayoutTimer.Enabled)
+            {
+                initialLayoutObservedSize = Size;
+                initialLayoutPassesRemaining = 12;
+                initialLayoutTimer.Start();
+            }
         }
 
         private void InitialLayoutTimer_Tick(object sender, EventArgs e)
@@ -374,7 +407,13 @@ namespace ADDIN
             }
 
             SyncSizeWithTaskPaneHost();
-            ForceTaskPaneLayout();
+            // Host sizing is asynchronous. Poll briefly, but do not relayout
+            // the entire pane on every tick when its size has not changed.
+            if (Size != initialLayoutObservedSize)
+            {
+                initialLayoutObservedSize = Size;
+                ForceTaskPaneLayout();
+            }
         }
 
         private void DisposeInitialLayoutTimer()
@@ -480,7 +519,7 @@ namespace ADDIN
                 tabDrawingBom.Controls.Add(btnCheckDrawingBom);
             }
         }
-        
+
         private void WireEvents()
         {
             btnLoadBom.Click += btnLoadBom_Click;
@@ -512,6 +551,12 @@ namespace ADDIN
             if (btnRepairDim != null)
                 btnRepairDim.Click += btnRepairDim_Click;
             btnDimMatCat.Click += btnDimMatCat_Click;
+            btnVCutSection.Click += btnVCutSection_Click;
+            btnVCutPropertySetup.Click += btnVCutPropertySetup_Click;
+            vCutBendAssignmentControl.SaveRequested += vCutBendAssignmentControl_SaveRequested;
+            vCutBendAssignmentControl.RefreshRequested += vCutBendAssignmentControl_RefreshRequested;
+            vCutBendAssignmentControl.CloseRequested += vCutBendAssignmentControl_CloseRequested;
+            vCutBendAssignmentControl.BendSelected += vCutBendAssignmentControl_BendSelected;
             btnSplineToArcs.Click += btnSplineToArcs_Click;
             btnMakeHole.Click += btnMakeHole_Click;
             btnRepairHole.Click += btnRepairHole_Click;
@@ -608,6 +653,112 @@ namespace ADDIN
             }
         }
 
+        private void btnRepair3DSpline_Click(object sender, EventArgs e)
+        {
+            new ADDIN.Commands.Repair3DSplineCommand(swApp).Run(this);
+        }
+
+        private void btnVCutSection_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (swApp == null)
+                {
+                    MessageBox.Show(this, "Chưa kết nối SOLIDWORKS.", "V-CUT SECTION",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                new AutoVCutSectionCommand(swApp).Run();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Không chạy được V-CUT SECTION:\n" + ex,
+                    "V-CUT SECTION", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnVCutPropertySetup_Click(object sender, EventArgs e)
+        {
+            if (vCutBendAssignmentControl.Visible &&
+                !vCutBendAssignmentControl.ConfirmDiscardChanges("mở lại bảng")) return;
+            LoadVCutBendAssignments(null);
+        }
+
+        private void LoadVCutBendAssignments(string preferredFeatureName, bool refreshed = false)
+        {
+            try
+            {
+                if (swApp == null)
+                {
+                    UI.VCutNoticeDialog.Inform(this, "Chưa kết nối SOLIDWORKS",
+                        "Không thể mở bảng cạnh bẻ. Hãy kiểm tra kết nối SOLIDWORKS rồi thử lại.",
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+                var command = new VCutPropertySetupCommand(swApp);
+                List<VCutPropertySetupCommand.BendRow> rows;
+                Dictionary<string, string> properties;
+                string message;
+                if (!command.Load(out rows, out properties, out message))
+                {
+                    UI.VCutNoticeDialog.Inform(this, "Không thể mở Set Bend line",
+                        message, MessageBoxIcon.Warning);
+                    return;
+                }
+                vCutPropertySetupCommand = command;
+                vCutBendAssignmentControl.LoadRows(rows, properties,
+                    command.LoadedPartTitle, command.LoadedConfiguration,
+                    preferredFeatureName, refreshed);
+                vCutBendAssignmentControl.Visible = true;
+                vCutBendAssignmentControl.BringToFront();
+            }
+            catch (Exception ex)
+            {
+                UI.VCutNoticeDialog.Inform(this, "Không nạp được cạnh bẻ",
+                    "Đã xảy ra lỗi khi đọc Bend Feature:\r\n\r\n" + ex,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private void vCutBendAssignmentControl_SaveRequested(object sender, EventArgs e)
+        {
+            try
+            {
+                if (vCutPropertySetupCommand == null) return;
+                string message;
+                bool saved = vCutPropertySetupCommand.Save(
+                    vCutBendAssignmentControl.Rows,
+                    vCutBendAssignmentControl.Properties, out message);
+                if (saved) vCutBendAssignmentControl.RefreshAfterSave();
+                UI.VCutNoticeDialog.Inform(this,
+                    saved ? "Đã lưu gán bào" : "Chưa thể lưu gán bào",
+                    message, saved ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            }
+            catch (Exception ex)
+            {
+                UI.VCutNoticeDialog.Inform(this, "Không lưu được loại bào",
+                    "Đã xảy ra lỗi khi lưu:\r\n\r\n" + ex,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private void vCutBendAssignmentControl_RefreshRequested(object sender, EventArgs e)
+        {
+            LoadVCutBendAssignments(vCutBendAssignmentControl.CurrentFeatureName, true);
+        }
+
+        private void vCutBendAssignmentControl_CloseRequested(object sender, EventArgs e)
+        {
+            vCutBendAssignmentControl.Visible = false;
+            vCutPropertySetupCommand = null;
+        }
+
+        private void vCutBendAssignmentControl_BendSelected(
+            VCutPropertySetupCommand.BendRow row)
+        {
+            vCutPropertySetupCommand?.SelectFeature(row);
+        }
+
         private void btnEdgeToEqualSpline_Click(object sender, EventArgs e)
         {
             try
@@ -622,8 +773,17 @@ namespace ADDIN
                     return;
                 }
 
-                var command = new ADDIN.Commands.EdgeToEqualSplineCommand(swApp);
-                command.Run(this);
+                if (autoSplinePage != null && autoSplinePage.IsOpen)
+                    return;
+
+                autoSplinePage = new ADDIN.UI.AutoSplinePropertyManagerPage(
+                    swApp, this,
+                    page =>
+                    {
+                        if (ReferenceEquals(autoSplinePage, page))
+                            autoSplinePage = null;
+                    });
+                autoSplinePage.Show();
             }
             catch (Exception ex)
             {
@@ -699,6 +859,9 @@ namespace ADDIN
                 SetButtonImageIfExists(btnDimKegaki, Path.Combine(imagesDir, "dimkegaki.png"));
                 SetButtonImageIfExists(btnDimKichThuocLo, Path.Combine(imagesDir, "dimmatcat.png"));
                 SetButtonImageIfExists(btnRepairDim, Path.Combine(imagesDir, "repairhole.png"));
+                SetButtonImageIfExists(btnSplineToArcs, Path.Combine(imagesDir, "splinetoarcs.png"));
+                SetButtonImageIfExists(btnDimKichThuocLo, Path.Combine(imagesDir, "dimkichthuoclo.png"));
+                SetButtonImageIfExists(btnVCutSection, Path.Combine(imagesDir, "vcutsection.png"));
 
                 SetModelCommandImageIfExists(btnMakeHole, Path.Combine(imagesDir, "makehole.png"));
                 SetModelCommandImageIfExists(btnRepairHole, Path.Combine(imagesDir, "repairhole.png"));
@@ -1018,14 +1181,143 @@ namespace ADDIN
                 }
             }
         }
+        private void InitializeHoleTypeControls()
+        {
+            holeNamePresetManager = new HoleNamePresetManager();
+            try { holeNamePresets = holeNamePresetManager.Load(); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[HOLE PRESET] Load failed: " + ex.Message);
+                holeNamePresets = new List<string>();
+            }
+
+            lblHoleType = new Label { Name = "lblHoleType", Text = "Hole Type",
+                AutoSize = true, Font = CreateUiFont(9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(20, 65, 115) };
+            cboHoleType = new ComboBox { Name = "cboHoleType", DropDownStyle = ComboBoxStyle.DropDown,
+                Font = CreateUiFont(9F, FontStyle.Bold) };
+            btnManageHoleTypes = new Button { Name = "btnManageHoleTypes", Text = "⋯",
+                Font = CreateUiFont(10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(230, 235, 240), TabStop = false };
+            btnChangeHoleName = new Button { Name = "btnChangeHoleName", Text = "CHANGE NAME HOLE",
+                Font = CreateUiFont(9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(200, 242, 236),
+                ForeColor = Color.FromArgb(12, 78, 70) };
+            panelModelCommands.Controls.Add(lblHoleType);
+            panelModelCommands.Controls.Add(cboHoleType);
+            panelModelCommands.Controls.Add(btnManageHoleTypes);
+            panelModelCommands.Controls.Add(btnChangeHoleName);
+            RefreshHoleTypeItems(null);
+            btnChangeHoleName.Click += (sender, args) =>
+            {
+                if (changeHoleNameCommand == null) changeHoleNameCommand = new ChangeHoleNameCommand(swApp);
+                changeHoleNameCommand.Run(cboHoleType.Text);
+            };
+            btnManageHoleTypes.Click += (sender, args) => ShowHoleTypeManager();
+            chkMakeHolePaint.Visible = false;
+            lblMakeHolePaintName.Visible = false;
+            txtMakeHolePaintName.Visible = false;
+        }
+
+        private void RefreshHoleTypeItems(string selected)
+        {
+            cboHoleType.BeginUpdate();
+            cboHoleType.Items.Clear();
+            foreach (string value in holeNamePresets) cboHoleType.Items.Add(value);
+            cboHoleType.EndUpdate();
+            cboHoleType.Text = selected ?? "";
+        }
+
+        private void ShowHoleTypeManager()
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = "Manage Hole Types";
+                dialog.ClientSize = new Size(340, 230);
+                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.MinimizeBox = false;
+                dialog.MaximizeBox = false;
+
+                var list = new ListBox { Left = 12, Top = 12, Width = 316, Height = 122 };
+                var input = new TextBox { Left = 12, Top = 145, Width = 316,
+                    Text = cboHoleType.Text, Font = CreateUiFont(9F) };
+                var add = new Button { Text = "Add", Left = 12, Top = 183, Width = 72 };
+                var edit = new Button { Text = "Edit", Left = 94, Top = 183, Width = 72 };
+                var delete = new Button { Text = "Delete", Left = 176, Top = 183, Width = 72 };
+                var close = new Button { Text = "Close", Left = 258, Top = 183, Width = 70,
+                    DialogResult = DialogResult.Cancel };
+                dialog.Controls.AddRange(new Control[] { list, input, add, edit, delete, close });
+                dialog.CancelButton = close;
+                list.SelectedIndexChanged += (sender, args) =>
+                {
+                    if (list.SelectedItem is string value) input.Text = value;
+                };
+                RefreshHoleTypeManagerList(list, cboHoleType.SelectedItem as string);
+
+                add.Click += (sender, args) =>
+                {
+                    string value = input.Text.Trim();
+                    if (TryUpdateHolePresets(() => holeNamePresetManager.Add(holeNamePresets, value), value))
+                        RefreshHoleTypeManagerList(list, value);
+                };
+                edit.Click += (sender, args) =>
+                {
+                    string oldValue = list.SelectedItem as string;
+                    if (oldValue == null) return;
+                    string value = input.Text.Trim();
+                    if (TryUpdateHolePresets(() => holeNamePresetManager.Update(holeNamePresets, oldValue, value), value))
+                        RefreshHoleTypeManagerList(list, value);
+                };
+                delete.Click += (sender, args) =>
+                {
+                    string value = list.SelectedItem as string;
+                    if (value == null) return;
+                    if (TryUpdateHolePresets(() => holeNamePresetManager.Delete(holeNamePresets, value), null))
+                    {
+                        RefreshHoleTypeManagerList(list, null);
+                        input.Clear();
+                    }
+                };
+                dialog.ActiveControl = input;
+                dialog.ShowDialog(this);
+            }
+        }
+
+        private void RefreshHoleTypeManagerList(ListBox list, string selected)
+        {
+            list.BeginUpdate();
+            try
+            {
+                list.Items.Clear();
+                foreach (string value in holeNamePresets) list.Items.Add(value);
+            }
+            finally { list.EndUpdate(); }
+            if (!string.IsNullOrWhiteSpace(selected)) list.SelectedItem = selected;
+        }
+
+        private bool TryUpdateHolePresets(Func<List<string>> action, string selected)
+        {
+            try
+            {
+                holeNamePresets = action();
+                RefreshHoleTypeItems(selected);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Hole Type", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+        }
         private void ApplyModelTypography()
         {
             Font uiFont = CreateUiFont(9.0F, FontStyle.Regular);
-            Font inputFont = CreateUiFont(9.0F, FontStyle.Bold);
-            Font labelFont = CreateUiFont(8.75F, FontStyle.Bold);
-            Font groupFont = CreateUiFont(9.0F, FontStyle.Bold);
-            Color labelColor = Color.FromArgb(229, 83, 12);
-            Color textColor = Color.FromArgb(18, 22, 28);
+            Font inputFont = CreateUiFont(10.5F, FontStyle.Bold);
+            Font labelFont = CreateUiFont(10.0F, FontStyle.Bold);
+            Font groupFont = CreateUiFont(9.5F, FontStyle.Bold);
+            Color labelColor = Color.FromArgb(25, 30, 40);
+            Color textColor = Color.FromArgb(10, 15, 25);
 
             panelModelCommands.Font = uiFont;
             panelModelProps.Font = uiFont;
@@ -1305,10 +1597,35 @@ namespace ADDIN
                 btnCheckSamePart,
                 "BOM chi tiet: tim cac chi tiet co bien dang hinh hoc giong nhau tren Flat-Pattern; doi chieu trang thai gap, vat lieu va chieu day.");
 
+            // Tooltips cho các nút Macro trong tab Model -> Macro
+            SetBomCommandToolTip(
+                btnCheckAssemblyHole,
+                "Macro: Kiểm tra vị trí và độ đồng tâm các lỗ trong cụm lắp ráp Assembly.");
+            SetBomCommandToolTip(
+                btnMirrorPart,
+                "Macro: Tạo chi tiết đối xứng (Mirror Part) tự động giữ nguyên thuộc tính.");
+            SetBomCommandToolTip(
+                btnEdgeToEqualSpline,
+                "AUTO SPLINE mở bảng SolidWorks:\n" +
+                "TẠO: chọn 1 Edge để tạo spline mới.\n" +
+                "DI CHUYỂN: Edit 3D Sketch, chọn spline nguồn và " +
+                "cạnh spline đích của Surface/Body.");
+            SetBomCommandToolTip(
+                btnRepair3DSpline,
+                "Macro: Sửa chữa và làm mịn đường 3D Spline.");
+            SetBomCommandToolTip(
+                btnVCutPropertySetup,
+                "Macro: Cài đặt thuộc tính đường gập và gán rãnh bào V-Cut.");
+
             // Disabled WinForms controls do not raise hover events. Listen on the
             // parent as well so the description remains available while buttons are dimmed.
             tabDrawingBom.MouseMove += tabDrawingBom_BomCommandToolTipMouseMove;
             tabDrawingBom.MouseLeave += tabDrawingBom_BomCommandToolTipMouseLeave;
+            if (tabModelMacroPage != null)
+            {
+                tabModelMacroPage.MouseMove += tabModelMacroPage_BomCommandToolTipMouseMove;
+                tabModelMacroPage.MouseLeave += tabModelMacroPage_BomCommandToolTipMouseLeave;
+            }
         }
 
         private void SetBomCommandToolTip(Control control, string description)
@@ -1341,7 +1658,7 @@ namespace ADDIN
             if (bomCommandToolTipFont == null)
                 return;
 
-            string text = e.AssociatedControl == tabDrawingBom
+            string text = (e.AssociatedControl == tabDrawingBom || e.AssociatedControl == tabModelMacroPage)
                 ? manualBomCommandToolTipText
                 : bomCommandToolTip.GetToolTip(e.AssociatedControl);
             if (string.IsNullOrWhiteSpace(text))
@@ -1438,6 +1755,59 @@ namespace ADDIN
             manualBomCommandToolTipText = "";
             if (bomCommandToolTip != null)
                 bomCommandToolTip.Hide(tabDrawingBom);
+        }
+
+        private void tabModelMacroPage_BomCommandToolTipMouseMove(object sender, MouseEventArgs e)
+        {
+            if (bomCommandToolTip == null || tabModelMacroPage == null)
+                return;
+
+            Point screenPoint = tabModelMacroPage.PointToScreen(e.Location);
+            Control hoveredControl = null;
+            Control[] macroButtons =
+            {
+                btnCheckAssemblyHole,
+                btnMirrorPart,
+                btnEdgeToEqualSpline,
+                btnRepair3DSpline,
+                btnVCutPropertySetup
+            };
+
+            foreach (Control control in macroButtons)
+            {
+                if (control != null && control.Visible && !control.Enabled &&
+                    control.RectangleToScreen(control.ClientRectangle).Contains(screenPoint))
+                {
+                    hoveredControl = control;
+                    break;
+                }
+            }
+
+            if (hoveredControl == lastDisabledBomToolTipControl)
+                return;
+
+            bomCommandToolTip.Hide(tabModelMacroPage);
+            lastDisabledBomToolTipControl = hoveredControl;
+
+            if (hoveredControl == null)
+                return;
+
+            string description = bomCommandToolTip.GetToolTip(hoveredControl);
+            if (string.IsNullOrEmpty(description))
+                return;
+
+            manualBomCommandToolTipText = description;
+            Rectangle buttonBounds = hoveredControl.RectangleToScreen(hoveredControl.ClientRectangle);
+            Point showPoint = tabModelMacroPage.PointToClient(new Point(buttonBounds.Left, buttonBounds.Bottom + 2));
+            bomCommandToolTip.Show(description, tabModelMacroPage, showPoint.X, showPoint.Y, 12000);
+        }
+
+        private void tabModelMacroPage_BomCommandToolTipMouseLeave(object sender, EventArgs e)
+        {
+            lastDisabledBomToolTipControl = null;
+            manualBomCommandToolTipText = "";
+            if (bomCommandToolTip != null)
+                bomCommandToolTip.Hide(tabModelMacroPage);
         }
 
         private void btnCheckDfTk_Click(object sender, EventArgs e)
@@ -1552,8 +1922,21 @@ namespace ADDIN
 
         private void btnRepairHole_Click(object sender, EventArgs e)
         {
+            // The WinForms control is constructed before Init(ISldWorks), so the
+            // RepairHoleViewModel may initially exist without a LenhMakeHole backend.
+            // Re-bind here as a safety net before exposing the Repair UI.
+            if (makeHoleCommand == null && swApp != null)
+            {
+                makeHoleCommand = new LenhMakeHole(swApp);
+            }
+
+            BindRepairHoleViewModelToMakeHoleCommand();
             SetMakeHolePanelMode(true);
-            cboRepairHoleDiameter.Focus();
+
+            if (elementHostRepairHole != null)
+            {
+                elementHostRepairHole.Focus();
+            }
         }
 
         private void chkMakeHolePaint_CheckedChanged(object sender, EventArgs e)
@@ -1622,7 +2005,10 @@ namespace ADDIN
         private void btnMakeHoleUpdate_Click(object sender, EventArgs e)
         {
             if (makeHoleCommand == null)
+            {
                 makeHoleCommand = new LenhMakeHole(swApp);
+                BindRepairHoleViewModelToMakeHoleCommand();
+            }
 
             double pitch;
             bool ok;
@@ -1658,10 +2044,56 @@ namespace ADDIN
             chkMakeHolePaint.Checked = false;
             InitializeMakeHoleSizeOptions();
             SelectComboItem(cboRepairHoleDiameter, "4.2");
+
+            repairHoleViewModel = new ADDIN.UI.RepairHoleViewModel();
+            BindRepairHoleViewModelToMakeHoleCommand();
+            repairHoleViewModel.TableVisibilityChanged += (visible) =>
+            {
+                if (repairHolePanelMode)
+                {
+                    LayoutMakeHoleOptions();
+                }
+            };
+            if (repairHoleTaskPaneView == null && elementHostRepairHole != null)
+            {
+                repairHoleTaskPaneView = new ADDIN.UI.RepairHoleTaskPaneView();
+                elementHostRepairHole.Child = repairHoleTaskPaneView;
+            }
+            if (repairHoleTaskPaneView != null)
+            {
+                repairHoleTaskPaneView.DataContext = repairHoleViewModel;
+            }
+
             SetMakeHolePanelMode(false);
             // Keep the command area compact on startup. The options are shown
             // only after the user chooses Make Hole or Repair Hole.
             grpMakeHoleOptions.Visible = false;
+        }
+
+        private void BindRepairHoleViewModelToMakeHoleCommand()
+        {
+            if (repairHoleViewModel == null)
+                return;
+
+            repairHoleViewModel.Initialize(
+                makeHoleCommand,
+                GetRepairHoleOptionsForTaskPane);
+        }
+
+        private MakeHoleOptions GetRepairHoleOptionsForTaskPane()
+        {
+            double thickness = 0.0;
+            if (!string.IsNullOrWhiteSpace(txtModelThickness?.Text))
+            {
+                TryParseFirstPositiveMillimeter(
+                    txtModelThickness.Text,
+                    out thickness);
+            }
+
+            return new MakeHoleOptions
+            {
+                ThicknessMm = thickness
+            };
         }
 
         private void SetMakeHolePanelMode(bool repairMode)
@@ -1673,27 +2105,40 @@ namespace ADDIN
             grpMakeHoleOptions.Text = repairMode ? "Repair Hole" : "Make Hole";
 
             bool makeMode = !repairMode;
-            lblRepairHoleDiameter.Text = "Hole Dia";
-            lblRepairHoleDiameter.Visible = repairMode;
-            cboRepairHoleDiameter.Visible = repairMode;
-            lblMakeHoleDirection.Visible = makeMode;
-            cboMakeHoleDirection.Visible = makeMode;
-            lblMakeHoleEdgeOffset.Visible = makeMode;
-            txtMakeHoleEdgeOffset.Visible = makeMode;
-            lblMakeHoleLeftOffset.Visible = makeMode;
-            txtMakeHoleLeftOffset.Visible = makeMode;
-            lblMakeHoleRightOffset.Visible = makeMode;
-            txtMakeHoleRightOffset.Visible = makeMode;
-            lblMakeHolePitch.Visible = makeMode;
-            txtMakeHolePitch.Visible = makeMode;
-            chkMakeHolePaint.Visible = makeMode;
-            if (lblMakeHolePaintName != null) lblMakeHolePaintName.Visible = makeMode;
-            if (txtMakeHolePaintName != null) txtMakeHolePaintName.Visible = makeMode;
-            btnMakeHoleReset.Visible = makeMode;
-            btnMakeHoleUpdate.Visible = makeMode;
-            btnMakeHolePattern.Visible = makeMode && makeHoleCommand != null && makeHoleCommand.HasPendingHybridPattern;
+            if (pnlMakeHoleDiagram != null) pnlMakeHoleDiagram.Visible = makeMode;
+            if (lblRepairHoleDiameter != null) lblRepairHoleDiameter.Visible = false;
+            if (cboRepairHoleDiameter != null) cboRepairHoleDiameter.Visible = false;
+            if (lblRepairHoleType != null) lblRepairHoleType.Visible = false;
+            if (cboRepairHoleType != null) cboRepairHoleType.Visible = false;
+            if (btnDeleteMakeHoleSize != null) btnDeleteMakeHoleSize.Visible = false;
 
-            btnMakeHoleAccept.Text = repairMode ? "Repair" : "Accept";
+            if (lblMakeHoleDirection != null) lblMakeHoleDirection.Visible = makeMode;
+            if (cboMakeHoleDirection != null) cboMakeHoleDirection.Visible = makeMode;
+            if (lblMakeHoleEdgeOffset != null) lblMakeHoleEdgeOffset.Visible = makeMode;
+            if (txtMakeHoleEdgeOffset != null) txtMakeHoleEdgeOffset.Visible = makeMode;
+            if (lblMakeHoleLeftOffset != null) lblMakeHoleLeftOffset.Visible = makeMode;
+            if (txtMakeHoleLeftOffset != null) txtMakeHoleLeftOffset.Visible = makeMode;
+            if (lblMakeHoleRightOffset != null) lblMakeHoleRightOffset.Visible = makeMode;
+            if (txtMakeHoleRightOffset != null) txtMakeHoleRightOffset.Visible = makeMode;
+            if (lblMakeHolePitch != null) lblMakeHolePitch.Visible = makeMode;
+            if (txtMakeHolePitch != null) txtMakeHolePitch.Visible = makeMode;
+            if (chkMakeHolePaint != null) chkMakeHolePaint.Visible = false;
+            if (lblMakeHolePaintName != null) lblMakeHolePaintName.Visible = false;
+            if (txtMakeHolePaintName != null) txtMakeHolePaintName.Visible = false;
+            if (btnMakeHoleReset != null) btnMakeHoleReset.Visible = makeMode;
+            if (btnMakeHoleUpdate != null) btnMakeHoleUpdate.Visible = makeMode;
+            if (btnMakeHoleAccept != null) btnMakeHoleAccept.Visible = makeMode;
+            if (btnMakeHolePattern != null) btnMakeHolePattern.Visible = makeMode && makeHoleCommand != null && makeHoleCommand.HasPendingHybridPattern;
+
+            if (elementHostRepairHole != null)
+            {
+                elementHostRepairHole.Visible = repairMode;
+                if (repairMode)
+                {
+                    elementHostRepairHole.BringToFront();
+                    repairHoleViewModel?.ResetPanel();
+                }
+            }
 
             LayoutMakeHoleOptions();
             UpdateMakeHolePaintNameState();
@@ -1710,14 +2155,34 @@ namespace ADDIN
             if (grpMakeHoleOptions == null || panelModelCommands == null)
                 return;
 
-            int availableWidth = Math.Max(230, panelModelCommands.ClientSize.Width - grpMakeHoleOptions.Left - 18);
+            int groupLeft = 6;
+            int groupRightMargin = 6;
+            int availableWidth = Math.Max(240, panelModelCommands.ClientSize.Width - groupLeft - groupRightMargin);
             bool compact = availableWidth < 350;
             int groupWidth = availableWidth;
             int inputWidth = compact ? Math.Max(120, groupWidth - 112) : 118;
-            int previewWidth = Math.Max(170, groupWidth - 32);
+            int previewWidth = Math.Max(170, groupWidth - 20);
 
+            grpMakeHoleOptions.Left = groupLeft;
             grpMakeHoleOptions.Width = groupWidth;
             pnlMakeHoleDiagram.Width = previewWidth;
+
+            if (repairHolePanelMode)
+            {
+                int hostLeft = 4;
+                int hostTop = 18;
+                int hostWidth = Math.Max(220, groupWidth - hostLeft * 2);
+
+                bool tableVisible = repairHoleViewModel != null && repairHoleViewModel.IsTableVisible;
+                int hostHeight = tableVisible ? 365 : 72;
+
+                if (elementHostRepairHole != null)
+                {
+                    elementHostRepairHole.SetBounds(hostLeft, hostTop, hostWidth, hostHeight);
+                }
+                grpMakeHoleOptions.Height = hostTop + hostHeight + 12;
+                return;
+            }
 
             if (compact)
             {
@@ -1738,16 +2203,7 @@ namespace ADDIN
                 LayoutStackedField(lblMakeHolePitch, txtMakeHolePitch, innerLeft, labelY, innerWidth);
                 labelY += rowGap;
 
-                if (repairHolePanelMode)
-                {
-                    LayoutStackedField(lblRepairHoleDiameter, cboRepairHoleDiameter, innerLeft, labelY, innerWidth);
-                    labelY += rowGap;
-                }
-
-                chkMakeHolePaint.Location = new Point(innerLeft, labelY - 2);
-                LayoutStackedField(lblMakeHolePaintName, txtMakeHolePaintName, innerLeft, labelY + 24, innerWidth);
-
-                int buttonTop = labelY + 74;
+                int buttonTop = labelY + 8;
                 int buttonGap = 8;
                 int buttonWidth = Math.Max(78, (innerWidth - buttonGap) / 2);
                 btnMakeHoleAccept.SetBounds(innerLeft, buttonTop, buttonWidth, 32);
@@ -1789,22 +2245,10 @@ namespace ADDIN
                 txtMakeHolePitch.Location = new Point(leftInputX, 209);
                 txtMakeHolePitch.Width = fieldWidth;
 
-                if (repairHolePanelMode)
-                {
-                    lblRepairHoleDiameter.Location = new Point(rightLabelX, 212);
-                    cboRepairHoleDiameter.Location = new Point(rightInputX, 209);
-                    cboRepairHoleDiameter.Width = fieldWidth;
-                }
-
-                chkMakeHolePaint.Location = new Point(rightLabelX, 214);
-                lblMakeHolePaintName.Location = new Point(leftLabelX, 244);
-                txtMakeHolePaintName.Location = new Point(leftInputX, 241);
-                txtMakeHolePaintName.Width = Math.Max(80, innerWidth - labelWidth);
-
                 int buttonGap = 12;
                 int buttonCount = 4;
                 int buttonWidth = (innerWidth - buttonGap * (buttonCount - 1)) / buttonCount;
-                int buttonTop = repairHolePanelMode ? 256 : 276;
+                int buttonTop = 248;
                 btnMakeHoleReset.Location = new Point(innerLeft, buttonTop);
                 btnMakeHoleReset.Width = buttonWidth;
                 btnMakeHolePattern.Location = new Point(innerLeft + (buttonWidth + buttonGap) * 1, buttonTop);
@@ -1813,26 +2257,7 @@ namespace ADDIN
                 btnMakeHoleAccept.Width = buttonWidth;
                 btnMakeHoleUpdate.Location = new Point(innerLeft + (buttonWidth + buttonGap) * 3, buttonTop);
                 btnMakeHoleUpdate.Width = buttonWidth;
-                grpMakeHoleOptions.Height = repairHolePanelMode ? 244 : 331;
-            }
-
-            if (repairHolePanelMode)
-            {
-                if (compact)
-                {
-                    int innerLeft = 16;
-                    int innerWidth = Math.Max(170, groupWidth - 32);
-                    LayoutStackedField(lblRepairHoleDiameter, cboRepairHoleDiameter, innerLeft, 148, innerWidth);
-                    btnMakeHoleAccept.SetBounds(innerLeft, 206, Math.Min(140, innerWidth), 32);
-                    grpMakeHoleOptions.Height = 260;
-                }
-                else
-                {
-                    int innerLeft = 16;
-                    int innerWidth = groupWidth - 32;
-                    btnMakeHoleAccept.Location = new Point(innerLeft, 180);
-                    btnMakeHoleAccept.Width = Math.Min(140, innerWidth);
-                }
+                grpMakeHoleOptions.Height = 302;
             }
 
             pnlMakeHoleDiagram.Invalidate();
@@ -1865,12 +2290,14 @@ namespace ADDIN
                 btnPaintHoleSummary
             };
 
-            int left = 18;
-            int top = 16;
-            int gap = panelModelCommands.ClientSize.Width < 340 ? 8 : 12;
-            int buttonWidth = panelModelCommands.ClientSize.Width < 340 ? 84 : 96;
-            int buttonHeight = panelModelCommands.ClientSize.Width < 340 ? 76 : 78;
-            int maxRight = Math.Max(left + buttonWidth, panelModelCommands.ClientSize.Width - 18);
+            int availableW = panelModelCommands.ClientSize.Width;
+            int gap = availableW < 310 ? 6 : (availableW < 340 ? 8 : 12);
+            int buttonWidth = availableW < 310 ? 80 : (availableW < 340 ? 84 : 96);
+            int buttonHeight = availableW < 340 ? 76 : 78;
+            int totalButtonsW = buttonWidth * 3 + gap * 2;
+            int left = Math.Max(6, (availableW - totalButtonsW) / 2);
+            int top = 14;
+            int maxRight = Math.Max(left + buttonWidth, availableW - 6);
             int x = left;
             int y = top;
             int rowBottom = top;
@@ -1892,7 +2319,13 @@ namespace ADDIN
                 x += buttonWidth + gap;
             }
 
-            grpMakeHoleOptions.Location = new Point(left, rowBottom + 16);
+            int rowWidth = Math.Max(180, availableW - left - 6);
+            int fieldTop = rowBottom + 14;
+            lblHoleType.SetBounds(left, fieldTop, rowWidth, 19);
+            cboHoleType.SetBounds(left, fieldTop + 21, Math.Max(100, rowWidth - 38), 25);
+            btnManageHoleTypes.SetBounds(left + rowWidth - 32, fieldTop + 21, 32, 25);
+            btnChangeHoleName.SetBounds(left, fieldTop + 55, rowWidth, 32);
+            grpMakeHoleOptions.Location = new Point(6, fieldTop + 101);
         }
 
         private void LayoutModelMacroButtons()
@@ -1904,7 +2337,9 @@ namespace ADDIN
             {
                 btnCheckAssemblyHole,
                 btnMirrorPart,
-                btnEdgeToEqualSpline
+                btnEdgeToEqualSpline,
+                btnRepair3DSpline,
+                btnVCutPropertySetup
             };
 
             int width = tabModelMacroPage.ClientSize.Width;
@@ -1919,24 +2354,11 @@ namespace ADDIN
             // Calculate number of columns that can comfortably fit
             // Each button has icon/2-line text and needs at least ~100px to avoid truncation
             int minBtnWidth = 100;
-            int cols = Math.Max(1, Math.Min(buttons.Length, (availableWidth + gap) / (minBtnWidth + gap)));
+            int cols = Math.Max(1, Math.Min(2, (availableWidth + gap) / (minBtnWidth + gap)));
 
-            int btnWidth;
-            if (cols >= buttons.Length)
-            {
-                // All 3 fit on 1 row: evenly distribute available space up to max 130px
-                btnWidth = Math.Min(130, (availableWidth - (buttons.Length - 1) * gap) / buttons.Length);
-            }
-            else if (cols == 2)
-            {
-                // 2 columns fit on row 1, 3rd button wraps to row 2
-                btnWidth = Math.Min(145, (availableWidth - gap) / 2);
-            }
-            else
-            {
-                // 1 column: stack vertically
-                btnWidth = Math.Min(200, availableWidth);
-            }
+            int btnWidth = cols == 2
+                ? Math.Min(145, (availableWidth - gap) / 2)
+                : Math.Min(200, availableWidth);
 
             int btnHeight = 48;
             int curX = margin;
@@ -1949,7 +2371,7 @@ namespace ADDIN
                 if (btn == null)
                     continue;
 
-                if (curX > margin && curX + btnWidth > width - margin)
+                if (i > 0 && i % cols == 0)
                 {
                     curX = margin;
                     curY += btnHeight + gap;
@@ -2217,9 +2639,10 @@ namespace ADDIN
                 ThicknessMm = thickness,
                 FaceColor = "",
                 SigmaType = "",
-                Paint = !repairHolePanelMode && chkMakeHolePaint.Checked,
+                Paint = false,
                 HoleSizeText = holeSizeText,
-                PaintNameText = txtMakeHolePaintName != null ? txtMakeHolePaintName.Text : ""
+                PaintNameText = "",
+                HoleLabel = string.IsNullOrWhiteSpace(cboHoleType.Text) ? null : cboHoleType.Text.Trim()
             };
 
             return true;
@@ -3093,7 +3516,13 @@ namespace ADDIN
             if (tabDrawingBom == null || dgvModelBom == null)
                 return;
 
-            tabDrawingBom.AutoScroll = true;
+            // Start from the fixed/default viewport. AutoScroll was previously
+            // enabled unconditionally, so the grid's horizontal scrollbar could
+            // trigger a second vertical scrollbar and let the whole page move,
+            // hiding the bottom action buttons.
+            tabDrawingBom.AutoScroll = false;
+            tabDrawingBom.AutoScrollMinSize = Size.Empty;
+            tabDrawingBom.AutoScrollPosition = Point.Empty;
 
             int margin = 12;
             int pageWidth = Math.Max(220, tabDrawingBom.ClientSize.Width - margin * 2);
@@ -3150,11 +3579,12 @@ namespace ADDIN
                 progressCheck.SetBounds(margin, progressTop, pageWidth, 16);
 
             int bottomButtonHeight = 32;
-            int bottomTop = pageHeight - margin - bottomButtonHeight;
-            if (bottomTop < selectTop + 170)
-            {
-                bottomTop = selectTop + 170;
-            }
+            int minimumBottomTop = selectTop + 170;
+            int requiredPageHeight = minimumBottomTop + bottomButtonHeight + margin;
+            bool needsVerticalScroll = tabDrawingBom.ClientSize.Height < requiredPageHeight;
+            int bottomTop = needsVerticalScroll
+                ? minimumBottomTop
+                : pageHeight - margin - bottomButtonHeight;
 
             int gridTop = progressTop + 16 + 8;
             int gridHeight = Math.Max(120, bottomTop - gridTop - 10);
@@ -3188,7 +3618,17 @@ namespace ADDIN
                 button.SetBounds(x, y, bottomButtonWidth, bottomButtonHeight);
             }
 
-            tabDrawingBom.AutoScrollMinSize = new Size(0, bottomTop + bottomButtonHeight + margin);
+            if (needsVerticalScroll)
+            {
+                tabDrawingBom.AutoScroll = true;
+                tabDrawingBom.AutoScrollMinSize = new Size(0, requiredPageHeight);
+            }
+            else
+            {
+                tabDrawingBom.AutoScroll = false;
+                tabDrawingBom.AutoScrollMinSize = Size.Empty;
+                tabDrawingBom.AutoScrollPosition = Point.Empty;
+            }
             actions?.AutoFitBomGrid();
             ApplyReadableContrast();
         }
@@ -3293,6 +3733,14 @@ namespace ADDIN
 
             try
             {
+                ModelDoc2 activeModel = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+                int documentType = activeModel == null ? 0 : activeModel.GetType();
+                if (documentType != (int)swDocumentTypes_e.swDocPART &&
+                    documentType != (int)swDocumentTypes_e.swDocASSEMBLY)
+                {
+                    SetMakeHoleUpdateButtonState(false);
+                    return;
+                }
                 if (makeHoleCommand != null)
                 {
                     bool cleaned = makeHoleCommand.CleanupTrackedMakeHoleEquationsIfFeatureMissing();
@@ -3303,6 +3751,10 @@ namespace ADDIN
                         return;
                     }
 
+                    // Keep tracked-feature cleanup, but only probe selection for
+                    // the update button when its Model/Edit page is visible.
+                    if (tabBom.SelectedTab != tabModel || tabModelPages.SelectedTab != tabModelEditPage)
+                        return;
                     double pitch;
                     if (TryParsePositiveMillimeter(txtMakeHolePitch.Text, out pitch))
                         needUpdate = makeHoleCommand.IsMakeHoleUpdateRequired(pitch);
@@ -3459,6 +3911,7 @@ namespace ADDIN
             ConfigureMacroButton(btnDimKichThuocLo);
             ConfigureMacroButton(btnFixScale);
             ConfigureMacroButton(btnRepairDim);
+            ConfigureMacroButton(btnVCutSection);
 
             Button[] buttons =
             {
@@ -3468,7 +3921,8 @@ namespace ADDIN
                 btnDimKegaki,
                 btnDimKichThuocLo,
                 btnFixScale,
-                btnRepairDim
+                btnRepairDim,
+                btnVCutSection
             };
 
             int innerLeft = 12;
@@ -3495,6 +3949,12 @@ namespace ADDIN
 
                 button.SetBounds(x, y, buttonWidth, buttonHeight);
             }
+
+            int rowCount = (buttons.Length + columnCount - 1) / columnCount;
+            int requiredHeight = innerTop + rowCount * buttonHeight +
+                (rowCount - 1) * innerGap + 12;
+            if (groupBox3.Height < requiredHeight)
+                groupBox3.Height = requiredHeight;
 
             groupBox3.Invalidate(true);
         }

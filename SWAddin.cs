@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Drawing;
 using System.IO;
+using System.Diagnostics;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swpublished;
 
@@ -33,12 +34,18 @@ namespace ADDIN
 
         public bool ConnectToSW(object ThisSW, int cookie)
         {
+            var startup = Stopwatch.StartNew();
+            Trace.WriteLine("[TAI STARTUP] Begin " + DateTime.Now.ToString("O") +
+                "; Assembly=" + typeof(SwAddin).Assembly.Location +
+                "; MVID=" + typeof(SwAddin).Module.ModuleVersionId);
             swApp = (ISldWorks)ThisSW;
             InstanceSwApp = swApp;
             addinID = cookie;
             swApp.SetAddinCallbackInfo(0, this, addinID);
 
+            Trace.WriteLine("[TAI STARTUP] Callback registration ms=" + startup.ElapsedMilliseconds);
             LoadTaskPane();
+            Trace.WriteLine("[TAI STARTUP] ConnectToSW total ms=" + startup.ElapsedMilliseconds);
 
             return true;
         }
@@ -62,15 +69,21 @@ namespace ADDIN
                 string assemblyDir = Path.GetDirectoryName(assemblyLocation);
                 string imagePath = Path.Combine(assemblyDir, "icons20.png");
 
+                var phase = Stopwatch.StartNew();
                 swTaskPane = swApp.CreateTaskpaneView2(imagePath, "TAI TOOL");
+                Trace.WriteLine("[TAI STARTUP] CreateTaskpaneView2 ms=" + phase.ElapsedMilliseconds);
 
                 if (swTaskPane != null)
                 {
+                    phase.Restart();
                     uiControl = (BomTaskPaneControl)swTaskPane.AddControl(SWTASKPANE_PROGID, "");
+                    Trace.WriteLine("[TAI STARTUP] AddControl + UI constructor ms=" + phase.ElapsedMilliseconds);
 
                     if (uiControl != null)
                     {
+                        phase.Restart();
                         uiControl.Init(swApp);
+                        Trace.WriteLine("[TAI STARTUP] UI Init ms=" + phase.ElapsedMilliseconds);
                     }
                 }
             }

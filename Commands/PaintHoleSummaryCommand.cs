@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows.Forms;
+using ADDIN.HoleManagement;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -29,19 +30,19 @@ namespace ADDIN.Commands
                 return;
             }
 
-            if (!ResolveLightweightComponents(activeModel))
-                return;
-
             bool oldCommandInProgress = false;
             try
             {
                 oldCommandInProgress = swApp.CommandInProgress;
                 swApp.CommandInProgress = true;
+                if (!ResolveLightweightComponents(activeModel))
+                    return;
+                HoleMetadataService.Initialize(swApp);
 
                 PaintHoleScanResult result = Scan(activeModel);
                 if (result.TotalFeatureRows == 0)
                 {
-                    MessageBox.Show("Khong tim thay feature ten dang phi hoac son trong model hien tai.", "Dem hole", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Khong tim thay ho lo trong model hien tai.", "Dem hole", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
@@ -82,35 +83,28 @@ namespace ADDIN.Commands
             try
             {
                 int before = assembly.GetLightWeightComponentCount();
-                if (before <= 0 && assembly.LightweightAllResolved())
+                int unavailableBefore = CountUnavailableComponentModels(assembly);
+                if (before <= 0 && unavailableBefore == 0)
                     return true;
 
-                Debug.WriteLine("[PAINT HOLE] Resolve lightweight before scan. before=" + before);
+                Debug.WriteLine("[PAINT HOLE] Resolve before scan. lightweight=" + before +
+                    ", unavailableModels=" + unavailableBefore);
                 assembly.ResolveAllLightWeightComponents(false);
-                Application.DoEvents();
 
                 int after = assembly.GetLightWeightComponentCount();
-                bool resolved = after <= 0 || assembly.LightweightAllResolved();
-                if (!resolved)
-                {
-                    assembly.ResolveAllLightweight();
-                    Application.DoEvents();
-                    after = assembly.GetLightWeightComponentCount();
-                    resolved = after <= 0 || assembly.LightweightAllResolved();
-                }
-
-                Debug.WriteLine("[PAINT HOLE] Resolve lightweight result. after=" + after + ", resolved=" + resolved);
-                if (!resolved)
+                int unavailableAfter = CountUnavailableComponentModels(assembly);
+                Debug.WriteLine("[PAINT HOLE] Resolve result. lightweight=" + after +
+                    ", unavailableModels=" + unavailableAfter);
+                if (after > 0)
                 {
                     MessageBox.Show(
-                        "Khong the bo het che do Lightweight. Hay Resolve component roi chay lai DEM LO.",
+                        "Con component Lightweight. Hay Resolve chung roi chay lai DEM HOLE.",
                         "Dem hole",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
                     return false;
                 }
 
-                activeModel.ForceRebuild3(false);
                 return true;
             }
             catch (Exception ex)
@@ -123,6 +117,24 @@ namespace ADDIN.Commands
                     MessageBoxIcon.Warning);
                 return false;
             }
+        }
+
+        private int CountUnavailableComponentModels(AssemblyDoc assembly)
+        {
+            int count = 0;
+            object[] components = assembly.GetComponents(false) as object[];
+            if (components == null) return count;
+            foreach (object item in components)
+            {
+                Component2 component = item as Component2;
+                if (component == null) continue;
+                try
+                {
+                    if (!component.IsSuppressed() && component.GetModelDoc2() == null) count++;
+                }
+                catch { count++; }
+            }
+            return count;
         }
 
         private PaintHoleScanResult Scan(ModelDoc2 activeModel)
@@ -148,9 +160,9 @@ namespace ADDIN.Commands
 
             Debug.WriteLine("[PAINT HOLE] Assembly scan all levels. componentOccurrences=" + components.Length);
             int scannedPartOccurrences = 0;
+            int unavailableOccurrences = 0;
             foreach (object item in components)
             {
-                Application.DoEvents();
                 Component2 component = item as Component2;
                 if (component == null || ShouldSkipComponent(component))
                     continue;
@@ -159,7 +171,13 @@ namespace ADDIN.Commands
                 if (model == null)
                     model = TryOpenComponentModel(component);
 
-                if (model == null || model.GetType() != (int)swDocumentTypes_e.swDocPART)
+                if (model == null)
+                {
+                    unavailableOccurrences++;
+                    Debug.WriteLine("[PAINT HOLE] Component model unavailable: " + component.Name2);
+                    continue;
+                }
+                if (model.GetType() != (int)swDocumentTypes_e.swDocPART)
                     continue;
 
                 scannedPartOccurrences++;
@@ -179,6 +197,9 @@ namespace ADDIN.Commands
                 }
             }
 
+            if (unavailableOccurrences > 0)
+                throw new InvalidOperationException("Khong doc duoc " + unavailableOccurrences.ToString(CultureInfo.InvariantCulture) +
+                    " component. Hay Resolve Lightweight va mo lai assembly truoc khi dem hole.");
             Debug.WriteLine("[PAINT HOLE] Assembly scan done. partOccurrences=" + scannedPartOccurrences + ", featureRows=" + result.TotalFeatureRows + ", totalQuantity=" + result.TotalQuantity);
             return result;
         }
@@ -234,76 +255,177 @@ namespace ADDIN.Commands
 
         private List<HoleRecord> ScanPart(ModelDoc2 model, string componentName, int multiplier, string configurationName)
         {
-            List<HoleRecord> records = new List<HoleRecord>();
-            HashSet<string> keysWithPattern = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            HashSet<string> baseKeysWithPattern = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            string partNumber = GetPartNumber(model, configurationName);
-
+            var records = new List<HoleRecord>();
+            string originalConfiguration = GetActiveConfigurationName(model);
+            List<byte[]> selection = CaptureSelection(model);
             try
             {
-                for (Feature feature = model.FirstFeature() as Feature; feature != null; feature = feature.GetNextFeature() as Feature)
+                if (!string.IsNullOrWhiteSpace(configurationName) &&
+                    !string.Equals(originalConfiguration, configurationName, StringComparison.OrdinalIgnoreCase) &&
+                    !model.ShowConfiguration2(configurationName))
+                    throw new InvalidOperationException("Khong mo duoc configuration " + configurationName);
+
+                string foldedConfiguration = GetActiveConfigurationName(model);
+                if (foldedConfiguration.IndexOf("flat", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    if (!IsUsableFeature(feature))
-                        continue;
+                    Configuration flat = model.GetConfigurationByName(foldedConfiguration) as Configuration;
+                    Configuration parent = flat == null ? null : flat.GetParent();
+                    if (parent != null && model.ShowConfiguration2(parent.Name))
+                        foldedConfiguration = parent.Name;
+                }
+                Debug.WriteLine("[HOLE SCAN] Part=" + SafePath(model) + ", Config=" + foldedConfiguration);
+                var foldedIdentities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                records.AddRange(ScanConfiguration(model, componentName, multiplier,
+                    foldedConfiguration, "Folded", foldedIdentities, null));
 
-                    string featureName = SafeFeatureName(feature);
-                    string holeKey = ParseHoleKey(featureName);
-                    if (string.IsNullOrWhiteSpace(holeKey))
-                        continue;
-
-                    bool pattern = IsPatternFeature(feature);
-                    if (pattern && !IsUsablePatternFeature(feature))
-                    {
-                        Debug.WriteLine("[PAINT HOLE] Skip unusable pattern feature. name=" + featureName + ", type=" + SafeFeatureType(feature));
-                        continue;
-                    }
-
-                    int quantity = pattern
-                        ? GetPatternInstanceCount(feature) * GetPatternSeedHoleCount(feature)
-                        : GetDirectHoleCount(feature);
-                    if (quantity < 1)
-                        quantity = 1;
-
-                    HoleRecord record = new HoleRecord
-                    {
-                        HoleKey = holeKey,
-                        FeatureName = featureName,
-                        FeatureType = SafeFeatureType(feature),
-                        PartPath = SafePath(model),
-                        PartNumber = partNumber,
-                        ComponentName = componentName,
-                        Quantity = quantity * Math.Max(1, multiplier),
-                        IsPaint = featureName.IndexOf(PaintToken, StringComparison.OrdinalIgnoreCase) >= 0,
-                        IsPattern = pattern
-                    };
-                    records.Add(record);
-                    if (pattern)
-                    {
-                        keysWithPattern.Add(holeKey);
-                        baseKeysWithPattern.Add(GetBaseHoleKey(holeKey));
-                    }
+                string flatConfiguration = FindFlatPatternConfiguration(model, foldedConfiguration);
+                if (!string.IsNullOrWhiteSpace(flatConfiguration) && model.ShowConfiguration2(flatConfiguration))
+                {
+                    Debug.WriteLine("[HOLE SCAN] Flat config=" + flatConfiguration);
+                    records.AddRange(ScanConfiguration(model, componentName, multiplier,
+                        flatConfiguration, "FlatPatternOnly", null, foldedIdentities));
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[PAINT HOLE] Scan part failed: " + ex.Message);
+                Debug.WriteLine("[HOLE SCAN] Scan part failed: " + ex.Message);
             }
-
-            if (keysWithPattern.Count == 0)
-                return records;
-
-            List<HoleRecord> filtered = new List<HoleRecord>();
-            foreach (HoleRecord record in records)
+            finally
             {
-                string baseKey = GetBaseHoleKey(record.HoleKey);
-                if (!record.IsPattern && (keysWithPattern.Contains(record.HoleKey) || baseKeysWithPattern.Contains(baseKey)))
+                if (!string.Equals(GetActiveConfigurationName(model), originalConfiguration,
+                    StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(originalConfiguration))
                 {
-                    Debug.WriteLine("[PAINT HOLE] Skip seed to avoid pattern double count. feature=" + record.FeatureName + ", key=" + record.HoleKey);
+                    try { model.ShowConfiguration2(originalConfiguration); }
+                    catch (Exception ex) { Debug.WriteLine("[HOLE SCAN] Restore config failed: " + ex.Message); }
+                }
+                RestoreSelection(model, selection);
+            }
+            return records;
+        }
+
+        private List<byte[]> CaptureSelection(ModelDoc2 model)
+        {
+            var references = new List<byte[]>();
+            try
+            {
+                SelectionMgr selection = model.SelectionManager as SelectionMgr;
+                if (selection == null) return references;
+                for (int index = 1; index <= selection.GetSelectedObjectCount2(-1); index++)
+                {
+                    object selected = selection.GetSelectedObject6(index, -1);
+                    byte[] reference = model.Extension.GetPersistReference3(selected) as byte[];
+                    if (reference != null) references.Add(reference);
+                }
+            }
+            catch (Exception ex) { Debug.WriteLine("[HOLE SCAN] Capture selection failed: " + ex.Message); }
+            return references;
+        }
+
+        private void RestoreSelection(ModelDoc2 model, List<byte[]> references)
+        {
+            if (references == null || references.Count == 0) return;
+            try
+            {
+                var objects = new List<object>();
+                foreach (byte[] reference in references)
+                {
+                    int error = 0;
+                    object item = model.Extension.GetObjectByPersistReference3(reference, out error);
+                    if (item != null) objects.Add(item);
+                }
+                if (objects.Count > 0)
+                {
+                    model.ClearSelection2(true);
+                    model.Extension.MultiSelect2(objects.ToArray(), false, null);
+                }
+            }
+            catch (Exception ex) { Debug.WriteLine("[HOLE SCAN] Restore selection failed: " + ex.Message); }
+        }
+
+        private List<HoleRecord> ScanConfiguration(ModelDoc2 model, string componentName, int multiplier,
+            string configuration, string source, HashSet<string> collectIdentities, HashSet<string> foldedIdentities)
+        {
+            var records = new List<HoleRecord>();
+            var resolver = new HoleFamilyResolver(model);
+            string partNumber = GetPartNumber(model, configuration);
+            foreach (HoleFamily family in resolver.Families)
+            {
+                bool inherited = false;
+                foreach (Feature feature in family.Features)
+                {
+                    string id = GetConfigurationFeatureKey(model, feature);
+                    if (collectIdentities != null) collectIdentities.Add(id);
+                    if (foldedIdentities != null && foldedIdentities.Contains(id)) inherited = true;
+                }
+                if (foldedIdentities != null && inherited)
+                {
+                    Debug.WriteLine("[HOLE SCAN] Skip inherited flat family: " +
+                        SafeFeatureName(family.Roots.Count > 0 ? family.Roots[0] : family.Features[0]));
                     continue;
                 }
-                filtered.Add(record);
+                Feature representative = family.Roots.Count > 0 ? family.Roots[0] : family.Features[0];
+                string label = family.Label ?? "";
+                if (label.Length == 0 && SafeFeatureName(representative).Contains(PaintToken)) label = PaintToken;
+                string holeKey = family.DiameterMm.HasValue
+                    ? PhiToken + family.DiameterMm.Value.ToString("0.###", CultureInfo.InvariantCulture)
+                    : "?";
+                var record = new HoleRecord
+                {
+                    HoleKey = holeKey,
+                    HoleLabel = label,
+                    FamilyId = family.FamilyId ?? "",
+                    DiameterMm = family.DiameterMm,
+                    Source = source,
+                    Configuration = configuration,
+                    FeatureName = SafeFeatureName(representative),
+                    FeatureType = SafeFeatureType(representative),
+                    PartPath = SafePath(model),
+                    PartNumber = partNumber,
+                    ComponentName = componentName,
+                    Quantity = family.PhysicalHoleCount * Math.Max(1, multiplier),
+                    IsPattern = family.Patterns.Count > 0
+                };
+                records.Add(record);
+                Debug.WriteLine("[HOLE SCAN] Feature=" + record.FeatureName + ", Type=" + record.FeatureType +
+                    ", Label=" + label + ", Quantity=" + record.Quantity + ", Source=" + source);
             }
-            return filtered;
+            return records;
+        }
+
+        private string GetConfigurationFeatureKey(ModelDoc2 model, Feature feature)
+        {
+            // A COM pointer can change when ShowConfiguration2 recreates feature wrappers.
+            // Feature names are unique within a Part and stable across its configurations.
+            string name = SafeFeatureName(feature);
+            if (!string.IsNullOrWhiteSpace(name)) return "Name:" + name;
+            try
+            {
+                byte[] reference = model.Extension.GetPersistReference3(feature) as byte[];
+                if (reference != null) return "Ref:" + Convert.ToBase64String(reference);
+            }
+            catch (Exception ex) { Debug.WriteLine("[HOLE SCAN] Feature reference failed: " + ex.Message); }
+            return "COM:" + HoleFeatureClassifier.Identity(feature).ToString(CultureInfo.InvariantCulture);
+        }
+
+        private string FindFlatPatternConfiguration(ModelDoc2 model, string folded)
+        {
+            try
+            {
+                var names = model.GetConfigurationNames() as Array;
+                if (names == null) return null;
+                foreach (object item in names)
+                {
+                    string name = item as string;
+                    if (string.IsNullOrWhiteSpace(name) ||
+                        name.IndexOf("flat", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    Configuration configuration = model.GetConfigurationByName(name) as Configuration;
+                    for (Configuration parent = configuration == null ? null : configuration.GetParent();
+                        parent != null; parent = parent.GetParent())
+                        if (string.Equals(parent.Name, folded, StringComparison.OrdinalIgnoreCase)) return name;
+                }
+            }
+            catch (Exception ex) { Debug.WriteLine("[HOLE SCAN] Flat config lookup failed: " + ex.Message); }
+            return null;
         }
 
         private void AddRecord(PaintHoleScanResult result, HoleRecord record)
@@ -315,513 +437,14 @@ namespace ADDIN.Commands
             result.TotalFeatureRows++;
             result.TotalQuantity += record.Quantity;
 
+            string summaryKey = record.HoleKey + "\u001F" + (record.HoleLabel ?? "");
             HoleSummary summary;
-            if (!result.Summary.TryGetValue(record.HoleKey, out summary))
+            if (!result.Summary.TryGetValue(summaryKey, out summary))
             {
-                summary = new HoleSummary { HoleKey = record.HoleKey, IsPaint = record.IsPaint };
-                result.Summary.Add(record.HoleKey, summary);
+                summary = new HoleSummary { HoleKey = record.HoleKey, HoleLabel = record.HoleLabel };
+                result.Summary.Add(summaryKey, summary);
             }
             summary.Quantity += record.Quantity;
-            if (record.IsPattern)
-                summary.PatternFeatureCount++;
-            else
-                summary.DirectFeatureCount++;
-        }
-
-        private string ParseHoleKey(string featureName)
-        {
-            featureName = (featureName ?? "").Trim();
-            if (featureName.Length == 0)
-                return null;
-
-            bool paint = featureName.IndexOf(PaintToken, StringComparison.OrdinalIgnoreCase) >= 0;
-            int index = IndexOfPhi(featureName);
-            if (index < 0)
-            {
-                if (!paint)
-                    return null;
-
-                int paintIndex = featureName.IndexOf(PaintToken, StringComparison.OrdinalIgnoreCase);
-                string beforePaint = featureName.Substring(0, paintIndex).Trim();
-                if (string.IsNullOrWhiteSpace(beforePaint))
-                    return null;
-                return beforePaint + " " + PaintToken;
-            }
-
-            string size = "";
-            for (int i = index + 1; i < featureName.Length; i++)
-            {
-                char c = featureName[i];
-                if (char.IsDigit(c) || c == '.' || c == ',' || c == 'x' || c == 'X' || c == '\u00D7')
-                {
-                    size += c == ',' ? '.' : (c == 'X' || c == '\u00D7' ? 'x' : c);
-                    continue;
-                }
-                break;
-            }
-
-            if (string.IsNullOrWhiteSpace(size))
-                return null;
-
-            return PhiToken + size + (paint ? " " + PaintToken : "");
-        }
-
-        private string GetBaseHoleKey(string holeKey)
-        {
-            holeKey = (holeKey ?? "").Trim();
-            if (holeKey.Length == 0)
-                return "";
-
-            int paintIndex = holeKey.IndexOf(PaintToken, StringComparison.OrdinalIgnoreCase);
-            if (paintIndex >= 0)
-                holeKey = holeKey.Substring(0, paintIndex).Trim();
-
-            int patternIndex = holeKey.IndexOf("PATTERN", StringComparison.OrdinalIgnoreCase);
-            if (patternIndex >= 0)
-                holeKey = holeKey.Substring(0, patternIndex).Trim();
-
-            return holeKey;
-        }
-
-        private int IndexOfPhi(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-                return -1;
-            char[] chars = { '\u03C6', '\u03A6', '\u2300', '\u00D8', '\u00F8' };
-            foreach (char c in chars)
-            {
-                int index = text.IndexOf(c);
-                if (index >= 0)
-                    return index;
-            }
-            return -1;
-        }
-
-        private bool IsPatternFeature(Feature feature)
-        {
-            string type = SafeFeatureType(feature);
-            string name = SafeFeatureName(feature);
-            return type.IndexOf("Pattern", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   type.IndexOf("Curve", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   name.IndexOf("PATTERN", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   name.IndexOf("Pattern", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private bool IsUsablePatternFeature(Feature feature)
-        {
-            if (!IsUsableFeature(feature))
-                return false;
-
-            if (HasFeatureWarning(feature))
-                return false;
-
-            int count = GetPatternInstanceCount(feature);
-            if (count <= 1)
-                return false;
-
-            return true;
-        }
-
-        private bool IsUsableFeature(Feature feature)
-        {
-            if (feature == null)
-                return false;
-
-            if (IsFeatureSuppressed(feature))
-                return false;
-
-            if (HasFeatureError(feature))
-                return false;
-
-            return true;
-        }
-
-        private bool IsFeatureSuppressed(Feature feature)
-        {
-            try
-            {
-                bool suppressed = feature.IsSuppressed();
-                if (suppressed)
-                    Debug.WriteLine("[PAINT HOLE] Skip suppressed feature. name=" + SafeFeatureName(feature));
-                return suppressed;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[PAINT HOLE] IsSuppressed failed, use current-configuration fallback. name=" +
-                    SafeFeatureName(feature) + ", error=" + ex.Message);
-            }
-
-            try
-            {
-                object value = feature.IsSuppressed2(
-                    (int)swInConfigurationOpts_e.swThisConfiguration,
-                    null);
-                if (value is bool)
-                {
-                    bool suppressed = (bool)value;
-                    if (suppressed)
-                        Debug.WriteLine("[PAINT HOLE] Skip suppressed feature (fallback). name=" + SafeFeatureName(feature));
-                    return suppressed;
-                }
-                object[] values = value as object[];
-                if (values != null)
-                {
-                    foreach (object item in values)
-                    {
-                        if (item is bool && (bool)item)
-                        {
-                            Debug.WriteLine("[PAINT HOLE] Skip suppressed feature (fallback array). name=" + SafeFeatureName(feature));
-                            return true;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[PAINT HOLE] IsSuppressed2 failed. name=" +
-                    SafeFeatureName(feature) + ", error=" + ex.Message);
-            }
-
-            return false;
-        }
-
-        private bool HasFeatureError(Feature feature)
-        {
-            try
-            {
-                int warning = 0;
-                object value = ((dynamic)feature).GetErrorCode2(ref warning);
-                int errorCode = Convert.ToInt32(value, CultureInfo.InvariantCulture);
-                if (errorCode != 0)
-                {
-                    Debug.WriteLine("[PAINT HOLE] Feature has rebuild error. name=" + SafeFeatureName(feature) + ", error=" + errorCode + ", warning=" + warning);
-                    return true;
-                }
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                object value = ((dynamic)feature).GetErrorCode();
-                int errorCode = Convert.ToInt32(value, CultureInfo.InvariantCulture);
-                if (errorCode != 0)
-                {
-                    Debug.WriteLine("[PAINT HOLE] Feature has error. name=" + SafeFeatureName(feature) + ", error=" + errorCode);
-                    return true;
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
-        }
-
-        private bool HasPatternWarningOrSkippedInstances(Feature feature)
-        {
-            if (HasFeatureWarning(feature))
-                return true;
-
-            if (HasPatternSkippedInstances(feature))
-                return true;
-
-            return false;
-        }
-
-        private bool HasFeatureWarning(Feature feature)
-        {
-            try
-            {
-                int warning = 0;
-                object value = ((dynamic)feature).GetErrorCode2(ref warning);
-                int errorCode = Convert.ToInt32(value, CultureInfo.InvariantCulture);
-                if (errorCode != 0 || warning != 0)
-                {
-                    Debug.WriteLine("[PAINT HOLE] Skip pattern with warning/error. name=" + SafeFeatureName(feature) + ", error=" + errorCode + ", warning=" + warning);
-                    return true;
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
-        }
-
-        private bool HasPatternSkippedInstances(Feature feature)
-        {
-            try
-            {
-                dynamic definition = feature.GetDefinition();
-                if (definition == null)
-                    return false;
-
-                int skipped = TryGetDynamicInt(definition, "SkippedItemCount");
-                if (skipped <= 0) skipped = TryGetDynamicInt(definition, "SkippedItemsCount");
-                if (skipped <= 0) skipped = TryGetDynamicInt(definition, "SkippedInstanceCount");
-                if (skipped <= 0) skipped = TryGetDynamicInt(definition, "SkippedInstancesCount");
-                if (skipped <= 0) skipped = TryGetDynamicInt(definition, "SkipCount");
-                if (skipped > 0)
-                {
-                    Debug.WriteLine("[PAINT HOLE] Skip pattern with skipped instances. name=" + SafeFeatureName(feature) + ", skipped=" + skipped);
-                    return true;
-                }
-
-                object skippedArray = TryGetDynamicObject(definition, "SkippedItemArray");
-                if (skippedArray == null) skippedArray = TryGetDynamicObject(definition, "SkippedItems");
-                if (skippedArray == null) skippedArray = TryGetDynamicObject(definition, "SkippedInstances");
-                Array array = skippedArray as Array;
-                if (array != null && array.Length > 0)
-                {
-                    Debug.WriteLine("[PAINT HOLE] Skip pattern with skipped item array. name=" + SafeFeatureName(feature) + ", skipped=" + array.Length);
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[PAINT HOLE] Read skipped pattern info failed: " + ex.Message);
-            }
-
-            return false;
-        }
-
-        private object TryGetDynamicObject(dynamic obj, string propertyName)
-        {
-            try
-            {
-                return obj.GetType().InvokeMember(propertyName, System.Reflection.BindingFlags.GetProperty, null, obj, null);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-        private int GetPatternInstanceCount(Feature feature)
-        {
-            try
-            {
-                object definition = feature.GetDefinition();
-
-                LinearPatternFeatureData linear = definition as LinearPatternFeatureData;
-                if (linear != null)
-                {
-                    int count = GetTwoDirectionPatternCount(
-                        linear.D1TotalInstances,
-                        linear.D2TotalInstances,
-                        linear.D2PatternSeedOnly);
-                    return Math.Max(1, count - linear.GetSkippedItemCount());
-                }
-
-                CurveDrivenPatternFeatureData curve = definition as CurveDrivenPatternFeatureData;
-                if (curve != null)
-                {
-                    int count = GetTwoDirectionPatternCount(
-                        curve.D1InstanceCount,
-                        curve.D2InstanceCount,
-                        curve.D2PatternSeedOnly);
-                    return Math.Max(1, count - curve.GetSkippedItemCount());
-                }
-
-                CircularPatternFeatureData circular = definition as CircularPatternFeatureData;
-                if (circular != null)
-                {
-                    int count = circular.TotalInstances2 > 0
-                        ? circular.TotalInstances2
-                        : circular.TotalInstances;
-                    return Math.Max(1, count - circular.GetSkippedItemCount());
-                }
-
-                FillPatternFeatureData fill = definition as FillPatternFeatureData;
-                if (fill != null && fill.NoOfInstances > 0)
-                    return fill.NoOfInstances;
-
-                TablePatternFeatureData table = definition as TablePatternFeatureData;
-                if (table != null)
-                    return Math.Max(1, table.GetPointCount() - table.GetSkippedItemCount());
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[PAINT HOLE] Read typed pattern count failed. feature=" +
-                    SafeFeatureName(feature) + ", error=" + ex.Message);
-            }
-
-            int value = TryGetFeatureDimensionInt(feature, "D1");
-            if (value > 1)
-                return value;
-
-            try
-            {
-                dynamic definition = feature.GetDefinition();
-                if (definition != null)
-                {
-                    value = TryGetDynamicInt(definition, "D1TotalInstances");
-                    if (value > 1) return value;
-                    value = TryGetDynamicInt(definition, "TotalInstances");
-                    if (value > 1) return value;
-                    value = TryGetDynamicInt(definition, "InstanceCount");
-                    if (value > 1) return value;
-                    value = TryGetDynamicInt(definition, "NumberOfInstances");
-                    if (value > 1) return value;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[PAINT HOLE] Read pattern definition failed: " + ex.Message);
-            }
-            return 1;
-        }
-
-        private int GetTwoDirectionPatternCount(int direction1, int direction2, bool secondDirectionSeedOnly)
-        {
-            direction1 = Math.Max(1, direction1);
-            direction2 = Math.Max(1, direction2);
-            if (direction2 <= 1)
-                return direction1;
-            return secondDirectionSeedOnly
-                ? direction1 + direction2 - 1
-                : direction1 * direction2;
-        }
-
-        private int GetPatternSeedHoleCount(Feature patternFeature)
-        {
-            try
-            {
-                object definition = patternFeature.GetDefinition();
-                object seedValue = null;
-
-                LinearPatternFeatureData linear = definition as LinearPatternFeatureData;
-                if (linear != null) seedValue = linear.PatternFeatureArray;
-                CurveDrivenPatternFeatureData curve = definition as CurveDrivenPatternFeatureData;
-                if (curve != null) seedValue = curve.PatternFeatureArray;
-                CircularPatternFeatureData circular = definition as CircularPatternFeatureData;
-                if (circular != null) seedValue = circular.PatternFeatureArray;
-                FillPatternFeatureData fill = definition as FillPatternFeatureData;
-                if (fill != null) seedValue = fill.PatternFeatureArray;
-                TablePatternFeatureData table = definition as TablePatternFeatureData;
-                if (table != null) seedValue = table.PatternFeatureArray;
-
-                Array seeds = seedValue as Array;
-                if (seeds == null || seeds.Length == 0)
-                    return 1;
-
-                int holeCount = 0;
-                foreach (object item in seeds)
-                {
-                    Feature seed = item as Feature;
-                    if (seed == null || IsPatternFeature(seed) || !IsUsableFeature(seed))
-                        continue;
-                    holeCount += GetDirectHoleCount(seed);
-                }
-                return Math.Max(1, holeCount);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[PAINT HOLE] Read pattern seed failed. feature=" +
-                    SafeFeatureName(patternFeature) + ", error=" + ex.Message);
-                return 1;
-            }
-        }
-
-        private int TryGetFeatureDimensionInt(Feature feature, string dimensionName)
-        {
-            try
-            {
-                Dimension dimension = feature.Parameter(dimensionName) as Dimension;
-                if (dimension == null)
-                    return 0;
-                double value = dimension.SystemValue;
-                if (value > 0.0 && value < 100000.0)
-                    return Math.Max(1, (int)Math.Round(value));
-            }
-            catch
-            {
-            }
-            return 0;
-        }
-
-        private int TryGetDynamicInt(dynamic obj, string propertyName)
-        {
-            try
-            {
-                object value = obj.GetType().InvokeMember(propertyName, System.Reflection.BindingFlags.GetProperty, null, obj, null);
-                if (value == null)
-                    return 0;
-                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
-            }
-            catch
-            {
-                return 0;
-            }
-        }
-
-        private int GetDirectHoleCount(Feature feature)
-        {
-            try
-            {
-                WizardHoleFeatureData2 holeData = feature.GetDefinition() as WizardHoleFeatureData2;
-                if (holeData != null)
-                {
-                    int positionCount = holeData.GetSketchPointCount();
-                    if (positionCount > 0)
-                    {
-                        Debug.WriteLine("[PAINT HOLE] Hole Wizard positions. feature=" +
-                            SafeFeatureName(feature) + ", count=" + positionCount);
-                        return positionCount;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[PAINT HOLE] Read Hole Wizard positions failed. feature=" +
-                    SafeFeatureName(feature) + ", error=" + ex.Message);
-            }
-
-            int contourCount = 0;
-            try
-            {
-                for (Feature sub = feature.GetFirstSubFeature() as Feature; sub != null; sub = sub.GetNextSubFeature() as Feature)
-                {
-                    Sketch sketch = null;
-                    try
-                    {
-                        sketch = sub.GetSpecificFeature2() as Sketch;
-                    }
-                    catch
-                    {
-                    }
-
-                    if (sketch == null)
-                        continue;
-
-                    object[] contours = sketch.GetSketchContours() as object[];
-                    if (contours == null)
-                        continue;
-
-                    foreach (object item in contours)
-                    {
-                        SketchContour contour = item as SketchContour;
-                        if (contour != null && contour.IsClosed())
-                            contourCount++;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[PAINT HOLE] Count closed hole contours failed: " + ex.Message);
-            }
-
-            if (contourCount > 0)
-            {
-                Debug.WriteLine("[PAINT HOLE] Direct feature closed contours. feature=" +
-                    SafeFeatureName(feature) + ", count=" + contourCount);
-                return contourCount;
-            }
-
-            Debug.WriteLine("[PAINT HOLE] Direct feature fallback to one physical hole. feature=" +
-                SafeFeatureName(feature));
-            return 1;
         }
 
         private string SafeFeatureName(Feature feature)
@@ -917,32 +540,23 @@ namespace ADDIN.Commands
             dynamic summarySheet = xlWB.Sheets[1];
             summarySheet.Name = "Thong ke lo";
 
-            summarySheet.Cells[1, 1] = "Loai lo";
-            summarySheet.Cells[1, 2] = "Tong so lo";
-            summarySheet.Cells[1, 3] = "\u7A74\u5857\u88C5";
-            summarySheet.Cells[1, 4] = "So feature pattern";
-            summarySheet.Cells[1, 5] = "So feature truc tiep";
-            summarySheet.Cells[1, 6] = "Loai lo";
-            summarySheet.Cells[1, 7] = "\u90E8\u54C1\u756A\u53F7";
-            summarySheet.Cells[1, 8] = "Ten component";
-            summarySheet.Cells[1, 9] = "Tong so lo";
-            summarySheet.Cells[1, 10] = "So feature";
+            summarySheet.Cells[1, 1] = "Hole";
+            summarySheet.Cells[1, 2] = "Hole Label";
+            summarySheet.Cells[1, 3] = "Total Quantity";
 
             int row = 2;
             foreach (HoleSummary summary in result.GetSortedSummary())
             {
                 summarySheet.Cells[row, 1] = summary.HoleKey;
-                summarySheet.Cells[row, 2] = summary.Quantity;
-                summarySheet.Cells[row, 3] = summary.IsPaint ? "\u7A74\u5857\u88C5" : "";
-                summarySheet.Cells[row, 4] = summary.PatternFeatureCount;
-                summarySheet.Cells[row, 5] = summary.DirectFeatureCount;
+                summarySheet.Cells[row, 2] = summary.HoleLabel;
+                summarySheet.Cells[row, 3] = summary.Quantity;
                 row++;
             }
             summarySheet.Cells[row, 1] = "TONG";
-            summarySheet.Cells[row, 2] = result.TotalQuantity;
+            summarySheet.Cells[row, 3] = result.TotalQuantity;
             try
             {
-                dynamic totalRange = summarySheet.Range[summarySheet.Cells[row, 1], summarySheet.Cells[row, 5]];
+                dynamic totalRange = summarySheet.Range[summarySheet.Cells[row, 1], summarySheet.Cells[row, 3]];
                 totalRange.Font.Bold = true;
                 totalRange.Interior.Color = 13434879;
             }
@@ -950,38 +564,29 @@ namespace ADDIN.Commands
             {
             }
 
-            int featureRow = 2;
-            foreach (HolePartSummary partSummary in BuildHolePartSummaries(result))
-            {
-                summarySheet.Cells[featureRow, 6] = partSummary.HoleKey;
-                summarySheet.Cells[featureRow, 7] = partSummary.PartNumber;
-                summarySheet.Cells[featureRow, 8] = partSummary.ComponentName;
-                summarySheet.Cells[featureRow, 9] = partSummary.Quantity;
-                summarySheet.Cells[featureRow, 10] = partSummary.FeatureCount;
-                featureRow++;
-            }
             summarySheet.Columns.AutoFit();
 
             dynamic detailSheet = xlWB.Sheets.Add(Type.Missing, summarySheet);
             detailSheet.Name = "Chi tiet";
-            detailSheet.Cells[1, 1] = "Loai lo";
-            detailSheet.Cells[1, 2] = "So lo";
-            detailSheet.Cells[1, 3] = "Feature";
-            detailSheet.Cells[1, 4] = "Kieu feature";
-            detailSheet.Cells[1, 5] = "La pattern";
-            detailSheet.Cells[1, 6] = "\u90E8\u54C1\u756A\u53F7";
-            detailSheet.Cells[1, 7] = "Ten component";
+            string[] headers = { "\u90E8\u54C1\u756A\u53F7", "Component", "Configuration", "Feature",
+                "Feature Type", "Hole", "Hole Label", "Family ID", "Quantity", "Pattern", "Source" };
+            for (int column = 0; column < headers.Length; column++)
+                detailSheet.Cells[1, column + 1] = headers[column];
 
             row = 2;
             foreach (HoleRecord record in result.Records)
             {
-                detailSheet.Cells[row, 1] = record.HoleKey;
-                detailSheet.Cells[row, 2] = record.Quantity;
-                detailSheet.Cells[row, 3] = record.FeatureName;
-                detailSheet.Cells[row, 4] = record.FeatureType;
-                detailSheet.Cells[row, 5] = record.IsPattern ? "Co" : "";
-                detailSheet.Cells[row, 6] = record.PartNumber;
-                detailSheet.Cells[row, 7] = GetComponentDisplayName(record);
+                detailSheet.Cells[row, 1] = record.PartNumber;
+                detailSheet.Cells[row, 2] = GetComponentDisplayName(record);
+                detailSheet.Cells[row, 3] = record.Configuration;
+                detailSheet.Cells[row, 4] = record.FeatureName;
+                detailSheet.Cells[row, 5] = record.FeatureType;
+                detailSheet.Cells[row, 6] = record.HoleKey;
+                detailSheet.Cells[row, 7] = record.HoleLabel;
+                detailSheet.Cells[row, 8] = record.FamilyId;
+                detailSheet.Cells[row, 9] = record.Quantity;
+                detailSheet.Cells[row, 10] = record.IsPattern ? "Yes" : "";
+                detailSheet.Cells[row, 11] = record.Source;
                 row++;
             }
             detailSheet.Columns.AutoFit();
@@ -996,49 +601,10 @@ namespace ADDIN.Commands
             xlApp.Visible = true;
         }
 
-        private List<HolePartSummary> BuildHolePartSummaries(PaintHoleScanResult result)
-        {
-            Dictionary<string, HolePartSummary> grouped =
-                new Dictionary<string, HolePartSummary>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (HoleRecord record in result.Records)
-            {
-                string componentName = GetComponentDisplayName(record);
-                string key = (record.HoleKey ?? "") + "\u001F" +
-                    (record.PartNumber ?? "") + "\u001F" + componentName;
-
-                HolePartSummary summary;
-                if (!grouped.TryGetValue(key, out summary))
-                {
-                    summary = new HolePartSummary
-                    {
-                        HoleKey = record.HoleKey,
-                        PartNumber = record.PartNumber,
-                        ComponentName = componentName
-                    };
-                    grouped.Add(key, summary);
-                }
-
-                summary.Quantity += record.Quantity;
-                summary.FeatureCount++;
-            }
-
-            List<HolePartSummary> list = new List<HolePartSummary>(grouped.Values);
-            list.Sort((left, right) =>
-            {
-                int compare = string.Compare(left.HoleKey, right.HoleKey, StringComparison.OrdinalIgnoreCase);
-                if (compare != 0)
-                    return compare;
-                compare = string.Compare(left.PartNumber, right.PartNumber, StringComparison.OrdinalIgnoreCase);
-                if (compare != 0)
-                    return compare;
-                return string.Compare(left.ComponentName, right.ComponentName, StringComparison.OrdinalIgnoreCase);
-            });
-            return list;
-        }
-
         private string GetComponentDisplayName(HoleRecord record)
         {
+            if (!string.IsNullOrWhiteSpace(record.ComponentName))
+                return record.ComponentName;
             try
             {
                 string fileName = Path.GetFileNameWithoutExtension(record.PartPath ?? "");
@@ -1064,7 +630,12 @@ namespace ADDIN.Commands
             public List<HoleSummary> GetSortedSummary()
             {
                 List<HoleSummary> list = new List<HoleSummary>(Summary.Values);
-                list.Sort((a, b) => string.Compare(a.HoleKey, b.HoleKey, StringComparison.OrdinalIgnoreCase));
+                list.Sort((a, b) =>
+                {
+                    int bySize = string.Compare(a.HoleKey, b.HoleKey, StringComparison.OrdinalIgnoreCase);
+                    return bySize != 0 ? bySize : string.Compare(a.HoleLabel, b.HoleLabel,
+                        StringComparison.OrdinalIgnoreCase);
+                });
                 return list;
             }
         }
@@ -1072,26 +643,19 @@ namespace ADDIN.Commands
         private class HoleSummary
         {
             public string HoleKey;
+            public string HoleLabel;
             public int Quantity;
-            public bool IsPaint;
-            public int PatternFeatureCount;
-            public int DirectFeatureCount;
-        }
-
-        private class HolePartSummary
-        {
-            public string HoleKey;
-            public string PartNumber;
-            public string ComponentName;
-            public int Quantity;
-            public int FeatureCount;
         }
 
         private class HoleRecord
         {
             public string HoleKey;
+            public string HoleLabel;
+            public string FamilyId;
+            public double? DiameterMm;
+            public string Configuration;
+            public string Source;
             public int Quantity;
-            public bool IsPaint;
             public bool IsPattern;
             public string FeatureName;
             public string FeatureType;

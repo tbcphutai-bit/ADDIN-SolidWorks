@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -22,7 +22,7 @@ namespace ADDIN.Commands
     ///
     /// Important:
     /// - Point spacing is NOT equal curve parameter spacing.
-    /// - Actual spline tolerance is 0.15–0.50 mm, scaled by edge length.
+    /// - Actual spline tolerance is 0.15–0.20 mm, scaled by edge length.
     /// - If a 3D Sketch is already active, the spline is created there.
     /// - If no sketch is active, the command creates a 3D Sketch automatically.
     /// </summary>
@@ -30,29 +30,30 @@ namespace ADDIN.Commands
     {
         private const double DefaultToleranceMm = 0.05;
         private const int MinimumPointCount = 4;
-        private const int MaximumPointCount = 32;
+        private const int MaximumPointCount = 256;
 
         // V37.4: a SAME 3D SketchSpline that is expected to MOVE again must keep
         // some topology in reserve. Runtime logs showed a complex Edge needed
-        // 12 points for the first verified CREATE pass, while a later 4-point
+        // 12 points for one complex Edge, while a later 4-point
         // SAME spline missed a complex Edge by ~50.8 mm even though every fit
-        // point reached its target. We cannot safely grow SAME spline topology
-        // again because InsertPoint previously changed native parameterization /
-        // produced loops. Therefore CREATE starts at 12 and MOVE never reduces
-        // below 12 when that topology is already available. Older splines with
-        // fewer points are preserved at their current count; they are never grown.
+        // point reached its target. CREATE now tests from its complexity plan
+        // and MOVE may insert on
+        // the old spline before its staged morph when the new Edge needs more
+        // points; it never inserts after morph, where native loops were seen.
         private const int ReusableSplineReservePointCount = 12;
 
         // V36.4 CREATE MODE:
         //
-        // V37.4 CREATE starts from the reusable topology reserve (12 points),
+        // CREATE starts from its geometry-derived minimum (at least 4 points),
         // then increases N by exactly one. The FIRST native SketchSpline that
         // passes both normal and dense bidirectional spline<->Edge deviation
-        // scans is accepted. The absolute API minimum remains 4, but CREATE no
-        // longer collapses reusable 3D spline topology to that floor.
+        // scans is accepted. MOVE can increase point count before retargeting.
         //
-        // 32 is a safety cap, not a target. Most Edges should stop far below it.
-        private const int CreateMaximumPointCount = 32;
+        // 32 is the end of the fine search, not an accuracy limit. More complex
+        // Edges continue with wider probes up to a bounded native safety cap.
+        private const int CreateMaximumPointCount = 256;
+        private const int CreateFineSearchMaximumPointCount = 32;
+        private const int CreateFastValidationSamplesPerPoint = 8;
 
         // V33: large 3D fit-point moves can converge over several native
         // rebuilds. V31 moved index 0 about 5 mm after one rebuild.
@@ -66,13 +67,13 @@ namespace ADDIN.Commands
         // straight helper chords.
         private const double CreateBaseSplineToleranceMm = 0.15;
         private const double CreateRelativeSplineToleranceRatio = 0.00020;
-        private const double CreateMaximumSplineToleranceMm = 0.50;
+        private const double CreateMaximumSplineToleranceMm = 0.20;
         private const double MoveRelativeSplineToleranceRatio = 0.00025;
 
         // V35.7: after the first successful reduction, only continue reducing
         // when the accepted native spline has comfortable tolerance headroom.
         // This prevents probing one point too far and then trying to rebuild
-        // topology with InsertPoint, which runtime V35.6 proved can create loops.
+        // topology with InsertPoint after morph, which can create loops.
         private const double MoveReduceContinueHeadroomRatio = 0.60;
         private const int MoveReduceUndoMaximumSteps = 8;
 
@@ -229,11 +230,21 @@ namespace ADDIN.Commands
         {
             if (commandRunning) return;
             commandRunning = true;
-            try { RunCore(owner); }
+            try { RunCore(owner, null); }
             finally { commandRunning = false; }
         }
 
-        private void RunCore(IWin32Window owner)
+        // The PropertyManager option chooses the workflow explicitly. The
+        // original Run overload remains available for existing callers.
+        public void Run(IWin32Window owner, bool moveMode)
+        {
+            if (commandRunning) return;
+            commandRunning = true;
+            try { RunCore(owner, moveMode); }
+            finally { commandRunning = false; }
+        }
+
+        private void RunCore(IWin32Window owner, bool? requestedMoveMode)
         {
             Debug.WriteLine(
                 "[EDGE EQUAL SPLINE] build=20260916-v37.5-finer-target-morph-stages");
@@ -288,8 +299,22 @@ namespace ADDIN.Commands
 
             try
             {
-                if (selection.MoveSketch != null &&
-                    selection.MoveSpline != null)
+                bool selectionIsMove =
+                    selection.MoveSketch != null &&
+                    selection.MoveSpline != null;
+
+                if (requestedMoveMode.HasValue &&
+                    requestedMoveMode.Value != selectionIsMove)
+                {
+                    ShowMessage(
+                        requestedMoveMode.Value
+                            ? "Đã chọn MOVE. Hãy Edit 3D Sketch và chọn spline cũ cùng đường đích."
+                            : "Đã chọn TẠO. Hãy chỉ chọn một cạnh đích.",
+                        swMessageBoxIcon_e.swMbInformation);
+                    return;
+                }
+
+                if (selectionIsMove)
                 {
                     Debug.WriteLine(
                         "[EDGE EQUAL SPLINE] MODE=MOVE_REATTACH " +
@@ -391,8 +416,6 @@ namespace ADDIN.Commands
                 throw new InvalidOperationException("Không lưu được reference của Edge.");
             var createSnapshot = BuildCurvePolylineByArcLength(edge, curve, u0, u1, totalLength, CreateEdgeSnapshotSamples);
             var createCandidates = new Dictionary<int, SamplingResult>();
-            for (int n = MinimumPointCount; n <= CreateMaximumPointCount; n++)
-                createCandidates.Add(n, EvaluateSampling(edge, curve, u0, u1, totalLength, n - 1, double.MaxValue));
             bool created3DSketch = false;
             Sketch activeSketch = model.SketchManager.ActiveSketch as Sketch;
 
@@ -442,10 +465,10 @@ namespace ADDIN.Commands
                 int startPointCount =
                     Math.Max(
                         MinimumPointCount,
-                        ReusableSplineReservePointCount);
+                        createPlan.PointCount);
 
                 Debug.WriteLine(
-                    "[EDGE EQUAL SPLINE] CREATE V37.4 REUSABLE MIN-POINT SEARCH BEGIN " +
+                    "[EDGE EQUAL SPLINE] CREATE MIN-POINT SEARCH BEGIN " +
                     "reserveFloor=" + ReusableSplineReservePointCount +
                     ", absoluteMinimum=" + MinimumPointCount +
                     ", startPoints=" + startPointCount +
@@ -453,18 +476,29 @@ namespace ADDIN.Commands
                     ", fastSamples=" + CreateSplineValidationSamples +
                     ", edgeSnapshotSamples=" + CreateEdgeSnapshotSamples);
 
-                // V37.4: start at the reusable reserve floor rather than the
-                // absolute mathematical minimum. The FIRST candidate that
-                // survives both native deviation scans is the minimum verified
-                // N that also retains enough topology for later SAME-spline MOVE.
-                for (int candidatePointCount =
-                         startPointCount;
-                     candidatePointCount <=
-                         CreateMaximumPointCount;
-                     candidatePointCount++)
+                List<int> probePointCounts =
+                    BuildCreateProbePointCounts(
+                        startPointCount,
+                        CreateMaximumPointCount);
+
+                int lastFailedPointCount = startPointCount - 1;
+
+                // Start from the complexity-derived minimum and verify both
+                // native spline creation routes at each point count. The first
+                // passing count is kept; MOVE can grow that SAME spline later.
+                // Above 32 points, probe wider counts first. When one passes,
+                // insert every skipped count since the last failure before
+                // accepting it, so the final native spline still uses the
+                // smallest verified count in that interval.
+                for (int probeIndex = 0;
+                     probeIndex < probePointCounts.Count;
+                     probeIndex++)
                 {
+                    int candidatePointCount = probePointCounts[probeIndex];
                     SamplingResult candidateSampling =
-                        createCandidates[candidatePointCount];
+                        GetOrEvaluateSampling(
+                            createCandidates, edge, curve, u0, u1,
+                            totalLength, candidatePointCount);
 
                     if (candidateSampling == null ||
                         candidateSampling.Points == null ||
@@ -479,136 +513,89 @@ namespace ADDIN.Commands
                         FlattenPoints(
                             candidateSampling.Points);
 
-                    object candidateSplineObject =
-                        CreateSplineCompat(
-                            model.SketchManager,
-                            pointData);
-
+                    double exactRouteDeviation;
                     SketchSegment candidateSplineSegment =
-                        candidateSplineObject
-                        as SketchSegment;
+                        TryCreateMeasuredSplineCandidate(
+                            model, pointData, createSnapshot,
+                            candidatePointCount, actualSplineToleranceMm,
+                            true, out exactRouteDeviation);
 
-                    if (candidateSplineObject == null ||
-                        candidateSplineSegment == null)
+                    string acceptedRoute = "CreateSpline2(false)";
+                    double normalRouteDeviation = double.MaxValue;
+                    if (candidateSplineSegment == null)
                     {
-                        throw new InvalidOperationException(
-                            "SolidWorks không tạo được candidate Spline.");
+                        candidateSplineSegment =
+                            TryCreateMeasuredSplineCandidate(
+                                model, pointData, createSnapshot,
+                                candidatePointCount, actualSplineToleranceMm,
+                                false, out normalRouteDeviation);
+                        acceptedRoute = "CreateSpline";
                     }
 
-                    // Stage 1: inexpensive native-curve scan.
-                    double fastActualDeviation =
-                        MeasureActualSplineToEdgeDeviation(
-                            null, null, 0, 0, 0,
-                            candidateSplineSegment,
-                            CreateSplineValidationSamples, createSnapshot);
-
-                    bool fastPass =
-                        IsFinite(fastActualDeviation) &&
-                        fastActualDeviation * 1000.0 <=
-                            actualSplineToleranceMm + 1.0e-9;
-
-                    // Stage 2: ONLY a fast-pass candidate gets a dense scan.
-                    // This keeps the search efficient while preventing a small,
-                    // highly twisted region from slipping between sparse samples.
-                    int denseValidationSamples = 0;
-                    double denseActualDeviation = fastActualDeviation;
-                    bool densePass = false;
-
-                    if (fastPass)
+                    if (candidateSplineSegment != null)
                     {
-                        denseValidationSamples =
-                            GetCreateDenseValidationSampleCount(
-                                candidatePointCount);
+                        double actualDeviation = acceptedRoute == "CreateSpline2(false)"
+                            ? exactRouteDeviation
+                            : normalRouteDeviation;
 
-                        denseActualDeviation =
-                            MeasureActualSplineToEdgeDeviation(
-                                null, null, 0, 0, 0,
-                                candidateSplineSegment,
-                                denseValidationSamples, createSnapshot);
+                        if (candidatePointCount > lastFailedPointCount + 1)
+                        {
+                            int firstSkippedPointCount = lastFailedPointCount + 1;
+                            if (!DeleteSingleSketchSegment(model, candidateSplineSegment))
+                                throw new InvalidOperationException(
+                                    "Không xóa được spline probe trước khi kiểm tra số điểm ít hơn.");
 
-                        densePass =
-                            IsFinite(denseActualDeviation) &&
-                            denseActualDeviation * 1000.0 <=
-                                actualSplineToleranceMm + 1.0e-9;
-                    }
+                            int insertAt = probeIndex + 1;
+                            for (int pointCount = firstSkippedPointCount;
+                                 pointCount <= candidatePointCount;
+                                 pointCount++)
+                                probePointCounts.Insert(insertAt++, pointCount);
 
-                    bool accepted =
-                        fastPass && densePass;
+                            Debug.WriteLine(
+                                "[EDGE EQUAL SPLINE] CREATE REFINE POINT COUNT " +
+                                "first=" + firstSkippedPointCount +
+                                ", last=" + candidatePointCount +
+                                ", upperPassDeviationMm=" +
+                                (actualDeviation * 1000.0)
+                                    .ToString("0.######", CultureInfo.InvariantCulture));
+                            continue;
+                        }
 
-                    double actualDeviation =
-                        fastPass
-                            ? denseActualDeviation
-                            : fastActualDeviation;
-
-                    bool atHardCap =
-                        candidatePointCount ==
-                        CreateMaximumPointCount;
-
-                    Debug.WriteLine(
-                        "[EDGE EQUAL SPLINE] CREATE V36.4 MIN-POINT TEST " +
-                        "points=" + candidatePointCount +
-                        ", fastDeviationMm=" +
-                        (fastActualDeviation * 1000.0)
-                            .ToString("0.######", CultureInfo.InvariantCulture) +
-                        ", fastPass=" + fastPass +
-                        ", denseSamples=" + denseValidationSamples +
-                        ", denseDeviationMm=" +
-                        (denseActualDeviation * 1000.0)
-                            .ToString("0.######", CultureInfo.InvariantCulture) +
-                        ", densePass=" + densePass +
-                        ", toleranceMm=" +
-                        actualSplineToleranceMm
-                            .ToString("0.######", CultureInfo.InvariantCulture) +
-                        ", pass=" + accepted +
-                        ", hardCap=" + atHardCap);
-
-                    if (accepted)
-                    {
-                        sampling =
-                            candidateSampling;
-
-                        splineObject =
-                            candidateSplineObject;
-
-                        acceptedSplineSegment =
-                            candidateSplineSegment;
-
-                        acceptedActualDeviation =
-                            actualDeviation;
+                        sampling = candidateSampling;
+                        splineObject = candidateSplineSegment;
+                        acceptedSplineSegment = candidateSplineSegment;
+                        acceptedActualDeviation = actualDeviation;
 
                         Debug.WriteLine(
-                            "[EDGE EQUAL SPLINE] CREATE V36.4 FIRST VERIFIED PASS " +
+                            "[EDGE EQUAL SPLINE] CREATE FIRST VERIFIED PASS " +
                             "minimumPoints=" + candidatePointCount +
+                            ", route=" + acceptedRoute +
                             ", denseDeviationMm=" +
                             (actualDeviation * 1000.0)
                                 .ToString("0.######", CultureInfo.InvariantCulture) +
                             ", toleranceMm=" +
                             actualSplineToleranceMm
                                 .ToString("0.######", CultureInfo.InvariantCulture));
-
                         break;
                     }
 
-                    if (atHardCap)
+                    if (candidatePointCount == CreateMaximumPointCount)
                     {
                         Debug.WriteLine(
-                            "[EDGE EQUAL SPLINE] CREATE V36.4 HARD CAP FAIL " +
+                            "[EDGE EQUAL SPLINE] CREATE HARD CAP FAIL " +
                             "maxPoints=" + CreateMaximumPointCount +
-                            ", deviationMm=" +
-                            (actualDeviation * 1000.0)
+                            ", CreateSpline2DeviationMm=" +
+                            (exactRouteDeviation * 1000.0)
+                                .ToString("0.######", CultureInfo.InvariantCulture) +
+                            ", CreateSplineDeviationMm=" +
+                            (normalRouteDeviation * 1000.0)
                                 .ToString("0.######", CultureInfo.InvariantCulture) +
                             ", toleranceMm=" +
                             actualSplineToleranceMm
                                 .ToString("0.######", CultureInfo.InvariantCulture));
                     }
 
-                    if (!DeleteSingleSketchSegment(
-                            model,
-                            candidateSplineSegment))
-                    {
-                        throw new InvalidOperationException(
-                            "Không xóa được candidate spline chưa đạt accuracy.");
-                    }
+                    lastFailedPointCount = candidatePointCount;
                 }
 
                 if (sampling == null ||
@@ -813,7 +800,7 @@ namespace ADDIN.Commands
 
                 double[] tangent =
                     EvaluateEdgeTangent(
-                        edge,
+                        curve,
                         parameter);
 
                 if (IsVector3(
@@ -914,16 +901,16 @@ namespace ADDIN.Commands
         }
 
         private static double[] EvaluateEdgeTangent(
-            Edge edge,
+            Curve curve,
             double parameter)
         {
-            if (edge == null)
+            if (curve == null)
                 return null;
 
             try
             {
                 double[] values =
-                    edge.Evaluate2(
+                    curve.Evaluate2(
                         parameter,
                         1)
                     as double[];
@@ -1023,6 +1010,93 @@ namespace ADDIN.Commands
                         byPoint));
         }
 
+        private SketchSegment TryCreateMeasuredSplineCandidate(
+            ModelDoc2 model,
+            double[] pointData,
+            List<double[]> edgeSnapshot,
+            int pointCount,
+            double toleranceMm,
+            bool useCreateSpline2,
+            out double actualDeviation)
+        {
+            actualDeviation = double.MaxValue;
+            SketchSegment segment = null;
+            string route = useCreateSpline2
+                ? "CreateSpline2(false)"
+                : "CreateSpline";
+
+            try
+            {
+                segment = useCreateSpline2
+                    ? model.SketchManager.CreateSpline2(pointData, false)
+                    : model.SketchManager.CreateSpline(pointData);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[EDGE EQUAL SPLINE] CREATE CANDIDATE API FAILED " +
+                    "route=" + route + ", points=" + pointCount +
+                    ", error=" + ex.Message);
+                return null;
+            }
+
+            if (segment == null)
+                return null;
+
+            bool accepted = false;
+            try
+            {
+                int fastSamples =
+                    Math.Min(
+                        CreateEdgeSnapshotSamples,
+                        Math.Max(CreateSplineValidationSamples,
+                            pointCount * CreateFastValidationSamplesPerPoint));
+                double fastDeviation = MeasureActualSplineToEdgeDeviation(
+                    null, null, 0, 0, 0,
+                    segment, fastSamples, edgeSnapshot);
+                bool fastPass = IsFinite(fastDeviation) &&
+                    fastDeviation * 1000.0 <= toleranceMm + 1.0e-9;
+
+                int denseSamples = 0;
+                double denseDeviation = fastDeviation;
+                if (fastPass)
+                {
+                    denseSamples = Math.Max(
+                        fastSamples,
+                        GetCreateDenseValidationSampleCount(pointCount));
+                    if (denseSamples != fastSamples)
+                        denseDeviation = MeasureActualSplineToEdgeDeviation(
+                            null, null, 0, 0, 0,
+                            segment, denseSamples, edgeSnapshot);
+                }
+
+                actualDeviation = fastPass ? denseDeviation : fastDeviation;
+                accepted = fastPass && IsFinite(denseDeviation) &&
+                    denseDeviation * 1000.0 <= toleranceMm + 1.0e-9;
+
+                Debug.WriteLine(
+                    "[EDGE EQUAL SPLINE] CREATE CANDIDATE TEST " +
+                    "route=" + route + ", points=" + pointCount +
+                    ", fastDeviationMm=" +
+                    (fastDeviation * 1000.0).ToString("0.######", CultureInfo.InvariantCulture) +
+                    ", denseSamples=" + denseSamples +
+                    ", actualDeviationMm=" +
+                    (actualDeviation * 1000.0).ToString("0.######", CultureInfo.InvariantCulture) +
+                    ", toleranceMm=" +
+                    toleranceMm.ToString("0.######", CultureInfo.InvariantCulture) +
+                    ", pass=" + accepted);
+
+                return accepted ? segment : null;
+            }
+            finally
+            {
+                if (!accepted &&
+                    !DeleteSingleSketchSegment(model, segment))
+                    throw new InvalidOperationException(
+                        "Không xóa được spline thử nghiệm chưa đạt accuracy.");
+            }
+        }
+
         private double ProbeTemporarySplineDeviationForTargets(
             ModelDoc2 model,
             List<double[]> targetPoints,
@@ -1057,7 +1131,11 @@ namespace ADDIN.Commands
                     temporaryObject as SketchSegment;
 
                 if (temporarySegment == null)
+                {
+                    // No segment was created, so there is nothing to remove.
+                    cleanupOk = true;
                     return double.MaxValue;
+                }
 
                 int denseSamples =
                     GetCreateDenseValidationSampleCount(
@@ -1096,6 +1174,26 @@ namespace ADDIN.Commands
             return Math.Min(
                 CreateMaximumSplineToleranceMm,
                 tolerance);
+        }
+
+        private static double GetSketchSegmentArcLength(SketchSegment segment)
+        {
+            Curve curve = segment == null ? null : segment.GetCurve() as Curve;
+            if (curve == null)
+                throw new InvalidOperationException("Không đọc được Curve của spline nguồn.");
+
+            double u0;
+            double u1;
+            bool closed;
+            bool periodic;
+            if (!curve.GetEndParams(out u0, out u1, out closed, out periodic))
+                throw new InvalidOperationException("Không đọc được parameter của spline nguồn.");
+
+            double length = GetCurveLength(curve, Math.Min(u0, u1), Math.Max(u0, u1));
+            if (!IsFinite(length) || length <= 1.0e-9)
+                throw new InvalidOperationException("Chiều dài spline nguồn không hợp lệ.");
+
+            return length;
         }
 
         private double MeasureActualSplineToEdgeDeviation(
@@ -1290,14 +1388,10 @@ namespace ADDIN.Commands
                         totalLength,
                         targetLength);
 
-                double[] point =
-                    edge != null
-                        ? EvaluateEdgePoint(
-                            edge,
-                            parameter)
-                        : EvaluateCurvePoint(
-                            curve,
-                            parameter);
+                // Arc lengths above come from this Curve. IEdge.Evaluate2
+                // reverses U on IsParamReversed edges, so mixing the two APIs
+                // can make adjacent "equal arc" points metres apart.
+                double[] point = EvaluateCurvePoint(curve, parameter);
 
                 if (IsPoint(
                         point))
@@ -3474,6 +3568,51 @@ namespace ADDIN.Commands
             return best;
         }
 
+        private static List<int> BuildCreateProbePointCounts(
+            int startPointCount,
+            int maximumPointCount)
+        {
+            var result = new List<int>();
+            int fineEnd = Math.Min(
+                Math.Max(CreateFineSearchMaximumPointCount,
+                    startPointCount),
+                maximumPointCount);
+
+            for (int count = startPointCount; count <= fineEnd; count++)
+                result.Add(count);
+
+            int next = fineEnd;
+            while (next < maximumPointCount)
+            {
+                int step = next < 64 ? 8 : next < 128 ? 16 : 32;
+                next = Math.Min(maximumPointCount, next + step);
+                result.Add(next);
+            }
+
+            return result;
+        }
+
+        private SamplingResult GetOrEvaluateSampling(
+            Dictionary<int, SamplingResult> cache,
+            Edge edge,
+            Curve curve,
+            double u0,
+            double u1,
+            double totalLength,
+            int pointCount)
+        {
+            SamplingResult result;
+            if (!cache.TryGetValue(pointCount, out result))
+            {
+                result = EvaluateSampling(
+                    edge, curve, u0, u1, totalLength,
+                    pointCount - 1, double.MaxValue);
+                cache.Add(pointCount, result);
+            }
+
+            return result;
+        }
+
         private SamplingResult EvaluateSampling(
             Edge edge,
             Curve curve,
@@ -3499,7 +3638,7 @@ namespace ADDIN.Commands
                 double parameter = FindParameterAtArcLength(
                     curve, u0, u1, totalLength, targetLength);
 
-                double[] point = EvaluateEdgePoint(edge, parameter);
+                double[] point = EvaluateCurvePoint(curve, parameter);
                 if (!IsPoint(point))
                     throw new InvalidOperationException("Không evaluate được point trên Edge.");
 
@@ -3530,7 +3669,7 @@ namespace ADDIN.Commands
                     double parameter = FindParameterAtArcLength(
                         curve, u0, u1, totalLength, targetLength);
 
-                    double[] realPoint = EvaluateEdgePoint(edge, parameter);
+                    double[] realPoint = EvaluateCurvePoint(curve, parameter);
                     if (!IsPoint(realPoint))
                         continue;
 
@@ -3998,9 +4137,10 @@ namespace ADDIN.Commands
 
         private static double[] EvaluateEdgePoint(Edge edge, double parameter)
         {
-            double[] values = GeometryCall("IEdge.Evaluate2", () => edge.Evaluate2(parameter, 0) as double[]);
-            if (!IsPoint(values)) throw new InvalidOperationException("IEdge.Evaluate2: invalid XYZ.");
-            return new[] { values[0], values[1], values[2] };
+            Curve curve = edge == null ? null : edge.GetCurve() as Curve;
+            if (curve == null)
+                throw new InvalidOperationException("Không đọc được Curve của Edge.");
+            return EvaluateCurvePoint(curve, parameter);
         }
 
         private static Edge ReacquireTargetEdge(ModelDoc2 model, byte[] reference)
@@ -6779,7 +6919,8 @@ namespace ADDIN.Commands
             // HARD RULES:
             // - Keep the SAME existing 3D Sketch feature.
             // - Keep the SAME existing SketchSpline entity.
-            // - NEVER call CreateSpline* in MOVE.
+            // - A disposable native spline may be measured and removed before
+            //   changing the selected spline; never replace the selected one.
             // - NEVER delete / replace the selected SketchSpline.
             // - Point count may change only by SketchSpline.InsertPoint /
             //   SketchSpline.DeletePoint on that SAME spline.
@@ -6890,6 +7031,9 @@ namespace ADDIN.Commands
             int oldPointCount =
                 geometry.FitPoints.Count;
 
+            double sourceSplineLength =
+                GetSketchSegmentArcLength(originalSplineSegment);
+
             int oldHelperLineCount =
                 geometry.ConstructionLines == null
                     ? 0
@@ -6996,12 +7140,9 @@ namespace ADDIN.Commands
                 GetCreateActualSplineToleranceMm(
                     targetLengthMm);
 
-            // V35.6 MOVE-specific tolerance.  MOVE must preserve the SAME
-            // native SketchSpline, so we do not grow fit-point topology with
-            // InsertPoint merely to chase a tiny residual.  A slightly more
-            // permissive relative tolerance (still capped at 0.50 mm) keeps
-            // the existing entity stable while remaining visually coincident
-            // with the selected Edge.
+            // Preserve the original native SketchSpline and cap the measured
+            // MOVE deviation at 0.20 mm. Additional points, when needed, are
+            // inserted into that SAME spline before the staged move.
             double moveActualSplineToleranceMm =
                 Math.Min(
                     CreateMaximumSplineToleranceMm,
@@ -7096,22 +7237,112 @@ namespace ADDIN.Commands
             Dictionary<int, SamplingResult> targetCandidates =
                 new Dictionary<int, SamplingResult>();
 
-            for (int n =
-                     MinimumPointCount;
-                 n <=
-                     CreateMaximumPointCount;
-                 n++)
+            // Use the target Edge length to preserve approximately the source
+            // point spacing. Round the required segment count: a tiny increase
+            // in Edge length must not add a fit point on every successive Move.
+            // The native spline preflight below still adds points whenever the
+            // actual deviation exceeds the tolerance.
+            // Before changing the selected spline, measure a temporary native
+            // spline through equally spaced Edge points. If its actual shape
+            // exceeds the tolerance, add another point to the plan and probe
+            // again. The selected spline is moved only after a plan passes.
+            if (!IsFinite(sourceSplineLength) || sourceSplineLength <= 1.0e-9)
+                throw new InvalidOperationException(
+                    "Không đọc được chiều dài spline cũ; 3D Sketch chưa bị sửa.");
+
+            double sourceSpanLength =
+                sourceSplineLength / (oldPointCount - 1);
+
+            double requiredTargetSegments = targetLength / sourceSpanLength;
+            double roundedTargetSegments =
+                Math.Floor(requiredTargetSegments + 0.5);
+            if (!IsFinite(requiredTargetSegments) ||
+                !IsFinite(roundedTargetSegments) ||
+                roundedTargetSegments > CreateMaximumPointCount - 1)
+                throw new InvalidOperationException(
+                    "Edge đích quá dài để giữ mật độ điểm của spline cũ với tối đa " +
+                    CreateMaximumPointCount + " fit point. 3D Sketch chưa bị sửa.");
+
+            int lengthRequiredPointCount =
+                (int)roundedTargetSegments + 1;
+
+            int minimumTargetPointCount =
+                Math.Max(oldPointCount, lengthRequiredPointCount);
+
+            int requiredTargetPointCount = -1;
+            List<int> moveProbePointCounts =
+                BuildCreateProbePointCounts(
+                    minimumTargetPointCount,
+                    CreateMaximumPointCount);
+            int lastFailedMovePointCount = minimumTargetPointCount - 1;
+
+            for (int probeIndex = 0;
+                 probeIndex < moveProbePointCounts.Count;
+                 probeIndex++)
             {
-                targetCandidates[n] =
-                    EvaluateSampling(
-                        targetEdge,
-                        targetCurve,
-                        targetU0,
-                        targetU1,
-                        targetLength,
-                        n - 1,
-                        double.MaxValue);
+                int n = moveProbePointCounts[probeIndex];
+                bool cleanupOk;
+                double candidateDeviation =
+                    ProbeTemporarySplineDeviationForTargets(
+                        model,
+                        GetOrEvaluateSampling(
+                            targetCandidates, targetEdge, targetCurve,
+                            targetU0, targetU1, targetLength, n).Points,
+                        targetSnapshot,
+                        out cleanupOk);
+
+                if (!cleanupOk)
+                    throw new InvalidOperationException(
+                        "Không xóa được spline thử nghiệm trong 3D Sketch. Dừng trước khi sửa spline cũ.");
+
+                double candidateDeviationMm = candidateDeviation * 1000.0;
+                Debug.WriteLine(
+                    "[EDGE EQUAL SPLINE] MOVE NATIVE SPLINE PREFLIGHT " +
+                    "sourceLengthMm=" +
+                    (sourceSplineLength * 1000.0).ToString("0.######", CultureInfo.InvariantCulture) +
+                    ", targetLengthMm=" +
+                    targetLengthMm.ToString("0.######", CultureInfo.InvariantCulture) +
+                    ", points=" + n +
+                    ", deviationMm=" +
+                    candidateDeviationMm.ToString("0.######", CultureInfo.InvariantCulture) +
+                    ", toleranceMm=" +
+                    moveActualSplineToleranceMm.ToString("0.######", CultureInfo.InvariantCulture));
+
+                if (IsFinite(candidateDeviationMm) &&
+                    candidateDeviationMm <= moveActualSplineToleranceMm + 1.0e-9)
+                {
+                    if (n > lastFailedMovePointCount + 1)
+                    {
+                        int insertAt = probeIndex + 1;
+                        for (int pointCount = lastFailedMovePointCount + 1;
+                             pointCount <= n;
+                             pointCount++)
+                        {
+                            moveProbePointCounts.Insert(insertAt++, pointCount);
+                        }
+                        continue;
+                    }
+
+                    requiredTargetPointCount = n;
+                    break;
+                }
+
+                lastFailedMovePointCount = n;
             }
+
+            if (requiredTargetPointCount < 0)
+                throw new InvalidOperationException(
+                    "Không tìm được số fit point cho spline thử nghiệm đạt sai số thực " +
+                    moveActualSplineToleranceMm.ToString("0.###", CultureInfo.InvariantCulture) +
+                    " mm với tối đa " + CreateMaximumPointCount +
+                    " fit point. 3D Sketch chưa bị sửa.");
+
+            Debug.WriteLine(
+                "[EDGE EQUAL SPLINE] MOVE ADAPTIVE POINT COUNT " +
+                "old=" + oldPointCount +
+                ", lengthFloor=" + lengthRequiredPointCount +
+                ", target=" + requiredTargetPointCount +
+                ", equalArc=True");
 
             Debug.WriteLine(
                 "[EDGE EQUAL SPLINE] MOVE V35 TARGET PLAN " +
@@ -7252,8 +7483,73 @@ namespace ADDIN.Commands
                         oldPointCount + " -> " + currentPointCount);
                 }
 
+                // Insert on the OLD spline while it still has its old shape.
+                // InsertPoint requires a coordinate on that spline; inserting
+                // on the distant target Edge would corrupt native point order.
+                // After insertion, freeze the new native order and morph every
+                // point to a freshly sampled equal-arc position on the Edge.
+                while (currentPointCount < requiredTargetPointCount)
+                {
+                    int nextPointCount = currentPointCount + 1;
+                    if (!InsertOnePointOnSameSpline(originalSpline, nextPointCount))
+                        throw new InvalidOperationException(
+                            "Không thêm được fit point " + nextPointCount +
+                            " vào spline cũ. Cần Undo trước khi thử lại.");
+
+                    targetSketch =
+                        EnsureSame3DSketchEditing(
+                            model,
+                            targetSketch,
+                            owningSketchFeature,
+                            owningSketchName);
+
+                    originalSplineSegment =
+                        ReacquireSketchSegmentByKey(targetSketch, splineKeyBefore);
+                    originalSpline = originalSplineSegment as SketchSpline;
+                    if (originalSpline == null)
+                        throw new InvalidOperationException(
+                            "Mất spline cũ sau khi InsertPoint. Cần Undo.");
+
+                    VerifySameSplineIdentityOrThrow(
+                        originalSpline,
+                        selectedSpline,
+                        splineKeyBefore,
+                        "adaptive point insertion");
+
+                    int observedCount = SafeGetSplinePointCount(originalSpline);
+                    if (observedCount != nextPointCount)
+                        throw new InvalidOperationException(
+                            "InsertPoint đổi số điểm không đúng: " +
+                            currentPointCount + " -> " + observedCount +
+                            ". Cần Undo.");
+
+                    currentPointCount = observedCount;
+                    Debug.WriteLine(
+                        "[EDGE EQUAL SPLINE] MOVE SAME SPLINE INSERT " +
+                        "points=" + currentPointCount +
+                        ", target=" + requiredTargetPointCount);
+                }
+
+                if (currentPointCount != oldPointCount)
+                {
+                    List<SketchPoint> expandedPoints =
+                        GetSplineFitPoints(originalSpline);
+                    if (expandedPoints.Count != currentPointCount)
+                        throw new InvalidOperationException(
+                            "Không đọc được thứ tự fit point sau InsertPoint. Cần Undo.");
+
+                    originalFitPointSnapshot =
+                        SnapshotSketchPointCoordinates(expandedPoints);
+                    originalFitPointKeys.Clear();
+                    foreach (SketchPoint point in expandedPoints)
+                        originalFitPointKeys.Add(GetSketchPointKey(point));
+                }
+
                 SamplingResult currentSampling =
-                    targetCandidates[currentPointCount];
+                    GetOrEvaluateSampling(
+                        targetCandidates, targetEdge, targetCurve,
+                        targetU0, targetU1, targetLength,
+                        currentPointCount);
 
                 // V36.2: keep the proven equal-ARC targets for SAME-spline MOVE.
                 // V36.1 proved that forcing exact equal-chord targets before the
@@ -7354,6 +7650,61 @@ namespace ADDIN.Commands
                         .ToString("0.######", CultureInfo.InvariantCulture) +
                     ", pass=" + currentCandidate.Success);
 
+                // InsertPoint retains the original spline's native handle
+                // state. After a coherent fit-point move, those handles can
+                // still bend the SAME spline away from an otherwise accurate
+                // equal-arc point layout. Resetting them is a native operation
+                // on the existing entity; it does not replace the 3D Sketch or
+                // any fit point. Verify identity and actual deviation again.
+                if (!currentCandidate.Success &&
+                    currentCandidate.SameSpline &&
+                    IsFinite(currentCandidate.MaxTargetError) &&
+                    currentCandidate.MaxTargetError <=
+                        MoveMorphMaximumPointReadbackErrorM)
+                {
+                    Sketch resetSketch =
+                        EnsureSame3DSketchEditing(
+                            model, targetSketch,
+                            owningSketchFeature, owningSketchName);
+                    SketchSegment resetSegment =
+                        ReacquireSketchSegmentByKey(
+                            resetSketch, splineKeyBefore);
+                    SketchSpline resetSpline = resetSegment as SketchSpline;
+                    if (resetSpline == null)
+                        throw new InvalidOperationException(
+                            "Mất SAME spline trước khi reset handles.");
+
+                    VerifySameSplineIdentityOrThrow(
+                        resetSpline, selectedSpline,
+                        splineKeyBefore, "before handle reset");
+
+                    resetSpline.ResetAllHandles();
+                    TryRebuildForMove(model, "after handle reset");
+
+                    currentCandidate =
+                        EvaluateDirectSameSplineCandidate(
+                            model, owningSketchFeature,
+                            owningSketchName, splineKeyBefore,
+                            selectedSpline, currentTargets,
+                            targetSnapshot, reverseTarget,
+                            moveActualSplineToleranceMm);
+
+                    Debug.WriteLine(
+                        "[EDGE EQUAL SPLINE] MOVE SAME SPLINE HANDLE RESET " +
+                        "points=" + currentCandidate.PointCount +
+                        ", sameSpline=" + currentCandidate.SameSpline +
+                        ", maxTargetMm=" +
+                        (currentCandidate.MaxTargetError * 1000.0)
+                            .ToString("0.######", CultureInfo.InvariantCulture) +
+                        ", actualDeviationMm=" +
+                        (currentCandidate.ActualSplineDeviation * 1000.0)
+                            .ToString("0.######", CultureInfo.InvariantCulture) +
+                        ", toleranceMm=" +
+                        moveActualSplineToleranceMm
+                            .ToString("0.######", CultureInfo.InvariantCulture) +
+                        ", pass=" + currentCandidate.Success);
+                }
+
                 // --------------------------------------------------------
                 // V37.2 STEP 4A - DO NOT EXPERIMENT ON THE SAME NATIVE SPLINE.
                 //
@@ -7365,7 +7716,7 @@ namespace ADDIN.Commands
                 // "best".  This caused long run times and visible loops.
                 //
                 // Therefore V37.2 keeps the stable equal-arc state intact.  If the
-                // CURRENT topology does not pass, we fail cleanly instead of
+                // CURRENT topology does not pass, we stop instead of
                 // destructively optimizing the SAME spline.  At that point we also
                 // log the exact SketchSpline interop members available in the
                 // user's SolidWorks version so the next route can use a real native
@@ -7418,24 +7769,16 @@ namespace ADDIN.Commands
                 // --------------------------------------------------------
                 if (!currentCandidate.Success)
                 {
-                    string reserveExplanation =
-                        currentPointCount < ReusableSplineReservePointCount
-                            ? " Topology hiện tại thấp hơn reusable reserve " +
-                              ReusableSplineReservePointCount +
-                              " point; V37.4 không InsertPoint để tránh làm đổi native parameterization của SAME spline."
-                            : "";
-
                     throw new InvalidOperationException(
-                        "SAME spline đã MOVE đúng fit point nhưng topology hiện tại " +
+                        "SAME spline đã MOVE đúng fit point và reset handles nhưng topology hiện tại " +
                         currentPointCount +
-                        " point vẫn lệch Edge ở trạng thái equal-arc an toàn: " +
+                        " point vẫn lệch Edge: " +
                         (currentCandidate.ActualSplineDeviation * 1000.0)
                             .ToString("0.######", CultureInfo.InvariantCulture) +
                         " mm > MOVE tolerance " +
                         moveActualSplineToleranceMm
                             .ToString("0.######", CultureInfo.InvariantCulture) +
-                        " mm. Không InsertPoint vì phải giữ SAME spline an toàn." +
-                        reserveExplanation);
+                        " mm. Không thêm point sau morph vì SolidWorks có thể xoắn SAME spline; hãy Undo lần MOVE này.");
                 }
 
                 int bestPointCount =
@@ -7447,16 +7790,18 @@ namespace ADDIN.Commands
                 double bestActualDeviation =
                     currentCandidate.ActualSplineDeviation;
 
-                // V37.4 reusable topology floor. Never delete below 7 when the
-                // incoming SAME spline already has at least 12 fit points. If an
-                // older spline already has fewer than 7, keep its existing count;
-                // this command still refuses to grow topology with InsertPoint.
+                // Do not undo the point count required by the target Edge.
+                // A shorter Edge may still reduce points, but never below its
+                // length-based density floor or the reusable reserve.
                 int reusableReductionFloor =
                     Math.Min(
                         currentPointCount,
                         Math.Max(
-                            MinimumPointCount,
-                            ReusableSplineReservePointCount));
+                            Math.Max(MinimumPointCount,
+                                ReusableSplineReservePointCount),
+                            requiredTargetPointCount > oldPointCount
+                                ? requiredTargetPointCount
+                                : lengthRequiredPointCount));
 
                 Debug.WriteLine(
                     "[EDGE EQUAL SPLINE] MOVE V37.4 REUSABLE TOPOLOGY FLOOR " +
@@ -7465,7 +7810,8 @@ namespace ADDIN.Commands
                     ", effectiveFloor=" + reusableReductionFloor +
                     ", canReduce=" +
                     (currentPointCount > reusableReductionFloor) +
-                    ", canGrowSafely=False");
+                    ", grewBeforeMorph=" +
+                    (currentPointCount > oldPointCount));
 
                 double reduceGeometryToleranceMm =
                     Math.Min(
@@ -7524,7 +7870,26 @@ namespace ADDIN.Commands
                 int previousAcceptedPointCount =
                     0;
 
+                // DeletePoint needs a reliable native rebuild/Undo path. A
+                // document with pre-existing errors can fail EditRebuild3 even
+                // though the current spline is valid, so keep the accepted
+                // topology instead of starting an unsafe delete trial.
+                bool canRebuildBeforeReduction =
+                    currentPointCount <= reusableReductionFloor ||
+                    TryRebuildForMove(
+                        model,
+                        "V37.5 before optional point reduction");
+
+                if (!canRebuildBeforeReduction)
+                {
+                    Debug.WriteLine(
+                        "[EDGE EQUAL SPLINE] REDUCE SKIPPED " +
+                        "reason=global-rebuild-failed-before-delete, " +
+                        "same-spline-current-topology-preserved=True");
+                }
+
                 for (int n = currentPointCount - 1;
+                     canRebuildBeforeReduction &&
                      n >= reusableReductionFloor;
                      n--)
                 {
@@ -7587,7 +7952,9 @@ namespace ADDIN.Commands
                     // ----------------------------------------------------
                     List<double[]> preflightTargets =
                         CopyOrReversePointList(
-                            targetCandidates[n].Points,
+                            GetOrEvaluateSampling(
+                                targetCandidates, targetEdge, targetCurve,
+                                targetU0, targetU1, targetLength, n).Points,
                             reverseTarget);
 
                     double preflightChordMin;
@@ -8845,6 +9212,23 @@ namespace ADDIN.Commands
                 return result;
             }
 
+            bool baselineSketchWarning;
+            int baselineSketchError;
+
+            try
+            {
+                baselineSketchError =
+                    owningSketchFeature.GetErrorCode2(
+                        out baselineSketchWarning);
+            }
+            catch (Exception ex)
+            {
+                result.Error =
+                    "Không đọc được trạng thái 3D Sketch trước " +
+                    stageName + ": " + ex.Message;
+                return result;
+            }
+
             Sketch sketch =
                 EnsureSame3DSketchEditing(
                     model,
@@ -9001,20 +9385,29 @@ namespace ADDIN.Commands
 
             model.ClearSelection2(true);
 
-            if (!TryRebuildForMove(
+            // A no-op stage does not need a rebuild. EditRebuild3 can also
+            // return false because of unrelated, pre-existing feature errors
+            // elsewhere in the Part. Validate this sketch and the actual
+            // spline readback below before accepting the stage.
+            bool rebuildOk =
+                result.MoveCallCount == 0 ||
+                TryRebuildForMove(
                     model,
-                    stageName))
-            {
-                result.Error = "EditRebuild3=false ở " + stageName;
-                return result;
-            }
+                    stageName);
 
+            // EditRebuild3 may leave 3D Sketch edit mode even when it returns
+            // true. Re-enter the existing feature before evaluating the stage;
+            // never create another sketch or accept a readback from a different one.
             sketch =
-                ReacquireSame3DSketchForReadback(
+                EnsureSame3DSketchEditing(
                     model,
+                    ReacquireSame3DSketchForReadback(
+                        model,
+                        owningSketchFeature,
+                        owningSketchName,
+                        stageName + " readback"),
                     owningSketchFeature,
-                    owningSketchName,
-                    stageName + " readback");
+                    owningSketchName);
 
             segment =
                 ReacquireSketchSegmentByKey(
@@ -9046,6 +9439,42 @@ namespace ADDIN.Commands
                 return result;
             }
 
+            bool readbackSketchWarning;
+            int readbackSketchError;
+
+            try
+            {
+                readbackSketchError =
+                    owningSketchFeature.GetErrorCode2(
+                        out readbackSketchWarning);
+            }
+            catch (Exception ex)
+            {
+                result.Error =
+                    "Không đọc được trạng thái 3D Sketch sau " +
+                    stageName + ": " + ex.Message;
+                return result;
+            }
+
+            // Rebuild may clear a pre-existing feature error/warning. That is
+            // an improvement, not a new failure. Reject only a new error or
+            // warning while still verifying SAME spline and every fit point.
+            bool newSketchError =
+                readbackSketchError != 0 &&
+                readbackSketchError != baselineSketchError;
+            bool newSketchWarning =
+                readbackSketchWarning && !baselineSketchWarning;
+            if (newSketchError || newSketchWarning)
+            {
+                result.Error =
+                    "Trạng thái 3D Sketch đổi sau " + stageName +
+                    ": error=" + baselineSketchError + "->" +
+                    readbackSketchError + ", warning=" +
+                    baselineSketchWarning + "->" +
+                    readbackSketchWarning;
+                return result;
+            }
+
             result.MaximumPointError =
                 GetMaximumPointTargetDistance(
                     points,
@@ -9055,6 +9484,17 @@ namespace ADDIN.Commands
                 IsFinite(result.MaximumPointError) &&
                 result.MaximumPointError <=
                     MoveMorphMaximumPointReadbackErrorM;
+
+            if (result.Success && !rebuildOk)
+            {
+                Debug.WriteLine(
+                    "[EDGE EQUAL SPLINE] GLOBAL REBUILD FALSE; " +
+                    "SAME SKETCH/SPLINE READBACK VERIFIED " +
+                    "stage=\"" + stageName + "\", moveCalls=" +
+                    result.MoveCallCount + ", maxPointErrorMm=" +
+                    (result.MaximumPointError * 1000.0).ToString(
+                        "0.######", CultureInfo.InvariantCulture));
+            }
 
             if (!result.Success)
             {
@@ -19005,7 +19445,7 @@ namespace ADDIN.Commands
             return result;
         }
 
-        private static SketchSpline ResolveSelectedSketchSpline(
+        internal static SketchSpline ResolveSelectedSketchSpline(
             ModelDoc2 model,
             object selectedObject)
         {

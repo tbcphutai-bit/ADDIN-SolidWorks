@@ -60,9 +60,10 @@ namespace ADDIN.UI
             grid.DefaultCellStyle.Padding = new Padding(4, 0, 4, 0);
             grid.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
 
-            // Hàng xen kẽ: màu trắng pha xám bạc dịu mắt, dễ theo dõi hàng ngang
-            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 253);
+            // Hàng xen kẽ: màu xanh băng nhạt thanh nhã dịu mắt (#EAF2FA), giúp phân biệt rõ từng chi tiết theo hàng ngang
+            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(234, 242, 250);
             grid.AlternatingRowsDefaultCellStyle.ForeColor = Color.FromArgb(25, 30, 36);
+            grid.AlternatingRowsDefaultCellStyle.Font = cellFont;
             grid.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(215, 235, 255);
             grid.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.FromArgb(10, 50, 110);
             grid.AlternatingRowsDefaultCellStyle.Padding = new Padding(4, 0, 4, 0);

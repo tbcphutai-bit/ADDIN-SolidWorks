@@ -58,11 +58,15 @@ namespace ADDIN.Commands
             }
         }
 
-        private class RepairHoleLoopCandidate
+        internal class RepairHoleLoopCandidate
         {
             public int Index;
 
             public List<Edge> Edges = new List<Edge>();
+
+            // Sample points of the original inner loop. Used to decide whether
+            // the requested Repair profile fully covers the existing hole.
+            public List<double[]> SampledPoints = new List<double[]>();
 
             public double[] FallbackCenter;
 
@@ -74,13 +78,32 @@ namespace ADDIN.Commands
 
             public double[] MajorDirection;
 
+            // Family metadata in the CURRENT FlatPattern state.  Exact circles
+            // are kept as family members when at least one malformed member of
+            // the same seed family needs Repair.
+            public bool IsExactCircle;
+            public double ExactCircleDiameterM;
+            public string FamilyKey;
+            public string FamilyDisplayName;
+            public double FamilyDiameterM;
+            public string SourceFeatureName;
+            public string SourceFeatureType;
+
+            // V19: source/seed slot metadata.  When the source family is a
+            // Hole Wizard slot, these values are authoritative for deciding
+            // whether the requested Repair slot is smaller and therefore must
+            // use Delete Face + Patch.
+            public bool IsSlotFamily;
+            public double SeedSlotWidthM;
+            public double SeedSlotLengthM;
+
             // Display only
             public double MeasuredWidthMm => Width * 1000.0;
             public double MeasuredHeightMm => Height * 1000.0;
             public double EquivalentDiameterMm => EquivalentDiameterM * 1000.0;
         }
 
-        private class RepairHoleGroup
+        public class RepairHoleGroup
         {
             public double EquivalentDiameterMm;
 
@@ -89,10 +112,18 @@ namespace ADDIN.Commands
 
             public string DisplayText;
 
-            public List<RepairHoleLoopCandidate> Candidates =
+            internal List<RepairHoleLoopCandidate> Candidates =
                 new List<RepairHoleLoopCandidate>();
 
+            internal string FamilyKey;
+            internal double FamilyDiameterMm;
+            internal bool IsSlotFamily;
+            internal double SeedSlotWidthMm;
+            internal double SeedSlotLengthMm;
+
             public int Count => Candidates.Count;
+            public int MalformedCount => Candidates.Count(candidate => candidate != null && !candidate.IsExactCircle);
+            public int ExactCircleCount => Candidates.Count(candidate => candidate != null && candidate.IsExactCircle);
 
             // NEW
             public double? RecommendedSourceNominalMm;
@@ -101,6 +132,115 @@ namespace ADDIN.Commands
                 new List<double>();
 
             public string RecommendedDisplayText;
+        }
+
+        public class RepairHoleBatchItem
+        {
+            public double SourceEquivalentDiameterMm;
+            public double SourceWidthMm;
+            public double SourceHeightMm;
+            public int SourceCount;
+            public string SourceDisplayText;
+
+            // Target is decided per row in the Repair table.
+            // Plain number, e.g. "4.2" => Circle Ø4.2.
+            // AxB, e.g. "5x25" => Loose/Slot 5 x 25.
+            public bool RepairAsLoose;
+            public double RepairDiameterMm;
+            public double RepairSlotWidthMm;
+            public double RepairSlotLengthMm;
+            public string RepairInputText;
+
+            // True when the requested target does not fully contain the current
+            // hole profile and the old hole must be patched before Hole Wizard.
+            public bool RequiresRebuildRepair;
+        }
+
+        private class FoldedRepairCandidateGeometry
+        {
+            public RepairHoleLoopCandidate SourceCandidate;
+            public RepairHoleLoopCandidate FoldedCandidate;
+            public List<Face2> WallFaces = new List<Face2>();
+        }
+
+        // LEGACY folded-state mapping helpers retained for compatibility/debugging.
+        // V17 FlatPattern Repair does NOT use these helpers: the selected flat face
+        // remains active for RH-P, Delete Face + Patch, and Hole Wizard.
+        private class FoldedRepairFeatureHint
+        {
+            public RepairHoleLoopCandidate SourceCandidate;
+            public string FeatureName;
+            public string FeatureType;
+
+            // V16: identify the pattern family by the seed Hole Wizard size, then
+            // preserve the instance identity by the source feature wall-cluster
+            // ordinal captured while FlatPattern is still active.  This avoids
+            // choosing an arbitrary subset when one CurvePattern owns both exact
+            // circles and malformed loops of the same diameter.
+            public string SeedFeatureName;
+            public double SeedDiameterM;
+            public int PatternInstanceCount = -1;
+            public int SourceClusterOrdinal = -1;
+            public int SourceClusterCount = -1;
+        }
+
+        private class FoldedRepairWallCluster
+        {
+            public string FeatureName;
+            public string FeatureType;
+            public List<Face2> WallFaces = new List<Face2>();
+            public double CylinderDiameterM;
+
+            // Ordinal in the filtered Feature.GetFaces() wall-face sequence.
+            // For a circular pattern instance this is stable enough to carry the
+            // instance identity from FlatPattern-active to folded state.
+            public int PrimaryFaceOrdinal = -1;
+        }
+
+        private class FoldedRepairFeatureBucket
+        {
+            public string FeatureName;
+            public string FeatureType;
+            public List<FoldedRepairFeatureHint> Hints = new List<FoldedRepairFeatureHint>();
+            public List<FoldedRepairWallCluster> Clusters = new List<FoldedRepairWallCluster>();
+            public bool UsesSourceInstanceOrdinals;
+        }
+
+        private class FoldedRepairPlanarFaceScore
+        {
+            public Face2 Face;
+            public int ClusterCount;
+            public double Area;
+        }
+
+        private class FoldedRepairClusterPlacement
+        {
+            public FoldedRepairWallCluster Cluster;
+            public List<Edge> BoundaryEdges = new List<Edge>();
+            public double[] Center;
+            public double U;
+            public double V;
+        }
+
+        private class RepairFamilyResolutionCacheEntry
+        {
+            public string SeedName;
+            public double FamilyDiameterM;
+            public bool IsSlotFamily;
+            public double SlotWidthM;
+            public double SlotLengthM;
+        }
+
+        // V22: one read-only snapshot of the Hole Wizard seed scalar data.
+        // The normal path reads GetDefinition() properties directly without
+        // AccessSelections, selection changes, PropertyManager, or rebuild.
+        private class RepairHoleWizardSeedInfo
+        {
+            public double DiameterM;
+            public bool IsSlot;
+            public double SlotWidthM;
+            public double SlotLengthM;
+            public bool UsedSelectionAccessFallback;
         }
 
         private class SelectionInfo
@@ -159,6 +299,23 @@ namespace ADDIN.Commands
         }
 
         private readonly ISldWorks swApp;
+
+        // V19 fast scan caches.  Family/seed COM queries are repeated many times
+        // for pattern instances; cache them for the duration of one scan.
+        private readonly Dictionary<string, RepairFamilyResolutionCacheEntry>
+            repairFamilyResolutionCache =
+                new Dictionary<string, RepairFamilyResolutionCacheEntry>(StringComparer.OrdinalIgnoreCase);
+
+        // V22: cache Hole Wizard scalar data separately from family resolution.
+        // One HoleWzd seed is loaded at most once during a scan.
+        private readonly Dictionary<string, RepairHoleWizardSeedInfo>
+            repairHoleWizardSeedInfoCache =
+                new Dictionary<string, RepairHoleWizardSeedInfo>(StringComparer.OrdinalIgnoreCase);
+
+        // Most recent TaskPane scan is reused for the pre-flight size check so
+        // pressing Repair does not immediately scan the same face a second time.
+        private Face2 repairLastScannedFace;
+        private List<RepairHoleGroup> repairLastScannedGroups;
 
         // Prevent re-entrant Make Hole selection probes. SolidWorks can fire
         // selection callbacks while another command is restoring/clearing selection.
@@ -235,6 +392,8 @@ namespace ADDIN.Commands
         private bool pendingPaintRename;
 
         private string pendingPaintFeatureName;
+        private string pendingHoleLabel;
+        private string pendingHoleFamilyId;
 
         private System.Windows.Forms.Timer pendingPaintRenameTimer;
 
@@ -441,7 +600,7 @@ namespace ADDIN.Commands
         public void RunRepairHole(MakeHoleOptions options)
         {
             Debug.WriteLine("[REPAIR HOLE] ===== RUN START =====");
-            Debug.WriteLine("[REPAIR HOLE] build=20260824-one-loop-one-reference-v2");
+            Debug.WriteLine("[REPAIR HOLE] build=20260921-silent-seed-read-v22");
             if (options == null)
             {
                 Debug.WriteLine("[REPAIR HOLE] canceled: options=null");
@@ -464,8 +623,16 @@ namespace ADDIN.Commands
             // for API initialization when the active Part is a regular solid.
             double num2 = ((options.ThicknessMm > 0.0) ? (options.ThicknessMm / 1000.0) : 0.002);
             bool repairLoose = string.Equals(options.HoleType, "Loose", StringComparison.OrdinalIgnoreCase);
+            bool repairFaceScanMode = selection.Face != null
+                && selection.Edge == null
+                && !IsPoint(selection.SidePoint);
+
             LooseSize repairLooseSize = null;
-            if (repairLoose && !TryParseLooseSize(options.LooseType, out repairLooseSize))
+            // In face-scan batch mode the target type/size is entered per row in the popup,
+            // so do not force the TaskPane HoleType/LooseType onto every group.
+            if (!repairFaceScanMode
+                && repairLoose
+                && !TryParseLooseSize(options.LooseType, out repairLooseSize))
             {
                 Debug.WriteLine("[REPAIR HOLE] invalid loose size. value=" + (options.LooseType ?? "<null>"));
                 MessageBox.Show("Loose AxB khong hop le. Hay nhap dang 4.2x25 hoac 10x16.", "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
@@ -594,6 +761,257 @@ namespace ADDIN.Commands
                 Debug.WriteLine("[REPAIR HOLE] single mode failed: " + ex2);
                 MessageBox.Show("Loi Repair Hole: " + ex2.Message, "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Hand);
             }
+        }
+
+
+        /// <summary>
+        /// Clears the temporary Repair Hole scan and feature lookup data.
+        /// </summary>
+        public void ClearRepairHoleCache()
+        {
+            repairLastScannedFace = null;
+            repairLastScannedGroups = null;
+            repairFamilyResolutionCache.Clear();
+            repairHoleWizardSeedInfoCache.Clear();
+        }
+
+        /// <summary>
+        /// TaskPane bridge: scans exactly one currently selected planar face.
+        /// This method is read-only; it does not create or delete model features.
+        /// </summary>
+        public bool ScanSelectedFaceForRepair(
+            out Face2 face,
+            out List<RepairHoleGroup> groups,
+            out string message)
+        {
+            face = null;
+            groups = new List<RepairHoleGroup>();
+            message = "";
+
+            if (!(swApp?.ActiveDoc is ModelDoc2 model))
+            {
+                message = "Hãy mở Part trước.";
+                return false;
+            }
+
+            if (model.GetType() != (int)swDocumentTypes_e.swDocPART)
+            {
+                message = "Repair Hole chỉ hỗ trợ trong Part.";
+                return false;
+            }
+
+            SelectionMgr selectionMgr = model.SelectionManager as SelectionMgr;
+            int selectedCount = selectionMgr?.GetSelectedObjectCount2(-1) ?? 0;
+
+            if (selectionMgr == null || selectedCount != 1)
+            {
+                message = "Hãy chọn đúng 1 mặt phẳng rồi bấm Xác nhận.";
+                return false;
+            }
+
+            int selectedType = -1;
+            object selectedObject = null;
+            try
+            {
+                selectedType = selectionMgr.GetSelectedObjectType3(1, -1);
+                selectedObject = selectionMgr.GetSelectedObject6(1, -1);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[REPAIR HOLE TASKPANE] read selection failed: " + ex.Message);
+            }
+
+            if (selectedType != (int)swSelectType_e.swSelFACES
+                || !(selectedObject is Face2 selectedFace))
+            {
+                message = "Đối tượng đã chọn không phải mặt. Hãy chọn 1 mặt phẳng rồi bấm Xác nhận.";
+                return false;
+            }
+
+            if (!IsPlanarFace(selectedFace))
+            {
+                message = "Mặt đã chọn không phải mặt phẳng. Hãy chọn mặt flat/unfold.";
+                return false;
+            }
+
+            List<RepairHoleLoopCandidate> candidates =
+                ScanRepairHoleLoops(selectedFace, out string scanMessage);
+
+            if (candidates == null || candidates.Count == 0)
+            {
+                message = !string.IsNullOrWhiteSpace(scanMessage)
+                    ? scanMessage
+                    : "Không tìm thấy lỗ cần Repair.";
+                return false;
+            }
+
+            List<RepairHoleGroup> scannedGroups =
+                GroupRepairHoleCandidates(candidates);
+
+            if (scannedGroups == null || scannedGroups.Count == 0)
+            {
+                message = "Không phân nhóm được lỗ cần Repair.";
+                return false;
+            }
+
+            face = selectedFace;
+            groups = scannedGroups;
+            repairLastScannedFace = selectedFace;
+            repairLastScannedGroups = scannedGroups;
+
+            Debug.WriteLine(
+                "[REPAIR HOLE TASKPANE] scan success. groups="
+                + groups.Count.ToString(CultureInfo.InvariantCulture)
+                + ", candidates="
+                + candidates.Count.ToString(CultureInfo.InvariantCulture));
+
+            return true;
+        }
+
+        /// <summary>
+        /// TaskPane bridge: determines which selected Repair rows require
+        /// Delete Face + Patch before the replacement Hole Wizard.
+        /// </summary>
+        public bool CheckRebuildRepairRequired(
+            Face2 sourceFace,
+            List<RepairHoleGroup> groups,
+            List<RepairHoleBatchItem> items,
+            out List<RepairHoleBatchItem> rebuildItems)
+        {
+            rebuildItems = new List<RepairHoleBatchItem>();
+
+            if (sourceFace == null
+                || groups == null
+                || items == null
+                || items.Count == 0)
+            {
+                return false;
+            }
+
+            rebuildItems =
+                MarkRepairItemsRequiringRebuild(
+                    sourceFace,
+                    groups,
+                    items);
+
+            return rebuildItems.Count > 0;
+        }
+
+        /// <summary>
+        /// TaskPane bridge for the confirmation message shown before
+        /// topology-changing Repair.
+        /// </summary>
+        public string GetRebuildRepairWarningMessage(
+            List<RepairHoleBatchItem> rebuildItems)
+        {
+            return BuildRebuildRepairWarning(rebuildItems);
+        }
+
+        /// <summary>
+        /// TaskPane bridge: executes the rows already entered in the TaskPane.
+        /// No modal Repair input dialog is opened here.
+        /// </summary>
+        public bool ExecuteRepairHoleBatch(
+            Face2 sourceFace,
+            List<RepairHoleBatchItem> repairItems,
+            MakeHoleOptions options,
+            out int repairedCount,
+            out string message)
+        {
+            repairedCount = 0;
+            message = "";
+
+            if (!(swApp?.ActiveDoc is ModelDoc2 model))
+            {
+                message = "Hãy mở Part trước.";
+                return false;
+            }
+
+            if (model.GetType() != (int)swDocumentTypes_e.swDocPART)
+            {
+                message = "Repair Hole chỉ hỗ trợ trong Part.";
+                return false;
+            }
+
+            if (sourceFace == null || !IsPlanarFace(sourceFace))
+            {
+                message = "Mặt Repair đã lưu không còn hợp lệ. Hãy chọn mặt và Xác nhận lại.";
+                return false;
+            }
+
+            if (repairItems == null || repairItems.Count == 0)
+            {
+                message = "Không có nhóm lỗ nào được nhập kích thước Repair.";
+                return false;
+            }
+
+            if (options == null)
+            {
+                options = new MakeHoleOptions();
+            }
+
+            // Through Next does not need the true material thickness. Keep the same
+            // API seed used by the legacy Repair workflow.
+            double depthM =
+                options.ThicknessMm > 0.0
+                    ? options.ThicknessMm / 1000.0
+                    : 0.002;
+
+            // V19: reuse the exact TaskPane scan when the same Face2 is still
+            // alive.  Xác nhận already performed the expensive family scan; doing
+            // it again here only burns COM time before any topology has changed.
+            List<RepairHoleGroup> groups = null;
+            string scanMessage = "";
+            if (repairLastScannedGroups != null
+                && repairLastScannedGroups.Count > 0
+                && repairLastScannedFace != null
+                && AreSameEntities(repairLastScannedFace, sourceFace))
+            {
+                groups = repairLastScannedGroups;
+                Debug.WriteLine("[REPAIR HOLE FAST] reuse TaskPane scan for preflight.");
+            }
+            else
+            {
+                List<RepairHoleLoopCandidate> candidates =
+                    ScanRepairHoleLoops(sourceFace, out scanMessage);
+                groups = GroupRepairHoleCandidates(candidates);
+            }
+
+            if (groups == null || groups.Count == 0)
+            {
+                message = !string.IsNullOrWhiteSpace(scanMessage)
+                    ? scanMessage
+                    : "Không tìm lại được nhóm lỗ để Repair.";
+                return false;
+            }
+
+            MarkRepairItemsRequiringRebuild(
+                sourceFace,
+                groups,
+                repairItems);
+
+            double[] wizardPickPoint = null;
+            try
+            {
+                SelectionInfo selection = GetSelection(model);
+                if (selection != null && IsPoint(selection.PickPoint))
+                {
+                    wizardPickPoint = selection.PickPoint;
+                }
+            }
+            catch
+            {
+            }
+
+            return ExecuteRepairHoleBatchCore(
+                model,
+                sourceFace,
+                wizardPickPoint,
+                depthM,
+                options,
+                repairItems,
+                out repairedCount,
+                out message);
         }
 
         private SelectionInfo GetSelection(ModelDoc2 model)
@@ -1123,8 +1541,13 @@ namespace ADDIN.Commands
                 int selectedType = 0;
                 try
                 {
-                    selected = selectionMgr.GetSelectedObject6(i, -1);
                     selectedType = selectionMgr.GetSelectedObjectType3(i, -1);
+                    // Make Hole Update only accepts a Curve Pattern selected in
+                    // FeatureManager. A selected model face must not be resolved
+                    // through Face2.GetFeature on every selection notification.
+                    if (selectedType == (int)swSelectType_e.swSelFACES)
+                        continue;
+                    selected = selectionMgr.GetSelectedObject6(i, -1);
                 }
                 catch (Exception ex)
                 {
@@ -5253,6 +5676,9 @@ namespace ADDIN.Commands
                 pendingPatternLengthDimensionName = (useDirectMeasuredLengthExpression ? TryCreateMeasuredLengthExpression() : TryCreatePatternLengthReference(model, patternSegments));
                 featureNamesBeforeHoleWizard = CollectFeatureNames(model);
                 pendingPaintFeatureName = BuildPaintFeatureName(options);
+                pendingHoleLabel = options.HoleLabel;
+                pendingHoleFamilyId = string.IsNullOrWhiteSpace(pendingHoleLabel)
+                    ? null : Guid.NewGuid().ToString("N");
                 pendingPaintRename = !string.IsNullOrWhiteSpace(pendingPaintFeatureName);
                 Debug.WriteLine("[MAKE HOLE] Hybrid pending. count=" + pendingPatternCount + ", spacing=" + (pendingPatternSpacing * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm, sketch=" + pendingPatternSketchName + ", lengthDim=" + pendingPatternLengthDimensionName + ", featureCountBefore=" + ((featureNamesBeforeHoleWizard != null) ? featureNamesBeforeHoleWizard.Count : 0));
                 bool started = TryStartHoleWizardCommand(model, face, null);
@@ -6055,6 +6481,8 @@ namespace ADDIN.Commands
             StopPendingPaintRenameMonitor();
             pendingPaintRename = false;
             pendingPaintFeatureName = null;
+            pendingHoleLabel = null;
+            pendingHoleFamilyId = null;
         }
 
         private void StartPendingPaintRenameMonitor()
@@ -6134,6 +6562,27 @@ namespace ADDIN.Commands
                 }
                 string newName = MakeUniqueFeatureName(model, baseName);
                 feature.Name = newName;
+                if (!string.IsNullOrWhiteSpace(pendingHoleLabel))
+                {
+                    try
+                    {
+                        var geometry = ADDIN.HoleManagement.HoleGeometryAnalyzer.Analyze(feature,
+                            ADDIN.HoleManagement.HoleFeatureClassifier.Classify(feature));
+                        ADDIN.HoleManagement.HoleMetadataService.Initialize(swApp);
+                        ADDIN.HoleManagement.HoleMetadataService.Write(model, feature,
+                            new ADDIN.HoleManagement.HoleMetadata
+                            {
+                                FamilyId = pendingHoleFamilyId,
+                                Label = pendingHoleLabel,
+                                DiameterMm = geometry == null ? null : geometry.DiameterMm,
+                                Role = isPattern ? "Pattern" : "Seed"
+                            });
+                    }
+                    catch (Exception metadataError)
+                    {
+                        Debug.WriteLine("[MAKE HOLE] Metadata failed: " + metadataError.Message);
+                    }
+                }
                 if (isPattern)
                 {
                     trackedPatternFeatureName = newName;
@@ -6154,6 +6603,13 @@ namespace ADDIN.Commands
 
         private string BuildPaintFeatureName(MakeHoleOptions options)
         {
+            if (options != null && !string.IsNullOrWhiteSpace(options.HoleLabel))
+            {
+                string size = options.DiameterMm > 0
+                    ? "φ" + options.DiameterMm.ToString("0.###", CultureInfo.InvariantCulture) + " "
+                    : "";
+                return size + options.HoleLabel.Trim();
+            }
             bool paint = options != null && options.Paint;
             string customName = NormalizePaintFeatureBaseText(options?.PaintNameText);
             if (!string.IsNullOrWhiteSpace(customName))
@@ -7597,25 +8053,28 @@ namespace ADDIN.Commands
         private class RepairHoleSourceSelectionDialog : Form
         {
             private DataGridView grid;
-            private ComboBox cboSourceDia;
-            private ComboBox cboRepairDia;
-            private Label lblRecommend;
             private Button btnRepair;
             private Button btnCancel;
 
-            public RepairHoleGroup SelectedGroup { get; private set; }
-            public double SelectedRepairDiameterMm { get; private set; }
+            public List<RepairHoleBatchItem> SelectedRepairs { get; private set; } =
+                new List<RepairHoleBatchItem>();
 
-            public RepairHoleSourceSelectionDialog(List<RepairHoleGroup> groups, double defaultRepairDiaMm, LooseSize looseSize)
+            public RepairHoleSourceSelectionDialog(
+                List<RepairHoleGroup> groups,
+                LooseSize looseSize,
+                List<RepairHoleBatchItem> previousInput = null)
             {
-                InitializeUI(groups, defaultRepairDiaMm, looseSize);
+                InitializeUI(groups, looseSize, previousInput);
             }
 
-            private void InitializeUI(List<RepairHoleGroup> groups, double defaultRepairDiaMm, LooseSize looseSize)
+            private void InitializeUI(
+                List<RepairHoleGroup> groups,
+                LooseSize looseSize,
+                List<RepairHoleBatchItem> previousInput)
             {
-                Text = "Repair Hole - Select Source Holes";
-                Size = new System.Drawing.Size(530, 470);
-                MinimumSize = new System.Drawing.Size(490, 430);
+                Text = "Repair Hole";
+                Size = new System.Drawing.Size(760, 435);
+                MinimumSize = new System.Drawing.Size(760, 435);
                 StartPosition = FormStartPosition.CenterScreen;
                 FormBorderStyle = FormBorderStyle.FixedDialog;
                 MaximizeBox = false;
@@ -7625,157 +8084,119 @@ namespace ADDIN.Commands
 
                 Label lblHeader = new Label
                 {
-                    Text = "Detected holes:",
-                    Location = new System.Drawing.Point(16, 12),
-                    Size = new System.Drawing.Size(480, 20),
-                    Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold)
+                    Text = "Nhập kích thước Repair cho các nhóm lỗ méo:",
+                    Location = new System.Drawing.Point(18, 14),
+                    Size = new System.Drawing.Size(705, 24),
+                    Font = new System.Drawing.Font("Segoe UI", 10.0f, System.Drawing.FontStyle.Bold)
                 };
                 Controls.Add(lblHeader);
 
                 grid = new DataGridView
                 {
-                    Location = new System.Drawing.Point(16, 36),
-                    Size = new System.Drawing.Size(480, 190),
+                    Location = new System.Drawing.Point(18, 42),
+                    Size = new System.Drawing.Size(710, 235),
                     AllowUserToAddRows = false,
                     AllowUserToDeleteRows = false,
                     AllowUserToResizeRows = false,
-                    ReadOnly = true,
-                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    AllowUserToResizeColumns = true,
+                    ReadOnly = false,
+                    SelectionMode = DataGridViewSelectionMode.CellSelect,
                     MultiSelect = false,
                     RowHeadersVisible = false,
                     BackgroundColor = System.Drawing.SystemColors.Window,
-                    BorderStyle = BorderStyle.Fixed3D
+                    BorderStyle = BorderStyle.Fixed3D,
+                    EditMode = DataGridViewEditMode.EditOnEnter,
+                    AutoGenerateColumns = false
                 };
 
-                grid.Columns.Clear();
-                grid.Columns.Add("CurrentSize", "Current Size");
-                grid.Columns.Add("Count", "Count");
-                grid.Columns.Add("Recommend", "Recommend");
+                grid.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    Name = "HoleType",
+                    HeaderText = "Loại lỗ",
+                    Width = 90,
+                    ReadOnly = true
+                });
+                grid.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    Name = "CurrentSize",
+                    HeaderText = "Kích thước hiện tại",
+                    Width = 150,
+                    ReadOnly = true
+                });
+                grid.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    Name = "Count",
+                    HeaderText = "Số lượng",
+                    Width = 75,
+                    ReadOnly = true
+                });
+                grid.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    Name = "Recommend",
+                    HeaderText = "RCM",
+                    Width = 175,
+                    ReadOnly = true
+                });
+                grid.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    Name = "RepairDia",
+                    HeaderText = "Repair (Ø / WxL)",
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                    MinimumWidth = 130,
+                    ReadOnly = false
+                });
 
-                grid.Columns["CurrentSize"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                grid.Columns["Count"].Width = 65;
-                grid.Columns["Recommend"].Width = 140;
-
+                grid.Columns["HoleType"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                grid.Columns["CurrentSize"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 grid.Columns["Count"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                grid.Columns["Recommend"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+                grid.Columns["Recommend"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                grid.Columns["RepairDia"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                grid.Columns["RepairDia"].DefaultCellStyle.BackColor =
+                    System.Drawing.Color.FromArgb(255, 255, 225);
 
                 if (groups != null)
                 {
                     foreach (RepairHoleGroup group in groups)
                     {
+                        string prefillText = FindPreviousRepairInput(group, previousInput);
                         int rowIndex = grid.Rows.Add(
-                            group.DisplayText,
+                            "Lỗ méo",
+                            "Ø" + group.EquivalentDiameterMm.ToString("0.00", CultureInfo.InvariantCulture),
                             group.Count.ToString(CultureInfo.InvariantCulture),
-                            group.RecommendedDisplayText);
-
+                            group.RecommendedDisplayText,
+                            prefillText);
                         grid.Rows[rowIndex].Tag = group;
                     }
                 }
 
-                grid.SelectionChanged += grid_SelectionChanged;
-                grid.DoubleClick += (s, e) =>
-                {
-                    if (btnRepair.Enabled)
-                    {
-                        btnRepair.PerformClick();
-                    }
-                };
                 Controls.Add(grid);
 
-                int currentY = 242;
-
-                Label lblSource = new Label
+                Label lblNote = new Label
                 {
-                    Text = "Selected source:",
-                    Location = new System.Drawing.Point(16, currentY + 3),
-                    Size = new System.Drawing.Size(115, 24)
+                    Text = "RCM chỉ để tham khảo. Nhập 4.2 = lỗ tròn Ø4.2; nhập 5x25 = Slot 5x25; để trống = bỏ qua.",
+                    Location = new System.Drawing.Point(18, 288),
+                    Size = new System.Drawing.Size(705, 24),
+                    ForeColor = System.Drawing.SystemColors.GrayText
                 };
-                Controls.Add(lblSource);
-
-                cboSourceDia = new ComboBox
-                {
-                    Location = new System.Drawing.Point(135, currentY),
-                    Size = new System.Drawing.Size(100, 26),
-                    DropDownStyle = ComboBoxStyle.DropDownList
-                };
-                Controls.Add(cboSourceDia);
-
-                currentY += 36;
-
-                Label lblRepair = new Label
-                {
-                    Text = "Repair Dia:",
-                    Location = new System.Drawing.Point(16, currentY + 3),
-                    Size = new System.Drawing.Size(115, 24),
-                    Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold)
-                };
-                Controls.Add(lblRepair);
-
-                cboRepairDia = new ComboBox
-                {
-                    Location = new System.Drawing.Point(135, currentY),
-                    Size = new System.Drawing.Size(100, 26),
-                    DropDownStyle = ComboBoxStyle.DropDown
-                };
-                cboRepairDia.TextChanged += (s, e) =>
-                {
-                    btnRepair.Enabled = !string.IsNullOrWhiteSpace(cboRepairDia.Text);
-                };
-                Controls.Add(cboRepairDia);
-
-                lblRecommend = new Label
-                {
-                    Text = "Recommend: -",
-                    Location = new System.Drawing.Point(245, currentY + 3),
-                    Size = new System.Drawing.Size(250, 24),
-                    Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold),
-                    ForeColor = System.Drawing.Color.FromArgb(24, 72, 160)
-                };
-                Controls.Add(lblRecommend);
-
-                currentY += 50;
+                Controls.Add(lblNote);
 
                 btnRepair = new Button
                 {
                     Text = "Repair",
-                    Location = new System.Drawing.Point(286, currentY),
-                    Size = new System.Drawing.Size(100, 34),
+                    Location = new System.Drawing.Point(506, 336),
+                    Size = new System.Drawing.Size(105, 36),
                     UseVisualStyleBackColor = true
                 };
-                btnRepair.Click += (s, e) =>
-                {
-                    if (grid.SelectedRows.Count == 0 || SelectedGroup == null)
-                    {
-                        MessageBox.Show("Vui long chon 1 nhom lo can repair.", "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
-
-                    string text = cboRepairDia.Text?.Trim();
-                    if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double repairDiaMm)
-                        && !double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out repairDiaMm))
-                    {
-                        MessageBox.Show("Vui long nhap hoac chon Repair Dia hop le.", "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
-                    if (repairDiaMm <= 1E-06)
-                    {
-                        MessageBox.Show("Repair Dia phai lon hon 0.", "Repair Hole", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
-                    SelectedRepairDiameterMm = repairDiaMm;
-                    DialogResult = DialogResult.OK;
-                    Close();
-                };
+                btnRepair.Click += BtnRepair_Click;
                 Controls.Add(btnRepair);
 
                 btnCancel = new Button
                 {
                     Text = "Cancel",
-                    Location = new System.Drawing.Point(396, currentY),
-                    Size = new System.Drawing.Size(100, 34),
+                    Location = new System.Drawing.Point(623, 336),
+                    Size = new System.Drawing.Size(105, 36),
                     DialogResult = DialogResult.Cancel,
+                    CausesValidation = false,
                     UseVisualStyleBackColor = true
                 };
                 Controls.Add(btnCancel);
@@ -7785,65 +8206,676 @@ namespace ADDIN.Commands
 
                 if (grid.Rows.Count > 0)
                 {
-                    grid.Rows[0].Selected = true;
-                    UpdateSelectionUI((RepairHoleGroup)grid.Rows[0].Tag, defaultRepairDiaMm);
+                    grid.CurrentCell = grid.Rows[0].Cells["RepairDia"];
                 }
             }
 
-            private void grid_SelectionChanged(object sender, EventArgs e)
+            private static string FindPreviousRepairInput(
+                RepairHoleGroup group,
+                List<RepairHoleBatchItem> previousInput)
             {
-                if (grid.SelectedRows.Count == 0)
+                if (group == null || previousInput == null || previousInput.Count == 0)
                 {
-                    SelectedGroup = null;
-                    btnRepair.Enabled = false;
+                    return "";
+                }
+
+                double groupMin = Math.Min(group.WidthMm, group.HeightMm);
+                double groupMax = Math.Max(group.WidthMm, group.HeightMm);
+                RepairHoleBatchItem best = null;
+                double bestScore = double.MaxValue;
+
+                foreach (RepairHoleBatchItem item in previousInput)
+                {
+                    if (item == null)
+                    {
+                        continue;
+                    }
+
+                    double itemMin = Math.Min(item.SourceWidthMm, item.SourceHeightMm);
+                    double itemMax = Math.Max(item.SourceWidthMm, item.SourceHeightMm);
+                    double eqDiff = Math.Abs(group.EquivalentDiameterMm - item.SourceEquivalentDiameterMm);
+                    double minDiff = Math.Abs(groupMin - itemMin);
+                    double maxDiff = Math.Abs(groupMax - itemMax);
+
+                    if (eqDiff > 0.06 || minDiff > 0.06 || maxDiff > 0.06)
+                    {
+                        continue;
+                    }
+
+                    double score = eqDiff + minDiff + maxDiff;
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        best = item;
+                    }
+                }
+
+                return best?.RepairInputText ?? "";
+            }
+
+            // Do not validate while leaving a cell. DataGridView CellValidating can
+            // prevent Cancel/X from closing the dialog. All row values are validated
+            // only when the user presses Repair.
+
+            private void BtnRepair_Click(object sender, EventArgs e)
+            {
+                if (grid == null || grid.Rows.Count == 0)
+                {
+                    MessageBox.Show(
+                        "Không có nhóm lỗ méo nào để Repair.",
+                        "Repair Hole",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                     return;
                 }
 
-                RepairHoleGroup group = grid.SelectedRows[0].Tag as RepairHoleGroup;
-                if (group == null)
+                try
                 {
-                    SelectedGroup = null;
-                    btnRepair.Enabled = false;
+                    grid.EndEdit();
+                }
+                catch
+                {
+                }
+
+                List<RepairHoleBatchItem> selected = new List<RepairHoleBatchItem>();
+                List<string> emptyRows = new List<string>();
+
+                foreach (DataGridViewRow row in grid.Rows)
+                {
+                    RepairHoleGroup group = row.Tag as RepairHoleGroup;
+                    if (group == null)
+                    {
+                        continue;
+                    }
+
+                    string raw = Convert.ToString(
+                        row.Cells["RepairDia"].Value,
+                        CultureInfo.InvariantCulture)?.Trim();
+
+                    if (string.IsNullOrWhiteSpace(raw))
+                    {
+                        emptyRows.Add(group.DisplayText);
+                        continue;
+                    }
+
+                    if (!TryParseRepairTargetText(
+                            raw,
+                            out bool repairAsLoose,
+                            out double repairDiameterMm,
+                            out double slotWidthMm,
+                            out double slotLengthMm,
+                            out string normalizedTarget))
+                    {
+                        MessageBox.Show(
+                            "Kích thước Repair không hợp lệ tại " + group.DisplayText
+                            + ".\r\n\r\n"
+                            + "Nhập 4.2 để tạo lỗ tròn Ø4.2, hoặc nhập 5x25 để tạo Slot 5x25.",
+                            "Repair Hole",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+
+                        grid.CurrentCell = row.Cells["RepairDia"];
+                        grid.BeginEdit(true);
+                        return;
+                    }
+
+                    selected.Add(new RepairHoleBatchItem
+                    {
+                        SourceEquivalentDiameterMm = group.EquivalentDiameterMm,
+                        SourceWidthMm = group.WidthMm,
+                        SourceHeightMm = group.HeightMm,
+                        SourceCount = group.Count,
+                        SourceDisplayText = group.DisplayText,
+                        RepairAsLoose = repairAsLoose,
+                        RepairDiameterMm = repairDiameterMm,
+                        RepairSlotWidthMm = slotWidthMm,
+                        RepairSlotLengthMm = slotLengthMm,
+                        RepairInputText = normalizedTarget
+                    });
+                }
+
+                if (emptyRows.Count > 0)
+                {
+                    DialogResult skipResult = MessageBox.Show(
+                        "Có " + emptyRows.Count.ToString(CultureInfo.InvariantCulture)
+                        + " nhóm lỗ chưa nhập "
+                        + "Repair Size"
+                        + ".\r\n\r\nBạn có muốn BỎ QUA các nhóm này và tiếp tục Repair các nhóm đã nhập không?",
+                        "Repair Hole",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question,
+                        MessageBoxDefaultButton.Button2);
+
+                    if (skipResult != DialogResult.Yes)
+                    {
+                        return;
+                    }
+                }
+
+                if (selected.Count == 0)
+                {
+                    MessageBox.Show(
+                        "Chưa có nhóm lỗ nào được nhập kích thước Repair.",
+                        "Repair Hole",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                     return;
                 }
 
-                UpdateSelectionUI(group, 0.0);
+                SelectedRepairs = selected;
+                DialogResult = DialogResult.OK;
+                Close();
             }
 
-            private void UpdateSelectionUI(RepairHoleGroup group, double defaultRepairDiaMm)
+            private static bool TryParseRepairTargetText(
+                string text,
+                out bool repairAsLoose,
+                out double repairDiameterMm,
+                out double slotWidthMm,
+                out double slotLengthMm,
+                out string normalizedTarget)
             {
-                SelectedGroup = group;
-                cboSourceDia.Items.Clear();
-                cboRepairDia.Items.Clear();
+                repairAsLoose = false;
+                repairDiameterMm = 0.0;
+                slotWidthMm = 0.0;
+                slotLengthMm = 0.0;
+                normalizedTarget = "";
 
-                if (group.RecommendedSourceNominalMm.HasValue)
-                {
-                    cboSourceDia.Items.Add(group.RecommendedSourceNominalMm.Value.ToString("0.###", CultureInfo.InvariantCulture));
-                    cboSourceDia.SelectedIndex = 0;
-                }
-                else
-                {
-                    cboSourceDia.Items.Add("-");
-                    cboSourceDia.SelectedIndex = 0;
-                }
+                string value = (text ?? "")
+                    .Trim()
+                    .ToLowerInvariant()
+                    .Replace("mm", "")
+                    .Replace(" ", "")
+                    .Replace("×", "x")
+                    .Replace("*", "x")
+                    .Replace(",", ".");
 
-                foreach (double value in group.RecommendedRepairDiametersMm)
+                if (string.IsNullOrWhiteSpace(value))
                 {
-                    cboRepairDia.Items.Add(value.ToString("0.###", CultureInfo.InvariantCulture));
-                }
-
-                if (cboRepairDia.Items.Count > 0)
-                {
-                    cboRepairDia.SelectedIndex = 0;
-                }
-                else if (defaultRepairDiaMm > 1E-06)
-                {
-                    cboRepairDia.Text = defaultRepairDiaMm.ToString("0.###", CultureInfo.InvariantCulture);
+                    return false;
                 }
 
-                lblRecommend.Text = "Recommend: " + group.RecommendedDisplayText;
-                btnRepair.Enabled = cboRepairDia.Items.Count > 0 || !string.IsNullOrWhiteSpace(cboRepairDia.Text);
+                if (value.Contains("x"))
+                {
+                    string[] parts = value.Split(
+                        new[] { 'x' },
+                        StringSplitOptions.RemoveEmptyEntries);
+
+                    if (parts.Length != 2
+                        || !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double a)
+                        || !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double b)
+                        || a <= 1E-06
+                        || b <= 1E-06)
+                    {
+                        return false;
+                    }
+
+                    slotWidthMm = Math.Min(a, b);
+                    slotLengthMm = Math.Max(a, b);
+
+                    // A straight slot must have an actual straight section.
+                    if (slotLengthMm <= slotWidthMm + 1E-06)
+                    {
+                        return false;
+                    }
+
+                    repairAsLoose = true;
+                    repairDiameterMm = slotWidthMm; // Hole Wizard slot width / diameter.
+                    normalizedTarget = slotWidthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + "x"
+                        + slotLengthMm.ToString("0.###", CultureInfo.InvariantCulture);
+                    return true;
+                }
+
+                if (!double.TryParse(
+                        value,
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out repairDiameterMm)
+                    || repairDiameterMm <= 1E-06)
+                {
+                    return false;
+                }
+
+                normalizedTarget = repairDiameterMm.ToString("0.###", CultureInfo.InvariantCulture);
+                return true;
             }
+        }
+
+
+        /// <summary>
+        /// Parses a Repair target entered from the TaskPane.
+        /// Plain number (for example 4.2) creates a circular Hole Wizard target.
+        /// AxB (for example 5x25) creates a slot/Loose target.
+        /// </summary>
+        public static bool TryParseRepairTargetText(
+            string text,
+            out bool repairAsLoose,
+            out double repairDiameterMm,
+            out double slotWidthMm,
+            out double slotLengthMm,
+            out string normalizedTarget)
+        {
+            repairAsLoose = false;
+            repairDiameterMm = 0.0;
+            slotWidthMm = 0.0;
+            slotLengthMm = 0.0;
+            normalizedTarget = "";
+
+            string value = (text ?? "")
+                .Trim()
+                .ToLowerInvariant()
+                .Replace("mm", "")
+                .Replace(" ", "")
+                .Replace("×", "x")
+                .Replace("*", "x")
+                .Replace(",", ".");
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            if (value.Contains("x"))
+            {
+                string[] parts = value.Split(
+                    new[] { 'x' },
+                    StringSplitOptions.RemoveEmptyEntries);
+
+                if (parts.Length != 2
+                    || !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double a)
+                    || !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double b)
+                    || a <= 1E-06
+                    || b <= 1E-06)
+                {
+                    return false;
+                }
+
+                slotWidthMm = Math.Min(a, b);
+                slotLengthMm = Math.Max(a, b);
+
+                if (slotLengthMm <= slotWidthMm + 1E-06)
+                {
+                    return false;
+                }
+
+                repairAsLoose = true;
+                repairDiameterMm = slotWidthMm;
+                normalizedTarget = slotWidthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                    + "x"
+                    + slotLengthMm.ToString("0.###", CultureInfo.InvariantCulture);
+                return true;
+            }
+
+            if (!double.TryParse(
+                    value,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out repairDiameterMm)
+                || repairDiameterMm <= 1E-06)
+            {
+                return false;
+            }
+
+            normalizedTarget = repairDiameterMm.ToString("0.###", CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        private bool TryGetExactCircularRepairLoopDiameter(
+            List<Edge> edges,
+            double width,
+            double height,
+            out double diameterM)
+        {
+            diameterM = 0.0;
+
+            if (edges == null || edges.Count == 0)
+            {
+                return false;
+            }
+
+            // IMPORTANT:
+            // Do NOT use sampled Width/Height to decide whether a loop is a true
+            // circle. SampleCurve/SampleRepairEdge can produce a distorted bounding
+            // box for a perfectly circular SolidWorks edge (for example 4.191 x
+            // 3.561 mm for a real Ø4.2 hole). That caused valid round holes to be
+            // misclassified as "Lỗ méo".
+            //
+            // A closed Face Loop whose ALL edges are circular and share the same
+            // center + radius is geometrically a true circle. Such holes are already
+            // valid and must never enter Repair Hole.
+            double[] referenceCenter = null;
+            double referenceRadius = 0.0;
+
+            foreach (Edge edge in edges)
+            {
+                if (edge == null
+                    || !TryGetCircularEdgeData(
+                        edge,
+                        out double[] center,
+                        out double radius)
+                    || !IsPoint(center)
+                    || radius <= 1E-06)
+                {
+                    return false;
+                }
+
+                if (referenceCenter == null)
+                {
+                    referenceCenter = center;
+                    referenceRadius = radius;
+                    continue;
+                }
+
+                // 0.02 mm is only numerical COM/geometry tolerance.
+                // It is NOT a Repair-size tolerance.
+                if (Distance(referenceCenter, center) > 0.00002
+                    || Math.Abs(referenceRadius - radius) > 0.00002)
+                {
+                    return false;
+                }
+            }
+
+            if (referenceCenter == null || referenceRadius <= 1E-06)
+            {
+                return false;
+            }
+
+            diameterM = referenceRadius * 2.0;
+
+            Debug.WriteLine(
+                "[REPAIR HOLE SCAN] exact circular loop detected from curve geometry."
+                + " dia="
+                + (diameterM * 1000.0).ToString(
+                    "0.###",
+                    CultureInfo.InvariantCulture)
+                + "mm"
+                + ((width > 1E-09 && height > 1E-09)
+                    ? ", sampledBBox="
+                        + (width * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                        + " x "
+                        + (height * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                        + "mm"
+                    : ", analytic-fast"));
+
+            return true;
+        }
+
+        private bool TryResolveRepairCandidateFamily(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            RepairHoleLoopCandidate candidate)
+        {
+            if (model == null || sourceFace == null || candidate == null || candidate.Edges == null)
+            {
+                return false;
+            }
+
+            Dictionary<string, int> nameScores =
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> nameTypes =
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, Feature> nameFeatures =
+                new Dictionary<string, Feature>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (Edge edge in candidate.Edges)
+            {
+                if (edge == null)
+                {
+                    continue;
+                }
+
+                Array adjacent = null;
+                try
+                {
+                    adjacent = edge.GetTwoAdjacentFaces2() as Array;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(
+                        "[RH FAMILY] GetTwoAdjacentFaces2 failed. loop="
+                        + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                        + ", error="
+                        + ex.Message);
+                }
+
+                if (adjacent == null)
+                {
+                    continue;
+                }
+
+                foreach (object obj in adjacent)
+                {
+                    if (!(obj is Face2 adjacentFace))
+                    {
+                        continue;
+                    }
+
+                    if (AreSameEntities(adjacentFace, sourceFace))
+                    {
+                        continue;
+                    }
+
+                    Feature feature = null;
+                    try
+                    {
+                        feature = adjacentFace.GetFeature() as Feature;
+                    }
+                    catch
+                    {
+                    }
+
+                    if (feature == null)
+                    {
+                        continue;
+                    }
+
+                    string featureName = SafeFeatureName(feature);
+                    string featureType = "";
+                    try
+                    {
+                        featureType = feature.GetTypeName2() ?? "";
+                    }
+                    catch
+                    {
+                    }
+
+                    if (string.IsNullOrWhiteSpace(featureName)
+                        || string.Equals(featureType, "FlatPattern", StringComparison.OrdinalIgnoreCase)
+                        || featureName.IndexOf("RH-F", StringComparison.OrdinalIgnoreCase) >= 0
+                        || featureName.IndexOf("RH-P", StringComparison.OrdinalIgnoreCase) >= 0
+                        || featureName.IndexOf("RH-DelSurf", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        continue;
+                    }
+
+                    if (!nameScores.ContainsKey(featureName))
+                    {
+                        nameScores[featureName] = 0;
+                    }
+
+                    nameScores[featureName]++;
+                    nameTypes[featureName] = featureType;
+                    nameFeatures[featureName] = feature;
+                }
+            }
+
+            if (nameScores.Count == 0)
+            {
+                Debug.WriteLine(
+                    "[RH FAMILY] loop="
+                    + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                    + " source feature not resolved; keep geometry-only grouping.");
+                return false;
+            }
+
+            string selectedName = nameScores.Keys
+                .OrderByDescending(name =>
+                    nameScores[name] * 1000
+                    + GetRepairFeatureTypePriority(
+                        nameTypes.ContainsKey(name) ? nameTypes[name] : ""))
+                .ThenBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+
+            Feature selectedFeature = selectedName != null && nameFeatures.ContainsKey(selectedName)
+                ? nameFeatures[selectedName]
+                : null;
+            string selectedType = selectedName != null && nameTypes.ContainsKey(selectedName)
+                ? nameTypes[selectedName]
+                : "";
+
+            if (selectedFeature == null)
+            {
+                return false;
+            }
+
+            candidate.SourceFeatureName = selectedName;
+            candidate.SourceFeatureType = selectedType;
+
+            string cacheKey = selectedType + "|" + selectedName;
+            if (repairFamilyResolutionCache.TryGetValue(
+                    cacheKey,
+                    out RepairFamilyResolutionCacheEntry cachedFamily)
+                && cachedFamily != null
+                && !string.IsNullOrWhiteSpace(cachedFamily.SeedName)
+                && cachedFamily.FamilyDiameterM > 1E-09)
+            {
+                candidate.FamilyDiameterM = cachedFamily.FamilyDiameterM;
+                candidate.FamilyDisplayName = cachedFamily.SeedName;
+                candidate.FamilyKey = "SEED|"
+                    + cachedFamily.SeedName
+                    + "|"
+                    + (cachedFamily.FamilyDiameterM * 1000.0)
+                        .ToString("0.###", CultureInfo.InvariantCulture);
+                candidate.IsSlotFamily = cachedFamily.IsSlotFamily;
+                candidate.SeedSlotWidthM = cachedFamily.SlotWidthM;
+                candidate.SeedSlotLengthM = cachedFamily.SlotLengthM;
+
+                Debug.WriteLine(
+                    "[RH FAMILY CACHE] hit. feature="
+                    + selectedName
+                    + ", seed="
+                    + cachedFamily.SeedName);
+                return true;
+            }
+
+            string seedName = "";
+            double familyDiameterM = 0.0;
+            bool seedIsSlot = false;
+            double seedSlotWidthM = 0.0;
+            double seedSlotLengthM = 0.0;
+            Feature resolvedSeedFeature = null;
+            bool isPattern = selectedType.IndexOf("Pattern", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (isPattern)
+            {
+                if (TryGetRepairPatternSeedHoleInfo(
+                        model,
+                        selectedFeature,
+                        candidate.EquivalentDiameterM,
+                        out Feature seedFeature,
+                        out double seedDiameterM,
+                        out int _))
+                {
+                    resolvedSeedFeature = seedFeature;
+                    seedName = SafeFeatureName(seedFeature);
+                    familyDiameterM = seedDiameterM;
+                }
+            }
+            else if (selectedType.IndexOf("HoleWzd", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                if (TryGetRepairHoleWizardDiameter(
+                        model,
+                        selectedFeature,
+                        candidate.EquivalentDiameterM,
+                        out double directDiameterM))
+                {
+                    resolvedSeedFeature = selectedFeature;
+                    seedName = selectedName;
+                    familyDiameterM = directDiameterM;
+                }
+            }
+
+            if (resolvedSeedFeature != null
+                && TryGetRepairHoleWizardSlotSize(
+                    model,
+                    resolvedSeedFeature,
+                    out double slotWidthM,
+                    out double slotLengthM))
+            {
+                seedIsSlot = true;
+                seedSlotWidthM = slotWidthM;
+                seedSlotLengthM = slotLengthM;
+                // For a slot, the family width is the Hole Wizard diameter.
+                familyDiameterM = slotWidthM;
+            }
+
+            if (!string.IsNullOrWhiteSpace(seedName) && familyDiameterM > 1E-09)
+            {
+                // Same physical seed must map to the same family whether the
+                // loop belongs to the seed HoleWzd itself or to its CurvePattern.
+                string diaKey = (familyDiameterM * 1000.0)
+                    .ToString("0.###", CultureInfo.InvariantCulture);
+                candidate.FamilyKey = "SEED|" + seedName + "|" + diaKey;
+                candidate.FamilyDisplayName = seedName;
+                candidate.FamilyDiameterM = familyDiameterM;
+                candidate.IsSlotFamily = seedIsSlot;
+                candidate.SeedSlotWidthM = seedSlotWidthM;
+                candidate.SeedSlotLengthM = seedSlotLengthM;
+
+                repairFamilyResolutionCache[cacheKey] =
+                    new RepairFamilyResolutionCacheEntry
+                    {
+                        SeedName = seedName,
+                        FamilyDiameterM = familyDiameterM,
+                        IsSlotFamily = seedIsSlot,
+                        SlotWidthM = seedSlotWidthM,
+                        SlotLengthM = seedSlotLengthM
+                    };
+
+                Debug.WriteLine(
+                    "[RH FAMILY] loop="
+                    + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                    + ", exact="
+                    + candidate.IsExactCircle
+                    + ", source="
+                    + selectedName
+                    + " ("
+                    + selectedType
+                    + ")"
+                    + ", seed="
+                    + seedName
+                    + ", familyDia="
+                    + (familyDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                    + "mm");
+                return true;
+            }
+
+            // Non-Hole-Wizard fallback.  Keep the owner feature in the key so
+            // unrelated loops of the same measured size are never merged.
+            if (!string.IsNullOrWhiteSpace(selectedName))
+            {
+                double fallbackDiameterM = candidate.EquivalentDiameterM;
+                string diaKey = (fallbackDiameterM * 1000.0)
+                    .ToString("0.###", CultureInfo.InvariantCulture);
+                candidate.FamilyKey = "FEATURE|" + selectedName + "|" + diaKey;
+                candidate.FamilyDisplayName = selectedName;
+                candidate.FamilyDiameterM = fallbackDiameterM;
+
+                Debug.WriteLine(
+                    "[RH FAMILY] loop="
+                    + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                    + ", exact="
+                    + candidate.IsExactCircle
+                    + ", fallbackFeature="
+                    + selectedName
+                    + ", familyDia="
+                    + diaKey
+                    + "mm");
+                return true;
+            }
+
+            return false;
         }
 
         private List<RepairHoleLoopCandidate> ScanRepairHoleLoops(
@@ -7852,6 +8884,8 @@ namespace ADDIN.Commands
         {
             message = "";
             List<RepairHoleLoopCandidate> candidates = new List<RepairHoleLoopCandidate>();
+            repairFamilyResolutionCache.Clear();
+            repairHoleWizardSeedInfoCache.Clear();
             if (face == null)
             {
                 message = "Khong co mat de scan.";
@@ -7874,8 +8908,11 @@ namespace ADDIN.Commands
                 return candidates;
             }
 
+            ModelDoc2 model = swApp?.ActiveDoc as ModelDoc2;
             FacePlaneFrame facePlaneFrame = CreateFacePlaneFrame(face);
             int loopIndex = 0;
+            int exactCount = 0;
+            int malformedCount = 0;
 
             foreach (object itemObj in loopArray)
             {
@@ -7924,53 +8961,190 @@ namespace ADDIN.Commands
                             {
                                 circularCenters.Add(cCenter);
                             }
-                            if (TryGetEdgeGeometry(edge, out var geometry))
-                            {
-                                sampledPoints.AddRange(SampleCurve(geometry, 16));
-                            }
-                            else
-                            {
-                                sampledPoints.AddRange(SampleRepairEdge(edge, 32));
-                            }
                         }
                     }
                 }
 
-                if (!TryGetLoopCenter(sampledPoints, circularCenters, facePlaneFrame, out var center, out var width, out var height))
+                // V19 fast path: classify analytic circles BEFORE sampling.
+                // Exact circles do not need 32/65 sampled points; their center and
+                // radius are already known exactly from the curve geometry.
+                bool isExactCircle = TryGetExactCircularRepairLoopDiameter(
+                    edges,
+                    0.0,
+                    0.0,
+                    out double exactCircleDiameterM);
+
+                double[] center = null;
+                double width = 0.0;
+                double height = 0.0;
+
+                if (isExactCircle && circularCenters.Count > 0)
                 {
-                    Debug.WriteLine("[REPAIR HOLE SCAN] loop " + loopIndex + " skipped: no center");
-                    continue;
+                    center = circularCenters[0];
+                    width = exactCircleDiameterM;
+                    height = exactCircleDiameterM;
+                }
+                else
+                {
+                    foreach (Edge edge in edges)
+                    {
+                        if (TryGetEdgeGeometry(edge, out var geometry))
+                        {
+                            sampledPoints.AddRange(SampleCurve(geometry, 12));
+                        }
+                        else
+                        {
+                            sampledPoints.AddRange(SampleRepairEdge(edge, 20));
+                        }
+                    }
+
+                    if (!TryGetLoopCenter(
+                            sampledPoints,
+                            circularCenters,
+                            facePlaneFrame,
+                            out center,
+                            out width,
+                            out height))
+                    {
+                        Debug.WriteLine("[REPAIR HOLE SCAN] loop " + loopIndex + " skipped: no center");
+                        continue;
+                    }
                 }
 
-                // NO CIRCLE AUTO-DETECTION: purely measure perimeter & equivalent diameter
-                double perimeterM = GetRepairLoopPerimeter(edges);
-                double equivalentDiameterM = perimeterM > 1E-06 ? (perimeterM / Math.PI) : 0.0;
-                double[] majorDirection = GetRepairLoopMajorDirection(sampledPoints, facePlaneFrame, width, height) ?? facePlaneFrame?.AxisU;
+                double perimeterM;
+                double equivalentDiameterM;
+                double storedWidth = width;
+                double storedHeight = height;
 
-                candidates.Add(new RepairHoleLoopCandidate
+                if (isExactCircle)
+                {
+                    exactCount++;
+                    equivalentDiameterM = exactCircleDiameterM;
+                    perimeterM = Math.PI * exactCircleDiameterM;
+                    // Width/height from a 3D sampled BBox can look elliptical in
+                    // FlatPattern coordinates.  For an exact circle, its analytic
+                    // diameter is authoritative.
+                    storedWidth = exactCircleDiameterM;
+                    storedHeight = exactCircleDiameterM;
+                }
+                else
+                {
+                    malformedCount++;
+                    perimeterM = GetRepairLoopPerimeter(edges);
+                    if (perimeterM <= 1E-06)
+                    {
+                        Debug.WriteLine("[REPAIR HOLE SCAN] loop #" + loopIndex + " skipped: invalid perimeter.");
+                        continue;
+                    }
+
+                    equivalentDiameterM = perimeterM / Math.PI;
+                }
+
+                double[] majorDirection = GetRepairLoopMajorDirection(
+                    sampledPoints,
+                    facePlaneFrame,
+                    storedWidth,
+                    storedHeight) ?? facePlaneFrame?.AxisU;
+
+                RepairHoleLoopCandidate candidate = new RepairHoleLoopCandidate
                 {
                     Index = loopIndex,
                     Edges = edges,
+                    SampledPoints = sampledPoints
+                        .Where(p => IsPoint(p))
+                        .Select(p => new double[3] { p[0], p[1], p[2] })
+                        .ToList(),
                     FallbackCenter = center,
-                    Width = width,
-                    Height = height,
+                    Width = storedWidth,
+                    Height = storedHeight,
                     PerimeterM = perimeterM,
                     EquivalentDiameterM = equivalentDiameterM,
-                    MajorDirection = majorDirection
-                });
+                    MajorDirection = majorDirection,
+                    IsExactCircle = isExactCircle,
+                    ExactCircleDiameterM = isExactCircle ? exactCircleDiameterM : 0.0
+                };
 
-                Debug.WriteLine("[REPAIR HOLE SCAN] loop #" + loopIndex
-                    + ": W=" + (width * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
-                    + ", H=" + (height * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
-                    + ", perim=" + (perimeterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
-                    + ", eqDia=" + (equivalentDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
-                    + ", center=(" + (center[0] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
-                    + (center[1] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
-                    + (center[2] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ")");
+                if (model != null)
+                {
+                    TryResolveRepairCandidateFamily(model, face, candidate);
+                }
+
+                candidates.Add(candidate);
+
+                if (isExactCircle)
+                {
+                    Debug.WriteLine(
+                        "[REPAIR HOLE SCAN] loop #"
+                        + loopIndex
+                        + " EXACT FAMILY MEMBER Ø"
+                        + (exactCircleDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                        + "mm, family="
+                        + (string.IsNullOrWhiteSpace(candidate.FamilyDisplayName)
+                            ? "<unresolved>"
+                            : candidate.FamilyDisplayName));
+                }
+                else
+                {
+                    Debug.WriteLine("[REPAIR HOLE SCAN] loop #" + loopIndex
+                        + " DEFORMED"
+                        + ": W=" + (width * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                        + ", H=" + (height * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                        + ", perim=" + (perimeterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                        + ", eqDia=" + (equivalentDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                        + ", family="
+                        + (string.IsNullOrWhiteSpace(candidate.FamilyDisplayName)
+                            ? "<unresolved>"
+                            : candidate.FamilyDisplayName)
+                        + ", center=(" + (center[0] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
+                        + (center[1] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ","
+                        + (center[2] * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + ")");
+                }
             }
 
-            Debug.WriteLine("[REPAIR HOLE SCAN] total inner loop candidates=" + candidates.Count);
+            Debug.WriteLine(
+                "[REPAIR HOLE SCAN] inner family members="
+                + candidates.Count.ToString(CultureInfo.InvariantCulture)
+                + ", malformed="
+                + malformedCount.ToString(CultureInfo.InvariantCulture)
+                + ", exact="
+                + exactCount.ToString(CultureInfo.InvariantCulture));
             return candidates;
+        }
+
+        private bool AreRepairCandidatesSameFamily(
+            RepairHoleLoopCandidate first,
+            RepairHoleLoopCandidate second)
+        {
+            if (first == null || second == null)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(first.FamilyKey)
+                && !string.IsNullOrWhiteSpace(second.FamilyKey))
+            {
+                return string.Equals(
+                    first.FamilyKey,
+                    second.FamilyKey,
+                    StringComparison.OrdinalIgnoreCase);
+            }
+
+            // Fail-safe fallback: only malformed candidates use legacy geometry
+            // grouping when a source family could not be resolved.  Exact circles
+            // are never pulled into an unresolved family by diameter alone.
+            if (first.IsExactCircle || second.IsExactCircle)
+            {
+                return false;
+            }
+
+            double firstMinMm = Math.Min(first.MeasuredWidthMm, first.MeasuredHeightMm);
+            double firstMaxMm = Math.Max(first.MeasuredWidthMm, first.MeasuredHeightMm);
+            double secondMinMm = Math.Min(second.MeasuredWidthMm, second.MeasuredHeightMm);
+            double secondMaxMm = Math.Max(second.MeasuredWidthMm, second.MeasuredHeightMm);
+
+            return Math.Abs(first.EquivalentDiameterMm - second.EquivalentDiameterMm) <= RepairGroupingToleranceMm
+                && Math.Abs(firstMinMm - secondMinMm) <= RepairGroupingToleranceMm
+                && Math.Abs(firstMaxMm - secondMaxMm) <= RepairGroupingToleranceMm;
         }
 
         private List<RepairHoleGroup> GroupRepairHoleCandidates(
@@ -7982,105 +9156,122 @@ namespace ADDIN.Commands
                 return groups;
             }
 
-            foreach (RepairHoleLoopCandidate candidate in candidates)
+            // Rows are created only from malformed loops.  Once a malformed loop
+            // identifies a seed family, ALL exact + malformed loops in that same
+            // family are attached to the row.  Therefore a Ø4 family with 6
+            // malformed + 5 exact members reports Count=11 and Repair acts on 11.
+            List<RepairHoleLoopCandidate> malformedCandidates = candidates
+                .Where(candidate => candidate != null && !candidate.IsExactCircle)
+                .OrderBy(candidate => candidate.Index)
+                .ToList();
+
+            HashSet<int> consumedMalformedIndexes = new HashSet<int>();
+
+            foreach (RepairHoleLoopCandidate anchor in malformedCandidates)
             {
-                double candEqDiaMm = candidate.EquivalentDiameterMm;
-                double candMinMm = Math.Min(candidate.MeasuredWidthMm, candidate.MeasuredHeightMm);
-                double candMaxMm = Math.Max(candidate.MeasuredWidthMm, candidate.MeasuredHeightMm);
-                bool candIsRound = Math.Abs(candMaxMm - candMinMm) <= 0.1;
-
-                RepairHoleGroup matchedGroup = null;
-
-                foreach (RepairHoleGroup group in groups)
+                if (consumedMalformedIndexes.Contains(anchor.Index))
                 {
-                    double groupMinMm = Math.Min(group.WidthMm, group.HeightMm);
-                    double groupMaxMm = Math.Max(group.WidthMm, group.HeightMm);
-                    bool groupIsRound = Math.Abs(groupMaxMm - groupMinMm) <= 0.1;
-
-                    if (groupIsRound && candIsRound)
-                    {
-                        if (Math.Abs(group.EquivalentDiameterMm - candEqDiaMm) <= RepairGroupingToleranceMm)
-                        {
-                            matchedGroup = group;
-                            break;
-                        }
-                    }
-                    else if (!groupIsRound && !candIsRound)
-                    {
-                        bool matchEqDia = Math.Abs(group.EquivalentDiameterMm - candEqDiaMm) <= RepairGroupingToleranceMm;
-                        bool matchMin = Math.Abs(groupMinMm - candMinMm) <= RepairGroupingToleranceMm;
-                        bool matchMax = Math.Abs(groupMaxMm - candMaxMm) <= RepairGroupingToleranceMm;
-
-                        if (matchEqDia && matchMin && matchMax)
-                        {
-                            matchedGroup = group;
-                            break;
-                        }
-                    }
+                    continue;
                 }
 
-                if (matchedGroup == null)
+                List<RepairHoleLoopCandidate> familyMalformed = malformedCandidates
+                    .Where(candidate => AreRepairCandidatesSameFamily(anchor, candidate))
+                    .OrderBy(candidate => candidate.Index)
+                    .ToList();
+
+                foreach (RepairHoleLoopCandidate member in familyMalformed)
                 {
-                    string displayText = "Eq Ø" + candEqDiaMm.ToString("0.##", CultureInfo.InvariantCulture)
-                        + " [" + candMinMm.ToString("0.##", CultureInfo.InvariantCulture)
-                        + " x " + candMaxMm.ToString("0.##", CultureInfo.InvariantCulture) + "]";
-
-                    matchedGroup = new RepairHoleGroup
-                    {
-                        EquivalentDiameterMm = candEqDiaMm,
-                        WidthMm = candidate.MeasuredWidthMm,
-                        HeightMm = candidate.MeasuredHeightMm,
-                        DisplayText = displayText
-                    };
-
-                    if (TryResolveRecommendedSourceNominalDiameterMm(
-                            matchedGroup.EquivalentDiameterMm,
-                            out double sourceNominalMm))
-                    {
-                        matchedGroup.RecommendedSourceNominalMm = sourceNominalMm;
-                        matchedGroup.RecommendedRepairDiametersMm =
-                            GetRecommendedRepairDiametersMm(sourceNominalMm);
-
-                        matchedGroup.RecommendedDisplayText =
-                            FormatRecommendedRepairDiameters(
-                                matchedGroup.RecommendedRepairDiametersMm);
-                    }
-                    else
-                    {
-                        matchedGroup.RecommendedSourceNominalMm = null;
-                        matchedGroup.RecommendedRepairDiametersMm =
-                            new List<double>();
-
-                        matchedGroup.RecommendedDisplayText = "-";
-                    }
-
-                    groups.Add(matchedGroup);
+                    consumedMalformedIndexes.Add(member.Index);
                 }
 
-                matchedGroup.Candidates.Add(candidate);
+                List<RepairHoleLoopCandidate> allFamilyMembers;
+                if (!string.IsNullOrWhiteSpace(anchor.FamilyKey))
+                {
+                    allFamilyMembers = candidates
+                        .Where(candidate =>
+                            candidate != null
+                            && !string.IsNullOrWhiteSpace(candidate.FamilyKey)
+                            && string.Equals(
+                                candidate.FamilyKey,
+                                anchor.FamilyKey,
+                                StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(candidate => candidate.Index)
+                        .ToList();
+                }
+                else
+                {
+                    // No source family => preserve legacy behavior and do not pull
+                    // exact circles in by size only.
+                    allFamilyMembers = familyMalformed;
+                }
+
+                double representativeEqDiaMm = familyMalformed
+                    .Average(candidate => candidate.EquivalentDiameterMm);
+                double representativeWidthMm = familyMalformed
+                    .Average(candidate => candidate.MeasuredWidthMm);
+                double representativeHeightMm = familyMalformed
+                    .Average(candidate => candidate.MeasuredHeightMm);
+                double familyDiameterMm = anchor.FamilyDiameterM > 1E-09
+                    ? anchor.FamilyDiameterM * 1000.0
+                    : representativeEqDiaMm;
+
+                RepairHoleGroup group = new RepairHoleGroup
+                {
+                    EquivalentDiameterMm = representativeEqDiaMm,
+                    WidthMm = representativeWidthMm,
+                    HeightMm = representativeHeightMm,
+                    FamilyKey = anchor.FamilyKey,
+                    FamilyDiameterMm = familyDiameterMm,
+                    IsSlotFamily = anchor.IsSlotFamily,
+                    SeedSlotWidthMm = anchor.SeedSlotWidthM * 1000.0,
+                    SeedSlotLengthMm = anchor.SeedSlotLengthM * 1000.0,
+                    DisplayText = anchor.IsSlotFamily
+                        ? "Lỗ dài "
+                            + (anchor.SeedSlotWidthM * 1000.0).ToString("0.##", CultureInfo.InvariantCulture)
+                            + "x"
+                            + (anchor.SeedSlotLengthM * 1000.0).ToString("0.##", CultureInfo.InvariantCulture)
+                        : (!string.IsNullOrWhiteSpace(anchor.FamilyKey)
+                            ? "Lỗ Ø" + familyDiameterMm.ToString("0.00", CultureInfo.InvariantCulture)
+                            : "Lỗ méo Ø" + representativeEqDiaMm.ToString("0.00", CultureInfo.InvariantCulture)),
+                    Candidates = allFamilyMembers
+                };
+
+                double recommendationSourceMm = familyDiameterMm;
+                if (TryResolveRecommendedSourceNominalDiameterMm(
+                        recommendationSourceMm,
+                        out double sourceNominalMm))
+                {
+                    group.RecommendedSourceNominalMm = sourceNominalMm;
+                    group.RecommendedRepairDiametersMm =
+                        GetRecommendedRepairDiametersMm(sourceNominalMm);
+                    group.RecommendedDisplayText =
+                        FormatRecommendedRepairDiameters(group.RecommendedRepairDiametersMm);
+                }
+                else
+                {
+                    group.RecommendedSourceNominalMm = null;
+                    group.RecommendedRepairDiametersMm = new List<double>();
+                    group.RecommendedDisplayText = "-";
+                }
+
+                groups.Add(group);
+
+                Debug.WriteLine(
+                    "[RH FAMILY] GROUP "
+                    + group.DisplayText
+                    + ", key="
+                    + (string.IsNullOrWhiteSpace(group.FamilyKey) ? "<geometry-only>" : group.FamilyKey)
+                    + ", malformed="
+                    + group.MalformedCount.ToString(CultureInfo.InvariantCulture)
+                    + ", exact="
+                    + group.ExactCircleCount.ToString(CultureInfo.InvariantCulture)
+                    + ", total="
+                    + group.Count.ToString(CultureInfo.InvariantCulture));
             }
 
-            groups.Sort((a, b) =>
-            {
-                double aMin = Math.Min(a.WidthMm, a.HeightMm);
-                double aMax = Math.Max(a.WidthMm, a.HeightMm);
-                double bMin = Math.Min(b.WidthMm, b.HeightMm);
-                double bMax = Math.Max(b.WidthMm, b.HeightMm);
-                bool aIsRound = Math.Abs(aMax - aMin) <= 0.1;
-                bool bIsRound = Math.Abs(bMax - bMin) <= 0.1;
-
-                if (aIsRound && !bIsRound) return -1;
-                if (!aIsRound && bIsRound) return 1;
-
-                if (aIsRound && bIsRound)
-                {
-                    return a.EquivalentDiameterMm.CompareTo(b.EquivalentDiameterMm);
-                }
-
-                int minComp = aMin.CompareTo(bMin);
-                if (minComp != 0) return minComp;
-                return aMax.CompareTo(bMax);
-            });
+            groups.Sort(
+                (a, b) =>
+                    a.FamilyDiameterMm.CompareTo(b.FamilyDiameterMm));
 
             return groups;
         }
@@ -8154,7 +9345,10 @@ namespace ADDIN.Commands
 
             return string.Join(
                 " / ",
-                values.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture)));
+                values.Select(
+                    v => v.ToString(
+                        "0.###",
+                        CultureInfo.InvariantCulture)));
         }
 
         private bool TryBuildRepairReferencesForCandidates(
@@ -8218,6 +9412,4858 @@ namespace ADDIN.Commands
             return true;
         }
 
+        private string GetRepairTargetDescription(RepairHoleBatchItem item)
+        {
+            if (item == null)
+            {
+                return "-";
+            }
+
+            if (item.RepairAsLoose)
+            {
+                return item.RepairSlotWidthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                    + "x"
+                    + item.RepairSlotLengthMm.ToString("0.###", CultureInfo.InvariantCulture);
+            }
+
+            return "Ø" + item.RepairDiameterMm.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private bool IsRepairTargetContainingCandidate(
+            RepairHoleLoopCandidate candidate,
+            RepairHoleBatchItem item,
+            FacePlaneFrame frame,
+            out string reason)
+        {
+            reason = "";
+            if (candidate == null || item == null || frame == null
+                || !IsPoint(candidate.FallbackCenter))
+            {
+                reason = "Không đủ dữ liệu hình học để kiểm tra biên dạng.";
+                return false;
+            }
+
+            // V19 fast exact-circle containment: no sampled points are required.
+            // Exact circles are analytic and can be compared directly.
+            if (candidate.IsExactCircle && candidate.ExactCircleDiameterM > 1E-09)
+            {
+                double sourceDiaMm = candidate.ExactCircleDiameterM * 1000.0;
+                if (!item.RepairAsLoose)
+                {
+                    if (item.RepairDiameterMm + 0.02 < sourceDiaMm)
+                    {
+                        reason = "Lỗ tròn nguồn Ø"
+                            + sourceDiaMm.ToString("0.###", CultureInfo.InvariantCulture)
+                            + " lớn hơn Ø"
+                            + item.RepairDiameterMm.ToString("0.###", CultureInfo.InvariantCulture)
+                            + ".";
+                        return false;
+                    }
+                    return true;
+                }
+
+                if (item.RepairSlotWidthMm + 0.02 < sourceDiaMm
+                    || item.RepairSlotLengthMm + 0.02 < sourceDiaMm)
+                {
+                    reason = "Lỗ tròn nguồn Ø"
+                        + sourceDiaMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + " không nằm trọn trong Slot "
+                        + item.RepairSlotWidthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + "x"
+                        + item.RepairSlotLengthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + ".";
+                    return false;
+                }
+                return true;
+            }
+
+            if (candidate.SampledPoints == null || candidate.SampledPoints.Count == 0)
+            {
+                reason = "Không đủ dữ liệu sampled geometry để kiểm tra biên dạng.";
+                return false;
+            }
+
+            // 0.02 mm only absorbs numerical sampling noise; it is not a size allowance.
+            const double toleranceM = 0.00002;
+            double[] center = frame.ProjectToPlane(candidate.FallbackCenter);
+            if (!IsPoint(center))
+            {
+                reason = "Không xác định được tâm lỗ hiện tại.";
+                return false;
+            }
+
+            if (!item.RepairAsLoose)
+            {
+                double targetRadiusM = item.RepairDiameterMm / 2000.0;
+                double maxRadiusM = 0.0;
+
+                foreach (double[] point in candidate.SampledPoints)
+                {
+                    if (!IsPoint(point))
+                    {
+                        continue;
+                    }
+
+                    double[] delta = Subtract(frame.ProjectToPlane(point), center);
+                    double u = Dot(delta, frame.AxisU);
+                    double v = Dot(delta, frame.AxisV);
+                    double radius = Math.Sqrt(u * u + v * v);
+                    maxRadiusM = Math.Max(maxRadiusM, radius);
+
+                    if (radius > targetRadiusM + toleranceM)
+                    {
+                        reason = "Biên dạng lỗ hiện tại vượt ra ngoài Ø"
+                            + item.RepairDiameterMm.ToString("0.###", CultureInfo.InvariantCulture)
+                            + ". Kích thước bao tối thiểu khoảng Ø"
+                            + (maxRadiusM * 2000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + ".";
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            double widthM = item.RepairSlotWidthMm / 1000.0;
+            double lengthM = item.RepairSlotLengthMm / 1000.0;
+            if (widthM <= 1E-06 || lengthM <= widthM + 1E-06)
+            {
+                reason = "Kích thước Slot Repair không hợp lệ.";
+                return false;
+            }
+
+            double[] direction = candidate.MajorDirection;
+            if (IsPoint(direction))
+            {
+                direction = Subtract(direction, Scale(frame.Normal, Dot(direction, frame.Normal)));
+            }
+            direction = Normalize(direction) ?? Normalize(frame.AxisU);
+            double[] perpendicular = Normalize(Cross(frame.Normal, direction));
+            if (!IsPoint(direction) || !IsPoint(perpendicular))
+            {
+                reason = "Không xác định được hướng Slot Repair.";
+                return false;
+            }
+
+            double radiusM = widthM / 2.0;
+            double halfStraightM = Math.Max(0.0, (lengthM - widthM) / 2.0);
+
+            foreach (double[] point in candidate.SampledPoints)
+            {
+                if (!IsPoint(point))
+                {
+                    continue;
+                }
+
+                double[] delta = Subtract(frame.ProjectToPlane(point), center);
+                double x = Dot(delta, direction);
+                double y = Dot(delta, perpendicular);
+                double absX = Math.Abs(x);
+                bool inside;
+
+                if (absX <= halfStraightM)
+                {
+                    inside = Math.Abs(y) <= radiusM + toleranceM;
+                }
+                else
+                {
+                    double dx = absX - halfStraightM;
+                    inside = dx * dx + y * y <= (radiusM + toleranceM) * (radiusM + toleranceM);
+                }
+
+                if (!inside)
+                {
+                    reason = "Biên dạng lỗ hiện tại vượt ra ngoài Slot "
+                        + item.RepairSlotWidthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + "x"
+                        + item.RepairSlotLengthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + ".";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private List<RepairHoleBatchItem> MarkRepairItemsRequiringRebuild(
+            Face2 sourceFace,
+            List<RepairHoleGroup> groups,
+            List<RepairHoleBatchItem> items)
+        {
+            List<RepairHoleBatchItem> rebuildItems = new List<RepairHoleBatchItem>();
+            if (sourceFace == null || groups == null || items == null)
+            {
+                return rebuildItems;
+            }
+
+            FacePlaneFrame frame = CreateFacePlaneFrame(sourceFace);
+            foreach (RepairHoleBatchItem item in items)
+            {
+                item.RequiresRebuildRepair = false;
+                RepairHoleGroup group = FindMatchingRepairHoleGroup(groups, item);
+                if (group == null || group.Candidates == null || group.Candidates.Count == 0 || frame == null)
+                {
+                    continue;
+                }
+
+                // V19: slot-family size check from the actual Hole Wizard seed.
+                // If the requested slot is smaller in width OR length, Delete Face
+                // + Patch is mandatory regardless of sampled flat geometry.
+                if (item.RepairAsLoose
+                    && group.IsSlotFamily
+                    && group.SeedSlotWidthMm > 0.0
+                    && group.SeedSlotLengthMm > 0.0
+                    && (item.RepairSlotWidthMm + 0.02 < group.SeedSlotWidthMm
+                        || item.RepairSlotLengthMm + 0.02 < group.SeedSlotLengthMm))
+                {
+                    item.RequiresRebuildRepair = true;
+                    rebuildItems.Add(item);
+                    Debug.WriteLine(
+                        "[REPAIR HOLE CHECK] SLOT SEED rebuild required. seed="
+                        + group.SeedSlotWidthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + "x"
+                        + group.SeedSlotLengthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + ", repair="
+                        + item.RepairSlotWidthMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + "x"
+                        + item.RepairSlotLengthMm.ToString("0.###", CultureInfo.InvariantCulture));
+                    continue;
+                }
+
+                foreach (RepairHoleLoopCandidate candidate in group.Candidates)
+                {
+                    if (!IsRepairTargetContainingCandidate(candidate, item, frame, out string reason))
+                    {
+                        item.RequiresRebuildRepair = true;
+                        rebuildItems.Add(item);
+                        Debug.WriteLine("[REPAIR HOLE CHECK] rebuild required. current="
+                            + item.SourceDisplayText
+                            + ", repair=" + GetRepairTargetDescription(item)
+                            + ", reason=" + reason);
+                        break;
+                    }
+                }
+            }
+
+            return rebuildItems;
+        }
+
+        private string BuildRebuildRepairWarning(List<RepairHoleBatchItem> rebuildItems)
+        {
+            if (rebuildItems == null || rebuildItems.Count == 0)
+            {
+                return "";
+            }
+
+            List<string> lines = new List<string>();
+            lines.Add("Phát hiện kích thước Repair nhỏ hơn biên dạng lỗ hiện tại:");
+            lines.Add("");
+
+            foreach (RepairHoleBatchItem item in rebuildItems.Take(6))
+            {
+                lines.Add("Lỗ hiện tại: " + item.SourceDisplayText.Replace("Lỗ méo ", "")
+                    + "    |    Kích thước Repair: " + GetRepairTargetDescription(item));
+            }
+
+            if (rebuildItems.Count > 6)
+            {
+                lines.Add("... và " + (rebuildItems.Count - 6).ToString(CultureInfo.InvariantCulture) + " nhóm khác.");
+            }
+
+            lines.Add("");
+            lines.Add("Cần vá lỗ cũ trước rồi tạo lại Hole Wizard.");
+            lines.Add("");
+            lines.Add("Tiếp tục Repair?");
+            return string.Join("\r\n", lines);
+        }
+
+        private RepairHoleGroup FindMatchingRepairHoleGroup(
+            List<RepairHoleGroup> groups,
+            RepairHoleBatchItem item)
+        {
+            if (groups == null || item == null)
+            {
+                return null;
+            }
+
+            double itemMinMm = Math.Min(item.SourceWidthMm, item.SourceHeightMm);
+            double itemMaxMm = Math.Max(item.SourceWidthMm, item.SourceHeightMm);
+            double toleranceMm = Math.Max(0.05, RepairGroupingToleranceMm * 2.5);
+
+            RepairHoleGroup best = null;
+            double bestScore = double.MaxValue;
+
+            foreach (RepairHoleGroup group in groups)
+            {
+                double groupMinMm = Math.Min(group.WidthMm, group.HeightMm);
+                double groupMaxMm = Math.Max(group.WidthMm, group.HeightMm);
+                double eqDiff = Math.Abs(group.EquivalentDiameterMm - item.SourceEquivalentDiameterMm);
+                double minDiff = Math.Abs(groupMinMm - itemMinMm);
+                double maxDiff = Math.Abs(groupMaxMm - itemMaxMm);
+
+                if (eqDiff > toleranceMm || minDiff > toleranceMm || maxDiff > toleranceMm)
+                {
+                    continue;
+                }
+
+                double score = eqDiff + minDiff + maxDiff;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = group;
+                }
+            }
+
+            return best;
+        }
+
+        private LooseSize CloneRepairLooseSize(LooseSize source, double repairDiameterM)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            return new LooseSize
+            {
+                WidthM = repairDiameterM > 1E-06 ? repairDiameterM : source.WidthM,
+                LengthM = source.LengthM
+            };
+        }
+
+        private bool AreSameEntities(object first, object second)
+        {
+            if (first == null || second == null)
+            {
+                return false;
+            }
+
+            if (ReferenceEquals(first, second) || first == second)
+            {
+                return true;
+            }
+
+            if (IsSameComObject(first, second))
+            {
+                return true;
+            }
+
+            try
+            {
+                if (swApp != null
+                    && swApp.IsSame(first, second) == (int)swObjectEquality.swObjectSame)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            // IsSamePersistentID expects persistent-reference IDs, not raw Face2/Edge
+            // COM objects. The old implementation passed the entities directly and
+            // also treated swObjectNotSame (0) as "same", which caused every adjacent
+            // face to be rejected as the selected source face.
+            try
+            {
+                ModelDoc2 modelDoc = swApp?.ActiveDoc as ModelDoc2;
+                if (modelDoc?.Extension != null)
+                {
+                    object firstId = modelDoc.Extension.GetPersistReference3(first);
+                    object secondId = modelDoc.Extension.GetPersistReference3(second);
+                    if (firstId != null
+                        && secondId != null
+                        && modelDoc.Extension.IsSamePersistentID(firstId, secondId)
+                            == (int)swObjectEquality.swObjectSame)
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        private void DumpDeleteFaceSelectionDiagnostics(
+            ModelDoc2 model,
+            IList<Face2> faces,
+            Face2 sourceFace,
+            Dictionary<Face2, int> faceToLoopIndex = null)
+        {
+            if (model == null || faces == null)
+            {
+                return;
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE PATCH] ===== DELETE FACE SELECTION DIAGNOSTICS ("
+                + faces.Count.ToString(CultureInfo.InvariantCulture)
+                + " faces) =====");
+
+            FacePlaneFrame sourceFrame = sourceFace != null ? CreateFacePlaneFrame(sourceFace) : null;
+            double[] sourceNormal = sourceFrame?.Normal;
+
+            for (int i = 0; i < faces.Count; i++)
+            {
+                Face2 face = faces[i];
+                if (face == null)
+                {
+                    Debug.WriteLine("[REPAIR HOLE PATCH] face[" + i + "]: null");
+                    continue;
+                }
+
+                int loopIndex = -1;
+                if (faceToLoopIndex != null && faceToLoopIndex.TryGetValue(face, out int li))
+                {
+                    loopIndex = li;
+                }
+
+                Surface surface = null;
+                try
+                {
+                    surface = face.GetSurface() as Surface;
+                }
+                catch
+                {
+                }
+
+                string surfaceType = "Unknown";
+                if (surface != null)
+                {
+                    if (surface.IsCylinder())
+                    {
+                        surfaceType = "Cylinder";
+                    }
+                    else if (surface.IsPlane())
+                    {
+                        surfaceType = "Plane";
+                    }
+                    else if (surface.IsCone())
+                    {
+                        surfaceType = "Cone";
+                    }
+                    else if (surface.IsSphere())
+                    {
+                        surfaceType = "Sphere";
+                    }
+                    else if (surface.IsTorus())
+                    {
+                        surfaceType = "Torus";
+                    }
+                    else if (surface.IsBlending())
+                    {
+                        surfaceType = "Blending";
+                    }
+                    else
+                    {
+                        surfaceType = "Type=" + surface.Identity().ToString(CultureInfo.InvariantCulture);
+                    }
+                }
+
+                Feature owningFeature = null;
+                try
+                {
+                    owningFeature = face.GetFeature() as Feature;
+                }
+                catch
+                {
+                }
+
+                string featureName = SafeFeatureName(owningFeature);
+                string featureType = owningFeature?.GetTypeName2() ?? "-";
+
+                int edgeCount = 0;
+                try
+                {
+                    edgeCount = face.GetEdgeCount();
+                }
+                catch
+                {
+                }
+
+                int loopCount = 0;
+                try
+                {
+                    loopCount = face.GetLoopCount();
+                }
+                catch
+                {
+                }
+
+                double area = 0.0;
+                try
+                {
+                    area = face.GetArea();
+                }
+                catch
+                {
+                }
+
+                string normalStr = "N/A";
+                double[] faceNormal = null;
+                if (surface != null && surface.IsPlane())
+                {
+                    FacePlaneFrame fFrame = CreateFacePlaneFrame(face);
+                    faceNormal = fFrame?.Normal;
+                    if (faceNormal != null)
+                    {
+                        normalStr = FormatRepairPoint(faceNormal);
+                    }
+                }
+
+                bool isSourceFace = AreSameEntities(face, sourceFace);
+                bool isFillSurfaceTemp = (featureName != null && featureName.IndexOf("RH-F", StringComparison.OrdinalIgnoreCase) >= 0)
+                    || string.Equals(featureType, "FillSurface", StringComparison.OrdinalIgnoreCase);
+                bool isFlatPatternGen = string.Equals(featureType, "FlatPattern", StringComparison.OrdinalIgnoreCase);
+
+                bool isOppositePlanarFace = false;
+                if (faceNormal != null && sourceNormal != null)
+                {
+                    double dot = Dot(faceNormal, sourceNormal);
+                    if (dot < -0.9)
+                    {
+                        isOppositePlanarFace = true;
+                    }
+                }
+
+                bool isHoleSideFace = !isSourceFace && !isFillSurfaceTemp && !isOppositePlanarFace
+                    && (surfaceType == "Cylinder" || surfaceType == "Cone" || (faceNormal != null && sourceNormal != null && Math.Abs(Dot(faceNormal, sourceNormal)) <= 0.7));
+
+                string classification = "UNKNOWN";
+                if (isSourceFace)
+                {
+                    classification = "SOURCE_PLANAR_FACE (ERROR)";
+                }
+                else if (isFillSurfaceTemp)
+                {
+                    classification = "FILL_SURFACE_TEMP_FACE (ERROR)";
+                }
+                else if (isOppositePlanarFace)
+                {
+                    classification = "OPPOSITE_PLANAR_FACE (ERROR)";
+                }
+                else if (isHoleSideFace)
+                {
+                    classification = "HOLE_SIDE_FACE (VALID)";
+                }
+
+                Debug.WriteLine(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "[REPAIR HOLE PATCH] face[{0}]: loop={1}, surf={2}, feat={3} ({4}), edges={5}, loops={6}, area={7:E3}m2, norm={8}, class={9}, flatPatternGen={10}",
+                    i,
+                    loopIndex >= 0 ? loopIndex.ToString(CultureInfo.InvariantCulture) : "-",
+                    surfaceType,
+                    featureName,
+                    featureType,
+                    edgeCount,
+                    loopCount,
+                    area,
+                    normalStr,
+                    classification,
+                    isFlatPatternGen));
+            }
+
+            Debug.WriteLine("[REPAIR HOLE PATCH] ========================================================");
+        }
+
+        private bool TrySelectRepairFaces(ModelDoc2 model, IList<Face2> faces)
+        {
+            if (model == null || faces == null || faces.Count == 0)
+            {
+                return false;
+            }
+
+            model.ClearSelection2(All: true);
+            int selectedCount = 0;
+
+            for (int i = 0; i < faces.Count; i++)
+            {
+                Face2 face = faces[i];
+                if (face == null)
+                {
+                    continue;
+                }
+
+                bool append = selectedCount > 0;
+                bool ok = false;
+                try
+                {
+                    if (face is Entity entity)
+                    {
+                        ok = entity.Select4(append, null);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[REPAIR HOLE PATCH] face " + i + " Select4 exception: " + ex.Message);
+                }
+
+                Debug.WriteLine("[REPAIR HOLE PATCH] face " + i + " selected=" + ok);
+                if (ok)
+                {
+                    selectedCount++;
+                }
+            }
+
+            SelectionMgr selMgr = model.SelectionManager as SelectionMgr;
+            int swSelected = selMgr?.GetSelectedObjectCount2(-1) ?? 0;
+
+            Debug.WriteLine(
+                "[REPAIR HOLE PATCH] selection verify. requested="
+                + faces.Count.ToString(CultureInfo.InvariantCulture)
+                + ", Select4Success="
+                + selectedCount.ToString(CultureInfo.InvariantCulture)
+                + ", SWSelected="
+                + swSelected.ToString(CultureInfo.InvariantCulture));
+
+            return selectedCount == faces.Count && swSelected == faces.Count;
+        }
+
+        private int GetFeatureCountSafe(ModelDoc2 model)
+        {
+            if (model == null)
+            {
+                return 0;
+            }
+
+            try
+            {
+                return model.GetFeatureCount();
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private Feature FindNewDeleteFaceFeature(ModelDoc2 model, int beforeFeatureCount)
+        {
+            if (model == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                Feature latest = null;
+                Feature feat = model.FirstFeature() as Feature;
+                int count = 0;
+                while (feat != null)
+                {
+                    count++;
+                    if (count > beforeFeatureCount)
+                    {
+                        string typeName = feat.GetTypeName2();
+                        if (string.Equals(typeName, "DeleteFace", StringComparison.OrdinalIgnoreCase)
+                            || typeName.IndexOf("DeleteFace", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            return feat;
+                        }
+
+                        latest = feat;
+                    }
+
+                    feat = feat.GetNextFeature() as Feature;
+                }
+
+                return latest;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private Feature FindFlatPatternFeature(ModelDoc2 model)
+        {
+            if (model == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                Feature feat = model.FirstFeature() as Feature;
+                while (feat != null)
+                {
+                    if (string.Equals(feat.GetTypeName2(), "FlatPattern", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return feat;
+                    }
+
+                    feat = feat.GetNextFeature() as Feature;
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private bool TryDeleteFaceWithFlatPatternWorkflow(
+            ModelDoc2 model,
+            IList<Face2> faces,
+            Face2 sourceFace,
+            out Feature deleteFaceFeature,
+            out string error)
+        {
+            deleteFaceFeature = null;
+            error = null;
+
+            if (model == null || faces == null || faces.Count == 0)
+            {
+                error = "Không có mặt thành lỗ hợp lệ để Delete Face.";
+                return false;
+            }
+
+            Feature flatPatternFeat = null;
+            try
+            {
+                flatPatternFeat = sourceFace?.GetFeature() as Feature;
+                if (flatPatternFeat == null || !string.Equals(flatPatternFeat.GetTypeName2(), "FlatPattern", StringComparison.OrdinalIgnoreCase))
+                {
+                    flatPatternFeat = FindFlatPatternFeature(model);
+                }
+            }
+            catch
+            {
+            }
+
+            if (flatPatternFeat == null)
+            {
+                error = "Không tìm thấy feature FlatPattern trong mô hình.";
+                return false;
+            }
+
+            Debug.WriteLine("[REPAIR HOLE PATCH] FlatPattern workflow starting for: " + SafeFeatureName(flatPatternFeat));
+
+            List<object> persistRefs = new List<object>();
+            foreach (Face2 f in faces)
+            {
+                object pRef = TryGetRepairPersistentReference(model, f);
+                if (pRef != null)
+                {
+                    persistRefs.Add(pRef);
+                }
+            }
+
+            bool wasSuppressed = false;
+            try
+            {
+                object suppVal = flatPatternFeat.IsSuppressed2((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                if (suppVal is bool[] arr && arr.Length > 0)
+                {
+                    wasSuppressed = arr[0];
+                }
+            }
+            catch
+            {
+            }
+
+            if (wasSuppressed)
+            {
+                return false;
+            }
+
+            int beforeCount = GetFeatureCountSafe(model);
+            bool patched = false;
+
+            try
+            {
+                Debug.WriteLine("[REPAIR HOLE PATCH] Suppressing FlatPattern feature to enter folded state...");
+                flatPatternFeat.SetSuppression2(
+                    (int)swFeatureSuppressionAction_e.swSuppressFeature,
+                    (int)swInConfigurationOpts_e.swThisConfiguration,
+                    null);
+                model.EditRebuild3();
+
+                List<Face2> foldedFaces = new List<Face2>();
+                foreach (object pRef in persistRefs)
+                {
+                    int err;
+                    object restored = model.Extension.GetObjectByPersistReference3(pRef, out err);
+                    if (restored is Face2 rf)
+                    {
+                        foldedFaces.Add(rf);
+                    }
+                }
+
+                Debug.WriteLine("[REPAIR HOLE PATCH] Folded faces resolved: " + foldedFaces.Count + "/" + faces.Count);
+
+                if (foldedFaces.Count < faces.Count)
+                {
+                    foreach (Face2 f in faces)
+                    {
+                        if (foldedFaces.Any(ff => AreSameEntities(ff, f)))
+                        {
+                            continue;
+                        }
+
+                        Feature feat = f.GetFeature() as Feature;
+                        if (feat != null && !string.Equals(feat.GetTypeName2(), "FlatPattern", StringComparison.OrdinalIgnoreCase))
+                        {
+                            List<Face2> featFaces = GetFeatureFaces(feat);
+                            foreach (Face2 ff in featFaces)
+                            {
+                                Surface s = ff.GetSurface() as Surface;
+                                if (s != null && (s.IsCylinder() || s.IsCone()))
+                                {
+                                    if (!foldedFaces.Any(existing => AreSameEntities(existing, ff)))
+                                    {
+                                        foldedFaces.Add(ff);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (foldedFaces.Count == faces.Count && TrySelectRepairFaces(model, foldedFaces))
+                {
+                    patched = model.Extension.InsertDeleteFace((int)swFaceDeleteOption_e.swFaceDelete_Patch);
+                    Debug.WriteLine("[REPAIR HOLE PATCH] Folded InsertDeleteFace(Patch) returned=" + patched);
+                    if (!patched)
+                    {
+                        try
+                        {
+                            patched = model.InsertDeleteFace2(1);
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    if (patched)
+                    {
+                        model.EditRebuild3();
+                        deleteFaceFeature = FindNewDeleteFaceFeature(model, beforeCount);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[REPAIR HOLE PATCH] FlatPattern suppression workflow exception: " + ex.Message);
+            }
+            finally
+            {
+                try
+                {
+                    Debug.WriteLine("[REPAIR HOLE PATCH] Restoring FlatPattern unsuppression...");
+                    flatPatternFeat.SetSuppression2(
+                        (int)swFeatureSuppressionAction_e.swUnSuppressFeature,
+                        (int)swInConfigurationOpts_e.swThisConfiguration,
+                        null);
+                    model.EditRebuild3();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[REPAIR HOLE PATCH] Unsuppress FlatPattern exception: " + ex.Message);
+                }
+            }
+
+            return patched;
+        }
+
+        private bool TryDeleteAndPatchRepairFaces(
+            ModelDoc2 model,
+            IList<Face2> faces,
+            Face2 sourceFace,
+            Dictionary<Face2, int> faceToLoopIndex,
+            out Feature deleteFaceFeature,
+            out string error)
+        {
+            deleteFaceFeature = null;
+            error = null;
+
+            if (model == null || faces == null || faces.Count == 0)
+            {
+                error = "Không có mặt thành lỗ hợp lệ.";
+                return false;
+            }
+
+            DumpDeleteFaceSelectionDiagnostics(model, faces, sourceFace, faceToLoopIndex);
+
+            if (!TrySelectRepairFaces(model, faces))
+            {
+                error = "Không chọn được đầy đủ các mặt thành lỗ ("
+                    + faces.Count.ToString(CultureInfo.InvariantCulture)
+                    + " mặt).";
+                return false;
+            }
+
+            int beforeFeatureCount = GetFeatureCountSafe(model);
+            bool ok = false;
+
+            try
+            {
+                ModelDocExtension ext = model.Extension;
+                if (ext != null)
+                {
+                    ok = ext.InsertDeleteFace((int)swFaceDeleteOption_e.swFaceDelete_Patch);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE PATCH] InsertDeleteFace exception: "
+                    + ex.GetType().Name
+                    + " - "
+                    + ex.Message);
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE PATCH] InsertDeleteFace(Patch) returned="
+                + ok);
+
+            if (!ok)
+            {
+                try
+                {
+                    ok = model.InsertDeleteFace2(1);
+                    Debug.WriteLine(
+                        "[REPAIR HOLE PATCH] IModelDoc2.InsertDeleteFace2(1) returned="
+                        + ok);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(
+                        "[REPAIR HOLE PATCH] InsertDeleteFace2 exception: "
+                        + ex.GetType().Name
+                        + " - "
+                        + ex.Message);
+                }
+            }
+
+            if (!ok)
+            {
+                bool isFlatPattern = false;
+                try
+                {
+                    Feature owningFeat = sourceFace?.GetFeature() as Feature;
+                    if (owningFeat != null && string.Equals(owningFeat.GetTypeName2(), "FlatPattern", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isFlatPattern = true;
+                    }
+                }
+                catch
+                {
+                }
+
+                if (isFlatPattern)
+                {
+                    Debug.WriteLine("[REPAIR HOLE PATCH] Direct Delete Face returned false on FlatPattern face. Trying FlatPattern rollback workflow...");
+                    ok = TryDeleteFaceWithFlatPatternWorkflow(model, faces, sourceFace, out deleteFaceFeature, out string fpError);
+                    if (ok)
+                    {
+                        return true;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(fpError))
+                    {
+                        error = fpError;
+                        return false;
+                    }
+                }
+
+                error = "SOLIDWORKS rejected Delete Face + Patch.";
+                return false;
+            }
+
+            model.EditRebuild3();
+
+            deleteFaceFeature = FindNewDeleteFaceFeature(model, beforeFeatureCount);
+            if (deleteFaceFeature != null)
+            {
+                deleteFaceFeature.Name = MakeUniqueFeatureName(
+                    model,
+                    "RH-Patch-DeleteFace");
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE PATCH] Delete Face + Patch success. feature="
+                + SafeFeatureName(deleteFaceFeature));
+            return true;
+        }
+
+        private List<Face2> GetRepairHoleSideFaces(
+            Face2 sourceFace,
+            RepairHoleGroup group,
+            out Dictionary<Face2, int> faceToLoopIndex)
+        {
+            faceToLoopIndex = new Dictionary<Face2, int>();
+            List<Face2> allSideFaces = new List<Face2>();
+            if (sourceFace == null || group?.Candidates == null)
+            {
+                return allSideFaces;
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE PATCH] scanning adjacent faces. group="
+                + group.EquivalentDiameterMm.ToString("0.###", CultureInfo.InvariantCulture)
+                + "mm, candidates="
+                + group.Candidates.Count.ToString(CultureInfo.InvariantCulture));
+
+            foreach (RepairHoleLoopCandidate candidate in group.Candidates)
+            {
+                if (candidate?.Edges == null)
+                {
+                    continue;
+                }
+
+                List<Face2> loopSideFaces = new List<Face2>();
+
+                for (int edgeIndex = 0; edgeIndex < candidate.Edges.Count; edgeIndex++)
+                {
+                    Edge edge = candidate.Edges[edgeIndex];
+                    if (edge == null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        Array adjacent = edge.GetTwoAdjacentFaces2() as Array;
+                        Debug.WriteLine(
+                            "[RH SIDEFACE] loop="
+                            + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                            + " edge="
+                            + edgeIndex.ToString(CultureInfo.InvariantCulture)
+                            + " adjacentCount="
+                            + ((adjacent == null) ? "0" : adjacent.Length.ToString(CultureInfo.InvariantCulture)));
+
+                        if (adjacent == null)
+                        {
+                            continue;
+                        }
+
+                        foreach (object obj in adjacent)
+                        {
+                            Face2 face = obj as Face2;
+                            if (face == null)
+                            {
+                                Debug.WriteLine("[RH SIDEFACE]   REJECT null");
+                                continue;
+                            }
+
+                            bool sameSource = AreSameEntities(face, sourceFace);
+                            Feature feat = null;
+                            Surface surf = null;
+                            Body2 body = null;
+                            try { feat = face.GetFeature() as Feature; } catch { }
+                            try { surf = face.GetSurface() as Surface; } catch { }
+                            try { body = face.GetBody() as Body2; } catch { }
+
+                            string surfaceText = "Unknown";
+                            try
+                            {
+                                if (surf != null)
+                                {
+                                    if (surf.IsPlane()) surfaceText = "Plane";
+                                    else if (surf.IsCylinder()) surfaceText = "Cylinder";
+                                    else if (surf.IsCone()) surfaceText = "Cone";
+                                    else surfaceText = "Other";
+                                }
+                            }
+                            catch
+                            {
+                            }
+
+                            Debug.WriteLine(
+                                "[RH SIDEFACE]   sameSource="
+                                + sameSource
+                                + ", bodyType="
+                                + ((body == null) ? "<null>" : body.GetType().ToString(CultureInfo.InvariantCulture))
+                                + ", surf="
+                                + surfaceText
+                                + ", feat="
+                                + SafeFeatureName(feat)
+                                + " ("
+                                + ((feat == null) ? "" : feat.GetTypeName2())
+                                + ")");
+
+                            if (sameSource)
+                            {
+                                Debug.WriteLine("[RH SIDEFACE]   REJECT sourceFace");
+                                continue;
+                            }
+
+                            string featureName = SafeFeatureName(feat) ?? "";
+                            if (featureName.IndexOf("RH-F", StringComparison.OrdinalIgnoreCase) >= 0
+                                || featureName.IndexOf("RH-DelSurf", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                Debug.WriteLine("[RH SIDEFACE]   REJECT temporary Repair feature");
+                                continue;
+                            }
+
+                            if (!loopSideFaces.Any(existing => AreSameEntities(existing, face)))
+                            {
+                                loopSideFaces.Add(face);
+                                Debug.WriteLine("[RH SIDEFACE]   ACCEPT");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(
+                            "[REPAIR HOLE PATCH] adjacent face read failed for loop #"
+                            + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                            + ": "
+                            + ex.Message);
+                    }
+                }
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE PATCH] loop "
+                    + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                    + " sideFaces="
+                    + loopSideFaces.Count.ToString(CultureInfo.InvariantCulture));
+
+                foreach (Face2 sideFace in loopSideFaces)
+                {
+                    if (!allSideFaces.Any(existing => AreSameEntities(existing, sideFace)))
+                    {
+                        allSideFaces.Add(sideFace);
+                        faceToLoopIndex[sideFace] = candidate.Index;
+                    }
+                }
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE PATCH] TOTAL hole side faces = "
+                + allSideFaces.Count.ToString(CultureInfo.InvariantCulture));
+
+            return allSideFaces;
+        }
+
+        private Face2 FindMatchingPlanarFace(ModelDoc2 model, FacePlaneFrame frame)
+        {
+            if (model == null || frame == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                PartDoc part = model as PartDoc;
+                if (part == null)
+                {
+                    return null;
+                }
+
+                object[] bodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as object[];
+                if (bodies == null || bodies.Length == 0)
+                {
+                    return null;
+                }
+
+                foreach (object bObj in bodies)
+                {
+                    if (!(bObj is Body2 body))
+                    {
+                        continue;
+                    }
+
+                    object[] faces = body.GetFaces() as object[];
+                    if (faces == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (object fObj in faces)
+                    {
+                        if (!(fObj is Face2 f))
+                        {
+                            continue;
+                        }
+
+                        if (!IsPlanarFace(f))
+                        {
+                            continue;
+                        }
+
+                        FacePlaneFrame fFrame = CreateFacePlaneFrame(f);
+                        if (fFrame == null)
+                        {
+                            continue;
+                        }
+
+                        double dot = Dot(fFrame.Normal, frame.Normal);
+                        if (dot > 0.999)
+                        {
+                            double dist = Math.Abs(Dot(Subtract(fFrame.Origin, frame.Origin), frame.Normal));
+                            if (dist < 1E-05)
+                            {
+                                Debug.WriteLine("[REPAIR HOLE] Found matching planar face via geometry fallback.");
+                                return f;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[REPAIR HOLE] FindMatchingPlanarFace failed: " + ex.Message);
+            }
+
+            return null;
+        }
+
+
+        private Feature GetRepairFlatPatternFeature(ModelDoc2 model, Face2 sourceFace)
+        {
+            Feature feature = null;
+            try
+            {
+                feature = sourceFace?.GetFeature() as Feature;
+                if (feature != null
+                    && string.Equals(feature.GetTypeName2(), "FlatPattern", StringComparison.OrdinalIgnoreCase))
+                {
+                    return feature;
+                }
+            }
+            catch
+            {
+            }
+
+            return FindFlatPatternFeature(model);
+        }
+
+        private bool TryGetFeatureSuppressedState(Feature feature, out bool suppressed)
+        {
+            suppressed = false;
+            if (feature == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                object raw = feature.IsSuppressed2(
+                    (int)swInConfigurationOpts_e.swThisConfiguration,
+                    null);
+
+                if (raw is bool value)
+                {
+                    suppressed = value;
+                    return true;
+                }
+
+                if (raw is bool[] values && values.Length > 0)
+                {
+                    suppressed = values[0];
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[REPAIR HOLE FP] read suppression state failed: " + ex.Message);
+            }
+
+            return false;
+        }
+
+        private bool TrySetRepairFlatPatternSuppressed(
+            ModelDoc2 model,
+            Feature flatPatternFeature,
+            bool suppress)
+        {
+            if (model == null || flatPatternFeature == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                int action = suppress
+                    ? (int)swFeatureSuppressionAction_e.swSuppressFeature
+                    : (int)swFeatureSuppressionAction_e.swUnSuppressFeature;
+
+                flatPatternFeature.SetSuppression2(
+                    action,
+                    (int)swInConfigurationOpts_e.swThisConfiguration,
+                    null);
+
+                model.EditRebuild3();
+
+                bool stateKnown = TryGetFeatureSuppressedState(
+                    flatPatternFeature,
+                    out bool isSuppressed);
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE FP] FlatPattern "
+                    + (suppress ? "suppress" : "unsuppress")
+                    + ". feature="
+                    + SafeFeatureName(flatPatternFeature)
+                    + ", stateKnown="
+                    + stateKnown
+                    + ", suppressed="
+                    + isSuppressed);
+
+                return !stateKnown || isSuppressed == suppress;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE FP] set suppression failed: "
+                    + ex.GetType().Name
+                    + " - "
+                    + ex.Message);
+                return false;
+            }
+        }
+
+        private object TryGetRepairEntityPersistentReference(ModelDoc2 model, object entity)
+        {
+            if (model == null || entity == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return model.Extension.GetPersistReference3(entity);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE] entity persistent reference failed: "
+                    + ex.GetType().Name
+                    + " - "
+                    + ex.Message);
+                return null;
+            }
+        }
+
+        private object TryRestoreRepairEntity(ModelDoc2 model, object persistReference)
+        {
+            if (model == null || persistReference == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                int errorCode;
+                object restored = model.Extension.GetObjectByPersistReference3(
+                    persistReference,
+                    out errorCode);
+                Debug.WriteLine(
+                    "[REPAIR HOLE] restore persistent entity. errorCode="
+                    + errorCode.ToString(CultureInfo.InvariantCulture)
+                    + ", type="
+                    + ((restored == null) ? "null" : restored.GetType().FullName));
+                return restored;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE] restore persistent entity failed: "
+                    + ex.GetType().Name
+                    + " - "
+                    + ex.Message);
+                return null;
+            }
+        }
+
+        private double SafeRepairFaceArea(Face2 face)
+        {
+            if (face == null)
+            {
+                return 0.0;
+            }
+
+            try
+            {
+                return Math.Abs(face.GetArea());
+            }
+            catch
+            {
+                return 0.0;
+            }
+        }
+
+        private void AddUniqueRepairFace(List<Face2> faces, Face2 face)
+        {
+            if (faces == null || face == null)
+            {
+                return;
+            }
+
+            if (!faces.Any(existing => AreSameEntities(existing, face)))
+            {
+                faces.Add(face);
+            }
+        }
+
+        private void AddUniqueRepairEdge(List<Edge> edges, Edge edge)
+        {
+            if (edges == null || edge == null)
+            {
+                return;
+            }
+
+            if (!edges.Any(existing => AreSameEntities(existing, edge)))
+            {
+                edges.Add(edge);
+            }
+        }
+
+        private int GetRepairFeatureTypePriority(string featureType)
+        {
+            if (string.IsNullOrWhiteSpace(featureType))
+            {
+                return 0;
+            }
+
+            if (featureType.IndexOf("HoleWzd", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return 100;
+            }
+
+            if (featureType.IndexOf("Pattern", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return 90;
+            }
+
+            if (featureType.IndexOf("Cut", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return 80;
+            }
+
+            return 10;
+        }
+
+        private string GetRepairHoleWizardSeedInfoCacheKey(Feature feature)
+        {
+            if (feature == null)
+            {
+                return "";
+            }
+
+            string type = "";
+            try
+            {
+                type = feature.GetTypeName2() ?? "";
+            }
+            catch
+            {
+                type = "";
+            }
+
+            return type + "|" + SafeFeatureName(feature);
+        }
+
+        private bool TryReadRepairHoleWizardSeedScalars(
+            IWizardHoleFeatureData2 data,
+            double preferredDiameterM,
+            out RepairHoleWizardSeedInfo info)
+        {
+            info = null;
+            if (data == null)
+            {
+                return false;
+            }
+
+            List<double> values = new List<double>();
+            TryAddPositiveHoleWizardValue(values, () => data.Diameter);
+            TryAddPositiveHoleWizardValue(values, () => data.HoleDiameter);
+            TryAddPositiveHoleWizardValue(values, () => data.ThruHoleDiameter);
+            if (values.Count == 0)
+            {
+                return false;
+            }
+
+            double diameterM = preferredDiameterM > 1E-09
+                ? GetNearestValue(values, preferredDiameterM)
+                : values[0];
+
+            if (double.IsNaN(diameterM)
+                || double.IsInfinity(diameterM)
+                || diameterM <= 1E-09)
+            {
+                return false;
+            }
+
+            // For Hole Wizard slots the diameter fields represent the slot width.
+            // Reading Length is scalar/read-only and normally does not require
+            // AccessSelections.  A circle returns no valid slot length here.
+            double slotWidthM = values.Min();
+            double slotLengthM = 0.0;
+            try
+            {
+                slotLengthM = data.Length;
+            }
+            catch
+            {
+                slotLengthM = 0.0;
+            }
+
+            bool isSlot = slotWidthM > 1E-09
+                && !double.IsNaN(slotLengthM)
+                && !double.IsInfinity(slotLengthM)
+                && slotLengthM > slotWidthM + 1E-06;
+
+            info = new RepairHoleWizardSeedInfo
+            {
+                DiameterM = diameterM,
+                IsSlot = isSlot,
+                SlotWidthM = isSlot ? slotWidthM : 0.0,
+                SlotLengthM = isSlot ? slotLengthM : 0.0,
+                UsedSelectionAccessFallback = false
+            };
+            return true;
+        }
+
+        /// <summary>
+        /// V22 silent-first Hole Wizard reader.
+        /// Normal path:
+        /// GetDefinition -> read scalar values -> cache.
+        /// It does NOT select the feature, open PropertyManager, edit the feature,
+        /// or rebuild the model. AccessSelections is used only as a compatibility
+        /// fallback when direct scalar reading returns no usable diameter.
+        /// </summary>
+        private bool TryGetRepairHoleWizardSeedInfoSilent(
+            ModelDoc2 model,
+            Feature feature,
+            double preferredDiameterM,
+            out RepairHoleWizardSeedInfo info)
+        {
+            info = null;
+            if (model == null || feature == null)
+            {
+                return false;
+            }
+
+            string cacheKey = GetRepairHoleWizardSeedInfoCacheKey(feature);
+            if (!string.IsNullOrWhiteSpace(cacheKey)
+                && repairHoleWizardSeedInfoCache.TryGetValue(
+                    cacheKey,
+                    out RepairHoleWizardSeedInfo cached)
+                && cached != null
+                && cached.DiameterM > 1E-09)
+            {
+                info = cached;
+                Debug.WriteLine(
+                    "[RH SILENT READ] cache HIT. feature="
+                    + SafeFeatureName(feature)
+                    + ", diameter="
+                    + (cached.DiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                    + "mm"
+                    + (cached.IsSlot
+                        ? ", slot="
+                            + (cached.SlotWidthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + "x"
+                            + (cached.SlotLengthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + "mm"
+                        : ", slot=False"));
+                return true;
+            }
+
+            IWizardHoleFeatureData2 data = null;
+            bool accessed = false;
+            try
+            {
+                data = feature.GetDefinition() as IWizardHoleFeatureData2;
+                if (data == null)
+                {
+                    return false;
+                }
+
+                // Fast/silent path first. Scalar Hole Wizard values are normally
+                // available directly from GetDefinition().
+                if (TryReadRepairHoleWizardSeedScalars(
+                        data,
+                        preferredDiameterM,
+                        out RepairHoleWizardSeedInfo directInfo))
+                {
+                    info = directInfo;
+                    if (!string.IsNullOrWhiteSpace(cacheKey))
+                    {
+                        repairHoleWizardSeedInfoCache[cacheKey] = directInfo;
+                    }
+
+                    Debug.WriteLine(
+                        "[RH SILENT READ] cache MISS. feature="
+                        + SafeFeatureName(feature)
+                        + ", access=NONE"
+                        + ", diameter="
+                        + (directInfo.DiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                        + "mm"
+                        + (directInfo.IsSlot
+                            ? ", slot="
+                                + (directInfo.SlotWidthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                                + "x"
+                                + (directInfo.SlotLengthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                                + "mm"
+                            : ", slot=False"));
+                    return true;
+                }
+
+                // Compatibility fallback only.  This should be uncommon and is
+                // immediately released after the scalar values are read.
+                try
+                {
+                    accessed = data.AccessSelections(model, null);
+                }
+                catch
+                {
+                    accessed = false;
+                }
+
+                if (!accessed
+                    || !TryReadRepairHoleWizardSeedScalars(
+                        data,
+                        preferredDiameterM,
+                        out RepairHoleWizardSeedInfo fallbackInfo))
+                {
+                    Debug.WriteLine(
+                        "[RH SILENT READ] FAILED. feature="
+                        + SafeFeatureName(feature)
+                        + ", direct=no-data"
+                        + ", fallbackAccess="
+                        + accessed);
+                    return false;
+                }
+
+                fallbackInfo.UsedSelectionAccessFallback = true;
+                info = fallbackInfo;
+                if (!string.IsNullOrWhiteSpace(cacheKey))
+                {
+                    repairHoleWizardSeedInfoCache[cacheKey] = fallbackInfo;
+                }
+
+                Debug.WriteLine(
+                    "[RH SILENT READ] cache MISS. feature="
+                    + SafeFeatureName(feature)
+                    + ", access=FALLBACK"
+                    + ", diameter="
+                    + (fallbackInfo.DiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                    + "mm"
+                    + (fallbackInfo.IsSlot
+                        ? ", slot="
+                            + (fallbackInfo.SlotWidthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + "x"
+                            + (fallbackInfo.SlotLengthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + "mm"
+                        : ", slot=False"));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[RH SILENT READ] exception. feature="
+                    + SafeFeatureName(feature)
+                    + ", error="
+                    + ex.GetType().Name
+                    + " - "
+                    + ex.Message);
+                info = null;
+                return false;
+            }
+            finally
+            {
+                if (data != null && accessed)
+                {
+                    try
+                    {
+                        data.ReleaseSelectionAccess();
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
+        private bool TryGetRepairHoleWizardDiameter(
+            ModelDoc2 model,
+            Feature feature,
+            double preferredDiameterM,
+            out double diameterM)
+        {
+            diameterM = 0.0;
+            if (!TryGetRepairHoleWizardSeedInfoSilent(
+                    model,
+                    feature,
+                    preferredDiameterM,
+                    out RepairHoleWizardSeedInfo info)
+                || info == null)
+            {
+                return false;
+            }
+
+            diameterM = info.DiameterM;
+            return diameterM > 1E-09;
+        }
+
+        private bool TryGetRepairHoleWizardSlotSize(
+            ModelDoc2 model,
+            Feature feature,
+            out double widthM,
+            out double lengthM)
+        {
+            widthM = 0.0;
+            lengthM = 0.0;
+
+            if (!TryGetRepairHoleWizardSeedInfoSilent(
+                    model,
+                    feature,
+                    0.0,
+                    out RepairHoleWizardSeedInfo info)
+                || info == null
+                || !info.IsSlot)
+            {
+                return false;
+            }
+
+            widthM = info.SlotWidthM;
+            lengthM = info.SlotLengthM;
+
+            Debug.WriteLine(
+                "[RH SLOT SEED] feature="
+                + SafeFeatureName(feature)
+                + ", width="
+                + (widthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                + "mm, length="
+                + (lengthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                + "mm, silent=True");
+
+            return widthM > 1E-09
+                && lengthM > widthM + 1E-06;
+        }
+
+        private bool TryGetRepairPatternSeedHoleInfo(
+            ModelDoc2 model,
+            Feature patternFeature,
+            double preferredDiameterM,
+            out Feature seedFeature,
+            out double seedDiameterM,
+            out int instanceCount)
+        {
+            seedFeature = null;
+            seedDiameterM = 0.0;
+            instanceCount = -1;
+
+            if (model == null || patternFeature == null)
+            {
+                return false;
+            }
+
+            ICurveDrivenPatternFeatureData data = null;
+            bool accessed = false;
+            bool usedPatternAccessFallback = false;
+            try
+            {
+                data = patternFeature.GetDefinition() as ICurveDrivenPatternFeatureData;
+                if (data == null)
+                {
+                    Debug.WriteLine(
+                        "[RH SEED MAP] feature is not ICurveDrivenPatternFeatureData: "
+                        + SafeFeatureName(patternFeature));
+                    return false;
+                }
+
+                // V22: try all read-only pattern scalar/reference properties before
+                // requesting selection access.
+                try
+                {
+                    instanceCount = data.D1InstanceCount;
+                }
+                catch
+                {
+                    instanceCount = -1;
+                }
+
+                object rawFeatures = null;
+                try
+                {
+                    rawFeatures = data.PatternFeatureArray;
+                }
+                catch
+                {
+                    rawFeatures = null;
+                }
+
+                // Some SolidWorks versions require AccessSelections for
+                // PatternFeatureArray. Use it only if the silent read returned
+                // nothing, then release it before opening the seed HoleWzd data.
+                if (rawFeatures == null)
+                {
+                    try
+                    {
+                        accessed = data.AccessSelections(model, null);
+                        usedPatternAccessFallback = accessed;
+                    }
+                    catch
+                    {
+                        accessed = false;
+                    }
+
+                    if (accessed)
+                    {
+                        try
+                        {
+                            if (instanceCount < 0)
+                            {
+                                instanceCount = data.D1InstanceCount;
+                            }
+                        }
+                        catch
+                        {
+                        }
+
+                        try
+                        {
+                            rawFeatures = data.PatternFeatureArray;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(
+                                "[RH SEED MAP] PatternFeatureArray fallback read failed. pattern="
+                                + SafeFeatureName(patternFeature)
+                                + ", error="
+                                + ex.Message);
+                        }
+                    }
+                }
+
+                List<Feature> seeds = new List<Feature>();
+                if (rawFeatures is Array array)
+                {
+                    foreach (object obj in array)
+                    {
+                        if (obj is Feature feature)
+                        {
+                            seeds.Add(feature);
+                        }
+                    }
+                }
+                else if (rawFeatures is Feature singleFeature)
+                {
+                    seeds.Add(singleFeature);
+                }
+
+                if (accessed)
+                {
+                    try
+                    {
+                        data.ReleaseSelectionAccess();
+                    }
+                    catch
+                    {
+                    }
+                    accessed = false;
+                }
+
+                double bestDelta = double.MaxValue;
+                foreach (Feature candidateSeed in seeds)
+                {
+                    string type = "";
+                    try
+                    {
+                        type = candidateSeed.GetTypeName2() ?? "";
+                    }
+                    catch
+                    {
+                    }
+
+                    if (type.IndexOf("HoleWzd", StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+
+                    if (!TryGetRepairHoleWizardDiameter(
+                            model,
+                            candidateSeed,
+                            preferredDiameterM,
+                            out double diameter))
+                    {
+                        continue;
+                    }
+
+                    double delta = preferredDiameterM > 1E-09
+                        ? Math.Abs(diameter - preferredDiameterM)
+                        : 0.0;
+                    if (seedFeature == null || delta < bestDelta)
+                    {
+                        seedFeature = candidateSeed;
+                        seedDiameterM = diameter;
+                        bestDelta = delta;
+                    }
+                }
+
+                Debug.WriteLine(
+                    "[RH SEED MAP] pattern="
+                    + SafeFeatureName(patternFeature)
+                    + ", seed="
+                    + SafeFeatureName(seedFeature)
+                    + ", seedDia="
+                    + ((seedDiameterM > 1E-09)
+                        ? (seedDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                        : "n/a")
+                    + ", D1Instances="
+                    + instanceCount.ToString(CultureInfo.InvariantCulture)
+                    + ", patternAccess="
+                    + (rawFeatures == null
+                        ? "FAILED"
+                        : (usedPatternAccessFallback ? "FALLBACK" : "SILENT")));
+
+                return seedFeature != null && seedDiameterM > 1E-09;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[RH SEED MAP] pattern seed read failed. pattern="
+                    + SafeFeatureName(patternFeature)
+                    + ", error="
+                    + ex.GetType().Name
+                    + " - "
+                    + ex.Message);
+                return false;
+            }
+            finally
+            {
+                if (data != null && accessed)
+                {
+                    try
+                    {
+                        data.ReleaseSelectionAccess();
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
+        private bool TryFindRepairSourceClusterOrdinal(
+            RepairHoleLoopCandidate candidate,
+            Face2 sourceFace,
+            List<FoldedRepairWallCluster> clusters,
+            out int primaryFaceOrdinal,
+            out string diagnostic)
+        {
+            primaryFaceOrdinal = -1;
+            diagnostic = "";
+            if (candidate?.Edges == null || clusters == null || clusters.Count == 0)
+            {
+                diagnostic = "candidate/cluster trống";
+                return false;
+            }
+
+            int bestScore = 0;
+            FoldedRepairWallCluster bestCluster = null;
+            bool tied = false;
+
+            foreach (FoldedRepairWallCluster cluster in clusters)
+            {
+                int score = 0;
+                foreach (Edge candidateEdge in candidate.Edges)
+                {
+                    if (candidateEdge == null)
+                    {
+                        continue;
+                    }
+
+                    Array adjacent = null;
+                    try
+                    {
+                        adjacent = candidateEdge.GetTwoAdjacentFaces2() as Array;
+                    }
+                    catch
+                    {
+                    }
+
+                    foreach (Face2 wallFace in cluster.WallFaces)
+                    {
+                        if (adjacent != null)
+                        {
+                            foreach (object obj in adjacent)
+                            {
+                                if (obj is Face2 adjacentFace
+                                    && AreSameEntities(adjacentFace, wallFace))
+                                {
+                                    score += 8;
+                                }
+                            }
+                        }
+
+                        foreach (Edge wallEdge in GetRepairFaceEdges(wallFace))
+                        {
+                            if (AreSameEntities(candidateEdge, wallEdge))
+                            {
+                                score += 4;
+                            }
+                        }
+                    }
+                }
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestCluster = cluster;
+                    tied = false;
+                }
+                else if (score > 0 && score == bestScore)
+                {
+                    tied = true;
+                }
+            }
+
+            if (bestCluster != null && bestScore > 0 && !tied)
+            {
+                primaryFaceOrdinal = bestCluster.PrimaryFaceOrdinal;
+                diagnostic = "topology score="
+                    + bestScore.ToString(CultureInfo.InvariantCulture);
+                return primaryFaceOrdinal >= 0;
+            }
+
+            // Same-state geometric fallback: while FlatPattern is active the
+            // candidate loop and source feature clusters live in the same body, so
+            // center distance is safe here (unlike comparing flat and folded global
+            // coordinates).  Require a unique nearest cluster inside a tight window.
+            if (sourceFace != null && IsPoint(candidate.FallbackCenter))
+            {
+                List<Tuple<FoldedRepairWallCluster, double>> distances =
+                    new List<Tuple<FoldedRepairWallCluster, double>>();
+
+                foreach (FoldedRepairWallCluster cluster in clusters)
+                {
+                    List<Edge> edges = GetRepairClusterBoundaryEdgesOnFace(
+                        cluster,
+                        sourceFace);
+                    if (edges.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    double[] center = GetRepairEdgesAveragePoint(edges);
+                    if (!IsPoint(center))
+                    {
+                        continue;
+                    }
+
+                    distances.Add(Tuple.Create(
+                        cluster,
+                        Distance(center, candidate.FallbackCenter)));
+                }
+
+                distances = distances
+                    .OrderBy(item => item.Item2)
+                    .ToList();
+
+                if (distances.Count > 0)
+                {
+                    double bestDistance = distances[0].Item2;
+                    double secondDistance = distances.Count > 1
+                        ? distances[1].Item2
+                        : double.MaxValue;
+                    double toleranceM = Math.Max(
+                        0.0015,
+                        candidate.EquivalentDiameterM * 0.75);
+
+                    if (bestDistance <= toleranceM
+                        && (secondDistance == double.MaxValue
+                            || secondDistance - bestDistance >= Math.Max(0.00025, toleranceM * 0.20)))
+                    {
+                        primaryFaceOrdinal = distances[0].Item1.PrimaryFaceOrdinal;
+                        diagnostic = "same-state center distance="
+                            + (bestDistance * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + "mm";
+                        return primaryFaceOrdinal >= 0;
+                    }
+                }
+            }
+
+            diagnostic = tied
+                ? "topology match bị trùng"
+                : "không match được source instance";
+            return false;
+        }
+
+        private bool TryCaptureRepairCandidateFeatureHints(
+            Face2 sourceFace,
+            RepairHoleGroup group,
+            out List<FoldedRepairFeatureHint> hints,
+            out string error)
+        {
+            hints = new List<FoldedRepairFeatureHint>();
+            error = "";
+
+            if (sourceFace == null || group?.Candidates == null || group.Candidates.Count == 0)
+            {
+                error = "Không có candidate để xác định source feature.";
+                return false;
+            }
+
+            ModelDoc2 model = swApp?.ActiveDoc as ModelDoc2;
+            if (model == null)
+            {
+                error = "Không có model đang active để map Repair Hole.";
+                return false;
+            }
+
+            foreach (RepairHoleLoopCandidate candidate in group.Candidates)
+            {
+                Dictionary<string, int> nameScores =
+                    new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, string> nameTypes =
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, Feature> nameFeatures =
+                    new Dictionary<string, Feature>(StringComparer.OrdinalIgnoreCase);
+
+                if (candidate?.Edges != null)
+                {
+                    foreach (Edge edge in candidate.Edges)
+                    {
+                        if (edge == null)
+                        {
+                            continue;
+                        }
+
+                        Array adjacent = null;
+                        try
+                        {
+                            adjacent = edge.GetTwoAdjacentFaces2() as Array;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(
+                                "[RH FEATURE MAP] GetTwoAdjacentFaces2 failed. loop="
+                                + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                                + ", "
+                                + ex.Message);
+                        }
+
+                        if (adjacent == null)
+                        {
+                            continue;
+                        }
+
+                        foreach (object obj in adjacent)
+                        {
+                            if (!(obj is Face2 face))
+                            {
+                                continue;
+                            }
+
+                            Feature feature = null;
+                            try
+                            {
+                                feature = face.GetFeature() as Feature;
+                            }
+                            catch
+                            {
+                            }
+
+                            if (feature == null)
+                            {
+                                continue;
+                            }
+
+                            string featureName = SafeFeatureName(feature);
+                            string featureType = "";
+                            try
+                            {
+                                featureType = feature.GetTypeName2() ?? "";
+                            }
+                            catch
+                            {
+                            }
+
+                            if (string.IsNullOrWhiteSpace(featureName)
+                                || string.Equals(featureType, "FlatPattern", StringComparison.OrdinalIgnoreCase)
+                                || featureName.IndexOf("RH-F", StringComparison.OrdinalIgnoreCase) >= 0
+                                || featureName.IndexOf("RH-P", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                continue;
+                            }
+
+                            if (!nameScores.ContainsKey(featureName))
+                            {
+                                nameScores[featureName] = 0;
+                            }
+
+                            nameScores[featureName]++;
+                            nameTypes[featureName] = featureType;
+                            nameFeatures[featureName] = feature;
+                        }
+                    }
+                }
+
+                if (nameScores.Count == 0)
+                {
+                    error = "Không xác định được feature tạo lỗ cho loop #"
+                        + ((candidate == null)
+                            ? "?"
+                            : candidate.Index.ToString(CultureInfo.InvariantCulture))
+                        + ".";
+                    return false;
+                }
+
+                string selectedName = nameScores.Keys
+                    .OrderByDescending(name =>
+                        nameScores[name] * 1000
+                        + GetRepairFeatureTypePriority(
+                            nameTypes.ContainsKey(name) ? nameTypes[name] : ""))
+                    .ThenBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault();
+
+                string selectedType = selectedName != null && nameTypes.ContainsKey(selectedName)
+                    ? nameTypes[selectedName]
+                    : "";
+                Feature selectedFeature = selectedName != null && nameFeatures.ContainsKey(selectedName)
+                    ? nameFeatures[selectedName]
+                    : null;
+
+                if (selectedFeature == null)
+                {
+                    error = "Không lấy được object source feature '"
+                        + (selectedName ?? "")
+                        + "' cho loop #"
+                        + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                        + ".";
+                    return false;
+                }
+
+                string seedFeatureName = "";
+                double seedDiameterM = 0.0;
+                int patternInstanceCount = -1;
+                bool isPattern = selectedType.IndexOf(
+                    "Pattern",
+                    StringComparison.OrdinalIgnoreCase) >= 0;
+
+                if (isPattern)
+                {
+                    if (!TryGetRepairPatternSeedHoleInfo(
+                            model,
+                            selectedFeature,
+                            candidate.EquivalentDiameterM,
+                            out Feature seedFeature,
+                            out seedDiameterM,
+                            out patternInstanceCount))
+                    {
+                        error = "Không đọc được lỗ mồi Hole Wizard của pattern '"
+                            + selectedName
+                            + "'.";
+                        return false;
+                    }
+
+                    seedFeatureName = SafeFeatureName(seedFeature);
+
+                    // The seed diameter is the family key requested by the Repair
+                    // logic.  It must agree with the measured candidate size before
+                    // we carry any instance identity into folded state.
+                    double diameterDeltaMm = Math.Abs(
+                        seedDiameterM * 1000.0
+                        - candidate.EquivalentDiameterM * 1000.0);
+                    if (diameterDeltaMm > 1.0)
+                    {
+                        error = "Kích thước lỗ mồi của pattern '"
+                            + selectedName
+                            + "' không khớp candidate loop #"
+                            + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                            + ". Seed="
+                            + (seedDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + " mm, candidate="
+                            + (candidate.EquivalentDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + " mm.";
+                        return false;
+                    }
+                }
+                else if (selectedType.IndexOf(
+                    "HoleWzd",
+                    StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    if (TryGetRepairHoleWizardDiameter(
+                            model,
+                            selectedFeature,
+                            candidate.EquivalentDiameterM,
+                            out double directDiameterM))
+                    {
+                        seedFeatureName = selectedName;
+                        seedDiameterM = directDiameterM;
+                    }
+                }
+
+                List<FoldedRepairWallCluster> sourceClusters =
+                    BuildRepairFeatureWallClusters(
+                        selectedFeature,
+                        selectedName,
+                        selectedType);
+
+                if (sourceClusters.Count == 0)
+                {
+                    error = "Không tìm được wall cluster của source feature '"
+                        + selectedName
+                        + "' khi FlatPattern đang active.";
+                    return false;
+                }
+
+                if (!TryFindRepairSourceClusterOrdinal(
+                        candidate,
+                        sourceFace,
+                        sourceClusters,
+                        out int sourceClusterOrdinal,
+                        out string instanceDiagnostic))
+                {
+                    error = "Không xác định được instance của feature '"
+                        + selectedName
+                        + "' cho loop #"
+                        + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                        + ". "
+                        + instanceDiagnostic
+                        + ".";
+                    return false;
+                }
+
+                FoldedRepairFeatureHint hint = new FoldedRepairFeatureHint
+                {
+                    SourceCandidate = candidate,
+                    FeatureName = selectedName,
+                    FeatureType = selectedType,
+                    SeedFeatureName = seedFeatureName,
+                    SeedDiameterM = seedDiameterM,
+                    PatternInstanceCount = patternInstanceCount,
+                    SourceClusterOrdinal = sourceClusterOrdinal,
+                    SourceClusterCount = sourceClusters.Count
+                };
+                hints.Add(hint);
+
+                Debug.WriteLine(
+                    "[RH FEATURE MAP] captured. loop="
+                    + candidate.Index.ToString(CultureInfo.InvariantCulture)
+                    + ", feature="
+                    + selectedName
+                    + ", type="
+                    + selectedType
+                    + ", seed="
+                    + (string.IsNullOrWhiteSpace(seedFeatureName) ? "<none>" : seedFeatureName)
+                    + ", seedDia="
+                    + ((seedDiameterM > 1E-09)
+                        ? (seedDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                        : "n/a")
+                    + ", sourceInstanceOrdinal="
+                    + sourceClusterOrdinal.ToString(CultureInfo.InvariantCulture)
+                    + "/"
+                    + sourceClusters.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", instanceMap="
+                    + instanceDiagnostic
+                    + ", alternatives="
+                    + string.Join(
+                        " | ",
+                        nameScores
+                            .OrderByDescending(pair => pair.Value)
+                            .Select(pair => pair.Key + ":" + pair.Value.ToString(CultureInfo.InvariantCulture))));
+            }
+
+            foreach (IGrouping<string, FoldedRepairFeatureHint> featureGroup in hints.GroupBy(
+                hint => hint.FeatureName,
+                StringComparer.OrdinalIgnoreCase))
+            {
+                List<FoldedRepairFeatureHint> featureHints = featureGroup.ToList();
+                int distinctOrdinals = featureHints
+                    .Select(hint => hint.SourceClusterOrdinal)
+                    .Where(ordinal => ordinal >= 0)
+                    .Distinct()
+                    .Count();
+                if (distinctOrdinals != featureHints.Count)
+                {
+                    error = "Source instance mapping của feature '"
+                        + featureGroup.Key
+                        + "' bị trùng. expected="
+                        + featureHints.Count.ToString(CultureInfo.InvariantCulture)
+                        + ", unique="
+                        + distinctOrdinals.ToString(CultureInfo.InvariantCulture)
+                        + ".";
+                    return false;
+                }
+            }
+
+            return hints.Count == group.Candidates.Count;
+        }
+
+        private List<Edge> GetRepairFaceEdges(Face2 face)
+        {
+            List<Edge> edges = new List<Edge>();
+            if (face == null)
+            {
+                return edges;
+            }
+
+            try
+            {
+                if (face.GetEdges() is Array array)
+                {
+                    foreach (object obj in array)
+                    {
+                        if (obj is Edge edge)
+                        {
+                            AddUniqueRepairEdge(edges, edge);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[RH FOLDED MAP] Face.GetEdges failed: " + ex.Message);
+            }
+
+            return edges;
+        }
+
+        private bool RepairFacesShareEdge(Face2 first, Face2 second)
+        {
+            if (first == null || second == null)
+            {
+                return false;
+            }
+
+            List<Edge> firstEdges = GetRepairFaceEdges(first);
+            List<Edge> secondEdges = GetRepairFaceEdges(second);
+
+            foreach (Edge firstEdge in firstEdges)
+            {
+                if (secondEdges.Any(secondEdge => AreSameEntities(firstEdge, secondEdge)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private string GetRepairFoldedSurfaceKind(Face2 face)
+        {
+            try
+            {
+                Surface surface = face?.GetSurface() as Surface;
+                if (surface == null)
+                {
+                    return "Unknown";
+                }
+
+                if (surface.IsCylinder()) return "Cylinder";
+                if (surface.IsCone()) return "Cone";
+                if (surface.IsPlane()) return "Plane";
+                if (surface.IsSphere()) return "Sphere";
+                if (surface.IsTorus()) return "Torus";
+                return "Other";
+            }
+            catch
+            {
+                return "Unknown";
+            }
+        }
+
+        private bool TryGetRepairCylinderDiameter(Face2 face, out double diameterM)
+        {
+            diameterM = 0.0;
+            if (face == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                Surface surface = face.GetSurface() as Surface;
+                if (surface == null || !surface.IsCylinder())
+                {
+                    return false;
+                }
+
+                object raw = surface.CylinderParams;
+                if (raw is double[] values && values.Length >= 7)
+                {
+                    diameterM = Math.Abs(values[6]) * 2.0;
+                    return diameterM > 1E-09;
+                }
+
+                if (raw is Array array && array.Length >= 7)
+                {
+                    double radius = Convert.ToDouble(
+                        array.GetValue(6),
+                        CultureInfo.InvariantCulture);
+                    diameterM = Math.Abs(radius) * 2.0;
+                    return diameterM > 1E-09;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[RH FOLDED MAP] CylinderParams failed: " + ex.Message);
+            }
+
+            return false;
+        }
+
+        private List<Face2> GetRepairFeatureWallFaceCandidates(Feature feature)
+        {
+            List<Face2> allFaces = GetFeatureFaces(feature);
+            List<Face2> uniqueFaces = new List<Face2>();
+            foreach (Face2 face in allFaces)
+            {
+                AddUniqueRepairFace(uniqueFaces, face);
+            }
+
+            List<double> curvedAreas = new List<double>();
+            foreach (Face2 face in uniqueFaces)
+            {
+                string kind = GetRepairFoldedSurfaceKind(face);
+                if (kind == "Cylinder" || kind == "Cone")
+                {
+                    double area = SafeRepairFaceArea(face);
+                    if (area > 1E-12)
+                    {
+                        curvedAreas.Add(area);
+                    }
+                }
+            }
+
+            double medianCurvedArea = 0.0;
+            if (curvedAreas.Count > 0)
+            {
+                List<double> sorted = curvedAreas.OrderBy(value => value).ToList();
+                medianCurvedArea = sorted[sorted.Count / 2];
+            }
+
+            List<Face2> result = new List<Face2>();
+            string expectedOwnerName = SafeFeatureName(feature);
+
+            foreach (Face2 face in uniqueFaces)
+            {
+                string kind = GetRepairFoldedSurfaceKind(face);
+                double area = SafeRepairFaceArea(face);
+                bool accept = false;
+                string owningFeatureName = "";
+                try
+                {
+                    owningFeatureName = SafeFeatureName(face.GetFeature() as Feature);
+                }
+                catch
+                {
+                }
+
+                bool sameOwningFeature = string.IsNullOrWhiteSpace(owningFeatureName)
+                    || string.Equals(
+                        owningFeatureName,
+                        expectedOwnerName,
+                        StringComparison.OrdinalIgnoreCase);
+
+                if (!sameOwningFeature)
+                {
+                    accept = false;
+                }
+                else if (kind == "Cylinder" || kind == "Cone")
+                {
+                    accept = true;
+                }
+                else if (kind == "Plane")
+                {
+                    // Small planar faces can be slot walls.  Large planar faces are
+                    // normally the sheet face and must not connect all holes into one
+                    // cluster.
+                    accept = medianCurvedArea > 1E-12
+                        && area <= medianCurvedArea * 12.0;
+                }
+                else if (kind != "Unknown")
+                {
+                    accept = medianCurvedArea <= 1E-12
+                        || area <= medianCurvedArea * 12.0;
+                }
+
+                Debug.WriteLine(
+                    "[RH FOLDED MAP] feature face. feature="
+                    + SafeFeatureName(feature)
+                    + ", surface="
+                    + kind
+                    + ", area="
+                    + area.ToString("0.########", CultureInfo.InvariantCulture)
+                    + ", owner="
+                    + owningFeatureName
+                    + ", sameOwner="
+                    + sameOwningFeature
+                    + ", accepted="
+                    + accept);
+
+                if (accept)
+                {
+                    AddUniqueRepairFace(result, face);
+                }
+            }
+
+            // For a simple circular cut the list above always contains the
+            // cylinder(s).  If a legacy feature reports no analytical curved face,
+            // keep the small feature-created faces instead of silently continuing
+            // with an empty set.
+            if (result.Count == 0 && uniqueFaces.Count > 0)
+            {
+                double minArea = uniqueFaces
+                    .Select(SafeRepairFaceArea)
+                    .Where(area => area > 1E-12)
+                    .DefaultIfEmpty(0.0)
+                    .Min();
+
+                if (minArea > 1E-12)
+                {
+                    foreach (Face2 face in uniqueFaces)
+                    {
+                        string owningFeatureName = "";
+                        try
+                        {
+                            owningFeatureName = SafeFeatureName(face.GetFeature() as Feature);
+                        }
+                        catch
+                        {
+                        }
+
+                        bool sameOwningFeature = string.IsNullOrWhiteSpace(owningFeatureName)
+                            || string.Equals(
+                                owningFeatureName,
+                                expectedOwnerName,
+                                StringComparison.OrdinalIgnoreCase);
+
+                        if (sameOwningFeature
+                            && SafeRepairFaceArea(face) <= minArea * 12.0)
+                        {
+                            AddUniqueRepairFace(result, face);
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private List<FoldedRepairWallCluster> BuildRepairFeatureWallClusters(
+            Feature feature,
+            string featureName,
+            string featureType)
+        {
+            List<FoldedRepairWallCluster> clusters =
+                new List<FoldedRepairWallCluster>();
+            List<Face2> faces = GetRepairFeatureWallFaceCandidates(feature);
+            HashSet<int> visited = new HashSet<int>();
+
+            for (int i = 0; i < faces.Count; i++)
+            {
+                if (visited.Contains(i))
+                {
+                    continue;
+                }
+
+                FoldedRepairWallCluster cluster = new FoldedRepairWallCluster
+                {
+                    FeatureName = featureName,
+                    FeatureType = featureType,
+                    PrimaryFaceOrdinal = i
+                };
+
+                Queue<int> queue = new Queue<int>();
+                queue.Enqueue(i);
+                visited.Add(i);
+
+                while (queue.Count > 0)
+                {
+                    int currentIndex = queue.Dequeue();
+                    Face2 current = faces[currentIndex];
+                    AddUniqueRepairFace(cluster.WallFaces, current);
+
+                    for (int j = 0; j < faces.Count; j++)
+                    {
+                        if (visited.Contains(j))
+                        {
+                            continue;
+                        }
+
+                        if (RepairFacesShareEdge(current, faces[j]))
+                        {
+                            visited.Add(j);
+                            queue.Enqueue(j);
+                        }
+                    }
+                }
+
+                List<double> diameters = new List<double>();
+                foreach (Face2 face in cluster.WallFaces)
+                {
+                    if (TryGetRepairCylinderDiameter(face, out double diameterM))
+                    {
+                        diameters.Add(diameterM);
+                    }
+                }
+
+                if (diameters.Count > 0)
+                {
+                    cluster.CylinderDiameterM = diameters.Average();
+                }
+
+                clusters.Add(cluster);
+            }
+
+            return clusters;
+        }
+
+        private List<Face2> GetRepairClusterPlanarBoundaryFaces(
+            FoldedRepairWallCluster cluster)
+        {
+            // First use real topological adjacency.  Hole Wizard faces obtained
+            // from Feature.GetFaces() do not always expose the later sheet face
+            // through Edge.GetTwoAdjacentFaces2 after FlatPattern is suppressed,
+            // so a geometric body fallback is required before rejecting the
+            // cluster.
+            List<Face2> direct = GetRepairClusterPlanarBoundaryFacesDirect(cluster);
+            if (direct.Count > 0)
+            {
+                return direct;
+            }
+
+            List<Face2> fallback = GetRepairClusterPlanarBoundaryFacesFromBody(cluster);
+            if (fallback.Count > 0)
+            {
+                Debug.WriteLine(
+                    "[RH FOLDED MAP] body fallback planar boundary="
+                    + fallback.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", feature="
+                    + (cluster?.FeatureName ?? ""));
+            }
+            else
+            {
+                Debug.WriteLine(
+                    "[RH FOLDED MAP] body fallback planar boundary=0, feature="
+                    + (cluster?.FeatureName ?? ""));
+            }
+
+            return fallback;
+        }
+
+        private List<Face2> GetRepairClusterPlanarBoundaryFacesDirect(
+            FoldedRepairWallCluster cluster)
+        {
+            List<Face2> planarFaces = new List<Face2>();
+            if (cluster?.WallFaces == null)
+            {
+                return planarFaces;
+            }
+
+            foreach (Face2 wallFace in cluster.WallFaces)
+            {
+                foreach (Edge edge in GetRepairFaceEdges(wallFace))
+                {
+                    Array adjacent = null;
+                    try
+                    {
+                        adjacent = edge.GetTwoAdjacentFaces2() as Array;
+                    }
+                    catch
+                    {
+                    }
+
+                    if (adjacent == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (object obj in adjacent)
+                    {
+                        if (!(obj is Face2 adjacentFace))
+                        {
+                            continue;
+                        }
+
+                        if (cluster.WallFaces.Any(
+                                wall => AreSameEntities(wall, adjacentFace)))
+                        {
+                            continue;
+                        }
+
+                        if (IsPlanarFace(adjacentFace))
+                        {
+                            AddUniqueRepairFace(planarFaces, adjacentFace);
+                        }
+                    }
+                }
+            }
+
+            return planarFaces;
+        }
+
+        private List<Body2> GetRepairClusterBodies(
+            FoldedRepairWallCluster cluster)
+        {
+            List<Body2> bodies = new List<Body2>();
+            if (cluster?.WallFaces == null)
+            {
+                return bodies;
+            }
+
+            foreach (Face2 wallFace in cluster.WallFaces)
+            {
+                Body2 body = null;
+                try
+                {
+                    body = wallFace?.GetBody() as Body2;
+                }
+                catch
+                {
+                }
+
+                if (body == null)
+                {
+                    continue;
+                }
+
+                bool duplicate = bodies.Any(existing =>
+                    ReferenceEquals(existing, body)
+                    || IsSameComObject(existing, body));
+                if (!duplicate)
+                {
+                    bodies.Add(body);
+                }
+            }
+
+            return bodies;
+        }
+
+        private List<Face2> GetRepairClusterPlanarBoundaryFacesFromBody(
+            FoldedRepairWallCluster cluster)
+        {
+            List<Face2> result = new List<Face2>();
+            if (cluster?.WallFaces == null || cluster.WallFaces.Count == 0)
+            {
+                return result;
+            }
+
+            List<Body2> bodies = GetRepairClusterBodies(cluster);
+            Debug.WriteLine(
+                "[RH FOLDED MAP] body fallback scan. feature="
+                + (cluster.FeatureName ?? "")
+                + ", bodies="
+                + bodies.Count.ToString(CultureInfo.InvariantCulture));
+
+            foreach (Body2 body in bodies)
+            {
+                object[] bodyFaces = null;
+                try
+                {
+                    bodyFaces = body.GetFaces() as object[];
+                }
+                catch
+                {
+                }
+
+                if (bodyFaces == null)
+                {
+                    try
+                    {
+                        if (body.GetFaces() is Array faceArray)
+                        {
+                            bodyFaces = faceArray.Cast<object>().ToArray();
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (bodyFaces == null)
+                {
+                    continue;
+                }
+
+                foreach (object obj in bodyFaces)
+                {
+                    if (!(obj is Face2 planarFace) || !IsPlanarFace(planarFace))
+                    {
+                        continue;
+                    }
+
+                    if (cluster.WallFaces.Any(
+                            wall => AreSameEntities(wall, planarFace)))
+                    {
+                        continue;
+                    }
+
+                    int matchedEdges = 0;
+                    foreach (Face2 wallFace in cluster.WallFaces)
+                    {
+                        foreach (Edge wallEdge in GetRepairFaceEdges(wallFace))
+                        {
+                            if (RepairEdgeGeometricallyTouchesPlanarFace(
+                                    wallEdge,
+                                    planarFace))
+                            {
+                                matchedEdges++;
+                            }
+                        }
+                    }
+
+                    if (matchedEdges <= 0)
+                    {
+                        continue;
+                    }
+
+                    AddUniqueRepairFace(result, planarFace);
+                    Debug.WriteLine(
+                        "[RH FOLDED MAP] body fallback planar match. feature="
+                        + (cluster.FeatureName ?? "")
+                        + ", matchedEdges="
+                        + matchedEdges.ToString(CultureInfo.InvariantCulture)
+                        + ", area="
+                        + SafeRepairFaceArea(planarFace).ToString(
+                            "0.########",
+                            CultureInfo.InvariantCulture));
+                }
+            }
+
+            return result;
+        }
+
+        private bool RepairEdgeGeometricallyTouchesPlanarFace(
+            Edge edge,
+            Face2 planarFace)
+        {
+            if (edge == null || planarFace == null)
+            {
+                return false;
+            }
+
+            FacePlaneFrame frame = CreateFacePlaneFrame(planarFace);
+            if (frame == null)
+            {
+                return false;
+            }
+
+            List<double[]> probes = GetRepairEdgeProbePoints(edge);
+            if (probes.Count == 0)
+            {
+                return false;
+            }
+
+            // Geometry is expressed in metres.  0.05 mm is loose enough for
+            // rebuilt sheet-metal topology while still much smaller than the
+            // hole sizes handled by Repair Hole.
+            const double planeToleranceM = 0.00005;
+            const double faceToleranceM = 0.00008;
+
+            int coplanarCount = 0;
+            int onTrimCount = 0;
+            foreach (double[] point in probes)
+            {
+                if (!IsPoint(point))
+                {
+                    continue;
+                }
+
+                double planeDistance = Math.Abs(
+                    Dot(Subtract(point, frame.Origin), frame.Normal));
+                if (planeDistance > planeToleranceM)
+                {
+                    continue;
+                }
+
+                coplanarCount++;
+
+                double[] closest = null;
+                try
+                {
+                    closest = planarFace.GetClosestPointOn(
+                        point[0],
+                        point[1],
+                        point[2]) as double[];
+                }
+                catch
+                {
+                }
+
+                if (closest != null
+                    && closest.Length >= 3
+                    && Distance(
+                        point,
+                        new double[3]
+                        {
+                            closest[0],
+                            closest[1],
+                            closest[2]
+                        }) <= faceToleranceM)
+                {
+                    onTrimCount++;
+                }
+            }
+
+            // A circular boundary supplies several probe points.  Requiring at
+            // least two points on the trimmed planar face prevents an unrelated
+            // coplanar sheet face from being accepted merely because its infinite
+            // plane coincides with the hole edge.
+            int required = probes.Count >= 3 ? 2 : 1;
+            return coplanarCount >= required && onTrimCount >= required;
+        }
+
+        private List<double[]> GetRepairEdgeProbePoints(Edge edge)
+        {
+            List<double[]> points = new List<double[]>();
+            if (edge == null)
+            {
+                return points;
+            }
+
+            try
+            {
+                double[] start = (edge.GetStartVertex() as Vertex)?.GetPoint() as double[];
+                double[] end = (edge.GetEndVertex() as Vertex)?.GetPoint() as double[];
+                if (IsPoint(start))
+                {
+                    points.Add(new double[3] { start[0], start[1], start[2] });
+                }
+                if (IsPoint(end))
+                {
+                    points.Add(new double[3] { end[0], end[1], end[2] });
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                Curve curve = edge.GetCurve() as Curve;
+                CurveParamData param = edge.GetCurveParams3();
+                if (curve != null && param != null)
+                {
+                    double u0 = param.UMinValue;
+                    double u1 = param.UMaxValue;
+                    if (Math.Abs(u1 - u0) > 1E-12)
+                    {
+                        double[] fractions = { 0.125, 0.375, 0.625, 0.875 };
+                        foreach (double fraction in fractions)
+                        {
+                            try
+                            {
+                                double u = u0 + (u1 - u0) * fraction;
+                                double[] value = curve.Evaluate(u) as double[];
+                                if (IsPoint(value))
+                                {
+                                    points.Add(new double[3]
+                                    {
+                                        value[0], value[1], value[2]
+                                    });
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            // Degenerate/closed analytical edges can report null start/end
+            // vertices.  Reuse the existing sampler only as a last resort.
+            if (points.Count == 0)
+            {
+                try
+                {
+                    points.AddRange(
+                        SampleRepairEdge(edge, 8)
+                            .Where(IsPoint)
+                            .Take(8));
+                }
+                catch
+                {
+                }
+            }
+
+            return points;
+        }
+
+        private List<Edge> GetRepairClusterBoundaryEdgesOnFace(
+            FoldedRepairWallCluster cluster,
+            Face2 planarFace)
+        {
+            List<Edge> edges = GetRepairClusterBoundaryEdgesOnFaceDirect(
+                cluster,
+                planarFace);
+            if (edges.Count > 0)
+            {
+                return edges;
+            }
+
+            if (cluster?.WallFaces == null || planarFace == null)
+            {
+                return edges;
+            }
+
+            foreach (Face2 wallFace in cluster.WallFaces)
+            {
+                foreach (Edge edge in GetRepairFaceEdges(wallFace))
+                {
+                    if (RepairEdgeGeometricallyTouchesPlanarFace(
+                            edge,
+                            planarFace))
+                    {
+                        AddUniqueRepairEdge(edges, edge);
+                    }
+                }
+            }
+
+            if (edges.Count > 0)
+            {
+                Debug.WriteLine(
+                    "[RH FOLDED MAP] boundary edge geometry fallback. feature="
+                    + (cluster.FeatureName ?? "")
+                    + ", edges="
+                    + edges.Count.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return edges;
+        }
+
+        private List<Edge> GetRepairClusterBoundaryEdgesOnFaceDirect(
+            FoldedRepairWallCluster cluster,
+            Face2 planarFace)
+        {
+            List<Edge> edges = new List<Edge>();
+            if (cluster?.WallFaces == null || planarFace == null)
+            {
+                return edges;
+            }
+
+            foreach (Face2 wallFace in cluster.WallFaces)
+            {
+                foreach (Edge edge in GetRepairFaceEdges(wallFace))
+                {
+                    Array adjacent = null;
+                    try
+                    {
+                        adjacent = edge.GetTwoAdjacentFaces2() as Array;
+                    }
+                    catch
+                    {
+                    }
+
+                    if (adjacent == null)
+                    {
+                        continue;
+                    }
+
+                    bool touchesTargetFace = false;
+                    foreach (object obj in adjacent)
+                    {
+                        if (obj is Face2 adjacentFace
+                            && AreSameEntities(adjacentFace, planarFace))
+                        {
+                            touchesTargetFace = true;
+                            break;
+                        }
+                    }
+
+                    if (touchesTargetFace)
+                    {
+                        AddUniqueRepairEdge(edges, edge);
+                    }
+                }
+            }
+
+            return edges;
+        }
+
+        private double[] GetRepairEdgesAveragePoint(List<Edge> edges)
+        {
+            if (edges == null || edges.Count == 0)
+            {
+                return null;
+            }
+
+            List<double[]> points = new List<double[]>();
+            foreach (Edge edge in edges)
+            {
+                List<double[]> sampled = SampleRepairEdge(edge, 24);
+                if (sampled != null)
+                {
+                    points.AddRange(sampled.Where(IsPoint));
+                }
+            }
+
+            if (points.Count == 0)
+            {
+                return null;
+            }
+
+            return new double[3]
+            {
+                points.Average(point => point[0]),
+                points.Average(point => point[1]),
+                points.Average(point => point[2])
+            };
+        }
+
+        private void AddRepairPlanarFaceScore(
+            List<FoldedRepairPlanarFaceScore> scores,
+            Face2 face)
+        {
+            if (scores == null || face == null)
+            {
+                return;
+            }
+
+            FoldedRepairPlanarFaceScore existing = scores.FirstOrDefault(
+                score => AreSameEntities(score.Face, face));
+            if (existing == null)
+            {
+                scores.Add(new FoldedRepairPlanarFaceScore
+                {
+                    Face = face,
+                    ClusterCount = 1,
+                    Area = SafeRepairFaceArea(face)
+                });
+            }
+            else
+            {
+                existing.ClusterCount++;
+                existing.Area = Math.Max(existing.Area, SafeRepairFaceArea(face));
+            }
+        }
+
+        private bool TryCollectFoldedRepairGeometryByFeature(
+            ModelDoc2 model,
+            RepairHoleGroup sourceGroup,
+            List<FoldedRepairFeatureHint> hints,
+            out List<FoldedRepairCandidateGeometry> geometries,
+            out List<Face2> allWallFaces,
+            out Dictionary<Face2, int> faceToLoopIndex,
+            out Face2 foldedPlanarFace,
+            out string error)
+        {
+            geometries = new List<FoldedRepairCandidateGeometry>();
+            allWallFaces = new List<Face2>();
+            faceToLoopIndex = new Dictionary<Face2, int>();
+            foldedPlanarFace = null;
+            error = "";
+
+            if (model == null
+                || sourceGroup?.Candidates == null
+                || hints == null
+                || hints.Count != sourceGroup.Candidates.Count)
+            {
+                error = "Dữ liệu source-feature mapping không hợp lệ.";
+                return false;
+            }
+
+            List<FoldedRepairFeatureBucket> buckets = new List<FoldedRepairFeatureBucket>();
+
+            foreach (IGrouping<string, FoldedRepairFeatureHint> group in hints.GroupBy(
+                hint => hint.FeatureName,
+                StringComparer.OrdinalIgnoreCase))
+            {
+                string featureName = group.Key;
+                List<FoldedRepairFeatureHint> featureHints = group
+                    .OrderBy(hint => hint.SourceCandidate.Index)
+                    .ToList();
+                string featureType = featureHints
+                    .Select(hint => hint.FeatureType)
+                    .FirstOrDefault(type => !string.IsNullOrWhiteSpace(type))
+                    ?? "";
+
+                Feature feature = FindFeatureByName(model, featureName);
+                if (feature == null)
+                {
+                    error = "Không tìm thấy source feature '"
+                        + featureName
+                        + "' sau khi suppress FlatPattern.";
+                    return false;
+                }
+
+                List<FoldedRepairWallCluster> rawClusters =
+                    BuildRepairFeatureWallClusters(
+                        feature,
+                        featureName,
+                        featureType);
+                List<FoldedRepairWallCluster> clusters = rawClusters.ToList();
+
+                int rawClusterCount = rawClusters.Count;
+                int expected = featureHints.Count;
+                double candidateDiameterMm = featureHints
+                    .Average(hint => hint.SourceCandidate.EquivalentDiameterM * 1000.0);
+                List<double> seedDiameters = featureHints
+                    .Where(hint => hint.SeedDiameterM > 1E-09)
+                    .Select(hint => hint.SeedDiameterM)
+                    .ToList();
+                double familyDiameterM = seedDiameters.Count > 0
+                    ? seedDiameters.Average()
+                    : candidateDiameterMm / 1000.0;
+                double familyDiameterMm = familyDiameterM * 1000.0;
+
+                Debug.WriteLine(
+                    "[RH FOLDED MAP] feature="
+                    + featureName
+                    + ", type="
+                    + featureType
+                    + ", expectedCandidates="
+                    + expected.ToString(CultureInfo.InvariantCulture)
+                    + ", rawClusters="
+                    + rawClusterCount.ToString(CultureInfo.InvariantCulture)
+                    + ", wallClusters="
+                    + clusters.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", seedDia="
+                    + familyDiameterMm.ToString("0.###", CultureInfo.InvariantCulture)
+                    + "mm, measuredEqDia="
+                    + candidateDiameterMm.ToString("0.###", CultureInfo.InvariantCulture)
+                    + "mm");
+
+                for (int clusterIndex = 0; clusterIndex < rawClusters.Count; clusterIndex++)
+                {
+                    FoldedRepairWallCluster cluster = rawClusters[clusterIndex];
+                    Debug.WriteLine(
+                        "[RH FOLDED MAP]   cluster="
+                        + (clusterIndex + 1).ToString(CultureInfo.InvariantCulture)
+                        + ", primaryOrdinal="
+                        + cluster.PrimaryFaceOrdinal.ToString(CultureInfo.InvariantCulture)
+                        + ", wallFaces="
+                        + cluster.WallFaces.Count.ToString(CultureInfo.InvariantCulture)
+                        + ", cylinderDia="
+                        + ((cluster.CylinderDiameterM > 1E-09)
+                            ? (cluster.CylinderDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm"
+                            : "n/a")
+                        + ", planarBoundaries="
+                        + GetRepairClusterPlanarBoundaryFaces(cluster).Count.ToString(CultureInfo.InvariantCulture));
+                }
+
+                bool usedSourceOrdinals = false;
+                bool canUseSourceOrdinals = featureHints.All(hint =>
+                    hint.SourceClusterOrdinal >= 0
+                    && hint.SourceClusterCount > 0
+                    && hint.SourceClusterCount == rawClusterCount);
+
+                if (canUseSourceOrdinals)
+                {
+                    Dictionary<int, FoldedRepairWallCluster> byOrdinal =
+                        new Dictionary<int, FoldedRepairWallCluster>();
+                    bool duplicateOrdinal = false;
+                    foreach (FoldedRepairWallCluster cluster in rawClusters)
+                    {
+                        if (cluster.PrimaryFaceOrdinal < 0)
+                        {
+                            continue;
+                        }
+                        if (byOrdinal.ContainsKey(cluster.PrimaryFaceOrdinal))
+                        {
+                            duplicateOrdinal = true;
+                            break;
+                        }
+                        byOrdinal[cluster.PrimaryFaceOrdinal] = cluster;
+                    }
+
+                    List<FoldedRepairWallCluster> mapped =
+                        new List<FoldedRepairWallCluster>();
+                    bool mapValid = !duplicateOrdinal;
+                    HashSet<int> consumedOrdinals = new HashSet<int>();
+
+                    foreach (FoldedRepairFeatureHint hint in featureHints)
+                    {
+                        if (!mapValid
+                            || !byOrdinal.TryGetValue(
+                                hint.SourceClusterOrdinal,
+                                out FoldedRepairWallCluster mappedCluster)
+                            || !consumedOrdinals.Add(hint.SourceClusterOrdinal))
+                        {
+                            mapValid = false;
+                            break;
+                        }
+
+                        if (mappedCluster.CylinderDiameterM > 1E-09
+                            && familyDiameterM > 1E-09
+                            && Math.Abs(
+                                mappedCluster.CylinderDiameterM
+                                - familyDiameterM) > 0.00075)
+                        {
+                            Debug.WriteLine(
+                                "[RH INSTANCE MAP] reject ordinal="
+                                + hint.SourceClusterOrdinal.ToString(CultureInfo.InvariantCulture)
+                                + ", loop="
+                                + hint.SourceCandidate.Index.ToString(CultureInfo.InvariantCulture)
+                                + ", seedDia="
+                                + familyDiameterMm.ToString("0.###", CultureInfo.InvariantCulture)
+                                + "mm, foldedDia="
+                                + (mappedCluster.CylinderDiameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                                + "mm");
+                            mapValid = false;
+                            break;
+                        }
+
+                        if (GetRepairClusterPlanarBoundaryFaces(mappedCluster).Count == 0)
+                        {
+                            mapValid = false;
+                            break;
+                        }
+
+                        mapped.Add(mappedCluster);
+                        Debug.WriteLine(
+                            "[RH INSTANCE MAP] loop="
+                            + hint.SourceCandidate.Index.ToString(CultureInfo.InvariantCulture)
+                            + " -> feature="
+                            + featureName
+                            + ", sourceOrdinal="
+                            + hint.SourceClusterOrdinal.ToString(CultureInfo.InvariantCulture)
+                            + ", foldedPrimaryOrdinal="
+                            + mappedCluster.PrimaryFaceOrdinal.ToString(CultureInfo.InvariantCulture)
+                            + ", seedDia="
+                            + familyDiameterMm.ToString("0.###", CultureInfo.InvariantCulture)
+                            + "mm");
+                    }
+
+                    if (mapValid && mapped.Count == expected)
+                    {
+                        clusters = mapped;
+                        usedSourceOrdinals = true;
+                        Debug.WriteLine(
+                            "[RH INSTANCE MAP] feature="
+                            + featureName
+                            + " matched by seed diameter + source instance ordinal: "
+                            + clusters.Count.ToString(CultureInfo.InvariantCulture)
+                            + "/"
+                            + expected.ToString(CultureInfo.InvariantCulture));
+                    }
+                }
+
+                if (!usedSourceOrdinals && clusters.Count != expected)
+                {
+                    // Fallback for legacy/non-pattern sources: seed diameter is the
+                    // family key.  This fallback is allowed only when it leaves an
+                    // unambiguous number of clusters; it never chooses an arbitrary
+                    // subset of a larger pattern.
+                    List<FoldedRepairWallCluster> plausible = rawClusters
+                        .Where(cluster =>
+                            GetRepairClusterPlanarBoundaryFaces(cluster).Count > 0
+                            && (cluster.CylinderDiameterM <= 1E-09
+                                || Math.Abs(
+                                    cluster.CylinderDiameterM
+                                    - familyDiameterM) <= 0.00075))
+                        .ToList();
+
+                    if (plausible.Count == expected)
+                    {
+                        clusters = plausible;
+                        Debug.WriteLine(
+                            "[RH FOLDED MAP] feature="
+                            + featureName
+                            + " filtered by seed diameter -> "
+                            + clusters.Count.ToString(CultureInfo.InvariantCulture)
+                            + " cluster(s).");
+                    }
+                }
+
+                if (clusters.Count == expected)
+                {
+                    List<FoldedRepairWallCluster> withoutBoundary = clusters
+                        .Where(cluster => GetRepairClusterPlanarBoundaryFaces(cluster).Count == 0)
+                        .ToList();
+                    if (withoutBoundary.Count > 0)
+                    {
+                        error = "Folded mapping đã tìm được wall face nhưng không resolve được planar boundary cho feature '"
+                            + featureName
+                            + "'. Missing boundary="
+                            + withoutBoundary.Count.ToString(CultureInfo.InvariantCulture)
+                            + ".";
+                        return false;
+                    }
+                }
+
+                if (clusters.Count != expected)
+                {
+                    string ordinalText = string.Join(
+                        ",",
+                        featureHints.Select(hint =>
+                            hint.SourceClusterOrdinal.ToString(CultureInfo.InvariantCulture)));
+                    error = "Folded mapping không đủ/không duy nhất cho feature '"
+                        + featureName
+                        + "'. Cần "
+                        + expected.ToString(CultureInfo.InvariantCulture)
+                        + " lỗ nhưng feature có "
+                        + rawClusterCount.ToString(CultureInfo.InvariantCulture)
+                        + " cluster. Seed="
+                        + familyDiameterMm.ToString("0.###", CultureInfo.InvariantCulture)
+                        + " mm, source ordinals="
+                        + ordinalText
+                        + ".";
+                    return false;
+                }
+
+                buckets.Add(new FoldedRepairFeatureBucket
+                {
+                    FeatureName = featureName,
+                    FeatureType = featureType,
+                    Hints = featureHints,
+                    Clusters = clusters,
+                    UsesSourceInstanceOrdinals = usedSourceOrdinals
+                });
+            }
+
+            List<FoldedRepairPlanarFaceScore> faceScores =
+                new List<FoldedRepairPlanarFaceScore>();
+            foreach (FoldedRepairFeatureBucket bucket in buckets)
+            {
+                foreach (FoldedRepairWallCluster cluster in bucket.Clusters)
+                {
+                    List<Face2> clusterPlanarFaces =
+                        GetRepairClusterPlanarBoundaryFaces(cluster);
+                    foreach (Face2 planarFace in clusterPlanarFaces)
+                    {
+                        AddRepairPlanarFaceScore(faceScores, planarFace);
+                    }
+                }
+            }
+
+            int expectedTotal = sourceGroup.Candidates.Count;
+            FoldedRepairPlanarFaceScore selectedFaceScore = faceScores
+                .OrderByDescending(score => score.ClusterCount)
+                .ThenByDescending(score => score.Area)
+                .FirstOrDefault();
+
+            if (selectedFaceScore == null
+                || selectedFaceScore.Face == null
+                || selectedFaceScore.ClusterCount < expectedTotal)
+            {
+                string scoreText = string.Join(
+                    " | ",
+                    faceScores.Select(score =>
+                        score.ClusterCount.ToString(CultureInfo.InvariantCulture)
+                        + "@"
+                        + score.Area.ToString("0.######", CultureInfo.InvariantCulture)));
+                error = "Không tìm được một mặt folded chung cho đủ "
+                    + expectedTotal.ToString(CultureInfo.InvariantCulture)
+                    + " lỗ. faceScores="
+                    + scoreText;
+                return false;
+            }
+
+            foldedPlanarFace = selectedFaceScore.Face;
+            FacePlaneFrame foldedFrame = CreateFacePlaneFrame(foldedPlanarFace);
+            if (foldedFrame == null)
+            {
+                error = "Không tạo được frame cho mặt folded đã map.";
+                return false;
+            }
+
+            foreach (FoldedRepairFeatureBucket bucket in buckets)
+            {
+                List<FoldedRepairClusterPlacement> placements =
+                    new List<FoldedRepairClusterPlacement>();
+
+                foreach (FoldedRepairWallCluster cluster in bucket.Clusters)
+                {
+                    List<Edge> boundaryEdges =
+                        GetRepairClusterBoundaryEdgesOnFace(
+                            cluster,
+                            foldedPlanarFace);
+                    if (boundaryEdges.Count == 0)
+                    {
+                        error = "Cluster của feature '"
+                            + bucket.FeatureName
+                            + "' không có boundary edge trên mặt folded đã chọn.";
+                        return false;
+                    }
+
+                    double[] center = GetRepairEdgesAveragePoint(boundaryEdges);
+                    if (!IsPoint(center))
+                    {
+                        error = "Không tính được center folded cho feature '"
+                            + bucket.FeatureName
+                            + "'.";
+                        return false;
+                    }
+
+                    double[] delta = Subtract(center, foldedFrame.Origin);
+                    placements.Add(new FoldedRepairClusterPlacement
+                    {
+                        Cluster = cluster,
+                        BoundaryEdges = boundaryEdges,
+                        Center = center,
+                        U = Dot(delta, foldedFrame.AxisU),
+                        V = Dot(delta, foldedFrame.AxisV)
+                    });
+                }
+
+                if (!bucket.UsesSourceInstanceOrdinals)
+                {
+                    placements = placements
+                        .OrderBy(placement => placement.U)
+                        .ThenBy(placement => placement.V)
+                        .ToList();
+                }
+                else
+                {
+                    Debug.WriteLine(
+                        "[RH INSTANCE MAP] preserve mapped cluster order for feature="
+                        + bucket.FeatureName);
+                }
+
+                List<FoldedRepairFeatureHint> orderedHints = bucket.Hints
+                    .OrderBy(hint => hint.SourceCandidate.Index)
+                    .ToList();
+
+                if (placements.Count != orderedHints.Count)
+                {
+                    error = "Số placement folded không khớp candidate của feature '"
+                        + bucket.FeatureName
+                        + "'.";
+                    return false;
+                }
+
+                for (int i = 0; i < orderedHints.Count; i++)
+                {
+                    FoldedRepairFeatureHint hint = orderedHints[i];
+                    FoldedRepairClusterPlacement placement = placements[i];
+                    RepairHoleLoopCandidate sourceCandidate = hint.SourceCandidate;
+
+                    RepairHoleLoopCandidate foldedCandidate =
+                        new RepairHoleLoopCandidate
+                        {
+                            Index = sourceCandidate.Index,
+                            Edges = placement.BoundaryEdges,
+                            FallbackCenter = placement.Center,
+                            Width = sourceCandidate.Width,
+                            Height = sourceCandidate.Height,
+                            PerimeterM = sourceCandidate.PerimeterM,
+                            EquivalentDiameterM = sourceCandidate.EquivalentDiameterM,
+                            MajorDirection = sourceCandidate.MajorDirection
+                        };
+
+                    FoldedRepairCandidateGeometry geometry =
+                        new FoldedRepairCandidateGeometry
+                        {
+                            SourceCandidate = sourceCandidate,
+                            FoldedCandidate = foldedCandidate,
+                            WallFaces = placement.Cluster.WallFaces
+                        };
+
+                    geometries.Add(geometry);
+
+                    foreach (Face2 wallFace in placement.Cluster.WallFaces)
+                    {
+                        if (!allWallFaces.Any(existing => AreSameEntities(existing, wallFace)))
+                        {
+                            allWallFaces.Add(wallFace);
+                            faceToLoopIndex[wallFace] = sourceCandidate.Index;
+                        }
+                    }
+
+                    Debug.WriteLine(
+                        "[RH FOLDED MAP] matched. loop="
+                        + sourceCandidate.Index.ToString(CultureInfo.InvariantCulture)
+                        + " -> feature="
+                        + bucket.FeatureName
+                        + ", wallFaces="
+                        + placement.Cluster.WallFaces.Count.ToString(CultureInfo.InvariantCulture)
+                        + ", boundaryEdges="
+                        + placement.BoundaryEdges.Count.ToString(CultureInfo.InvariantCulture)
+                        + ", centerMm="
+                        + FormatRepairPoint(placement.Center));
+                }
+            }
+
+            Debug.WriteLine(
+                "[RH FOLDED MAP] TOTAL candidates="
+                + geometries.Count.ToString(CultureInfo.InvariantCulture)
+                + "/"
+                + expectedTotal.ToString(CultureInfo.InvariantCulture)
+                + ", wallFaces="
+                + allWallFaces.Count.ToString(CultureInfo.InvariantCulture)
+                + ", commonFaceScore="
+                + selectedFaceScore.ClusterCount.ToString(CultureInfo.InvariantCulture));
+
+            if (geometries.Count != expectedTotal || allWallFaces.Count == 0)
+            {
+                error = "Folded source-feature mapping chưa đủ candidate/wall face.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private double[] GetFoldedRepairDirection(
+            RepairHoleLoopCandidate candidate,
+            FacePlaneFrame frame)
+        {
+            if (candidate?.Edges != null)
+            {
+                double bestLength = -1.0;
+                double[] bestDirection = null;
+
+                foreach (Edge edge in candidate.Edges)
+                {
+                    if (TryGetEdgeGeometry(edge, out EdgeGeometry geometry)
+                        && geometry != null
+                        && geometry.Direction != null
+                        && geometry.Length > bestLength)
+                    {
+                        double[] direction = Normalize(geometry.Direction);
+                        if (direction != null && frame?.Normal != null)
+                        {
+                            direction = Normalize(Subtract(
+                                direction,
+                                Scale(frame.Normal, Dot(direction, frame.Normal))));
+                        }
+
+                        if (direction != null)
+                        {
+                            bestLength = geometry.Length;
+                            bestDirection = direction;
+                        }
+                    }
+                }
+
+                if (bestDirection != null)
+                {
+                    return bestDirection;
+                }
+            }
+
+            return Normalize(frame?.AxisU);
+        }
+
+        private double[] TryGetReferencePointCoordinates(Feature pointFeature)
+        {
+            if (pointFeature == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                if (pointFeature.GetSpecificFeature2() is RefPoint refPoint
+                    && refPoint.GetRefPoint() is MathPoint mathPoint
+                    && mathPoint.ArrayData is double[] data
+                    && IsPoint(data))
+                {
+                    return new double[3] { data[0], data[1], data[2] };
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE] read RH-P coordinates failed. feature="
+                    + SafeFeatureName(pointFeature)
+                    + ", "
+                    + ex.Message);
+            }
+
+            return null;
+        }
+
+        private bool TryDeleteAndPatchRepairFacesCurrentState(
+            ModelDoc2 model,
+            IList<Face2> faces,
+            Face2 sourceFace,
+            Dictionary<Face2, int> faceToLoopIndex,
+            out Feature deleteFaceFeature,
+            out string error)
+        {
+            deleteFaceFeature = null;
+            error = null;
+
+            if (model == null || faces == null || faces.Count == 0)
+            {
+                error = "Không có mặt thành lỗ để Delete Face + Patch.";
+                return false;
+            }
+
+            DumpDeleteFaceSelectionDiagnostics(
+                model,
+                faces,
+                sourceFace,
+                faceToLoopIndex);
+
+            if (!TrySelectRepairFaces(model, faces))
+            {
+                error = "Không select đủ toàn bộ mặt thành lỗ trước Delete Face.";
+                return false;
+            }
+
+            int beforeFeatureCount = GetFeatureCountSafe(model);
+            bool ok = false;
+
+            try
+            {
+                ok = model.Extension.InsertDeleteFace(
+                    (int)swFaceDeleteOption_e.swFaceDelete_Patch);
+                Debug.WriteLine(
+                    "[REPAIR HOLE PATCH] InsertDeleteFace(Patch) returned="
+                    + ok);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE PATCH] InsertDeleteFace(Patch) exception: "
+                    + ex.GetType().Name
+                    + " - "
+                    + ex.Message);
+            }
+
+            if (!ok)
+            {
+                try
+                {
+                    ok = model.InsertDeleteFace2(1);
+                    Debug.WriteLine(
+                        "[REPAIR HOLE PATCH] InsertDeleteFace2(1) returned="
+                        + ok);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(
+                        "[REPAIR HOLE PATCH] InsertDeleteFace2(1) exception: "
+                        + ex.GetType().Name
+                        + " - "
+                        + ex.Message);
+                }
+            }
+
+            if (!ok)
+            {
+                error = "SOLIDWORKS từ chối Delete Face + Patch.";
+                return false;
+            }
+
+            try
+            {
+                model.EditRebuild3();
+            }
+            catch
+            {
+            }
+
+            deleteFaceFeature = FindNewDeleteFaceFeature(
+                model,
+                beforeFeatureCount);
+
+            if (deleteFaceFeature != null)
+            {
+                try
+                {
+                    deleteFaceFeature.Name = MakeUniqueFeatureName(
+                        model,
+                        "RH-Patch-DeleteFace");
+                }
+                catch
+                {
+                }
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE PATCH] Delete Face + Patch success. feature="
+                + ((deleteFaceFeature == null)
+                    ? "<unknown>"
+                    : SafeFeatureName(deleteFaceFeature)));
+
+            return true;
+        }
+
+        private bool TryRepairRebuildHoleGroupFlatPatternOrdered(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            object facePersistReference,
+            double[] wizardPickPoint,
+            RepairHoleGroup selectedGroup,
+            double repairDiameterM,
+            double depthM,
+            LooseSize targetLooseSize,
+            MakeHoleOptions options,
+            Feature flatPatternFeature,
+            out int createdCount,
+            out string message)
+        {
+            createdCount = 0;
+            message = "";
+
+            if (model == null
+                || sourceFace == null
+                || selectedGroup?.Candidates == null
+                || selectedGroup.Candidates.Count == 0
+                || flatPatternFeature == null)
+            {
+                message = "Dữ liệu FlatPattern Rebuild Repair không hợp lệ.";
+                return false;
+            }
+
+            if (!TryCaptureRepairCandidateFeatureHints(
+                    sourceFace,
+                    selectedGroup,
+                    out List<FoldedRepairFeatureHint> featureHints,
+                    out string captureError))
+            {
+                message = captureError;
+                return false;
+            }
+
+            TryGetFeatureSuppressedState(
+                flatPatternFeature,
+                out bool originallySuppressed);
+
+            Debug.WriteLine(
+                "[REPAIR HOLE FP] original state. feature="
+                + SafeFeatureName(flatPatternFeature)
+                + ", suppressed="
+                + originallySuppressed);
+
+            bool success = false;
+            bool changedSuppression = false;
+            Feature deleteFillBodiesFeature = null;
+            Feature patchFeature = null;
+            Feature holeWizardFeature = null;
+            List<Feature> fillFeatures = new List<Feature>();
+            List<Feature> pointFeatures = new List<Feature>();
+
+            try
+            {
+                if (!originallySuppressed)
+                {
+                    if (!TrySetRepairFlatPatternSuppressed(
+                            model,
+                            flatPatternFeature,
+                            suppress: true))
+                    {
+                        message = "Không suppress được FlatPattern để tạo feature theo đúng thứ tự.";
+                        return false;
+                    }
+
+                    changedSuppression = true;
+                }
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE FP] FlatPattern is kept suppressed until RH-P -> DeleteFace -> HoleWizard are complete.");
+
+                if (!TryCollectFoldedRepairGeometryByFeature(
+                        model,
+                        selectedGroup,
+                        featureHints,
+                        out List<FoldedRepairCandidateGeometry> geometries,
+                        out List<Face2> wallFaces,
+                        out Dictionary<Face2, int> wallFaceToLoopIndex,
+                        out Face2 foldedPlanarFace,
+                        out string foldedError))
+                {
+                    message = foldedError;
+                    return false;
+                }
+
+                FacePlaneFrame foldedFrame =
+                    CreateFacePlaneFrame(foldedPlanarFace);
+                if (foldedFrame == null)
+                {
+                    message = "Không tạo được hệ tọa độ của mặt folded.";
+                    return false;
+                }
+
+                object foldedFaceReference =
+                    TryGetRepairEntityPersistentReference(
+                        model,
+                        foldedPlanarFace);
+
+                List<double[]> centers = new List<double[]>();
+                List<double[]> directions = new List<double[]>();
+
+                // IMPORTANT TREE ORDER:
+                // FlatPattern is already suppressed here. Fill Surface and RH-P are
+                // created now, so they are placed before FlatPattern in the tree.
+                foreach (FoldedRepairCandidateGeometry geometry in geometries)
+                {
+                    if (!TryCreateRepairFillSurfaceCenter(
+                            model,
+                            geometry.FoldedCandidate,
+                            foldedFrame,
+                            out Feature fillFeature,
+                            out double[] center)
+                        || fillFeature == null
+                        || !IsPoint(center))
+                    {
+                        message = "Không tạo được folded Fill Surface cho loop #"
+                            + geometry.SourceCandidate.Index.ToString(CultureInfo.InvariantCulture)
+                            + ".";
+                        return false;
+                    }
+
+                    fillFeatures.Add(fillFeature);
+                    centers.Add(center);
+                    directions.Add(
+                        GetFoldedRepairDirection(
+                            geometry.FoldedCandidate,
+                            foldedFrame));
+
+                    Debug.WriteLine(
+                        "[REPAIR HOLE FP] folded center ready. loop="
+                        + geometry.SourceCandidate.Index.ToString(CultureInfo.InvariantCulture)
+                        + ", centerMm="
+                        + FormatRepairPoint(center));
+                }
+
+                pointFeatures =
+                    TryCreateRepairReferencePoints(
+                        model,
+                        fillFeatures);
+
+                bool pointsOk =
+                    pointFeatures != null
+                    && pointFeatures.Count == selectedGroup.Candidates.Count
+                    && pointFeatures.All(point => point != null);
+
+                if (!pointsOk)
+                {
+                    message = "Không tạo đủ RH-P point ở folded state.";
+                    return false;
+                }
+
+                // Read the actual RH-P coordinates back. They are the authoritative
+                // Hole Wizard positions from this point onward.
+                centers.Clear();
+                foreach (Feature pointFeature in pointFeatures)
+                {
+                    double[] point = TryGetReferencePointCoordinates(
+                        pointFeature);
+                    if (!IsPoint(point))
+                    {
+                        message = "Không đọc lại được tọa độ từ "
+                            + SafeFeatureName(pointFeature)
+                            + ".";
+                        return false;
+                    }
+
+                    centers.Add(point);
+                }
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE FP] RH-P created BEFORE Delete Face. points="
+                    + pointFeatures.Count.ToString(CultureInfo.InvariantCulture));
+
+                deleteFillBodiesFeature =
+                    TryInsertDeleteBodyForRepairFillSurfaces(
+                        model,
+                        fillFeatures);
+
+                if (deleteFillBodiesFeature == null)
+                {
+                    message = "Không tạo được RH-DelSurf trước Delete Face.";
+                    return false;
+                }
+
+                try
+                {
+                    model.EditRebuild3();
+                }
+                catch
+                {
+                }
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE FP] BEGIN Delete Face AFTER RH-P creation.");
+
+                if (!TryDeleteAndPatchRepairFacesCurrentState(
+                        model,
+                        wallFaces,
+                        foldedPlanarFace,
+                        wallFaceToLoopIndex,
+                        out patchFeature,
+                        out string patchError))
+                {
+                    message = patchError;
+                    return false;
+                }
+
+                Face2 currentFoldedFace = null;
+                if (foldedFaceReference != null)
+                {
+                    currentFoldedFace =
+                        TryRestoreRepairEntity(
+                            model,
+                            foldedFaceReference) as Face2;
+                }
+
+                if (currentFoldedFace == null
+                    || !IsPlanarFace(currentFoldedFace))
+                {
+                    currentFoldedFace =
+                        FindMatchingPlanarFace(
+                            model,
+                            foldedFrame);
+                }
+
+                if (currentFoldedFace == null
+                    || !IsPlanarFace(currentFoldedFace))
+                {
+                    message = "Delete Face thành công nhưng không restore được mặt folded để Make Hole.";
+                    return false;
+                }
+
+                LooseSize currentLooseSize = null;
+                if (targetLooseSize != null)
+                {
+                    currentLooseSize = new LooseSize
+                    {
+                        WidthM = targetLooseSize.WidthM,
+                        LengthM = targetLooseSize.LengthM
+                    };
+                }
+
+                double[] foldedWizardPickPoint =
+                    centers.FirstOrDefault(IsPoint)
+                    ?? wizardPickPoint;
+
+                holeWizardFeature =
+                    TryCreateRepairHoleWizardCuts(
+                        model,
+                        currentFoldedFace,
+                        foldedWizardPickPoint,
+                        centers,
+                        currentLooseSize == null ? null : directions,
+                        pointFeatures,
+                        currentLooseSize,
+                        repairDiameterM,
+                        depthM,
+                        out createdCount,
+                        out string wizardMessage);
+
+                if (holeWizardFeature == null)
+                {
+                    message = "Đã tạo RH-P và Delete Face nhưng Make Hole/Hole Wizard thất bại: "
+                        + wizardMessage;
+                    return false;
+                }
+
+                ApplyRepairHoleFeatureName(
+                    model,
+                    holeWizardFeature,
+                    options);
+
+                TryGroupRepairHoleReferenceFeatures(
+                    model,
+                    fillFeatures,
+                    pointFeatures,
+                    repairDiameterM,
+                    createdCount);
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE FP] ordered rebuild success: RH-P -> DeleteFace -> HoleWizard -> FlatPattern. holes="
+                    + createdCount.ToString(CultureInfo.InvariantCulture));
+
+                success = true;
+                return true;
+            }
+            finally
+            {
+                if (!success)
+                {
+                    // Roll back in reverse dependency order while FlatPattern is
+                    // still suppressed.
+                    if (holeWizardFeature != null)
+                    {
+                        TryDeleteRepairFeature(
+                            model,
+                            holeWizardFeature,
+                            includeAbsorbed: true);
+                    }
+
+                    if (patchFeature != null)
+                    {
+                        TryDeleteRepairFeature(
+                            model,
+                            patchFeature,
+                            includeAbsorbed: false);
+                    }
+
+                    CleanupFailedRepairHole(
+                        model,
+                        deleteFillBodiesFeature,
+                        pointFeatures,
+                        fillFeatures);
+                }
+
+                if (changedSuppression)
+                {
+                    Debug.WriteLine(
+                        "[REPAIR HOLE FP] restoring FlatPattern ONLY AFTER Repair feature creation/cleanup.");
+
+                    TrySetRepairFlatPatternSuppressed(
+                        model,
+                        flatPatternFeature,
+                        suppress: false);
+                }
+
+                try
+                {
+                    model.EditRebuild3();
+                    model.GraphicsRedraw2();
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        private bool TryRepairRebuildHoleGroupFlatPatternCurrentState(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            object facePersistReference,
+            double[] wizardPickPoint,
+            RepairHoleGroup selectedGroup,
+            double repairDiameterM,
+            double depthM,
+            LooseSize targetLooseSize,
+            MakeHoleOptions options,
+            Feature flatPatternFeature,
+            out int createdCount,
+            out string message)
+        {
+            createdCount = 0;
+            message = "";
+
+            if (model == null
+                || sourceFace == null
+                || selectedGroup?.Candidates == null
+                || selectedGroup.Candidates.Count == 0
+                || flatPatternFeature == null)
+            {
+                message = "Dữ liệu FlatPattern Repair không hợp lệ.";
+                return false;
+            }
+
+            // The whole command is defined in the currently displayed flat state.
+            // Never switch to folded state here.
+            if (TryGetFeatureSuppressedState(flatPatternFeature, out bool isSuppressed)
+                && isSuppressed)
+            {
+                message = "FlatPattern đang suppressed. Hãy mở FlatPattern rồi chọn mặt phẳng cần Repair.";
+                return false;
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE FLAT] FlatPattern remains ACTIVE. feature="
+                + SafeFeatureName(flatPatternFeature)
+                + ", candidates="
+                + selectedGroup.Candidates.Count.ToString(CultureInfo.InvariantCulture));
+
+            Debug.WriteLine(
+                "[REPAIR HOLE RH-P] associative FlatPattern path: "
+                + "create Fill Surface references -> RH-P -> optional Delete Face + Patch -> Hole Wizard constrained to RH-P.");
+
+            // Keep RH-P as the authoritative associative position reference.
+            // Do not replace it with cached XYZ coordinates: cached coordinates are
+            // only a scan-time aid and will not follow later model changes.
+            bool ok = TryRepairRebuildHoleGroupDirectOrdered(
+                model,
+                sourceFace,
+                facePersistReference,
+                wizardPickPoint,
+                selectedGroup,
+                repairDiameterM,
+                depthM,
+                targetLooseSize,
+                options,
+                out createdCount,
+                out message);
+
+            // Safety invariant: this path must never suppress FlatPattern.
+            if (TryGetFeatureSuppressedState(flatPatternFeature, out bool afterSuppressed)
+                && afterSuppressed)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE FLAT] SAFETY: FlatPattern unexpectedly became suppressed; restoring active state.");
+                TrySetRepairFlatPatternSuppressed(
+                    model,
+                    flatPatternFeature,
+                    suppress: false);
+            }
+
+            if (ok)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE FLAT] success in FlatPattern CURRENT STATE. holes="
+                    + createdCount.ToString(CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE FLAT] failed in FlatPattern CURRENT STATE. "
+                    + (message ?? ""));
+            }
+
+            return ok;
+        }
+
+        private bool TryRepairRebuildHoleGroupFlatPatternFast(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            object facePersistReference,
+            double[] wizardPickPoint,
+            RepairHoleGroup selectedGroup,
+            double repairDiameterM,
+            double depthM,
+            LooseSize targetLooseSize,
+            MakeHoleOptions options,
+            out int createdCount,
+            out string message)
+        {
+            createdCount = 0;
+            message = "";
+
+            if (model == null
+                || sourceFace == null
+                || selectedGroup?.Candidates == null
+                || selectedGroup.Candidates.Count == 0)
+            {
+                message = "Dữ liệu Fast FlatPattern Repair không hợp lệ.";
+                return false;
+            }
+
+            List<double[]> centers = selectedGroup.Candidates
+                .Select(candidate => candidate?.FallbackCenter)
+                .Where(IsPoint)
+                .Select(point => new double[3] { point[0], point[1], point[2] })
+                .ToList();
+
+            List<double[]> directions = selectedGroup.Candidates
+                .Select(candidate => candidate?.MajorDirection)
+                .Select(direction => IsPoint(direction)
+                    ? new double[3] { direction[0], direction[1], direction[2] }
+                    : null)
+                .ToList();
+
+            if (centers.Count != selectedGroup.Candidates.Count)
+            {
+                message = "Không có đủ tâm cached để dùng Fast FlatPattern Repair.";
+                return false;
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE FAST] direct centers. count="
+                + centers.Count.ToString(CultureInfo.InvariantCulture)
+                + ", no FillSurface, no RH-P, no RH-DelSurf.");
+
+            // Resolve all side faces BEFORE Delete Face while the original loops
+            // are still alive.  This is the only topology-dependent lookup needed.
+            List<Face2> sideFaces =
+                GetRepairHoleSideFaces(
+                    sourceFace,
+                    selectedGroup,
+                    out Dictionary<Face2, int> faceToLoopIndex);
+
+            if (sideFaces == null || sideFaces.Count == 0)
+            {
+                message = "Không tìm được mặt thành lỗ cho Fast Delete Face + Patch.";
+                return false;
+            }
+
+            FacePlaneFrame frame = CreateFacePlaneFrame(sourceFace);
+
+            if (!TryDeleteAndPatchRepairFacesCurrentState(
+                    model,
+                    sideFaces,
+                    sourceFace,
+                    faceToLoopIndex,
+                    out Feature patchFeature,
+                    out string patchError))
+            {
+                message = patchError;
+                return false;
+            }
+
+            Face2 currentFace = TryRestoreRepairFace(model, facePersistReference);
+            if (currentFace == null || !IsPlanarFace(currentFace))
+            {
+                currentFace = FindMatchingPlanarFace(model, frame);
+            }
+
+            if (currentFace == null || !IsPlanarFace(currentFace))
+            {
+                if (patchFeature != null)
+                {
+                    TryDeleteRepairFeature(model, patchFeature, includeAbsorbed: false);
+                }
+                message = "Delete Face thành công nhưng không restore được mặt FlatPattern.";
+                return false;
+            }
+
+            Feature feature = TryCreateRepairHoleWizardCuts(
+                model,
+                currentFace,
+                wizardPickPoint,
+                centers,
+                targetLooseSize == null ? null : directions,
+                null,
+                targetLooseSize,
+                repairDiameterM,
+                depthM,
+                out createdCount,
+                out string wizardMessage);
+
+            if (feature == null)
+            {
+                if (patchFeature != null)
+                {
+                    TryDeleteRepairFeature(model, patchFeature, includeAbsorbed: false);
+                }
+                message = "Fast Delete Face thành công nhưng Hole Wizard thất bại: "
+                    + wizardMessage;
+                return false;
+            }
+
+            ApplyRepairHoleFeatureName(model, feature, options);
+
+            Debug.WriteLine(
+                "[REPAIR HOLE FAST] success. holes="
+                + createdCount.ToString(CultureInfo.InvariantCulture));
+            return true;
+        }
+
+        private bool TryRepairRebuildHoleGroupDirectOrdered(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            object facePersistReference,
+            double[] wizardPickPoint,
+            RepairHoleGroup selectedGroup,
+            double repairDiameterM,
+            double depthM,
+            LooseSize targetLooseSize,
+            MakeHoleOptions options,
+            out int createdCount,
+            out string message)
+        {
+            createdCount = 0;
+            message = "";
+
+            if (!TryBuildRepairReferencesForCandidates(
+                    model,
+                    sourceFace,
+                    selectedGroup.Candidates,
+                    out List<double[]> centers,
+                    out List<double[]> directions,
+                    out List<Feature> fillFeatures,
+                    out string buildMessage))
+            {
+                message = buildMessage;
+                return false;
+            }
+
+            List<Feature> pointFeatures =
+                TryCreateRepairReferencePoints(
+                    model,
+                    fillFeatures);
+
+            if (pointFeatures == null
+                || pointFeatures.Count != selectedGroup.Candidates.Count
+                || pointFeatures.Any(point => point == null))
+            {
+                CleanupFailedRepairHole(
+                    model,
+                    null,
+                    pointFeatures,
+                    fillFeatures);
+                message = "Không tạo đủ RH-P trước Delete Face.";
+                return false;
+            }
+
+            Feature deleteFillBodiesFeature =
+                TryInsertDeleteBodyForRepairFillSurfaces(
+                    model,
+                    fillFeatures);
+
+            if (deleteFillBodiesFeature == null)
+            {
+                CleanupFailedRepairHole(
+                    model,
+                    null,
+                    pointFeatures,
+                    fillFeatures);
+                message = "Không tạo được RH-DelSurf trước Delete Face.";
+                return false;
+            }
+
+            List<Face2> sideFaces =
+                GetRepairHoleSideFaces(
+                    sourceFace,
+                    selectedGroup,
+                    out Dictionary<Face2, int> faceToLoopIndex);
+
+            if (sideFaces == null || sideFaces.Count == 0)
+            {
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    pointFeatures,
+                    fillFeatures);
+                message = "Không tìm được mặt thành lỗ để Delete Face + Patch.";
+                return false;
+            }
+
+            if (!TryDeleteAndPatchRepairFacesCurrentState(
+                    model,
+                    sideFaces,
+                    sourceFace,
+                    faceToLoopIndex,
+                    out Feature patchFeature,
+                    out string patchError))
+            {
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    pointFeatures,
+                    fillFeatures);
+                message = patchError;
+                return false;
+            }
+
+            FacePlaneFrame frame = CreateFacePlaneFrame(sourceFace);
+            Face2 currentFace =
+                TryRestoreRepairFace(
+                    model,
+                    facePersistReference);
+
+            if (currentFace == null || !IsPlanarFace(currentFace))
+            {
+                currentFace =
+                    FindMatchingPlanarFace(
+                        model,
+                        frame);
+            }
+
+            if (currentFace == null || !IsPlanarFace(currentFace))
+            {
+                TryDeleteRepairFeature(
+                    model,
+                    patchFeature,
+                    includeAbsorbed: false);
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    pointFeatures,
+                    fillFeatures);
+                message = "Delete Face thành công nhưng không restore được mặt để Hole Wizard.";
+                return false;
+            }
+
+            centers = pointFeatures
+                .Select(TryGetReferencePointCoordinates)
+                .ToList();
+
+            if (centers.Any(point => !IsPoint(point)))
+            {
+                TryDeleteRepairFeature(
+                    model,
+                    patchFeature,
+                    includeAbsorbed: false);
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    pointFeatures,
+                    fillFeatures);
+                message = "Không đọc lại được tọa độ RH-P sau Delete Face.";
+                return false;
+            }
+
+            LooseSize currentLooseSize = null;
+            if (targetLooseSize != null)
+            {
+                currentLooseSize = new LooseSize
+                {
+                    WidthM = targetLooseSize.WidthM,
+                    LengthM = targetLooseSize.LengthM
+                };
+            }
+
+            Feature feature =
+                TryCreateRepairHoleWizardCuts(
+                    model,
+                    currentFace,
+                    wizardPickPoint,
+                    centers,
+                    currentLooseSize == null ? null : directions,
+                    pointFeatures,
+                    currentLooseSize,
+                    repairDiameterM,
+                    depthM,
+                    out createdCount,
+                    out string wizardMessage);
+
+            if (feature == null)
+            {
+                TryDeleteRepairFeature(
+                    model,
+                    patchFeature,
+                    includeAbsorbed: false);
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    pointFeatures,
+                    fillFeatures);
+                message = "Delete Face thành công nhưng Hole Wizard thất bại: "
+                    + wizardMessage;
+                return false;
+            }
+
+            ApplyRepairHoleFeatureName(
+                model,
+                feature,
+                options);
+
+            TryGroupRepairHoleReferenceFeatures(
+                model,
+                fillFeatures,
+                pointFeatures,
+                repairDiameterM,
+                createdCount);
+
+            return true;
+        }
+
+        private bool TryRepairRebuildHoleGroup(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            object facePersistReference,
+            double[] wizardPickPoint,
+            RepairHoleGroup selectedGroup,
+            double repairDiameterM,
+            double depthM,
+            LooseSize targetLooseSize,
+            MakeHoleOptions options,
+            out int createdCount,
+            out string message)
+        {
+            createdCount = 0;
+            message = "";
+
+            if (model == null
+                || sourceFace == null
+                || selectedGroup?.Candidates == null
+                || selectedGroup.Candidates.Count == 0
+                || repairDiameterM <= 1E-06)
+            {
+                message = "Thông số Rebuild Repair không hợp lệ.";
+                return false;
+            }
+
+            Feature flatPatternFeature =
+                GetRepairFlatPatternFeature(
+                    model,
+                    sourceFace);
+
+            bool sourceIsFlatPattern = false;
+            try
+            {
+                Feature sourceFeature =
+                    sourceFace.GetFeature() as Feature;
+                sourceIsFlatPattern =
+                    sourceFeature != null
+                    && string.Equals(
+                        sourceFeature.GetTypeName2(),
+                        "FlatPattern",
+                        StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+            }
+
+            if (sourceIsFlatPattern && flatPatternFeature != null)
+            {
+                // Repair Hole is intentionally a FLAT-PATTERN operation.
+                // The selected FlatPattern face is the authoritative geometry.
+                // Do NOT suppress FlatPattern and do NOT map the candidates back
+                // to folded CurvePattern/HoleWzd instances.  Creating the repair
+                // in folded state makes a true folded cylinder unfold into a
+                // deformed profile again, which defeats the purpose of Repair Hole.
+                Debug.WriteLine(
+                    "[REPAIR HOLE FLAT] mode=FlatPattern CURRENT STATE: "
+                    + "keep FlatPattern active -> create RH-P on flat loops -> Delete Face + Patch on flat walls -> Hole Wizard on flat face. NO FOLDED MAPPING.");
+
+                return TryRepairRebuildHoleGroupFlatPatternCurrentState(
+                    model,
+                    sourceFace,
+                    facePersistReference,
+                    wizardPickPoint,
+                    selectedGroup,
+                    repairDiameterM,
+                    depthM,
+                    targetLooseSize,
+                    options,
+                    flatPatternFeature,
+                    out createdCount,
+                    out message);
+            }
+
+            Debug.WriteLine(
+                "[REPAIR HOLE BATCH] ordered mode=Direct: "
+                + "create RH-P -> Delete Face -> Hole Wizard.");
+
+            return TryRepairRebuildHoleGroupDirectOrdered(
+                model,
+                sourceFace,
+                facePersistReference,
+                wizardPickPoint,
+                selectedGroup,
+                repairDiameterM,
+                depthM,
+                targetLooseSize,
+                options,
+                out createdCount,
+                out message);
+        }
+
+        private bool TryRepairSingleHoleGroup(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            object facePersistReference,
+            double[] wizardPickPoint,
+            RepairHoleGroup selectedGroup,
+            double repairDiameterM,
+            double depthM,
+            LooseSize targetLooseSize,
+            MakeHoleOptions options,
+            out int createdCount,
+            out string message)
+        {
+            createdCount = 0;
+            message = "";
+
+            if (model == null
+                || sourceFace == null
+                || selectedGroup == null
+                || selectedGroup.Candidates == null
+                || selectedGroup.Candidates.Count == 0
+                || repairDiameterM <= 1E-06)
+            {
+                message = "Dữ liệu nhóm Repair không hợp lệ.";
+                return false;
+            }
+
+            // RH-P is intentionally retained even when the target fully contains
+            // the old opening.  The Repair Hole feature must remain associative
+            // when the sheet-metal geometry changes later; therefore a direct
+            // cached-XYZ Hole Wizard fast path is not allowed here.
+
+            if (!TryBuildRepairReferencesForCandidates(
+                    model,
+                    sourceFace,
+                    selectedGroup.Candidates,
+                    out List<double[]> centers,
+                    out List<double[]> directions,
+                    out List<Feature> fillFeatures,
+                    out string buildMessage))
+            {
+                message = buildMessage;
+                return false;
+            }
+
+            List<Feature> pointFeatures = TryCreateRepairReferencePoints(model, fillFeatures);
+            bool pointsOk = pointFeatures != null
+                && pointFeatures.Count == fillFeatures.Count
+                && pointFeatures.All(p => p != null);
+
+            if (!pointsOk)
+            {
+                CleanupFailedRepairHole(model, null, pointFeatures, fillFeatures);
+                message = "Có tâm lỗ không tạo được Reference Point RH-P.";
+                return false;
+            }
+
+            Feature deleteFillBodiesFeature =
+                TryInsertDeleteBodyForRepairFillSurfaces(model, fillFeatures);
+
+            if (deleteFillBodiesFeature == null)
+            {
+                CleanupFailedRepairHole(model, null, pointFeatures, fillFeatures);
+                message = "Không xóa/ẩn được temporary Fill Surface body.";
+                return false;
+            }
+
+            try
+            {
+                model.EditRebuild3();
+            }
+            catch
+            {
+            }
+
+            Face2 currentFace = TryRestoreRepairFace(model, facePersistReference);
+            if (currentFace == null || !IsPlanarFace(currentFace))
+            {
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    pointFeatures,
+                    fillFeatures);
+                message = "Không restore được mặt gốc trước khi tạo Hole Wizard.";
+                return false;
+            }
+
+            LooseSize currentLooseSize = null;
+            if (targetLooseSize != null)
+            {
+                currentLooseSize = new LooseSize
+                {
+                    WidthM = targetLooseSize.WidthM,
+                    LengthM = targetLooseSize.LengthM
+                };
+            }
+            Feature feature;
+            string wizardMessage;
+
+            if (currentLooseSize == null)
+            {
+                feature = TryCreateRepairHoleWizardCuts(
+                    model,
+                    currentFace,
+                    wizardPickPoint,
+                    centers,
+                    null,
+                    pointFeatures,
+                    null,
+                    repairDiameterM,
+                    depthM,
+                    out createdCount,
+                    out wizardMessage);
+            }
+            else
+            {
+                feature = TryCreateRepairHoleWizardCuts(
+                    model,
+                    currentFace,
+                    wizardPickPoint,
+                    centers,
+                    directions,
+                    pointFeatures,
+                    currentLooseSize,
+                    repairDiameterM,
+                    depthM,
+                    out createdCount,
+                    out wizardMessage);
+            }
+
+            if (feature == null)
+            {
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    pointFeatures,
+                    fillFeatures);
+                message = "Không tạo được Hole Wizard: " + wizardMessage;
+                return false;
+            }
+
+            ApplyRepairHoleFeatureName(model, feature, options);
+            TryGroupRepairHoleReferenceFeatures(
+                model,
+                fillFeatures,
+                pointFeatures,
+                repairDiameterM,
+                createdCount);
+
+            return true;
+        }
+
         private bool TryRepairHolesFromPlanarFace(
             ModelDoc2 model,
             Face2 face,
@@ -8231,263 +14277,712 @@ namespace ADDIN.Commands
         {
             repairedCount = 0;
             message = "";
-            if (model == null || face == null || diameterM <= 1E-06 || depthM <= 1E-06)
-            {
-                message = "Thong so Repair Hole khong hop le.";
-                return false;
-            }
-            object facePersistReference = TryGetRepairPersistentReference(model, face);
-            if (facePersistReference == null)
-            {
-                message =
-                    "Khong tao duoc persistent reference cua mat goc. "
-                    + "Repair Hole da dung de tranh chon nham mat.";
 
-                Debug.WriteLine(
-                    "[REPAIR HOLE] STOP: source face persistent reference=null");
-
+            if (model == null || face == null || depthM <= 1E-06)
+            {
+                message = "Thông số Repair Hole không hợp lệ.";
                 return false;
             }
 
-            // 1. READ-ONLY scan of all inner loops on selected face
-            List<RepairHoleLoopCandidate> allCandidates = ScanRepairHoleLoops(face, out string scanMessage);
-            if (allCandidates == null || allCandidates.Count == 0)
+            List<RepairHoleLoopCandidate> initialCandidates =
+                ScanRepairHoleLoops(face, out string scanMessage);
+
+            if (initialCandidates == null || initialCandidates.Count == 0)
             {
                 message = !string.IsNullOrWhiteSpace(scanMessage)
                     ? scanMessage
-                    : "Khong tim thay loop lo tren mat phang da chon.";
-                Debug.WriteLine("[REPAIR HOLE] STOP: no inner loops found on face.");
+                    : "Không tìm thấy lỗ méo cần Repair. Lỗ tròn hoàn chỉnh không được Repair.";
                 return false;
             }
 
-            // 2. Group detected holes by measured size
-            List<RepairHoleGroup> groups = GroupRepairHoleCandidates(allCandidates);
-            if (groups == null || groups.Count == 0)
+            List<RepairHoleGroup> initialGroups =
+                GroupRepairHoleCandidates(initialCandidates);
+            if (initialGroups == null || initialGroups.Count == 0)
             {
-                message = "Khong phan nhom duoc lo nao tren mat da chon.";
-                Debug.WriteLine("[REPAIR HOLE] STOP: grouping produced 0 groups.");
+                message = "Không phân nhóm được lỗ méo nào trên mặt đã chọn.";
                 return false;
             }
 
-            // 3. Show modal selection popup
-            RepairHoleGroup selectedGroup = null;
-            double chosenRepairDiaM = diameterM;
-            using (RepairHoleSourceSelectionDialog dialog = new RepairHoleSourceSelectionDialog(groups, diameterM * 1000.0, looseSize))
+            List<RepairHoleBatchItem> repairItems = null;
+            List<RepairHoleBatchItem> previousInput = null;
+
+            // Keep the table open/re-openable when the user rejects Rebuild Repair.
+            // Previous values are preserved so No means "quay lại bảng", not cancel.
+            while (true)
             {
-                DialogResult dialogResult = dialog.ShowDialog();
-                if (dialogResult != DialogResult.OK || dialog.SelectedGroup == null)
+                using (RepairHoleSourceSelectionDialog dialog =
+                    new RepairHoleSourceSelectionDialog(initialGroups, looseSize, previousInput))
                 {
-                    message = "Nguoi dung da huy chon nhom lo Repair.";
-                    Debug.WriteLine("[REPAIR HOLE] user cancelled source group selection.");
+                    DialogResult result = dialog.ShowDialog();
+                    if (result != DialogResult.OK)
+                    {
+                        message = "Người dùng đã hủy Repair Hole.";
+                        return false;
+                    }
+
+                    repairItems = dialog.SelectedRepairs;
+                }
+
+                if (repairItems == null || repairItems.Count == 0)
+                {
+                    message = "Không có nhóm lỗ nào được nhập kích thước Repair.";
                     return false;
                 }
-                selectedGroup = dialog.SelectedGroup;
-                if (dialog.SelectedRepairDiameterMm > 1E-06)
+
+                List<RepairHoleBatchItem> rebuildItems =
+                    MarkRepairItemsRequiringRebuild(face, initialGroups, repairItems);
+
+                if (rebuildItems.Count == 0)
                 {
-                    chosenRepairDiaM = dialog.SelectedRepairDiameterMm / 1000.0;
+                    break;
                 }
+
+                DialogResult rebuildResult = MessageBox.Show(
+                    BuildRebuildRepairWarning(rebuildItems),
+                    "Repair Hole",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+
+                if (rebuildResult == DialogResult.Yes)
+                {
+                    break;
+                }
+
+                // No = return to the same table and keep all entered values.
+                previousInput = repairItems;
             }
 
-            diameterM = chosenRepairDiaM;
-            if (looseSize != null && chosenRepairDiaM > 1E-06)
-            {
-                looseSize.WidthM = chosenRepairDiaM;
-            }
-
-            List<RepairHoleLoopCandidate> selectedCandidates = selectedGroup.Candidates;
-            Debug.WriteLine("[REPAIR HOLE] selected source group: " + selectedGroup.DisplayText
-                + ", count=" + selectedCandidates.Count
-                + ", chosen repairDia=" + (diameterM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + "mm");
-
-            // 5. Create Fill Surfaces ONLY for selected candidates
-            if (!TryBuildRepairReferencesForCandidates(
+            return ExecuteRepairHoleBatchCore(
                 model,
                 face,
-                selectedCandidates,
-                out List<double[]> repairHoleCentersFromFace,
-                out List<double[]> looseDirections,
-                out List<Feature> temporaryFillFeatures,
-                out string buildRefMessage))
+                wizardPickPoint,
+                depthM,
+                options,
+                repairItems,
+                out repairedCount,
+                out message);
+        }
+
+        private bool TryExecuteRepairHoleBatchFlatPatternFast(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            object facePersistReference,
+            double[] wizardPickPoint,
+            double depthM,
+            MakeHoleOptions options,
+            List<RepairHoleBatchItem> repairItems,
+            out bool applicable,
+            out int repairedCount,
+            out string message)
+        {
+            applicable = false;
+            repairedCount = 0;
+            message = "";
+
+            if (model == null
+                || sourceFace == null
+                || repairItems == null
+                || repairItems.Count == 0
+                || repairLastScannedGroups == null
+                || repairLastScannedGroups.Count == 0
+                || repairLastScannedFace == null
+                || !AreSameEntities(repairLastScannedFace, sourceFace))
             {
-                message = buildRefMessage;
                 return false;
             }
 
-            Debug.WriteLine("[REPAIR HOLE] kept fill surfaces=" + (temporaryFillFeatures?.Count ?? 0));
-            Debug.WriteLine("[REPAIR HOLE] face scan centers=" + repairHoleCentersFromFace.Count
-                + ", type=" + ((looseSize == null) ? "Circle" : "Loose")
-                + ", directions=" + looseDirections.Count);
-
-            List<Feature> repairPointFeatures = TryCreateRepairReferencePoints(model, temporaryFillFeatures);
-            bool referencePointsOk =
-                repairPointFeatures != null
-                && repairPointFeatures.Count == temporaryFillFeatures.Count
-                && repairPointFeatures.All(p => p != null);
-
-            if (!referencePointsOk)
-            {
-                Debug.WriteLine(
-                    "[REPAIR HOLE] STOP: RH-P creation incomplete."
-                    + " expected=" + temporaryFillFeatures.Count
-                    + ", actual="
-                    + (repairPointFeatures == null
-                        ? 0
-                        : repairPointFeatures.Count(p => p != null)));
-
-                CleanupFailedRepairHole(
-                    model,
-                    null,
-                    repairPointFeatures,
-                    temporaryFillFeatures);
-
-                message =
-                    "Co tam lo khong tao duoc Reference Point RH-P. "
-                    + "Repair Hole da dung de tranh sai vi tri.";
-
-                return false;
-            }
-
-            Feature deleteFillBodiesFeature = TryInsertDeleteBodyForRepairFillSurfaces(
-                model,
-                temporaryFillFeatures);
-
-            if (deleteFillBodiesFeature == null)
-            {
-                Debug.WriteLine(
-                    "[REPAIR HOLE] STOP: RH-DelSurf creation failed.");
-
-                CleanupFailedRepairHole(
-                    model,
-                    null,
-                    repairPointFeatures,
-                    temporaryFillFeatures);
-
-                message =
-                    "Khong an/xoa duoc temporary Fill Surface body. "
-                    + "Repair Hole da dung de tranh Hole Wizard chon nham surface.";
-
-                return false;
-            }
-
+            Feature sourceFeature = null;
             try
             {
-                model.EditRebuild3();
+                sourceFeature = sourceFace.GetFeature() as Feature;
             }
             catch
             {
             }
 
-            Face2 currentFace = TryRestoreRepairFace(model, facePersistReference);
-            if (currentFace == null)
+            if (sourceFeature == null
+                || !string.Equals(
+                    sourceFeature.GetTypeName2(),
+                    "FlatPattern",
+                    StringComparison.OrdinalIgnoreCase))
             {
-                Debug.WriteLine(
-                    "[REPAIR HOLE] STOP: cannot restore original source face.");
-
-                CleanupFailedRepairHole(
-                    model,
-                    deleteFillBodiesFeature,
-                    repairPointFeatures,
-                    temporaryFillFeatures);
-
-                message =
-                    "Khong khoi phuc duoc mat goc sau khi tao "
-                    + "Fill Surface / RH-P. Repair Hole da dung.";
-
                 return false;
             }
 
-            if (!IsPlanarFace(currentFace))
+            List<RepairHoleGroup> mappedGroups = new List<RepairHoleGroup>();
+            foreach (RepairHoleBatchItem item in repairItems)
             {
-                Debug.WriteLine(
-                    "[REPAIR HOLE] STOP: restored source face is not planar.");
-
-                CleanupFailedRepairHole(
-                    model,
-                    deleteFillBodiesFeature,
-                    repairPointFeatures,
-                    temporaryFillFeatures);
-
-                message =
-                    "Mat goc sau khi restore khong con la planar face. "
-                    + "Repair Hole da dung.";
-
-                return false;
-            }
-
-            int createdCount;
-            Feature feature;
-            if (looseSize == null)
-            {
-                string wizardMessage;
-                feature = TryCreateRepairHoleWizardCuts(
-                    model,
-                    currentFace,
-                    wizardPickPoint,
-                    repairHoleCentersFromFace,
-                    null,
-                    repairPointFeatures,
-                    null,
-                    diameterM,
-                    depthM,
-                    out createdCount,
-                    out wizardMessage);
-                if (feature != null)
+                RepairHoleGroup group =
+                    FindMatchingRepairHoleGroup(repairLastScannedGroups, item);
+                if (group == null
+                    || group.Count != item.SourceCount
+                    || group.Candidates == null
+                    || group.Candidates.Count == 0)
                 {
-                    message = "Da tao bang Hole Wizard va da xac nhan dung kich thuoc.";
+                    return false;
                 }
-                else
+                mappedGroups.Add(group);
+            }
+
+            applicable = true;
+            Debug.WriteLine(
+                "[REPAIR HOLE FAST BATCH] START groups="
+                + repairItems.Count.ToString(CultureInfo.InvariantCulture)
+                + ", reuse one TaskPane scan, KEEP associative RH-P, one optional DeleteFace batch.");
+
+            // Build all associative references before any topology-changing operation.
+            // This is the part we must NOT optimize away: RH-P follows the original
+            // hole geometry when the sheet-metal part changes later.
+            List<List<Feature>> groupFillFeatures = new List<List<Feature>>();
+            List<List<Feature>> groupPointFeatures = new List<List<Feature>>();
+            List<List<double[]>> groupDirections = new List<List<double[]>>();
+            List<Feature> allFillFeatures = new List<Feature>();
+            List<Feature> allPointFeatures = new List<Feature>();
+
+            for (int i = 0; i < mappedGroups.Count; i++)
+            {
+                RepairHoleGroup group = mappedGroups[i];
+                if (!TryBuildRepairReferencesForCandidates(
+                        model,
+                        sourceFace,
+                        group.Candidates,
+                        out List<double[]> initialCenters,
+                        out List<double[]> directions,
+                        out List<Feature> fillFeatures,
+                        out string buildMessage))
                 {
-                    Debug.WriteLine("[REPAIR HOLE] Hole Wizard failed. reason=" + wizardMessage);
+                    CleanupFailedRepairHole(
+                        model,
+                        null,
+                        allPointFeatures,
+                        allFillFeatures);
+                    message = "Không tạo được associative reference cho "
+                        + repairItems[i].SourceDisplayText
+                        + ": " + buildMessage;
+                    return false;
+                }
+
+                List<Feature> pointFeatures =
+                    TryCreateRepairReferencePoints(model, fillFeatures);
+
+                bool pointsOk = pointFeatures != null
+                    && pointFeatures.Count == group.Candidates.Count
+                    && pointFeatures.All(point => point != null);
+
+                if (!pointsOk)
+                {
+                    if (pointFeatures != null)
+                    {
+                        allPointFeatures.AddRange(pointFeatures.Where(point => point != null));
+                    }
+                    if (fillFeatures != null)
+                    {
+                        allFillFeatures.AddRange(fillFeatures.Where(fill => fill != null));
+                    }
+                    CleanupFailedRepairHole(
+                        model,
+                        null,
+                        allPointFeatures,
+                        allFillFeatures);
+                    message = "Không tạo đủ RH-P cho "
+                        + repairItems[i].SourceDisplayText
+                        + ".";
+                    return false;
+                }
+
+                groupFillFeatures.Add(fillFeatures);
+                groupPointFeatures.Add(pointFeatures);
+                groupDirections.Add(directions);
+                allFillFeatures.AddRange(fillFeatures.Where(fill => fill != null));
+                allPointFeatures.AddRange(pointFeatures.Where(point => point != null));
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE RH-P] group "
+                    + (i + 1).ToString(CultureInfo.InvariantCulture)
+                    + "/"
+                    + mappedGroups.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", RH-P="
+                    + pointFeatures.Count.ToString(CultureInfo.InvariantCulture)
+                    + "/"
+                    + group.Candidates.Count.ToString(CultureInfo.InvariantCulture));
+            }
+
+            Feature deleteFillBodiesFeature =
+                TryInsertDeleteBodyForRepairFillSurfaces(
+                    model,
+                    allFillFeatures);
+
+            if (deleteFillBodiesFeature == null)
+            {
+                CleanupFailedRepairHole(
+                    model,
+                    null,
+                    allPointFeatures,
+                    allFillFeatures);
+                message = "Không tạo được RH-DelSurf cho associative RH-P batch.";
+                return false;
+            }
+
+            // Collect all holes that actually need topology repair, but keep a
+            // single Delete Face + Patch call for performance.
+            List<Face2> allPatchFaces = new List<Face2>();
+            Dictionary<Face2, int> allFaceToLoopIndex = new Dictionary<Face2, int>();
+
+            for (int i = 0; i < repairItems.Count; i++)
+            {
+                if (!repairItems[i].RequiresRebuildRepair)
+                {
+                    continue;
+                }
+
+                List<Face2> groupFaces = GetRepairHoleSideFaces(
+                    sourceFace,
+                    mappedGroups[i],
+                    out Dictionary<Face2, int> groupFaceToLoopIndex);
+
+                if (groupFaces == null || groupFaces.Count == 0)
+                {
                     CleanupFailedRepairHole(
                         model,
                         deleteFillBodiesFeature,
-                        repairPointFeatures,
-                        temporaryFillFeatures);
-                    message = "Khong tao duoc Hole Wizard: " + wizardMessage;
+                        allPointFeatures,
+                        allFillFeatures);
+                    message = "Không tìm được mặt thành lỗ cho "
+                        + repairItems[i].SourceDisplayText
+                        + ".";
+                    return false;
+                }
+
+                foreach (Face2 face in groupFaces)
+                {
+                    if (face == null)
+                    {
+                        continue;
+                    }
+
+                    bool exists = allPatchFaces.Any(existing => AreSameEntities(existing, face));
+                    if (!exists)
+                    {
+                        allPatchFaces.Add(face);
+                        int loopIndex = -1;
+                        if (groupFaceToLoopIndex != null)
+                        {
+                            foreach (KeyValuePair<Face2, int> pair in groupFaceToLoopIndex)
+                            {
+                                if (AreSameEntities(pair.Key, face))
+                                {
+                                    loopIndex = pair.Value;
+                                    break;
+                                }
+                            }
+                        }
+                        allFaceToLoopIndex[face] = loopIndex;
+                    }
+                }
+            }
+
+            FacePlaneFrame frame = CreateFacePlaneFrame(sourceFace);
+            Feature patchFeature = null;
+
+            if (allPatchFaces.Count > 0)
+            {
+                Debug.WriteLine(
+                    "[REPAIR HOLE FAST BATCH] patch faces="
+                    + allPatchFaces.Count.ToString(CultureInfo.InvariantCulture)
+                    + " -> ONE Delete Face + Patch AFTER RH-P creation.");
+
+                if (!TryDeleteAndPatchRepairFacesCurrentState(
+                        model,
+                        allPatchFaces,
+                        sourceFace,
+                        allFaceToLoopIndex,
+                        out patchFeature,
+                        out string patchError))
+                {
+                    CleanupFailedRepairHole(
+                        model,
+                        deleteFillBodiesFeature,
+                        allPointFeatures,
+                        allFillFeatures);
+                    message = patchError;
                     return false;
                 }
             }
-            else
+
+            Face2 currentFace = TryRestoreRepairFace(model, facePersistReference);
+            if (currentFace == null || !IsPlanarFace(currentFace))
             {
-                string wizardMessage;
-                feature = TryCreateRepairHoleWizardCuts(
+                currentFace = FindMatchingPlanarFace(model, frame);
+            }
+
+            if (currentFace == null || !IsPlanarFace(currentFace))
+            {
+                if (patchFeature != null)
+                {
+                    TryDeleteRepairFeature(model, patchFeature, includeAbsorbed: false);
+                }
+                CleanupFailedRepairHole(
+                    model,
+                    deleteFillBodiesFeature,
+                    allPointFeatures,
+                    allFillFeatures);
+                message = "Không restore được mặt FlatPattern sau batch Patch.";
+                return false;
+            }
+
+            List<Feature> createdFeatures = new List<Feature>();
+            int totalCreated = 0;
+
+            for (int i = 0; i < repairItems.Count; i++)
+            {
+                RepairHoleBatchItem item = repairItems[i];
+                List<Feature> pointFeatures = groupPointFeatures[i];
+
+                // Read positions from RH-P after the topology repair.  This keeps
+                // Hole Wizard positioning driven by the associative reference
+                // features, not by stale scan-time XYZ coordinates.
+                List<double[]> centers = pointFeatures
+                    .Select(TryGetReferencePointCoordinates)
+                    .ToList();
+
+                if (centers.Count != pointFeatures.Count
+                    || centers.Any(point => !IsPoint(point)))
+                {
+                    for (int j = createdFeatures.Count - 1; j >= 0; j--)
+                    {
+                        TryDeleteRepairFeature(model, createdFeatures[j], includeAbsorbed: true);
+                    }
+                    if (patchFeature != null)
+                    {
+                        TryDeleteRepairFeature(model, patchFeature, includeAbsorbed: false);
+                    }
+                    CleanupFailedRepairHole(
+                        model,
+                        deleteFillBodiesFeature,
+                        allPointFeatures,
+                        allFillFeatures);
+                    message = "Không đọc lại được tọa độ RH-P cho "
+                        + item.SourceDisplayText
+                        + ".";
+                    return false;
+                }
+
+                LooseSize looseSize = item.RepairAsLoose
+                    ? new LooseSize
+                    {
+                        WidthM = item.RepairSlotWidthMm / 1000.0,
+                        LengthM = item.RepairSlotLengthMm / 1000.0
+                    }
+                    : null;
+
+                double diameterM = item.RepairDiameterMm / 1000.0;
+                Feature feature = TryCreateRepairHoleWizardCuts(
                     model,
                     currentFace,
                     wizardPickPoint,
-                    repairHoleCentersFromFace,
-                    looseDirections,
-                    repairPointFeatures,
+                    centers,
+                    looseSize == null ? null : groupDirections[i],
+                    pointFeatures,
                     looseSize,
                     diameterM,
                     depthM,
-                    out createdCount,
-                    out wizardMessage);
+                    out int createdCount,
+                    out string wizardMessage);
+
                 if (feature == null)
                 {
-                    Debug.WriteLine("[REPAIR HOLE] Loose Hole Wizard failed. reason=" + wizardMessage);
+                    for (int j = createdFeatures.Count - 1; j >= 0; j--)
+                    {
+                        TryDeleteRepairFeature(model, createdFeatures[j], includeAbsorbed: true);
+                    }
+                    if (patchFeature != null)
+                    {
+                        TryDeleteRepairFeature(model, patchFeature, includeAbsorbed: false);
+                    }
                     CleanupFailedRepairHole(
                         model,
                         deleteFillBodiesFeature,
-                        repairPointFeatures,
-                        temporaryFillFeatures);
-                    message = "Khong tao duoc Loose Hole Wizard: " + wizardMessage;
+                        allPointFeatures,
+                        allFillFeatures);
+                    message = "Associative batch lỗi tại "
+                        + item.SourceDisplayText
+                        + " -> "
+                        + GetRepairTargetDescription(item)
+                        + ": "
+                        + wizardMessage;
                     return false;
                 }
-                message = "Loose Hole Wizard da tao point tam va 2 point dieu khien huong cho moi slot; chi rang buoc point tam vao reference point de co the chinh huong thu cong.";
-            }
-            if (feature == null)
-            {
-                CleanupFailedRepairHole(
+
+                createdFeatures.Add(feature);
+                ApplyRepairHoleFeatureName(model, feature, options);
+                totalCreated += createdCount;
+
+                TryGroupRepairHoleReferenceFeatures(
                     model,
-                    deleteFillBodiesFeature,
-                    repairPointFeatures,
-                    temporaryFillFeatures);
-                message = "Da tim thay tam lo nhung chua tao duoc Hole Wizard/Extrude Cut. Hay xem log [REPAIR HOLE] trong Output.";
+                    groupFillFeatures[i],
+                    pointFeatures,
+                    diameterM,
+                    createdCount);
+
+                Debug.WriteLine(
+                    "[REPAIR HOLE FAST BATCH] HW "
+                    + (i + 1).ToString(CultureInfo.InvariantCulture)
+                    + "/"
+                    + repairItems.Count.ToString(CultureInfo.InvariantCulture)
+                    + ", holes="
+                    + createdCount.ToString(CultureInfo.InvariantCulture)
+                    + ", drivenByRH-P=True");
+
+                if (i + 1 < repairItems.Count)
+                {
+                    Face2 restored = TryRestoreRepairFace(model, facePersistReference);
+                    if (restored != null && IsPlanarFace(restored))
+                    {
+                        currentFace = restored;
+                    }
+                    else
+                    {
+                        currentFace = FindMatchingPlanarFace(model, frame);
+                    }
+
+                    if (currentFace == null || !IsPlanarFace(currentFace))
+                    {
+                        message = "Không restore được mặt cho nhóm Repair kế tiếp.";
+                        return false;
+                    }
+                }
+            }
+
+            try
+            {
+                model.EditRebuild3();
+                model.GraphicsRedraw2();
+            }
+            catch
+            {
+            }
+
+            repairedCount = totalCreated;
+            message = "Đã Repair "
+                + repairItems.Count.ToString(CultureInfo.InvariantCulture)
+                + " nhóm / "
+                + totalCreated.ToString(CultureInfo.InvariantCulture)
+                + " lỗ. RH-P được giữ lại để vị trí Hole Wizard cập nhật theo model.";
+
+            repairLastScannedFace = null;
+            repairLastScannedGroups = null;
+
+            Debug.WriteLine(
+                "[REPAIR HOLE FAST BATCH] SUCCESS totalHoles="
+                + totalCreated.ToString(CultureInfo.InvariantCulture)
+                + ", associativeRH-P=True");
+            return true;
+        }
+
+        private bool ExecuteRepairHoleBatchCore(
+            ModelDoc2 model,
+            Face2 sourceFace,
+            double[] wizardPickPoint,
+            double depthM,
+            MakeHoleOptions options,
+            List<RepairHoleBatchItem> repairItems,
+            out int repairedCount,
+            out string message)
+        {
+            repairedCount = 0;
+            message = "";
+
+            if (model == null
+                || sourceFace == null
+                || repairItems == null
+                || repairItems.Count == 0
+                || depthM <= 1E-06)
+            {
+                message = "Thông số Repair Hole không hợp lệ.";
                 return false;
             }
-            ApplyRepairHoleFeatureName(model, feature, options);
-            TryGroupRepairHoleReferenceFeatures(model, temporaryFillFeatures, repairPointFeatures, diameterM, createdCount);
-            repairedCount = createdCount;
+
+            object facePersistReference =
+                TryGetRepairPersistentReference(
+                    model,
+                    sourceFace);
+
+            if (facePersistReference == null)
+            {
+                message = "Không tạo được persistent reference của mặt gốc.";
+                return false;
+            }
+
+            if (TryExecuteRepairHoleBatchFlatPatternFast(
+                    model,
+                    sourceFace,
+                    facePersistReference,
+                    wizardPickPoint,
+                    depthM,
+                    options,
+                    repairItems,
+                    out bool fastApplicable,
+                    out repairedCount,
+                    out message))
+            {
+                return true;
+            }
+
+            if (fastApplicable)
+            {
+                // Fast mode was applicable but failed after it started. Do not
+                // silently re-enter the legacy path against partially changed
+                // topology. The error message already explains the failing step.
+                return false;
+            }
+
+            int totalCreated = 0;
+            int completedGroups = 0;
+
+            for (int i = 0; i < repairItems.Count; i++)
+            {
+                RepairHoleBatchItem item = repairItems[i];
+
+                // Hole Wizard rebuild changes topology. Never reuse the Edge COM objects
+                // captured by the first scan. Restore the source face and scan again for
+                // every group so 3.3, 4.2, ... become separate safe features.
+                Face2 currentFace = TryRestoreRepairFace(model, facePersistReference);
+                if (currentFace == null || !IsPlanarFace(currentFace))
+                {
+                    message = "Đã Repair " + completedGroups
+                        + " nhóm, sau đó không restore được mặt gốc cho "
+                        + item.SourceDisplayText + ".";
+                    return false;
+                }
+
+                string freshScanMessage = "";
+                List<RepairHoleGroup> freshGroups = null;
+
+                // V19: before the first topology edit, the TaskPane scan is still
+                // fresh and its Edge COM objects are valid. Reuse it once. After a
+                // group creates/deletes features we intentionally rescan for the
+                // next group because topology may have changed.
+                if (i == 0
+                    && repairLastScannedGroups != null
+                    && repairLastScannedFace != null
+                    && AreSameEntities(repairLastScannedFace, currentFace))
+                {
+                    freshGroups = repairLastScannedGroups;
+                    Debug.WriteLine("[REPAIR HOLE FAST] reuse TaskPane scan for first batch group.");
+                }
+                else
+                {
+                    List<RepairHoleLoopCandidate> freshCandidates =
+                        ScanRepairHoleLoops(currentFace, out freshScanMessage);
+                    freshGroups = GroupRepairHoleCandidates(freshCandidates);
+                }
+
+                RepairHoleGroup freshGroup =
+                    FindMatchingRepairHoleGroup(freshGroups, item);
+
+                if (freshGroup == null)
+                {
+                    Debug.WriteLine("[REPAIR HOLE BATCH] group not found after rebuild. source="
+                        + item.SourceDisplayText + ", scan=" + freshScanMessage);
+                    message = "Không tìm lại được nhóm " + item.SourceDisplayText
+                        + " sau rebuild. Repair đã dừng để tránh chọn sai lỗ.";
+                    return false;
+                }
+
+                if (freshGroup.Count != item.SourceCount)
+                {
+                    message = "Số lượng lỗ của " + item.SourceDisplayText
+                        + " đã thay đổi sau rebuild (ban đầu "
+                        + item.SourceCount.ToString(CultureInfo.InvariantCulture)
+                        + ", hiện tại "
+                        + freshGroup.Count.ToString(CultureInfo.InvariantCulture)
+                        + "). Repair đã dừng để tránh tạo sai.";
+                    return false;
+                }
+
+                double repairDiameterM = item.RepairDiameterMm / 1000.0;
+                LooseSize targetLooseSize = null;
+                if (item.RepairAsLoose)
+                {
+                    targetLooseSize = new LooseSize
+                    {
+                        WidthM = item.RepairSlotWidthMm / 1000.0,
+                        LengthM = item.RepairSlotLengthMm / 1000.0
+                    };
+                }
+
+                string targetDescription = GetRepairTargetDescription(item);
+
+                Debug.WriteLine("[REPAIR HOLE BATCH] START "
+                    + item.SourceDisplayText
+                    + " -> " + targetDescription
+                    + ", count=" + freshGroup.Count.ToString(CultureInfo.InvariantCulture));
+
+                bool groupOk;
+                int createdCount;
+                string groupMessage;
+
+                if (item.RequiresRebuildRepair)
+                {
+                    Debug.WriteLine("[REPAIR HOLE BATCH] mode=DELETE FACE + PATCH before Hole Wizard");
+                    groupOk = TryRepairRebuildHoleGroup(
+                        model,
+                        currentFace,
+                        facePersistReference,
+                        wizardPickPoint,
+                        freshGroup,
+                        repairDiameterM,
+                        depthM,
+                        targetLooseSize,
+                        options,
+                        out createdCount,
+                        out groupMessage);
+                }
+                else
+                {
+                    groupOk = TryRepairSingleHoleGroup(
+                        model,
+                        currentFace,
+                        facePersistReference,
+                        wizardPickPoint,
+                        freshGroup,
+                        repairDiameterM,
+                        depthM,
+                        targetLooseSize,
+                        options,
+                        out createdCount,
+                        out groupMessage);
+                }
+
+                if (!groupOk)
+                {
+                    message = "Đã Repair " + completedGroups
+                        + " nhóm. Lỗi tại " + item.SourceDisplayText
+                        + " -> " + targetDescription
+                        + ": " + groupMessage;
+                    return false;
+                }
+
+                completedGroups++;
+                totalCreated += createdCount;
+
+                try
+                {
+                    model.EditRebuild3();
+                    model.GraphicsRedraw2();
+                }
+                catch
+                {
+                }
+            }
+
+            repairedCount = totalCreated;
+            message = "Đã Repair "
+                + completedGroups.ToString(CultureInfo.InvariantCulture)
+                + " nhóm / "
+                + totalCreated.ToString(CultureInfo.InvariantCulture)
+                + " lỗ. Mỗi nhóm được tạo thành một Hole Wizard feature riêng.";
             return true;
         }
 
@@ -8499,6 +14994,24 @@ namespace ADDIN.Commands
             if (model == null || feature == null || options == null)
             {
                 return;
+            }
+            if (!string.IsNullOrWhiteSpace(options.HoleLabel))
+            {
+                try
+                {
+                    var geometry = ADDIN.HoleManagement.HoleGeometryAnalyzer.Analyze(feature,
+                        ADDIN.HoleManagement.HoleFeatureClassifier.Classify(feature));
+                    ADDIN.HoleManagement.HoleMetadataService.Initialize(swApp);
+                    ADDIN.HoleManagement.HoleMetadataService.Write(model, feature,
+                        new ADDIN.HoleManagement.HoleMetadata
+                        {
+                            FamilyId = Guid.NewGuid().ToString("N"),
+                            Label = options.HoleLabel.Trim(),
+                            DiameterMm = geometry == null ? (double?)options.DiameterMm : geometry.DiameterMm,
+                            Role = "Repair"
+                        });
+                }
+                catch (Exception ex) { Debug.WriteLine("[REPAIR HOLE] Metadata failed: " + ex.Message); }
             }
             string requestedName = BuildPaintFeatureName(options);
             if (string.IsNullOrWhiteSpace(requestedName))
@@ -10148,6 +16661,7 @@ namespace ADDIN.Commands
                 int deletedPointCount = DeleteRepairHoleWizardDefaultPoints(model, positionSketch);
                 int expectedPointCount = centers.Count;
                 int createdPointCount = 0;
+                int createdGuideLineCount = 0;
 
                 for (int index = 0; index < centers.Count; index++)
                 {
@@ -10179,6 +16693,18 @@ namespace ADDIN.Commands
 
                     if (isLoose)
                     {
+                        // Fast FlatPattern path intentionally does not create RH-P for
+                        // every hole.  CreatePoint leaves the new point selected; when
+                        // pointFeature is null the old helper returned without clearing
+                        // that selection, and SketchManager.CreateLine could then fail.
+                        // Clear selection explicitly before creating the Slot guide line.
+                        try
+                        {
+                            model.ClearSelection2(All: true);
+                        }
+                        catch
+                        {
+                        }
                         double[] slotDirection = (directions != null && index < directions.Count)
                             ? Normalize(directions[index])
                             : null;
@@ -10219,6 +16745,7 @@ namespace ADDIN.Commands
                             {
                                 dirLine.ConstructionGeometry = true;
                                 lineCreated = true;
+                                createdGuideLineCount++;
                             }
                         }
 
@@ -10239,6 +16766,19 @@ namespace ADDIN.Commands
                 {
                     message = "So point Position Sketch khong dung. Tao duoc "
                         + createdPointCount + "/" + expectedPointCount + ".";
+                    deleteFeatureAfterSketch = true;
+                    return null;
+                }
+
+                if (isLoose && createdGuideLineCount != expectedPointCount)
+                {
+                    message = "Slot guide line khong dung. Tao duoc "
+                        + createdGuideLineCount + "/" + expectedPointCount + ".";
+                    Debug.WriteLine(
+                        "[REPAIR HOLE FAST SLOT] FAIL guideLine="
+                        + createdGuideLineCount.ToString(CultureInfo.InvariantCulture)
+                        + "/"
+                        + expectedPointCount.ToString(CultureInfo.InvariantCulture));
                     deleteFeatureAfterSketch = true;
                     return null;
                 }
@@ -11092,6 +17632,20 @@ namespace ADDIN.Commands
                 Debug.WriteLine("[REPAIR HOLE] loose center coincident skipped. index=" + index
                     + ", hasCenter=" + (slotCenterPoint != null)
                     + ", hasPointFeature=" + (pointFeature != null));
+
+                // Important for the fast path: CreatePoint selects the point.
+                // If there is no RH-P reference feature, clear that selection before
+                // the caller creates the Slot construction/guide line.
+                if (model != null)
+                {
+                    try
+                    {
+                        model.ClearSelection2(All: true);
+                    }
+                    catch
+                    {
+                    }
+                }
                 return;
             }
             try

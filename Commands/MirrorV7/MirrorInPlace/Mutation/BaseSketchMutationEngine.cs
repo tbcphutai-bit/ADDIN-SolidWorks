@@ -1037,12 +1037,29 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                     // expected is already reflected; compare it directly to candidate.
                     double[] a = expected.GetMassProperties(1.0) as double[];
                     double[] b = candidate.GetMassProperties(1.0) as double[];
-                    if (a == null || b == null || Math.Abs(a[3] - b[3]) > Math.Max(1e-15, Math.Abs(a[3]) * 1e-6)) return false;
-                    for (int i = 0; i < 3; i++) if (Math.Abs(a[i] - b[i]) > PointTolerance) return false;
+                    if (a == null || b == null || a.Length < 5 || b.Length < 5 || a[3] <= 0 || b[3] <= 0 ||
+                        a.Concat(b).Any(v => double.IsNaN(v) || double.IsInfinity(v))) return false;
+                    bool massAgrees = Math.Abs(a[3] - b[3]) <= Math.Max(1e-15, Math.Abs(a[3]) * 1e-6);
+                    for (int i = 0; i < 3; i++) massAgrees &= Math.Abs(a[i] - b[i]) <= PointTolerance;
                     if (!SameVertexSet(expected, candidate)) return false;
                     var left = BodyOperationsHelper.BooleanCutStrict(expected, candidate, "INPLACE_EXPECTED_MINUS_ACTUAL");
                     var right = BodyOperationsHelper.BooleanCutStrict(candidate, expected, "INPLACE_ACTUAL_MINUS_EXPECTED");
                     double tolerance = Math.Max(1e-15, Math.Abs(a[3]) * 1e-6);
+                    if (!massAgrees)
+                    {
+                        // In the live bent-sheet regression, equal vertices and two
+                        // EMPTY native cuts proved the same BRep, while GetMassProperties
+                        // gave different numerical integrals for a BSpline bend face.
+                        // Do not enlarge mass/position tolerances or accept a small
+                        // residual in this branch. Require strictly empty differences.
+                        bool exact = left.Success && right.Success && left.Bodies.Count == 0 && right.Bodies.Count == 0;
+                        MirrorV7Diagnostics.Log("[BODY63][MASS_DISAGREEMENT] volumeDelta_m3=" + (b[3] - a[3]) +
+                            " centroidDelta_m=" + string.Join(",", Enumerable.Range(0, 3).Select(i => b[i] - a[i])) +
+                            " vertexSetEqual=True missingCount=" + left.Bodies.Count + " extraCount=" + right.Bodies.Count +
+                            " booleanSuccess=" + left.Success + "," + right.Success +
+                            " proof=EMPTY_BIDIRECTIONAL_BOOLEAN result=" + (exact ? "PASS" : "FAIL"));
+                        return exact;
+                    }
                     return left.Success && right.Success &&
                         left.Bodies.Sum(x => ((double[])x.GetMassProperties(1.0))[3]) <= tolerance &&
                         right.Bodies.Sum(x => ((double[])x.GetMassProperties(1.0))[3]) <= tolerance;

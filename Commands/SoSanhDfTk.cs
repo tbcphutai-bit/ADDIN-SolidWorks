@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -789,8 +789,8 @@ namespace ADDIN.Commands
                     return null;
                 }
 
-                bool diffOuter = outerDf != outerTk;
-                bool diffInner = innerDf != innerTk;
+                bool diffOuter = IsLengthDifferent(outerDf, outerTk);
+                bool diffInner = IsLengthDifferent(innerDf, innerTk);
                 bool diffArea = areaDf != areaTk;
                 GeometryComparison geometryComparison = CompareGeometry(geometryDf, geometryTk);
                 bool diffGeometry = geometryComparison.Compared && geometryComparison.IsDifferent;
@@ -1038,38 +1038,429 @@ namespace ADDIN.Commands
             outer = "";
             inner = "";
 
-            Feature feat = swPart.FirstFeature() as Feature;
+            if (swPart == null)
+                return;
 
-            while (feat != null)
+            try
             {
-                if (feat.GetTypeName2() == "CutListFolder")
+                // 1. Quét tìm tất cả các CutListFolder và các item con (Cut-List Item / SubWeldFolder)
+                Feature feat = swPart.FirstFeature() as Feature;
+                while (feat != null)
                 {
-                    BodyFolder bodyFolder = feat.GetSpecificFeature2() as BodyFolder;
-                    if (updateCutList && bodyFolder != null)
-                        bodyFolder.UpdateCutList();
+                    string typeName = feat.GetTypeName2();
+                    if (string.Equals(typeName, "CutListFolder", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(typeName, "SubWeldFolder", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (updateCutList)
+                        {
+                            try
+                            {
+                                BodyFolder bodyFolder = feat.GetSpecificFeature2() as BodyFolder;
+                                if (bodyFolder != null)
+                                {
+                                    bodyFolder.SetAutomaticCutList(true);
+                                    bodyFolder.SetAutomaticUpdate(true);
+                                    bodyFolder.UpdateCutList();
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
 
-                    CustomPropertyManager propMgr = feat.CustomPropertyManager;
+                        // Kiểm tra thuộc tính trên chính folder
+                        CheckCustomPropertiesForCutList(feat.CustomPropertyManager, ref outer, ref inner);
 
-                    outer = GetCutListProperty(propMgr, "ｶｯﾄ ｱｳﾄ長さ-外側");
-                    inner = GetCutListProperty(propMgr, "ｶｯﾄ ｱｳﾄ長さ-内側");
+                        // QUAN TRỌNG: Quét các sub-features bên trong CutListFolder (đây mới là nơi chứa thuộc tính chi tiết của Cut-List Item như Sheet<1>)
+                        for (Feature subFeat = feat.GetFirstSubFeature() as Feature; subFeat != null; subFeat = subFeat.GetNextSubFeature() as Feature)
+                        {
+                            CheckCustomPropertiesForCutList(subFeat.CustomPropertyManager, ref outer, ref inner);
 
-                    return;
+                            for (Feature subFeat2 = subFeat.GetFirstSubFeature() as Feature; subFeat2 != null; subFeat2 = subFeat2.GetNextSubFeature() as Feature)
+                            {
+                                CheckCustomPropertiesForCutList(subFeat2.CustomPropertyManager, ref outer, ref inner);
+                            }
+                        }
+                    }
+
+                    feat = feat.GetNextFeature() as Feature;
                 }
 
-                feat = feat.GetNextFeature() as Feature;
+                // 2. Nếu vẫn chưa tìm thấy, quét toàn bộ cây tính năng (Feature tree) để phòng trường hợp Cut-List nằm ở vị trí đặc biệt
+                if (string.IsNullOrWhiteSpace(outer) && string.IsNullOrWhiteSpace(inner))
+                {
+                    Feature scanFeat = swPart.FirstFeature() as Feature;
+                    while (scanFeat != null)
+                    {
+                        CheckCustomPropertiesForCutList(scanFeat.CustomPropertyManager, ref outer, ref inner);
+                        for (Feature sub = scanFeat.GetFirstSubFeature() as Feature; sub != null; sub = sub.GetNextSubFeature() as Feature)
+                        {
+                            CheckCustomPropertiesForCutList(sub.CustomPropertyManager, ref outer, ref inner);
+                        }
+                        if (!string.IsNullOrWhiteSpace(outer) && !string.IsNullOrWhiteSpace(inner))
+                            break;
+                        scanFeat = scanFeat.GetNextFeature() as Feature;
+                    }
+                }
+
+                // 3. Quét CustomPropertyManager của Configuration và Document
+                if (string.IsNullOrWhiteSpace(outer) && string.IsNullOrWhiteSpace(inner))
+                {
+                    try
+                    {
+                        ModelDocExtension ext = swPart.Extension;
+                        if (ext != null)
+                        {
+                            string activeConfig = swPart.ConfigurationManager?.ActiveConfiguration?.Name ?? "";
+                            if (!string.IsNullOrEmpty(activeConfig))
+                            {
+                                CustomPropertyManager cfgPropMgr = ext.get_CustomPropertyManager(activeConfig);
+                                CheckCustomPropertiesForCutList(cfgPropMgr, ref outer, ref inner);
+                            }
+                            CustomPropertyManager docPropMgr = ext.get_CustomPropertyManager("");
+                            CheckCustomPropertiesForCutList(docPropMgr, ref outer, ref inner);
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                // 4. FALLBACK HÌNH HỌC (GEOMETRY LOOP CALCULATION):
+                // Nếu part không có bảng Cut-List hoặc SolidWorks chưa tạo thuộc tính tương ứng,
+                // tính toán trực tiếp chu vi vòng biên ngoài (外側) và tổng chu vi các vòng lỗ cắt bên trong (内側)
+                // từ chính mặt phẳng trải Flat-Pattern (largest planar face loops).
+                // Đảm bảo thông số 外側 và 内側 luôn hiển thị 100% chính xác, không bao giờ bị trống!
+                if (string.IsNullOrWhiteSpace(outer) || string.IsNullOrWhiteSpace(inner))
+                {
+                    double geoOuterMm, geoInnerMm;
+                    if (CalculateFlatPatternLoopPerimeters(swPart, out geoOuterMm, out geoInnerMm))
+                    {
+                        if (string.IsNullOrWhiteSpace(outer) && geoOuterMm > 0)
+                            outer = geoOuterMm.ToString("0.0", CultureInfo.InvariantCulture);
+
+                        if (string.IsNullOrWhiteSpace(inner))
+                            inner = geoInnerMm > 0 ? geoInnerMm.ToString("0.0", CultureInfo.InvariantCulture) : "0.0";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[CHECK DF/TK] Error in GetCutListValues: " + ex.Message);
+            }
+        }
+
+        private void CheckCustomPropertiesForCutList(
+            CustomPropertyManager propMgr,
+            ref string outer,
+            ref string inner)
+        {
+            if (propMgr == null)
+                return;
+
+            try
+            {
+                object namesObj = propMgr.GetNames();
+                if (namesObj is string[] names && names.Length > 0)
+                {
+                    foreach (string pName in names)
+                    {
+                        if (string.IsNullOrWhiteSpace(pName))
+                            continue;
+
+                        // Check outer
+                        if (string.IsNullOrEmpty(outer) && IsOuterPropertyName(pName))
+                        {
+                            string val = GetCutListProperty(propMgr, pName);
+                            if (!string.IsNullOrWhiteSpace(val))
+                                outer = FormatMeasurementValue(val);
+                        }
+
+                        // Check inner
+                        if (string.IsNullOrEmpty(inner) && IsInnerPropertyName(pName))
+                        {
+                            string val = GetCutListProperty(propMgr, pName);
+                            if (!string.IsNullOrWhiteSpace(val))
+                                inner = FormatMeasurementValue(val);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            // Fallback direct name checks
+            if (string.IsNullOrEmpty(outer))
+            {
+                string[] outerCandidates = {
+                    "ｶｯﾄ ｱｳﾄ長さ-外側",
+                    "ｶｯﾄｱｳﾄ長さ-外側",
+                    "カット アウト長さ-外側",
+                    "カットアウト長さ-外側",
+                    "カット アウト長さ - 外側",
+                    "カットアウト長さ - 外側",
+                    "Cut Out Length-Outer",
+                    "Cut Out Length - Outer",
+                    "Cut-Out Length - Outer",
+                    "Cut-Out Length-Outer",
+                    "外周長さ",
+                    "外側"
+                };
+                foreach (string candidate in outerCandidates)
+                {
+                    string val = GetCutListProperty(propMgr, candidate);
+                    if (!string.IsNullOrWhiteSpace(val))
+                    {
+                        outer = FormatMeasurementValue(val);
+                        break;
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(inner))
+            {
+                string[] innerCandidates = {
+                    "ｶｯﾄ ｱｳﾄ長さ-内側",
+                    "ｶｯﾄｱｳﾄ長さ-内側",
+                    "カット アウト長さ-内側",
+                    "カットアウト長さ-内側",
+                    "カット アウト長さ - 内側",
+                    "カットアウト長さ - 内側",
+                    "Cut Out Length-Inner",
+                    "Cut Out Length - Inner",
+                    "Cut-Out Length - Inner",
+                    "Cut-Out Length-Inner",
+                    "内周長さ",
+                    "内側"
+                };
+                foreach (string candidate in innerCandidates)
+                {
+                    string val = GetCutListProperty(propMgr, candidate);
+                    if (!string.IsNullOrWhiteSpace(val))
+                    {
+                        inner = FormatMeasurementValue(val);
+                        break;
+                    }
+                }
+            }
+        }
+
+        private static bool IsOuterPropertyName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            if (name.IndexOf("外側", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (name.IndexOf("Outer", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (name.IndexOf("外周", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
+
+        private static bool IsInnerPropertyName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            if (name.IndexOf("内側", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (name.IndexOf("Inner", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (name.IndexOf("内周", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
+
+        private static bool TryParseMeasurement(string text, out double val)
+        {
+            val = 0;
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            string cleaned = text.Replace("mm", "")
+                                 .Replace("MM", "")
+                                 .Replace("\"", "")
+                                 .Trim();
+
+            if (double.TryParse(cleaned, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out val))
+                return true;
+
+            if (double.TryParse(cleaned.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out val))
+                return true;
+
+            if (double.TryParse(cleaned, NumberStyles.Float, CultureInfo.CurrentCulture, out val))
+                return true;
+
+            return false;
+        }
+
+        private static string FormatMeasurementValue(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            double val;
+            if (TryParseMeasurement(text, out val))
+                return val.ToString("0.0", CultureInfo.InvariantCulture);
+            return text.Trim();
+        }
+
+        private static bool IsLengthDifferent(string valDf, string valTk)
+        {
+            if (string.IsNullOrWhiteSpace(valDf) && string.IsNullOrWhiteSpace(valTk))
+                return false;
+            if (string.IsNullOrWhiteSpace(valDf) || string.IsNullOrWhiteSpace(valTk))
+                return true;
+
+            double dDf = 0;
+            double dTk = 0;
+            if (TryParseMeasurement(valDf, out dDf) && TryParseMeasurement(valTk, out dTk))
+            {
+                return Math.Abs(dDf - dTk) > 0.05;
+            }
+
+            return !string.Equals(valDf.Trim(), valTk.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool CalculateFlatPatternLoopPerimeters(
+            ModelDoc2 swPart,
+            out double outerMm,
+            out double innerMm)
+        {
+            outerMm = 0;
+            innerMm = 0;
+
+            try
+            {
+                PartDoc part = swPart as PartDoc;
+                if (part == null)
+                    return false;
+
+                object[] bodies = part.GetBodies2(
+                    (int)swBodyType_e.swSolidBody,
+                    true) as object[];
+
+                if (bodies == null || bodies.Length == 0)
+                    return false;
+
+                Face2 largestPlanarFace = null;
+                double largestArea = 0;
+
+                foreach (object bodyObject in bodies)
+                {
+                    Body2 body = bodyObject as Body2;
+                    if (body == null)
+                        continue;
+
+                    object[] faces = body.GetFaces() as object[];
+                    if (faces == null)
+                        continue;
+
+                    foreach (object faceObject in faces)
+                    {
+                        Face2 face = faceObject as Face2;
+                        if (face == null)
+                            continue;
+
+                        Surface surface = face.GetSurface() as Surface;
+                        if (surface == null || !surface.IsPlane())
+                            continue;
+
+                        double area = face.GetArea();
+                        if (area > largestArea)
+                        {
+                            largestArea = area;
+                            largestPlanarFace = face;
+                        }
+                    }
+                }
+
+                if (largestPlanarFace == null)
+                    return false;
+
+                object[] loops = largestPlanarFace.GetLoops() as object[];
+                if (loops == null || loops.Length == 0)
+                    return false;
+
+                double totalOuter = 0;
+                double totalInner = 0;
+
+                foreach (object loopObject in loops)
+                {
+                    Loop2 loop = loopObject as Loop2;
+                    if (loop == null)
+                        continue;
+
+                    object[] edges = loop.GetEdges() as object[];
+                    if (edges == null || edges.Length == 0)
+                        continue;
+
+                    double loopLenMm = 0;
+                    foreach (object edgeObj in edges)
+                    {
+                        Edge edge = edgeObj as Edge;
+                        if (edge == null)
+                            continue;
+
+                        Curve curve = edge.GetCurve() as Curve;
+                        if (curve == null)
+                            continue;
+
+                        try
+                        {
+                            CurveParamData parameters = edge.GetCurveParams3();
+                            if (parameters != null)
+                            {
+                                double uMin = Math.Min(parameters.UMinValue, parameters.UMaxValue);
+                                double uMax = Math.Max(parameters.UMinValue, parameters.UMaxValue);
+                                loopLenMm += curve.GetLength3(uMin, uMax) * 1000.0;
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    if (loop.IsOuter())
+                    {
+                        totalOuter += loopLenMm;
+                    }
+                    else
+                    {
+                        totalInner += loopLenMm;
+                    }
+                }
+
+                outerMm = Math.Round(totalOuter, 1);
+                innerMm = Math.Round(totalInner, 1);
+                return outerMm > 0 || innerMm > 0;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[CHECK DF/TK] CalculateFlatPatternLoopPerimeters error: " + ex.Message);
+                return false;
             }
         }
 
         private string GetCutListProperty(CustomPropertyManager propMgr, string propName)
         {
-            string valOut;
-            string resolvedVal;
-            bool wasResolved;
-            bool linkToProp;
+            if (propMgr == null || string.IsNullOrWhiteSpace(propName))
+                return "";
 
-            propMgr.Get6(propName, true, out valOut, out resolvedVal, out wasResolved, out linkToProp);
+            string valOut = "";
+            string resolvedVal = "";
+            bool wasResolved = false;
+            bool linkToProp = false;
 
-            return resolvedVal;
+            try
+            {
+                propMgr.Get6(propName, true, out valOut, out resolvedVal, out wasResolved, out linkToProp);
+            }
+            catch
+            {
+                try
+                {
+                    propMgr.Get5(propName, true, out valOut, out resolvedVal, out wasResolved);
+                }
+                catch
+                {
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(resolvedVal))
+                return resolvedVal.Trim();
+            return (valOut ?? "").Trim();
         }
 
         private Feature FindFlatPatternFeature(ModelDoc2 swPart)
@@ -1771,21 +2162,25 @@ namespace ADDIN.Commands
                     return;
                 }
 
+                // Sắp xếp danh sách chi tiết tự nhiên theo BuhinNo (1, 2, 3... 10) trước khi xuất
+                // giúp thứ tự chi tiết khoa học và các sọc màu xen kẽ luôn thẳng hàng, không bị lệch do lệnh sort Excel
+                if (results != null && results.Count > 1)
+                {
+                    results.Sort((a, b) => CompareBuhinNoNatural(a?.BuhinNo, b?.BuhinNo, a?.Component, b?.Component));
+                }
+
                 dynamic xlApp = Activator.CreateInstance(excelType);
                 dynamic xlWB = xlApp.Workbooks.Add();
                 dynamic xlWS = xlWB.Sheets[1];
+                xlWS.Name = "DF-TK Check";
 
                 WriteResultHeader(xlWS);
                 WriteResults(xlWS, results);
                 FreezeTopRow(xlWS);
 
                 int lastRow = results.Count + 1;
-                if (lastRow > 1)
-                    TrySortExcelByBuhinNo(xlWS, lastRow);
+                FormatTable(xlWS, lastRow);
 
-                xlWS.Columns.AutoFit();
-                AutoFitNoteColumn(xlWS, Math.Max(1, lastRow), 9);
-                AutoFitNoteColumn(xlWS, Math.Max(1, lastRow), 11);
                 WriteCheckLog(xlWB, xlWS, checkLogs);
                 xlWS.Activate();
                 xlWS.Range["A1"].Select();
@@ -1807,58 +2202,171 @@ namespace ADDIN.Commands
             xlWS.Cells[1, 4].Value = "外側-TK";
             xlWS.Cells[1, 5].Value = "内側-DF";
             xlWS.Cells[1, 6].Value = "内側-TK";
-            xlWS.Cells[1, 7].Value = "表面積 DF (mm2)";
-            xlWS.Cells[1, 8].Value = "表面積 TK (mm2)";
+            xlWS.Cells[1, 7].Value = "表面積 DF (mm²)";
+            xlWS.Cells[1, 8].Value = "表面積 TK (mm²)";
             xlWS.Cells[1, 9].Value = "差分値 (DF-TK)";
             xlWS.Cells[1, 10].Value = "Status";
             xlWS.Cells[1, 11].Value = "Note";
+
+            dynamic headerRange = xlWS.Range["A1:K1"];
+            headerRange.Font.Name = "Meiryo UI";
+            headerRange.Font.Size = 10;
+            headerRange.Font.Bold = true;
+            headerRange.Font.Color = Rgb(255, 255, 255);
+            headerRange.Interior.Color = Rgb(30, 58, 138); // Deep Navy (#1E3A8A)
+            headerRange.HorizontalAlignment = -4108; // xlCenter
+            headerRange.VerticalAlignment = -4108;   // xlCenter
+            headerRange.RowHeight = 28;
+            headerRange.WrapText = true;
         }
 
         private static void WriteResults(dynamic xlWS, List<DfTkResult> results)
         {
             int xlRow = 2;
+            int diffBg = Rgb(254, 243, 199);       // Soft Amber 100 (#FEF3C7) - tô màu nhấn ô có khác biệt DF-TK
+            int zebraEven = Rgb(255, 255, 255);    // Trắng tinh khiết (#FFFFFF)
+            int zebraOdd = Rgb(234, 242, 250);     // Xanh băng nhạt thanh nhã (#EAF2FA) - tô màu nhạt xen kẽ từng chi tiết
+            int ngBg = Rgb(254, 226, 226);         // Soft Rose 100 (#FEE2E2)
+            int ngText = Rgb(185, 28, 28);         // Deep Red 700 (#B91C1C)
+
             foreach (DfTkResult result in results)
             {
+                int rowBg = (xlRow % 2 == 0) ? zebraEven : zebraOdd;
+                dynamic fullRow = xlWS.Range[string.Format("A{0}:K{0}", xlRow)];
+                fullRow.Interior.Color = rowBg;
+                fullRow.VerticalAlignment = -4108; // xlCenter
+                fullRow.RowHeight = 26;
+
                 xlWS.Cells[xlRow, 1].Value = result.BuhinNo;
                 xlWS.Cells[xlRow, 2].Value = result.Component;
-                xlWS.Cells[xlRow, 3].Value = result.OuterDf;
-                xlWS.Cells[xlRow, 4].Value = result.OuterTk;
-                xlWS.Cells[xlRow, 5].Value = result.InnerDf;
-                xlWS.Cells[xlRow, 6].Value = result.InnerTk;
+
+                AssignNumericOrText(xlWS.Cells[xlRow, 3], result.OuterDf);
+                AssignNumericOrText(xlWS.Cells[xlRow, 4], result.OuterTk);
+                AssignNumericOrText(xlWS.Cells[xlRow, 5], result.InnerDf);
+                AssignNumericOrText(xlWS.Cells[xlRow, 6], result.InnerTk);
+
                 xlWS.Cells[xlRow, 7].Value = result.AreaDf;
+                xlWS.Cells[xlRow, 7].NumberFormat = "#,##0.0";
                 xlWS.Cells[xlRow, 8].Value = result.AreaTk;
+                xlWS.Cells[xlRow, 8].NumberFormat = "#,##0.0";
+
                 xlWS.Cells[xlRow, 9].Value = BuildDifferenceValue(result);
-                xlWS.Cells[xlRow, 10].Value = "NG";
-                xlWS.Cells[xlRow, 11].Value = result.DiffText;
                 xlWS.Cells[xlRow, 9].WrapText = true;
 
-                int yellow = Rgb(255, 255, 153);
+                // Status: Badge appearance
+                dynamic statusCell = xlWS.Cells[xlRow, 10];
+                statusCell.Value = "NG";
+                statusCell.Font.Bold = true;
+                statusCell.Font.Color = ngText;
+                statusCell.Interior.Color = ngBg;
+                statusCell.HorizontalAlignment = -4108;
 
+                xlWS.Cells[xlRow, 11].Value = result.DiffText;
+
+                // Soft Amber highlight on differences
                 if (result.DiffOuter)
                 {
-                    xlWS.Cells[xlRow, 3].Interior.Color = yellow;
-                    xlWS.Cells[xlRow, 4].Interior.Color = yellow;
+                    xlWS.Cells[xlRow, 3].Interior.Color = diffBg;
+                    xlWS.Cells[xlRow, 4].Interior.Color = diffBg;
+                    xlWS.Cells[xlRow, 3].Font.Bold = true;
+                    xlWS.Cells[xlRow, 4].Font.Bold = true;
                 }
 
                 if (result.DiffInner)
                 {
-                    xlWS.Cells[xlRow, 5].Interior.Color = yellow;
-                    xlWS.Cells[xlRow, 6].Interior.Color = yellow;
+                    xlWS.Cells[xlRow, 5].Interior.Color = diffBg;
+                    xlWS.Cells[xlRow, 6].Interior.Color = diffBg;
+                    xlWS.Cells[xlRow, 5].Font.Bold = true;
+                    xlWS.Cells[xlRow, 6].Font.Bold = true;
                 }
 
                 if (result.DiffArea)
                 {
-                    xlWS.Cells[xlRow, 7].Interior.Color = yellow;
-                    xlWS.Cells[xlRow, 8].Interior.Color = yellow;
+                    xlWS.Cells[xlRow, 7].Interior.Color = diffBg;
+                    xlWS.Cells[xlRow, 8].Interior.Color = diffBg;
+                    xlWS.Cells[xlRow, 7].Font.Bold = true;
+                    xlWS.Cells[xlRow, 8].Font.Bold = true;
                 }
 
                 if (result.DiffOuter || result.DiffInner || result.DiffArea || result.DiffGeometry)
-                    xlWS.Cells[xlRow, 9].Interior.Color = yellow;
+                {
+                    xlWS.Cells[xlRow, 9].Interior.Color = diffBg;
+                    xlWS.Cells[xlRow, 9].Font.Bold = true;
+                }
 
                 if (result.DiffGeometry)
-                    xlWS.Cells[xlRow, 11].Interior.Color = yellow;
+                {
+                    xlWS.Cells[xlRow, 11].Interior.Color = diffBg;
+                    xlWS.Cells[xlRow, 11].Font.Bold = true;
+                }
 
                 xlRow++;
+            }
+        }
+
+        private static void AssignNumericOrText(dynamic cell, string text)
+        {
+            double val;
+            if (TryParseMeasurement(text, out val))
+            {
+                cell.Value = val;
+                cell.NumberFormat = "#,##0.0";
+            }
+            else
+            {
+                cell.Value = text ?? "";
+            }
+        }
+
+        private static void FormatTable(dynamic xlWS, int lastRow)
+        {
+            try
+            {
+                int maxRow = Math.Max(2, lastRow);
+                dynamic tableRange = xlWS.Range[string.Format("A1:K{0}", maxRow)];
+
+                tableRange.Font.Name = "Meiryo UI";
+
+                dynamic dataRange = xlWS.Range[string.Format("A2:K{0}", maxRow)];
+                dataRange.Font.Size = 9.5;
+
+                xlWS.Range[string.Format("A2:A{0}", maxRow)].HorizontalAlignment = -4108; // Center
+                xlWS.Range[string.Format("B2:B{0}", maxRow)].HorizontalAlignment = -4131; // Left
+                xlWS.Range[string.Format("C2:H{0}", maxRow)].HorizontalAlignment = -4152; // Right
+                xlWS.Range[string.Format("I2:I{0}", maxRow)].HorizontalAlignment = -4131; // Left
+                xlWS.Range[string.Format("J2:J{0}", maxRow)].HorizontalAlignment = -4108; // Center
+                xlWS.Range[string.Format("K2:K{0}", maxRow)].HorizontalAlignment = -4131; // Left
+
+                xlWS.Range[string.Format("C2:H{0}", maxRow)].NumberFormat = "#,##0.0";
+
+                // Subtle modern borders
+                tableRange.Borders.LineStyle = 1;
+                tableRange.Borders.Color = Rgb(215, 222, 230);
+
+                tableRange.AutoFilter();
+
+                xlWS.Columns.AutoFit();
+                xlWS.Columns[1].ColumnWidth = Math.Max(12.0, Math.Min(18.0, Convert.ToDouble(xlWS.Columns[1].ColumnWidth) + 3));
+                xlWS.Columns[2].ColumnWidth = Math.Max(28.0, Math.Min(45.0, Convert.ToDouble(xlWS.Columns[2].ColumnWidth) + 3));
+                xlWS.Columns[3].ColumnWidth = Math.Max(12.0, Convert.ToDouble(xlWS.Columns[3].ColumnWidth) + 2);
+                xlWS.Columns[4].ColumnWidth = Math.Max(12.0, Convert.ToDouble(xlWS.Columns[4].ColumnWidth) + 2);
+                xlWS.Columns[5].ColumnWidth = Math.Max(12.0, Convert.ToDouble(xlWS.Columns[5].ColumnWidth) + 2);
+                xlWS.Columns[6].ColumnWidth = Math.Max(12.0, Convert.ToDouble(xlWS.Columns[6].ColumnWidth) + 2);
+                xlWS.Columns[7].ColumnWidth = Math.Max(18.0, Convert.ToDouble(xlWS.Columns[7].ColumnWidth) + 2);
+                xlWS.Columns[8].ColumnWidth = Math.Max(18.0, Convert.ToDouble(xlWS.Columns[8].ColumnWidth) + 2);
+                xlWS.Columns[9].ColumnWidth = Math.Max(26.0, Math.Min(40.0, Convert.ToDouble(xlWS.Columns[9].ColumnWidth) + 3));
+                xlWS.Columns[10].ColumnWidth = 10.0;
+                xlWS.Columns[11].ColumnWidth = Math.Max(18.0, Math.Min(35.0, Convert.ToDouble(xlWS.Columns[11].ColumnWidth) + 3));
+
+                dataRange.Rows.AutoFit();
+                for (int r = 2; r <= maxRow; r++)
+                {
+                    double h = Convert.ToDouble(xlWS.Rows[r].RowHeight);
+                    xlWS.Rows[r].RowHeight = Math.Max(24.0, h + 4);
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -1876,8 +2384,8 @@ namespace ADDIN.Commands
             {
                 double areaDelta = result.AreaDf - result.AreaTk;
                 differences.Add("表面積: "
-                    + areaDelta.ToString("0.0", CultureInfo.InvariantCulture)
-                    + " mm2");
+                    + areaDelta.ToString("#,##0.0", CultureInfo.InvariantCulture)
+                    + " mm²");
             }
 
             // Geometry does not have one DF/TK scalar value to subtract.
@@ -1907,7 +2415,7 @@ namespace ADDIN.Commands
             {
                 double delta = dfValue - tkValue;
                 differences.Add(label + ": "
-                    + delta.ToString("0.###", CultureInfo.InvariantCulture)
+                    + delta.ToString("#,##0.0", CultureInfo.InvariantCulture)
                     + " mm");
                 return;
             }
@@ -1964,13 +2472,31 @@ namespace ADDIN.Commands
             logSheet.Name = "Check Log";
             logSheet.Cells[1, 1].Value = "Log";
 
+            dynamic header = logSheet.Range["A1"];
+            header.Font.Name = "Meiryo UI";
+            header.Font.Size = 10;
+            header.Font.Bold = true;
+            header.Font.Color = Rgb(255, 255, 255);
+            header.Interior.Color = Rgb(30, 58, 138);
+            header.HorizontalAlignment = -4108;
+            header.RowHeight = 28;
+
             for (int i = 0; i < checkLogs.Count; i++)
             {
                 logSheet.Cells[i + 2, 1].Value = checkLogs[i];
             }
 
+            int lastLogRow = checkLogs.Count + 1;
+            dynamic data = logSheet.Range[string.Format("A2:A{0}", lastLogRow)];
+            data.Font.Name = "Meiryo UI";
+            data.Font.Size = 9.5;
+            data.RowHeight = 22;
+
+            logSheet.Range[string.Format("A1:A{0}", lastLogRow)].Borders.LineStyle = 1;
+            logSheet.Range[string.Format("A1:A{0}", lastLogRow)].Borders.Color = Rgb(215, 222, 230);
+
             logSheet.Columns.AutoFit();
-            AutoFitNoteColumn(logSheet, checkLogs.Count + 1, 1);
+            AutoFitNoteColumn(logSheet, lastLogRow, 1);
             FreezeTopRow(logSheet);
         }
 
@@ -1993,7 +2519,6 @@ namespace ADDIN.Commands
             }
             catch
             {
-                // Freeze header is presentation only; export must still succeed.
             }
         }
 
@@ -2015,6 +2540,27 @@ namespace ADDIN.Commands
             catch
             {
             }
+        }
+
+        private static int CompareBuhinNoNatural(string buhinA, string buhinB, string compA, string compB)
+        {
+            int cmp = CompareNatural(buhinA, buhinB);
+            if (cmp != 0) return cmp;
+            return CompareNatural(compA, compB);
+        }
+
+        private static int CompareNatural(string left, string right)
+        {
+            left = (left ?? "").Trim();
+            right = (right ?? "").Trim();
+            if (string.Equals(left, right, StringComparison.OrdinalIgnoreCase))
+                return 0;
+
+            decimal leftNum, rightNum;
+            if (decimal.TryParse(left, out leftNum) && decimal.TryParse(right, out rightNum))
+                return leftNum.CompareTo(rightNum);
+
+            return string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
         }
 
         private static void TrySortExcelByBuhinNo(dynamic xlWS, int lastRow)

@@ -238,7 +238,7 @@ namespace ADDIN.Commands
                 foreach (RoundHoleRowResult row in item.Rows.OrderBy(r => r.HoleNumber))
                 {
                     marker++;
-                    row.MarkerId = "NG-" + marker;
+                    row.MarkerId = row.Status + "-" + marker;
                     RoundHolePreviewPath path = item.Data.Paths.FirstOrDefault(
                         p => p.HoleNumber == row.HoleNumber);
                     if (path != null)
@@ -246,6 +246,10 @@ namespace ADDIN.Commands
                         path.Status = row.Status;
                         path.MarkerId = row.MarkerId;
                     }
+                    RoundHolePreviewPath drawingMarker = item.Data.DrawingMarkers.FirstOrDefault(
+                        p => p.HoleNumber == row.HoleNumber);
+                    if (drawingMarker != null)
+                        drawingMarker.MarkerId = row.MarkerId;
                 }
             }
             return items;
@@ -266,8 +270,10 @@ namespace ADDIN.Commands
             lblInfo.Text = "Buhin No.: " + item.BuhinNo
                 + "    NG: " + ng + "    CHECK: " + check
                 + "    " + (string.IsNullOrWhiteSpace(item.Data.ProjectionSource)
-                    ? "Chieu: mat phang Part"
+                    ? "Chua lay duoc bien dang Drawing 2D"
                     : item.Data.ProjectionSource)
+                + (item.Data.UnmappedMarkerCount > 0
+                    ? "    Chua dinh vi duoc " + item.Data.UnmappedMarkerCount + " dau kiem tra" : "")
                 + "    Mouse wheel: zoom";
         }
 
@@ -353,24 +359,13 @@ namespace ADDIN.Commands
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 e.Graphics.Clear(Color.White);
                 if (item == null || item.Data == null
-                    || (item.Data.Paths.Count == 0 && item.Data.DrawingPaths.Count == 0))
+                    || !item.Data.UsesDrawingGeometry || item.Data.DrawingPaths.Count == 0)
                 {
-                    DrawCenteredText(e.Graphics, "Khong co du lieu preview 2D.");
+                    DrawCenteredText(e.Graphics, "Chua lay duoc bien dang 2D tu Drawing View.");
                     return;
                 }
 
-                // Component Drawing da bien doi day du loop Flat-Pattern sang toa do
-                // Drawing View. Dung loop day du de preview vi visible edge co the thieu.
-                bool useCompleteComponentPaths = item.Data.Paths.Count > 0
-                    && !string.IsNullOrWhiteSpace(item.Data.ProjectionSource)
-                    && item.Data.ProjectionSource.StartsWith(
-                        "Component Drawing:",
-                        StringComparison.OrdinalIgnoreCase);
-                List<RoundHolePreviewPath> displayPaths = useCompleteComponentPaths
-                    ? item.Data.Paths
-                    : (item.Data.DrawingPaths.Count > 0
-                        ? item.Data.DrawingPaths
-                        : item.Data.Paths);
+                List<RoundHolePreviewPath> displayPaths = item.Data.DrawingPaths;
                 RectangleF modelBounds = GetModelBounds(displayPaths);
                 if (modelBounds.Width <= 1e-12f || modelBounds.Height <= 1e-12f)
                 {
@@ -398,10 +393,13 @@ namespace ADDIN.Commands
                 using (Pen outerPen = new Pen(Color.FromArgb(30, 30, 30), 2.2F))
                 using (Pen normalPen = new Pen(Color.FromArgb(45, 55, 62), 1.45F))
                 using (Pen errorPen = new Pen(Color.FromArgb(220, 35, 35), 2.6F))
+                using (Pen checkPen = new Pen(Color.FromArgb(225, 125, 0), 2.6F))
                 using (Pen leaderPen = new Pen(Color.FromArgb(220, 35, 35), 1.15F))
+                using (Pen checkLeaderPen = new Pen(Color.FromArgb(225, 125, 0), 1.15F))
                 using (Brush bodyBrush = new SolidBrush(Color.FromArgb(232, 247, 249)))
                 using (Brush holeBrush = new SolidBrush(Color.White))
                 using (Brush markerBrush = new SolidBrush(Color.Red))
+                using (Brush checkMarkerBrush = new SolidBrush(Color.FromArgb(225, 125, 0)))
                 using (Brush markerBackBrush = new SolidBrush(Color.FromArgb(255, 247, 247)))
                 using (Font markerFont = new Font("Meiryo UI", 8.5F, FontStyle.Bold, GraphicsUnit.Point, 128))
                 {
@@ -422,33 +420,17 @@ namespace ADDIN.Commands
                         screenPaths.Add(new ScreenPath { Source = path, Points = points });
                     }
 
-                    foreach (ScreenPath screenPath in screenPaths.Where(p => p.Source.IsOuter))
-                    {
-                        using (GraphicsPath fillPath = CreateClosedGraphicsPath(screenPath.Points))
-                        {
-                            if (fillPath != null)
-                                e.Graphics.FillPath(bodyBrush, fillPath);
-                        }
-                    }
-
                     foreach (ScreenPath screenPath in screenPaths)
                     {
                         RoundHolePreviewPath path = screenPath.Source;
                         PointF[] points = screenPath.Points;
                         bool abnormal = path.Status == "NG" || path.Status == "CHECK";
-                        Pen pen = abnormal ? errorPen : (path.IsOuter ? outerPen : normalPen);
-                        if (!path.IsOuter)
-                        {
-                            using (GraphicsPath holePath = CreateClosedGraphicsPath(points))
-                            {
-                                if (holePath != null)
-                                    e.Graphics.FillPath(holeBrush, holePath);
-                            }
-                        }
+                        Pen pen = path.Status == "CHECK" ? checkPen
+                            : (abnormal ? errorPen : (path.IsOuter ? outerPen : normalPen));
                         e.Graphics.DrawLines(pen, points);
                     }
 
-                    List<MarkerLayout> markers = item.Data.Paths
+                    List<MarkerLayout> markers = item.Data.DrawingMarkers
                         .Where(p => p != null && p.Points.Count >= 2
                             && (p.Status == "NG" || p.Status == "CHECK")
                             && !string.IsNullOrWhiteSpace(p.MarkerId))
@@ -466,6 +448,7 @@ namespace ADDIN.Commands
                             return new MarkerLayout
                             {
                                 Id = p.MarkerId,
+                                Status = p.Status,
                                 Center = GetCenter(markerPoints),
                                 Bounds = GetScreenBounds(markerPoints)
                             };
@@ -477,6 +460,19 @@ namespace ADDIN.Commands
                     {
                         float laneLeft = Math.Max(12F, originX);
                         float laneRight = Math.Min(ClientSize.Width - 12F, originX + drawingWidth);
+                        float widestLabel = markers.Max(marker =>
+                            e.Graphics.MeasureString(marker.Id, markerFont).Width + 10F);
+                        float requiredSpan = (markers.Count - 1) * (widestLabel + 12F);
+                        if (laneRight - laneLeft < requiredSpan)
+                        {
+                            float middle = (laneLeft + laneRight) / 2F;
+                            float halfSpan = Math.Min(requiredSpan / 2F,
+                                Math.Max(0F, (ClientSize.Width - widestLabel - 24F) / 2F));
+                            middle = Math.Max(12F + widestLabel / 2F + halfSpan,
+                                Math.Min(ClientSize.Width - 12F - widestLabel / 2F - halfSpan, middle));
+                            laneLeft = middle - halfSpan;
+                            laneRight = middle + halfSpan;
+                        }
                         float spacing = markers.Count == 1
                             ? 0F
                             : (laneRight - laneLeft) / (markers.Count - 1);
@@ -484,6 +480,8 @@ namespace ADDIN.Commands
                         for (int i = 0; i < markers.Count; i++)
                         {
                             MarkerLayout marker = markers[i];
+                            Pen labelPen = marker.Status == "CHECK" ? checkLeaderPen : leaderPen;
+                            Brush labelBrush = marker.Status == "CHECK" ? checkMarkerBrush : markerBrush;
                             float anchorX = markers.Count == 1
                                 ? marker.Center.X
                                 : laneLeft + spacing * i;
@@ -495,18 +493,18 @@ namespace ADDIN.Commands
                                 textSize.Height + 4F);
                             PointF target = new PointF(
                                 marker.Center.X,
-                                Math.Max(marker.Bounds.Top, originY));
+                                marker.Bounds.Top);
                             PointF elbow = new PointF(anchorX, labelRect.Bottom + 5F);
-                            e.Graphics.DrawLine(leaderPen, target, elbow);
+                            e.Graphics.DrawLine(labelPen, target, elbow);
                             e.Graphics.FillEllipse(
-                                markerBrush,
+                                labelBrush,
                                 target.X - 3F,
                                 target.Y - 3F,
                                 6F,
                                 6F);
                             e.Graphics.FillRectangle(markerBackBrush, labelRect);
                             e.Graphics.DrawRectangle(
-                                leaderPen,
+                                labelPen,
                                 labelRect.X,
                                 labelRect.Y,
                                 labelRect.Width,
@@ -514,7 +512,7 @@ namespace ADDIN.Commands
                             e.Graphics.DrawString(
                                 marker.Id,
                                 markerFont,
-                                markerBrush,
+                                labelBrush,
                                 labelRect.X + 5F,
                                 labelRect.Y + 2F);
                         }
@@ -531,6 +529,7 @@ namespace ADDIN.Commands
             private sealed class MarkerLayout
             {
                 public string Id;
+                public string Status;
                 public PointF Center;
                 public RectangleF Bounds;
             }
@@ -625,16 +624,11 @@ namespace ADDIN.Commands
 
             private static PointF GetCenter(PointF[] points)
             {
-                float x = 0F;
-                float y = 0F;
-                foreach (PointF point in points)
-                {
-                    x += point.X;
-                    y += point.Y;
-                }
-                return points.Length == 0
-                    ? PointF.Empty
-                    : new PointF(x / points.Length, y / points.Length);
+                if (points.Length == 0)
+                    return PointF.Empty;
+                RectangleF bounds = GetScreenBounds(points);
+                return new PointF(bounds.Left + bounds.Width / 2F,
+                    bounds.Top + bounds.Height / 2F);
             }
         }
     }

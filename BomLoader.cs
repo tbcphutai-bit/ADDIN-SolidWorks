@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,6 +13,14 @@ namespace ADDIN.Commands
         None,
         Detail,
         Unit
+    }
+
+    public sealed class BomNumberValues
+    {
+        public string ItemNumber { get; set; } = "";
+        public string PartNumber { get; set; } = "";
+        public string Goban { get; set; } = "";
+        public string Quantity { get; set; } = "";
     }
 
     public class BomLoader
@@ -194,6 +202,13 @@ namespace ADDIN.Commands
             gridBom.AllowUserToAddRows = false;
             Debug.WriteLine("[BOM LOAD] start table rows=" + swTable.RowCount);
 
+            int itemNoCol = FindColumnIndex(swTable, "INo");
+            foreach (string alias in new[] { "I No", "I.No", "I.No.", "№", "No", "No.", "ITEM NO", "ITEM NO.", "ITEM NUMBER", "項目番号" })
+            {
+                if (itemNoCol >= 0)
+                    break;
+                itemNoCol = FindColumnIndex(swTable, alias);
+            }
             int buhinNoCol = FindColumnIndex(swTable, "部品番号");
             int materialCol = FindColumnIndex(swTable, "材質");
             int thicknessCol = FindColumnIndex(swTable, "板厚");
@@ -228,6 +243,16 @@ namespace ADDIN.Commands
                     GetCellText(swTable, r, qtyCol),
                     fileName
                 );
+
+                // Keep both values from this exact BOM row. Never derive INo
+                // from a grid index or the subset selected for a report.
+                gridBom.Rows[rowIndex].Cells[1].Tag = new BomNumberValues
+                {
+                    ItemNumber = GetCellText(swTable, r, itemNoCol),
+                    PartNumber = bomBuhinNo,
+                    Goban = GetCellText(swTable, r, gobanCol),
+                    Quantity = GetCellText(swTable, r, qtyCol)
+                };
 
                 object[] rowComponents = SaveComponentPathToRowTag(
                     gridBom,
@@ -271,14 +296,9 @@ namespace ADDIN.Commands
             if (rootModel == null)
                 rootModel = GetRootAssemblyFromActiveDrawing();
 
-            HashSet<string> traversedAssemblyPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string assemblyPath in bomAssemblyPathsToScan)
-            {
-                Application.DoEvents();
-                if (IsCancellationRequested())
-                    break;
-                AddSubAssemblyRowsFromBomAssembly(gridBom, assemblyPath, rowAssemblyPaths, traversedAssemblyPaths, rootModel);
-            }
+            if (activeBomContext == BomCommandContext.Unit && bomAssemblyPathsToScan.Count > 0)
+                AddCountedSubAssemblyRows(gridBom, swTable as IBomTableAnnotation,
+                    rootModel, rowAssemblyPaths, bomAssemblyPathsToScan);
 
             Debug.WriteLine("[BOM LOAD] final grid rows=" + gridBom.Rows.Count + ", bomAssembliesToScan=" + bomAssemblyPathsToScan.Count);
             }
@@ -572,6 +592,99 @@ namespace ADDIN.Commands
 
             Debug.WriteLine("[BOM LOAD] scan seed -02- assembly=" + path);
             paths.Add(path);
+        }
+
+        private void AddCountedSubAssemblyRows(DataGridView gridBom,
+            IBomTableAnnotation bomTable, ModelDoc2 rootModel,
+            HashSet<string> nativeRowPaths, List<string> seedPaths)
+        {
+            if (!(rootModel is AssemblyDoc))
+                throw new InvalidOperationException("Không đọc được assembly gốc để tính số lượng BOM UNIT.");
+
+            string originalConfiguration = rootModel.ConfigurationManager.ActiveConfiguration.Name;
+            string bomConfiguration = originalConfiguration;
+            BomFeature feature = bomTable?.BomFeature as BomFeature;
+            if (feature != null)
+            {
+                object visible = null;
+                string[] configurations = feature.GetConfigurations(true, ref visible) as string[];
+                if (configurations != null && configurations.Length > 0)
+                    bomConfiguration = configurations[0];
+            }
+
+            try
+            {
+                if (!string.Equals(originalConfiguration, bomConfiguration, StringComparison.OrdinalIgnoreCase)
+                    && !rootModel.ShowConfiguration2(bomConfiguration))
+                    throw new InvalidOperationException("Không mở được configuration BOM: " + bomConfiguration);
+
+                Configuration configuration = rootModel.GetConfigurationByName(bomConfiguration) as Configuration;
+                Component2 rootComponent = configuration?.GetRootComponent3(true) as Component2;
+                if (rootComponent == null)
+                    throw new InvalidOperationException("Không đọc được cây component của configuration BOM.");
+
+                var seeds = new HashSet<string>(seedPaths, StringComparer.OrdinalIgnoreCase);
+                var quantities = BomOccurrenceCounter.Count<Component2>(
+                    GetQuantityChildren(rootComponent), GetQuantityChildren,
+                    component => !IsSuppressed(component) && !IsEnvelopeComponent(component)
+                        && !IsExcludeFromBomComponent(component),
+                    component => seeds.Contains(component.GetPathName()),
+                    component => IsAssemblyPath(component.GetPathName())
+                        ? component.GetPathName() + "|" + component.ReferencedConfiguration : null,
+                    IsCancellationRequested);
+
+                // Original table rows retain SOLIDWORKS quantities, including overrides.
+                // Only rows absent from the native table receive occurrence totals.
+                foreach (var quantity in quantities)
+                {
+                    Component2 component = quantity.Component;
+                    string path = component.GetPathName();
+                    if (nativeRowPaths.Contains(path)) continue;
+                    ModelDoc2 model = component.GetModelDoc2() as ModelDoc2;
+                    int index = gridBom.Rows.Add(true,
+                        GetComponentCustomProperty(component, model, "部品番号"),
+                        GetComponentCustomProperty(component, model, "合番"), "",
+                        quantity.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        Path.GetFileNameWithoutExtension(path));
+                    DataGridViewRow row = gridBom.Rows[index];
+                    row.Tag = new object[] { component };
+                    row.Cells[1].Tag = new BomNumberValues
+                    {
+                        PartNumber = Convert.ToString(row.Cells[1].Value),
+                        Goban = Convert.ToString(row.Cells[2].Value),
+                        Quantity = Convert.ToString(row.Cells[4].Value)
+                    };
+                    Debug.WriteLine("[BOM LOAD] counted sub assembly=" + path
+                        + ", configuration=" + component.ReferencedConfiguration
+                        + ", quantity=" + quantity.Count);
+                }
+            }
+            finally
+            {
+                if (!string.Equals(originalConfiguration, bomConfiguration, StringComparison.OrdinalIgnoreCase))
+                    rootModel.ShowConfiguration2(originalConfiguration);
+            }
+        }
+
+        private IEnumerable<Component2> GetQuantityChildren(Component2 component)
+        {
+            Application.DoEvents();
+            if (IsCancellationRequested()) throw new OperationCanceledException();
+            object[] children = component.GetChildren() as object[];
+            if (children == null && IsAssemblyPath(component.GetPathName())
+                && !IsSuppressed(component))
+            {
+                // Resolve in assembly context so GetChildren follows the instance's
+                // referenced configuration rather than the model's active configuration.
+                component.SetSuppression2((int)swComponentSuppressionState_e.swComponentResolved);
+                children = component.GetChildren() as object[];
+            }
+            if (children == null) yield break;
+            foreach (object child in children)
+            {
+                Component2 item = child as Component2;
+                if (item != null) yield return item;
+            }
         }
 
         private void AddSubAssemblyRowsFromBomAssembly(

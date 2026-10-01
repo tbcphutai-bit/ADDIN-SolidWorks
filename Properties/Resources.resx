@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -147,5 +147,23 @@
   </data>
   <data name="DimMatCat" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Images\DimMatCat.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="SetBendLine3D" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\setbendline3d.png;System.Drawing.Bitmap, System.Drawing</value>
+  </data>
+  <data name="AutoSpline3D" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\autospline3d.png;System.Drawing.Bitmap, System.Drawing</value>
+  </data>
+  <data name="RepairSpline3D" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\repairspline3d.png;System.Drawing.Bitmap, System.Drawing</value>
+  </data>
+  <data name="SplineToArcs" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\splinetoarcs.png;System.Drawing.Bitmap, System.Drawing</value>
+  </data>
+  <data name="DimKichThuocLo" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\dimkichthuoclo.png;System.Drawing.Bitmap, System.Drawing</value>
+  </data>
+  <data name="VCutSection" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Images\vcutsection.png;System.Drawing.Bitmap, System.Drawing</value>
   </data>
 </root>

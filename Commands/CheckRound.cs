@@ -66,8 +66,11 @@ namespace ADDIN.Commands
         public string Configuration { get; set; }
         public string DrawingViewName { get; set; }
         public string ProjectionSource { get; set; }
+        public bool UsesDrawingGeometry { get; set; }
+        public int UnmappedMarkerCount { get; set; }
         public readonly List<RoundHolePreviewPath> Paths = new List<RoundHolePreviewPath>();
         public readonly List<RoundHolePreviewPath> DrawingPaths = new List<RoundHolePreviewPath>();
+        public readonly List<RoundHolePreviewPath> DrawingMarkers = new List<RoundHolePreviewPath>();
     }
 
     public sealed class RoundHolePreviewPath
@@ -77,6 +80,10 @@ namespace ADDIN.Commands
         public string Status { get; set; }
         public string MarkerId { get; set; }
         public readonly List<RoundHolePreviewPoint> Points = new List<RoundHolePreviewPoint>();
+        public readonly HashSet<string> EdgeReferences = new HashSet<string>(StringComparer.Ordinal);
+        public double? CircleRadiusM { get; set; }
+        public double CircleX { get; set; }
+        public double CircleY { get; set; }
     }
 
     public sealed class RoundHolePreviewPoint
@@ -450,7 +457,15 @@ namespace ADDIN.Commands
 
                     RoundHolePreviewPath previewPath = CreatePreviewPath(loop, projector);
                     if (previewPath != null)
+                    {
+                        foreach (object loopEdge in ToObjectArray(loop.GetEdges()))
+                        {
+                            string reference = GetEdgeReference(model, loopEdge);
+                            if (reference != null)
+                                previewPath.EdgeReferences.Add(reference);
+                        }
                         previewData.Paths.Add(previewPath);
+                    }
 
                     if (loop.IsOuter())
                         continue;
@@ -465,6 +480,22 @@ namespace ADDIN.Commands
                         {
                             previewPath.HoleNumber = row.HoleNumber;
                             previewPath.Status = row.Status;
+                            if (row.HoleType == "ROUND" && row.Status == "OK" && row.R1Mm.HasValue)
+                            {
+                                previewPath.CircleRadiusM = row.R1Mm.Value / 1000.0;
+                                // A tessellated or split circle may not contain its
+                                // extrema. Use the analytic curve center, projected
+                                // through the same plane as the preview contour.
+                                if (row.CenterModelX.HasValue && row.CenterModelY.HasValue
+                                    && row.CenterModelZ.HasValue)
+                                {
+                                    var center = projector.Project(new[] { row.CenterModelX.Value,
+                                        row.CenterModelY.Value, row.CenterModelZ.Value });
+                                    previewPath.CircleX = center.X;
+                                    previewPath.CircleY = center.Y;
+                                }
+                                else SetCircleCenter(previewPath);
+                            }
                         }
                     }
                 }
@@ -545,11 +576,12 @@ namespace ADDIN.Commands
                 + ", line=" + lines.Count
                 + ", other=" + otherCurveCount);
 
-            // Loop chi co line la cutout dang polygon, khong phai lo can CHECK ROUND.
-            // Loop co curve nhung khong con Circle/Arc la lo bi meo, khong co gia tri Phi/R.
+            // A non-circular curve alone does not prove that a round hole was
+            // deformed. General cutouts can contain splines and straight edges.
             if (circles.Count == 0)
             {
-                if (otherCurveCount > 0)
+                string nonCircularStatus = GetNonCircularLoopStatus(lines.Count, otherCurveCount);
+                if (nonCircularStatus != null)
                 {
                     RoundHoleRowResult irregular = CreateHoleResult(
                         target,
@@ -557,12 +589,16 @@ namespace ADDIN.Commands
                         null,
                         null,
                         null,
-                        "NG",
-                        "Lo bi meo: curve khong con gia tri Phi/R trong Flat-Pattern."
+                        nonCircularStatus,
+                        "Bien co curve khong doc duoc Phi/R; chua du co so ket luan lo tron bi meo."
+                            + " Can doi chieu hinh dang thiet ke."
                             + " Body=" + bodyIndex + ", Loop=" + loopIndex + ".");
                     SetLoopCenter(irregular, edges);
                     return irregular;
                 }
+                Debug.WriteLine("[CHECK ROUND] General cutout skipped. body=" + bodyIndex
+                    + ", loop=" + loopIndex + ", line=" + lines.Count
+                    + ", other=" + otherCurveCount);
                 return null;
             }
 
@@ -585,6 +621,34 @@ namespace ADDIN.Commands
                     + " Body=" + bodyIndex + ", Loop=" + loopIndex + ".");
             SetAverageCenter(unknownHole, circles);
             return unknownHole;
+        }
+
+        internal static string GetEdgeReference(ModelDoc2 model, object edge)
+        {
+            try
+            {
+                byte[] bytes = model == null || edge == null ? null
+                    : model.Extension.GetPersistReference3(edge) as byte[];
+                return bytes == null || bytes.Length == 0 ? null : Convert.ToBase64String(bytes);
+            }
+            catch { return null; }
+        }
+
+        internal static void SetCircleCenter(RoundHolePreviewPath path)
+        {
+            if (path.Points.Count == 0)
+                return;
+            path.CircleX = (path.Points.Min(p => p.X) + path.Points.Max(p => p.X)) / 2;
+            path.CircleY = (path.Points.Min(p => p.Y) + path.Points.Max(p => p.Y)) / 2;
+        }
+
+        private static string GetNonCircularLoopStatus(int lineCount, int otherCurveCount)
+        {
+            // Three or more straight sides without any circular arc describe a
+            // general opening, outside the round/obround checks. A curve-only
+            // opening (or two sides plus non-circular ends) remains unresolved.
+            // Never infer NG merely because Curve.IsCircle() returned false.
+            return otherCurveCount > 0 && lineCount <= 2 ? "CHECK" : null;
         }
 
         private RoundHoleRowResult AnalyzeRoundHole(
@@ -868,10 +932,24 @@ namespace ADDIN.Commands
             {
                 Surface surface = face == null ? null : face.GetSurface() as Surface;
                 double[] values = surface == null ? null : surface.PlaneParams as double[];
+                return CreatePlaneProjectorFromParameters(values);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[CHECK ROUND] Preview plane ERROR: " + ex.Message);
+                return null;
+            }
+        }
+
+        private static PlaneProjector CreatePlaneProjectorFromParameters(double[] values)
+        {
+            try
+            {
                 if (values == null || values.Length < 6)
                     return null;
 
-                double[] normal = NormalizeVector(values[3], values[4], values[5]);
+                // ISurface.PlaneParams: normal first, then root point (meters).
+                double[] normal = NormalizeVector(values[0], values[1], values[2]);
                 if (normal == null)
                     return null;
 
@@ -893,9 +971,9 @@ namespace ADDIN.Commands
 
                 return new PlaneProjector
                 {
-                    OriginX = values[0],
-                    OriginY = values[1],
-                    OriginZ = values[2],
+                    OriginX = values[3],
+                    OriginY = values[4],
+                    OriginZ = values[5],
                     Ux = axisU[0],
                     Uy = axisU[1],
                     Uz = axisU[2],
@@ -1015,6 +1093,8 @@ namespace ADDIN.Commands
             double end;
             bool closed;
             bool periodic;
+            double[] firstPoint = null;
+            double[] lastPoint = null;
             try
             {
                 CurveParamData edgeParams = edge.GetCurveParams3();
@@ -1024,6 +1104,8 @@ namespace ADDIN.Commands
                     end = edgeParams.UMaxValue;
                     double[] startPoint = edgeParams.StartPoint as double[];
                     double[] endPoint = edgeParams.EndPoint as double[];
+                    firstPoint = startPoint;
+                    lastPoint = endPoint;
                     closed = DistanceSquared(startPoint, endPoint) <= 1e-16;
                     periodic = false;
                 }
@@ -1036,6 +1118,24 @@ namespace ADDIN.Commands
             {
                 return points;
             }
+
+            try
+            {
+                Vertex firstVertex = edge.GetStartVertex() as Vertex;
+                Vertex lastVertex = edge.GetEndVertex() as Vertex;
+                firstPoint = firstVertex == null ? firstPoint : firstVertex.GetPoint() as double[];
+                lastPoint = lastVertex == null ? lastPoint : lastVertex.GetPoint() as double[];
+                if (curve.IsLine() && firstPoint != null && lastPoint != null)
+                    return new List<double[]> { firstPoint, lastPoint };
+                if (curve.IsCircle())
+                {
+                    List<double[]> circlePoints = SampleTrimmedCircle(
+                        curve.CircleParams as double[], firstPoint, lastPoint, Math.Abs(end - start));
+                    if (circlePoints != null)
+                        return circlePoints;
+                }
+            }
+            catch { }
 
             int sampleCount = 16;
             try
@@ -1056,6 +1156,40 @@ namespace ADDIN.Commands
                     points.Add(new[] { value[0], value[1], value[2] });
             }
             return points;
+        }
+
+        private static List<double[]> SampleTrimmedCircle(
+            double[] circle, double[] first, double[] last, double parameterSpan)
+        {
+            if (circle == null || circle.Length < 7 || first == null || last == null
+                || first.Length < 3 || last.Length < 3 || circle[6] <= 0)
+                return null;
+            double[] normal = NormalizeVector(circle[3], circle[4], circle[5]);
+            double[] u = NormalizeVector(first[0] - circle[0], first[1] - circle[1], first[2] - circle[2]);
+            if (normal == null || u == null) return null;
+            double[] v = NormalizeVector(normal[1]*u[2] - normal[2]*u[1],
+                normal[2]*u[0] - normal[0]*u[2], normal[0]*u[1] - normal[1]*u[0]);
+            if (v == null) return null;
+            double[] finish = { last[0] - circle[0], last[1] - circle[1], last[2] - circle[2] };
+            double angle = Math.Atan2(finish[0]*v[0] + finish[1]*v[1] + finish[2]*v[2],
+                finish[0]*u[0] + finish[1]*u[1] + finish[2]*u[2]);
+            if (angle < 0) angle += 2*Math.PI;
+            bool closedCircle = DistanceSquared(first, last) <= 1e-16;
+            double sweep = closedCircle ? 2*Math.PI : angle;
+            if (!closedCircle && Math.Abs(Math.Abs(angle - 2*Math.PI) - parameterSpan)
+                < Math.Abs(angle - parameterSpan)) sweep = angle - 2*Math.PI;
+            int samples = closedCircle ? 48 : Math.Max(20, (int)Math.Ceiling(Math.Abs(sweep) / (2*Math.PI) * 48));
+            var result = new List<double[]>();
+            for (int i=0; i<=samples; i++)
+            {
+                double theta = sweep*i/samples;
+                double cs = Math.Cos(theta), sn = Math.Sin(theta);
+                result.Add(new[] { circle[0]+circle[6]*(u[0]*cs+v[0]*sn),
+                    circle[1]+circle[6]*(u[1]*cs+v[1]*sn), circle[2]+circle[6]*(u[2]*cs+v[2]*sn) });
+            }
+            result[0] = first;
+            result[result.Count-1] = last;
+            return result;
         }
 
         private static double DistanceSquared(double[] first, double[] second)
@@ -1575,7 +1709,7 @@ namespace ADDIN.Commands
                 ViewMatch best = FindBestMatch(candidates, data.PartPath);
                 if (best == null)
                 {
-                    data.ProjectionSource = "Mat phang cua Part (khong tim thay Drawing View)";
+                    data.ProjectionSource = "Khong tim thay Drawing View cua chi tiet.";
                     Debug.WriteLine("[CHECK ROUND] Preview align fallback. part=" + data.PartPath);
                     continue;
                 }
@@ -1594,81 +1728,10 @@ namespace ADDIN.Commands
                             + best.Name + ", success=" + temporarilyUnsuppressed);
                     }
 
-                    RefreshMatchGeometry(best);
-                    bool openedInPosition = TryProjectByOpenPartInPosition(
-                        swApp,
-                        model,
-                        drawing,
-                        mathUtility,
-                        best,
-                        data,
-                        originalSheetName);
-
-                    if (!openedInPosition && best.ViewTransform == null)
-                    {
-                        data.ProjectionSource = "Mat phang cua Part (khong lay duoc transform Drawing View)";
-                        continue;
-                    }
-
-                    bool transformedAny = openedInPosition;
-                    if (!openedInPosition)
-                    {
-                        foreach (RoundHolePreviewPath path in data.Paths)
-                        {
-                            if (path == null)
-                                continue;
-                            foreach (RoundHolePreviewPoint point in path.Points)
-                            {
-                                double[] transformed = TransformPoint(
-                                    mathUtility,
-                                    best.ComponentTransform,
-                                    best.ViewTransform,
-                                    point.ModelX,
-                                    point.ModelY,
-                                    point.ModelZ);
-                                if (transformed == null || transformed.Length < 2)
-                                    continue;
-                                point.X = transformed[0];
-                                point.Y = transformed[1];
-                                transformedAny = true;
-                            }
-                        }
-                    }
-
-                    if (!transformedAny)
-                    {
-                        data.ProjectionSource = "Mat phang cua Part (loi bien doi Drawing View)";
-                        continue;
-                    }
-
-                    data.DrawingViewName = best.Name;
-                    List<RoundHolePreviewPath> drawingPaths = openedInPosition
-                        ? new List<RoundHolePreviewPath>()
-                        : CollectDrawingPaths(best, mathUtility);
-                    if (!openedInPosition
-                        && drawingPaths.Count < 3
-                        && data.Paths.Count > drawingPaths.Count)
-                    {
-                        Debug.WriteLine("[CHECK ROUND] Preview visible edges rejected: too sparse. view="
-                            + best.Name + ", paths=" + drawingPaths.Count
-                            + ", modelPaths=" + data.Paths.Count);
-                        drawingPaths.Clear();
-                    }
-                    data.DrawingPaths.Clear();
-                    data.DrawingPaths.AddRange(drawingPaths);
-                    data.ProjectionSource = openedInPosition
-                        ? "Open Part In Position: " + best.Name
-                        : (drawingPaths.Count > 0
-                            ? "Drawing View: " + best.Name + " (visible edges)"
-                            : "Drawing View: " + best.Name + " (model projection)");
-                    alignedCount++;
-                    Debug.WriteLine("[CHECK ROUND] Preview aligned. part=" + data.PartPath
-                        + ", view=" + best.Name
-                        + ", component=" + (best.ComponentTransform != null)
-                        + ", flatPattern=" + best.IsFlatPattern
-                        + ", visible=" + best.IsVisible
-                        + ", openInPosition=" + openedInPosition
-                        + ", visibleEdges=" + drawingPaths.Count);
+                    if (TryCaptureDrawingGeometry(model, best, data))
+                        alignedCount++;
+                    else
+                        data.ProjectionSource = "Khong lay duoc bien dang 2D cua Drawing View: " + best.Name;
                 }
                 finally
                 {
@@ -1792,78 +1855,12 @@ namespace ADDIN.Commands
                         + best.Name + ", success=" + temporarilyUnsuppressed);
                 }
 
-                RefreshMatchGeometry(best);
-                if (best.ViewTransform == null)
-                {
-                    Debug.WriteLine("[CHECK ROUND] Component Drawing view has no transform. view="
-                        + best.Name + ", drawing=" + drawingPath);
-                    return false;
-                }
-
-                List<ProjectedPreviewPoint> projected = new List<ProjectedPreviewPoint>();
-                foreach (RoundHolePreviewPath path in data.Paths)
-                {
-                    if (path == null)
-                        continue;
-                    foreach (RoundHolePreviewPoint point in path.Points)
-                    {
-                        double[] transformed = TransformPoint(
-                            mathUtility,
-                            best.ComponentTransform,
-                            best.ViewTransform,
-                            point.ModelX,
-                            point.ModelY,
-                            point.ModelZ);
-                        if (transformed == null || transformed.Length < 2)
-                            continue;
-                        projected.Add(new ProjectedPreviewPoint
-                        {
-                            Point = point,
-                            X = transformed[0],
-                            Y = transformed[1]
-                        });
-                    }
-                }
-
-                int expectedPointCount = data.Paths.Sum(
-                    path => path == null ? 0 : path.Points.Count);
-                if (expectedPointCount == 0 || projected.Count != expectedPointCount)
-                {
-                    Debug.WriteLine("[CHECK ROUND] Component Drawing projection incomplete. part="
-                        + data.PartPath + ", projected=" + projected.Count
-                        + "/" + expectedPointCount);
-                    return false;
-                }
-
-                List<RoundHolePreviewPath> drawingPaths = CollectDrawingPaths(
-                    best,
-                    mathUtility);
-                if (drawingPaths.Count < 3)
-                {
-                    Debug.WriteLine("[CHECK ROUND] Component Drawing visible edges too sparse. view="
-                        + best.Name + ", paths=" + drawingPaths.Count);
-                    drawingPaths.Clear();
-                }
-
-                foreach (ProjectedPreviewPoint item in projected)
-                {
-                    item.Point.X = item.X;
-                    item.Point.Y = item.Y;
-                }
-                data.DrawingPaths.Clear();
-                data.DrawingPaths.AddRange(drawingPaths);
-                data.DrawingViewName = best.Name;
-                data.ProjectionSource = "Component Drawing: " + best.Name;
-
-                Debug.WriteLine("[CHECK ROUND] Component Drawing aligned. part="
-                    + data.PartPath + ", drawing=" + drawingPath
-                    + ", sheet=" + best.SheetName + ", view=" + best.Name
-                    + ", config=" + data.Configuration
-                    + ", flatPattern=" + best.IsFlatPattern
-                    + ", suppressed=" + best.IsSuppressed
-                    + ", visibleEdges=" + drawingPaths.Count
-                    + ", elapsedMs=" + stopwatch.ElapsedMilliseconds);
-                return true;
+                bool captured = TryCaptureDrawingGeometry(drawingModel, best, data);
+                Debug.WriteLine("[CHECK ROUND] Component Drawing native capture. part="
+                    + data.PartPath + ", sheet=" + best.SheetName + ", view=" + best.Name
+                    + ", paths=" + data.DrawingPaths.Count + ", mappedMarkers=" + data.DrawingMarkers.Count
+                    + ", unmappedMarkers=" + data.UnmappedMarkerCount + ", success=" + captured);
+                return captured;
             }
             catch (Exception ex)
             {
@@ -2541,7 +2538,8 @@ namespace ADDIN.Commands
                 }
 
                 int expectedPointCount = data.Paths.Sum(path => path == null ? 0 : path.Points.Count);
-                if (expectedPointCount == 0 || projected.Count != expectedPointCount)
+                if (expectedPointCount == 0 || projected.Count != expectedPointCount
+                    || !IsUsableProjection(data, projected))
                 {
                     Debug.WriteLine("[CHECK ROUND] Open In Position projection incomplete. part="
                         + data.PartPath + ", projected=" + projected.Count
@@ -2551,18 +2549,6 @@ namespace ADDIN.Commands
 
                 double sourceAspect = GetPreviewAspect(data.Paths);
                 double projectedAspect = GetProjectedAspect(projected);
-                if (sourceAspect > 0.0
-                    && projectedAspect > 0.0
-                    && projectedAspect < sourceAspect * 0.25)
-                {
-                    Debug.WriteLine("[CHECK ROUND] Open In Position projection rejected: collapsed. part="
-                        + data.PartPath + ", sourceAspect="
-                        + sourceAspect.ToString("0.####", CultureInfo.InvariantCulture)
-                        + ", projectedAspect="
-                        + projectedAspect.ToString("0.####", CultureInfo.InvariantCulture));
-                    return false;
-                }
-
                 foreach (ProjectedPreviewPoint item in projected)
                 {
                     item.Point.X = item.X;
@@ -2625,6 +2611,43 @@ namespace ADDIN.Commands
                 Debug.WriteLine("[CHECK ROUND] Open In Position finished. part="
                     + data.PartPath + ", elapsedMs=" + stopwatch.ElapsedMilliseconds);
             }
+        }
+
+        private static bool IsUsableProjection(
+            RoundHolePreviewData data,
+            List<ProjectedPreviewPoint> projected)
+        {
+            int expected = data.Paths.Sum(path => path == null ? 0 : path.Points.Count);
+            if (expected < 3 || projected.Count != expected
+                || projected.Any(p => double.IsNaN(p.X) || double.IsInfinity(p.X)
+                    || double.IsNaN(p.Y) || double.IsInfinity(p.Y)))
+                return false;
+
+            // Compare a wide triangle, rather than bounding-box aspect: a long
+            // narrow part or a 90-degree view rotation is still a valid drawing.
+            ProjectedPreviewPoint a = projected[0];
+            ProjectedPreviewPoint b = projected.OrderByDescending(p =>
+                Math.Pow(p.Point.X - a.Point.X, 2)
+                + Math.Pow(p.Point.Y - a.Point.Y, 2)).First();
+            double ux = b.Point.X - a.Point.X;
+            double uy = b.Point.Y - a.Point.Y;
+            ProjectedPreviewPoint c = projected.OrderByDescending(p => Math.Abs(
+                ux * (p.Point.Y - a.Point.Y) - uy * (p.Point.X - a.Point.X))).First();
+            double vx = c.Point.X - a.Point.X;
+            double vy = c.Point.Y - a.Point.Y;
+            double sourceArea = Math.Abs(ux * vy - uy * vx);
+            if (sourceArea <= 1e-20)
+                return false;
+            double pu = b.X - a.X;
+            double qu = b.Y - a.Y;
+            double pv = c.X - a.X;
+            double qv = c.Y - a.Y;
+            double scaleSquared = Math.Max(
+                (pu * pu + qu * qu) / (ux * ux + uy * uy),
+                (pv * pv + qv * qv) / (vx * vx + vy * vy));
+            double projectedArea = Math.Abs(pu * qv - qu * pv);
+            return scaleSquared > 1e-20
+                && projectedArea >= sourceArea * scaleSquared * 0.1;
         }
 
         private static double GetPreviewAspect(List<RoundHolePreviewPath> paths)
@@ -2777,6 +2800,516 @@ namespace ADDIN.Commands
             }
             catch { }
             try { model.ClearSelection2(true); } catch { }
+        }
+
+        private static bool TryCaptureDrawingGeometry(
+            ModelDoc2 drawingModel, ViewMatch match, RoundHolePreviewData data)
+        {
+            data.DrawingPaths.Clear();
+            data.DrawingMarkers.Clear();
+            data.UsesDrawingGeometry = false;
+            data.UnmappedMarkerCount = 0;
+            if (match == null || match.View == null)
+                return false;
+            try
+            {
+                // Generate the view's actual 2D display data, including geometry
+                // outside the previous viewport. No model-to-view projection.
+                drawingModel.ViewZoomtofit2();
+                object buffer;
+                object edgeObjects = match.View.GetPolylines7(1, out buffer);
+                double[] values = buffer as double[];
+                List<RoundHolePreviewPath> paths = ParseDrawingPolylines(values);
+                if (paths.Count == 0)
+                    return false;
+                Array edges = edgeObjects as Array;
+                List<RoundHolePreviewPath> sourceMarkers = data.Paths.Where(p => p != null
+                    && (p.Status == "NG" || p.Status == "CHECK"))
+                    .OrderBy(p => p.HoleNumber).ToList();
+                for (int markerIndex = 0; markerIndex < sourceMarkers.Count; markerIndex++)
+                    sourceMarkers[markerIndex].MarkerId = sourceMarkers[markerIndex].Status
+                        + "-" + (markerIndex + 1);
+                ModelDoc2 referencedPart = null;
+                try { referencedPart = match.View.ReferencedDocument as ModelDoc2; } catch { }
+                var markerPaths = new Dictionary<RoundHolePreviewPath, RoundHolePreviewPath>();
+                int referenceMatches = 0;
+                for (int i = 0; i < paths.Count; i++)
+                {
+                    Edge edge = edges != null && i < edges.Length
+                        ? edges.GetValue(i + edges.GetLowerBound(0)) as Edge : null;
+                    string edgeReference = CheckRoundRunner.GetEdgeReference(referencedPart, edge);
+                    RoundHolePreviewPath source = FindSourceMarkerByPersistentId(
+                        referencedPart, edgeReference, sourceMarkers);
+                    if (source != null)
+                        referenceMatches++;
+                    Curve curve = null;
+                    try { curve = edge == null ? null : edge.GetCurve() as Curve; } catch { }
+                    if (source == null && curve == null)
+                        continue;
+                    if (source == null)
+                        source = FindSourceMarker(SampleDrawingEdge(edge, curve), sourceMarkers);
+                    if (source == null)
+                        continue;
+                    RoundHolePreviewPath marker;
+                    if (!markerPaths.TryGetValue(source, out marker))
+                    {
+                        marker = new RoundHolePreviewPath
+                        {
+                            MarkerId = source.MarkerId,
+                            Status = source.Status,
+                            HoleNumber = source.HoleNumber
+                        };
+                        markerPaths.Add(source, marker);
+                    }
+                    // Highlight the corresponding rendered edge in its native
+                    // drawing coordinates, rather than connecting model loops.
+                    paths[i].Status = source.Status;
+                    marker.Points.AddRange(paths[i].Points);
+                }
+                if (markerPaths.Count < sourceMarkers.Count)
+                {
+                    Similarity2D mapping = FindDrawingRegistration(data.Paths, paths);
+                    if (mapping != null)
+                    {
+                        foreach (RoundHolePreviewPath source in sourceMarkers)
+                        {
+                            if (markerPaths.ContainsKey(source))
+                                continue;
+                            var mapped = new RoundHolePreviewPath
+                            {
+                                MarkerId = source.MarkerId, Status = source.Status,
+                                HoleNumber = source.HoleNumber
+                            };
+                            foreach (RoundHolePreviewPoint point in source.Points)
+                                mapped.Points.Add(mapping.Map(point.X, point.Y));
+                            var nativeMarker = new RoundHolePreviewPath
+                            {
+                                MarkerId = source.MarkerId, Status = source.Status,
+                                HoleNumber = source.HoleNumber
+                            };
+                            foreach (RoundHolePreviewPath drawingPath in paths)
+                            {
+                                if (DrawingEdgeMatches(drawingPath, mapped, 0.0003 * mapping.Scale))
+                                {
+                                    drawingPath.Status = source.Status;
+                                    nativeMarker.Points.AddRange(drawingPath.Points);
+                                }
+                            }
+                            if (nativeMarker.Points.Count > 0)
+                                markerPaths.Add(source, nativeMarker);
+                        }
+                        Debug.WriteLine("[CHECK ROUND] Marker registration verified by round holes and outer contour.");
+                    }
+                }
+                data.DrawingPaths.AddRange(paths);
+                data.DrawingMarkers.AddRange(markerPaths.Values);
+                data.UnmappedMarkerCount = sourceMarkers.Count - markerPaths.Count;
+                data.UsesDrawingGeometry = true;
+                data.DrawingViewName = match.Name;
+                data.ProjectionSource = "Drawing 2D: " + match.Name + " / " + match.SheetName;
+                Debug.WriteLine("[CHECK ROUND] Native Drawing geometry. view=" + match.Name
+                    + ", paths=" + paths.Count + ", mapped=" + markerPaths.Count
+                    + ", unmapped=" + data.UnmappedMarkerCount + ", referenceEdges=" + referenceMatches);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[CHECK ROUND] Native Drawing geometry ERROR: " + ex);
+                return false;
+            }
+        }
+
+        private static List<RoundHolePreviewPath> ParseDrawingPolylines(double[] values)
+        {
+            var paths = new List<RoundHolePreviewPath>();
+            if (values == null)
+                return paths;
+            int offset = 0;
+            while (offset < values.Length)
+            {
+                // IView.GetPolylines7: type, geometry count, geometry,
+                // six line attributes, point count, then XYZ triples.
+                if (values.Length - offset < 9)
+                    return new List<RoundHolePreviewPath>();
+                double geometryType = values[offset++];
+                double geometryCountValue = values[offset++];
+                if (!IsArrayCount(geometryCountValue, values.Length - offset - 7))
+                    return new List<RoundHolePreviewPath>();
+                int geometryOffset = offset;
+                bool fullCircle = geometryType == 1 && geometryCountValue >= 12
+                    && Math.Pow(values[geometryOffset + 3] - values[geometryOffset + 6], 2)
+                        + Math.Pow(values[geometryOffset + 4] - values[geometryOffset + 7], 2)
+                        + Math.Pow(values[geometryOffset + 5] - values[geometryOffset + 8], 2) <= 1e-16;
+                offset += (int)geometryCountValue + 6;
+                double pointCountValue = values[offset++];
+                if (!IsArrayCount(pointCountValue, (values.Length - offset) / 3))
+                    return new List<RoundHolePreviewPath>();
+                var path = new RoundHolePreviewPath();
+                for (int i = 0; i < (int)pointCountValue; i++)
+                {
+                    double x = values[offset++];
+                    double y = values[offset++];
+                    double z = values[offset++];
+                    if (double.IsNaN(x) || double.IsInfinity(x)
+                        || double.IsNaN(y) || double.IsInfinity(y)
+                        || double.IsNaN(z) || double.IsInfinity(z))
+                        return new List<RoundHolePreviewPath>();
+                    path.Points.Add(new RoundHolePreviewPoint { X = x, Y = y });
+                }
+                if (fullCircle && path.Points.Count >= 3)
+                {
+                    ReadDrawingCircle(path);
+                }
+                // Keep one entry per record so the returned edge array stays
+                // aligned, including silhouettes and zero-point records.
+                paths.Add(path);
+            }
+            return paths.Any(p => p.Points.Count >= 2)
+                ? paths : new List<RoundHolePreviewPath>();
+        }
+
+        private static bool IsArrayCount(double value, int available)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value)
+                && value >= 0 && value <= available && value == Math.Floor(value);
+        }
+
+        private static void ReadDrawingCircle(RoundHolePreviewPath path)
+        {
+            var a = path.Points[0];
+            var b = path.Points.OrderByDescending(p => Math.Pow(p.X - a.X, 2) + Math.Pow(p.Y - a.Y, 2)).First();
+            double ux = b.X - a.X, uy = b.Y - a.Y;
+            var c = path.Points.OrderByDescending(p => Math.Abs(ux * (p.Y - a.Y) - uy * (p.X - a.X))).First();
+            double vx = c.X - a.X, vy = c.Y - a.Y;
+            double determinant = 2 * (ux * vy - uy * vx);
+            if (Math.Abs(determinant) <= 1e-24) return;
+            double u2 = ux * ux + uy * uy, v2 = vx * vx + vy * vy;
+            double cx = (u2 * vy - v2 * uy) / determinant;
+            double cy = (ux * v2 - vx * u2) / determinant;
+            double radius = Math.Sqrt(cx * cx + cy * cy);
+            cx += a.X; cy += a.Y;
+            if (radius <= 1e-12 || path.Points.Any(p => Math.Abs(
+                Math.Sqrt(Math.Pow(p.X - cx, 2) + Math.Pow(p.Y - cy, 2)) - radius) > radius * 0.005)) return;
+            // Display circles can have only a few vertices. Bounding-box radius
+            // and center estimates would depend on the tessellation angle.
+            path.CircleX = cx; path.CircleY = cy; path.CircleRadiusM = radius;
+        }
+
+        private sealed class Similarity2D
+        {
+            public double A, B, Tx, Ty;
+            public bool Mirror;
+            public double Scale => Math.Sqrt(A * A + B * B);
+            public RoundHolePreviewPoint Map(double x, double y)
+            {
+                if (Mirror) x = -x;
+                return new RoundHolePreviewPoint { X = Tx + A * x - B * y, Y = Ty + B * x + A * y };
+            }
+        }
+
+        private static Similarity2D FindDrawingRegistration(
+            List<RoundHolePreviewPath> sourcePaths, List<RoundHolePreviewPath> drawingPaths)
+        {
+            var source = sourcePaths.Where(p => p.CircleRadiusM.HasValue).ToList();
+            var native = new List<RoundHolePreviewPath>();
+            foreach (RoundHolePreviewPath circle in drawingPaths.Where(p => p.CircleRadiusM.HasValue))
+            {
+                if (!native.Any(p => Math.Abs(p.CircleX - circle.CircleX) < 1e-7
+                    && Math.Abs(p.CircleY - circle.CircleY) < 1e-7
+                    && Math.Abs(p.CircleRadiusM.Value - circle.CircleRadiusM.Value) < 1e-7))
+                    native.Add(circle);
+            }
+            var outer = sourcePaths.Where(p => p.IsOuter).SelectMany(p => p.Points).ToList();
+            if (native.Count < source.Count || outer.Count < 3)
+                return null;
+            RoundHolePreviewPath first = source.OrderByDescending(p => p.CircleRadiusM.Value)
+                .FirstOrDefault(p => source.Any(q => q != p
+                    && Math.Abs(q.CircleRadiusM.Value - p.CircleRadiusM.Value) < 1e-8));
+            RoundHolePreviewPath second = first == null ? null : source.Where(p => p != first
+                    && Math.Abs(p.CircleRadiusM.Value - first.CircleRadiusM.Value) < 1e-8)
+                .OrderByDescending(p => Math.Pow(p.CircleX - first.CircleX, 2)
+                    + Math.Pow(p.CircleY - first.CircleY, 2)).First();
+            var anchors = native;
+            bool circleAnchors = first != null && source.Any(p => Math.Abs(
+                (second.CircleX-first.CircleX)*(p.CircleY-first.CircleY)
+                - (second.CircleY-first.CircleY)*(p.CircleX-first.CircleX)) > 1e-10);
+            if (!circleAnchors)
+            {
+                // Parts without a non-collinear set of circular holes use the
+                // actual outer corners. No part number or predefined pose is used.
+                var corners = sourcePaths.Where(p => p.IsOuter)
+                    .SelectMany(p => FindOutlineCorners(p.Points)).ToList();
+                if (corners.Count < 3) return null;
+                var pair = corners.SelectMany(a => corners.Select(b => new { A=a, B=b }))
+                    .OrderByDescending(p => Math.Pow(p.A.X-p.B.X,2)+Math.Pow(p.A.Y-p.B.Y,2)).First();
+                first = new RoundHolePreviewPath { CircleX=pair.A.X, CircleY=pair.A.Y };
+                second = new RoundHolePreviewPath { CircleX=pair.B.X, CircleY=pair.B.Y };
+                anchors = drawingPaths.Where(p => !p.CircleRadiusM.HasValue && p.Points.Count >= 2)
+                    .SelectMany(p => new[] { p.Points.First(), p.Points.Last() })
+                    .GroupBy(p => new { X=Math.Round(p.X,8), Y=Math.Round(p.Y,8) })
+                    .Select(g => new RoundHolePreviewPath { CircleX=g.First().X, CircleY=g.First().Y }).ToList();
+            }
+            double sx = second.CircleX - first.CircleX;
+            double sy = second.CircleY - first.CircleY;
+            double sourceLengthSquared = sx * sx + sy * sy;
+            if (sourceLengthSquared <= 1e-16)
+                return null;
+            Similarity2D accepted = null;
+            foreach (RoundHolePreviewPath a in anchors)
+            foreach (RoundHolePreviewPath b in anchors)
+            {
+                if (ReferenceEquals(a, b)) continue;
+                double dx = b.CircleX - a.CircleX, dy = b.CircleY - a.CircleY;
+                double scale = Math.Sqrt((dx * dx + dy * dy) / sourceLengthSquared);
+                if (scale <= 1e-12 || (circleAnchors && (Math.Abs(a.CircleRadiusM.Value - first.CircleRadiusM.Value * scale)
+                    > first.CircleRadiusM.Value * scale * 0.02
+                    || Math.Abs(b.CircleRadiusM.Value - second.CircleRadiusM.Value * scale)
+                    > second.CircleRadiusM.Value * scale * 0.02)))
+                    continue;
+                foreach (bool mirror in new[] { false, true })
+                {
+                    double ux = mirror ? -sx : sx;
+                    var mapping = new Similarity2D
+                    {
+                        A = (dx * ux + dy * sy) / sourceLengthSquared,
+                        B = (dy * ux - dx * sy) / sourceLengthSquared,
+                        Mirror = mirror
+                    };
+                    double fx = mirror ? -first.CircleX : first.CircleX;
+                    mapping.Tx = a.CircleX - mapping.A * fx + mapping.B * first.CircleY;
+                    mapping.Ty = a.CircleY - mapping.B * fx - mapping.A * first.CircleY;
+                    // Independent flat-pattern/display calculations can differ
+                    // by a few tenths of a millimeter. This bounded tolerance
+                    // validates every landmark and outer vertex; marker positions
+                    // then come from matched native Drawing edges themselves.
+                    double tolerance = 0.0003 * scale;
+                    if (!circleAnchors)
+                    {
+                        var projected = outer.Select(p => mapping.Map(p.X,p.Y)).ToList();
+                        var displayed = drawingPaths.SelectMany(p => p.Points).ToList();
+                        if (displayed.Count == 0
+                            || Math.Abs(projected.Min(p=>p.X)-displayed.Min(p=>p.X)) > tolerance
+                            || Math.Abs(projected.Max(p=>p.X)-displayed.Max(p=>p.X)) > tolerance
+                            || Math.Abs(projected.Min(p=>p.Y)-displayed.Min(p=>p.Y)) > tolerance
+                            || Math.Abs(projected.Max(p=>p.Y)-displayed.Max(p=>p.Y)) > tolerance) continue;
+                    }
+                    var used = new HashSet<RoundHolePreviewPath>();
+                    bool valid = true;
+                    foreach (RoundHolePreviewPath circle in source)
+                    {
+                        RoundHolePreviewPoint target = mapping.Map(circle.CircleX, circle.CircleY);
+                        var nearest = native.Where(p => !used.Contains(p)
+                            && Math.Abs(p.CircleRadiusM.Value - circle.CircleRadiusM.Value * scale)
+                                <= circle.CircleRadiusM.Value * scale * 0.02)
+                            .OrderBy(p => Math.Pow(p.CircleX - target.X, 2) + Math.Pow(p.CircleY - target.Y, 2))
+                            .FirstOrDefault();
+                        if (nearest == null || Math.Pow(nearest.CircleX - target.X, 2)
+                            + Math.Pow(nearest.CircleY - target.Y, 2) > tolerance * tolerance)
+                        {
+                            valid = false;
+                            break;
+                        }
+                        used.Add(nearest);
+                    }
+                    if (!valid || outer.Any(p => DistanceToDrawingPathsSquared(mapping.Map(p.X, p.Y), drawingPaths)
+                        > tolerance * tolerance))
+                        continue;
+                    if (!circleAnchors && sourcePaths.Where(p => !p.IsOuter).SelectMany(p => p.Points)
+                        .Any(p => DistanceToDrawingPathsSquared(mapping.Map(p.X,p.Y),drawingPaths) > tolerance*tolerance))
+                        continue;
+                    if (accepted != null)
+                    {
+                        var marked = sourcePaths.Where(p => p.Status == "CHECK" || p.Status == "NG").ToList();
+                        bool different = outer.Any(p =>
+                        {
+                            var one = accepted.Map(p.X, p.Y);
+                            var two = mapping.Map(p.X, p.Y);
+                            return Math.Pow(one.X - two.X, 2) + Math.Pow(one.Y - two.Y, 2) > tolerance * tolerance;
+                        });
+                        if (different)
+                        {
+                            // A symmetric part can have multiple equivalent poses.
+                            // Equivalent poses may swap identical CHECK holes.
+                            // Accept only if each complete contour still matches
+                            // one contour with the SAME status, in both directions.
+                            // A CHECK hole must never swap with OK or NG geometry.
+                            if (marked.Count == 0 || marked.Any(path =>
+                            {
+                                var candidate = new RoundHolePreviewPath();
+                                candidate.Points.AddRange(path.Points.Select(p => mapping.Map(p.X,p.Y)));
+                                return !marked.Where(other => other.Status == path.Status).Any(other =>
+                                {
+                                    var original = new RoundHolePreviewPath();
+                                    original.Points.AddRange(other.Points.Select(p => accepted.Map(p.X,p.Y)));
+                                    return candidate.Points.All(p => DistanceToDrawingPathsSquared(p,
+                                        new List<RoundHolePreviewPath> { original }) <= tolerance*tolerance)
+                                        && original.Points.All(p => DistanceToDrawingPathsSquared(p,
+                                            new List<RoundHolePreviewPath> { candidate }) <= tolerance*tolerance);
+                                });
+                            }))
+                            {
+                                Debug.WriteLine("[CHECK ROUND] Drawing registration rejected: symmetric poses change CHECK/NG locations.");
+                                return null;
+                            }
+                        }
+                    }
+                    accepted = mapping;
+                }
+            }
+            Debug.WriteLine("[CHECK ROUND] Drawing registration. sourceCircles=" + source.Count
+                + ", nativeCircles=" + native.Count + ", verified=" + (accepted != null));
+            return accepted;
+        }
+
+        private static IEnumerable<RoundHolePreviewPoint> FindOutlineCorners(List<RoundHolePreviewPoint> points)
+        {
+            var distinct = new List<RoundHolePreviewPoint>();
+            foreach (var p in points)
+                if (distinct.Count == 0 || Math.Pow(p.X-distinct.Last().X,2)
+                    + Math.Pow(p.Y-distinct.Last().Y,2) > 1e-16) distinct.Add(p);
+            if (distinct.Count > 1 && Math.Pow(distinct.First().X-distinct.Last().X,2)
+                + Math.Pow(distinct.First().Y-distinct.Last().Y,2) <= 1e-16) distinct.RemoveAt(distinct.Count-1);
+            for (int i=0; i<distinct.Count; i++)
+            {
+                var a=distinct[(i+distinct.Count-1)%distinct.Count]; var b=distinct[i];
+                var c=distinct[(i+1)%distinct.Count];
+                double ux=b.X-a.X, uy=b.Y-a.Y, vx=c.X-b.X, vy=c.Y-b.Y;
+                double length=Math.Sqrt((ux*ux+uy*uy)*(vx*vx+vy*vy));
+                if (length > 1e-16 && (ux*vx+uy*vy)/length < 0.995) yield return b;
+            }
+        }
+
+        private static double DistanceToDrawingPathsSquared(
+            RoundHolePreviewPoint point, List<RoundHolePreviewPath> paths)
+        {
+            double nearest = double.MaxValue;
+            foreach (RoundHolePreviewPath path in paths)
+            for (int i = 1; i < path.Points.Count; i++)
+            {
+                var a = path.Points[i - 1]; var b = path.Points[i];
+                double ux = b.X - a.X, uy = b.Y - a.Y;
+                double dx = point.X - a.X, dy = point.Y - a.Y;
+                double lengthSquared = ux * ux + uy * uy;
+                double t = lengthSquared <= 1e-30 ? 0 : Math.Max(0, Math.Min(1,
+                    (dx * ux + dy * uy) / lengthSquared));
+                nearest = Math.Min(nearest, Math.Pow(dx - t * ux, 2) + Math.Pow(dy - t * uy, 2));
+            }
+            return nearest;
+        }
+
+        private static bool DrawingEdgeMatches(
+            RoundHolePreviewPath edge, RoundHolePreviewPath marker, double tolerance)
+        {
+            if (edge.Points.Count < 2) return false;
+            var paths = new List<RoundHolePreviewPath> { marker };
+            return new[] { 0, edge.Points.Count / 2, edge.Points.Count - 1 }.All(i =>
+                DistanceToDrawingPathsSquared(edge.Points[i], paths) <= tolerance * tolerance);
+        }
+
+        private static RoundHolePreviewPath FindSourceMarkerByReference(
+            string reference, List<RoundHolePreviewPath> markers)
+        {
+            if (reference == null)
+                return null;
+            RoundHolePreviewPath found = null;
+            foreach (RoundHolePreviewPath marker in markers)
+            {
+                if (!marker.EdgeReferences.Contains(reference))
+                    continue;
+                if (found != null)
+                    return null;
+                found = marker;
+            }
+            return found;
+        }
+
+        private static RoundHolePreviewPath FindSourceMarkerByPersistentId(
+            ModelDoc2 model, string reference, List<RoundHolePreviewPath> markers)
+        {
+            RoundHolePreviewPath exact = FindSourceMarkerByReference(reference, markers);
+            if (exact != null || model == null || reference == null)
+                return exact;
+            // The serialized bytes can change after a rebuild. Ask SOLIDWORKS
+            // to compare entity identities rather than only comparing bytes.
+            byte[] nativeId = Convert.FromBase64String(reference);
+            RoundHolePreviewPath found = null;
+            foreach (RoundHolePreviewPath marker in markers)
+            {
+                bool matches = false;
+                foreach (string sourceReference in marker.EdgeReferences)
+                {
+                    try
+                    {
+                        if (model.Extension.IsSamePersistentID(nativeId,
+                            Convert.FromBase64String(sourceReference)) == (int)swObjectEquality.swObjectSame)
+                        {
+                            matches = true;
+                            break;
+                        }
+                    }
+                    catch { }
+                }
+                if (!matches)
+                    continue;
+                if (found != null)
+                    return null;
+                found = marker;
+            }
+            return found;
+        }
+
+        private static RoundHolePreviewPath FindSourceMarker(
+            List<double[]> edgePoints, List<RoundHolePreviewPath> markers)
+        {
+            if (edgePoints == null || edgePoints.Count < 2)
+                return null;
+            const double toleranceSquared = 0.00005 * 0.00005; // 0.05 mm
+            RoundHolePreviewPath best = null;
+            double bestScore = double.MaxValue;
+            bool ambiguous = false;
+            foreach (RoundHolePreviewPath marker in markers)
+            {
+                double worstDistance = 0;
+                // Endpoints plus the middle distinguish nearby holes. Compare
+                // to source segments, so different curve tessellations match.
+                foreach (int sample in new[] { 0, edgePoints.Count / 2, edgePoints.Count - 1 })
+                {
+                    double nearest = double.MaxValue;
+                    for (int i = 1; i < marker.Points.Count; i++)
+                        nearest = Math.Min(nearest, DistanceToModelSegmentSquared(
+                            edgePoints[sample], marker.Points[i - 1], marker.Points[i]));
+                    worstDistance = Math.Max(worstDistance, nearest);
+                }
+                if (worstDistance > toleranceSquared)
+                    continue;
+                if (worstDistance < bestScore - 1e-16)
+                {
+                    best = marker;
+                    bestScore = worstDistance;
+                    ambiguous = false;
+                }
+                else if (Math.Abs(worstDistance - bestScore) <= 1e-16)
+                    ambiguous = true;
+            }
+            return ambiguous ? null : best;
+        }
+
+        private static double DistanceToModelSegmentSquared(
+            double[] point, RoundHolePreviewPoint a, RoundHolePreviewPoint b)
+        {
+            double ux = b.ModelX - a.ModelX;
+            double uy = b.ModelY - a.ModelY;
+            double uz = b.ModelZ - a.ModelZ;
+            double dx = point[0] - a.ModelX;
+            double dy = point[1] - a.ModelY;
+            double dz = point[2] - a.ModelZ;
+            double lengthSquared = ux * ux + uy * uy + uz * uz;
+            double t = lengthSquared <= 1e-30 ? 0 : Math.Max(0, Math.Min(1,
+                (dx * ux + dy * uy + dz * uz) / lengthSquared));
+            dx -= t * ux;
+            dy -= t * uy;
+            dz -= t * uz;
+            return dx * dx + dy * dy + dz * dz;
         }
 
         private static List<RoundHolePreviewPath> CollectDrawingPaths(

@@ -45,7 +45,7 @@ namespace ADDIN.Commands
 
         public void Run()
         {
-            const string build = "20260919-broken-view-native-transaction-v18.5";
+            const string build = "20260922-single-main-arc-restore-v18.6";
             Debug.WriteLine("[DIM MAT CAT] build=" + build);
             ModelDoc2 model = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
             if (model == null || model.GetType() != (int)swDocumentTypes_e.swDocDRAWING)
@@ -125,7 +125,7 @@ namespace ADDIN.Commands
                     Debug.WriteLine("[DIM MAT CAT BREAK TX] fresh view reacquired after UnBreak: " + view.Name);
                 }
 
-                Profile.Plan plan = ReadSectionPlan(view, math, transform, seedLine, seedArc);
+                Profile.Plan plan = ReadSectionPlanOrClickedSingleArc(view, math, transform, seedLine, seedArc);
                 restoreView = true;
                 ActivateSectionViewSketch(model, drawing, view);
                 selection = model.SelectionManager as SelectionMgr;
@@ -151,7 +151,7 @@ namespace ADDIN.Commands
                 }
                 // Deletion can invalidate COM edge references. Recollect and rebuild
                 // the plan from the saved seed rather than relying on selection.
-                plan = ReadSectionPlan(view, math, transform, seedLine, seedArc);
+                plan = ReadSectionPlanOrClickedSingleArc(view, math, transform, seedLine, seedArc);
                 DisableEdgeSelectionFilter();
                 EnableNativeVirtualSharpDisplay(model);
                 previousInput = swApp.GetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate);
@@ -1748,6 +1748,165 @@ namespace ADDIN.Commands
             CurvedConstraint(model, "sgTANGENT", () => line.Select4(false, null), () => SelectEdge(source, true, data));
             return line;
         }
+        // v18.6 - Restore the original "one main arc" behavior before the general
+        // topology planner. A pure curved sheet strip is returned by SOLIDWORKS as
+        // two concentric open arcs (the two skins) plus two short thickness caps.
+        // It has no flange/support edge, so CurvedSupports intentionally rejects it.
+        // For this exact topology, the clicked arc itself is the manufacturing
+        // reference: create only native R + Arc Length for THAT skin.
+        private Profile.Plan ReadSectionPlanOrClickedSingleArc(
+            SolidWorks.Interop.sldworks.View view,
+            MathUtility math,
+            MathTransform transform,
+            EdgeInfo seedLine,
+            ArcInfo seedArc)
+        {
+            Profile.Plan singleArcPlan;
+            if (seedArc != null && TryBuildClickedSingleArcPlan(
+                    view, math, transform, seedArc, out singleArcPlan))
+                return singleArcPlan;
+
+            return ReadSectionPlan(view, math, transform, seedLine, seedArc);
+        }
+
+        private bool TryBuildClickedSingleArcPlan(
+            SolidWorks.Interop.sldworks.View view,
+            MathUtility math,
+            MathTransform transform,
+            ArcInfo seedArc,
+            out Profile.Plan plan)
+        {
+            plan = null;
+            if (view == null || math == null || transform == null || seedArc == null)
+                return false;
+
+            List<EdgeInfo> lines = CollectVisibleLineEdges(view, math, transform);
+            List<ArcInfo> allArcs = CollectVisibleArcEdges(view, math, transform);
+            List<ArcInfo> arcs = allArcs
+                .Where(a => a != null && a.Edge != null && !IsFullCircleArc(a))
+                .ToList();
+
+            // This branch is deliberately narrow. Do not steal L/U/Z/multi-bend or
+            // multi-arc profiles from SectionProfilePlanner.
+            if (arcs.Count != 2 || lines.Count != 2)
+                return false;
+
+            ArcInfo selected = FindMatchingArcGeometry(arcs, seedArc);
+            if (selected == null)
+                return false;
+
+            ArcInfo other = arcs.FirstOrDefault(a => !ReferenceEquals(a, selected));
+            if (other == null)
+                return false;
+
+            double centerGapMm = Distance2D(
+                selected.CenterX, selected.CenterY,
+                other.CenterX, other.CenterY) * 1000.0 / viewScale;
+            if (centerGapMm > 0.20)
+                return false;
+
+            if (Math.Abs(Math.Abs(selected.SweepAngleRad) - Math.Abs(other.SweepAngleRad)) > 0.01)
+                return false;
+
+            double thicknessMm = Math.Abs(selected.RadiusMm - other.RadiusMm);
+            if (thicknessMm <= 0.01)
+                return false;
+
+            double endpointTol = MmToViewM(0.20);
+            EdgeInfo capStart = lines.FirstOrDefault(line =>
+                SingleArcCapTouches(line, selected.StartX, selected.StartY, other, endpointTol));
+            EdgeInfo capEnd = lines.FirstOrDefault(line =>
+                !ReferenceEquals(line, capStart)
+                && SingleArcCapTouches(line, selected.EndX, selected.EndY, other, endpointTol));
+
+            if (capStart == null || capEnd == null)
+                return false;
+
+            double capToleranceMm = Math.Max(0.25, thicknessMm * 0.15);
+            if (Math.Abs(capStart.LengthMm - thicknessMm) > capToleranceMm
+                || Math.Abs(capEnd.LengthMm - thicknessMm) > capToleranceMm)
+                return false;
+
+            Profile.Curve clickedCurve = SingleArcProfileCurve(selected);
+            Profile.Curve mateCurve = SingleArcProfileCurve(other);
+            Profile.Curve startCap = SingleArcProfileCurve(capStart);
+            Profile.Curve endCap = SingleArcProfileCurve(capEnd);
+
+            plan = new Profile.Plan
+            {
+                Shape = "Single curved strip / clicked arc",
+                SelectedContour = "clicked-arc",
+                Thickness = MmToViewM(thicknessMm)
+            };
+            plan.Boundary.Add(clickedCurve);
+            plan.Boundary.Add(startCap);
+            plan.Boundary.Add(mateCurve);
+            plan.Boundary.Add(endCap);
+
+            // The generic native-arc DIM path below creates exactly two dimensions
+            // from DimensionArcs: radius + arc length. Only the clicked skin is put
+            // here, so the mate arc is never dimensioned by accident.
+            plan.DimensionArcs.Add(clickedCurve);
+
+            Debug.WriteLine(
+                "[DIM MAT CAT SINGLE ARC] matched pure curved strip. clicked R="
+                + selected.RadiusMm.ToString("0.###")
+                + "mm, arcLength=" + selected.ArcLengthMm.ToString("0.###")
+                + "mm, mateR=" + other.RadiusMm.ToString("0.###")
+                + "mm, thickness=" + thicknessMm.ToString("0.###")
+                + "mm, caps=" + capStart.LengthMm.ToString("0.###")
+                + "/" + capEnd.LengthMm.ToString("0.###") + "mm");
+            return true;
+        }
+
+        private bool SingleArcCapTouches(
+            EdgeInfo line,
+            double selectedX,
+            double selectedY,
+            ArcInfo other,
+            double tolerance)
+        {
+            if (line == null || other == null)
+                return false;
+
+            bool touchesSelected =
+                Distance2D(line.X1, line.Y1, selectedX, selectedY) <= tolerance
+                || Distance2D(line.X2, line.Y2, selectedX, selectedY) <= tolerance;
+            if (!touchesSelected)
+                return false;
+
+            bool touchesOther =
+                Distance2D(line.X1, line.Y1, other.StartX, other.StartY) <= tolerance
+                || Distance2D(line.X2, line.Y2, other.StartX, other.StartY) <= tolerance
+                || Distance2D(line.X1, line.Y1, other.EndX, other.EndY) <= tolerance
+                || Distance2D(line.X2, line.Y2, other.EndX, other.EndY) <= tolerance;
+            return touchesOther;
+        }
+
+        private static Profile.Curve SingleArcProfileCurve(ArcInfo arc)
+        {
+            return new Profile.Curve
+            {
+                A = new Profile.Point(arc.StartX, arc.StartY),
+                B = new Profile.Point(arc.EndX, arc.EndY),
+                Center = new Profile.Point(arc.CenterX, arc.CenterY),
+                IsArc = true,
+                SweepAngleRadians = arc.SweepAngleRad,
+                Source = arc
+            };
+        }
+
+        private static Profile.Curve SingleArcProfileCurve(EdgeInfo line)
+        {
+            return new Profile.Curve
+            {
+                A = new Profile.Point(line.X1, line.Y1),
+                B = new Profile.Point(line.X2, line.Y2),
+                IsArc = false,
+                Source = line
+            };
+        }
+
         private Profile.Plan ReadSectionPlan(SolidWorks.Interop.sldworks.View view, MathUtility math,
             MathTransform transform, EdgeInfo seedLine, ArcInfo seedArc)
         {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -96,6 +96,7 @@ namespace ADDIN.Commands
     internal sealed class DrawingCheckItemResult
     {
         public int BomRowIndex { get; set; } = -1;
+        public string BomItemNumber { get; set; } = "";
         public string PartNumber { get; set; } = "";
         public string Component { get; set; } = "";
         public string PartPath { get; set; } = "";
@@ -277,6 +278,7 @@ namespace ADDIN.Commands
                     DrawingCheckItemResult itemResult = new DrawingCheckItemResult
                     {
                         BomRowIndex = row.Index,
+                        BomItemNumber = GetBomNumberValues(row)?.ItemNumber ?? "",
                         PartNumber = buhinNo,
                         Component = componentName
                     };
@@ -409,6 +411,7 @@ namespace ADDIN.Commands
             DrawingCheckItemResult itemResult = new DrawingCheckItemResult
             {
                 BomRowIndex = bomRow != null ? bomRow.Index : -1,
+                BomItemNumber = GetBomNumberValues(bomRow)?.ItemNumber ?? "",
                 PartNumber = buhinNoBom,
                 Component = componentName,
                 PartPath = partPath,
@@ -432,6 +435,9 @@ namespace ADDIN.Commands
                 return itemResult;
             }
 
+            // Linked drawing tables need an active document window. Opening them
+            // with DocumentVisible(false) leaves $PRPSHEET display evaluation empty.
+            ActivateDrawingForDisplayRead(drawingModel, drawing);
             Sheet activeSheet = drawing.GetCurrentSheet() as Sheet;
             string sheetName = ResolveCurrentSheetName(drawing, activeSheet);
 
@@ -491,6 +497,12 @@ namespace ADDIN.Commands
                     fileNameBom,
                     bomQuantity);
             }
+
+            BomNumberValues bomNumbers = GetBomNumberValues(bomRow);
+            itemResult.Fields.Add(CompareBomNumbers(bomNumbers));
+            DrawingBomFieldResult gobanTotalField = CompareBomGobanTotal(bomNumbers);
+            itemResult.Fields.Add(gobanTotalField);
+            LogDebug($"[BOM GOBAN TOTAL] component=\"{componentName}\" total=\"{gobanTotalField.DrawingValue}\" bomQty=\"{gobanTotalField.BomValue}\" status={gobanTotalField.Status}");
 
             // 5. PART DRAWING: giữ nguyên rule cũ, phải nhận diện được khung tên + 部品番号.
             if (!drawingData.HeaderFound || string.IsNullOrWhiteSpace(drawingData.PartNumber))
@@ -567,7 +579,7 @@ namespace ADDIN.Commands
             itemResult.Fields.Add(ApplyStrictPropertyLinkAudit(
                 CompareMaterialField(drawingData.Material, bomMaterial),
                 GetPropertyLinkAudit(propertyLinkAudits, "材質")));
-            itemResult.Fields.Add(ApplyStrictPropertyLinkAudit(
+            itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
                 CompareThicknessField(drawingData.Thickness, bomThickness),
                 GetPropertyLinkAudit(propertyLinkAudits, "板厚")));
             itemResult.Fields.Add(CompareGobanField(drawingData.Goban, bomGoban));
@@ -828,11 +840,12 @@ namespace ADDIN.Commands
 
             if (!string.IsNullOrWhiteSpace(dxfJobNo) && !string.IsNullOrWhiteSpace(dxfPartNo))
             {
-                data.DxfFileName = $"{dxfJobNo} {dxfPartNo}".Trim();
+                data.DxfFileName = CombineDxfFragments(dxfJobNo, dxfPartNo);
             }
             else if (!string.IsNullOrWhiteSpace(dxfJobNo) && !string.IsNullOrWhiteSpace(data.PartNumber))
             {
-                data.DxfFileName = $"{dxfJobNo} / {data.PartNumber}".Trim();
+                data.DxfFileName = CombineDxfFragments(
+                    dxfJobNo, "/" + data.PartNumber.Trim());
             }
 
             // =========================================================================
@@ -1060,6 +1073,7 @@ namespace ADDIN.Commands
                 if (table == null || table.Cells == null || table.Cells.Count == 0)
                     continue;
 
+                int entryCountBeforeTable = result.Count;
                 bool foundTypeAInTable = false;
 
                 // -------------------------------------------------------------
@@ -1136,10 +1150,11 @@ namespace ADDIN.Commands
                     continue;
 
                 // -------------------------------------------------------------
-                // TYPE B
-                //   合番 | BR-02:35枚
-                // Không quan tâm chữ ghi chú khác trong/ngoài bảng.
-                // Không dùng tọa độ; chỉ tìm cell "合番" rồi parse cell cùng row.
+                // TYPE B/C
+                //   合番 | BR-02:35枚      (ngang, template 4185)
+                //   合番                  (dọc, template 4120)
+                //   M-4A:1
+                // Có template đặt cả nhãn và giá trị trong cùng một cell.
                 // -------------------------------------------------------------
                 foreach (TableCellDiagnosticInfo headerCell in table.Cells)
                 {
@@ -1151,6 +1166,20 @@ namespace ADDIN.Commands
                         continue;
                     }
 
+                    string headerText =
+                        CleanTableCellText(headerCell.DisplayedText);
+                    string inlineValue = Regex.Replace(
+                        headerText,
+                        @"^.*?合番\s*[:：]?\s*",
+                        "");
+
+                    if (TryAddCombinedGobanEntries(
+                            result, dedupe, table, headerCell, inlineValue))
+                    {
+                        continue;
+                    }
+
+                    bool foundValue = false;
                     for (int c = headerCell.Column + 1; c < table.ColumnCount; c++)
                     {
                         TableCellDiagnosticInfo valueCell =
@@ -1159,32 +1188,49 @@ namespace ADDIN.Commands
                         string combined =
                             CleanTableCellText(valueCell?.DisplayedText ?? "");
 
-                        string goban;
-                        string qty;
-                        if (!TryParseCombinedGobanQuantity(
-                                combined,
-                                out goban,
-                                out qty))
+                        if (!TryAddCombinedGobanEntries(
+                                result, dedupe, table, valueCell, combined))
                         {
                             continue;
                         }
 
-                        AddPartGobanQuantityEntry(
-                            result,
-                            dedupe,
-                            new PartGobanQuantityEntry
-                            {
-                                Goban = goban,
-                                Quantity = qty,
-                                // Giữ nguyên text của cell Drawing, ví dụ "P2 : 100".
-                                DisplayText = combined,
-                                Table = table,
-                                GobanCell = valueCell,
-                                QuantityCell = valueCell
-                            });
-
+                        foundValue = true;
                         break;
                     }
+
+                    if (foundValue)
+                        continue;
+
+                    // Bảng 合番 của template 4120 xếp nhãn và giá trị
+                    // thành 2 hàng trong cùng một cột.
+                    for (int r = headerCell.Row + 1; r < table.RowCount; r++)
+                    {
+                        TableCellDiagnosticInfo valueCell =
+                            FindTableCell(table, r, headerCell.Column);
+                        string combined =
+                            CleanTableCellText(valueCell?.DisplayedText ?? "");
+
+                        if (HeaderMatchesLogicalName(combined, "合番"))
+                            break;
+
+                        if (!TryAddCombinedGobanEntries(
+                                result, dedupe, table, valueCell, combined))
+                            continue;
+                        break;
+                    }
+                }
+
+                if (result.Count == entryCountBeforeTable &&
+                    table.RowCount == 2 && table.ColumnCount == 1)
+                {
+                    TableCellDiagnosticInfo first = FindTableCell(table, 0, 0);
+                    TableCellDiagnosticInfo second = FindTableCell(table, 1, 0);
+                    LogDebug(
+                        $"[PART GOBAN TABLE MISS] table={table.Index} " +
+                        $"cell0=\"{first?.DisplayedText}\" " +
+                        $"cell1=\"{second?.DisplayedText}\" " +
+                        $"raw0=\"{first?.RawText}\" " +
+                        $"raw1=\"{second?.RawText}\"");
                 }
             }
 
@@ -1218,32 +1264,51 @@ namespace ADDIN.Commands
             result.Add(entry);
         }
 
-        private static bool TryParseCombinedGobanQuantity(
-            string text,
-            out string goban,
-            out string quantity)
+        private static bool TryAddCombinedGobanEntries(
+            List<PartGobanQuantityEntry> result,
+            HashSet<string> dedupe,
+            TableDiagnosticInfo table,
+            TableCellDiagnosticInfo cell,
+            string text)
         {
-            goban = "";
-            quantity = "";
-
             string value = CleanTableCellText(text);
             if (string.IsNullOrWhiteSpace(value))
                 return false;
 
-            Match match = Regex.Match(
+            // A single cell can contain several pairs separated by spaces,
+            // line breaks or slashes. Validate the whole cell before adding any.
+            MatchCollection matches = Regex.Matches(
                 value,
-                @"^\s*(.+?)\s*[:：]\s*(\d+(?:[\.,]\d+)?)\s*枚?\s*$",
+                @"\G[\s/／,，、;；]*(?<pair>(?<goban>[^:：/／,，、;；]+?)\s*[:：]\s*(?<qty>\d+(?:[\.,]\d+)?)\s*枚?)(?=$|[\s/／,，、;；])",
                 RegexOptions.IgnoreCase);
 
-            if (!match.Success)
+            if (matches.Count == 0)
                 return false;
 
-            goban = (match.Groups[1].Value ?? "").Trim();
-            quantity = (match.Groups[2].Value ?? "").Trim();
+            Match last = matches[matches.Count - 1];
+            if (!string.IsNullOrWhiteSpace(value.Substring(last.Index + last.Length)))
+                return false;
 
-            return
-                !string.IsNullOrWhiteSpace(goban) &&
-                !string.IsNullOrWhiteSpace(quantity);
+            foreach (Match match in matches)
+            {
+                if (string.IsNullOrWhiteSpace(match.Groups["goban"].Value))
+                    return false;
+            }
+
+            foreach (Match match in matches)
+            {
+                AddPartGobanQuantityEntry(result, dedupe,
+                    new PartGobanQuantityEntry
+                    {
+                        Goban = match.Groups["goban"].Value.Trim(),
+                        Quantity = match.Groups["qty"].Value.Trim(),
+                        DisplayText = match.Groups["pair"].Value.Trim(),
+                        Table = table,
+                        GobanCell = cell,
+                        QuantityCell = cell
+                    });
+            }
+            return true;
         }
 
         private static bool TryParseQuantityNumber(
@@ -1344,6 +1409,80 @@ namespace ADDIN.Commands
 
         #region Extended Comparison Methods
 
+        private static BomNumberValues GetBomNumberValues(DataGridViewRow row)
+        {
+            return row != null && row.Cells.Count > 1
+                ? row.Cells[1].Tag as BomNumberValues
+                : null;
+        }
+
+        internal static DrawingBomFieldResult CompareBomNumbers(BomNumberValues values)
+        {
+            string itemNo = values?.ItemNumber ?? "";
+            string partNo = values?.PartNumber ?? "";
+            bool missing = string.IsNullOrWhiteSpace(itemNo) || string.IsNullOrWhiteSpace(partNo);
+            bool equal = string.Equals(NormalizeText(itemNo), NormalizeText(partNo), StringComparison.OrdinalIgnoreCase);
+            return new DrawingBomFieldResult
+            {
+                FieldName = "INo ↔ 部品番号 (BOM)",
+                DrawingValue = itemNo,
+                BomValue = partNo,
+                Source = "BOM: INo / 部品番号 cùng dòng",
+                Status = missing ? DrawingBomCheckStatus.Warning
+                    : equal ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG,
+                Message = missing ? "Không đọc được INo hoặc 部品番号 từ dòng BOM."
+                    : equal ? "" : $"Khác biệt trên cùng dòng BOM: INo='{itemNo}' != 部品番号='{partNo}'"
+            };
+        }
+
+        internal static DrawingBomFieldResult CompareBomGobanTotal(BomNumberValues values)
+        {
+            string goban = (values?.Goban ?? "").Normalize(System.Text.NormalizationForm.FormKC).Trim();
+            string quantity = (values?.Quantity ?? "").Normalize(System.Text.NormalizationForm.FormKC).Replace("枚", "").Trim();
+            var field = new DrawingBomFieldResult
+            {
+                FieldName = "合番合計 ↔ 数量 (BOM)",
+                BomValue = values?.Quantity ?? "",
+                Source = "BOM: tổng 合番 / 数量 cùng dòng",
+                Status = DrawingBomCheckStatus.Warning,
+                Message = "Không đọc đầy đủ được số lượng của từng 合番 hoặc 数量 trong dòng BOM."
+            };
+            decimal expected;
+            if (string.IsNullOrWhiteSpace(goban) ||
+                !decimal.TryParse(quantity.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture, out expected))
+                return field;
+
+            // Consume the complete cell, including multiline and slash-separated
+            // entries. Repeated 合番 entries contribute separately to the total.
+            MatchCollection entries = Regex.Matches(goban,
+                @"\G[\s/,、;]*(?<goban>[^\s:/,、;]+)(?:\s*:\s*|\s+)(?<qty>[0-9]+(?:[.,][0-9]+)?)\s*枚?(?=$|[\s/,、;])");
+            if (entries.Count == 0)
+                return field;
+            Match last = entries[entries.Count - 1];
+            if (!Regex.IsMatch(goban.Substring(last.Index + last.Length), @"^[\s/,、;]*$"))
+                return field;
+
+            decimal total = 0;
+            var terms = new List<string>();
+            foreach (Match entry in entries)
+            {
+                decimal amount;
+                if (!decimal.TryParse(entry.Groups["qty"].Value.Replace(',', '.'),
+                    NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount))
+                    return field;
+                try { total += amount; }
+                catch (OverflowException) { return field; }
+                terms.Add(entry.Groups["goban"].Value + ": " + amount.ToString(CultureInfo.InvariantCulture));
+            }
+            field.DrawingValue = total.ToString(CultureInfo.InvariantCulture);
+            field.Status = total == expected ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+            field.Message = string.Join(" + ", terms) + " = " + field.DrawingValue
+                + "; 数量 BOM = " + quantity
+                + (total == expected ? " — khớp." : " — không khớp.");
+            return field;
+        }
+
         private static DrawingBomFieldResult ComparePartNumber(string drawVal, string bomVal, string source)
         {
             string normDraw = NormalizeText(drawVal);
@@ -1393,7 +1532,7 @@ namespace ADDIN.Commands
 
             string linkMessage =
                 "Custom Property '" + audit.PropertyName +
-                "' đang là giá trị nhập tay, đã mất link. Cần kiểm tra trong file chi tiết.";
+                "' đang là giá trị nhập tay, không có liên kết. Cần kiểm tra trong file chi tiết.";
 
             if (field.Status == DrawingBomCheckStatus.OK)
                 field.Status = DrawingBomCheckStatus.Warning;
@@ -1704,12 +1843,9 @@ namespace ADDIN.Commands
                 return new DrawingBomFieldResult { FieldName = "板厚", DrawingValue = "-", BomValue = "-", Status = DrawingBomCheckStatus.OK };
             }
 
-            string cleanDraw = Regex.Replace(drawVal ?? "", @"[tTmM\s]", "").Trim();
-            string cleanBom = Regex.Replace(bomVal ?? "", @"[tTmM\s]", "").Trim();
-
             double dVal, bVal;
-            if (double.TryParse(cleanDraw.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out dVal) &&
-                double.TryParse(cleanBom.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out bVal))
+            if (TryParseThicknessMm(drawVal, out dVal) &&
+                TryParseThicknessMm(bomVal, out bVal))
             {
                 if (Math.Abs(dVal - bVal) <= NumericTolerance)
                 {
@@ -1727,6 +1863,35 @@ namespace ADDIN.Commands
             }
 
             return new DrawingBomFieldResult { FieldName = "板厚", DrawingValue = drawVal, BomValue = bomVal, Status = DrawingBomCheckStatus.NG, Message = "Độ dày không khớp" };
+        }
+
+        private static bool TryParseThicknessMm(string text, out double value)
+        {
+            value = 0.0;
+            string compact = Regex.Replace(text ?? "", @"\s+", "");
+            Match match = Regex.Match(
+                compact,
+                @"^(?<value>\d+(?:[.,]\d+)?)(?:t|mm)?$",
+                RegexOptions.IgnoreCase);
+
+            if (!match.Success)
+            {
+                // A material code may precede the final thickness token.
+                // Reject text with more than one thickness token.
+                match = Regex.Match(
+                    compact,
+                    @"^.+[-－−](?<value>\d+(?:[.,]\d+)?)t$",
+                    RegexOptions.IgnoreCase);
+                if (!match.Success ||
+                    Regex.Matches(compact, @"\d+(?:[.,]\d+)?t", RegexOptions.IgnoreCase).Count != 1)
+                    return false;
+            }
+
+            return double.TryParse(
+                match.Groups["value"].Value.Replace(',', '.'),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value);
         }
 
         private static DrawingBomFieldResult CompareGobanField(string drawVal, string bomVal)
@@ -1957,8 +2122,8 @@ namespace ADDIN.Commands
 
         private static DrawingBomFieldResult CompareDxfField(string drawVal, string bomVal)
         {
-            string nDraw = NormalizeText(drawVal).Replace(" ", "");
-            string nBom = NormalizeText(bomVal).Replace(" ", "");
+            string nDraw = NormalizeDxfName(drawVal);
+            string nBom = NormalizeDxfName(bomVal);
 
             if (string.IsNullOrWhiteSpace(nDraw) && string.IsNullOrWhiteSpace(nBom))
                 return new DrawingBomFieldResult { FieldName = "DXFファイル名", DrawingValue = "-", BomValue = "-", Status = DrawingBomCheckStatus.OK };
@@ -1980,6 +2145,24 @@ namespace ADDIN.Commands
                 Status = DrawingBomCheckStatus.NG,
                 Message = "Tên file DXF không khớp"
             };
+        }
+
+        private static string NormalizeDxfName(string text)
+        {
+            string compact = Regex.Replace(NormalizeText(text), @"\s+", "")
+                .Replace('／', '/');
+            return Regex.Replace(compact, @"(?<=\d)[-－−](?=\d)", "/");
+        }
+
+        private static string CombineDxfFragments(string jobNo, string partNo)
+        {
+            string normalizedJobNo = NormalizeDxfName(jobNo);
+            string normalizedPartNo = NormalizeDxfName(partNo);
+            return normalizedPartNo.StartsWith("/", StringComparison.Ordinal) &&
+                normalizedJobNo.EndsWith(
+                    normalizedPartNo, StringComparison.OrdinalIgnoreCase)
+                ? (jobNo ?? "").Trim()
+                : $"{jobNo} {partNo}".Trim();
         }
 
         private static DrawingBomFieldResult CompareOptionalStringField(string fieldName, string drawVal, string bomVal)
@@ -3241,7 +3424,26 @@ namespace ADDIN.Commands
                 FindAssemblySummaryTable(tables);
 
             if (summaryTable == null)
-                return 0;
+            {
+                int missing = 0;
+                foreach (string name in new[] { "合番", "重量", "数量" })
+                {
+                    if (checkedLogicalNames != null && !checkedLogicalNames.Add(name))
+                        continue;
+                    itemResult.Fields.Add(new DrawingBomFieldResult
+                    {
+                        FieldName = "ASM:" + name,
+                        DrawingValue = "(Không đọc được bảng UNIT)",
+                        BomValue = name == "数量" ? (bomQuantity ?? "")
+                            : GetModelCustomProperty(assemblyModel, configurationName, name),
+                        Source = "ASSEMBLY_TABLE_MISSING",
+                        Status = DrawingBomCheckStatus.Warning,
+                        Message = "Không nhận diện được bảng tổng hợp UNIT; chưa thể xác nhận giá trị trên Drawing."
+                    });
+                    missing++;
+                }
+                return missing;
+            }
 
             int added = 0;
 
@@ -3325,8 +3527,24 @@ namespace ADDIN.Commands
                     headerRow,
                     expectedGoban);
 
+            // Preserve the check even when all linked display cells are blank.
+            // The summary structure has already identified the header and columns.
+            if (dataRow < 0 && headerRow + 1 < table.RowCount)
+                dataRow = headerRow + 1;
             if (dataRow < 0)
-                return 0;
+            {
+                itemResult.Fields.Add(new DrawingBomFieldResult
+                {
+                    FieldName = "ASM:" + logicalName,
+                    DrawingValue = "(Không có dòng dữ liệu UNIT)",
+                    BomValue = logicalName == "数量" ? (bomQuantity ?? "")
+                        : GetModelCustomProperty(assemblyModel, configurationName, logicalName),
+                    Source = "ASSEMBLY_TABLE_ROW_MISSING",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = "Bảng UNIT có tiêu đề nhưng không có dòng dữ liệu đọc được."
+                });
+                return 1;
+            }
 
             TableCellDiagnosticInfo valueCell =
                 FindTableCell(
@@ -3352,10 +3570,25 @@ namespace ADDIN.Commands
                         configurationName,
                         logicalName);
 
-            // Với 数量, kể cả BOM quantity bị trống vẫn tạo field Warning để
-            // người dùng thấy rõ BOM không có số lượng cho UNIT này.
-            if (!isQuantity && string.IsNullOrWhiteSpace(assemblyValue))
-                return 0;
+            // Required summary fields must never disappear from the report.
+            if (string.IsNullOrWhiteSpace(drawingValue) || string.IsNullOrWhiteSpace(assemblyValue)
+                || IsIncompleteLinkedTableDisplay(valueCell.RawText, drawingValue))
+            {
+                itemResult.Fields.Add(new DrawingBomFieldResult
+                {
+                    FieldName = "ASM:" + logicalName,
+                    DrawingValue = string.IsNullOrWhiteSpace(drawingValue)
+                        ? "(Không đọc được giá trị hiển thị)" : drawingValue,
+                    BomValue = assemblyValue,
+                    Source = "ASSEMBLY_TABLE_VALUE_UNAVAILABLE",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = "Thiếu giá trị hiển thị của ô bảng hoặc giá trị đối chiếu. "
+                        + "Raw='" + valueCell.RawText + "'; API='" + valueCell.ApiDisplayedText
+                        + "'; API hidden='" + valueCell.ApiDisplayedTextWithHidden + "'."
+                });
+                LogDebug($"[ASM TABLE UNAVAILABLE] field={logicalName} table={table.Index} row={dataRow} col={column} source={valueCell.ValueSource} raw={valueCell.RawText}");
+                return 1;
+            }
 
             LogDebug(
                 $"[ASM TABLE FIELD] field=\"{logicalName}\" " +
@@ -3467,8 +3700,12 @@ namespace ADDIN.Commands
                         ? CleanTableCellText(GetTableCellText(table, r, qtyCol))
                         : "";
 
+                TableCellDiagnosticInfo gobanCell = FindTableCell(table, r, gobanCol);
+                TableCellDiagnosticInfo qtyCell = FindTableCell(table, r, qtyCol);
+                bool hasLinkedData = ContainsTablePropertyExpression(gobanCell?.RawText)
+                    || ContainsTablePropertyExpression(qtyCell?.RawText);
                 if (string.IsNullOrWhiteSpace(goban) &&
-                    string.IsNullOrWhiteSpace(qty))
+                    string.IsNullOrWhiteSpace(qty) && !hasLinkedData)
                 {
                     if (firstDataRow >= 0)
                         break;
@@ -3784,20 +4021,17 @@ namespace ADDIN.Commands
             string drawingValue,
             string assemblyValue)
         {
-            if (string.Equals(logicalName, "板厚", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(logicalName, "板厚", StringComparison.OrdinalIgnoreCase))
             {
-                string d = Regex.Replace(drawingValue ?? "", @"[tTmM\s]", "").Trim();
-                string a = Regex.Replace(assemblyValue ?? "", @"[tTmM\s]", "").Trim();
-
-                double dv;
-                double av;
-                if (double.TryParse(d.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out dv) &&
-                    double.TryParse(a.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out av))
-                {
-                    return Math.Abs(dv - av) <= NumericTolerance;
-                }
+                double thicknessDrawing;
+                double thicknessAssembly;
+                if (TryParseThicknessMm(drawingValue, out thicknessDrawing) &&
+                    TryParseThicknessMm(assemblyValue, out thicknessAssembly))
+                    return Math.Abs(thicknessDrawing - thicknessAssembly) <= NumericTolerance;
             }
+
+            if (string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase))
+                return AreDisplayedMassValuesEquivalent(drawingValue, assemblyValue);
 
             string normDrawing = NormalizeText(drawingValue).TrimEnd('-').Trim();
             string normAssembly = NormalizeText(assemblyValue).TrimEnd('-').Trim();
@@ -4474,6 +4708,38 @@ namespace ADDIN.Commands
             return directories;
         }
 
+        private void ActivateDrawingForDisplayRead(ModelDoc2 model, DrawingDoc drawing)
+        {
+            if (swApp == null || model == null || drawing == null)
+                return;
+            try
+            {
+                try { model.Visible = true; } catch { }
+                int errors = 0;
+                ModelDoc2 activated = swApp.ActivateDoc3(model.GetTitle(), false, 0, ref errors) as ModelDoc2;
+                LogDebug($"[DRAWING ACTIVATE] title={model.GetTitle()} success={activated != null} errors={errors}");
+                Sheet sheet = drawing.GetCurrentSheet() as Sheet;
+                string current = sheet != null ? (sheet.GetName() ?? "").Trim() : "";
+                if (string.IsNullOrWhiteSpace(current))
+                {
+                    Array names = drawing.GetSheetNames() as Array;
+                    if (names != null && names.Length > 0)
+                    {
+                        string first = Convert.ToString(names.GetValue(0));
+                        if (!string.IsNullOrWhiteSpace(first))
+                        {
+                            bool switched = drawing.ActivateSheet(first);
+                            LogDebug($"[DRAWING SHEET ACTIVATE] sheet={first} success={switched}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"[DRAWING ACTIVATE WARNING] message={ex.Message}");
+            }
+        }
+
         private void RefreshDrawingBeforeCheck(
             ModelDoc2 drawingModel,
             DrawingDoc drawing,
@@ -4538,7 +4804,9 @@ namespace ADDIN.Commands
 
             try
             {
-                swApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocDRAWING);
+                // A visible document window is required for drawing-side linked
+                // text evaluation. Silent still suppresses opening prompts.
+                swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocDRAWING);
                 restoreVisibility = true;
 
                 int openOptions = (int)(swOpenDocOptions_e.swOpenDocOptions_Silent | swOpenDocOptions_e.swOpenDocOptions_ReadOnly);
@@ -4990,6 +5258,63 @@ namespace ADDIN.Commands
             return "";
         }
 
+        internal static string SelectDrawingTableText(
+            string displayed, string displayedWithHidden, string raw, out string source)
+        {
+            if (!string.IsNullOrWhiteSpace(displayed) && !ContainsTablePropertyExpression(displayed))
+            {
+                source = "DISPLAYED_TEXT2";
+                return displayed;
+            }
+            if (!string.IsNullOrWhiteSpace(displayedWithHidden) && !ContainsTablePropertyExpression(displayedWithHidden))
+            {
+                source = "DISPLAYED_TEXT2_INCLUDE_HIDDEN";
+                return displayedWithHidden;
+            }
+            if (!string.IsNullOrWhiteSpace(raw) && !ContainsTablePropertyExpression(raw)
+                && !raw.TrimStart().StartsWith("$", StringComparison.OrdinalIgnoreCase))
+            {
+                source = "RAW_STATIC_FALLBACK";
+                return raw;
+            }
+            // A missing/unresolved display must remain missing, so the comparison
+            // warns instead of comparing a model property against itself.
+            source = "DRAWING_DISPLAY_UNAVAILABLE";
+            return "";
+        }
+
+        internal static bool IsIncompleteLinkedTableDisplay(string raw, string display)
+        {
+            if (!ContainsTablePropertyExpression(raw))
+                return false;
+            // The linked value can vanish while a fixed suffix such as (kg)
+            // survives. This is missing display evidence, not a mass mismatch.
+            string literal = Regex.Replace(raw ?? "",
+                @"\$PRP(?:SHEET|MODEL|VIEW)?\s*:\s*""[^""]+""", "", RegexOptions.IgnoreCase);
+            return string.Equals(CleanTableCellText(display), CleanTableCellText(literal), StringComparison.Ordinal);
+        }
+
+        internal static bool AreDisplayedMassValuesEquivalent(string display, string expected)
+        {
+            const string pattern = @"^\s*(?<number>[+-]?\d+(?:[.,]\d+)?)\s*(?:\(\s*kg\s*\)|kg)?\s*$";
+            Match d = Regex.Match(display ?? "", pattern, RegexOptions.IgnoreCase);
+            Match e = Regex.Match(expected ?? "", pattern, RegexOptions.IgnoreCase);
+            if (!d.Success || !e.Success)
+                return false;
+            decimal dv, ev;
+            const NumberStyles styles = NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint;
+            if (!decimal.TryParse(d.Groups["number"].Value.Replace(',', '.'), styles, CultureInfo.InvariantCulture, out dv)
+                || !decimal.TryParse(e.Groups["number"].Value.Replace(',', '.'), styles, CultureInfo.InvariantCulture, out ev))
+                return false;
+            // Compare numeric values exactly; formatting and trailing zeros may differ.
+            return dv == ev;
+        }
+
+        private static bool ContainsTablePropertyExpression(string text)
+        {
+            return Regex.IsMatch(text ?? "", @"\$PRP(?:SHEET|MODEL|VIEW)?\s*:", RegexOptions.IgnoreCase);
+        }
+
         private TableDiagnosticInfo ExtractTableInfo(
             ITableAnnotation table,
             string viewName,
@@ -5081,61 +5406,29 @@ namespace ADDIN.Commands
                 {
                     for (int c = 0; c < colCount; c++)
                     {
-                        // IMPORTANT:
-                        // Do not trust get_DisplayedText2() as the only source.
-                        // In linked General Tables SOLIDWORKS can return a stale cached
-                        // displayed value (for example 数量=1) even while the drawing
-                        // visibly shows the current linked value (for example 数量=2).
-                        // Always inspect the raw cell expression first.  If the cell is
-                        // linked with $PRP/$PRPSHEET/$PRPMODEL, resolve that property
-                        // directly from the drawing's referenced model.
+                        // Drawing evidence must come from the cell display, independently
+                        // of the model property used for the expected value.
                         string apiDisplayedText = "";
                         string apiDisplayedTextWithHidden = "";
                         string rawText = "";
-                        string displayText = "";
-                        string valueSource = "DISPLAYED_TEXT2";
-
                         try { apiDisplayedText = table.get_DisplayedText2(r, c, false) ?? ""; } catch { }
                         try { apiDisplayedTextWithHidden = table.get_DisplayedText2(r, c, true) ?? ""; } catch { }
                         try { rawText = table.get_Text(r, c) ?? ""; } catch { }
 
-                        displayText = apiDisplayedText;
-
-                        Match linkedPropertyMatch = Regex.Match(
-                            rawText ?? "",
-                            @"\$PRP(?:SHEET|MODEL)?\s*:\s*""([^""]+)""",
-                            RegexOptions.IgnoreCase);
-
-                        if (linkedPropertyMatch.Success)
+                        string valueSource;
+                        string displayText = SelectDrawingTableText(
+                            apiDisplayedText, apiDisplayedTextWithHidden, rawText, out valueSource);
+                        if (valueSource == "DRAWING_DISPLAY_UNAVAILABLE")
                         {
-                            string propName =
-                                (linkedPropertyMatch.Groups[1].Value ?? "").Trim();
-
-                            string resolved =
-                                ResolveLinkedTableProperty(
-                                    drawingModel,
-                                    rawText,
-                                    propName);
-
-                            if (!string.IsNullOrWhiteSpace(resolved))
+                            // Older display accessor is a separate drawing-side fallback.
+                            string legacyDisplay = "";
+                            try { legacyDisplay = table.get_DisplayedText(r, c) ?? ""; } catch { }
+                            if (!string.IsNullOrWhiteSpace(legacyDisplay)
+                                && !ContainsTablePropertyExpression(legacyDisplay))
                             {
-                                displayText = resolved;
-                                valueSource = "LINK_RESOLVED";
+                                displayText = legacyDisplay;
+                                valueSource = "DISPLAYED_TEXT_LEGACY";
                             }
-                        }
-                        else if (!string.IsNullOrWhiteSpace(rawText) &&
-                                 !rawText.TrimStart().StartsWith("$", StringComparison.OrdinalIgnoreCase))
-                        {
-                            // Static/general-table text: the raw cell text is the source of truth.
-                            displayText = rawText;
-                            valueSource = "RAW_TEXT";
-                        }
-
-                        if (string.IsNullOrWhiteSpace(displayText) &&
-                            !string.IsNullOrWhiteSpace(apiDisplayedTextWithHidden))
-                        {
-                            displayText = apiDisplayedTextWithHidden;
-                            valueSource = "DISPLAYED_TEXT2_INCLUDE_HIDDEN";
                         }
 
                         // Không suy diễn vị trí cell từ table anchor.
@@ -5203,11 +5496,9 @@ namespace ADDIN.Commands
 
             try
             {
-                dynamic dynSheet = sheet;
-                int paperSize = 0;
                 double w = 0.0;
                 double h = 0.0;
-                dynSheet.GetSize(ref paperSize, ref w, ref h);
+                ((ISheet)sheet).GetSize(ref w, ref h);
 
                 if (w > 0.0 && h > 0.0)
                 {
@@ -5526,30 +5817,11 @@ namespace ADDIN.Commands
                 ? MessageBoxIcon.Warning
                 : (result.WarningCount > 0 ? MessageBoxIcon.Information : MessageBoxIcon.Information);
 
-            if (result.NgCount > 0)
-            {
-                sb.AppendLine();
-                sb.AppendLine("Duyệt các lỗi NG trên Drawing?");
-
-                DialogResult answer = MessageBox.Show(
-                    sb.ToString(),
-                    "CHECK DRAWING BOM",
-                    MessageBoxButtons.YesNo,
-                    icon);
-
-                if (answer == DialogResult.Yes)
-                {
-                    NavigateThroughNgErrors(result);
-                }
-            }
-            else
-            {
-                MessageBox.Show(
-                    sb.ToString(),
-                    "CHECK DRAWING BOM",
-                    MessageBoxButtons.OK,
-                    icon);
-            }
+            MessageBox.Show(
+                sb.ToString(),
+                "CHECK DRAWING BOM",
+                MessageBoxButtons.OK,
+                icon);
         }
 
         private void NavigateThroughNgErrors(
