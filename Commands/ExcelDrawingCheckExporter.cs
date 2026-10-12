@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace ADDIN.Commands
@@ -30,6 +31,24 @@ namespace ADDIN.Commands
 
         public static void Export(DrawingBatchCheckResult result)
         {
+            ExportReport(result, null, false);
+        }
+
+        public static void ExportToFile(DrawingBatchCheckResult result, string outputPath)
+        {
+            if (string.IsNullOrWhiteSpace(outputPath))
+                throw new ArgumentException("Chưa có đường dẫn file Excel.", nameof(outputPath));
+
+            string fullPath = Path.GetFullPath(outputPath);
+            if (!string.Equals(Path.GetExtension(fullPath), ".xlsx", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("File báo cáo phải có đuôi .xlsx.", nameof(outputPath));
+
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
+            ExportReport(result, fullPath, true);
+        }
+
+        private static void ExportReport(DrawingBatchCheckResult result, string outputPath, bool silent)
+        {
             if (result == null ||
                 result.Items == null ||
                 result.Items.Count == 0)
@@ -39,6 +58,11 @@ namespace ADDIN.Commands
 
             dynamic excel = null;
             dynamic workbook = null;
+            dynamic summarySheet = null;
+            dynamic detailSheet = null;
+            bool eventsEnabled = true;
+            var totalTimer = Stopwatch.StartNew();
+            var phaseTimer = Stopwatch.StartNew();
 
             try
             {
@@ -47,6 +71,9 @@ namespace ADDIN.Commands
 
                 if (excelType == null)
                 {
+                    if (silent)
+                        throw new InvalidOperationException("Không tìm thấy Microsoft Excel trên máy tính.");
+
                     MessageBox.Show(
                         "Không tìm thấy Microsoft Excel trên máy tính.",
                         "CHECK DRAWING — XUẤT EXCEL",
@@ -61,6 +88,8 @@ namespace ADDIN.Commands
 
                 excel.ScreenUpdating = false;
                 excel.DisplayAlerts = false;
+                eventsEnabled = excel.EnableEvents;
+                excel.EnableEvents = false;
 
                 workbook =
                     excel.Workbooks.Add();
@@ -70,15 +99,15 @@ namespace ADDIN.Commands
                     workbook,
                     2);
 
-                Debug.WriteLine("[CHECK DRAWING EXCEL] workbook created");
+                Debug.WriteLine("[CHECK DRAWING EXCEL] workbook created ms=" + phaseTimer.ElapsedMilliseconds);
 
-                dynamic summarySheet =
+                summarySheet =
                     workbook.Sheets[1];
 
                 summarySheet.Name =
                     "TỔNG HỢP";
 
-                dynamic detailSheet =
+                detailSheet =
                     workbook.Sheets[2];
 
                 detailSheet.Name =
@@ -101,24 +130,26 @@ namespace ADDIN.Commands
                     result.Items.Count);
 
                 Debug.WriteLine("[CHECK DRAWING EXCEL] write summary start");
+                phaseTimer.Restart();
 
                 WriteSummarySheet(
                     summarySheet,
                     componentItems,
                     summaryFields);
 
-                Debug.WriteLine("[CHECK DRAWING EXCEL] write summary done");
+                Debug.WriteLine("[CHECK DRAWING EXCEL] write summary done ms=" + phaseTimer.ElapsedMilliseconds);
 
                 FreezeTopRow(
                     summarySheet);
 
                 Debug.WriteLine("[CHECK DRAWING EXCEL] write detail start");
+                phaseTimer.Restart();
 
                 WriteGroupedDetailSheet(
                     detailSheet,
                     result.Items);
 
-                Debug.WriteLine("[CHECK DRAWING EXCEL] write detail done");
+                Debug.WriteLine("[CHECK DRAWING EXCEL] write detail done ms=" + phaseTimer.ElapsedMilliseconds);
 
                 FreezeTopRow(
                     detailSheet);
@@ -126,11 +157,23 @@ namespace ADDIN.Commands
                 summarySheet.Activate();
                 summarySheet.Range["A1"].Select();
 
-                excel.ScreenUpdating = true;
-                excel.DisplayAlerts = true;
-                excel.Visible = true;
+                if (!string.IsNullOrWhiteSpace(outputPath))
+                {
+                    // Use the same report and formatting as the normal command.
+                    phaseTimer.Restart();
+                    workbook.SaveAs(outputPath, 51); // xlOpenXMLWorkbook
+                    Debug.WriteLine("[CHECK DRAWING EXCEL] saved ms=" + phaseTimer.ElapsedMilliseconds + ": " + outputPath);
+                }
 
-                Debug.WriteLine("[CHECK DRAWING EXCEL] export complete");
+                if (!silent)
+                {
+                    excel.ScreenUpdating = true;
+                    excel.DisplayAlerts = true;
+                    excel.EnableEvents = eventsEnabled;
+                    excel.Visible = true;
+                }
+
+                Debug.WriteLine("[CHECK DRAWING EXCEL] export complete ms=" + totalTimer.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
@@ -138,12 +181,16 @@ namespace ADDIN.Commands
                     "[CHECK DRAWING EXCEL] ERROR: " +
                     ex.ToString());
 
+                if (silent)
+                    throw;
+
                 try
                 {
                     if (excel != null)
                     {
                         excel.ScreenUpdating = true;
                         excel.DisplayAlerts = true;
+                        excel.EnableEvents = eventsEnabled;
                     }
                 }
                 catch
@@ -157,6 +204,31 @@ namespace ADDIN.Commands
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
+            finally
+            {
+                if (silent)
+                {
+                    if (workbook != null)
+                    {
+                        try { workbook.Close(false); } catch { }
+                    }
+                    if (excel != null)
+                    {
+                        try { excel.Quit(); } catch { }
+                    }
+                    ReleaseExcelObject((object)detailSheet);
+                    ReleaseExcelObject((object)summarySheet);
+                    ReleaseExcelObject((object)workbook);
+                    ReleaseExcelObject((object)excel);
+                }
+            }
+        }
+
+        private static void ReleaseExcelObject(object value)
+        {
+            if (value == null || !Marshal.IsComObject(value))
+                return;
+            try { Marshal.ReleaseComObject(value); } catch { }
         }
 
         // ================================================================
@@ -259,51 +331,33 @@ namespace ADDIN.Commands
                             rowCount + 1,
                             colCount]];
 
-                dataRange.Value = data;
+                dataRange.Value2 = data;
 
-                // Overall status + field status colors.
+                // Format runs of equal statuses together instead of making
+                // several cross-process Excel calls for every status cell.
+                var statusRanges = new Dictionary<string, List<string>>();
                 for (int i = 0;
                      i < rowCount;
                      i++)
                 {
-                    int row =
-                        i + 2;
-
-                    DrawingCheckItemResult item =
-                        items[i];
-
-                    string overallStatus =
-                        GetEffectiveSummaryStatus(
-                            item);
-
-                    ApplyStatusColor(
-                        sheet.Cells[row, 4],
-                        overallStatus);
-
-                    for (int f = 0;
-                         f < fieldOrder.Count;
-                         f++)
+                    int row = i + 2;
+                    AddStatusRange(statusRanges, Convert.ToString(data[i, 3]),
+                        RangeAddress(row, 4, row, 4));
+                    int first = 5;
+                    while (first < colCount)
                     {
-                        DrawingBomFieldResult field =
-                            GetField(
-                                item.Fields,
-                                fieldOrder[f]);
-
-                        if (field == null)
-                            continue;
-
-                        string effectiveFieldStatus =
-                            GetEffectiveFieldStatus(
-                                fieldOrder[f],
-                                field);
-
-                        ApplyStatusColor(
-                            sheet.Cells[
-                                row,
-                                6 + f],
-                            effectiveFieldStatus);
+                        string status = Convert.ToString(data[i, first]);
+                        int end = first;
+                        while (end + 1 < colCount &&
+                               string.Equals(status, Convert.ToString(data[i, end + 1]),
+                                   StringComparison.OrdinalIgnoreCase))
+                            end++;
+                        AddStatusRange(statusRanges, status,
+                            RangeAddress(row, first + 1, row, end + 1));
+                        first = end + 1;
                     }
                 }
+                ApplyBatchedStatusColors((object)sheet, statusRanges);
             }
 
             int lastRow =
@@ -343,6 +397,7 @@ namespace ADDIN.Commands
                 "合番",
                 "部品ファイル名",
                 "DXFファイル名",
+                "表/ウラ ↔ 展開",
                 "品名",
                 "現場名",
                 "工事番号"
@@ -683,28 +738,157 @@ namespace ADDIN.Commands
         // DETAIL
         // ================================================================
 
+        private sealed class GroupedDetailBlock
+        {
+            public int HeaderRow;
+            public int FieldHeaderRow;
+            public int LastFieldRow;
+            public int SeparatorRow;
+            public string Status;
+        }
+
         private static void WriteGroupedDetailSheet(
             dynamic sheet,
             List<DrawingCheckItemResult> items)
         {
             const int colCount = 5;
+            var rows = new List<object[]>();
+            var blocks = new List<GroupedDetailBlock>();
+            var statusRanges = new Dictionary<string, List<string>>();
+            var ngRows = new List<string>();
+            var warningRows = new List<string>();
+            rows.Add(new object[] { "CHI TIẾT KIỂM TRA", null, null, null, null });
+            rows.Add(new object[colCount]);
 
-            // Main title.
-            dynamic mainTitleRange =
-                sheet.Range[
-                    sheet.Cells[1, 1],
-                    sheet.Cells[1, colCount]];
+            // Build the complete sheet in managed memory. All values, including
+            // Japanese text, multiline notes and raw mass values, cross COM once.
+            if (items != null)
+            {
+                foreach (DrawingCheckItemResult item in items)
+                {
+                    if (item == null)
+                        continue;
 
-            mainTitleRange.Merge();
+                    string status = GetEffectiveSummaryStatus(item);
+                    string drawingFile = string.IsNullOrWhiteSpace(item.DrawingPath)
+                        ? "(Chưa có Drawing)" : Path.GetFileName(item.DrawingPath);
+                    string prefix = IsUnitItem(item)
+                        ? "UNIT" : "COMPONENT INo " + item.BomItemNumber;
+                    var block = new GroupedDetailBlock
+                    {
+                        HeaderRow = rows.Count + 1,
+                        FieldHeaderRow = rows.Count + 2,
+                        Status = status
+                    };
+                    string title = prefix + ": " + (item.Component ?? "") +
+                        "    |    Drawing: " + drawingFile +
+                        "    |    Kết quả: " + status +
+                        "    |    Số lỗi NG: " + CountNgFields(item);
+                    rows.Add(new object[] { title, null, null, null, null });
+                    rows.Add(new object[] { "Field", "Drawing Value",
+                        "Expected / BOM / Assembly", "Status", "Ghi chú" });
 
-            sheet.Cells[1, 1].Value =
-                "CHI TIẾT KIỂM TRA";
+                    if (item.Fields != null && item.Fields.Count > 0)
+                    {
+                        foreach (DrawingBomFieldResult field in item.Fields)
+                        {
+                            if (field == null)
+                                continue;
+                            string fieldStatus = GetEffectiveFieldStatus(field.FieldName, field);
+                            int row = rows.Count + 1;
+                            rows.Add(new object[] { GetDisplayFieldName(field.FieldName),
+                                field.DrawingValue ?? "", field.BomValue ?? "",
+                                fieldStatus, field.Message ?? "" });
+                            AddStatusRange(statusRanges, fieldStatus, "D" + row);
+                            if (string.Equals(fieldStatus, "NG", StringComparison.OrdinalIgnoreCase))
+                                ngRows.Add("A" + row + ":E" + row);
+                            else if (string.Equals(fieldStatus, "Warning", StringComparison.OrdinalIgnoreCase))
+                                warningRows.Add("A" + row + ":E" + row);
+                        }
+                    }
+                    else
+                    {
+                        int row = rows.Count + 1;
+                        rows.Add(new object[] { "(Không có field)", item.Note ?? "",
+                            null, item.Status.ToString(), null });
+                        AddStatusRange(statusRanges, item.Status.ToString(), "D" + row);
+                    }
 
-            dynamic mainTitle =
-                sheet.Range[
-                    sheet.Cells[1, 1],
-                    sheet.Cells[1, colCount]];
+                    block.LastFieldRow = rows.Count;
+                    block.SeparatorRow = rows.Count + 1;
+                    rows.Add(new object[colCount]);
+                    blocks.Add(block);
+                }
+            }
+            while (rows.Count < 3)
+                rows.Add(new object[colCount]);
 
+            object[,] data = new object[rows.Count, colCount];
+            for (int row = 0; row < rows.Count; row++)
+                for (int col = 0; col < colCount; col++)
+                    data[row, col] = rows[row][col];
+            sheet.Range["A1:E" + rows.Count].Value2 = data;
+
+            var blockRanges = new List<string>();
+            var emptyBlockBorders = new List<string>();
+            var fieldHeaders = new List<string>();
+            var separators = new List<string>();
+            var unitHeaders = new Dictionary<string, List<string>>();
+            foreach (GroupedDetailBlock block in blocks)
+            {
+                blockRanges.Add("A" + block.HeaderRow + ":E" + block.LastFieldRow);
+                // Preserve the legacy border when a nonempty field list
+                // contains only null entries.
+                if (block.LastFieldRow == block.FieldHeaderRow)
+                    emptyBlockBorders.Add("A" + block.SeparatorRow + ":E" + block.SeparatorRow);
+                fieldHeaders.Add("A" + block.FieldHeaderRow + ":E" + block.FieldHeaderRow);
+                separators.Add("A" + block.SeparatorRow);
+                AddStatusRange(unitHeaders, block.Status,
+                    "A" + block.HeaderRow + ":E" + block.HeaderRow);
+            }
+
+            ForEachExcelRange((object)sheet, blockRanges, range =>
+            {
+                range.Borders.LineStyle = XlContinuous;
+                range.WrapText = true;
+            });
+            ForEachExcelRange((object)sheet, emptyBlockBorders,
+                range => range.Borders.LineStyle = XlContinuous);
+            ForEachExcelRange((object)sheet, fieldHeaders, range =>
+            {
+                range.Font.Bold = true;
+                range.Font.Color = Rgb(255, 255, 255);
+                range.Interior.Color = Rgb(91, 155, 213);
+                range.HorizontalAlignment = XlCenter;
+                range.VerticalAlignment = XlCenter;
+                range.EntireRow.RowHeight = 28.0;
+            });
+            foreach (KeyValuePair<string, List<string>> entry in unitHeaders)
+            {
+                string status = entry.Key;
+                ForEachExcelRange((object)sheet, entry.Value, range =>
+                {
+                    // Across merges each heading row, keeping blocks separate.
+                    range.Merge(true);
+                    range.Font.Bold = true;
+                    range.Font.Color = Rgb(255, 255, 255);
+                    range.HorizontalAlignment = -4131; // xlLeft
+                    range.VerticalAlignment = XlCenter;
+                    range.WrapText = false;
+                    ApplyUnitHeaderColor(range, status);
+                    range.EntireRow.RowHeight = 24.0;
+                });
+            }
+            ForEachExcelRange((object)sheet, separators,
+                range => range.EntireRow.RowHeight = 8.0);
+            ForEachExcelRange((object)sheet, ngRows,
+                range => range.Interior.Color = Rgb(252, 232, 230));
+            ForEachExcelRange((object)sheet, warningRows,
+                range => range.Interior.Color = Rgb(255, 242, 204));
+            ApplyBatchedStatusColors((object)sheet, statusRanges);
+
+            dynamic mainTitle = sheet.Range["A1:E1"];
+            mainTitle.Merge();
             mainTitle.Font.Bold = true;
             mainTitle.Font.Size = 14;
             mainTitle.Font.Color = Rgb(255, 255, 255);
@@ -713,334 +897,89 @@ namespace ADDIN.Commands
             mainTitle.VerticalAlignment = XlCenter;
             sheet.Rows[1].RowHeight = 28.0;
 
-            int currentRow = 3;
-
-            if (items != null)
-            {
-                for (int itemIndex = 0;
-                     itemIndex < items.Count;
-                     itemIndex++)
-                {
-                    DrawingCheckItemResult item =
-                        items[itemIndex];
-
-                    if (item == null)
-                        continue;
-
-                    string component =
-                        item.Component ?? "";
-
-                    string drawingFile =
-                        string.IsNullOrWhiteSpace(
-                            item.DrawingPath)
-                            ? "(Chưa có Drawing)"
-                            : Path.GetFileName(
-                                item.DrawingPath);
-
-                    bool isUnit =
-                        IsUnitItem(item);
-
-                    string effectiveStatus =
-                        GetEffectiveSummaryStatus(
-                            item);
-
-                    int ngCount =
-                        CountNgFields(item);
-
-                    // ----------------------------------------------------
-                    // COMPONENT / UNIT HEADER
-                    // ----------------------------------------------------
-                    int unitHeaderRow =
-                        currentRow;
-
-                    dynamic unitHeaderMergeRange =
-                        sheet.Range[
-                            sheet.Cells[unitHeaderRow, 1],
-                            sheet.Cells[unitHeaderRow, colCount]];
-
-                    unitHeaderMergeRange.Merge();
-
-                    string blockPrefix =
-                        isUnit
-                            ? "UNIT"
-                            : "COMPONENT INo " + item.BomItemNumber;
-
-                    string unitTitle =
-                        blockPrefix + ": " + component +
-                        "    |    Drawing: " + drawingFile +
-                        "    |    Kết quả: " + effectiveStatus +
-                        "    |    Số lỗi NG: " + ngCount;
-
-                    sheet.Cells[
-                        unitHeaderRow,
-                        1].Value =
-                        unitTitle;
-
-                    dynamic unitHeader =
-                        sheet.Range[
-                            sheet.Cells[unitHeaderRow, 1],
-                            sheet.Cells[unitHeaderRow, colCount]];
-
-                    unitHeader.Font.Bold = true;
-                    unitHeader.Font.Color =
-                        Rgb(255, 255, 255);
-
-                    unitHeader.VerticalAlignment =
-                        XlCenter;
-
-                    unitHeader.HorizontalAlignment =
-                        -4131; // xlLeft
-
-                    unitHeader.WrapText =
-                        false;
-
-                    ApplyUnitHeaderColor(
-                        unitHeader,
-                        effectiveStatus);
-
-                    unitHeader.Borders.LineStyle =
-                        XlContinuous;
-
-                    sheet.Rows[
-                        unitHeaderRow].RowHeight =
-                        24.0;
-
-                    currentRow++;
-
-                    // ----------------------------------------------------
-                    // FIELD HEADER
-                    // ----------------------------------------------------
-                    string[] detailHeaders =
-                    {
-                        "Field",
-                        "Drawing Value",
-                        "Expected / BOM / Assembly",
-                        "Status",
-                        "Ghi chú"
-                    };
-
-                    for (int c = 0;
-                         c < detailHeaders.Length;
-                         c++)
-                    {
-                        sheet.Cells[
-                            currentRow,
-                            c + 1].Value =
-                            detailHeaders[c];
-                    }
-
-                    dynamic fieldHeader =
-                        sheet.Range[
-                            sheet.Cells[currentRow, 1],
-                            sheet.Cells[currentRow, colCount]];
-
-                    fieldHeader.Font.Bold =
-                        true;
-
-                    fieldHeader.Font.Color =
-                        Rgb(255, 255, 255);
-
-                    fieldHeader.Interior.Color =
-                        Rgb(91, 155, 213);
-
-                    fieldHeader.HorizontalAlignment =
-                        XlCenter;
-
-                    fieldHeader.VerticalAlignment =
-                        XlCenter;
-
-                    fieldHeader.Borders.LineStyle =
-                        XlContinuous;
-
-                    fieldHeader.WrapText =
-                        true;
-
-                    sheet.Rows[
-                        currentRow].RowHeight =
-                        28.0;
-
-                    currentRow++;
-
-                    int firstFieldRow =
-                        currentRow;
-
-                    // ----------------------------------------------------
-                    // FIELD ROWS
-                    // ----------------------------------------------------
-                    if (item.Fields != null &&
-                        item.Fields.Count > 0)
-                    {
-                        foreach (DrawingBomFieldResult field in item.Fields)
-                        {
-                            if (field == null)
-                                continue;
-
-                            sheet.Cells[
-                                currentRow,
-                                1].Value =
-                                GetDisplayFieldName(
-                                    field.FieldName);
-
-                            sheet.Cells[
-                                currentRow,
-                                2].Value =
-                                field.DrawingValue ?? "";
-
-                            sheet.Cells[
-                                currentRow,
-                                3].Value =
-                                field.BomValue ?? "";
-
-                            string displayedFieldStatus =
-                                GetEffectiveFieldStatus(
-                                    field.FieldName,
-                                    field);
-
-                            sheet.Cells[
-                                currentRow,
-                                4].Value =
-                                displayedFieldStatus;
-
-                            sheet.Cells[
-                                currentRow,
-                                5].Value =
-                                field.Message ?? "";
-
-                            dynamic rowRange =
-                                sheet.Range[
-                                    sheet.Cells[currentRow, 1],
-                                    sheet.Cells[currentRow, colCount]];
-
-                            rowRange.Borders.LineStyle =
-                                XlContinuous;
-
-                            rowRange.VerticalAlignment =
-                                XlTop;
-
-                            rowRange.WrapText =
-                                true;
-
-                            if (string.Equals(
-                                    displayedFieldStatus,
-                                    "NG",
-                                    StringComparison.OrdinalIgnoreCase))
-                            {
-                                rowRange.Interior.Color =
-                                    Rgb(252, 232, 230);
-                            }
-                            else if (string.Equals(
-                                         displayedFieldStatus,
-                                         "Warning",
-                                         StringComparison.OrdinalIgnoreCase))
-                            {
-                                rowRange.Interior.Color =
-                                    Rgb(255, 242, 204);
-                            }
-
-                            ApplyStatusColor(
-                                sheet.Cells[currentRow, 4],
-                                displayedFieldStatus);
-
-                            currentRow++;
-                        }
-                    }
-                    else
-                    {
-                        sheet.Cells[
-                            currentRow,
-                            1].Value =
-                            "(Không có field)";
-
-                        sheet.Cells[
-                            currentRow,
-                            2].Value =
-                            item.Note ?? "";
-
-                        sheet.Cells[
-                            currentRow,
-                            4].Value =
-                            item.Status.ToString();
-
-                        dynamic noFieldRow =
-                            sheet.Range[
-                                sheet.Cells[currentRow, 1],
-                                sheet.Cells[currentRow, colCount]];
-
-                        noFieldRow.Borders.LineStyle =
-                            XlContinuous;
-
-                        noFieldRow.WrapText =
-                            true;
-
-                        ApplyStatusColor(
-                            sheet.Cells[currentRow, 4],
-                            item.Status.ToString());
-
-                        currentRow++;
-                    }
-
-                    int lastFieldRow =
-                        currentRow - 1;
-
-                    // Strong outside border around the Unit field block.
-                    try
-                    {
-                        dynamic block =
-                            sheet.Range[
-                                sheet.Cells[firstFieldRow, 1],
-                                sheet.Cells[lastFieldRow, colCount]];
-
-                        block.Borders.LineStyle =
-                            XlContinuous;
-                    }
-                    catch
-                    {
-                    }
-
-                    // Blank separator row makes Unit boundaries obvious.
-                    sheet.Rows[currentRow].RowHeight =
-                        8.0;
-
-                    currentRow++;
-                }
-            }
-
-            int lastRow =
-                Math.Max(
-                    3,
-                    currentRow - 1);
-
-            // ------------------------------------------------------------
-            // COLUMN WIDTHS
-            // ------------------------------------------------------------
             sheet.Columns[1].ColumnWidth = 22.0;
             sheet.Columns[2].ColumnWidth = 24.0;
             sheet.Columns[3].ColumnWidth = 27.0;
             sheet.Columns[4].ColumnWidth = 11.0;
             sheet.Columns[5].ColumnWidth = 60.0;
-
-            sheet.Range[
-                sheet.Cells[1, 1],
-                sheet.Cells[lastRow, colCount]]
-                .VerticalAlignment =
-                    XlTop;
-
-            // Center Field and Status for readability.
-            sheet.Range[
-                sheet.Cells[3, 1],
-                sheet.Cells[lastRow, 1]]
-                .HorizontalAlignment =
-                    XlCenter;
-
-            sheet.Range[
-                sheet.Cells[3, 4],
-                sheet.Cells[lastRow, 4]]
-                .HorizontalAlignment =
-                    XlCenter;
-
-            // No AutoFilter here intentionally:
-            // this sheet is formatted as Unit blocks rather than one flat table.
+            sheet.Range["A1:E" + rows.Count].VerticalAlignment = XlTop;
+            sheet.Range["A3:A" + rows.Count].HorizontalAlignment = XlCenter;
+            sheet.Range["D3:D" + rows.Count].HorizontalAlignment = XlCenter;
+            // Grouped blocks intentionally have no AutoFilter.
         }
+
+        private static string ColumnName(int column)
+        {
+            string name = "";
+            while (column > 0)
+            {
+                column--;
+                name = (char)('A' + column % 26) + name;
+                column /= 26;
+            }
+            return name;
+        }
+
+        private static string RangeAddress(int firstRow, int firstColumn, int lastRow, int lastColumn)
+        {
+            string first = ColumnName(firstColumn) + firstRow;
+            string last = ColumnName(lastColumn) + lastRow;
+            return first == last ? first : first + ":" + last;
+        }
+
+        private static void AddStatusRange(Dictionary<string, List<string>> ranges,
+            string status, string address)
+        {
+            string key = (status ?? "").Trim().ToUpperInvariant();
+            if (key != "OK" && key != "NG" && key != "WARNING")
+                return;
+            List<string> addresses;
+            if (!ranges.TryGetValue(key, out addresses))
+            {
+                addresses = new List<string>();
+                ranges.Add(key, addresses);
+            }
+            addresses.Add(address);
+        }
+
+        private static void ApplyBatchedStatusColors(object sheet,
+            Dictionary<string, List<string>> ranges)
+        {
+            foreach (KeyValuePair<string, List<string>> entry in ranges)
+            {
+                string status = entry.Key;
+                ForEachExcelRange(sheet, entry.Value, range => ApplyStatusColor(range, status));
+            }
+        }
+
+        private static void ForEachExcelRange(object sheetObject, List<string> addresses,
+            Action<dynamic> apply)
+        {
+            if (addresses.Count == 0)
+                return;
+            dynamic sheet = sheetObject;
+            string batch = "";
+            foreach (string address in addresses)
+            {
+                // Keep each comma-separated address short for Excel's Range parser.
+                if (batch.Length > 0 && batch.Length + address.Length + 1 > 200)
+                {
+                    ApplyExcelRange((object)sheet, batch, apply);
+                    batch = "";
+                }
+                batch += (batch.Length == 0 ? "" : ",") + address;
+            }
+            if (batch.Length > 0)
+                ApplyExcelRange((object)sheet, batch, apply);
+        }
+
+        private static void ApplyExcelRange(object sheetObject, string address, Action<dynamic> apply)
+        {
+            dynamic range = ((dynamic)sheetObject).Range[address];
+            try { apply(range); }
+            finally { ReleaseExcelObject((object)range); }
+        }
+
 
         private static void ApplyUnitHeaderColor(
             dynamic range,
@@ -1396,22 +1335,16 @@ namespace ADDIN.Commands
             dynamic sheet,
             string[] headers)
         {
+            object[,] values = new object[1, headers.Length];
             for (int i = 0;
                  i < headers.Length;
                  i++)
             {
-                sheet.Cells[
-                    1,
-                    i + 1].Value =
-                    headers[i];
+                values[0, i] = headers[i];
             }
 
-            dynamic header =
-                sheet.Range[
-                    sheet.Cells[1, 1],
-                    sheet.Cells[
-                        1,
-                        headers.Length]];
+            dynamic header = sheet.Range[RangeAddress(1, 1, 1, headers.Length)];
+            header.Value2 = values;
 
             ApplyHeaderFormat(
                 header);
@@ -1474,13 +1407,8 @@ namespace ADDIN.Commands
             sheet.Columns[5].ColumnWidth =
                 12.0;
 
-            for (int col = 6;
-                 col <= lastColumn;
-                 col++)
-            {
-                sheet.Columns[col].ColumnWidth =
-                    16.0;
-            }
+            if (lastColumn >= 6)
+                sheet.Range["F:" + ColumnName(lastColumn)].ColumnWidth = 16.0;
 
             // №, Kết quả, Số lỗi NG và các field status căn giữa.
             sheet.Range[
@@ -1585,24 +1513,40 @@ namespace ADDIN.Commands
             sheet.Rows[1].RowHeight =
                 30.0;
 
-            for (int row = 2;
-                 row <= lastRow;
-                 row++)
+            dynamic dataRows = sheet.Range["A2:A" + lastRow].EntireRow;
+            dataRows.AutoFit();
+            object commonHeight = dataRows.RowHeight;
+            if (commonHeight != null && commonHeight != DBNull.Value)
             {
-                dynamic excelRow =
-                    sheet.Rows[row];
-
-                excelRow.AutoFit();
-
-                double height =
-                    Convert.ToDouble(
-                        excelRow.RowHeight);
-
+                double height = Convert.ToDouble(commonHeight);
                 if (height > 42.0)
-                    excelRow.RowHeight = 42.0;
+                    dataRows.RowHeight = 42.0;
                 else if (height < 18.0)
-                    excelRow.RowHeight = 18.0;
+                    dataRows.RowHeight = 18.0;
             }
+            else
+            {
+                // Mixed row heights still need their individual limits, but
+                // AutoFit and height assignments are performed in batches.
+                var shortRows = new List<string>();
+                var tallRows = new List<string>();
+                for (int row = 2; row <= lastRow; row++)
+                {
+                    dynamic excelRow = sheet.Rows[row];
+                    try
+                    {
+                        double height = Convert.ToDouble(excelRow.RowHeight);
+                        if (height > 42.0) tallRows.Add("A" + row);
+                        else if (height < 18.0) shortRows.Add("A" + row);
+                    }
+                    finally { ReleaseExcelObject((object)excelRow); }
+                }
+                ForEachExcelRange((object)sheet, tallRows,
+                    range => range.EntireRow.RowHeight = 42.0);
+                ForEachExcelRange((object)sheet, shortRows,
+                    range => range.EntireRow.RowHeight = 18.0);
+            }
+            ReleaseExcelObject((object)dataRows);
         }
 
         private static void FreezeTopRow(

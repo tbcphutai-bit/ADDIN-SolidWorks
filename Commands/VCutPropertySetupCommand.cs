@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -8,6 +8,13 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
+    internal enum VCutBendIssue
+    {
+        None, WrongBendTable, TableUnreadable, MissingValue, InvalidValue,
+        MarkRequired, MarkNotAllowed, InvalidMark, RemainingNotBelowThickness,
+        KindValuesDiffer, VValuesEqual
+    }
+
     // Assigns a manufacturing groove kind to each Bend Feature. On save, the
     // confirmed groove value in its Bend Table updates the Part properties.
     internal sealed class VCutPropertySetupCommand
@@ -21,6 +28,7 @@ namespace ADDIN.Commands
         private string loadedConfiguration;
         private string loadedDefaultTable;
         private double loadedModelThicknessMm;
+        private List<BendRow> loadedRows = new List<BendRow>();
         public string LoadedPartTitle { get { return loadedPartTitle ?? ""; } }
         public string LoadedConfiguration { get { return loadedConfiguration ?? ""; } }
         public VCutPropertySetupCommand(ISldWorks swApp) { app = swApp; }
@@ -39,12 +47,15 @@ namespace ADDIN.Commands
             }
 
             string config = part.ConfigurationManager.ActiveConfiguration.Name;
-            List<Feature> features = new List<Feature>();
-            HashSet<string> defaults = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            HashSet<double> thicknesses = new HashSet<double>();
-            for (Feature root = part.FirstFeature() as Feature; root != null;
-                root = root.GetNextFeature() as Feature)
-                Collect(root, features, defaults, thicknesses);
+            string defaultTable;
+            double modelThicknessMm;
+            List<Feature> features;
+            try { features = CollectActiveBends(part, out defaultTable, out modelThicknessMm); }
+            catch (Exception ex)
+            {
+                message = "Không đọc được Bend Feature: " + ex.Message;
+                return false;
+            }
 
             if (features.Count == 0)
             {
@@ -52,8 +63,6 @@ namespace ADDIN.Commands
                 return false;
             }
 
-            string defaultTable = defaults.Count == 1 ? defaults.First() : "";
-            double modelThicknessMm = thicknesses.Count == 1 ? thicknesses.First() : 0;
             VCutFeatureTagStore tags = new VCutFeatureTagStore(app, part);
             string material = ReadMaterial(part, config);
             rows = features.Select(feature =>
@@ -67,6 +76,7 @@ namespace ADDIN.Commands
             loadedConfiguration = config;
             loadedDefaultTable = defaultTable;
             loadedModelThicknessMm = modelThicknessMm;
+            loadedRows = rows.Select(SnapshotRow).ToList();
             return true;
         }
 
@@ -88,6 +98,7 @@ namespace ADDIN.Commands
         private bool IsLoadedPart(ModelDoc2 active)
         {
             return loadedPart != null && active != null &&
+                (ReferenceEquals(loadedPart, active) || app.IsSame(loadedPart, active) == (int)swObjectEquality.swObjectSame) &&
                 active.GetType() == (int)swDocumentTypes_e.swDocPART &&
                 string.Equals(active.GetTitle(), loadedPartTitle,
                     StringComparison.OrdinalIgnoreCase) &&
@@ -97,6 +108,18 @@ namespace ADDIN.Commands
                     loadedConfiguration, StringComparison.OrdinalIgnoreCase);
         }
 
+        // Read-only validation for the native page; Save repeats it before mutation.
+        internal bool ValidateRows(IEnumerable<BendRow> rows, out string message)
+        {
+            ModelDoc2 active = app == null ? null : app.ActiveDoc as ModelDoc2;
+            if (!IsLoadedPart(active)) { message = "Part hoặc cấu hình đã thay đổi; hãy mở lại Set Bend line."; return false; }
+            List<BendRow> current;
+            if (!TryReadCurrentDraft(rows, out current, out message)) return false;
+            Dictionary<string, double> values;
+            var errors = Validate(current, out values);
+            message = errors.Count == 0 ? "Sẵn sàng. ✓ lưu loại bào và Custom Property; ✕ bỏ thay đổi." : string.Join("\n", errors.Take(4));
+            return errors.Count == 0;
+        }
         public bool Save(IEnumerable<BendRow> rows,
             IDictionary<string, string> properties, out string message)
         {
@@ -109,11 +132,10 @@ namespace ADDIN.Commands
                 return false;
             }
             List<BendRow> bendRows = rows == null ? new List<BendRow>() : rows.ToList();
+            List<BendRow> current;
+            if (!TryReadCurrentDraft(bendRows, out current, out message)) return false;
             Dictionary<string, double> grooveValues;
-            List<string> errors = Validate(bendRows, loadedDefaultTable,
-                loadedModelThicknessMm, new VCutFeatureTagStore(app, loadedPart),
-                ReadMaterial(active, loadedConfiguration),
-                out grooveValues);
+            List<string> errors = Validate(current, out grooveValues);
             if (errors.Count > 0)
             {
                 message = "Chưa lưu; Custom Property vẫn giữ nguyên.\r\n\r\n" +
@@ -127,7 +149,7 @@ namespace ADDIN.Commands
             int saved = 0;
             VCutFeatureTagStore tags = new VCutFeatureTagStore(app, loadedPart);
             var changedRows = new List<BendRow>();
-            foreach (BendRow row in bendRows)
+            foreach (BendRow row in current)
             {
                 if (IsSuppressedInCurrentConfiguration(row.Feature)) continue;
                 if (row.Kind == row.OriginalKind &&
@@ -138,7 +160,7 @@ namespace ADDIN.Commands
                     changedRows.Add(row);
                     string restoreError;
                     bool restored = RestoreBendTags(tags, changedRows, out restoreError);
-                    message = "NG — không gán được " + row.Feature.Name + ": " + error +
+                    message = "NG — không gán được " + row.FeatureName + ": " + error +
                         (restored ? "" : "\r\nKhông khôi phục đủ Bend Feature: " + restoreError);
                     return false;
                 }
@@ -148,7 +170,7 @@ namespace ADDIN.Commands
                     string restoreError;
                     bool restored = RestoreBendTags(tags, changedRows, out restoreError);
                     message = "NG — không đọc lại được loại bào vừa gán cho " +
-                        row.Feature.Name + ". Chưa cập nhật Custom Property." +
+                        row.FeatureName + ". Chưa cập nhật Custom Property." +
                         (restored ? "" : "\r\nKhông khôi phục đủ Bend Feature: " + restoreError);
                     return false;
                 }
@@ -167,7 +189,11 @@ namespace ADDIN.Commands
                     "\r\nHãy Refresh bảng để kiểm tra trước khi Save Part.";
                 return false;
             }
-            foreach (BendRow row in changedRows) row.OriginalKind = row.Kind;
+            foreach (BendRow row in bendRows) row.OriginalKind = row.Kind ?? "";
+            // Advance only the immutable tag baseline after a successful commit.
+            // It lets a second Save validate against the latest document state.
+            foreach (BendRow row in current) row.OriginalKind = row.Kind;
+            loadedRows = current.Select(SnapshotRow).ToList();
             if (properties != null)
                 foreach (string name in GroovePropertyNames)
                 {
@@ -193,7 +219,7 @@ namespace ADDIN.Commands
                 string writeError;
                 if (!tags.Write(loadedPart, row.Feature, row.OriginalKind, out writeError) ||
                     tags.Read(row.Feature) != row.OriginalKind)
-                    failures.Add(row.Feature.Name + ": " + writeError);
+                    failures.Add(row.FeatureName + ": " + writeError);
             }
             error = string.Join("; ", failures);
             return failures.Count == 0;
@@ -347,81 +373,234 @@ namespace ADDIN.Commands
             return failures.Count == 0;
         }
 
+        private bool TryReadCurrentDraft(IEnumerable<BendRow> draftRows,
+            out List<BendRow> currentRows, out string message)
+        {
+            currentRows = null;
+            message = "";
+            try
+            {
+                string defaultTable;
+                double modelThicknessMm;
+                List<Feature> features = CollectActiveBends(loadedPart,
+                    out defaultTable, out modelThicknessMm);
+                var tags = new VCutFeatureTagStore(app, loadedPart);
+                string material = ReadMaterial(loadedPart, loadedConfiguration);
+                var freshRows = features.Select(feature => CreateRow(feature,
+                    defaultTable, modelThicknessMm, tags, material)).ToList();
+                string reason = !string.Equals(defaultTable, loadedDefaultTable,
+                    StringComparison.OrdinalIgnoreCase) ? "Bend Table của Sheet Metal đã thay đổi" :
+                    Math.Abs(modelThicknessMm - loadedModelThicknessMm) > 0.000001
+                        ? "Bề dày hoặc nhóm Sheet Metal đã thay đổi" :
+                        GetRefreshReason(loadedRows, freshRows);
+                if (reason.Length > 0)
+                {
+                    message = "Chưa lưu; dữ liệu ngoài bảng đã thay đổi.\r\n\r\n" + reason +
+                        ".\r\nHãy bấm Refresh để cập nhật Bend Feature trước khi lưu.";
+                    return false;
+                }
+
+                var draftById = new Dictionary<int, BendRow>();
+                foreach (BendRow row in draftRows ?? Enumerable.Empty<BendRow>())
+                {
+                    if (row == null || row.Feature == null)
+                        throw new InvalidOperationException("Bend Feature trong bảng không hợp lệ.");
+                    int id = row.Feature.GetID();
+                    if (id <= 0 || (row.FeatureId > 0 && row.FeatureId != id) ||
+                        draftById.ContainsKey(id))
+                        throw new InvalidOperationException("Bend Feature trong bảng bị trùng hoặc đã thay đổi.");
+                    draftById.Add(id, row);
+                }
+                if (draftById.Count != freshRows.Count ||
+                    freshRows.Any(row => !draftById.ContainsKey(row.FeatureId)))
+                    throw new InvalidOperationException("Danh sách Bend Feature không còn đầy đủ.");
+                foreach (BendRow row in freshRows) row.Kind = draftById[row.FeatureId].Kind ?? "";
+                currentRows = freshRows;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                message = "Chưa lưu; không xác nhận được Bend Feature hiện tại.\r\n\r\n" +
+                    ex.Message + "\r\nHãy bấm Refresh rồi thử lại.";
+                return false;
+            }
+        }
+
+        private static List<Feature> CollectActiveBends(ModelDoc2 part,
+            out string defaultTable, out double modelThicknessMm)
+        {
+            var features = new List<Feature>();
+            var defaults = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var thicknesses = new HashSet<double>();
+            for (Feature root = part.FirstFeature() as Feature; root != null;
+                root = root.GetNextFeature() as Feature)
+                Collect(root, features, defaults, thicknesses);
+            defaultTable = defaults.Count == 1 ? defaults.First() : "";
+            modelThicknessMm = thicknesses.Count == 1 ? thicknesses.First() : 0;
+            // A subfeature can also be exposed by the top-level iterator. Its
+            // document feature ID remains stable across rename/save/reopen.
+            var unique = new Dictionary<int, Feature>();
+            foreach (Feature feature in features)
+            {
+                int id = feature.GetID();
+                if (id <= 0) throw new InvalidOperationException("Bend Feature không có ID ổn định.");
+                if (!unique.ContainsKey(id)) unique.Add(id, feature);
+            }
+            return unique.Values.ToList();
+        }
+
+        // Compare cached values only. This is also used by regression checks;
+        // it never calls SOLIDWORKS or mutates the user's Mark draft.
+        internal static string GetRefreshReason(IEnumerable<BendRow> loaded,
+            IEnumerable<BendRow> current)
+        {
+            var oldRows = (loaded ?? Enumerable.Empty<BendRow>()).ToList();
+            var newRows = (current ?? Enumerable.Empty<BendRow>()).ToList();
+            if (oldRows.Any(row => row == null || row.FeatureId <= 0) ||
+                newRows.Any(row => row == null || row.FeatureId <= 0) ||
+                oldRows.GroupBy(row => row.FeatureId).Any(group => group.Count() > 1) ||
+                newRows.GroupBy(row => row.FeatureId).Any(group => group.Count() > 1))
+                return "Không xác nhận được ID của Bend Feature";
+            var byId = oldRows.ToDictionary(row => row.FeatureId);
+            if (byId.Count != newRows.Count || newRows.Any(row => !byId.ContainsKey(row.FeatureId)))
+                return "Danh sách Bend Feature đã thêm, xóa hoặc thay đổi trạng thái";
+            foreach (BendRow row in newRows)
+            {
+                BendRow old = byId[row.FeatureId];
+                bool same = EqualText(old.FeatureName, row.FeatureName) &&
+                    EqualText(old.FeatureType, row.FeatureType) &&
+                    EqualText(old.Material, row.Material) &&
+                    EqualText(old.Table, row.Table) &&
+                    EqualText(old.TableSource, row.TableSource) &&
+                    EqualText(old.TableRevision, row.TableRevision) &&
+                    EqualText(old.TableError, row.TableError) &&
+                    old.WrongBendTable == row.WrongBendTable && old.IsGrooveTable == row.IsGrooveTable &&
+                    EqualNumber(old.ModelThicknessMm, row.ModelThicknessMm) &&
+                    EqualNumber(old.TableThicknessMm, row.TableThicknessMm) &&
+                    EqualNumber(old.TableValueMm, row.TableValueMm) &&
+                    EqualNumber(old.ValueMm, row.ValueMm) &&
+                    EqualNumber(old.BendAngleDeg, row.BendAngleDeg) &&
+                    EqualNumber(old.BendRadiusMm, row.BendRadiusMm) &&
+                    string.Equals(old.OriginalKind, row.OriginalKind, StringComparison.Ordinal);
+                if (!same)
+                    return (string.IsNullOrWhiteSpace(row.FeatureName) ? "Bend Feature" : row.FeatureName) +
+                        ": thông số, vật liệu, Bend Table hoặc Mark đã thay đổi";
+            }
+            return "";
+        }
+
+        private static bool EqualText(string left, string right)
+        { return string.Equals(left ?? "", right ?? "", StringComparison.OrdinalIgnoreCase); }
+        private static bool EqualNumber(double? left, double? right)
+        {
+            if (left.HasValue != right.HasValue) return false;
+            if (!left.HasValue) return true;
+            return IsFinite(left.Value) && IsFinite(right.Value) &&
+                Math.Abs(left.Value - right.Value) <= 0.000001;
+        }
+
+        private static BendRow SnapshotRow(BendRow row)
+        {
+            return new BendRow { Feature = row.Feature, FeatureId = row.FeatureId,
+                FeatureName = row.FeatureName, FeatureType = row.FeatureType,
+                Material = row.Material, ModelThicknessMm = row.ModelThicknessMm,
+                BendAngleDeg = row.BendAngleDeg, BendRadiusMm = row.BendRadiusMm,
+                Table = row.Table, TableSource = row.TableSource, TableRevision = row.TableRevision,
+                TableThicknessMm = row.TableThicknessMm, TableValueMm = row.TableValueMm,
+                TableError = row.TableError, WrongBendTable = row.WrongBendTable,
+                IsGrooveTable = row.IsGrooveTable, ValueMm = row.ValueMm,
+                OriginalKind = row.OriginalKind, Kind = row.Kind };
+        }
+
         private static List<string> Validate(IEnumerable<BendRow> rows,
-            string defaultTable, double modelThicknessMm,
-            VCutFeatureTagStore tags, string material, out Dictionary<string, double> grooveValues)
+            out Dictionary<string, double> grooveValues)
         {
             List<string> errors = new List<string>();
             grooveValues = new Dictionary<string, double>();
-            foreach (BendRow row in rows)
+            var allRows = (rows ?? Enumerable.Empty<BendRow>()).ToList();
+            foreach (BendRow row in allRows)
             {
                 if (row == null || row.Feature == null)
                 {
                     errors.Add("NG — Bend Feature không hợp lệ. Hãy Refresh bảng.");
                     continue;
                 }
-                // The table may have changed since Load. Check every active bend
-                // again before changing any feature tag or Custom Property.
-                if (IsSuppressedInCurrentConfiguration(row.Feature)) continue;
-                string featName = (row.Feature.Name ?? "").Normalize(System.Text.NormalizationForm.FormKC);
-                string kind = row.Kind ?? "";
-                if (VCutFeatureTagStore.Normalize(kind) != kind)
+                VCutBendIssue issue = GetDraftIssue(row, allRows);
+                if (issue != VCutBendIssue.None)
                 {
-                    errors.Add(featName + ": NG — loại bào không hợp lệ.");
+                    errors.Add(row.FeatureName + ": " + GetDraftIssueMessage(row, issue));
                     continue;
                 }
-                BendRow current = CreateRow(row.Feature, defaultTable,
-                    modelThicknessMm, tags, material);
-                if (current.WrongBendTable)
-                {
-                    errors.Add(featName + ": " + current.TableError);
-                    continue;
-                }
-                if (kind.Length == 0)
-                {
-                    if (string.IsNullOrWhiteSpace(current.TableError) &&
-                        current.IsGrooveTable && current.ValueMm.HasValue &&
-                        current.ValueMm.Value > 0 &&
-                        !double.IsNaN(current.ValueMm.Value) &&
-                        !double.IsInfinity(current.ValueMm.Value))
-                        errors.Add(featName + ": chưa gán loại bào " +
-                            "(Bend Table 溝=" + Format(current.ValueMm.Value) +
-                            " mm). Hãy chọn V溝1, V溝2 hoặc C溝 rồi lưu lại.");
-                    continue;
-                }
-                if (!string.IsNullOrWhiteSpace(current.TableError))
-                {
-                    errors.Add(featName + ": NG — " + current.TableError);
-                    continue;
-                }
-                if (!current.IsGrooveTable)
-                {
-                    errors.Add(featName + ": NG — Bend Table không xác nhận 溝.");
-                    continue;
-                }
-                if (!current.ValueMm.HasValue || current.ValueMm.Value <= 0 ||
-                    double.IsNaN(current.ValueMm.Value) || double.IsInfinity(current.ValueMm.Value))
-                {
-                    errors.Add(featName + ": NG — không đọc được giá trị từ Bend Feature.");
-                    continue;
-                }
-                double previous;
-                if (grooveValues.TryGetValue(row.Kind, out previous) &&
-                    Math.Abs(previous - current.ValueMm.Value) > ToleranceMm)
-                    errors.Add(featName + ": NG — " + row.Kind + " được gán cho " +
-                        Format(previous) + " mm và " + Format(current.ValueMm.Value) +
-                        " mm. Hãy dùng loại bào khác cho hai giá trị khác nhau.");
-                else
-                    grooveValues[row.Kind] = current.ValueMm.Value;
-            }
-            if (VValuesConflict(grooveValues))
-            {
-                double v1 = grooveValues["V溝1"];
-                errors.Add("V溝1 và V溝2 cùng " + Format(v1) +
-                    " mm. Hai loại V溝 phải có giá trị khác nhau; C溝 được phép trùng giá trị với V溝.");
+                if (!string.IsNullOrEmpty(row.Kind)) grooveValues[row.Kind] = row.ValueMm.Value;
             }
             return errors;
         }
+
+        internal static VCutBendIssue GetDraftIssue(BendRow row, IEnumerable<BendRow> rows)
+        {
+            VCutBendIssue local = GetLocalDraftIssue(row);
+            if (local != VCutBendIssue.None || row == null || string.IsNullOrEmpty(row.Kind)) return local;
+            foreach (BendRow other in rows ?? Enumerable.Empty<BendRow>())
+            {
+                if (ReferenceEquals(row, other) || GetLocalDraftIssue(other) != VCutBendIssue.None ||
+                    other == null || string.IsNullOrEmpty(other.Kind)) continue;
+                double difference = Math.Abs(row.ValueMm.Value - other.ValueMm.Value);
+                if (row.Kind == other.Kind && difference > ToleranceMm) return VCutBendIssue.KindValuesDiffer;
+                if (((row.Kind == "V溝1" && other.Kind == "V溝2") ||
+                    (row.Kind == "V溝2" && other.Kind == "V溝1")) && difference <= ToleranceMm)
+                    return VCutBendIssue.VValuesEqual;
+            }
+            return VCutBendIssue.None;
+        }
+
+        private static VCutBendIssue GetLocalDraftIssue(BendRow row)
+        {
+            if (row == null) return VCutBendIssue.InvalidMark;
+            string kind = row.Kind ?? "";
+            if (VCutFeatureTagStore.Normalize(kind) != kind) return VCutBendIssue.InvalidMark;
+            if (row.WrongBendTable) return VCutBendIssue.WrongBendTable;
+            // Unknown table data is not an ordinary bend. It must never permit
+            // a successful Save that silently clears the previous properties.
+            if (!string.IsNullOrWhiteSpace(row.TableError)) return VCutBendIssue.TableUnreadable;
+            if (!row.IsGrooveTable) return kind.Length == 0 ? VCutBendIssue.None : VCutBendIssue.MarkNotAllowed;
+            if (!row.ValueMm.HasValue) return VCutBendIssue.MissingValue;
+            if (!IsPositiveFinite(row.ValueMm.Value)) return VCutBendIssue.InvalidValue;
+            if ((row.ModelThicknessMm.HasValue && !IsPositiveFinite(row.ModelThicknessMm.Value)) ||
+                (row.TableThicknessMm.HasValue && !IsPositiveFinite(row.TableThicknessMm.Value)))
+                return VCutBendIssue.InvalidValue;
+            // The table stores remaining stock (残厚), not machining depth.
+            // A real groove needs 0 < remaining < the measured stock thickness.
+            if (row.ModelThicknessMm.HasValue && IsPositiveFinite(row.ModelThicknessMm.Value) &&
+                row.ValueMm.Value >= row.ModelThicknessMm.Value)
+                return VCutBendIssue.RemainingNotBelowThickness;
+            return kind.Length == 0 ? VCutBendIssue.MarkRequired : VCutBendIssue.None;
+        }
+
+        internal static string GetDraftIssueMessage(BendRow row, VCutBendIssue issue)
+        {
+            switch (issue)
+            {
+                case VCutBendIssue.WrongBendTable: return "NG — " + (row == null ? "Sai Bend Table." : row.TableError);
+                case VCutBendIssue.TableUnreadable: return "NG — " + (row == null ? "Không đọc được Bend Table." : row.TableError);
+                case VCutBendIssue.MissingValue: return "NG — không đọc được bề dày còn lại từ Bend Table 溝.";
+                case VCutBendIssue.InvalidValue: return "NG — bề dày còn lại phải là số hữu hạn lớn hơn 0.";
+                case VCutBendIssue.MarkRequired: return "NG — chưa gán loại bào (Bend Table 溝=" +
+                    Format(row.ValueMm.Value) + " mm). Hãy chọn V溝1, V溝2 hoặc C溝 rồi lưu lại.";
+                case VCutBendIssue.MarkNotAllowed: return "NG — Bend Table thường không xác nhận 溝; hãy bỏ Mark cũ.";
+                case VCutBendIssue.InvalidMark: return "NG — loại bào không hợp lệ.";
+                case VCutBendIssue.RemainingNotBelowThickness: return "NG — bề dày còn lại " + Format(row.ValueMm.Value) +
+                    " mm phải nhỏ hơn bề dày vật liệu " + Format(row.ModelThicknessMm.Value) + " mm.";
+                case VCutBendIssue.KindValuesDiffer: return "NG — " + row.Kind +
+                    " đang được gán cho các giá trị khác nhau. Mỗi Mark phải dùng một giá trị thống nhất.";
+                case VCutBendIssue.VValuesEqual: return "NG — V溝1 và V溝2 phải có giá trị khác nhau; C溝 được phép trùng với V溝.";
+                default: return "";
+            }
+        }
+
+        private static bool IsFinite(double value)
+        { return !double.IsNaN(value) && !double.IsInfinity(value); }
+        private static bool IsPositiveFinite(double value)
+        { return value > 0 && IsFinite(value); }
 
         internal static bool VValuesConflict(IDictionary<string, double> values)
         {
@@ -523,7 +702,12 @@ namespace ADDIN.Commands
         {
             BendRow row = new BendRow();
             row.Feature = feature;
+            row.FeatureId = feature.GetID();
+            row.FeatureName = (feature.Name ?? "").Normalize(System.Text.NormalizationForm.FormKC);
             row.FeatureType = feature.GetTypeName2() ?? "";
+            row.Material = material ?? "";
+            row.ModelThicknessMm = IsPositiveFinite(modelThicknessMm)
+                ? (double?)modelThicknessMm : null;
             row.OriginalKind = tags.Read(feature);
             row.Kind = row.OriginalKind;
             try
@@ -532,7 +716,11 @@ namespace ADDIN.Commands
                 IOneBendFeatureData one = definition as IOneBendFeatureData;
                 IEdgeFlangeFeatureData flange = definition as IEdgeFlangeFeatureData;
                 ISketchedBendFeatureData sketch = definition as ISketchedBendFeatureData;
-                if (one == null && flange == null && sketch == null) return row;
+                if (one == null && flange == null && sketch == null)
+                {
+                    row.TableError = "Chưa hỗ trợ đọc thông số Bend Feature loại " + row.FeatureType;
+                    return row;
+                }
                 try
                 {
                     double angle = one != null ? one.BendAngle :
@@ -606,13 +794,16 @@ namespace ADDIN.Commands
                     return row;
                 }
                 row.Table = resolved;
+                var tableFile = new System.IO.FileInfo(resolved);
+                row.TableRevision = tableFile.Length.ToString(CultureInfo.InvariantCulture) + ":" +
+                    tableFile.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
                 row.TableThicknessMm = thickness;
                 row.TableValueMm = tableValue;
                 row.IsGrooveTable = isGroove;
                 if (row.IsGrooveTable)
                     row.ValueMm = tableValue;
             }
-            catch { }
+            catch (Exception ex) { row.TableError = "Không đọc được thông số Bend Feature: " + ex.Message; }
             return row;
         }
 
@@ -726,11 +917,16 @@ namespace ADDIN.Commands
         internal sealed class BendRow
         {
             public Feature Feature;
+            public int FeatureId;
+            public string FeatureName = "";
             public string FeatureType = "";
+            public string Material = "";
+            public double? ModelThicknessMm;
             public double? BendAngleDeg;
             public double? BendRadiusMm;
             public string Table = "";
             public string TableSource = "";
+            public string TableRevision = "";
             public double? TableThicknessMm;
             public double? TableValueMm;
             public string TableError = "";

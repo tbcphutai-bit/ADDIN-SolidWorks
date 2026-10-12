@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Windows.Forms;
@@ -8,7 +8,7 @@ using SwView = SolidWorks.Interop.sldworks.View;
 
 namespace ADDIN.Commands
 {
-    internal sealed class SplineToArcsCommand
+    internal sealed partial class SplineToArcsCommand
     {
         private const double MinimumArcLengthMm = 2.0;
         private const int MaximumSplitDepth = 7;

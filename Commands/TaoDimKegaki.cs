@@ -10,7 +10,7 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    public class TaoDimKegaki
+    public partial class TaoDimKegaki
     {
         private class BendInfo
         {
@@ -51,9 +51,9 @@ namespace ADDIN.Commands
                 diagnosticPath = Path.Combine(folder, "DimKegaki_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + "_" + Guid.NewGuid().ToString("N") + ".log");
             }
             catch (Exception ex) { Trace.WriteLine("[DIM KEGAKI] Cannot initialize file log: " + ex); }
-            LogDiagnostic("BEGIN build=kegaki-direct-view-bbox-20261001 assembly=" + typeof(TaoDimKegaki).Assembly.Location
+            LogDiagnostic("BEGIN build=kegaki-model-distance-cutoff-20261007 assembly=" + typeof(TaoDimKegaki).Assembly.Location
                 + " mvid=" + typeof(TaoDimKegaki).Module.ModuleVersionId + " log=" + diagnosticPath);
-            LogDiagnostic("Coordinates/distances below are drawing-sheet metres, AFTER view transform; cutoff=0.001 sheet m.");
+            LogDiagnostic("Coordinates/distances below are drawing-sheet metres, AFTER view transform; minimum model distance=0.001 m, scaled to the selected view.");
         }
 
         private void LogDiagnostic(string message)
@@ -85,6 +85,21 @@ namespace ADDIN.Commands
 
         private readonly ISldWorks swApp;
         private const double ParallelAngleTolerance = 10.0;
+        private const double MinimumModelDistance = 0.001;
+        private double minimumSheetDistance = MinimumModelDistance;
+
+        private void ConfigureGeometryTolerance(double viewScale)
+        {
+            if (double.IsNaN(viewScale) || double.IsInfinity(viewScale) || viewScale <= 0)
+                throw new InvalidOperationException("Drawing view scale must be positive.");
+
+            // Geometry has already been projected to the sheet. A fixed sheet cutoff
+            // would discard real flanges when the drawing view is scaled down.
+            minimumSheetDistance = MinimumModelDistance * viewScale;
+            LogDiagnostic("GEOMETRY_CUTOFF viewScale=" + viewScale.ToString("G17", CultureInfo.InvariantCulture)
+                + " modelM=" + MinimumModelDistance.ToString("G17", CultureInfo.InvariantCulture)
+                + " sheetM=" + minimumSheetDistance.ToString("G17", CultureInfo.InvariantCulture));
+        }
 
         public TaoDimKegaki(ISldWorks app)
         {
@@ -164,6 +179,7 @@ namespace ADDIN.Commands
 
                 // Rebuild co the thay COM proxy cua View/Feature, nen bat buoc lay lai.
                 view = ReacquireViewByName(drawing, selectedViewName) ?? view;
+                ConfigureGeometryTolerance(view.ScaleDecimal);
                 LogViewBoundingBoxes(view);
                 boundingBoxFeature = ResolveBoundingBoxFeature(model, view);
 
@@ -248,7 +264,7 @@ namespace ADDIN.Commands
 
                     model.ClearSelection2(true);
                     model.GraphicsRedraw2();
-                    MessageBox.Show(
+                    if (nativeShowCompletion || overallCount == 0) MessageBox.Show(
                         "Hoan tat! Da tao " + overallCount + " kich thuoc W,L.",
                         "dim kegaki",
                         MessageBoxButtons.OK,
@@ -329,7 +345,7 @@ namespace ADDIN.Commands
                 model.ClearSelection2(true);
                 model.GraphicsRedraw2();
                 LogDiagnostic("TOTAL created=" + dimensionCount);
-                MessageBox.Show(
+                if (nativeShowCompletion || dimensionCount == 0) MessageBox.Show(
                     "Hoan tat! Da tao " + dimensionCount + " kich thuoc chuan Form.",
                     "dim kegaki",
                     MessageBoxButtons.OK,
@@ -746,8 +762,8 @@ namespace ADDIN.Commands
             double dx = p2[0] - p1[0];
             double dy = p2[1] - p1[1];
             double length = Math.Sqrt(dx * dx + dy * dy);
-            if (length <= 0.001)
-            { LogDiagnostic("SKIP sketch segment length <= 0.001 sheet m: " + length); return; }
+            if (length <= minimumSheetDistance)
+            { LogDiagnostic("SKIP sketch segment length <= minimumSheetDistance sheet m: " + length); return; }
 
             double angle = Math.Atan2(dy, dx);
             if (angle < 0)
@@ -854,8 +870,8 @@ namespace ADDIN.Commands
                         double n2 = ProjectPoint(second.MidX, second.MidY, normalX, normalY);
                         double distance = Math.Abs(n2 - n1);
                         LogDiagnostic("CHAIN_PAIR distance=" + distance.ToString("G9", CultureInfo.InvariantCulture) + " A=" + Describe(first) + " B=" + Describe(second));
-                        if (distance <= 0.001)
-                        { LogDiagnostic("SKIP chain distance <= 0.001 sheet m"); continue; }
+                        if (distance <= minimumSheetDistance)
+                        { LogDiagnostic("SKIP chain distance <= minimumSheetDistance sheet m"); continue; }
 
                         // Tat ca DIM trong group nam tren cung 1 chain line.
                         double chainN = (n1 + n2) / 2.0;
@@ -962,8 +978,8 @@ namespace ADDIN.Commands
             double dx = p2[0] - p1[0];
             double dy = p2[1] - p1[1];
             double length = Math.Sqrt(dx * dx + dy * dy);
-            if (length <= 0.001)
-            { LogDiagnostic("SKIP edge length <= 0.001 sheet m: " + length); return null; }
+            if (length <= minimumSheetDistance)
+            { LogDiagnostic("SKIP edge length <= minimumSheetDistance sheet m: " + length); return null; }
 
             double angle = Math.Atan2(dy, dx);
             if (angle < 0)
@@ -1104,7 +1120,7 @@ namespace ADDIN.Commands
             model.ClearSelection2(true);
             return SelectGeometry(view, left, false, selectData) &&
                 SelectGeometry(view, right, true, selectData) &&
-                AddLinearDimensionOnly(model, (minX + maxX) / 2.0, minY - 0.025);
+                AddLinearDimensionOnly(model, (minX + maxX) / 2.0, minY - 0.025 * nativeOffsetFactor);
         }
 
         private bool TryCreateVerticalOverall(
@@ -1129,7 +1145,7 @@ namespace ADDIN.Commands
             model.ClearSelection2(true);
             return SelectGeometry(view, bottom, false, selectData) &&
                 SelectGeometry(view, top, true, selectData) &&
-                AddLinearDimensionOnly(model, maxX + 0.025, (minY + maxY) / 2.0);
+                AddLinearDimensionOnly(model, maxX + 0.025 * nativeOffsetFactor, (minY + maxY) / 2.0);
         }
 
         private bool TryCreateVerticalOverallFromVertices(
@@ -1179,7 +1195,7 @@ namespace ADDIN.Commands
             }
 
             DisplayDimension dimension = model.AddVerticalDimension2(
-                maxX + 0.025, (minY + maxY) / 2.0, 0) as DisplayDimension;
+                maxX + 0.025 * nativeOffsetFactor, (minY + maxY) / 2.0, 0) as DisplayDimension;
             if (dimension == null)
             {
                 LogDiagnostic("OVERALL_VERTICAL AddVerticalDimension2 returned null");
@@ -1252,7 +1268,7 @@ namespace ADDIN.Commands
                 double measureX = (edge.MidX + bend.MidX) / 2.0;
                 double measureY = (edge.MidY + bend.MidY) / 2.0;
                 double direction = GetOutwardDirection(edge, centerX, centerY);
-                double offset = 0.01;
+                double offset = 0.01 * nativeOffsetFactor;
 
                 model.ClearSelection2(true);
                 if (!SelectGeometry(view, edge, false, selectData) ||
@@ -1294,10 +1310,10 @@ namespace ADDIN.Commands
                     (candidate.MidX - centerX) * bend.NormalX +
                     (candidate.MidY - centerY) * bend.NormalY;
 
-                if (bendSide >= 0 && candidateSide > bendSide + 0.001)
+                if (bendSide >= 0 && candidateSide > bendSide + minimumSheetDistance)
                     return true;
 
-                if (bendSide < 0 && candidateSide < bendSide - 0.001)
+                if (bendSide < 0 && candidateSide < bendSide - minimumSheetDistance)
                     return true;
             }
 
@@ -1330,7 +1346,7 @@ namespace ADDIN.Commands
                     (candidate.MidX - centerX) * bend.NormalX +
                     (candidate.MidY - centerY) * bend.NormalY;
 
-                if ((candidateSide - bendSide) * direction > 0.001)
+                if ((candidateSide - bendSide) * direction > minimumSheetDistance)
                     return true;
             }
 
@@ -1501,8 +1517,8 @@ namespace ADDIN.Commands
             double edgeN = ProjectPoint(edge.MidX, edge.MidY, normalX, normalY);
             double bendN = ProjectPoint(bend.MidX, bend.MidY, normalX, normalY);
             double distance = Math.Abs(edgeN - bendN);
-            if (distance <= 0.001)
-            { LogDiagnostic("SKIP edge/bend distance <= 0.001 sheet m: " + distance); return 0; }
+            if (distance <= minimumSheetDistance)
+            { LogDiagnostic("SKIP edge/bend distance <= minimumSheetDistance sheet m: " + distance); return 0; }
 
             // Edge -> Bend dau/cuoi nam tren dung chain line cua group Bend-Line.
             double chainN = (edgeN + bendN) / 2.0;
@@ -1560,7 +1576,7 @@ namespace ADDIN.Commands
                 double score = (lineSide - bendSide) * direction;
 
                 LogDiagnostic("OUTER_CANDIDATE score=" + score + " best=" + bestScore + " " + Describe(line));
-                if (score <= 0.001 || score <= bestScore)
+                if (score <= minimumSheetDistance || score <= bestScore)
                 { LogDiagnostic("OUTER_REJECT score <= cutoff or not farther than best"); continue; }
 
                 outermost = line;
@@ -1631,7 +1647,7 @@ namespace ADDIN.Commands
                 return 0;
 
             double direction = GetOutwardDirection(edge, centerX, centerY);
-            double offset = 0.02;
+            double offset = 0.02 * nativeOffsetFactor;
             double dimensionX =
                 (edge.MidX + pointX) / 2.0 +
                 direction * edge.NormalX * offset;
@@ -1673,7 +1689,7 @@ namespace ADDIN.Commands
                 double measureX = (edge.MidX + nearestBend.MidX) / 2.0;
                 double measureY = (edge.MidY + nearestBend.MidY) / 2.0;
                 double direction = GetOutwardDirection(edge, centerX, centerY);
-                double offset = 0.02;
+                double offset = 0.02 * nativeOffsetFactor;
 
                 model.ClearSelection2(true);
                 if (!SelectGeometry(view, edge, false, selectData) ||
@@ -1840,7 +1856,7 @@ namespace ADDIN.Commands
                 return 0;
 
             double direction = GetOutwardDirection(line, centerX, centerY);
-            double offset = 0.02;
+            double offset = 0.02 * nativeOffsetFactor;
             double dimensionX =
                 (linePointX + point.X) / 2.0 +
                 direction * line.NormalX * offset;
@@ -2034,7 +2050,7 @@ namespace ADDIN.Commands
                 double distance = Math.Abs(
                     (line.MidX - bend.MidX) * bend.NormalX +
                     (line.MidY - bend.MidY) * bend.NormalY);
-                if (distance > 0.001 && distance < nearestDistance)
+                if (distance > minimumSheetDistance && distance < nearestDistance)
                 {
                     nearest = line;
                     nearestDistance = distance;
@@ -2058,7 +2074,7 @@ namespace ADDIN.Commands
                     double distance = Math.Abs(
                 (edge.MidX - bend.MidX) * bend.NormalX +
                 (edge.MidY - bend.MidY) * bend.NormalY);
-                    if (distance > 0.001 && distance < nearestDistance)
+                    if (distance > minimumSheetDistance && distance < nearestDistance)
                     {
                         nearest = bend;
                         nearestDistance = distance;
@@ -2097,7 +2113,7 @@ namespace ADDIN.Commands
                     (line.MidY - centerY) * bend.NormalY;
                 double score = (lineSide - bendSide) * direction;
 
-                if (score <= 0.001)
+                if (score <= minimumSheetDistance)
                     continue;
 
                 if (score <= bestScore)
@@ -2264,8 +2280,8 @@ namespace ADDIN.Commands
             double dx = p2[0] - p1[0];
             double dy = p2[1] - p1[1];
             double length = Math.Sqrt(dx * dx + dy * dy);
-            if (length <= 0.001)
-            { LogDiagnostic("SKIP edge length <= 0.001 sheet m: " + length); return null; }
+            if (length <= minimumSheetDistance)
+            { LogDiagnostic("SKIP edge length <= minimumSheetDistance sheet m: " + length); return null; }
 
             double angle = Math.Atan2(dy, dx);
             if (angle < 0)
@@ -2520,7 +2536,7 @@ namespace ADDIN.Commands
             return lines;
         }
 
-        private static BendInfo CreateDisplayBoundingBoxLine(double[] data)
+        private BendInfo CreateDisplayBoundingBoxLine(double[] data)
         {
             double x1 = data[4];
             double y1 = data[5];
@@ -2534,7 +2550,7 @@ namespace ADDIN.Commands
             double dx = x2 - x1;
             double dy = y2 - y1;
             double length = Math.Sqrt(dx * dx + dy * dy);
-            if (length <= 0.001)
+            if (length <= minimumSheetDistance)
                 return null;
 
             double angle = Math.Atan2(dy, dx);

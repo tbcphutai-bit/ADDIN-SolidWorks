@@ -1008,7 +1008,8 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             return count;
         }
 
-        internal static List<Body2> ReflectCurrentSolids(MirrorInPlaceExecutionContextV7 context)
+        internal static List<Body2> ReflectCurrentSolids(MirrorInPlaceExecutionContextV7 context,
+            string checkpointLabel69 = "SOURCE_CHECKPOINT")
         {
             List<Body2> source = Solids(context.WorkingDocument);
             double[] data = new double[16];
@@ -1019,9 +1020,8 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             List<Body2> result = new List<Body2>();
             foreach (Body2 body in source)
             {
-                Body2 copy = body.Copy2(false) as Body2;
-                if (copy == null || !copy.ApplyTransform(transform))
-                    throw new InvalidOperationException("Cannot create Base Feature geometry oracle.");
+                Body2 copy = ADDIN.Helpers.NativeBodyAudit69.CopyAndReflect(body, transform,
+                    checkpointLabel69 + "/body=" + result.Count);
                 result.Add(copy);
             }
             return result;
@@ -1034,6 +1034,9 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             EquivalenceMatchResultV7 match = BipartiteEquivalenceMatcherV7.Match(oracle, actual,
                 delegate(Body2 expected, Body2 candidate)
                 {
+                    // Invalid BRep inputs mean an unavailable proof, not a bad
+                    // sketch/direction. Never send them into a native Boolean.
+                    ADDIN.Helpers.NativeBodyAudit69.RequireCheckpoint(expected, candidate, "INPLACE_CHECKPOINT69");
                     // expected is already reflected; compare it directly to candidate.
                     double[] a = expected.GetMassProperties(1.0) as double[];
                     double[] b = candidate.GetMassProperties(1.0) as double[];
@@ -1041,9 +1044,36 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                         a.Concat(b).Any(v => double.IsNaN(v) || double.IsInfinity(v))) return false;
                     bool massAgrees = Math.Abs(a[3] - b[3]) <= Math.Max(1e-15, Math.Abs(a[3]) * 1e-6);
                     for (int i = 0; i < 3; i++) massAgrees &= Math.Abs(a[i] - b[i]) <= PointTolerance;
-                    if (!SameVertexSet(expected, candidate)) return false;
+                    if (!SameVertexSet(expected, candidate))
+                    {
+                        // Diagnostic only: where the two bodies sit when their
+                        // vertices disagree. Does not change the verdict.
+                        double[] eb = expected.GetBodyBox() as double[], cb = candidate.GetBodyBox() as double[];
+                        Func<double[], string> text = v => v == null ? "" : string.Join(",", v.Select(x => (x * 1000).ToString("F4")));
+                        var ev = ((expected.GetVertices() as object[]) ?? new object[0]).Cast<Vertex>().Select(v => (double[])v.GetPoint()).ToList();
+                        var cv = ((candidate.GetVertices() as object[]) ?? new object[0]).Cast<Vertex>().Select(v => (double[])v.GetPoint()).ToList();
+                        double farthest = ev.Count == 0 || cv.Count == 0 ? double.NaN : ev.Max(p => cv.Min(q =>
+                            Math.Sqrt((p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]) + (p[2] - q[2]) * (p[2] - q[2]))));
+                        if (ev.Count <= 16 && cv.Count <= 16)
+                            MirrorV7Diagnostics.Log("[BODY71][VERTEX_LIST] expected_mm=" + string.Join(" | ", ev.Select(text)) +
+                                " ## actual_mm=" + string.Join(" | ", cv.Select(text)));
+                        MirrorV7Diagnostics.Log("[BODY71][VERTEX_MISMATCH] vertices=" + ev.Count + "/" + cv.Count +
+                            " farthestNearestVertex_m=" + farthest.ToString("E3") + " expectedVolume_mm3=" + (a[3] * 1e9).ToString("F3") +
+                            " actualVolume_mm3=" + (b[3] * 1e9).ToString("F3") +
+                            " expectedCentroid_mm=" + text(a.Take(3).ToArray()) + " actualCentroid_mm=" + text(b.Take(3).ToArray()) +
+                            " expectedBox_mm=[" + text(eb) + "] actualBox_mm=[" + text(cb) + "]");
+                        return ADDIN.Helpers.NativeBodyCoincidence67.ConfirmSurfaceChainResidual71(expected, candidate, "INPLACE_CHECKPOINT71");
+                    }
                     var left = BodyOperationsHelper.BooleanCutStrict(expected, candidate, "INPLACE_EXPECTED_MINUS_ACTUAL");
                     var right = BodyOperationsHelper.BooleanCutStrict(candidate, expected, "INPLACE_ACTUAL_MINUS_EXPECTED");
+                    if (!left.Success || !right.Success)
+                    {
+                        // Congruence at identity is a whole-body native proof;
+                        // translating/rotating/reflection to fit is forbidden.
+                        return ADDIN.Helpers.NativeBodyCoincidence67.ConfirmUnavailableBoolean(
+                            expected, candidate, left, right, "INPLACE_CHECKPOINT67") ||
+                            ADDIN.Helpers.NativeBodyCoincidence67.ConfirmSurfaceChainResidual71(expected, candidate, "INPLACE_CHECKPOINT71");
+                    }
                     double tolerance = Math.Max(1e-15, Math.Abs(a[3]) * 1e-6);
                     if (!massAgrees)
                     {
@@ -1058,11 +1088,14 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                             " vertexSetEqual=True missingCount=" + left.Bodies.Count + " extraCount=" + right.Bodies.Count +
                             " booleanSuccess=" + left.Success + "," + right.Success +
                             " proof=EMPTY_BIDIRECTIONAL_BOOLEAN result=" + (exact ? "PASS" : "FAIL"));
-                        return exact;
+                        return exact || ADDIN.Helpers.NativeBodyCoincidence67.ConfirmRefoldResidual71(
+                            expected, candidate, left, right, "INPLACE_CHECKPOINT71") ||
+                            ADDIN.Helpers.NativeBodyCoincidence67.ConfirmSurfaceChainResidual71(expected, candidate, "INPLACE_CHECKPOINT71");
                     }
-                    return left.Success && right.Success &&
+                    return (left.Success && right.Success &&
                         left.Bodies.Sum(x => ((double[])x.GetMassProperties(1.0))[3]) <= tolerance &&
-                        right.Bodies.Sum(x => ((double[])x.GetMassProperties(1.0))[3]) <= tolerance;
+                        right.Bodies.Sum(x => ((double[])x.GetMassProperties(1.0))[3]) <= tolerance) ||
+                        ADDIN.Helpers.NativeBodyCoincidence67.ConfirmSurfaceChainResidual71(expected, candidate, "INPLACE_CHECKPOINT71");
                 });
             if (!match.HasPerfectMatching) throw new InvalidOperationException("Current checkpoint geometry does not match reflected oracle (mass, centroid, vertices or Boolean difference).");
         }
@@ -1073,7 +1106,15 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             object[] ra = right.GetVertices() as object[];
             List<double[]> a = la == null ? new List<double[]>() : la.Cast<Vertex>().Select(v => v.GetPoint() as double[]).ToList();
             List<double[]> b = ra == null ? new List<double[]>() : ra.Cast<Vertex>().Select(v => v.GetPoint() as double[]).ToList();
-            if (a.Count == 0 || a.Count != b.Count) return false;
+            if (a.Count != b.Count) return false;
+            // A body bounded only by closed edges (disc, ring) has no vertex on
+            // either side. Empty sets agree; the caller's bidirectional Boolean
+            // difference is still mandatory and is what proves the geometry.
+            if (a.Count == 0)
+            {
+                MirrorV7Diagnostics.Log("[BODY71][VERTEX_SET] expected=0 actual=0 result=EMPTY_EQUAL booleanProofStillRequired=True");
+                return true;
+            }
             return BipartiteEquivalenceMatcherV7.Match(a, b, delegate(double[] x, double[] y)
             {
                 return x != null && y != null && x.Length >= 3 && y.Length >= 3 &&

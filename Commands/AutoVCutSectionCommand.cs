@@ -171,7 +171,7 @@ namespace ADDIN.Commands
     }
 
     // A selected drawing line creates a section; selecting only a view runs diagnostics.
-    internal sealed class AutoVCutSectionCommand
+    internal sealed partial class AutoVCutSectionCommand
     {
         internal const double ToleranceMm = 0.0005;
         private readonly ISldWorks app;
@@ -208,6 +208,11 @@ namespace ADDIN.Commands
             { Notify("Hãy chọn một đường Line đã vẽ trong Drawing View của chi tiết, hoặc chọn View để chỉ phân tích."); return; }
 
             ModelDoc2 part = selectedView.ReferencedDocument as ModelDoc2;
+            if (part != null && part.GetType() == (int)swDocumentTypes_e.swDocASSEMBLY)
+            {
+                RunAssemblySection(drawing, selectedView, selectedCutLine);
+                return;
+            }
             if (part == null || part.GetType() != (int)swDocumentTypes_e.swDocPART)
             { Notify("View đã chọn phải tham chiếu một file Part, không phải sheet hoặc Assembly."); return; }
 
@@ -2021,6 +2026,11 @@ namespace ADDIN.Commands
         private static string F(double value) { return value.ToString("0.###", CultureInfo.InvariantCulture); }
         private static string Mm(double metres) { return F(metres * 1000); }
         private static void Log(string value) { Debug.WriteLine("[VCUT SECTION] " + value); }
-        private static void Notify(string message) { MessageBox.Show(message, "V-CUT SECTION", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+        private static void Notify(string message)
+        {
+            Log("NOTICE " + message.Replace("\r", "").Replace("\n", " | "));
+            MessageBox.Show(message, "SECTION VIEW / 断面図", MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
     }
 }

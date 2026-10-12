@@ -1,119 +1,107 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace ADDIN.UI
 {
+    // A white panel that groups related commands under one short title.
     public class ModernCard : Panel
     {
-        private int borderRadius = 6;
+        private string badgeText = string.Empty;
+        private ModernButtonTone badgeTone = ModernButtonTone.Neutral;
 
         [Category("Appearance")]
-        [Description("Bán kính bo tròn góc")]
-        public int BorderRadius
+        [Description("Nhãn trạng thái ở góc phải tiêu đề")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public string BadgeText
         {
-            get => borderRadius;
-            set
-            {
-                borderRadius = Math.Max(0, value);
-                UpdateRegion();
-                Invalidate();
-            }
+            get { return badgeText; }
+            set { value = value ?? string.Empty; if (badgeText == value) return; badgeText = value; Invalidate(); }
         }
 
         [Category("Appearance")]
-        [Description("Màu viền thẻ")]
-        public Color BorderColor { get; set; } = Color.FromArgb(215, 220, 228);
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public ModernButtonTone BadgeTone
+        {
+            get { return badgeTone; }
+            set { if (badgeTone == value) return; badgeTone = value; Invalidate(); }
+        }
 
         [Category("Appearance")]
-        [Description("Màu chữ tiêu đề")]
-        public Color HeaderTextColor { get; set; } = Color.FromArgb(30, 48, 70);
+        [Description("Kẻ một đường mảnh dưới tiêu đề")]
+        [DefaultValue(false)]
+        public bool ShowHeaderDivider { get; set; }
 
-        [Category("Appearance")]
-        [Description("Màu vạch điểm nhấn tiêu đề")]
-        public Color AccentColor { get; set; } = Color.FromArgb(0, 110, 210);
-
-        [Category("Appearance")]
-        [Description("Hiển thị đường gạch ngang dưới tiêu đề")]
-        public bool ShowHeaderDivider { get; set; } = true;
+        // Appearance properties from before TaiTheme; Designer code still assigns
+        // them, the theme now decides the colours.
+        [Browsable(false)] public int BorderRadius { get; set; } = TaiTheme.CardRadius;
+        [Browsable(false)] public Color BorderColor { get; set; } = TaiTheme.Border;
+        [Browsable(false)] public Color HeaderTextColor { get; set; } = TaiTheme.Text;
+        [Browsable(false)] public Color AccentColor { get; set; } = TaiTheme.Accent;
+        [Browsable(false)] [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color BadgeBackColor { get; set; } = TaiTheme.Sunken;
+        [Browsable(false)] [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color BadgeBorderColor { get; set; } = TaiTheme.Border;
+        [Browsable(false)] [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color BadgeTextColor { get; set; } = TaiTheme.TextMuted;
 
         public ModernCard()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true);
             DoubleBuffered = true;
-            BackColor = Color.FromArgb(248, 249, 251);
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            BackColor = TaiTheme.Surface;
+            Font = TaiTheme.BodyStrong;
         }
 
-        protected override void OnResize(EventArgs e)
+        protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); Invalidate(); }
+
+        // Children clear their corners with BackColor, so the card surface is fixed.
+        public override Color BackColor
         {
-            base.OnResize(e);
-            UpdateRegion();
+            get { return TaiTheme.Surface; }
+            set { base.BackColor = TaiTheme.Surface; }
         }
 
-        private void UpdateRegion()
-        {
-            if (this.Region != null)
-            {
-                this.Region.Dispose();
-                this.Region = null;
-            }
-        }
+        protected override void OnPaintBackground(PaintEventArgs e) { }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            g.Clear(TaiTheme.BackdropOf(this));
+            TaiTheme.PaintCard(g, this, ClientRectangle, null);
+            int pad = TaiTheme.Px(this, TaiTheme.CardPadding), top = TaiTheme.Px(this, 7), line = TaiTheme.Px(this, 18);
+            int right = Width - pad;
 
-            Color parentBg = (Parent != null && Parent.BackColor.A > 0)
-                ? Parent.BackColor
-                : Color.FromArgb(240, 243, 246);
-            g.Clear(parentBg);
-
-            Rectangle rect = new Rectangle(0, 0, Width - 1, Height - 1);
-            using (var path = UIHelper.GetRoundPath(rect, borderRadius))
+            if (badgeText.Length > 0)
             {
-                using (var brush = new SolidBrush(BackColor))
+                Color text, fill;
+                switch (badgeTone)
                 {
-                    g.FillPath(brush, path);
+                    case ModernButtonTone.Accent: text = TaiTheme.Accent; fill = TaiTheme.AccentSoft; break;
+                    case ModernButtonTone.Success: text = TaiTheme.Success; fill = TaiTheme.SuccessSoft; break;
+                    case ModernButtonTone.Danger: text = TaiTheme.Danger; fill = TaiTheme.DangerSoft; break;
+                    case ModernButtonTone.Warning: text = TaiTheme.Warning; fill = TaiTheme.WarningSoft; break;
+                    default: text = TaiTheme.TextMuted; fill = TaiTheme.Sunken; break;
                 }
-                using (var pen = new Pen(BorderColor, 1F))
-                {
-                    g.DrawPath(pen, path);
-                }
+                int width = TextRenderer.MeasureText(g, badgeText, TaiTheme.Small, Size.Empty,
+                    TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width + TaiTheme.Px(this, 14);
+                Rectangle pill = new Rectangle(right - width, top, width, line);
+                TaiTheme.FillRound(g, new Rectangle(pill.X, pill.Y, pill.Width - 1, pill.Height - 1), pill.Height / 2, fill, Color.Empty);
+                TextRenderer.DrawText(g, badgeText, TaiTheme.Small, pill, text, TextFormatFlags.HorizontalCenter |
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+                right = pill.X - TaiTheme.Px(this, 8);
             }
 
-            // Vẽ tiêu đề thẻ nếu có
             if (!string.IsNullOrEmpty(Text))
-            {
-                // Vạch chỉ báo nhấn dọc nhỏ bên trái tiêu đề
-                int accentX = 12;
-                int accentY = 8;
-                int accentW = 3;
-                int accentH = 14;
-                using (var brush = new SolidBrush(AccentColor))
-                {
-                    g.FillRectangle(brush, accentX, accentY, accentW, accentH);
-                }
+                TextRenderer.DrawText(g, Text, TaiTheme.BodyStrong, new Rectangle(pad, top, Math.Max(1, right - pad), line), TaiTheme.Text,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis |
+                    TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
 
-                // Tiêu đề
-                using (var headerFont = new Font("Segoe UI", 8.75F, FontStyle.Bold))
-                {
-                    TextRenderer.DrawText(g, Text, headerFont, new Point(accentX + accentW + 6, accentY - 1), HeaderTextColor,
-                        TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix);
-                }
-
-                if (ShowHeaderDivider)
-                {
-                    using (var linePen = new Pen(Color.FromArgb(226, 231, 238), 1F))
-                    {
-                        g.DrawLine(linePen, 12, accentY + accentH + 6, Width - 12, accentY + accentH + 6);
-                    }
-                }
-            }
+            if (ShowHeaderDivider && !string.IsNullOrEmpty(Text))
+                using (Pen pen = new Pen(TaiTheme.Divider, 1F))
+                    g.DrawLine(pen, pad, TaiTheme.Px(this, TaiTheme.CardHeader) - 1, Width - pad, TaiTheme.Px(this, TaiTheme.CardHeader) - 1);
         }
     }
 }

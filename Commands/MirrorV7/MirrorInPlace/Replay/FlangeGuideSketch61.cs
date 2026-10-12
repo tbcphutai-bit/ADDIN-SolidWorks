@@ -268,10 +268,11 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
         // and apply its length dimension to their geometry. Resolve the actual drivers
         // after committing native options; never infer them from sketch labels/order.
         private static void ReacquireAndRedrawNativeFlangeProfiles64(MirrorInPlaceExecutionContextV7 context,
-            FeatureReplayCheckpointV7 item, FlangeRecipe33 recipe, IList<string> names, IList<FlangeGuide61> guides)
+            FeatureReplayCheckpointV7 item, FlangeRecipe33 recipe, IList<string> names, IList<FlangeGuide61> guides,
+            bool nativeProfilesRebound68)
         {
             var model = context.WorkingDocument;
-            if (model.SketchManager.ActiveSketch != null || names.Count != recipe.Pairs.Count ||
+            if (!nativeProfilesRebound68 || model.SketchManager.ActiveSketch != null || names.Count != recipe.Pairs.Count ||
                 guides.Count != recipe.Pairs.Count)
                 throw new InvalidOperationException("FLANGE64 native profile recovery requires closed, paired sketches.");
             var layout = FeatureTreeScannerV7.Scan(model);
@@ -313,10 +314,10 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             if (driverReferences65.Any(reference => reference == null) ||
                 driverReferences65.Select(reference => Convert.ToBase64String(reference.Data)).Distinct().Count() != assignment.Length)
                 throw new InvalidOperationException("FLANGE65 native driver identities are unavailable or duplicated; no profile edit started.");
-            var plane = new ADDIN.Commands.PlaneData { Origin = context.Reflection.Origin, Normal = context.Reflection.Normal };
+            var identityAudits68 = new List<Tuple<PersistReferenceV7, NativeProfileIdentity68>>();
             for (int i = 0; i < assignment.Length; i++)
             {
-                // No native flange/body regeneration while its drivers are replaced.
+                // No native flange/body regeneration while its existing points move.
                 if (!model.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToBeforeFeature, item.Feature.Name))
                     throw new InvalidOperationException("FLANGE65 cannot roll back the owner before editing its native driver.");
                 MirrorV7Diagnostics.Log("[FLANGE65][ROLLBACK_BEFORE_OWNER] feature=" + item.Feature.Name + " hinge=" + i);
@@ -330,6 +331,7 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                 if (!profile.Select2(false, 0)) throw new InvalidOperationException("FLANGE64 native driver selection failed.");
                 MirrorV7Diagnostics.Log("[FLANGE65][EDIT_BEGIN] profile=" + names[i] + " hinge=" + i);
                 model.EditSketch();
+                bool unsafeEdit68 = false;
                 try
                 {
                     var editing65 = model.SketchManager.ActiveSketch;
@@ -340,22 +342,32 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                     if (heights.Count == 0 || heights.Max() - heights.Min() > 1e-7)
                         throw new InvalidOperationException("FLANGE64 native support plane is tilted from the reflected 3D guide.");
                     offset = heights.Average();
-                    PrepareRecreatedFlangeProfile66(context, item, driverReferences65[i], editing65);
-                    SketchOperationsHelper.RecreateMirroredPrimitives58(model, editing65, guides[i].Profile,
-                        plane, true, offset, alreadyReflected: true, deferOwnerRebuild65: true);
+                    var identity68 = MoveNativeFlangeProfilePoints68(context, item, editing65, recipe.Pairs[i], guides[i], offset,
+                        nativeProfilesRebound68);
+                    identityAudits68.Add(Tuple.Create(driverReferences65[i], identity68));
+                }
+                catch (Exception ex)
+                {
+                    unsafeEdit68 = IsUnsafeNativeFailure66(ex);
+                    throw;
                 }
                 finally
                 {
-                    if (model.SketchManager.ActiveSketch != null) model.SketchManager.InsertSketch(false);
-                    model.ClearSelection2(true);
+                    if (!unsafeEdit68)
+                    {
+                        if (model.SketchManager.ActiveSketch != null) model.SketchManager.InsertSketch(false);
+                        model.ClearSelection2(true);
+                    }
                 }
                 var committed65 = ResolveNativeFlangeDriver65(context, item, driverReferences65[i]);
                 names[i] = committed65.Name;
                 RequireHealthyNativeFlange66(committed65, "PROFILE_EXIT");
+                RequireNativeProfileIdentity68(context, committed65.GetSpecificFeature2() as Sketch,
+                    identityAudits68[i].Item2, "PROFILE_EXIT");
                 VerifyProfileAgainstGuide61(context, names[i], guides[i], offset);
                 MirrorV7Diagnostics.Log("[FLANGE64][NATIVE_DRIVER_REDRAW] source=" + recipe.Pairs[i].SketchName +
                     " consumedInput=" + previous + " actual=" + names[i] + " hinge=" + i +
-                    " method=UNIQUE_NATIVE_HINGE_BINDING_AND_3D_GUIDE bodyVerificationPending=True");
+                    " method=EXISTING_POINT_IDS_TO_3D_GUIDE segmentsDeleted=0 relationsDeleted=0 bodyVerificationPending=True");
             }
             MirrorV7Diagnostics.Log("[FLANGE65][OWNER_COMMIT_BEGIN] feature=" + item.Feature.Name +
                 " profiles=" + names.Count + " activeSketch=False");
@@ -368,53 +380,351 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             model.EditRebuild3();
             RequireHealthyNativeFlange66(item.Feature.Feature, "OWNER_REBUILD");
             for (int i = 0; i < names.Count; i++)
-                names[i] = ResolveNativeFlangeDriver65(context, item, driverReferences65[i]).Name;
+            {
+                var profile68 = ResolveNativeFlangeDriver65(context, item, driverReferences65[i]);
+                names[i] = profile68.Name;
+                RequireNativeProfileIdentity68(context, profile68.GetSpecificFeature2() as Sketch,
+                    identityAudits68[i].Item2, "OWNER_REBUILD");
+            }
             MirrorV7Diagnostics.Log("[FLANGE65][OWNER_COMMIT_END] feature=" + item.Feature.Name +
                 " bodyVerificationPending=True");
         }
 
-        // These sketches were just created in staging, not copied user sketches.
-        // Their auto-generated dimensions/USEEDGE relations refer to the segments
-        // that are about to be removed. Deleting those segments first left error
-        // 51 (swSketchErrorExtRefFail) in the SW2024 runtime. Remove the disposable
-        // constraints first; attachment remains the typed native edge/profile pair.
-        private static void PrepareRecreatedFlangeProfile66(MirrorInPlaceExecutionContextV7 context,
-            FeatureReplayCheckpointV7 item, PersistReferenceV7 reference, Sketch editing)
+        private sealed class NativeProfileIdentity68
+        {
+            internal HashSet<string> Points = new HashSet<string>(StringComparer.Ordinal);
+            internal HashSet<string> Segments = new HashSet<string>(StringComparer.Ordinal);
+            internal HashSet<string> Dimensions = new HashSet<string>(StringComparer.Ordinal);
+            internal int[] RelationTypes;
+            internal int SupportKind;
+        }
+
+        private sealed class NativeProfilePrimitive68
+        {
+            internal SketchPrimitiveSnapshot58 Geometry;
+            internal string StartKey, EndKey, CenterKey;
+        }
+
+        // Editing an absorbed profile is not equivalent to replacing an input
+        // sketch. Its segment/point IDs are part of the native flange attachment.
+        // Retain those identities, relations and dimensions. A USEEDGE conflict
+        // rejects this native direction BEFORE any point is changed. Removing
+        // that binding also produced owner error51 even with all IDs retained.
+        private static NativeProfileIdentity68 MoveNativeFlangeProfilePoints68(
+            MirrorInPlaceExecutionContextV7 context, FeatureReplayCheckpointV7 item, Sketch editing,
+            FlangePair33 pair, FlangeGuide61 guide, double normalOffset, bool nativeProfilesRebound68)
         {
             var model = context.WorkingDocument;
-            var profile = ResolveNativeFlangeDriver65(context, item, reference);
-            if (!item.WasNativeReplacement || editing == null ||
-                !SameCom28(model.SketchManager.ActiveSketch, editing) ||
-                !SameCom28(profile.GetSpecificFeature2(), editing))
-                throw new System.IO.InvalidDataException("FLANGE66 constraint cleanup is restricted to a newly recreated, active native driver.");
-            var manager = editing.RelationManager;
-            int before = manager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
-            MirrorV7Diagnostics.Log("[FLANGE66][DETACH_BEGIN] profile=" + profile.Name + " relations=" + before);
-            if (before > 0 && !manager.DeleteAllRelations())
-                throw new System.IO.InvalidDataException("FLANGE66 could not remove disposable native profile relations; segments retained.");
-            if (manager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll) != 0)
-                throw new System.IO.InvalidDataException("FLANGE66 native profile relations remain; segments retained.");
-
-            // Logical relation deletion does not guarantee dimension deletion.
-            // Resolve the feature/first dimension afresh after every deletion;
-            // never retain annotation handles across another native deletion.
-            var removed = new HashSet<string>(StringComparer.Ordinal);
-            while (true)
+            if (!nativeProfilesRebound68 || editing == null || editing.Is3D() ||
+                !SameCom28(model.SketchManager.ActiveSketch, editing))
+                throw new System.IO.InvalidDataException("FLANGE68 point mutation requires a newly bound, active native driver.");
+            var math = (IMathUtility)context.SwApp.GetMathUtility();
+            var modelToSketch = editing.ModelToSketchTransform as MathTransform;
+            if (modelToSketch == null) throw new InvalidOperationException("FLANGE68 native profile frame unavailable.");
+            var native = CaptureNativeProfilePrimitives68(math, editing);
+            var currentFrame = FlangeGuideFrame61.FromPoints(pair.Start, pair.End,
+                GuidePoints61(native.Select(p => p.Geometry)).ToList(), ProfileAxis60(math, modelToSketch, 2));
+            Func<SketchPrimitiveSnapshot58, double[], FlangeIdentityPrimitive68> canonical = (p, outward) =>
             {
-                profile = ResolveNativeFlangeDriver65(context, item, reference);
-                var display = profile.GetFirstDisplayDimension() as DisplayDimension;
-                if (display == null) break;
-                var dimension = display.GetDimension2(0) as Dimension;
-                var annotation = display.GetAnnotation() as Annotation;
-                if (dimension == null || annotation == null || !removed.Add(dimension.FullName))
-                    throw new System.IO.InvalidDataException("FLANGE66 disposable dimension identity is missing/repeated; no segment deletion attempted.");
-                model.ClearSelection2(true);
-                if (!annotation.Select3(false, null) || !model.Extension.DeleteSelection2(0))
-                    throw new System.IO.InvalidDataException("FLANGE66 could not delete a disposable profile dimension; segments retained.");
-                model.ClearSelection2(true);
+                Func<double[], double[]> convert = value => value == null ? null : new[] {
+                    Dot60(FlangeGuideFrame61.Subtract(value, pair.Start), guide.Frame.Hinge),
+                    Dot60(FlangeGuideFrame61.Subtract(value, pair.Start), outward) };
+                return new FlangeIdentityPrimitive68 { Type = p.Type, Construction = p.Construction,
+                    Circle = p.Circle, Start = convert(p.StartModel), End = convert(p.EndModel),
+                    Center = convert(p.CenterModel), Middle = convert(p.MiddleModel) };
+            };
+            var current = native.Select(p => {
+                var value = canonical(p.Geometry, currentFrame.Outward);
+                value.StartKey = p.StartKey; value.EndKey = p.EndKey; value.CenterKey = p.CenterKey;
+                return value;
+            }).ToList();
+            var target = guide.Profile.Select(p => canonical(p, guide.Frame.Outward)).ToList();
+            // Complete correspondence is decided BEFORE the first SetCoords.
+            // The directed frames remove axis conventions; normalization is only
+            // a topology matcher, never a tolerance/geometry acceptance shortcut.
+            var moves = FlangeIdentityGeometry68.Plan(current, target);
+            var desired = new Dictionary<string, double[]>(StringComparer.Ordinal);
+            foreach (var move in moves)
+            {
+                var primitive = guide.Profile[move.TargetPrimitive];
+                double[] world = move.TargetRole == 0 ? primitive.StartModel :
+                    move.TargetRole == 1 ? primitive.EndModel : primitive.CenterModel;
+                double[] local = SketchMutationMathV7.Transform(math, modelToSketch, world);
+                RequireFiniteProfilePoint68(local);
+                if (Math.Abs(local[2] - normalOffset) > 1e-7)
+                    throw new InvalidOperationException("FLANGE68 guide point is off the native support plane.");
+                desired.Add(move.PointKey, new[] { local[0], local[1], 0.0 });
             }
-            MirrorV7Diagnostics.Log("[FLANGE66][DETACH_END] profile=" + profile.Name +
-                " relationsAfter=0 dimensionsRemoved=" + removed.Count + " sourceConstraintsUntouched=True");
+            var before = CaptureNativeProfileIdentity68(context, editing);
+            var original = NativeProfilePoints68(editing);
+            if (desired.Keys.Any(key => !original.ContainsKey(key)))
+                throw new InvalidOperationException("FLANGE68 native move ID does not resolve; no point was moved.");
+            RequireCompatibleNativeUseEdges68(editing, desired);
+            MirrorV7Diagnostics.Log("[FLANGE68][PLAN] feature=" + item.Feature.Name +
+                " points=" + desired.Count + " primitives=" + native.Count +
+                " unique=True pointAndSegmentIdsRetained=True dimensionsRetained=True");
+            bool mutationStarted = false;
+            try
+            {
+                foreach (var move in desired)
+                {
+                    // A previous solver step may move connected points. Reacquire
+                    // by ID, not a cached point wrapper or array index.
+                    var live = NativeProfilePoints68(editing);
+                    SketchPoint point;
+                    if (!live.TryGetValue(move.Key, out point))
+                        throw new System.IO.InvalidDataException("FLANGE68 native point disappeared during mutation: " + move.Key);
+                    var actual = new[] { point.X, point.Y, point.Z };
+                    RequireFiniteProfilePoint68(actual);
+                    if (Distance(actual, move.Value) <= 1e-7) continue;
+                    MirrorV7Diagnostics.Log("[FLANGE68][POINT_MOVE_BEGIN] id=" + move.Key +
+                        " currentLocal_m=" + string.Join(",", actual) + " targetLocal_m=" + string.Join(",", move.Value));
+                    mutationStarted = true;
+                    if (!point.SetCoords(move.Value[0], move.Value[1], move.Value[2]))
+                        throw new System.IO.InvalidDataException("FLANGE68 SetCoords rejected point=" + move.Key +
+                            "; native constraints retained; no deletion/recreation fallback.");
+                }
+                // SetCoords adheres to native constraints. True does not prove
+                // all points stayed at their requested positions after solving.
+                var readback = NativeProfilePoints68(editing);
+                double residual = 0;
+                foreach (var move in desired)
+                {
+                    SketchPoint point;
+                    if (!readback.TryGetValue(move.Key, out point))
+                        throw new System.IO.InvalidDataException("FLANGE68 readback point ID missing: " + move.Key);
+                    var actual = new[] { point.X, point.Y, point.Z };
+                    RequireFiniteProfilePoint68(actual);
+                    double error = Distance(actual, move.Value);
+                    residual = Math.Max(residual, error);
+                    if (error > 1e-7)
+                        throw new System.IO.InvalidDataException("FLANGE68 native solver displaced point=" + move.Key +
+                            " residual_m=" + error + "; staging retained, owner rebuild not attempted.");
+                }
+                RequireNativeProfileIdentity68(context, editing, before, "ACTIVE_POINT_READBACK");
+                MirrorV7Diagnostics.Log("[FLANGE68][POINT_READBACK] maxResidual_m=" + residual +
+                    " segmentsDeleted=0 relationsDeleted=0 dimensionsDeleted=0 bodyVerificationPending=True");
+                return before;
+            }
+            catch (Exception ex)
+            {
+                MirrorV7Diagnostics.Log("[FLANGE68][POINT_STOP] mutationStarted=" + mutationStarted +
+                    " reason=" + ex.Message + " bodyVerificationPending=True");
+                // A half-mutated driver is not a direction candidate. Stop before
+                // closing/rebuilding it or trying another set of native options.
+                if (mutationStarted && !IsUnsafeNativeFailure66(ex))
+                    throw new System.IO.InvalidDataException("FLANGE68 interrupted native point transaction.", ex);
+                throw;
+            }
+        }
+
+        private static void RequireCompatibleNativeUseEdges68(Sketch sketch, Dictionary<string, double[]> desired)
+        {
+            var manager = sketch.RelationManager;
+            var owned = (sketch.GetSketchSegments() as object[] ?? new object[0]).Cast<SketchSegment>().ToList();
+            Func<SketchRelation, string> signature = relation => {
+                if (relation.GetRelationType() != (int)swConstraintType_e.swConstraintType_USEEDGE) return null;
+                var bound = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var candidate in (relation.GetEntities() as object[] ?? new object[0]).OfType<SketchSegment>())
+                {
+                    // GetEntities may return a different COM proxy even for the
+                    // real local segment (observed in SW2024). GetID is unique
+                    // WITHIN its owning sketch, not globally. Resolve that tuple
+                    // against owned geometry and verify the sketch identity; a
+                    // solver-only ID such as the USEEDGE proxy is not in this set.
+                    string candidateKey = candidate.GetType() + ":" + SegmentKey45(candidate);
+                    var segment = owned.SingleOrDefault(s => s.GetType() + ":" + SegmentKey45(s) == candidateKey);
+                    if (segment == null || !SameCom28(candidate.GetSketch(), sketch)) continue;
+                    var keys = new List<string>();
+                    var line = segment as ISketchLine;
+                    var arc = segment as ISketchArc;
+                    if (line != null) {
+                        keys.Add(NativePointKey68(line.GetStartPoint2() as SketchPoint));
+                        keys.Add(NativePointKey68(line.GetEndPoint2() as SketchPoint));
+                    }
+                    else if (arc != null) {
+                        keys.Add(NativePointKey68(arc.GetStartPoint2() as SketchPoint));
+                        keys.Add(NativePointKey68(arc.GetCenterPoint2() as SketchPoint));
+                        if (arc.IsCircle() == 0) keys.Add(NativePointKey68(arc.GetEndPoint2() as SketchPoint));
+                    }
+                    var points = NativeProfilePoints68(sketch);
+                    if (keys.Any(key => desired.ContainsKey(key) && Distance(
+                        new[] { points[key].X, points[key].Y, points[key].Z }, desired[key]) > 1e-7))
+                        bound.Add(segment.GetType() + ":" + SegmentKey45(segment));
+                }
+                return bound.Count == 0 ? null : string.Join("|", bound.OrderBy(key => key, StringComparer.Ordinal));
+            };
+            var plans = (manager.GetRelations((int)swSketchRelationFilterType_e.swAll) as object[] ?? new object[0])
+                .Cast<SketchRelation>().Select(signature).Where(key => key != null).ToList();
+            if (plans.Count > 0)
+            {
+                MirrorV7Diagnostics.Log("[FLANGE68][DIRECTION_INCOMPATIBLE] ownedSegmentIds=" + string.Join(";", plans) +
+                    " reason=USEEDGE_ANCHOR_CONFLICT pointWrites=0 relationsDeleted=0 nativeReferencesPreserved=True");
+                // This is an untouched geometric candidate, not a failed native
+                // transaction. Let the finite native flag search try its next
+                // state; never force a bound root to the other side of the hinge.
+                throw new InvalidOperationException("FLANGE68 native USEEDGE anchors conflict with this reflected guide direction; no profile mutation performed.");
+            }
+            MirrorV7Diagnostics.Log("[FLANGE68][USEEDGE_COMPATIBLE] pointWrites=0 relationsDeleted=0");
+        }
+
+        private static string NativePointKey68(SketchPoint point)
+        {
+            var id = point == null ? null : point.GetID() as int[];
+            if (id == null || id.Length != 2)
+                throw new InvalidOperationException("FLANGE68 native sketch point ID unavailable.");
+            return string.Join(":", id);
+        }
+
+        private static void RequireFiniteProfilePoint68(double[] point)
+        {
+            if (point == null || point.Length != 3 || point.Any(v => double.IsNaN(v) || double.IsInfinity(v)))
+                throw new InvalidOperationException("FLANGE68 non-finite native profile coordinates.");
+        }
+
+        private static Dictionary<string, SketchPoint> NativeProfilePoints68(Sketch sketch)
+        {
+            var points = new Dictionary<string, SketchPoint>(StringComparer.Ordinal);
+            Action<SketchPoint> add = point => {
+                string key = NativePointKey68(point);
+                SketchPoint previous;
+                if (points.TryGetValue(key, out previous))
+                {
+                    if (!SameCom28(previous, point))
+                        throw new InvalidOperationException("FLANGE68 duplicate native point ID: " + key);
+                    return;
+                }
+                points.Add(key, point);
+            };
+            // Include hidden native sketch points as well as segment endpoints.
+            foreach (object value in sketch.GetSketchPoints2() as object[] ?? new object[0]) add(value as SketchPoint);
+            foreach (object value in sketch.GetSketchSegments() as object[] ?? new object[0])
+            {
+                var segment = value as SketchSegment;
+                if (segment == null) throw new InvalidOperationException("FLANGE68 native segment unavailable.");
+                if (segment.GetType() == (int)swSketchSegments_e.swSketchLINE)
+                {
+                    var line = segment as ISketchLine;
+                    if (line == null) throw new InvalidOperationException("FLANGE68 native line interface unavailable.");
+                    add(line.GetStartPoint2() as SketchPoint); add(line.GetEndPoint2() as SketchPoint);
+                }
+                else if (segment.GetType() == (int)swSketchSegments_e.swSketchARC)
+                {
+                    var arc = segment as ISketchArc;
+                    if (arc == null) throw new InvalidOperationException("FLANGE68 native arc interface unavailable.");
+                    add(arc.GetCenterPoint2() as SketchPoint); add(arc.GetStartPoint2() as SketchPoint);
+                    if (arc.IsCircle() == 0) add(arc.GetEndPoint2() as SketchPoint);
+                }
+                else throw new InvalidOperationException("FLANGE68 native primitive requires a dedicated identity-preserving adapter.");
+            }
+            return points;
+        }
+
+        private static List<NativeProfilePrimitive68> CaptureNativeProfilePrimitives68(IMathUtility math, Sketch sketch)
+        {
+            var toModel = ((MathTransform)sketch.ModelToSketchTransform).Inverse() as MathTransform;
+            if (toModel == null) throw new InvalidOperationException("FLANGE68 inverse profile frame unavailable.");
+            Func<SketchPoint, double[]> world = point => {
+                NativePointKey68(point);
+                var local = new[] { point.X, point.Y, point.Z };
+                RequireFiniteProfilePoint68(local);
+                var result = SketchMutationMathV7.Transform(math, toModel, local);
+                RequireFiniteProfilePoint68(result);
+                return result;
+            };
+            var result68 = new List<NativeProfilePrimitive68>();
+            foreach (object value in sketch.GetSketchSegments() as object[] ?? new object[0])
+            {
+                var segment = value as SketchSegment;
+                if (segment == null) throw new InvalidOperationException("FLANGE68 native profile segment missing.");
+                var p = new SketchPrimitiveSnapshot58 { Type = segment.GetType(),
+                    Construction = segment.ConstructionGeometry, Length = segment.GetLength() };
+                var entry = new NativeProfilePrimitive68 { Geometry = p };
+                SketchPoint start, end, center;
+                if (p.Type == (int)swSketchSegments_e.swSketchLINE)
+                {
+                    var line = segment as ISketchLine;
+                    if (line == null) throw new InvalidOperationException("FLANGE68 native line interface missing.");
+                    start = line.GetStartPoint2() as SketchPoint; end = line.GetEndPoint2() as SketchPoint;
+                    entry.StartKey = NativePointKey68(start); entry.EndKey = NativePointKey68(end);
+                    p.StartModel = world(start); p.EndModel = world(end);
+                }
+                else if (p.Type == (int)swSketchSegments_e.swSketchARC)
+                {
+                    var arc = segment as ISketchArc;
+                    if (arc == null) throw new InvalidOperationException("FLANGE68 native arc interface missing.");
+                    p.Circle = arc.IsCircle() != 0;
+                    start = arc.GetStartPoint2() as SketchPoint; center = arc.GetCenterPoint2() as SketchPoint;
+                    entry.StartKey = NativePointKey68(start); entry.CenterKey = NativePointKey68(center);
+                    p.StartModel = world(start); p.CenterModel = world(center);
+                    if (!p.Circle)
+                    {
+                        end = arc.GetEndPoint2() as SketchPoint;
+                        entry.EndKey = NativePointKey68(end); p.EndModel = world(end);
+                        double radius = arc.GetRadius();
+                        if (!(radius > 0) || double.IsInfinity(radius))
+                            throw new InvalidOperationException("FLANGE68 native arc radius invalid.");
+                        double angle = p.Length / radius * .5 * (arc.GetRotationDir() >= 0 ? 1 : -1);
+                        double x = start.X - center.X, y = start.Y - center.Y;
+                        p.MiddleModel = SketchMutationMathV7.Transform(math, toModel, new[] {
+                            center.X + x * Math.Cos(angle) - y * Math.Sin(angle),
+                            center.Y + x * Math.Sin(angle) + y * Math.Cos(angle), center.Z });
+                        RequireFiniteProfilePoint68(p.MiddleModel);
+                    }
+                }
+                else throw new InvalidOperationException("FLANGE68 unsupported profile type=" + p.Type + "; original entities retained.");
+                result68.Add(entry);
+            }
+            return result68;
+        }
+
+        private static NativeProfileIdentity68 CaptureNativeProfileIdentity68(MirrorInPlaceExecutionContextV7 context, Sketch sketch)
+        {
+            if (sketch == null) throw new System.IO.InvalidDataException("FLANGE68 native profile missing during identity audit.");
+            var result = new NativeProfileIdentity68();
+            result.Points.UnionWith(NativeProfilePoints68(sketch).Keys);
+            foreach (object value in sketch.GetSketchSegments() as object[] ?? new object[0])
+            {
+                var segment = value as SketchSegment;
+                var id = segment == null ? null : segment.GetID() as int[];
+                if (id == null || id.Length != 2)
+                    throw new System.IO.InvalidDataException("FLANGE68 native segment ID unavailable.");
+                string key = segment.GetType() + ":" + string.Join(":", id) + ":" + segment.ConstructionGeometry;
+                if (!result.Segments.Add(key)) throw new System.IO.InvalidDataException("FLANGE68 duplicate native segment identity.");
+            }
+            int kind = 0;
+            sketch.GetReferenceEntity(ref kind);
+            result.SupportKind = kind;
+            var manager = sketch.RelationManager;
+            var relations = manager.GetRelations((int)swSketchRelationFilterType_e.swAll) as object[] ?? new object[0];
+            if (relations.Length != manager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll))
+                throw new System.IO.InvalidDataException("FLANGE68 native relation audit incomplete.");
+            result.RelationTypes = relations.Select(value => ((SketchRelation)value).GetRelationType()).OrderBy(value => value).ToArray();
+            var feature = FindSketchOwner28(context.WorkingDocument, sketch);
+            var display = feature.GetFirstDisplayDimension() as DisplayDimension;
+            while (display != null)
+            {
+                var dimension = display.GetDimension2(0) as Dimension;
+                if (dimension == null || !result.Dimensions.Add(dimension.FullName))
+                    throw new System.IO.InvalidDataException("FLANGE68 native dimension audit incomplete/repeated.");
+                display = feature.GetNextDisplayDimension(display) as DisplayDimension;
+            }
+            return result;
+        }
+
+        private static void RequireNativeProfileIdentity68(MirrorInPlaceExecutionContextV7 context, Sketch sketch,
+            NativeProfileIdentity68 expected, string stage)
+        {
+            var actual = CaptureNativeProfileIdentity68(context, sketch);
+            if (expected == null || !actual.Points.SetEquals(expected.Points) ||
+                !actual.Segments.SetEquals(expected.Segments) || !actual.Dimensions.SetEquals(expected.Dimensions) ||
+                !actual.RelationTypes.SequenceEqual(expected.RelationTypes) || actual.SupportKind != expected.SupportKind)
+                throw new System.IO.InvalidDataException("FLANGE68 native profile identity changed at " + stage +
+                    "; no owner retry/body acceptance attempted.");
+            MirrorV7Diagnostics.Log("[FLANGE68][IDENTITY_PASS] stage=" + stage +
+                " points=" + actual.Points.Count + " segments=" + actual.Segments.Count +
+                " relations=" + actual.RelationTypes.Length + " dimensions=" + actual.Dimensions.Count +
+                " supportKind=" + actual.SupportKind + " bodyVerificationPending=True");
         }
 
         private static void RequireHealthyNativeFlange66(Feature feature, string stage)

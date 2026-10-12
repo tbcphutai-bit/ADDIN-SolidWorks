@@ -17,8 +17,16 @@ namespace ADDIN.Helpers
         public double[] PlaneOrigin;
         public double[] PlaneNormal;
     }
+    // A contour or region of its sketch that an extrusion uses: start, middle and
+    // end of every boundary edge, in model space.
+    public sealed class SelectedContour71
+    {
+        public bool Region;
+        public double[][][] Edges;
+    }
     public sealed class CutAuditSnapshot21
     {
+        public List<SelectedContour71> SelectedContours71;
         public SketchSupportSnapshot20 BeforeSupport;
         public List<SketchPrimitiveSnapshot58> BeforePrimitives53;
         public string CaptureError;
@@ -28,6 +36,7 @@ namespace ADDIN.Helpers
         public string CircleInvariant26;
         public List<SketchPointSnapshot> CirclePoints26;
         public List<RelationReference30> References30;
+        public List<ConvertedEdge71> ConvertedEdges71 = new List<ConvertedEdge71>();
         public string ProfileKind50;
         public int SegmentCount50;
         public int ContourCount50;
@@ -54,6 +63,14 @@ namespace ADDIN.Helpers
         public double[][] ReferenceEdgeSamples;
         public SketchSupportSnapshot20 ReferenceFace;
         public string CaptureError;
+    }
+    // A sketch segment that is a copy of a model edge (On Edge / Offset Edge) and is
+    // not a line or an arc: which relation, which entity of it is the edge, and the
+    // edge as model-space samples of the source.
+    public sealed class ConvertedEdge71
+    {
+        public int Relation, Entity, RelationCount, RelationType;
+        public double[][] EdgeSamples;
     }
     public sealed class RelationReference30
     {
@@ -106,6 +123,17 @@ namespace ADDIN.Helpers
         public double[] EndModel;
         public double[] CenterModel;
         public double[] MiddleModel;
+        // A spline: 129 points along it in model space (null when it could not be read).
+        public double[][] SamplesModel;
+        // A spline, when its curve hands it out: order, knots and control points
+        // (model space) of the non-rational, non-periodic B-curve it is.
+        public int SplineOrder;
+        public double[] SplineKnots;
+        public double[][] SplineControlModel;
+        // Weights of the control points when the B-curve is rational (null otherwise), and whether
+        // SOLIDWORKS hands its control points out multiplied by them.
+        public double[] SplineWeights;
+        public bool SplineHomogeneous;
     }
 
     public sealed class SketchPointMoveRejected58 : InvalidOperationException
@@ -167,6 +195,13 @@ namespace ADDIN.Helpers
                             entry.MiddleModel = PrimitiveLocalToModel58(math, sketchToModel, middleLocal);
                         }
                     }
+                    else if (entry.Type == (int)swSketchSegments_e.swSketchSPLINE)
+                    {
+                        entry.SamplesModel = SplineSamplesModel58(math, sketchToModel, segment, 129);
+                        entry.StartModel = entry.SamplesModel[0];
+                        entry.EndModel = entry.SamplesModel[entry.SamplesModel.Length - 1];
+                        CaptureSplineDefinition58(math, sketchToModel, segment, entry);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -178,6 +213,333 @@ namespace ADDIN.Helpers
                 result.Add(entry);
             }
             return result;
+        }
+
+        // Points along a sketch spline in model space, evenly in the parameter of
+        // its curve. The curve of a sketch segment is handed out in the space of
+        // its sketch (natively, on a 2D sketch, its first point was the first
+        // spline point in sketch coordinates). The curve of a sketch segment need
+        // not end where the segment ends (it does not for an arc), so the chords
+        // of the samples must add up to the length of the segment and the samples
+        // must start and end on the first and last point of the spline.
+        internal static double[][] SplineSamplesModel58(IMathUtility math, MathTransform sketchToModel, SketchSegment segment, int count)
+        {
+            var curve = segment.GetCurve() as Curve;
+            double a, b; bool closed, periodic;
+            if (curve == null || !curve.GetEndParams(out a, out b, out closed, out periodic) || closed)
+                throw new InvalidOperationException("SPLINE58: Spline curve unavailable or closed.");
+            double[][] local = Enumerable.Range(0, count).Select(i =>
+            {
+                var p = curve.Evaluate2(a + (b - a) * i / (count - 1), 0) as double[];
+                RequirePoint25(p);
+                return new[] { p[0], p[1], p[2] };
+            }).ToArray();
+            Func<double[], double[], double> distance = (p, q) => Math.Sqrt((p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]) + (p[2] - q[2]) * (p[2] - q[2]));
+            double chords = Enumerable.Range(1, count - 1).Sum(i => distance(local[i - 1], local[i])), length = segment.GetLength();
+            if (Math.Abs(chords - length) > Math.Max(1e-6, length * 2e-3))
+                throw new InvalidOperationException("SPLINE58: Spline samples do not span the segment. chords_m=" + chords.ToString("R") + " length_m=" + length.ToString("R"));
+            var spline = segment as SketchSpline;
+            var points = spline == null ? null : spline.GetPoints2() as object[];
+            if (points == null || points.Length < 2) throw new InvalidOperationException("SPLINE58: Spline points unavailable.");
+            double[] first = { ((SketchPoint)points[0]).X, ((SketchPoint)points[0]).Y, ((SketchPoint)points[0]).Z };
+            double[] last = { ((SketchPoint)points[points.Length - 1]).X, ((SketchPoint)points[points.Length - 1]).Y, ((SketchPoint)points[points.Length - 1]).Z };
+            double ends = Math.Min(Math.Max(distance(local[0], first), distance(local[count - 1], last)), Math.Max(distance(local[0], last), distance(local[count - 1], first)));
+            if (ends > 1e-6) throw new InvalidOperationException("SPLINE58: Spline samples do not end on the spline points. residual_m=" + ends.ToString("R"));
+            return local.Select(p => PrimitiveLocalToModel58(math, sketchToModel, p)).ToArray();
+        }
+
+        // The spline as the B-curve it is, so that it can be made again exactly: a
+        // spline drawn through sample points is another curve between the points
+        // (natively 0.5 mm shorter over 2981 mm with 65 points, and a Curve Driven
+        // Pattern with equal spacing along it put its last instance 0.25 mm off).
+        // The curve may be rational; asked for without weights, an 8-point spline
+        // came back 0.365 mm from itself. How SOLIDWORKS stores weighted control
+        // points is not assumed: the definition is evaluated here, both ways, at the
+        // parameters the samples were taken at, and kept only when it gives the
+        // samples back and spans exactly the segment.
+        private static void CaptureSplineDefinition58(IMathUtility math, MathTransform sketchToModel, SketchSegment segment, SketchPrimitiveSnapshot58 entry)
+        {
+            SplineParamData data = null;
+            try
+            {
+                var curve = segment.GetCurve() as Curve;
+                double a, b; bool closed, periodic;
+                if (curve == null || !curve.GetEndParams(out a, out b, out closed, out periodic)) return;
+                data = curve.GetBCurveParams5(false, false, true, false) as SplineParamData;
+                object controlObject = null, knotObject = null;
+                if (data == null || (data.Dimension != 3 && data.Dimension != 4) || data.Periodic != 0 ||
+                    !data.GetControlPoints(out controlObject) || !data.GetKnotPoints(out knotObject)) return;
+                int dimension = data.Dimension, count = data.ControlPointsCount, order = data.Order;
+                var control = controlObject as double[]; var knots = knotObject as double[];
+                if (control == null || knots == null || count < 2 || control.Length != dimension * count || knots.Length != count + order) return;
+                bool spansSegment = Math.Abs(knots[order - 1] - a) <= 1e-12 * Math.Max(1, Math.Abs(a)) && Math.Abs(knots[count] - b) <= 1e-12 * Math.Max(1, Math.Abs(b));
+                double best = double.PositiveInfinity; double[][] bestModel = null; double[] bestWeights = null; bool bestHomogeneous = false;
+                foreach (bool homogeneous in dimension == 4 ? new[] { false, true } : new[] { false })
+                {
+                    double[] weights = dimension == 4 ? Enumerable.Range(0, count).Select(i => control[4 * i + 3]).ToArray() : null;
+                    if (weights != null && weights.Any(w => !(w > 0))) continue;
+                    double[][] model = Enumerable.Range(0, count).Select(i =>
+                    {
+                        double scale = homogeneous ? weights[i] : 1.0;
+                        return PrimitiveLocalToModel58(math, sketchToModel, new[] { control[dimension * i] / scale, control[dimension * i + 1] / scale, control[dimension * i + 2] / scale });
+                    }).ToArray();
+                    double off = DefinitionDeviation58(order, knots, model, weights, entry.SamplesModel);
+                    if (off < best) { best = off; bestModel = model; bestWeights = weights; bestHomogeneous = homogeneous; }
+                }
+                // The parameter of the curve need not be the parameter of its B-curve
+                // (natively the knots of three splines did not span the end
+                // parameters of their curves, and the definition was the curve all
+                // the same); what counts is that the definition gives the samples back.
+                bool kept = best <= 1e-6;
+                CreateMirrorPartPackage.LogDebug("[SPLINE58][DEFINITION] order=" + order + " controlPoints=" + count + " knots=" + knots.Length + " rational=" + (dimension == 4) +
+                    " weightedControlPoints=" + bestHomogeneous + " spansSegment=" + spansSegment +
+                    " givesSamplesBack_m=" + best.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) + " kept=" + kept);
+                if (!kept) return;
+                entry.SplineOrder = order; entry.SplineKnots = knots; entry.SplineControlModel = bestModel;
+                entry.SplineWeights = bestWeights; entry.SplineHomogeneous = bestHomogeneous;
+            }
+            catch (Exception ex)
+            {
+                CreateMirrorPartPackage.LogDebug("[SPLINE58][DEFINITION] unavailable reason=" + ex.Message);
+            }
+            finally
+            {
+                // Not released by hand: with an explicit release here SOLIDWORKS ended with a
+                // corrupted heap half a minute into four of nine native runs.
+                GC.KeepAlive(data);
+            }
+        }
+
+        // How far a B-curve definition is from samples taken along the curve it is
+        // said to be. Point by point when the samples are spread over its parameter
+        // range the way they were taken (either direction); otherwise every sample
+        // against the curve drawn finely (which a wrong reading of the weights fails
+        // by tenths of a millimetre, natively 0.365 mm).
+        private static double DefinitionDeviation58(int order, double[] knots, double[][] points, double[] weights, double[][] samples)
+        {
+            double lo = knots[order - 1], hi = knots[points.Length];
+            Func<double[], double[], double> distance = (p, q) => Math.Sqrt((p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]) + (p[2] - q[2]) * (p[2] - q[2]));
+            int last = samples.Length - 1;
+            double forward = 0, backward = 0;
+            for (int s = 0; s <= last; s++)
+            {
+                double[] p = EvaluateBSpline58(order, knots, points, weights, lo + (hi - lo) * s / last);
+                forward = Math.Max(forward, distance(p, samples[s]));
+                backward = Math.Max(backward, distance(p, samples[last - s]));
+            }
+            double pointwise = Math.Min(forward, backward);
+            if (pointwise <= 1e-9) return pointwise;
+            double[][] fine = Enumerable.Range(0, 8193).Select(k => EvaluateBSpline58(order, knots, points, weights, lo + (hi - lo) * k / 8192.0)).ToArray();
+            return Math.Min(pointwise, PolylineDeviation58(samples, fine));
+        }
+
+        // One point of a B-curve (weights null: not rational) at parameter u.
+        private static double[] EvaluateBSpline58(int order, double[] knots, double[][] points, double[] weights, double u)
+        {
+            int n = points.Length, p = order - 1, span = p;
+            u = Math.Max(knots[p], Math.Min(knots[n], u));
+            while (span < n - 1 && u >= knots[span + 1]) span++;
+            var basis = new double[p + 1]; var left = new double[p + 1]; var right = new double[p + 1];
+            basis[0] = 1;
+            for (int j = 1; j <= p; j++)
+            {
+                left[j] = u - knots[span + 1 - j]; right[j] = knots[span + j] - u;
+                double saved = 0;
+                for (int r = 0; r < j; r++)
+                {
+                    double denominator = right[r + 1] + left[j - r];
+                    double term = denominator == 0 ? 0 : basis[r] / denominator;
+                    basis[r] = saved + right[r + 1] * term;
+                    saved = left[j - r] * term;
+                }
+                basis[j] = saved;
+            }
+            double x = 0, y = 0, z = 0, w = 0;
+            for (int j = 0; j <= p; j++)
+            {
+                int i = span - p + j; double weight = weights == null ? 1 : weights[i];
+                x += basis[j] * weight * points[i][0]; y += basis[j] * weight * points[i][1]; z += basis[j] * weight * points[i][2]; w += basis[j] * weight;
+            }
+            return new[] { x / w, y / w, z / w };
+        }
+
+        private sealed class EdgeSpline71
+        {
+            internal int Order; internal double[] Knots, Weights; internal bool Homogeneous;
+            internal double[][] Control;   // in the sketch
+            internal double Deviation;
+        }
+
+        // The piece of a body edge a source spline ran along, as a B-curve in the
+        // sketch. The mirrored body is the mirror image only within the accepted
+        // local deviation; a profile that has to share an edge with it (natively a
+        // Boss beside a sheet, whose side is a spline fitted to the sheet edge) must
+        // lie on the edge of the body as it is, not on the exact mirror image of
+        // the source edge, or the two do not meet and the Boss stays a body of its
+        // own. Null when no edge of the solid bodies holds every reflected point of
+        // the spline within that deviation.
+        private static EdgeSpline71 SplineOnBodyEdge71(ModelDoc2 model, IMathUtility math, MathTransform modelToSketch,
+            SketchPrimitiveSnapshot58 source, PlaneData plane, bool alreadyReflected)
+        {
+            double limit = NativeBodyCoincidence67.LocalDeviationLimit71;
+            double[][] wanted = source.SamplesModel.Select(p => alreadyReflected ? p : ReflectReference30(p, plane)).ToArray();
+            Func<double[], double[], double> distance = (p, q) => Math.Sqrt((p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]) + (p[2] - q[2]) * (p[2] - q[2]));
+            Func<Edge, double[], double[]> nearest = (edge, p) =>
+            {
+                var q = edge.GetClosestPointOn(p[0], p[1], p[2]) as double[];
+                return q == null || q.Length < 3 ? null : new[] { q[0], q[1], q[2] };
+            };
+            Func<Edge, double[], double> off = (edge, p) => { double[] q = nearest(edge, p); return q == null ? double.PositiveInfinity : distance(p, q); };
+            Edge best = null; double bestOff = double.PositiveInfinity; int edges = 0;
+            foreach (Body2 body in ((PartDoc)model).GetBodies2((int)swBodyType_e.swSolidBody, true) as object[] ?? new object[0])
+                foreach (Edge edge in body.GetEdges() as object[] ?? new object[0])
+                {
+                    edges++;
+                    if (off(edge, wanted[0]) > limit || off(edge, wanted[wanted.Length - 1]) > limit || off(edge, wanted[wanted.Length / 2]) > limit) continue;
+                    double worst = wanted.Max(p => off(edge, p));
+                    if (worst < bestOff) { bestOff = worst; best = edge; }
+                }
+            if (best == null || bestOff > limit)
+            {
+                CreateMirrorPartPackage.LogDebug("[SPLINE71][BODY_EDGE] edges=" + edges + " found=False nearest_m=" + bestOff.ToString("E2", System.Globalization.CultureInfo.InvariantCulture));
+                return null;
+            }
+            SplineParamData data = null;
+            try
+            {
+                double[] from = nearest(best, wanted[0]), to = nearest(best, wanted[wanted.Length - 1]);
+                var whole = best.GetCurve() as Curve;
+                Curve piece = whole == null ? null : whole.CreateTrimmedCurve2(from[0], from[1], from[2], to[0], to[1], to[2]) as Curve;
+                bool otherWay = false;
+                if (piece == null && whole != null)
+                {
+                    piece = whole.CreateTrimmedCurve2(to[0], to[1], to[2], from[0], from[1], from[2]) as Curve;
+                    otherWay = piece != null;
+                }
+                double a = 0, b = 0; bool closed = false, periodic = false;
+                if (piece == null || !piece.GetEndParams(out a, out b, out closed, out periodic))
+                {
+                    var range = best.GetCurveParams2() as double[];
+                    CreateMirrorPartPackage.LogDebug("[SPLINE71][BODY_EDGE] edges=" + edges + " found=True onEdge_m=" + bestOff.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                        " curve=" + (whole != null) + " pieceBetweenEnds=" + (piece != null) + " curveType=" + (whole == null ? -1 : whole.Identity()) +
+                        (range == null || range.Length < 6 ? "" : " edgeStartToSplineEnds_m=" + Math.Min(distance(new[] { range[0], range[1], range[2] }, from), distance(new[] { range[0], range[1], range[2] }, to)).ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                            " edgeEndToSplineEnds_m=" + Math.Min(distance(new[] { range[3], range[4], range[5] }, from), distance(new[] { range[3], range[4], range[5] }, to)).ToString("E2", System.Globalization.CultureInfo.InvariantCulture)) +
+                        " usable=False");
+                    return null;
+                }
+                double[][] onPiece = Enumerable.Range(0, 129).Select(s =>
+                {
+                    var p = piece.Evaluate2(a + (b - a) * s / 128.0, 0) as double[];
+                    RequirePoint25(p);
+                    return new[] { p[0], p[1], p[2] };
+                }).ToArray();
+                double ends = Math.Min(Math.Max(distance(onPiece[0], from), distance(onPiece[128], to)), Math.Max(distance(onPiece[0], to), distance(onPiece[128], from)));
+                data = piece.GetBCurveParams5(false, false, true, false) as SplineParamData;
+                object controlObject = null, knotObject = null;
+                if (ends > 1e-7 || data == null || (data.Dimension != 3 && data.Dimension != 4) || data.Periodic != 0 ||
+                    !data.GetControlPoints(out controlObject) || !data.GetKnotPoints(out knotObject))
+                {
+                    CreateMirrorPartPackage.LogDebug("[SPLINE71][BODY_EDGE] found=True onEdge_m=" + bestOff.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                        " pieceEnds_m=" + ends.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) + " definition=False");
+                    return null;
+                }
+                int dimension = data.Dimension, count = data.ControlPointsCount, order = data.Order;
+                var control = controlObject as double[]; var knots = knotObject as double[];
+                if (control == null || knots == null || count < 2 || control.Length != dimension * count || knots.Length != count + order)
+                {
+                    CreateMirrorPartPackage.LogDebug("[SPLINE71][BODY_EDGE] found=True definitionShape=False dimension=" + dimension + " controlPoints=" + count + " order=" + order +
+                        " controlValues=" + (control == null ? -1 : control.Length) + " knots=" + (knots == null ? -1 : knots.Length) + " otherWay=" + otherWay);
+                    return null;
+                }
+                bool spans = Math.Abs(knots[order - 1] - a) <= 1e-12 * Math.Max(1, Math.Abs(a)) && Math.Abs(knots[count] - b) <= 1e-12 * Math.Max(1, Math.Abs(b));
+                double bestBack = double.PositiveInfinity; double[][] bestModel = null; double[] bestWeights = null; bool bestHomogeneous = false;
+                foreach (bool homogeneous in dimension == 4 ? new[] { false, true } : new[] { false })
+                {
+                    double[] weights = dimension == 4 ? Enumerable.Range(0, count).Select(i => control[4 * i + 3]).ToArray() : null;
+                    if (weights != null && weights.Any(w => !(w > 0))) continue;
+                    double[][] points = Enumerable.Range(0, count).Select(i =>
+                    {
+                        double scale = homogeneous ? weights[i] : 1.0;
+                        return new[] { control[dimension * i] / scale, control[dimension * i + 1] / scale, control[dimension * i + 2] / scale };
+                    }).ToArray();
+                    double back = DefinitionDeviation58(order, knots, points, weights, onPiece);
+                    if (back < bestBack) { bestBack = back; bestModel = points; bestWeights = weights; bestHomogeneous = homogeneous; }
+                }
+                // Into the sketch: the control points of the curve projected on its plane.
+                double offPlane = 0;
+                double[][] local = bestModel == null ? null : bestModel.Select(p =>
+                {
+                    var q = (double[])((MathPoint)((MathPoint)math.CreatePoint(p)).MultiplyTransform(modelToSketch)).ArrayData;
+                    offPlane = Math.Max(offPlane, Math.Abs(q[2]));
+                    return new[] { q[0], q[1], 0.0 };
+                }).ToArray();
+                bool usable = bestBack <= 1e-6 && local != null;
+                CreateMirrorPartPackage.LogDebug("[SPLINE71][BODY_EDGE] edges=" + edges + " found=True onEdge_m=" + bestOff.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                    " order=" + order + " controlPoints=" + count + " rational=" + (dimension == 4) + " spansPiece=" + spans +
+                    " givesPieceBack_m=" + bestBack.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                    " controlOffSketchPlane_m=" + offPlane.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) + " usable=" + usable);
+                return !usable ? null : new EdgeSpline71 { Order = order, Knots = knots, Weights = bestWeights, Homogeneous = bestHomogeneous, Control = local, Deviation = bestOff };
+            }
+            catch (Exception ex)
+            {
+                CreateMirrorPartPackage.LogDebug("[SPLINE71][BODY_EDGE] unavailable reason=" + ex.Message);
+                return null;
+            }
+            finally
+            {
+                // Not released by hand: with an explicit release here SOLIDWORKS ended with a
+                // corrupted heap half a minute into four of nine native runs.
+                GC.KeepAlive(data);
+            }
+        }
+
+        // Farthest of 'points' from the polyline through 'path' (both in one space).
+        private static double PolylineDeviation58(double[][] points, double[][] path)
+        {
+            double worst = 0;
+            foreach (double[] p in points)
+            {
+                double best = double.PositiveInfinity;
+                for (int i = 1; i < path.Length; i++)
+                {
+                    double[] a = path[i - 1], b = path[i];
+                    double[] ab = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, ap = { p[0] - a[0], p[1] - a[1], p[2] - a[2] };
+                    double span = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+                    double t = span <= 0 ? 0 : Math.Max(0, Math.Min(1, (ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / span));
+                    double dx = ap[0] - t * ab[0], dy = ap[1] - t * ab[1], dz = ap[2] - t * ab[2];
+                    best = Math.Min(best, Math.Sqrt(dx * dx + dy * dy + dz * dz));
+                }
+                worst = Math.Max(worst, best);
+            }
+            return worst;
+        }
+
+        // How far the splines of a sketch are from the mirror image of the source
+        // splines; 0 for a sketch without splines. Moving the points of a spline
+        // moves its ends, not its shape: natively a two-point spline that was the
+        // path of a Curve Driven Pattern kept its reflected ends to 26e-6 m and
+        // came out 2769 mm long instead of 2982 mm, and the pattern put its
+        // instances elsewhere.
+        public static double SplineShapeDeviation58(Sketch sketch, List<SketchPrimitiveSnapshot58> pristine, PlaneData plane)
+        {
+            if (sketch == null || pristine == null || plane == null ||
+                !pristine.Any(p => p.Type == (int)swSketchSegments_e.swSketchSPLINE && p.SamplesModel != null)) return 0;
+            var segments = (sketch.GetSketchSegments() as object[] ?? new object[0]).OfType<SketchSegment>().ToList();
+            MathTransform modelToSketch = sketch.ModelToSketchTransform as MathTransform;
+            MathTransform sketchToModel = modelToSketch == null ? null : modelToSketch.Inverse() as MathTransform;
+            IMathUtility math = SwAddin.InstanceSwApp == null ? null : SwAddin.InstanceSwApp.GetMathUtility() as IMathUtility;
+            if (segments.Count != pristine.Count || sketchToModel == null || math == null) return double.PositiveInfinity;
+            double worst = 0;
+            for (int i = 0; i < pristine.Count; i++)
+            {
+                if (pristine[i].Type != (int)swSketchSegments_e.swSketchSPLINE || pristine[i].SamplesModel == null) continue;
+                if (segments[i].GetType() != (int)swSketchSegments_e.swSketchSPLINE) return double.PositiveInfinity;
+                double[][] live;
+                try { live = SplineSamplesModel58(math, sketchToModel, segments[i], 257); }
+                catch (InvalidOperationException) { return double.PositiveInfinity; }
+                worst = Math.Max(worst, PolylineDeviation58(pristine[i].SamplesModel.Select(p => ReflectReference30(p, plane)).ToArray(), live));
+            }
+            return worst;
         }
 
         private static double[] PrimitivePointToModel58(IMathUtility math, MathTransform transform, SketchPoint point)
@@ -321,6 +683,9 @@ namespace ADDIN.Helpers
                 snapshot.SegmentCount50 = segments50 == null ? 0 : segments50.Length;
                 snapshot.ContourCount50 = contours50 == null ? 0 : contours50.Length;
                 snapshot.SelectedContourCount50 = selectedContours50 == null ? 0 : selectedContours50.Length;
+                // What the feature chose inside its sketch, by geometry (see ReselectContours71).
+                snapshot.SelectedContours71 = (selectedContours50 ?? new object[0]).Select(item =>
+                    new SelectedContour71 { Region = item is SketchRegion, Edges = ContourBoundary71(item) }).ToList();
                 // Required replay options must not silently become false on an API read error.
                 snapshot.BothDirections50 = definition.BothDirections;
                 snapshot.ReverseDirection50 = definition.ReverseDirection;
@@ -352,6 +717,7 @@ namespace ADDIN.Helpers
                     " checkpoint=BEFORE_CUT primitives=" + snapshot.BeforePrimitives53.Count);
                 snapshot.CircleInvariant26 = CircleInvariant26(sourceSketch26);
                 snapshot.CirclePoints26 = CapturePristineSketchPoints(sourceSketch26);
+                snapshot.ConvertedEdges71 = CaptureConvertedEdges71(sourceSketch26);
                 try
                 {
                     snapshot.References30 = CaptureReferences30(model, sourceSketch26);
@@ -382,10 +748,114 @@ namespace ADDIN.Helpers
             catch (Exception ex)
             {
                 snapshot.CaptureError = ex.Message;
-                Audit21(model, "SOURCE_CAPTURE_INCOMPLETE feature=" + feature.Name + " reason=" + ex.Message);
+                Audit21(model, "SOURCE_CAPTURE_INCOMPLETE feature=" + feature.Name + " reason=" + ex.Message +
+                    " at=" + ((ex.StackTrace ?? "").Split(new[] { '\n' }, 2)[0]).Trim());
             }
             finally { if (access) definition.ReleaseSelectionAccess(); }
             return snapshot;
+        }
+
+        // Null when the boundary cannot be read; reading it must never fail a capture.
+        private static double[][][] ContourBoundary71(object item)
+        {
+            try
+            {
+                var contour = item as SketchContour; var region = item as SketchRegion;
+                object[] edges = contour != null ? contour.GetEdges() as object[] : region != null ? region.GetEdges() as object[] : null;
+                var result = new List<double[][]>();
+                foreach (Edge edge in (edges ?? new object[0]).OfType<Edge>())
+                {
+                    var p = edge.GetCurveParams2() as double[];
+                    var middle = p == null || p.Length < 8 ? null : edge.Evaluate2((p[6] + p[7]) / 2, 0) as double[];
+                    if (middle == null || middle.Length < 3) return null;
+                    result.Add(new[] { new[] { p[0], p[1], p[2] }, new[] { middle[0], middle[1], middle[2] }, new[] { p[3], p[4], p[5] } });
+                }
+                return result.Count == 0 ? null : result.ToArray();
+            }
+            catch (System.Runtime.InteropServices.COMException) { return null; }
+            catch (InvalidCastException) { return null; }
+        }
+
+        // Farthest edge of 'wanted' from its nearest edge of 'have' (ends in either
+        // order, and the middle), measured within the sketch plane: SOLIDWORKS
+        // reports a region a fraction of a micrometre off its plane (natively 6.3e-7 m).
+        private static double BoundaryApart71(double[][][] wanted, double[][][] have, double[] normal)
+        {
+            if (have == null || wanted.Length != have.Length) return double.PositiveInfinity;
+            Func<double[], double[], double> inPlane = (a, b) =>
+            {
+                double[] d = { a[0] - b[0], a[1] - b[1], a[2] - b[2] };
+                double along = d[0] * normal[0] + d[1] * normal[1] + d[2] * normal[2];
+                return Math.Sqrt(Math.Max(0, d[0] * d[0] + d[1] * d[1] + d[2] * d[2] - along * along));
+            };
+            double worst = 0;
+            foreach (double[][] w in wanted)
+                worst = Math.Max(worst, have.Min(h => Math.Max(inPlane(w[1], h[1]),
+                    Math.Min(Math.Max(inPlane(w[0], h[0]), inPlane(w[2], h[2])), Math.Max(inPlane(w[0], h[2]), inPlane(w[2], h[0]))))));
+            return worst;
+        }
+
+        // An extrusion made from chosen contours or regions of its sketch (natively
+        // seven regions between two arcs) loses that choice when its profile has to
+        // be drawn again: the sketch then consists of new entities and the feature
+        // cannot rebuild. The choice is made again by geometry - each recorded
+        // boundary, reflected, is the boundary of exactly one contour or region of
+        // the re-drawn sketch - and handed back to the feature. A list SOLIDWORKS
+        // does not take back as a whole (natively: with an open contour in it,
+        // which cuts nothing) is handed back as its regions only; the body checks
+        // that follow judge the result either way.
+        public static void ReselectContours71(ModelDoc2 model, Feature feature, Feature profile, CutAuditSnapshot21 audit, PlaneData plane)
+        {
+            List<SelectedContour71> recorded = audit == null ? null : audit.SelectedContours71;
+            if (recorded == null || recorded.Count == 0) return;
+            string featureName = feature.Name, profileName = profile.Name;
+            if (recorded.Any(r => r == null || r.Edges == null))
+                throw new InvalidOperationException("CONTOUR71 a chosen contour of " + featureName + " could not be recorded in the source.");
+            double norm = plane.Normal.Sum(v => v * v);
+            Func<double[], double[]> reflect = p =>
+            {
+                double d = Enumerable.Range(0, 3).Sum(i => (p[i] - plane.Origin[i]) * plane.Normal[i]) / norm;
+                return Enumerable.Range(0, 3).Select(i => p[i] - 2 * d * plane.Normal[i]).ToArray();
+            };
+            foreach (bool regionsOnly in new[] { false, true })
+            {
+                List<SelectedContour71> wanted = recorded.Where(r => !regionsOnly || r.Region).ToList();
+                if (wanted.Count == 0 || (regionsOnly && wanted.Count == recorded.Count)) break;
+                var live = ((PartDoc)model).FeatureByName(featureName) as Feature;
+                var data = live == null ? null : live.GetDefinition() as IExtrudeFeatureData2;
+                if (data == null || !data.AccessSelections(model, null))
+                    throw new InvalidOperationException("CONTOUR71 cannot open the definition of " + featureName);
+                bool accepted = false;
+                try
+                {
+                    var liveProfile = ((PartDoc)model).FeatureByName(profileName) as Feature;
+                    var sketch = liveProfile == null ? null : liveProfile.GetSpecificFeature2() as Sketch;
+                    if (sketch == null) throw new InvalidOperationException("CONTOUR71 profile sketch missing: " + profileName);
+                    double[] m = (double[])sketch.ModelToSketchTransform.ArrayData;
+                    double[] normal = { m[2], m[5], m[8] };
+                    var candidates = new List<Tuple<object, bool, double[][][]>>();
+                    foreach (object c in sketch.GetSketchContours() as object[] ?? new object[0]) candidates.Add(Tuple.Create(c, false, ContourBoundary71(c)));
+                    foreach (object r in sketch.GetSketchRegions() as object[] ?? new object[0]) candidates.Add(Tuple.Create(r, true, ContourBoundary71(r)));
+                    var chosen = new List<object>();
+                    foreach (SelectedContour71 item in wanted)
+                    {
+                        double[][][] goal = item.Edges.Select(e => e.Select(reflect).ToArray()).ToArray();
+                        var same = candidates.Where(c => c.Item2 == item.Region && BoundaryApart71(goal, c.Item3, normal) < 1e-7).ToList();
+                        if (same.Count != 1)
+                            throw new InvalidOperationException("CONTOUR71 a chosen " + (item.Region ? "region" : "contour") + " of " + featureName +
+                                " has " + same.Count + " counterparts in the re-drawn profile (contours and regions there: " + candidates.Count + ").");
+                        chosen.Add(same[0].Item1);
+                    }
+                    data.Contours = chosen.Select(c => new System.Runtime.InteropServices.DispatchWrapper(c)).ToArray();
+                    accepted = live.ModifyDefinition(data, model, null);
+                }
+                finally { if (!accepted) data.ReleaseSelectionAccess(); }
+                CreateMirrorPartPackage.LogDebug("[CONTOUR71][RESELECT] feature=" + featureName + " recorded=" + recorded.Count +
+                    " regions=" + recorded.Count(r => r.Region) + " handedBack=" + wanted.Count + " contoursLeftOut=" + (recorded.Count - wanted.Count) +
+                    " accepted=" + accepted + " decidedBy=BODY_CHECK");
+                if (accepted) return;
+            }
+            throw new InvalidOperationException("CONTOUR71 SOLIDWORKS did not take back the chosen contours of " + featureName + ".");
         }
 
         private static ExtrudeDirectionAudit50 CaptureExtrudeDirection50(
@@ -574,13 +1044,63 @@ namespace ADDIN.Helpers
         private static int SupportCandidates23(Body2 body, SketchSupportSnapshot20 support, double[][][] boundaries, out double best)
         {
             best = double.PositiveInfinity;
-            int count = 0;
+            int count = 0, otherEdgeCount = 0, areaNoise = 0;
+            double areaNoiseRelative = 0;
             foreach (Face2 face in body.GetFaces() as object[] ?? new object[0])
             {
                 double residual = BoundaryResidual23(face, boundaries);
                 best = Math.Min(best, residual);
-                if (residual <= 1e-7 && Math.Abs(face.GetArea() - support.Area) <= Math.Max(1e-12, support.Area * 1e-6) &&
-                    (face.GetEdges() as object[] ?? new object[0]).Length == boundaries.Length) count++;
+                // The same face with another area: natively a 0.45 m2 planar face
+                // bounded by 2.9 m splines, whose boundary lay on the recorded one to
+                // 1.7e-14 m in the reflected copy of the source body itself, measured
+                // 447574.658 mm2 there against 447644.528 mm2 recorded (1.6e-4). The
+                // area of such a face is a numerical integration; with the boundary
+                // exact and the edge count equal, an area within 1e-3 is that face
+                // (counted only when no face passes the area test as well).
+                double areaOff = Math.Abs(face.GetArea() - support.Area) / Math.Max(1e-12, support.Area);
+                if (residual <= (NativeBodyCoincidence67.SurfaceChainResidualAllowed71 ? 5e-6 : 1e-7) && areaOff > 1e-6 && areaOff <= 1e-3 &&
+                    (face.GetEdges() as object[] ?? new object[0]).Length == boundaries.Length)
+                {
+                    areaNoise++; areaNoiseRelative = Math.Max(areaNoiseRelative, areaOff);
+                }
+                // Accepted micrometre class of a re-attached in-context surface chain: see ConfirmSurfaceChainResidual71.
+                if (residual <= (NativeBodyCoincidence67.SurfaceChainResidualAllowed71 ? 5e-6 : 1e-7) &&
+                    Math.Abs(face.GetArea() - support.Area) <= Math.Max(1e-12, support.Area * (NativeBodyCoincidence67.SurfaceChainResidualAllowed71 ? 1e-4 : 1e-6)))
+                {
+                    if ((face.GetEdges() as object[] ?? new object[0]).Length == boundaries.Length) count++;
+                    else otherEdgeCount++;
+                }
+            }
+            // In that class the same face can have one of its edges in two pieces
+            // (natively after an Unfold: 76 corners against 74, the support of the
+            // next cut matched to 1e-13 m and by area, with one edge more). Such a
+            // face counts only when no face matches with the edge count as well.
+            if (count == 0 && otherEdgeCount > 0 && NativeBodyCoincidence67.SurfaceChainResidualAllowed71)
+            {
+                CreateMirrorPartPackage.LogDebug("[CUT23][SUPPORT_EDGE_COUNT_DIFFERS] candidates=" + otherEdgeCount + " expectedEdges=" + boundaries.Length +
+                    " bestResidual_m=" + best.ToString("E2"));
+                return otherEdgeCount;
+            }
+            if (count == 0 && areaNoise == 0)
+            {
+                // Nothing matched: say what the nearest face is, so that the reason can be read.
+                Face2 nearestFace = null; double nearestResidual = double.PositiveInfinity;
+                foreach (Face2 face in body.GetFaces() as object[] ?? new object[0])
+                {
+                    double residual = BoundaryResidual23(face, boundaries);
+                    if (residual < nearestResidual) { nearestResidual = residual; nearestFace = face; }
+                }
+                if (nearestFace != null)
+                    CreateMirrorPartPackage.LogDebug("[CUT23][SUPPORT_NOT_MATCHED] nearestResidual_m=" + nearestResidual.ToString("E2") +
+                        " faceArea_mm2=" + (nearestFace.GetArea() * 1e6).ToString("F3") + " recordedArea_mm2=" + (support.Area * 1e6).ToString("F3") +
+                        " faceEdges=" + (nearestFace.GetEdges() as object[] ?? new object[0]).Length + " recordedEdges=" + boundaries.Length +
+                        " acceptedClass=" + NativeBodyCoincidence67.SurfaceChainResidualAllowed71);
+            }
+            if (count == 0 && areaNoise > 0)
+            {
+                CreateMirrorPartPackage.LogDebug("[CUT23][SUPPORT_AREA_WITHIN_1E-3] candidates=" + areaNoise + " areaRelative=" + areaNoiseRelative.ToString("E2") +
+                    " bestResidual_m=" + best.ToString("E2"));
+                return areaNoise;
             }
             return count;
         }
@@ -632,8 +1152,13 @@ namespace ADDIN.Helpers
                 var extra = BodyOperationsHelper.BooleanCutStrict(live, oracle.Body, "CUT23_BEFORE_EXTRA");
                 double tolerance = Math.Max(BodyOperationsHelper.ABSOLUTE_GEOMETRY_TOLERANCE,
                     BodyOperationsHelper.GetBodyVolume(oracle.Body) * BodyOperationsHelper.BODY_TRANSFORM_RELATIVE_TOLERANCE);
-                if (!missing.Success || !extra.Success || BodyOperationsHelper.SumBodyVolumes(missing.Bodies) > tolerance ||
-                    BodyOperationsHelper.SumBodyVolumes(extra.Bodies) > tolerance)
+                // Bodies in the accepted self-contact class cannot be subtracted;
+                // the dedicated reduced proof replaces the Boolean pair there.
+                bool selfContact71 = (!missing.Success || !extra.Success) &&
+                    NativeBodyCoincidence67.ConfirmUnavailableBoolean(oracle.Body, live, missing, extra, "CUT23_BEFORE71");
+                if (!selfContact71 && (!missing.Success || !extra.Success || BodyOperationsHelper.SumBodyVolumes(missing.Bodies) > tolerance ||
+                    BodyOperationsHelper.SumBodyVolumes(extra.Bodies) > tolerance) &&
+                    !NativeBodyCoincidence67.ConfirmSurfaceChainResidual71(oracle.Body, live, "CUT23_BEFORE71"))
                     throw new InvalidOperationException("Live before-cut body differs from reflected source checkpoint");
                 if (reflected != null)
                 {
@@ -754,6 +1279,9 @@ namespace ADDIN.Helpers
             return snapshot;
         }
 
+        // Set for a run whose base feature is a Lofted Bend, before anything is captured.
+        public static bool TolerantSplineEdges71;
+
         // Shared by source capture and target matching. Keep the public name for callers.
         // EDGE25: never mix ICurve parameter space with the trimmed IEdge evaluator.
         public static double[][] SampleEdge24(Edge edge)
@@ -795,8 +1323,19 @@ namespace ADDIN.Helpers
             Func<double[], double[], double> distance = (a, b) => Math.Sqrt(Enumerable.Range(0, 3).Sum(i => (a[i] - b[i]) * (a[i] - b[i])));
             double endpointError = Math.Min(Math.Max(distance(samples[0], start), distance(samples[8], end)),
                 Math.Max(distance(samples[0], end), distance(samples[8], start)));
-            if (double.IsNaN(endpointError) || endpointError > 1e-7)
+            // A Part with a re-attached in-context surface chain carries the accepted
+            // micrometre sliver; its tolerant edges do not meet their vertices to 1e-7.
+            // The spline body of a Lofted Bend has such edges in the source itself
+            // (natively a B-curve edge ending 4.2e-6 m from its vertex, and one ending
+            // 6.3e-6 m from it in another Lofted Bend Part). The limit is the accepted
+            // local deviation: this is how far the modeller lets an edge end from
+            // its vertex, not something the mirror adds.
+            double edgeTolerance71 = NativeBodyCoincidence67.SurfaceChainResidualAllowed71 || TolerantSplineEdges71 ? NativeBodyCoincidence67.LocalDeviationLimit71 : 1e-7;
+            if (double.IsNaN(endpointError) || endpointError > edgeTolerance71)
                 throw new InvalidOperationException("EDGE25 endpoint mismatch: type=" + curve.Identity() + " residual_m=" + endpointError.ToString("R"));
+            if (endpointError > 5e-6)
+                CreateMirrorPartPackage.LogDebug("[EDGE25][TOLERANT_EDGE_END] type=" + curve.Identity() + " endpointResidual_m=" + endpointError.ToString("E2") +
+                    " limit_m=" + edgeTolerance71.ToString("E0"));
             double edgeError = 0;
             foreach (var point in samples)
             {
@@ -804,7 +1343,7 @@ namespace ADDIN.Helpers
                 RequirePoint25(nearest);
                 edgeError = Math.Max(edgeError, distance(point, nearest));
             }
-            if (edgeError > 1e-7) throw new InvalidOperationException("EDGE25 sample outside trimmed edge; type=" + curve.Identity() + " residual_m=" + edgeError.ToString("R"));
+            if (edgeError > edgeTolerance71) throw new InvalidOperationException("EDGE25 sample outside trimmed edge; type=" + curve.Identity() + " residual_m=" + edgeError.ToString("R"));
             CreateMirrorPartPackage.LogDebug("[EDGE25] SAMPLE_PASS mode=" + (line ? "LINE_VERTICES" : "EDGE_EVALUATE") +
                 " type=" + curve.Identity() + " endpointResidual_m=" + endpointError.ToString("R") + " edgeResidual_m=" + edgeError.ToString("R"));
             return samples;
@@ -1006,6 +1545,18 @@ namespace ADDIN.Helpers
             double before = residual();
             CreateMirrorPartPackage.LogDebug("[CUTSPACE20][PLANE_CHECK] sketch=" + feature.Name + " maxResidual_m=" + before.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
             if (before <= 1e-7) return;
+            // Accepted local-deviation class (re-attached surface chain / Lofted Bend):
+            // a plane that holds the reflected points within that deviation is the
+            // reflected plane (natively a plane lost with its in-context face, almost
+            // normal to the mirror plane: 2.2e-5 m). The body check after the feature
+            // measures what this costs.
+            double planeLimit71 = NativeBodyCoincidence67.SurfaceChainResidualAllowed71 ? NativeBodyCoincidence67.LocalDeviationLimit71 : 1e-7;
+            if (before <= planeLimit71)
+            {
+                CreateMirrorPartPackage.LogDebug("[CUTSPACE71][PLANE_WITHIN_LOCAL_DEVIATION] sketch=" + feature.Name + " residual_m=" +
+                    before.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) + " limit_m=" + planeLimit71.ToString("E0", System.Globalization.CultureInfo.InvariantCulture));
+                return;
+            }
             if (support == null)
                 throw new InvalidOperationException("CUTSPACE50: Source support was not captured: " + feature.Name);
             Face2 mappedFace = null;
@@ -1016,7 +1567,7 @@ namespace ADDIN.Helpers
             }
             else
             {
-                mappedFace = FindPlanarSupportForPoints50(model, targets);
+                mappedFace = FindPlanarSupportForPoints50(model, targets, planeLimit71);
             }
             if (mappedFace == null)
                 throw new InvalidOperationException("CUTSPACE50: No unique reflected planar support for " + support.Kind + ": " + feature.Name);
@@ -1025,10 +1576,10 @@ namespace ADDIN.Helpers
                 throw new InvalidOperationException("CUTSPACE20: Cannot apply reflected support: " + feature.Name);
             double after = residual();
             CreateMirrorPartPackage.LogDebug("[CUTSPACE20][SUPPORT_REBOUND] sketch=" + feature.Name + " maxResidual_m=" + after.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
-            if (after > 1e-7) throw new InvalidOperationException("CUTSPACE20: Mapped support does not contain reflected points.");
+            if (after > planeLimit71) throw new InvalidOperationException("CUTSPACE20: Mapped support does not contain reflected points.");
         }
 
-        private static Face2 FindPlanarSupportForPoints50(ModelDoc2 model, double[][] targets)
+        private static Face2 FindPlanarSupportForPoints50(ModelDoc2 model, double[][] targets, double limit = 1e-7)
         {
             var matches = new List<Tuple<Face2, double>>();
             foreach (Body2 body in (object[])((PartDoc)model).GetBodies2((int)swBodyType_e.swSolidBody, false) ?? new object[0])
@@ -1046,7 +1597,7 @@ namespace ADDIN.Helpers
                             residual = Math.Max(residual, Math.Sqrt(Enumerable.Range(0, 3)
                                 .Sum(i => Math.Pow(target[i] - closest[i], 2))));
                         }
-                        if (residual <= 1e-7) matches.Add(Tuple.Create(face, residual));
+                        if (residual <= limit) matches.Add(Tuple.Create(face, residual));
                     }
                     catch { }
                 }
@@ -1263,6 +1814,204 @@ namespace ADDIN.Helpers
                 throw new InvalidOperationException("REFERENCE45: Coplanar carrier Face is ambiguous; candidates=" +
                     ranked45.Length + " best=" + best45.ToString("R") + " second=" + second45.ToString("R"));
             return ranked45[0].Item1;
+        }
+
+        // Geometry-first replay mirrors a profile by moving its points and gives up
+        // the relations to the source side. One kind of segment cannot be mirrored
+        // that way: a spline (or any segment other than a line or an arc) made with
+        // Convert Entities is a copy of a model edge, and its shape is not carried by
+        // sketch points. Such a relation is recorded here and, when the point move is
+        // rejected, re-attached to the mirrored edge; the segment then follows it.
+        // Offset Entities is left alone on purpose: its relation finds the edge on the
+        // mirrored body by itself and on the right side, and re-attached by geometry
+        // it took the twin edge across the sheet thickness and came out on the other
+        // side (native: OffsetRelationProbe71, 107 mm from the mirror image).
+        private static List<ConvertedEdge71> CaptureConvertedEdges71(Sketch sketch)
+        {
+            var result = new List<ConvertedEdge71>();
+            try
+            {
+                if (sketch == null || sketch.RelationManager == null) return result;
+                var own = new HashSet<string>((sketch.GetSketchSegments() as object[] ?? new object[0]).Cast<SketchSegment>()
+                    .Select(s => string.Join(":", (int[])s.GetID())), StringComparer.Ordinal);
+                object[] relations = sketch.RelationManager.GetRelations((int)swSketchRelationFilterType_e.swAll) as object[] ?? new object[0];
+                for (int r = 0; r < relations.Length; r++)
+                {
+                    var relation = (SketchRelation)relations[r];
+                    int type = relation.GetRelationType();
+                    if (type != (int)swConstraintType_e.swConstraintType_USEEDGE) continue;
+                    object[] definition = relation.GetDefinitionEntities2() as object[] ?? new object[0];
+                    object[] entities = relation.GetEntities() as object[] ?? new object[0];
+                    var driven = entities.OfType<SketchSegment>().FirstOrDefault(s => own.Contains(string.Join(":", (int[])s.GetID())));
+                    if (driven == null || driven.GetType() == (int)swSketchSegments_e.swSketchLINE || driven.GetType() == (int)swSketchSegments_e.swSketchARC) continue;
+                    for (int k = 0; k < definition.Length; k++)
+                    {
+                        var edge = definition[k] as Edge;
+                        if (edge == null) continue;
+                        result.Add(new ConvertedEdge71 { Relation = r, Entity = k, RelationCount = relations.Length, RelationType = type, EdgeSamples = SampleEdge24(edge) });
+                    }
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                CreateMirrorPartPackage.LogDebug("[CONVERTED71][CAPTURE_IGNORED] reason=" + ex.Message);
+                result.Clear();
+            }
+            if (result.Count > 0) CreateMirrorPartPackage.LogDebug("[CONVERTED71][CAPTURE] nonLinearConvertedSegments=" + result.Count);
+            return result;
+        }
+
+        // The point move stays the first way to mirror a profile. When it is rejected:
+        // attempt 1 repeats it with the converted segments re-attached to the mirrored
+        // edges (exact, relation kept); attempt 2, only in the accepted local-deviation
+        // class, repeats the plain move and lets an end that slides on a fixed curve
+        // stay within that deviation. False: not applicable, or rejected again.
+        private static int convertedAttempt71;
+        public static bool RetryConvertedProfile71(Action mutate, CutAuditSnapshot21 audit, int attempt)
+        {
+            if (attempt == 1 && (audit == null || audit.ConvertedEdges71 == null || audit.ConvertedEdges71.Count == 0)) return false;
+            if (attempt == 2 && !NativeBodyCoincidence67.SurfaceChainResidualAllowed71) return false;
+            convertedAttempt71 = attempt;
+            try { mutate(); CreateMirrorPartPackage.LogDebug("[CONVERTED71][RETRY] attempt=" + attempt + " result=PASS"); return true; }
+            catch (SketchPointMoveRejected58 ex) { CreateMirrorPartPackage.LogDebug("[CONVERTED71][RETRY] attempt=" + attempt + " result=REJECTED reason=" + ex.Message); return false; }
+            finally { convertedAttempt71 = 0; }
+        }
+
+        // Geometry-first leaves the relations to the source side suppressed. A spline
+        // that is a converted or offset copy of a model edge is the exception:
+        // SOLIDWORKS finds its edge on the mirrored body by itself, and a consumer
+        // needs the relation alive (natively a Curve Pattern with equal spacing used
+        // the whole offset curve while the relation was active, and only the trimmed
+        // piece once it was suppressed: 330.5 against 307.0 mm between instances).
+        // The relation is re-activated when that leaves the sketch where it is,
+        // and suppressed again when anything moves.
+        private static List<SketchRelation> suppressedInSource71 = new List<SketchRelation>();
+
+        private static void ReactivateEdgeCopies71(Sketch sketch, List<SketchRelation> suspended)
+        {
+            var own = new Dictionary<string, SketchSegment>(StringComparer.Ordinal);
+            foreach (SketchSegment segment in (sketch.GetSketchSegments() as object[] ?? new object[0]).OfType<SketchSegment>())
+                own[string.Join(":", (int[])segment.GetID())] = segment;
+            var copies = new List<SketchRelation>();
+            // Every suppressed one, not only those of this pass: an earlier, rejected pass suspended them too.
+            foreach (SketchRelation relation in (sketch.RelationManager.GetRelations((int)swSketchRelationFilterType_e.swAll) as object[] ?? new object[0]).OfType<SketchRelation>())
+            {
+                if (!relation.Suppressed || suppressedInSource71.Any(r => SameProbeObject(r, relation))) continue;
+                int type = relation.GetRelationType();
+                if (type != (int)swConstraintType_e.swConstraintType_USEEDGE && type != (int)swConstraintType_e.swConstraintType_OFFSETEDGE) continue;
+                var driven = (relation.GetEntities() as object[] ?? new object[0]).OfType<SketchSegment>()
+                    .FirstOrDefault(s => own.ContainsKey(string.Join(":", (int[])s.GetID())));
+                if (driven == null || driven.GetType() == (int)swSketchSegments_e.swSketchLINE || driven.GetType() == (int)swSketchSegments_e.swSketchARC) continue;
+                copies.Add(relation);
+            }
+            if (copies.Count == 0) return;
+            Func<List<double[]>> shape = () =>
+            {
+                var all = new List<double[]>();
+                foreach (SketchPoint point in (sketch.GetSketchPoints2() as object[] ?? new object[0]).OfType<SketchPoint>())
+                    all.Add(new[] { point.X, point.Y, point.Z });
+                foreach (SketchSegment segment in own.Values)
+                {
+                    var curve = segment.GetCurve() as Curve;
+                    double a, b; bool closed, periodic;
+                    if (curve == null || !curve.GetEndParams(out a, out b, out closed, out periodic)) continue;
+                    for (int i = 0; i <= 8; i++) all.Add(((double[])curve.Evaluate2(a + (b - a) * i / 8.0, 0)).Take(3).ToArray());
+                }
+                return all;
+            };
+            List<double[]> before = shape();
+            foreach (SketchRelation relation in copies) relation.Suppressed = false;
+            List<double[]> after = shape();
+            double moved = before.Count != after.Count ? double.PositiveInfinity : Enumerable.Range(0, before.Count).Select(i =>
+                Math.Sqrt(Enumerable.Range(0, 3).Sum(k => (before[i][k] - after[i][k]) * (before[i][k] - after[i][k])))).DefaultIfEmpty(0).Max();
+            bool kept = moved <= 1e-7 && copies.All(r => !r.Suppressed);
+            if (kept) suspended.RemoveAll(r => copies.Any(c => SameProbeObject(c, r)));
+            else foreach (SketchRelation relation in copies) relation.Suppressed = true;
+            CreateMirrorPartPackage.LogDebug("[CONVERTED71][RELATION_ACTIVE] splineCopies=" + copies.Count + " moved_m=" +
+                moved.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) + " result=" + (kept ? "KEPT_ACTIVE" : "SUPPRESSED_AGAIN"));
+        }
+
+        // A segment re-attached to the mirrored edge lies on the reflected curve, but
+        // SOLIDWORKS decides which of its two end points sits at which end, and the
+        // mirror image of a curve runs the other way: the ends come out exchanged
+        // (natively a converted spline whose start point sat where its end has to
+        // be). The edge holds these two points; they cannot be moved. When each is
+        // at the reflected position of the other, the figure has a point at both
+        // places it needs one, and the two keep where they are.
+        private static void ExchangeEndsOfEdgeCopies71(Sketch sketch, List<SketchRelation> following,
+            List<Tuple<SketchPoint, double, double>> targets)
+        {
+            if (following == null || following.Count == 0) return;
+            double limit = NativeBodyCoincidence67.SurfaceChainResidualAllowed71 ? NativeBodyCoincidence67.LocalDeviationLimit71 : 1e-7;
+            Func<SketchPoint, string> key = p => { var id = p == null ? null : p.GetID() as int[]; return id == null || id.Length < 2 ? null : id[0] + ":" + id[1]; };
+            Func<SketchPoint, Tuple<SketchPoint, double, double>, double> off = (p, t) =>
+                Math.Sqrt(Math.Pow(p.X - t.Item2, 2) + Math.Pow(p.Y - t.Item3, 2));
+            // Only curves are re-attached (CaptureConvertedEdges71); which relation
+            // drives which of them is not readable, so every curve of the sketch
+            // is looked at and only an exact exchange counts.
+            foreach (SketchSegment segment in (sketch.GetSketchSegments() as object[] ?? new object[0]).OfType<SketchSegment>())
+            {
+                if (segment.GetType() == (int)swSketchSegments_e.swSketchLINE || segment.GetType() == (int)swSketchSegments_e.swSketchARC) continue;
+                var spline = segment as SketchSpline;
+                object[] through = spline == null ? null : spline.GetPoints2() as object[];
+                SketchPoint a = through != null && through.Length >= 2 ? through[0] as SketchPoint : null;
+                SketchPoint b = through != null && through.Length >= 2 ? through[through.Length - 1] as SketchPoint : null;
+                string ka = key(a), kb = key(b);
+                int ia = ka == null ? -1 : targets.FindIndex(t => key(t.Item1) == ka), ib = kb == null ? -1 : targets.FindIndex(t => key(t.Item1) == kb);
+                string id = string.Join(":", (int[])segment.GetID());
+                if (ia < 0 || ib < 0 || ia == ib)
+                {
+                    CreateMirrorPartPackage.LogDebug("[CONVERTED71][ENDS] segment=" + id + " type=" + segment.GetType() + " ends=" + (ka ?? "?") + "," + (kb ?? "?") +
+                        " throughPoints=" + (through == null ? -1 : through.Length) + " inTargets=" + (ia >= 0) + "," + (ib >= 0) + " exchanged=False");
+                    continue;
+                }
+                double own = Math.Max(off(a, targets[ia]), off(b, targets[ib])), exchanged = Math.Max(off(a, targets[ib]), off(b, targets[ia]));
+                bool keep = own > 1e-7 && exchanged <= limit;
+                CreateMirrorPartPackage.LogDebug("[CONVERTED71][ENDS] segment=" + id + " type=" + segment.GetType() + " ends=" + ka + "," + kb +
+                    " offOwnTargets_m=" + own.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                    " offEachOthers_m=" + exchanged.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) + " exchanged=" + keep);
+                if (!keep) continue;
+                if (exchanged > 1e-7) NativeBodyCoincidence67.LargestAcceptedDeviation71 = Math.Max(NativeBodyCoincidence67.LargestAcceptedDeviation71, exchanged);
+                targets[ia] = Tuple.Create(targets[ia].Item1, a.X, a.Y);
+                targets[ib] = Tuple.Create(targets[ib].Item1, b.X, b.Y);
+            }
+        }
+
+        // In sketch edit mode. Returns the relations SOLIDWORKS accepted on the
+        // mirrored edge; they must stay active. A record that cannot be re-attached
+        // is left to the point move.
+        private static List<SketchRelation> RebindConvertedEdges71(ModelDoc2 model, Sketch sketch, CutAuditSnapshot21 audit, PlaneData plane)
+        {
+            var bound = new List<SketchRelation>();
+            if (audit == null || audit.ConvertedEdges71 == null || audit.ConvertedEdges71.Count == 0) return bound;
+            object[] live = sketch.RelationManager.GetRelations((int)swSketchRelationFilterType_e.swAll) as object[] ?? new object[0];
+            foreach (ConvertedEdge71 item in audit.ConvertedEdges71)
+            {
+                string outcome;
+                try
+                {
+                    var relation = item.RelationCount == live.Length && item.Relation < live.Length ? live[item.Relation] as SketchRelation : null;
+                    if (relation == null || relation.GetRelationType() != item.RelationType) outcome = "RELATION_LIST_CHANGED";
+                    else
+                    {
+                        // The rejected first pass left the relation suspended.
+                        if (relation.Suppressed) relation.Suppressed = false;
+                        object target = ADDIN.Commands.MirrorV7.MirrorInPlace.RollbackReplayEngineV7.FindEdge(
+                            model, item.EdgeSamples.Select(x => ReflectReference30(x, plane)).ToArray());
+                        object[] standIns = relation.GetEntities() as object[] ?? new object[0];
+                        object[] definition = relation.GetDefinitionEntities2() as object[] ?? new object[0];
+                        // The sketch-side stand-in at the position of the edge is what
+                        // ReplaceEntity accepts; the edge itself is tried second.
+                        bool done = (item.Entity < standIns.Length && standIns[item.Entity] != null && relation.ReplaceEntity(standIns[item.Entity], target)) ||
+                            (item.Entity < definition.Length && definition[item.Entity] != null && relation.ReplaceEntity(definition[item.Entity], target));
+                        if (done) bound.Add(relation);
+                        outcome = done ? "REATTACHED" : "REFUSED";
+                    }
+                }
+                catch (InvalidOperationException ex) { outcome = "NOT_RESOLVED " + ex.Message; }
+                CreateMirrorPartPackage.LogDebug("[CONVERTED71][REBIND] relation=" + item.Relation + " type=" + (swConstraintType_e)item.RelationType + " outcome=" + outcome);
+            }
+            return bound;
         }
 
         private static object[] DefinitionEntities31(SketchRelation relation)
@@ -1867,6 +2616,13 @@ namespace ADDIN.Helpers
             return replacement;
         }
 
+        // Owned points of a sketch (free points, segment ends, arc centres,
+        // spline points), without logging.
+        internal static List<SketchPoint> OwnedSketchPoints71(Sketch sketch)
+        {
+            return EnumerateSketchPoints28(sketch, false).Cast<SketchPoint>().ToList();
+        }
+
         private static object[] EnumerateSketchPoints28(Sketch sketch, bool log = true)
         {
             var result = new List<SketchPoint>();
@@ -2219,7 +2975,10 @@ namespace ADDIN.Helpers
                         MathPoint mpMirr = mathUtility.CreatePoint(new double[] { mxMirr, myMirr, mzMirr }) as MathPoint;
                         MathPoint mp2D = mpMirr != null ? mpMirr.MultiplyTransform(m2s) as MathPoint : null;
                         double[] arr2D = mp2D != null ? mp2D.ArrayData as double[] : null;
-                        if (arr2D != null && arr2D.Length >= 3 && Math.Abs(arr2D[2]) <= 1e-7)
+                        // Accepted local-deviation class: see EnsureReflectedSupport20 (the plane
+                        // holds the reflected points within that deviation and is kept).
+                        if (arr2D != null && arr2D.Length >= 3 && Math.Abs(arr2D[2]) <=
+                            (NativeBodyCoincidence67.SurfaceChainResidualAllowed71 ? NativeBodyCoincidence67.LocalDeviationLimit71 : 1e-7))
                         {
                             newX = arr2D[0];
                             newY = arr2D[1];
@@ -2260,9 +3019,44 @@ namespace ADDIN.Helpers
                 targets.Add(Tuple.Create(swPt, newX, newY));
             }
 
-            Action verifyDimensions = ApplyConstraintAwareTargets(partDoc, swSketch, targets, audit, mirrorPlane);
+            var circleSeams71 = ExemptClosedCircleSeams71(swSketch, targets);
+            Action verifyDimensions;
+            // Where the points are BEFORE any move: a failed first attempt leaves
+            // them displaced, and counterparts must be paired on the source layout.
+            var before71 = targets.Select(t => new[] { t.Item1.X, t.Item1.Y }).ToList();
+            // An arc that straddles the mirror line has to exchange its own two
+            // ends (no API reverses an arc). Sending each end to its own
+            // reflection makes them cross and the solver drags them back; a
+            // failed attempt also left the sketch displaced and once dropped the
+            // COM connection natively. For such a sketch the counterpart
+            // assignment is therefore applied directly.
+            arcEndsExchanged71 = false;
+            var direct71 = CounterpartTargets71(swSketch, targets, before71);
+            if (direct71 != null && arcEndsExchanged71)
+            {
+                CreateMirrorPartPackage.LogDebug("[SYMMETRIC71][COUNTERPART_FIRST] reason=ARC_EXCHANGES_ITS_OWN_ENDS");
+                targets.Clear();
+                targets.AddRange(direct71);
+            }
+            try { verifyDimensions = ApplyConstraintAwareTargets(partDoc, swSketch, targets, audit, mirrorPlane); }
+            catch (SketchPointMoveRejected58)
+            {
+                var counterpart71 = CounterpartTargets71(swSketch, targets, before71);
+                if (counterpart71 == null) throw;
+                targets.Clear();
+                targets.AddRange(counterpart71);
+                verifyDimensions = ApplyConstraintAwareTargets(partDoc, swSketch, targets, audit, mirrorPlane);
+            }
             partDoc.InsertSketch2(true);
             verifyDimensions();
+            foreach (var seam71 in circleSeams71)
+            {
+                double radius71 = Math.Sqrt(Math.Pow(seam71.Item1.X - seam71.Item2, 2) + Math.Pow(seam71.Item1.Y - seam71.Item3, 2));
+                if (Math.Abs(radius71 - seam71.Item4) > 1e-7)
+                    throw new InvalidOperationException("CIRCLE71: Full circle did not keep its radius at the reflected centre. expected=" +
+                        seam71.Item4.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + " actual=" +
+                        radius71.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+            }
             // Check after leaving the sketch: the solver may undo a coordinate
             // assignment even when the COM setter itself reports no exception.
             int rejectedPoints = 0;
@@ -2325,6 +3119,138 @@ namespace ADDIN.Helpers
             }
         }
 
+        // Nearly symmetric profile: moving every point to its OWN reflection
+        // swaps the two halves across the sketch and the solver rejects it. The
+        // reflected profile is the same point set, so let each point take the
+        // reflected position of its mirror counterpart instead; it then moves
+        // only by the asymmetry. Allowed only when that reassignment is a
+        // bijection that maps every segment onto a segment of the same type
+        // (lines by end points, arcs by end points and centre), so the result
+        // is exactly the set of reflected source segments. Returns null when no
+        // such non-trivial reassignment exists. The caller's body oracle still
+        // decides.
+        // Set by CounterpartTargets71: some arc's start and end map onto each other.
+        private static bool arcEndsExchanged71;
+
+        private static List<Tuple<SketchPoint, double, double>> CounterpartTargets71(Sketch sketch,
+            List<Tuple<SketchPoint, double, double>> targets, List<double[]> before)
+        {
+            Func<object, string> key = value =>
+            {
+                var point = value as SketchPoint;
+                var id = point == null ? null : point.GetID() as int[];
+                return id == null || id.Length < 2 ? null : id[0] + ":" + id[1];
+            };
+            var keys = targets.Select(t => key(t.Item1)).ToList();
+            if (keys.Any(k => k == null) || keys.Distinct().Count() != keys.Count) return null;
+            int n = targets.Count;
+            var take = new int[n];
+            var used = new HashSet<int>();
+            for (int i = 0; i < n; i++)
+            {
+                int best = -1; double bestDistance = double.MaxValue;
+                // Nearest target not taken yet: coincident points (for example
+                // two coradial arc centres) share one location. A wrong greedy
+                // choice cannot pass the segment check below.
+                for (int j = 0; j < n; j++)
+                {
+                    if (used.Contains(j)) continue;
+                    double dx = before[i][0] - targets[j].Item2, dy = before[i][1] - targets[j].Item3;
+                    double distance = Math.Sqrt(dx * dx + dy * dy);
+                    if (distance < bestDistance) { bestDistance = distance; best = j; }
+                }
+                if (best < 0) return null;
+                used.Add(best);
+                take[i] = best;
+            }
+            if (Enumerable.Range(0, n).All(i => take[i] == i)) return null;
+            var counterpart = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (int i = 0; i < n; i++) counterpart[keys[i]] = keys[take[i]];
+            Func<string, string> map = id => id != null && counterpart.ContainsKey(id) ? counterpart[id] : id;
+            var segments = new List<string>(); var mapped = new List<string>();
+            foreach (object value in sketch.GetSketchSegments() as object[] ?? new object[0])
+            {
+                var line = value as SketchLine; var arc = value as SketchArc;
+                string a, b, c = "", type;
+                if (line != null) { type = "L"; a = key(line.GetStartPoint2()); b = key(line.GetEndPoint2()); }
+                else if (arc != null) { type = "A"; a = key(arc.GetStartPoint2()); b = key(arc.GetEndPoint2()); c = key(arc.GetCenterPoint2()); }
+                else return null;
+                bool construction = ((SketchSegment)value).ConstructionGeometry;
+                Func<string, string, string, string> name = (p, q, r) => type + (construction ? "c" : "") + "|" +
+                    string.Join("|", new[] { p ?? "", q ?? "" }.OrderBy(x => x, StringComparer.Ordinal)) + "|" + (r ?? "");
+                segments.Add(name(a, b, c));
+                mapped.Add(name(map(a), map(b), map(c)));
+                if (arc != null && a != null && b != null && a != b && map(a) == b && map(b) == a) arcEndsExchanged71 = true;
+            }
+            if (!segments.OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(mapped.OrderBy(x => x, StringComparer.Ordinal)))
+            {
+                CreateMirrorPartPackage.LogDebug("[SYMMETRIC71][COUNTERPART_TARGETS] points=" + n + " topologyPreserved=False result=NOT_APPLICABLE");
+                return null;
+            }
+            var result = new List<Tuple<SketchPoint, double, double>>();
+            double largest = 0;
+            for (int i = 0; i < n; i++)
+            {
+                result.Add(Tuple.Create(targets[i].Item1, targets[take[i]].Item2, targets[take[i]].Item3));
+                largest = Math.Max(largest, Math.Sqrt(Math.Pow(before[i][0] - targets[take[i]].Item2, 2) +
+                    Math.Pow(before[i][1] - targets[take[i]].Item3, 2)));
+            }
+            CreateMirrorPartPackage.LogDebug("[SYMMETRIC71][COUNTERPART_TARGETS] points=" + n + " segments=" + segments.Count +
+                " topologyPreserved=True largestMove_m=" + largest.ToString("R", System.Globalization.CultureInfo.InvariantCulture) +
+                " reason=OWN_REFLECTION_REJECTED");
+            return result;
+        }
+
+        // A full circle is defined by its centre and radius. Its seam point
+        // (start == end) follows the centre and SOLIDWORKS rejects SetCoords on
+        // it, so it is not a reflection target. Exempt it only when it belongs
+        // to exactly one closed arc whose centre IS a target; the caller then
+        // verifies the radius at the reflected centre. Returns
+        // (seam point, centre target X, centre target Y, source radius).
+        private static List<Tuple<SketchPoint, double, double, double>> ExemptClosedCircleSeams71(Sketch sketch,
+            List<Tuple<SketchPoint, double, double>> targets)
+        {
+            var result = new List<Tuple<SketchPoint, double, double, double>>();
+            Func<object, string> key = value =>
+            {
+                var point = value as SketchPoint;
+                var id = point == null ? null : point.GetID() as int[];
+                return id == null || id.Length < 2 ? null : id[0] + ":" + id[1];
+            };
+            var uses = new Dictionary<string, int>(StringComparer.Ordinal);
+            var circles = new List<SketchArc>();
+            foreach (object value in sketch.GetSketchSegments() as object[] ?? new object[0])
+            {
+                var ends = new List<string>();
+                var line = value as SketchLine;
+                var arc = value as SketchArc;
+                var spline = value as SketchSpline;
+                if (line != null) { ends.Add(key(line.GetStartPoint2())); ends.Add(key(line.GetEndPoint2())); }
+                else if (arc != null)
+                {
+                    ends.Add(key(arc.GetStartPoint2())); ends.Add(key(arc.GetEndPoint2()));
+                    if (ends[0] != null && ends[0] == ends[1]) circles.Add(arc);
+                }
+                else if (spline != null)
+                    foreach (object point in spline.GetPoints2() as object[] ?? new object[0]) ends.Add(key(point));
+                foreach (string id in ends.Where(id => id != null).Distinct())
+                { int count; uses.TryGetValue(id, out count); uses[id] = count + 1; }
+            }
+            foreach (SketchArc circle in circles)
+            {
+                string seam = key(circle.GetStartPoint2()), centre = key(circle.GetCenterPoint2());
+                int seamIndex = targets.FindIndex(t => key(t.Item1) == seam);
+                var centreTarget = targets.FirstOrDefault(t => key(t.Item1) == centre);
+                if (seam == null || centre == null || seam == centre || seamIndex < 0 || centreTarget == null || uses[seam] != 1) continue;
+                result.Add(Tuple.Create(targets[seamIndex].Item1, centreTarget.Item2, centreTarget.Item3, circle.GetRadius()));
+                targets.RemoveAt(seamIndex);
+                CreateMirrorPartPackage.LogDebug("[CIRCLE71][SEAM_EXEMPT] seam=" + seam + " centre=" + centre +
+                    " radius_m=" + circle.GetRadius().ToString("R", System.Globalization.CultureInfo.InvariantCulture) +
+                    " verification=RADIUS_AT_REFLECTED_CENTRE");
+            }
+            return result;
+        }
+
         private static Action ApplyConstraintAwareTargets(ModelDoc2 model, Sketch sketch,
             List<Tuple<SketchPoint, double, double>> targets, CutAuditSnapshot21 audit, PlaneData plane)
         {
@@ -2335,6 +3261,11 @@ namespace ADDIN.Helpers
             // The output remains an editable native sketch, but dimensions are reference
             // dimensions and geometric relations remain suppressed.
             bool geometryFirst53 = true;
+            // What the source itself keeps suppressed stays suppressed (first pass only:
+            // a rejected pass leaves its own suspensions behind).
+            if (convertedAttempt71 == 0)
+                suppressedInSource71 = (sketch.RelationManager.GetRelations((int)swSketchRelationFilterType_e.swAll) as object[] ?? new object[0])
+                    .OfType<SketchRelation>().Where(r => r.Suppressed).ToList();
             // Dimensions are handled uniformly by release/restore. Non-dimensional
             // incidence and metric relations below are invariant under any reflection
             // isometry once their external references have been rebound.
@@ -2418,8 +3349,10 @@ namespace ADDIN.Helpers
                     RebindReferences30(model, sketch, audit, plane);
                 else
                     CreateMirrorPartPackage.LogDebug("[GEOMETRY_FIRST53][REFERENCE_REBIND_SKIPPED] reason=IndependentProfile");
+                List<SketchRelation> followingModel71 = convertedAttempt71 == 1 ? RebindConvertedEdges71(model, sketch, audit, plane) : new List<SketchRelation>();
                 for (int i = 0; i < targets.Count; i++)
                     targets[i] = Tuple.Create(ResolveProbePoint(sketch, targetIds[i]), targets[i].Item2, targets[i].Item3);
+                ExchangeEndsOfEdgeCopies71(sketch, followingModel71, targets);
                 // A point constrained Coincident/Collinear to an external entity cannot be
                 // moved one-at-a-time while automatic solve is active.  After all external
                 // references have been rebound, move the complete point set atomically and
@@ -2442,8 +3375,16 @@ namespace ADDIN.Helpers
                             as object[] ?? new object[0]).OfType<SketchRelation>())
                     {
                         DisplayDimension display52 = relation52.GetDisplayDimension() as DisplayDimension;
-                        if (display52 != null || relation52.Suppressed) continue;
                         swConstraintType_e type52 = (swConstraintType_e)relation52.GetRelationType();
+                        // An Offset Entities relation keeps coupling its curves even
+                        // after its distance dimension is released to driven (native
+                        // observation: every re-placed end point dragged another one
+                        // back). In geometry-first mode it is suspended like the
+                        // other geometric relations.
+                        bool dimensionedOffset71 = geometryFirst53 && display52 != null &&
+                            type52 == swConstraintType_e.swConstraintType_SKETCHOFFSET;
+                        if ((display52 != null && !dimensionedOffset71) || relation52.Suppressed) continue;
+                        if (followingModel71.Any(r => SameProbeObject(r, relation52))) continue;
                         if (!geometryFirst53 && !IsReflectionInvariantConstraint47(type52))
                             throw new InvalidOperationException("CONSTRAINT52: Relation cannot be suspended generically: " + type52);
                         relation52.Suppressed = true;
@@ -2484,9 +3425,48 @@ namespace ADDIN.Helpers
                             "segment-level geometry replay required. point=" + DiagnosticEntity(target.Item1));
                     }
                 }
+                // Moving one end of a segment can carry its other end along, so a
+                // point that was already at its target (or was placed earlier)
+                // may have drifted. Re-place only the drifted points, a bounded
+                // number of times; the exact check below still decides.
+                for (int pass71 = 0; pass71 < 3; pass71++)
+                {
+                    var drifted71 = targets.Where(t => Math.Abs(t.Item1.X - t.Item2) > 1e-7 ||
+                        Math.Abs(t.Item1.Y - t.Item3) > 1e-7).ToList();
+                    if (drifted71.Count == 0) break;
+                    CreateMirrorPartPackage.LogDebug("[REFLECT71][REPLACE_DRIFTED] pass=" + (pass71 + 1) + " points=" + drifted71.Count);
+                    foreach (var target in drifted71)
+                        target.Item1.SetCoords(target.Item2, target.Item3, target.Item1.Z);
+                }
+                // The end of a converted or offset spline only slides along that curve:
+                // the curve is a fixed copy of a model edge and does not follow its points.
+                // In the accepted local-deviation class such an end may stay off its target
+                // by up to that deviation (natively 2.6e-5 m on the offset of a 2.9 m flat
+                // pattern edge); the body check after the feature measures the result.
+                // Which point is an end of such a curve is not readable for every kind of
+                // copy, so the rule is by sketch: it holds a segment that is neither a
+                // line nor an arc, and the point stayed within the local deviation.
+                bool fixedCurve71 = convertedAttempt71 == 2 && NativeBodyCoincidence67.SurfaceChainResidualAllowed71 &&
+                    (sketch.GetSketchSegments() as object[] ?? new object[0]).OfType<SketchSegment>().Any(s =>
+                        s.GetType() != (int)swSketchSegments_e.swSketchLINE && s.GetType() != (int)swSketchSegments_e.swSketchARC);
+                double worstOnFixedCurve71 = 0;
+                foreach (var target in targets.ToList())
+                {
+                    double off71 = Math.Sqrt(Math.Pow(target.Item1.X - target.Item2, 2) + Math.Pow(target.Item1.Y - target.Item3, 2));
+                    if (!fixedCurve71 || off71 <= 1e-7 || off71 > NativeBodyCoincidence67.LocalDeviationLimit71) continue;
+                    worstOnFixedCurve71 = Math.Max(worstOnFixedCurve71, off71);
+                    targets.Remove(target);
+                }
+                if (worstOnFixedCurve71 > 0)
+                    CreateMirrorPartPackage.LogDebug("[REFLECT71][END_ON_FIXED_CURVE] worstResidual_m=" + worstOnFixedCurve71.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                        " limit_m=" + NativeBodyCoincidence67.LocalDeviationLimit71.ToString("E0", System.Globalization.CultureInfo.InvariantCulture));
                 foreach (var target in targets)
                     if (Math.Abs(target.Item1.X - target.Item2) > 1e-7 || Math.Abs(target.Item1.Y - target.Item3) > 1e-7)
-                        throw new InvalidOperationException("REFLECT52: Coordinate assignment failed while constraints were suspended.");
+                        // Same class as a rejected SetCoords: a point cannot take its own
+                        // reflection. Native case: a single arc, whose mirror image needs its
+                        // start and end exchanged (no API reverses an arc), so each end drags
+                        // the other back. The caller then retries with counterpart targets.
+                        throw new SketchPointMoveRejected58("REFLECT52: Coordinate assignment failed while constraints were suspended.");
                 CreateMirrorPartPackage.LogDebug("[REFLECT52][TARGETS_ASSIGNED] verified=True constraintsPendingRestore=" +
                     suspendedRelations52.Count);
             }
@@ -2575,6 +3555,7 @@ namespace ADDIN.Helpers
                 if (failures.Count > 0)
                     throw new InvalidOperationException("CONSTRAINT15: Cannot restore driving dimensions; output forbidden: " + string.Join("; ", failures));
             }
+            if (geometryFirst53) ReactivateEdgeCopies71(sketch, suspendedRelations52);
             for (int i = 0; i < targets.Count; i++)
                 targets[i] = Tuple.Create(ResolveProbePoint(sketch, targetIds[i]), targets[i].Item2, targets[i].Item3);
             foreach (var target in targets)
@@ -2813,6 +3794,10 @@ namespace ADDIN.Helpers
         {
             public SketchPrimitiveSnapshot58 Source;
             public double[] Start, End, Center, Middle;
+            // A spline: its recorded points, reflected, in the sketch; and its control
+            // points likewise when its definition was recorded.
+            public double[][] Samples;
+            public double[][] Control;
         }
 
         private static double[] PrimitiveReflectedLocal58(IMathUtility math, MathTransform modelToSketch,
@@ -2823,8 +3808,21 @@ namespace ADDIN.Helpers
             MathPoint point = math.CreatePoint(reflected) as MathPoint;
             MathPoint local = point == null ? null : point.MultiplyTransform(modelToSketch) as MathPoint;
             double[] values = local == null ? null : local.ArrayData as double[];
-            if (values == null || values.Length < 3 || Math.Abs(values[2] - planeOffset) > 1e-7)
-                throw new InvalidOperationException("PRIMITIVE58: Reflected segment does not lie on the active sketch plane.");
+            // Accepted local-deviation class, as where the points are placed one by one
+            // (MutateSketchPoints): the plane of a sketch made in an assembly is not
+            // exactly square to the mirror plane, and a point 1.2 m from it then lies
+            // a little off the plane after reflection. The profile is drawn in the
+            // plane; the body check measures what the cut becomes.
+            double offPlane58 = values == null || values.Length < 3 ? double.NaN : Math.Abs(values[2] - planeOffset);
+            if (!(offPlane58 <= (NativeBodyCoincidence67.SurfaceChainResidualAllowed71 ? NativeBodyCoincidence67.LocalDeviationLimit71 : 1e-7)))
+                throw new InvalidOperationException("PRIMITIVE58: Reflected segment does not lie on the active sketch plane. offPlane_m=" +
+                    offPlane58.ToString("E2", System.Globalization.CultureInfo.InvariantCulture));
+            if (offPlane58 > 1e-7)
+            {
+                CreateMirrorPartPackage.LogDebug("[PRIMITIVE58][OFF_PLANE_ACCEPTED] offPlane_m=" + offPlane58.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                    " limit_m=" + NativeBodyCoincidence67.LocalDeviationLimit71.ToString("E0", System.Globalization.CultureInfo.InvariantCulture));
+                NativeBodyCoincidence67.LargestAcceptedDeviation71 = Math.Max(NativeBodyCoincidence67.LargestAcceptedDeviation71, offPlane58);
+            }
             return new[] { values[0], values[1], 0.0 };
         }
 
@@ -2852,12 +3850,54 @@ namespace ADDIN.Helpers
             return Math.Sqrt(Math.Pow(left[0] - right[0], 2) + Math.Pow(left[1] - right[1], 2));
         }
 
+        private static string SegmentId71(SketchSegment segment)
+        {
+            int[] id = segment == null ? null : segment.GetID() as int[];
+            return id == null ? "" : string.Join(":", id);
+        }
+
+        // Whether a live line or arc (not a full circle, not half a turn) already
+        // lies where the reflected original has to be: same kind, same ends in
+        // either order, and for an arc the same centre and the same one of the two
+        // arcs between those ends.
+        private static bool IsAlready71(SketchSegment live, MirroredPrimitive58 entry)
+        {
+            const double same = 1e-8;
+            if (live == null || live.GetType() != entry.Source.Type || live.ConstructionGeometry != entry.Source.Construction) return false;
+            if (entry.Source.Type == (int)swSketchSegments_e.swSketchLINE)
+            {
+                ISketchLine line = live as ISketchLine;
+                SketchPoint a = line == null ? null : line.GetStartPoint2() as SketchPoint, b = line == null ? null : line.GetEndPoint2() as SketchPoint;
+                if (a == null || b == null) return false;
+                double[] p = { a.X, a.Y }, q = { b.X, b.Y };
+                return Math.Min(Math.Max(PrimitiveDistance58(p, entry.Start), PrimitiveDistance58(q, entry.End)),
+                    Math.Max(PrimitiveDistance58(p, entry.End), PrimitiveDistance58(q, entry.Start))) <= same;
+            }
+            if (entry.Source.Type != (int)swSketchSegments_e.swSketchARC || entry.Source.Circle) return false;
+            ISketchArc arc = live as ISketchArc;
+            if (arc == null) return false;
+            SketchPoint c = arc.GetCenterPoint2() as SketchPoint, s = arc.GetStartPoint2() as SketchPoint, e = arc.GetEndPoint2() as SketchPoint;
+            if (c == null || s == null || e == null) return false;
+            double[] centre = { c.X, c.Y }, start = { s.X, s.Y }, end = { e.X, e.Y };
+            if (PrimitiveDistance58(centre, entry.Center) > same) return false;
+            if (Math.Min(Math.Max(PrimitiveDistance58(start, entry.Start), PrimitiveDistance58(end, entry.End)),
+                Math.Max(PrimitiveDistance58(start, entry.End), PrimitiveDistance58(end, entry.Start))) > same) return false;
+            double radius = arc.GetRadius();
+            double[] chord = { (start[0] + end[0]) / 2 - centre[0], (start[1] + end[1]) / 2 - centre[1] };
+            double reach = Math.Sqrt(chord[0] * chord[0] + chord[1] * chord[1]);
+            if (reach < 1e-6 * radius) return false;
+            double side = live.GetLength() < Math.PI * radius ? 1 : -1;
+            double[] middle = { centre[0] + side * chord[0] / reach * radius, centre[1] + side * chord[1] / reach * radius };
+            return PrimitiveDistance58(middle, entry.Middle) <= same;
+        }
+
         // Used only when a point setter rejects a valid reflected target. Recreate the
         // complete line/arc sketch from the original model-space snapshot, never from
         // the partly-mutated staging sketch. This remains a native driving sketch/cut.
         public static void RecreateMirroredPrimitives58(ModelDoc2 model, Sketch sketch,
             List<SketchPrimitiveSnapshot58> pristine, PlaneData plane, bool replaceGeneratedProfile = false,
-            double planeOffset = 0, bool alreadyReflected = false, bool deferOwnerRebuild65 = false)
+            double planeOffset = 0, bool alreadyReflected = false, bool deferOwnerRebuild65 = false, bool followBodyEdges71 = false,
+            bool keepOwnMirrorImage71 = false)
         {
             if (model == null || sketch == null || pristine == null || pristine.Count == 0 || plane == null)
                 throw new InvalidOperationException("PRIMITIVE58: Original primitive snapshot is unavailable.");
@@ -2872,13 +3912,20 @@ namespace ADDIN.Helpers
             var mapped = new List<MirroredPrimitive58>();
             foreach (SketchPrimitiveSnapshot58 source in pristine)
             {
+                // A spline is drawn again through its recorded points; any other
+                // curve (ellipse, parabola, text) still has no handler.
+                bool spline58 = source.Type == (int)swSketchSegments_e.swSketchSPLINE && source.SamplesModel != null && source.SamplesModel.Length >= 5;
                 if (source.Type != (int)swSketchSegments_e.swSketchLINE &&
-                    source.Type != (int)swSketchSegments_e.swSketchARC)
+                    source.Type != (int)swSketchSegments_e.swSketchARC && !spline58)
                     throw new InvalidOperationException("PRIMITIVE58: Segment type " + source.Type +
                         " needs a dedicated geometry handler; original sketch retained.");
                 var target = new MirroredPrimitive58
                 {
                     Source = source,
+                    Samples = !spline58 ? null : source.SamplesModel.Select(p =>
+                        PrimitiveReflectedLocal58(math, modelToSketch, plane, p, planeOffset, alreadyReflected)).ToArray(),
+                    Control = !spline58 || source.SplineControlModel == null ? null : source.SplineControlModel.Select(p =>
+                        PrimitiveReflectedLocal58(math, modelToSketch, plane, p, planeOffset, alreadyReflected)).ToArray(),
                     Start = PrimitiveReflectedLocal58(math, modelToSketch, plane, source.StartModel, planeOffset, alreadyReflected),
                     End = PrimitiveReflectedLocal58(math, modelToSketch, plane, source.EndModel, planeOffset, alreadyReflected),
                     Center = PrimitiveReflectedLocal58(math, modelToSketch, plane, source.CenterModel, planeOffset, alreadyReflected),
@@ -2895,6 +3942,29 @@ namespace ADDIN.Helpers
                 throw new InvalidOperationException("PRIMITIVE58: Segment count changed before fallback; original sketch retained. " +
                     "pristine=" + pristine.Count + " live=" + existing.Length);
 
+            // A segment that already is the mirror image of one of the originals
+            // (natively the 44 m arc of a base flange, lying across the mirror
+            // plane) is left as it is, so that what was built on the faces and
+            // edges it generates keeps its references: an Edge Flange on that
+            // curved edge lost its hinge when the arc was drawn again, and
+            // SOLIDWORKS 2024 gives no way to hand the hinge back (Edge / Edges
+            // are refused by ModifyDefinition, and CreateFeature returns nothing
+            // for a flange on a curved edge, with a 3D and with a 2D profile).
+            var kept71 = new Dictionary<int, string>();
+            if (keepOwnMirrorImage71)
+                foreach (SketchSegment live71 in existing.OfType<SketchSegment>())
+                    for (int i = 0; i < mapped.Count; i++)
+                    {
+                        if (kept71.ContainsKey(i) || !IsAlready71(live71, mapped[i])) continue;
+                        kept71.Add(i, SegmentId71(live71));
+                        break;
+                    }
+            if (kept71.Count > 0)
+                CreateMirrorPartPackage.LogDebug("[PRIMITIVE71][OWN_MIRROR_IMAGE_KEPT] segments=" + kept71.Count + " of=" + mapped.Count +
+                    " indices=" + string.Join(",", kept71.Keys));
+            Func<object[]> replaceable71 = () => (sketch.GetSketchSegments() as object[] ?? new object[0])
+                .Where(s => !kept71.Values.Contains(SegmentId71(s as SketchSegment))).ToArray();
+
             bool oldAddToDb = model.SketchManager.AddToDB;
             // Attached, regenerated profiles are edited with their owner rolled back.
             // Do not toggle the native solver there: restoring it can trigger native
@@ -2910,27 +3980,133 @@ namespace ADDIN.Helpers
                 if (!deferOwnerRebuild65) sketch.SetAutomaticSolve(false);
                 model.SketchManager.AddToDB = true;
                 model.ClearSelection2(true);
-                foreach (object item in existing)
+                object[] replaced71 = replaceable71();
+                foreach (object item in replaced71)
                 {
                     SketchSegment segment = item as SketchSegment;
                     if (segment == null || !segment.Select4(true, null))
                         throw new InvalidOperationException("PRIMITIVE58: Cannot select every original segment for replacement.");
                 }
                 int deletionOptions65 = deferOwnerRebuild65 ? 0 : (int)swDeleteSelectionOptions_e.swDelete_Absorbed;
-                if (existing.Length > 0 && !model.Extension.DeleteSelection2(deletionOptions65))
+                // The same deletion was accepted in one native run and refused in the
+                // next (a Boss profile with two converted splines). It is asked for
+                // again on what is still there, and what was selected is logged.
+                bool deleted58 = replaced71.Length == 0;
+                for (int attempt58 = 0; attempt58 < 3 && !deleted58; attempt58++)
+                {
+                    object[] remaining58 = replaceable71();
+                    if (attempt58 == 2)
+                    {
+                        // One by one, to learn which of them SOLIDWORKS keeps.
+                        foreach (SketchSegment single58 in remaining58.OfType<SketchSegment>())
+                        {
+                            string what58 = "type=" + single58.GetType() + " id=" + string.Join(":", (int[])single58.GetID()) +
+                                " construction=" + single58.ConstructionGeometry + " relations=" + (single58.GetRelations() as object[] ?? new object[0]).Length;
+                            model.ClearSelection2(true);
+                            bool picked58 = single58.Select4(false, null);
+                            bool gone58 = picked58 && model.Extension.DeleteSelection2(0);
+                            CreateMirrorPartPackage.LogDebug("[PRIMITIVE58][DELETE_ONE] " + what58 + " selected=" + picked58 + " accepted=" + gone58);
+                        }
+                        remaining58 = replaceable71();
+                    }
+                    if (attempt58 == 1)
+                    {
+                        // The edit this sketch is in has been through refused point moves
+                        // and suspended relations; the sketch is left without a rebuild
+                        // and entered again before the deletion is asked for once more.
+                        var owner58 = sketch as Feature;
+                        model.SketchManager.AddToDB = oldAddToDb;
+                        model.SketchManager.InsertSketch(false);
+                        model.ClearSelection2(true);
+                        bool entered58 = owner58 != null && owner58.Select2(false, 0);
+                        if (entered58)
+                        {
+                            model.EditSketch();
+                            entered58 = SameProbeObject(model.SketchManager.ActiveSketch, sketch);
+                        }
+                        CreateMirrorPartPackage.LogDebug("[PRIMITIVE58][SKETCH_ENTERED_AGAIN] entered=" + entered58);
+                        if (!entered58) throw new InvalidOperationException("PRIMITIVE58: Cannot enter the sketch again to delete its segments.");
+                        if (!deferOwnerRebuild65) sketch.SetAutomaticSolve(false);
+                        model.SketchManager.AddToDB = true;
+                        remaining58 = replaceable71();
+                    }
+                    if (attempt58 > 0)
+                    {
+                        model.ClearSelection2(true);
+                        foreach (SketchSegment again58 in remaining58.OfType<SketchSegment>()) again58.Select4(true, null);
+                    }
+                    int selected58 = ((SelectionMgr)model.SelectionManager).GetSelectedObjectCount2(-1);
+                    bool accepted58 = model.Extension.DeleteSelection2(deletionOptions65);
+                    int left58 = replaceable71().Length;
+                    deleted58 = left58 == 0;
+                    if (!accepted58 || attempt58 > 0)
+                        CreateMirrorPartPackage.LogDebug("[PRIMITIVE58][DELETE] attempt=" + attempt58 + " segments=" + remaining58.Length + " selected=" + selected58 +
+                            " accepted=" + accepted58 + " left=" + left58);
+                }
+                if (!deleted58)
                     throw new InvalidOperationException("PRIMITIVE58: Original segment deletion was rejected.");
-                if ((sketch.GetSketchSegments() as object[] ?? new object[0]).Length != 0)
+                if ((sketch.GetSketchSegments() as object[] ?? new object[0]).Length != kept71.Count)
                     throw new InvalidOperationException("PRIMITIVE58: Original sketch segments remain after deletion.");
 
                 const double tolerance = 1e-7;
+                var anchors58 = new List<SketchPoint>(); var freeEnds58 = new List<SketchPoint>();
                 for (int i = 0; i < mapped.Count; i++)
                 {
                     MirroredPrimitive58 entry = mapped[i];
+                    if (kept71.ContainsKey(i))
+                    {
+                        CreateMirrorPartPackage.LogDebug("[GEOMETRY_FIRST58][PRIMITIVE_PASS] index=" + i +
+                            " type=" + entry.Source.Type + " construction=" + entry.Source.Construction + " keptAsOwnMirrorImage=True");
+                        continue;
+                    }
                     SketchSegment created;
+                    bool exact58 = false, onBodyEdge58 = false;
                     if (entry.Source.Type == (int)swSketchSegments_e.swSketchLINE)
                     {
                         created = model.SketchManager.CreateLine(entry.Start[0], entry.Start[1], 0,
                             entry.End[0], entry.End[1], 0) as SketchSegment;
+                    }
+                    else if (entry.Samples != null)
+                    {
+                        // The same B-curve with reflected control points is the mirror
+                        // image itself. Only a spline whose definition was not handed out
+                        // is drawn through every second recorded point instead. Either
+                        // way the new curve is measured below against all recorded points.
+                        created = null;
+                        double[][] control58 = entry.Control; double[] knots58 = entry.Source.SplineKnots, weights58 = entry.Source.SplineWeights;
+                        int order58 = entry.Source.SplineOrder; bool homogeneous58 = entry.Source.SplineHomogeneous;
+                        // On the edge of the body as it is, when that is asked for and the
+                        // spline ran along one (SplineOnBodyEdge71).
+                        EdgeSpline71 onEdge58 = followBodyEdges71 ? SplineOnBodyEdge71(model, math, modelToSketch, entry.Source, plane, alreadyReflected) : null;
+                        if (onEdge58 != null)
+                        {
+                            control58 = onEdge58.Control; knots58 = onEdge58.Knots; weights58 = onEdge58.Weights;
+                            order58 = onEdge58.Order; homogeneous58 = onEdge58.Homogeneous; onBodyEdge58 = true;
+                        }
+                        if (control58 != null)
+                        {
+                            var definition58 = model.SketchManager.CreateSplineParamData() as SplineParamData;
+                            if (definition58 != null)
+                            {
+                                definition58.Dimension = weights58 == null ? 3 : 4; definition58.Order = order58; definition58.Periodic = 0;
+                                definition58.ControlPointsCount = control58.Length;
+                                if (definition58.SetControlPoints(control58.SelectMany((p, k) => weights58 == null ? new[] { p[0], p[1], 0.0 }
+                                        : homogeneous58 ? new[] { p[0] * weights58[k], p[1] * weights58[k], 0.0, weights58[k] }
+                                        : new[] { p[0], p[1], 0.0, weights58[k] }).ToArray()) &&
+                                    definition58.SetKnotPoints(knots58))
+                                {
+                                    object made58 = model.SketchManager.CreateSplinesByEqnParams2(definition58);
+                                    var list58 = made58 as object[];
+                                    created = list58 != null ? (list58.Length == 1 ? list58[0] as SketchSegment : null) : made58 as SketchSegment;
+                                    if (list58 != null && list58.Length > 1)
+                                        throw new InvalidOperationException("PRIMITIVE58: Spline definition gave " + list58.Length + " curves at " + i);
+                                }
+                            }
+                        }
+                        exact58 = created != null;
+                        if (created == null)
+                            created = model.SketchManager.CreateSpline2(
+                                entry.Samples.Where((p, k) => k % 2 == 0).SelectMany(p => new[] { p[0], p[1], 0.0 }).ToArray(), false) as SketchSegment;
                     }
                     else if (entry.Source.Circle)
                     {
@@ -2947,11 +4123,56 @@ namespace ADDIN.Helpers
                     if (created == null) throw new InvalidOperationException("PRIMITIVE58: Segment creation failed at " + i);
                     created.ConstructionGeometry = entry.Source.Construction;
                     if (created.ConstructionGeometry != entry.Source.Construction ||
-                        Math.Abs(created.GetLength() - entry.Source.Length) > tolerance)
+                        (entry.Samples == null && Math.Abs(created.GetLength() - entry.Source.Length) > tolerance))
                         throw new InvalidOperationException("PRIMITIVE58: Segment length/construction mismatch at " + i);
-                    if (entry.Source.Type == (int)swSketchSegments_e.swSketchLINE)
+                    if (entry.Samples != null)
+                    {
+                        // The spline through the points is the mirror image only as far as it
+                        // is measured to be: every recorded point against the new curve (its
+                        // ends must be the recorded ends), and its length against the source.
+                        // What is found is the accepted local deviation or the profile is refused.
+                        var curve58 = created.GetCurve() as Curve;
+                        double deviation58 = 0;
+                        foreach (double[] p in entry.Samples)
+                        {
+                            var q = curve58 == null ? null : curve58.GetClosestPointOn(p[0], p[1], 0) as double[];
+                            deviation58 = Math.Max(deviation58, q == null || q.Length < 3 ? double.PositiveInfinity
+                                : Math.Sqrt((q[0] - p[0]) * (q[0] - p[0]) + (q[1] - p[1]) * (q[1] - p[1]) + q[2] * q[2]));
+                        }
+                        var ends58 = (created as SketchSpline) == null ? null : ((SketchSpline)created).GetPoints2() as object[];
+                        double endResidual58 = ends58 == null || ends58.Length < 2 ? double.PositiveInfinity : Math.Min(
+                            Math.Max(PrimitiveDistance58(new[] { ((SketchPoint)ends58[0]).X, ((SketchPoint)ends58[0]).Y }, entry.Start),
+                                PrimitiveDistance58(new[] { ((SketchPoint)ends58[ends58.Length - 1]).X, ((SketchPoint)ends58[ends58.Length - 1]).Y }, entry.End)),
+                            Math.Max(PrimitiveDistance58(new[] { ((SketchPoint)ends58[0]).X, ((SketchPoint)ends58[0]).Y }, entry.End),
+                                PrimitiveDistance58(new[] { ((SketchPoint)ends58[ends58.Length - 1]).X, ((SketchPoint)ends58[ends58.Length - 1]).Y }, entry.Start)));
+                        double lengthOff58 = Math.Abs(created.GetLength() - entry.Source.Length);
+                        // A spline on the body edge ends where the edge does, within the
+                        // deviation of the body; the other ends of the profile are joined to it below.
+                        double endLimit58 = onBodyEdge58 ? NativeBodyCoincidence67.LocalDeviationLimit71 : tolerance;
+                        if (ends58 != null && ends58.Length >= 2)
+                            (onBodyEdge58 ? anchors58 : freeEnds58).AddRange(new[] { (SketchPoint)ends58[0], (SketchPoint)ends58[ends58.Length - 1] });
+                        CreateMirrorPartPackage.LogDebug("[SPLINE58][DRAWN_AGAIN] index=" + i + " onBodyEdge=" + onBodyEdge58 + " exactDefinition=" + exact58 + " through=" +
+                            (exact58 ? 0 : (entry.Samples.Length + 1) / 2) + " measuredAt=" + entry.Samples.Length +
+                            " deviation_m=" + deviation58.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                            " ends_m=" + endResidual58.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                            " lengthDifference_m=" + lengthOff58.ToString("E2", System.Globalization.CultureInfo.InvariantCulture) +
+                            " limit_m=" + NativeBodyCoincidence67.LocalDeviationLimit71.ToString("E0", System.Globalization.CultureInfo.InvariantCulture));
+                        // The length as well: what is placed along the curve by distance (a
+                        // pattern with equal spacing) moves by the difference.
+                        if (!(deviation58 <= NativeBodyCoincidence67.LocalDeviationLimit71) || endResidual58 > endLimit58 ||
+                            lengthOff58 > NativeBodyCoincidence67.LocalDeviationLimit71)
+                            throw new InvalidOperationException("PRIMITIVE58: Spline drawn again is not the mirror image at " + i +
+                                ". deviation_m=" + deviation58.ToString("E2", System.Globalization.CultureInfo.InvariantCulture));
+                        if (deviation58 > 1e-7)
+                        {
+                            NativeBodyCoincidence67.LargestAcceptedDeviation71 = Math.Max(NativeBodyCoincidence67.LargestAcceptedDeviation71, deviation58);
+                            NativeBodyCoincidence67.SurfaceChainResidualAllowed71 = true;
+                        }
+                    }
+                    else if (entry.Source.Type == (int)swSketchSegments_e.swSketchLINE)
                     {
                         ISketchLine line = created as ISketchLine;
+                        freeEnds58.AddRange(new[] { (SketchPoint)line.GetStartPoint2(), (SketchPoint)line.GetEndPoint2() });
                         double[] a = { ((SketchPoint)line.GetStartPoint2()).X, ((SketchPoint)line.GetStartPoint2()).Y };
                         double[] b = { ((SketchPoint)line.GetEndPoint2()).X, ((SketchPoint)line.GetEndPoint2()).Y };
                         double residual = Math.Min(Math.Max(PrimitiveDistance58(a, entry.Start), PrimitiveDistance58(b, entry.End)),
@@ -2978,6 +4199,26 @@ namespace ADDIN.Helpers
                     CreateMirrorPartPackage.LogDebug("[GEOMETRY_FIRST58][PRIMITIVE_PASS] index=" + i +
                         " type=" + entry.Source.Type + " construction=" + entry.Source.Construction);
                 }
+                // The other ends of the profile that met a spline now lying on the body
+                // edge are put on its ends, so that the profile stays closed.
+                if (anchors58.Count > 0)
+                {
+                    int joined58 = 0; double farthest58 = 0;
+                    foreach (SketchPoint free58 in freeEnds58)
+                        foreach (SketchPoint anchor58 in anchors58)
+                        {
+                            double gap58 = PrimitiveDistance58(new[] { free58.X, free58.Y }, new[] { anchor58.X, anchor58.Y });
+                            if (gap58 <= 1e-9 || gap58 > NativeBodyCoincidence67.LocalDeviationLimit71) continue;
+                            free58.SetCoords(anchor58.X, anchor58.Y, 0);
+                            if (PrimitiveDistance58(new[] { free58.X, free58.Y }, new[] { anchor58.X, anchor58.Y }) > 1e-9)
+                                throw new InvalidOperationException("PRIMITIVE58: An end of the profile could not be joined to the spline on the body edge.");
+                            joined58++; farthest58 = Math.Max(farthest58, gap58);
+                            break;
+                        }
+                    CreateMirrorPartPackage.LogDebug("[SPLINE71][ENDS_JOINED] splinesOnBodyEdge=" + anchors58.Count / 2 + " endsMoved=" + joined58 +
+                        " farthest_m=" + farthest58.ToString("E2", System.Globalization.CultureInfo.InvariantCulture));
+                    NativeBodyCoincidence67.LargestAcceptedDeviation71 = Math.Max(NativeBodyCoincidence67.LargestAcceptedDeviation71, farthest58);
+                }
                 CreateMirrorPartPackage.LogDebug("[SKETCH65][COUNT_BEGIN] deferOwnerRebuild=" + deferOwnerRebuild65);
                 var active65 = model.SketchManager.ActiveSketch;
                 if (active65 == null || !SameProbeObject(active65, sketch))
@@ -2997,10 +4238,16 @@ namespace ADDIN.Helpers
                 try { app.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swSketchInference, oldInference); } catch { }
                 CreateMirrorPartPackage.LogDebug("[SKETCH65][RESTORE_SETTINGS_END]");
             }
+            // What SOLIDWORKS makes of the re-drawn profile as a cut profile: for the
+            // log, and for the message when it refuses to leave the sketch.
+            int open65 = 0, closed65 = 0, use65 = -2;
+            try { use65 = sketch.CheckFeatureUse((int)swSketchCheckFeatureProfileUsage_e.swSketchCheckFeature_CUTEXTRUDE, ref open65, ref closed65); } catch { }
+            string featureUse65 = "cutProfileStatus=" + use65 + " openContours=" + open65 + " closedContours=" + closed65;
+            CreateMirrorPartPackage.LogDebug("[SKETCH65][FEATURE_USE] " + featureUse65);
             CreateMirrorPartPackage.LogDebug("[SKETCH65][EXIT_BEGIN] updateEditRebuild=" + !deferOwnerRebuild65);
             model.SketchManager.InsertSketch(!deferOwnerRebuild65);
             if (model.SketchManager.ActiveSketch != null)
-                throw new InvalidOperationException("PRIMITIVE65: Sketch exit did not close the active edit.");
+                throw new InvalidOperationException("PRIMITIVE65: Sketch exit did not close the active edit. " + featureUse65);
             CreateMirrorPartPackage.LogDebug("[SKETCH65][EXIT_END]");
             CreateMirrorPartPackage.LogDebug("[GEOMETRY_FIRST58][PRIMITIVE_RECREATION_PASS] segments=" + pristine.Count +
                 " nativeSketch=True rebuildPending=True");

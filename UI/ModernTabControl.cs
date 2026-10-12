@@ -1,109 +1,204 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace ADDIN.UI
 {
+    public enum ModernTabStyle
+    {
+        Card,       // Level 1: a segmented switch (Drawing / Model)
+        Underline   // Level 2: text tabs with an underline for the open page
+    }
+
+    // A tab control that paints its own header and gives its pages the full
+    // width. Hit-testing uses the painted tabs, not the native ones.
     public class ModernTabControl : TabControl
     {
-        [Category("Appearance")]
-        [Description("Màu đường chỉ báo gạch chân tab đang chọn")]
-        public Color ActiveTabColor { get; set; } = Color.FromArgb(0, 114, 206);
+        private ModernTabStyle tabStyle = ModernTabStyle.Card;
+        private int hoverIndex = -1;
 
         [Category("Appearance")]
-        [Description("Màu chữ tab đang chọn")]
-        public Color ActiveTextColor { get; set; } = Color.FromArgb(15, 25, 45);
+        [Description("Card: công tắc phân đoạn cấp 1. Underline: tab chữ gạch chân cấp 2")]
+        [DefaultValue(ModernTabStyle.Card)]
+        public ModernTabStyle TabStyle
+        {
+            get
+            {
+                if (Name == "tabDrawingPages" || Name == "tabModelPages" || Parent is TabPage)
+                    return ModernTabStyle.Underline;
+                return tabStyle;
+            }
+            set { tabStyle = value; Invalidate(); }
+        }
 
-        [Category("Appearance")]
-        [Description("Màu chữ tab không chọn")]
-        public Color InactiveTextColor { get; set; } = Color.FromArgb(100, 115, 135);
+        // Colour properties from before TaiTheme; Designer code still assigns them.
+        [Browsable(false)] public Color ActiveTabColor { get; set; } = TaiTheme.Accent;
+        [Browsable(false)] public Color ActiveTextColor { get; set; } = TaiTheme.Accent;
+        [Browsable(false)] public Color InactiveTextColor { get; set; } = TaiTheme.TextMuted;
+        [Browsable(false)] public Color HeaderBackColor { get; set; } = TaiTheme.Page;
+        [Browsable(false)] public Color BorderColor { get; set; } = TaiTheme.Border;
 
-        [Category("Appearance")]
-        [Description("Màu nền thanh tab")]
-        public Color HeaderBackColor { get; set; } = Color.FromArgb(232, 236, 242);
-
-        [Category("Appearance")]
-        [Description("Màu đường phân cách")]
-        public Color BorderColor { get; set; } = Color.FromArgb(215, 222, 230);
+        // The native tabs are never shown. They stay narrow so the native control
+        // has no reason to add its scroll arrows; sizes assigned by Designer
+        // code are for those hidden tabs and are not applied.
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public new Size ItemSize
+        {
+            get { return base.ItemSize; }
+            set { }
+        }
 
         public ModernTabControl()
         {
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            DrawMode = TabDrawMode.OwnerDrawFixed;
-            SizeMode = TabSizeMode.Normal;
-            ItemSize = new Size(110, 30);
-            Padding = new Point(14, 6);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            DoubleBuffered = true;
+            SizeMode = TabSizeMode.Fixed;
+            base.ItemSize = new Size(8, 24);
         }
 
-        protected override void OnDrawItem(DrawItemEventArgs e)
+        private int HeaderHeight { get { return TaiTheme.Px(this, TabStyle == ModernTabStyle.Card ? 44 : 34); } }
+
+        // Pages start right under the painted header and reach every edge.
+        public override Rectangle DisplayRectangle
         {
-            if (e.Index < 0 || e.Index >= TabCount)
-                return;
+            get { return new Rectangle(0, HeaderHeight, Math.Max(0, Width), Math.Max(0, Height - HeaderHeight)); }
+        }
 
-            Graphics g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-
-            TabPage page = TabPages[e.Index];
-            Rectangle rect = GetTabRect(e.Index);
-            bool isSelected = (SelectedIndex == e.Index);
-
-            // Nền tab phẳng dịu mắt đồng bộ với trang Task Pane
-            Color backColor = isSelected ? Color.FromArgb(240, 243, 246) : HeaderBackColor;
-            using (var brush = new SolidBrush(backColor))
+        private Rectangle Track
+        {
+            get
             {
-                g.FillRectangle(brush, rect);
+                int side = TaiTheme.Px(this, 8);
+                return new Rectangle(side, TaiTheme.Px(this, 7), Math.Max(1, Width - side * 2), TaiTheme.Px(this, 30));
             }
+        }
 
-            // Đường chỉ báo tab đang chọn (Active Indicator Underline)
-            if (isSelected)
+        private Rectangle TabBounds(Graphics g, int index)
+        {
+            if (TabStyle == ModernTabStyle.Card)
             {
-                int indicatorHeight = 3;
-                Rectangle indicatorRect = new Rectangle(rect.X + 4, rect.Bottom - indicatorHeight, rect.Width - 8, indicatorHeight);
-                using (var brush = new SolidBrush(ActiveTabColor))
-                {
-                    g.FillRectangle(brush, indicatorRect);
-                }
+                Rectangle track = Track;
+                int count = Math.Max(1, TabCount), inset = TaiTheme.Px(this, 3);
+                int left = track.X + track.Width * index / count, right = track.X + track.Width * (index + 1) / count;
+                return new Rectangle(left + inset, track.Y + inset, Math.Max(1, right - left - inset * 2), track.Height - inset * 2);
             }
+            int x = TaiTheme.Px(this, 10), gap = TaiTheme.Px(this, 6), width = 0;
+            for (int n = 0; n <= index; n++)
+            {
+                if (n > 0) x += width + gap;
+                width = TextRenderer.MeasureText(g, TabPages[n].Text, TaiTheme.BodyStrong, Size.Empty,
+                    TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width + TaiTheme.Px(this, 16);
+            }
+            return new Rectangle(x, 0, width, HeaderHeight - 1);
+        }
 
-            // Chữ tiêu đề tab
-            Font tabFont = isSelected
-                ? new Font("Segoe UI", 9F, FontStyle.Bold)
-                : new Font("Segoe UI", 9F, FontStyle.Regular);
-
-            Color textColor = isSelected ? ActiveTextColor : InactiveTextColor;
-
-            Rectangle textRect = new Rectangle(rect.X, rect.Y, rect.Width, rect.Height - (isSelected ? 3 : 0));
-            TextRenderer.DrawText(g, page.Text, tabFont, textRect, textColor,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-
-            tabFont.Dispose();
+        private int TabAt(Point point)
+        {
+            if (point.Y < 0 || point.Y >= HeaderHeight || TabCount == 0) return -1;
+            using (Graphics g = CreateGraphics())
+                for (int n = 0; n < TabCount; n++)
+                    if (TabBounds(g, n).Contains(point)) return n;
+            return -1;
         }
 
         protected override void WndProc(ref Message m)
         {
-            base.WndProc(ref m);
-            // 0x000F is WM_PAINT
-            if (m.Msg == 0x000F && TabCount > 0)
+            const int HitTest = 0x0084, HitClient = 1, LeftButtonDown = 0x0201, LeftButtonDoubleClick = 0x0203;
+            // Away from its own tabs, which stay hidden here, the native control answers
+            // "transparent" and Windows gives a click on the painted header to the parent.
+            if (m.Msg == HitTest) { m.Result = (IntPtr)HitClient; return; }
+            if (m.Msg == LeftButtonDown || m.Msg == LeftButtonDoubleClick)
             {
-                try
+                long position = m.LParam.ToInt64();
+                Point point = new Point((short)(position & 0xFFFF), (short)((position >> 16) & 0xFFFF));
+                if (point.Y < HeaderHeight)
                 {
-                    using (Graphics g = Graphics.FromHwnd(Handle))
-                    {
-                        Rectangle firstTab = GetTabRect(0);
-                        int lineY = firstTab.Bottom - 1;
-                        using (var pen = new Pen(BorderColor, 1F))
-                        {
-                            g.DrawLine(pen, 0, lineY, Width, lineY);
-                        }
-                    }
+                    int index = TabAt(point);
+                    if (index >= 0 && index != SelectedIndex) SelectedIndex = index;
+                    return;
                 }
-                catch
+            }
+            base.WndProc(ref m);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            int index = TabAt(e.Location);
+            if (index == hoverIndex) return;
+            hoverIndex = index;
+            Invalidate(new Rectangle(0, 0, Width, HeaderHeight));
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            if (hoverIndex < 0) return;
+            hoverIndex = -1;
+            Invalidate(new Rectangle(0, 0, Width, HeaderHeight));
+        }
+
+        protected override void OnSelectedIndexChanged(EventArgs e)
+        {
+            base.OnSelectedIndexChanged(e);
+            Invalidate();
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs pevent) { }
+
+        private static TaiIcon IconFor(string text)
+        {
+            if (string.Equals(text, "Drawing", StringComparison.OrdinalIgnoreCase)) return TaiIcon.Sheet;
+            return string.Equals(text, "Model", StringComparison.OrdinalIgnoreCase) ? TaiIcon.Cube : TaiIcon.None;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            TaiTheme.Prepare(g);
+            g.Clear(TaiTheme.Page);
+            const TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix |
+                TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis;
+
+            if (TabStyle == ModernTabStyle.Card)
+            {
+                Rectangle track = Track;
+                TaiTheme.FillRound(g, new Rectangle(track.X, track.Y, track.Width - 1, track.Height - 1), TaiTheme.Px(this, 8), TaiTheme.Sunken, Color.Empty);
+                for (int n = 0; n < TabCount; n++)
                 {
-                    // Suppress any GDI handle issues on shutdown
+                    Rectangle tab = TabBounds(g, n);
+                    bool selected = n == SelectedIndex;
+                    if (selected)
+                        TaiTheme.FillRound(g, new Rectangle(tab.X, tab.Y, tab.Width - 1, tab.Height - 1), TaiTheme.Px(this, 6), TaiTheme.Surface, TaiTheme.Border);
+                    Color color = selected ? TaiTheme.Text : n == hoverIndex ? TaiTheme.Text : TaiTheme.TextMuted;
+                    string text = TabPages[n].Text;
+                    TaiIcon icon = IconFor(text);
+                    int glyph = icon == TaiIcon.None ? 0 : TaiTheme.Px(this, 16), gap = glyph == 0 ? 0 : TaiTheme.Px(this, 6);
+                    int textWidth = TextRenderer.MeasureText(g, text, TaiTheme.BodyStrong, Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
+                    int left = tab.X + Math.Max(TaiTheme.Px(this, 4), (tab.Width - glyph - gap - textWidth) / 2);
+                    if (glyph > 0)
+                        TaiIcons.Draw(g, icon, new Rectangle(left, tab.Y + (tab.Height - glyph) / 2, glyph, glyph), selected ? TaiTheme.Accent : color);
+                    TextRenderer.DrawText(g, text, TaiTheme.BodyStrong, new Rectangle(left + glyph + gap, tab.Y, Math.Max(1, tab.Right - left - glyph - gap), tab.Height - 1),
+                        color, TextFormatFlags.Left | flags);
                 }
+                return;
+            }
+
+            int baseline = HeaderHeight - 1;
+            using (Pen pen = new Pen(TaiTheme.Divider, 1F)) g.DrawLine(pen, 0, baseline, Width, baseline);
+            for (int n = 0; n < TabCount; n++)
+            {
+                Rectangle tab = TabBounds(g, n);
+                bool selected = n == SelectedIndex;
+                Color color = selected ? TaiTheme.Accent : n == hoverIndex ? TaiTheme.Text : TaiTheme.TextMuted;
+                TextRenderer.DrawText(g, TabPages[n].Text, selected ? TaiTheme.BodyStrong : TaiTheme.Body, tab, color, TextFormatFlags.HorizontalCenter | flags);
+                if (!selected) continue;
+                int inset = TaiTheme.Px(this, 8), thickness = TaiTheme.Px(this, 2);
+                using (SolidBrush brush = new SolidBrush(TaiTheme.Accent))
+                    g.FillRectangle(brush, tab.X + inset, baseline - thickness + 1, Math.Max(1, tab.Width - inset * 2), thickness);
             }
         }
     }

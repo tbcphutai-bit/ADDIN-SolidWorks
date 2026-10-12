@@ -23,6 +23,10 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             internal double[] Translation, Direction;
             internal Func<ModelDoc2, object>[] Faces;
             internal Func<ModelDoc2, object> DirectionReference, EndReference, FromReference;
+            internal string Configuration70;
+            internal List<Body2> ReflectedBefore70, ReflectedAfter70;
+            internal readonly Dictionary<string, MoveFaceRecipe64> ActiveConfigurations70 =
+                new Dictionary<string, MoveFaceRecipe64>(StringComparer.Ordinal);
         }
 
         private static void CaptureDependencyGraph64(MirrorInPlaceExecutionContextV7 context)
@@ -114,6 +118,7 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             var data = (IMoveFaceFeatureData)feature.GetDefinition();
             if (!data.AccessSelections(context.WorkingDocument, null))
                 throw new InvalidOperationException("MOVEFACE64 selections unavailable; suppressed commands are not blindly unsuppressed.");
+            bool unsafeCapture70 = false;
             try
             {
                 var faces = data.Faces as Array;
@@ -154,9 +159,141 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                     throw new InvalidOperationException("MOVEFACE64 unsupported move type=" + recipe.MoveType);
                 MirrorV7Diagnostics.Log("[MOVEFACE64][RECIPE_CAPTURED] feature=" + feature.Name + " type=" + recipe.MoveType +
                     " faces=" + recipe.Faces.Length + " suppressed=" + feature.IsSuppressed() + " retainedComFaces=False");
+                recipe.Configuration70 = context.WorkingDocument.ConfigurationManager.ActiveConfiguration.Name;
                 return recipe;
             }
-            finally { data.ReleaseSelectionAccess(); }
+            catch (Exception ex) { unsafeCapture70 = IsUnsafeNativeFailure66(ex); throw; }
+            finally { if (!unsafeCapture70) data.ReleaseSelectionAccess(); }
+        }
+
+        private static void CaptureMoveConfigurations70(MirrorInPlaceExecutionContextV7 context,
+            FeatureReplayCheckpointV7 item)
+        {
+            var model = context.WorkingDocument;
+            var recipe = item.MoveFace64;
+            var node = context.Dependencies64.Nodes[item.Feature.TreeOrder];
+            string original = model.ConfigurationManager.ActiveConfiguration.Name;
+            bool unsafeNative = false;
+            try
+            {
+                var activeConfigurations = DependencyConfiguration70.ActiveSourceConfigurations(node.Suppression);
+                if (activeConfigurations.Length == 0)
+                    throw new InvalidOperationException("MOVEFACE70 no source-active configuration; native deletion recovery not qualified.");
+                foreach (string configuration in activeConfigurations)
+                {
+                    ActivateDependencyConfiguration70(model, configuration);
+                    var feature = ResolveDependencyFeature64(context, node.Id);
+                    MoveRollbackAfter(model, feature);
+                    model.EditRebuild3();
+                    if (feature.IsSuppressed())
+                        throw new InvalidOperationException("MOVEFACE70 source-active suppression disagrees with snapshot.");
+                    RequireHealthyMoveFace68(feature, "SOURCE_ACTIVE_CONFIGURATION70");
+                    var after = BaseSketchMutationEngineV7.ReflectCurrentSolids(context,
+                        "MOVEFACE70/SOURCE_AFTER/configuration=" + configuration + "/sourceId=" + node.Id);
+                    var activeRecipe = CaptureMoveFace64(context, feature);
+                    if (!SameMoveScalars70(recipe, activeRecipe))
+                        throw new InvalidOperationException("MOVEFACE70 configuration-dependent scalar options need a qualified adapter; mutation not started.");
+                    if (!model.FeatureManager.EditRollback((int)swMoveRollbackBarTo_e.swMoveRollbackBarToBeforeFeature, feature.Name))
+                        throw new InvalidOperationException("MOVEFACE70 source BEFORE checkpoint rollback rejected.");
+                    model.EditRebuild3();
+                    activeRecipe.ReflectedBefore70 = BaseSketchMutationEngineV7.ReflectCurrentSolids(context,
+                        "MOVEFACE70/SOURCE_BEFORE/configuration=" + configuration + "/sourceId=" + node.Id);
+                    activeRecipe.ReflectedAfter70 = after;
+                    recipe.ActiveConfigurations70.Add(configuration, activeRecipe);
+                    MirrorV7Diagnostics.Log("[MOVEFACE70][SOURCE_CONTEXT_CAPTURED] sourceId=" + node.Id +
+                        " configuration=" + configuration + " sourceActive=True faces=" + activeRecipe.Faces.Length +
+                        " beforeAndAfterHealthy=True nativeInsertionAttempted=False");
+                }
+            }
+            catch (Exception ex) { unsafeNative = IsUnsafeNativeFailure66(ex); throw; }
+            finally
+            {
+                if (!unsafeNative)
+                {
+                    ActivateDependencyConfiguration70(model, original);
+                    MoveRollbackAfter(model, ResolveDependencyFeature64(context, node.Id));
+                    model.EditRebuild3();
+                    AssertMoveSuppression70(context, node.Id);
+                }
+                else MirrorV7Diagnostics.Log("[MOVEFACE70][CAPTURE_NATIVE_STOP] configurationRestoreSkipped=True furtherCadCalls=0");
+            }
+        }
+
+        private static bool SameMoveScalars70(MoveFaceRecipe64 first, MoveFaceRecipe64 second)
+        {
+            return first.MoveType == second.MoveType && first.EndCondition == second.EndCondition &&
+                first.Reverse == second.Reverse && first.Faces.Length == second.Faces.Length &&
+                SameScalarOption63(first.Distance, second.Distance) && SameScalarOption63(first.Angle, second.Angle) &&
+                SameScalarOption63(first.Offset, second.Offset) &&
+                ((first.Translation == null && second.Translation == null) ||
+                (first.Translation != null && second.Translation != null && first.Translation.Length == second.Translation.Length &&
+                    first.Translation.Zip(second.Translation, (a, b) => SameScalarOption63(a, b)).All(v => v)));
+        }
+
+        private static void ActivateDependencyConfiguration70(ModelDoc2 model, string configuration)
+        {
+            if (model.ConfigurationManager.ActiveConfiguration.Name == configuration) return;
+            bool changed = model.ShowConfiguration2(configuration);
+            if (model.ConfigurationManager.ActiveConfiguration.Name != configuration)
+                throw new InvalidOperationException("DEPENDENCY70 configuration activation rejected: " + configuration + " return=" + changed);
+        }
+
+        private static void AssertMoveSuppression70(MirrorInPlaceExecutionContextV7 context, int id)
+        {
+            var node = context.Dependencies64.Nodes[id];
+            var configurations = node.Suppression.Keys.ToArray();
+            var actual = ResolveDependencyFeature64(context, id).IsSuppressed2(
+                (int)swInConfigurationOpts_e.swSpecifyConfiguration, configurations) as Array;
+            if (actual == null || actual.Length != configurations.Length ||
+                configurations.Where((c, i) => node.Suppression[c] != (bool)actual.GetValue(i)).Any())
+                throw new InvalidOperationException("DEPENDENCY70 source suppression mask changed: id=" + id);
+        }
+
+        private static bool HasOriginalHistorySlot70(MirrorInPlaceExecutionContextV7 context, int id)
+        {
+            // The native insertion API can place a post-flat command directly
+            // after FlatPattern, irrespective of the requested rollback slot.
+            // Compare surviving SOURCE identities, excluding new native helper
+            // sketches. Localized names are resolved runtime identities only.
+            var journal = context.Dependencies64;
+            var expected = journal.Nodes.Values.Where(n => n.Depth == 0 &&
+                (n.Id == id || !journal.Pending.Contains(n.Id))).OrderBy(n => n.Id).Select(n => n.Id).ToArray();
+            var lookup = expected.ToDictionary(sourceId => ResolveDependencyFeature64(context, sourceId).Name,
+                sourceId => sourceId, StringComparer.Ordinal);
+            var actual = new List<int>();
+            int traversed = 0;
+            for (var feature = context.WorkingDocument.FirstFeature() as Feature; feature != null;
+                feature = feature.GetNextFeature() as Feature)
+            {
+                if (++traversed > 100000) throw new InvalidOperationException("DEPENDENCY70 native history traversal limit exceeded.");
+                int sourceId;
+                if (lookup.TryGetValue(feature.Name, out sourceId)) actual.Add(sourceId);
+            }
+            return DependencyHistory70.IsOriginalSourceOrder(expected, actual);
+        }
+
+        private static Feature RestoreOriginalHistorySlot70(MirrorInPlaceExecutionContextV7 context,
+            FeatureReplayCheckpointV7 item, DependencyNode64 predecessor)
+        {
+            int id = item.Feature.TreeOrder;
+            var model = context.WorkingDocument;
+            if (!HasOriginalHistorySlot70(context, id))
+            {
+                var child = ResolveDependencyFeature64(context, id);
+                var previous = ResolveDependencyFeature64(context, predecessor.Id);
+                MoveRollbackAfter(model, previous);
+                RequireHealthyMoveFace68(child, "HISTORY_ROLLFORWARD70");
+                if (!model.Extension.ReorderFeature(child.Name, previous.Name, (int)swMoveLocation_e.swMoveAfter))
+                    throw new InvalidOperationException("DEPENDENCY70 native source-history reorder rejected; publication blocked.");
+                child = ResolveDependencyFeature64(context, id);
+                RequireHealthyMoveFace68(child, "HISTORY_REORDER70");
+                MirrorV7Diagnostics.Log("[MOVEFACE70][HISTORY_REORDER] sourceId=" + id + " predecessorId=" + predecessor.Id +
+                    " nativeApi=ReorderFeature filenameRules=False");
+            }
+            if (!HasOriginalHistorySlot70(context, id))
+                throw new InvalidOperationException("DEPENDENCY70 recreated command is not in its original source-history slot.");
+            MirrorV7Diagnostics.Log("[MOVEFACE70][HISTORY_SLOT_PASS] sourceId=" + id + " predecessorId=" + predecessor.Id);
+            return ResolveDependencyFeature64(context, id);
         }
 
         private static double[] DirectionVector64(MirrorInPlaceExecutionContextV7 context, object reference)
@@ -337,11 +474,41 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
         private static void CreateMoveFace64(MirrorInPlaceExecutionContextV7 context, FeatureReplayCheckpointV7 item)
         {
             var model = context.WorkingDocument;
-            var recipe = item.MoveFace64;
-            if (recipe == null) throw new InvalidOperationException("MOVEFACE64 complete native recipe required.");
-            model.ClearSelection2(true);
+            var captured = item.MoveFace64;
+            if (captured == null) throw new InvalidOperationException("MOVEFACE64 complete native recipe required.");
+            if (model.SketchManager.ActiveSketch != null)
+                throw new InvalidOperationException("MOVEFACE68 native insertion requires a closed sketch; API not called.");
+            var node70 = context.Dependencies64.Nodes[item.Feature.TreeOrder];
+            string originalConfiguration70 = model.ConfigurationManager.ActiveConfiguration.Name;
+            string creationConfiguration70 = DependencyConfiguration70.SelectReconstruction(node70.Suppression,
+                captured.ActiveConfigurations70.Keys, originalConfiguration70);
+            var recipe = captured.ActiveConfigurations70[creationConfiguration70];
+            bool unsafeNative68 = false;
             try
             {
+                ActivateDependencyConfiguration70(model, creationConfiguration70);
+                var predecessor70 = context.Dependencies64.Nodes.Values.Where(n => n.Depth == 0 && n.Id < node70.Id)
+                    .OrderByDescending(n => n.Id).FirstOrDefault();
+                if (predecessor70 == null) throw new InvalidOperationException("MOVEFACE70 original native predecessor unavailable.");
+                MoveRollbackAfter(model, ResolveDependencyFeature64(context, predecessor70.Id));
+                model.EditRebuild3();
+                // Verify the source-active BEFORE state before passing any face
+                // pointers to native insertion. A wrong unfolded frame is a
+                // checkpoint mismatch, not an invitation to try offset flags.
+                try { BaseSketchMutationEngineV7.VerifyCurrentSolids(context, recipe.ReflectedBefore70); }
+                catch (InvalidOperationException ex)
+                {
+                    // Natively: a Boss that exists in the flat-pattern configuration
+                    // only, in front of this Move Face, had not been mirrored (its
+                    // plane had lost the bend line it was made on). Said as it is.
+                    MirrorV7Diagnostics.Log("[MOVEFACE70][BEFORE_CHECKPOINT_FAIL] sourceId=" + node70.Id + " configuration=" + creationConfiguration70 + " reason=" + ex.Message);
+                    throw new InvalidOperationException("MOVEFACE70 cau hinh '" + creationConfiguration70 + "': than truoc lenh Move Face '" + item.Feature.Name +
+                        "' khong trung anh mirror cua Part goc. Cac lenh chi bat o cau hinh nay dung truoc no (Boss, Cut, mat phang tren hinh trai...) chua duoc mirror: " + ex.Message, ex);
+                }
+                MirrorV7Diagnostics.Log("[MOVEFACE70][RESTORE_CONTEXT] sourceId=" + node70.Id +
+                    " originalConfiguration=" + originalConfiguration70 + " creationConfiguration=" + creationConfiguration70 +
+                    " sourceActive=True beforeCheckpoint=PASS sourceOptionsUnchanged=True");
+                model.ClearSelection2(true);
                 // Fresh numeric mapping at the child's BEFORE checkpoint. No COM
                 // face pointer from capture/deletion is reused here.
                 foreach (var face in recipe.Faces) SelectMoveReference64(model, face(model), 1);
@@ -350,12 +517,29 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                     recipe.MoveType == (int)swMoveFaceType_e.swMoveFaceTypeRotate ? 4 : 2);
                 if (recipe.EndReference != null) SelectMoveReference64(model, recipe.EndReference(model), 8);
                 bool reverse = MoveFaceReverse64(context, recipe, direction);
+                var selection68 = (SelectionMgr)model.SelectionManager;
+                int faceCount68 = selection68.GetSelectedObjectCount2(1);
+                if (faceCount68 != recipe.Faces.Length || Enumerable.Range(1, faceCount68).Any(i =>
+                    selection68.GetSelectedObjectType3(i, 1) != (int)swSelectType_e.swSelFACES))
+                    throw new InvalidOperationException("MOVEFACE68 marked face selection differs from captured recipe; API not called.");
+                MirrorV7Diagnostics.Log("[MOVEFACE68][INSERT_BEGIN] feature=" + item.Feature.Name +
+                    " moveType=" + recipe.MoveType + " faces=" + faceCount68 + " mark=1" +
+                    " reverse=" + reverse + " distance_m=" + recipe.Distance + " angle_rad=" + recipe.Angle +
+                    " endCondition=" + recipe.EndCondition + " offset_m=" + recipe.Offset +
+                    " translation=" + (recipe.Translation == null ? "NONE" : string.Join(",", recipe.Translation)) +
+                    " suppressedInSource=" + item.Feature.IsSuppressed);
                 var created = model.FeatureManager.InsertMoveFace3(recipe.MoveType, reverse, recipe.Angle,
                     recipe.Translation == null ? recipe.Distance : 0, recipe.Translation, null, recipe.EndCondition, recipe.Offset);
-                if (created == null) throw new InvalidOperationException("MOVEFACE64 native InsertMoveFace3 returned null.");
+                // A failed native insertion is not a direction candidate. The
+                // caller must not save/close/rebuild or inspect more CAD state.
+                if (created == null)
+                    throw new System.IO.InvalidDataException("MOVEFACE68 native InsertMoveFace3 returned null; further CAD calls, save and close skipped.");
+                RequireHealthyMoveFace68(created, "INSERT_RETURN");
                 created.Name = item.Feature.Name;
                 if (created.Name != item.Feature.Name || created.GetTypeName2() != item.Feature.TypeName)
                     throw new InvalidOperationException("MOVEFACE64 recreated native identity changed.");
+                item.Feature.Feature = created;
+                created = RestoreOriginalHistorySlot70(context, item, predecessor70);
                 item.Feature.Feature = created;
                 if (recipe.FromReference != null)
                 {
@@ -368,24 +552,78 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                         if (!created.ModifyDefinition(data, model, null)) throw new InvalidOperationException("MOVEFACE64 from-reference modify failed.");
                         accessed = false;
                     }
-                    finally { if (accessed) data.ReleaseSelectionAccess(); }
+                    catch (Exception ex) { unsafeNative68 = IsUnsafeNativeFailure66(ex); throw; }
+                    finally { if (accessed && !unsafeNative68) data.ReleaseSelectionAccess(); }
                 }
+                MoveRollbackAfter(model, created);
+                RequireHealthyMoveFace68(created, "ROLLFORWARD");
+                model.EditRebuild3();
+                RequireHealthyMoveFace68(created, "REBUILD");
+                EnsureFeatureHasNoError(created, "MOVEFACE70 created source-active feature");
+                var read = (IMoveFaceFeatureData)created.GetDefinition();
+                bool readAccess70 = read.AccessSelections(model, null);
+                if (!readAccess70) throw new InvalidOperationException("MOVEFACE70 native readback selection access unavailable.");
+                try
+                {
+                    if (read.GetFacesCount() != recipe.Faces.Length || read.MoveType != recipe.MoveType || (recipe.MoveType == (int)swMoveFaceType_e.swMoveFaceTypeTranslate && read.EndCondition != recipe.EndCondition) ||
+                        (recipe.Translation == null && !SameScalarOption63(read.Distance, recipe.Distance)) ||
+                        !SameScalarOption63(read.Angle, recipe.Angle) || read.ReverseDirection != reverse ||
+                        (recipe.EndCondition == (int)swEndConditions_e.swEndCondOffsetFromSurface && !SameScalarOption63(read.OffsetDistance, recipe.Offset)))
+                        throw new InvalidOperationException("MOVEFACE70 native option readback mismatch.");
+                }
+                catch (Exception ex) { unsafeNative68 = IsUnsafeNativeFailure66(ex); throw; }
+                finally { if (!unsafeNative68) read.ReleaseSelectionAccess(); }
+                BaseSketchMutationEngineV7.VerifyCurrentSolids(context, recipe.ReflectedAfter70);
                 RestoreMoveSuppression64(context, item);
+                AssertMoveSuppression70(context, node70.Id);
+                foreach (var active70 in captured.ActiveConfigurations70)
+                {
+                    ActivateDependencyConfiguration70(model, active70.Key);
+                    created = ResolveDependencyFeature64(context, node70.Id);
+                    item.Feature.Feature = created;
+                    MoveRollbackAfter(model, created);
+                    model.EditRebuild3();
+                    RequireHealthyMoveFace68(created, "SOURCE_ACTIVE_READBACK70");
+                    BaseSketchMutationEngineV7.VerifyCurrentSolids(context, active70.Value.ReflectedAfter70);
+                }
+                ActivateDependencyConfiguration70(model, originalConfiguration70);
+                created = ResolveDependencyFeature64(context, node70.Id);
+                item.Feature.Feature = created;
                 MoveRollbackAfter(model, created);
                 model.EditRebuild3();
-                if (!item.Feature.IsSuppressed) EnsureFeatureHasNoError(created, "MOVEFACE64 created feature");
-                var read = (IMoveFaceFeatureData)created.GetDefinition();
-                if (read.GetFacesCount() != recipe.Faces.Length || read.MoveType != recipe.MoveType || (recipe.MoveType == (int)swMoveFaceType_e.swMoveFaceTypeTranslate && read.EndCondition != recipe.EndCondition) ||
-                    (recipe.Translation == null && !SameScalarOption63(read.Distance, recipe.Distance)) ||
-                    !SameScalarOption63(read.Angle, recipe.Angle) || read.ReverseDirection != reverse ||
-                    (recipe.EndCondition == (int)swEndConditions_e.swEndCondOffsetFromSurface && !SameScalarOption63(read.OffsetDistance, recipe.Offset)))
-                    throw new InvalidOperationException("MOVEFACE64 native option readback mismatch.");
+                AssertMoveSuppression70(context, node70.Id);
                 BaseSketchMutationEngineV7.VerifyCurrentSolids(context, item.ReflectedBodyOracle);
                 item.WasNativeReplacement = true;
                 item.Result = new MirrorV7FeatureResult { FeatureName = item.Feature.Name, FeatureType = item.Feature.TypeName,
-                    Status = MirrorV7ReplayStatus.ExactReplay, Message = "MOVEFACE64 native recovery at original history slot; options/suppression/checkpoint PASS." };
+                    Status = MirrorV7ReplayStatus.ExactReplay, Message = "MOVEFACE70 native recovery in source-active configuration; all active checkpoints/options/suppression PASS." };
+                MirrorV7Diagnostics.Log("[MOVEFACE70][RESTORED] sourceId=" + node70.Id + " activeConfigurationsVerified=" +
+                    captured.ActiveConfigurations70.Count + " originalConfigurationRestored=True suppressionMask=PASS geometry=PASS");
             }
-            finally { model.ClearSelection2(true); }
+            catch (Exception ex)
+            {
+                unsafeNative68 = IsUnsafeNativeFailure66(ex);
+                if (unsafeNative68)
+                    MirrorV7Diagnostics.Log("[MOVEFACE68][NATIVE_STOP] feature=" + item.Feature.Name +
+                        " reason=" + ex.Message + " furtherCadCalls=0 outputPublished=False");
+                throw;
+            }
+            finally
+            {
+                if (!unsafeNative68)
+                {
+                    model.ClearSelection2(true);
+                    ActivateDependencyConfiguration70(model, originalConfiguration70);
+                }
+            }
+        }
+
+        private static void RequireHealthyMoveFace68(Feature feature, string stage)
+        {
+            bool warning;
+            int error = feature.GetErrorCode2(out warning);
+            if (error != 0 && !warning)
+                throw new System.IO.InvalidDataException("MOVEFACE68 native error at " + stage +
+                    " errorCode=" + error + "; subsequent rebuild, body read, save and close skipped.");
         }
 
         private static void RebindMoveFace64(MirrorInPlaceExecutionContextV7 context, FeatureReplayCheckpointV7 item)

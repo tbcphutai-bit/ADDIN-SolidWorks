@@ -27,6 +27,24 @@ namespace ADDIN
         private ITaskpaneView swTaskPane;
         private BomTaskPaneControl uiControl;
 
+        public void OpenStandaloneCurveMacro(string selectedPartNumbers)
+        {
+            if (uiControl == null) throw new InvalidOperationException("TAI TOOL task pane chưa nạp.");
+            // Return from the COM callback before pumping SOLIDWORKS/WinForms commands.
+            uiControl.BeginInvoke(new Action(() => {
+                try {
+                    swTaskPane.ShowView();
+                    uiControl.OpenStandaloneCurveMacro(selectedPartNumbers);
+                } catch (Exception ex) { Trace.WriteLine("Standalone macro launcher: " + ex); }
+            }));
+        }
+
+        public string GetStandaloneCurveMacroState()
+        {
+            if (uiControl == null) throw new InvalidOperationException("TAI TOOL task pane chưa nạp.");
+            return uiControl.GetStandaloneCurveMacroState();
+        }
+
         public string RunMirrorPackageSelfTest(string manifestPathOrJson)
         {
             return Commands.CreateMirrorPartPackage.RunSelfTest(swApp, manifestPathOrJson);
@@ -186,5 +204,61 @@ namespace ADDIN
             catch { }
         }
         #endregion
+
+        public string RunRepair3DSplineSelfTest(string expectedDocumentPath)
+        {
+            var model = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+            if (model == null || string.IsNullOrWhiteSpace(expectedDocumentPath) ||
+                !string.Equals(Path.GetFullPath(model.GetPathName()),
+                    Path.GetFullPath(expectedDocumentPath), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Active document differs from the designated test document.");
+            string logPath = Path.ChangeExtension(expectedDocumentPath, ".repair3dspline.log");
+            using (var listener = new TextWriterTraceListener(logPath))
+            {
+                bool previousAutoFlush = Trace.AutoFlush;
+                Trace.AutoFlush = true;
+                Trace.Listeners.Add(listener);
+                try
+                {
+                    Trace.WriteLine("[Repair3DSplineSelfTest] Assembly=" + typeof(SwAddin).Assembly.Location +
+                        "; MVID=" + typeof(SwAddin).Module.ModuleVersionId + "; Document=" + model.GetPathName());
+                    string result = "NO_RESULT";
+                    new Commands.Repair3DSplineCommand(swApp, (message, success) =>
+                        result = "SUCCESS=" + success + "; " + message).Run(uiControl);
+                    Trace.WriteLine(result); Trace.Flush(); return result;
+                }
+                finally { Trace.Listeners.Remove(listener); Trace.AutoFlush = previousAutoFlush; }
+            }
+        }
+
+        public string RunAutoSplineSelfTest(string expectedDocumentPath, int mode)
+        {
+            var model = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+            if (model == null || string.IsNullOrWhiteSpace(expectedDocumentPath) ||
+                !string.Equals(Path.GetFullPath(model.GetPathName()), Path.GetFullPath(expectedDocumentPath),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Active document differs from the designated test document.");
+            using (var listener = new TextWriterTraceListener(Path.ChangeExtension(expectedDocumentPath, ".autospline.log")))
+            {
+                bool previousAutoFlush = Trace.AutoFlush;
+                Trace.AutoFlush = true;
+                Trace.Listeners.Add(listener);
+                try
+                {
+                    Trace.WriteLine("[AutoSplineSelfTest] Assembly=" + typeof(SwAddin).Assembly.Location +
+                        "; MVID=" + typeof(SwAddin).Module.ModuleVersionId + "; mode=" + mode);
+                    string result = "NO_RESULT";
+                    var command = new Commands.EdgeToEqualSplineCommand(swApp,
+                        (message, success) => result = "SUCCESS=" + success + "; " + message);
+                    if (mode == 5) command.RunMinimumPointPreview();
+                    else if (mode == 3) command.RunCreate3DFromTwoEdges(uiControl);
+                    else if (mode == 4) command.RunCreate2D(uiControl);
+                    else if (mode == 1 || mode == 2) command.Run(uiControl, mode == 2);
+                    else throw new ArgumentOutOfRangeException(nameof(mode));
+                    Trace.WriteLine(result); Trace.Flush(); return result;
+                }
+                finally { Trace.Listeners.Remove(listener); Trace.AutoFlush = previousAutoFlush; }
+            }
+        }
     }
 }

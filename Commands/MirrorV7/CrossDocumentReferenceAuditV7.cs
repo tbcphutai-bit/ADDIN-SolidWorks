@@ -26,6 +26,9 @@ namespace ADDIN.Commands.MirrorV7
             if (sourceGraph == null) throw new ArgumentNullException("sourceGraph");
             if (copy == null) throw new ArgumentNullException("copy");
             CrossDocumentReferenceResultV7 result = new CrossDocumentReferenceResultV7();
+            // Same structural definition as the layout gate: a FlatPattern's
+            // regenerated sketch cache is not a design identity.
+            HashSet<int> flatSketchCache71 = MirrorInPlace.FeatureTreeLayout50.FlatSketchCacheNodes71(sourceGraph);
             foreach (MirrorV7FeatureNode node in sourceGraph.Nodes)
             {
                 if (node != null && node.Role == MirrorV7FeatureRole.System) { result.SystemSkipped++; continue; }
@@ -40,6 +43,12 @@ namespace ADDIN.Commands.MirrorV7
                     object raw = PersistentReferenceServiceV7.Resolve(copy,
                         recreated ? replacement : node.PersistentReference, out state);
                     Feature feature = raw as Feature;
+                    if (raw == null && !recreated && flatSketchCache71.Contains(node.TreeOrder))
+                    {
+                        result.Attempted--; result.SystemSkipped++;
+                        MirrorV7Diagnostics.Log("[PHASE6A][FLAT_SKETCH_CACHE_DROPPED] name=\"" + node.Name + "\" state=" + state);
+                        continue;
+                    }
                     if (raw == null) { result.Unavailable++; MirrorV7Diagnostics.Log("[PHASE6A][COPY_RESOLVE_NULL] name=\"" + node.Name + "\" state=" + state); continue; }
                     if (feature == null) { result.Mismatched++; MirrorV7Diagnostics.Log("[PHASE6A][COPY_TYPE_MISMATCH] name=\"" + node.Name + "\" state=" + state); continue; }
                     string type2, type1;
@@ -49,7 +58,12 @@ namespace ADDIN.Commands.MirrorV7
                     string registeredName;
                     if (replacementTargetNames != null && replacementTargetNames.TryGetValue(node.TreeOrder, out registeredName))
                     {
-                        if (!recreated || node.Role != MirrorV7FeatureRole.Sketch || string.IsNullOrWhiteSpace(registeredName))
+                        bool generatedFlatBend70 = node.Role == MirrorV7FeatureRole.SheetMetal && node.TypeName == "UiBend" &&
+                            node.Depth > 0 && sourceGraph.Nodes.Any(n => (n.TypeName == "OneBend" && node.ParentFeatureNames.Contains(n.Name)) ||
+                                // The bend of a profile arc that had to be drawn again (see RegisterRegeneratedUnderRedrawnProfile71).
+                                (n.TypeName == "SketchBend" && (node.ParentFeatureNames.Contains(n.Name) ||
+                                    (node.Name ?? "").IndexOf("<" + n.Name + ">", StringComparison.Ordinal) >= 0)));
+                        if (!recreated || (node.Role != MirrorV7FeatureRole.Sketch && !generatedFlatBend70) || string.IsNullOrWhiteSpace(registeredName))
                             throw new InvalidOperationException("FLANGE51 invalid replacement name registration: " + node.Name);
                         expectedName = registeredName;
                         MirrorV7Diagnostics.Log("[FLANGE51][REPLACEMENT_NAME_AUDIT] source=" + node.Name +

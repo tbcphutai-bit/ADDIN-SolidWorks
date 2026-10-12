@@ -11,8 +11,12 @@ namespace ADDIN.Commands
     {
         private readonly TextBox inputTextBox;
         private readonly Button dropDownButton;
-        private readonly ContextMenuStrip historyMenu;
+        private const int MaximumVisibleHistoryItems = 10;
+        private readonly ToolStripDropDown historyMenu;
+        private readonly ListBox historyList;
+        private readonly ToolStripControlHost historyHost;
         private readonly List<string> historyItems;
+        private bool historyMenuDirty = true;
 
         public HistoryTextBox()
         {
@@ -36,21 +40,44 @@ namespace ADDIN.Commands
             dropDownButton.Margin = new Padding(0);
             dropDownButton.Padding = new Padding(0);
             dropDownButton.TabStop = false;
-            dropDownButton.Text = "▼";
-            dropDownButton.Font = new Font("Segoe UI", 6.5F, FontStyle.Regular);
-            dropDownButton.ForeColor = Color.FromArgb(100, 116, 139);
-            dropDownButton.BackColor = Color.FromArgb(246, 248, 250);
+            dropDownButton.Text = "";
+            dropDownButton.BackColor = UI.TaiTheme.Surface;
+            dropDownButton.FlatAppearance.MouseOverBackColor = UI.TaiTheme.SurfaceHover;
+            dropDownButton.FlatAppearance.MouseDownBackColor = UI.TaiTheme.SurfacePressed;
+            dropDownButton.Paint += DropDownButton_Paint;
             dropDownButton.Cursor = Cursors.Hand;
             dropDownButton.Width = 20;
             dropDownButton.Click += DropDownButton_Click;
 
-            historyMenu = new ContextMenuStrip();
-            historyMenu.ShowImageMargin = false;
+            historyList = new ListBox();
+            historyList.BorderStyle = BorderStyle.FixedSingle;
+            historyList.IntegralHeight = false;
+            historyList.DrawMode = DrawMode.OwnerDrawFixed;
+            historyList.HorizontalScrollbar = false;
+            historyList.ScrollAlwaysVisible = false;
+            historyList.DrawItem += HistoryList_DrawItem;
+            historyList.MouseUp += HistoryList_MouseUp;
+            historyList.KeyDown += HistoryList_KeyDown;
 
-            BackColor = Color.White;
-            BorderStyle = BorderStyle.FixedSingle;
+            historyHost = new ToolStripControlHost(historyList);
+            historyHost.AutoSize = false;
+            historyHost.Margin = new Padding(0);
+            historyHost.Padding = new Padding(0);
+
+            historyMenu = new ToolStripDropDown();
+            historyMenu.AutoSize = false;
+            historyMenu.Padding = new Padding(0);
+            historyMenu.Items.Add(historyHost);
+            historyMenu.Closed += HistoryMenu_Closed;
+
+            BackColor = UI.TaiTheme.Surface;
+            BorderStyle = BorderStyle.None;
             MinimumSize = new Size(40, 23);
-            Padding = new Padding(3, 2, 0, 2);
+            // The outer pixel of the padding is the border drawn in OnPaint.
+            Padding = new Padding(5, 4, 1, 4);
+            SetStyle(ControlStyles.ResizeRedraw, true);
+            inputTextBox.Enter += (sender, e) => Invalidate();
+            inputTextBox.Leave += (sender, e) => Invalidate();
             Size = new Size(180, 23);
 
             Controls.Add(inputTextBox);
@@ -92,7 +119,11 @@ namespace ADDIN.Commands
 
         public void ClearItems()
         {
+            if (historyItems.Count == 0)
+                return;
+
             historyItems.Clear();
+            historyMenuDirty = true;
         }
 
         public void AddItem(string value)
@@ -101,6 +132,7 @@ namespace ADDIN.Commands
                 return;
 
             historyItems.Add(value);
+            historyMenuDirty = true;
         }
 
         public string GetItem(int index)
@@ -117,6 +149,30 @@ namespace ADDIN.Commands
         public void FocusInput()
         {
             inputTextBox.Focus();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && historyMenu != null)
+                historyMenu.Dispose();
+
+            base.Dispose(disposing);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            Color edge = !Enabled ? UI.TaiTheme.Divider : ContainsFocus ? UI.TaiTheme.Accent : UI.TaiTheme.BorderStrong;
+            using (Pen pen = new Pen(edge))
+                e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+        }
+
+        private void DropDownButton_Paint(object sender, PaintEventArgs e)
+        {
+            int size = Math.Max(8, Math.Min(dropDownButton.Width, dropDownButton.Height) - 4);
+            UI.TaiIcons.Draw(e.Graphics, UI.TaiIcon.ChevronDown,
+                new Rectangle((dropDownButton.Width - size) / 2, (dropDownButton.Height - size) / 2, size, size),
+                Enabled ? UI.TaiTheme.TextMuted : UI.TaiTheme.TextDisabled);
         }
 
         protected override void OnFontChanged(EventArgs e)
@@ -189,20 +245,57 @@ namespace ADDIN.Commands
 
         private void ShowHistoryMenu()
         {
-            historyMenu.Font = Font;
-            historyMenu.Items.Clear();
-            foreach (string value in historyItems)
+            if (!Enabled || IsDisposed || Disposing)
+                return;
+            if (historyMenu.Visible)
             {
-                ToolStripMenuItem item = new ToolStripMenuItem(value);
-                item.Tag = value;
-                item.Click += HistoryItem_Click;
-                historyMenu.Items.Add(item);
+                historyMenu.Close();
+                return;
             }
 
-            if (historyMenu.Items.Count == 0)
+            historyMenu.Font = Font;
+            EnsureHistoryMenuItems();
+
+            if (historyList.Items.Count == 0)
                 return;
 
+            UpdateHistoryMenuSize();
+            int selected = historyItems.FindIndex(value => string.Equals(value, Text, StringComparison.Ordinal));
+            historyList.SelectedIndex = selected >= 0 ? selected : 0;
             historyMenu.Show(this, new Point(0, Height));
+            historyList.Focus();
+        }
+
+        private void EnsureHistoryMenuItems()
+        {
+            if (!historyMenuDirty)
+                return;
+
+            historyList.BeginUpdate();
+            try
+            {
+                historyList.Items.Clear();
+                foreach (string value in historyItems)
+                    historyList.Items.Add(value);
+            }
+            finally
+            {
+                historyList.EndUpdate();
+            }
+
+            historyMenuDirty = false;
+        }
+
+        private void UpdateHistoryMenuSize()
+        {
+            int spacing = Math.Max(4, (int)Math.Round(6.0 * DeviceDpi / 96));
+            historyList.ItemHeight = Math.Max(Font.Height + spacing, (int)Math.Round(22.0 * DeviceDpi / 96));
+            int rows = Math.Max(1, Math.Min(MaximumVisibleHistoryItems, historyList.Items.Count));
+            int width = Math.Max(Width, MinimumSize.Width);
+            int height = rows * historyList.ItemHeight + SystemInformation.BorderSize.Height * 2;
+            historyList.Size = new Size(width, height);
+            historyHost.Size = historyList.Size;
+            historyMenu.Size = historyList.Size;
         }
 
         private void ApplyFontToChildren()
@@ -213,17 +306,62 @@ namespace ADDIN.Commands
                 dropDownButton.Font = Font;
             if (historyMenu != null)
                 historyMenu.Font = Font;
+            if (historyList != null)
+                historyList.Font = Font;
         }
 
-        private void HistoryItem_Click(object sender, EventArgs e)
+        private void HistoryList_DrawItem(object sender, DrawItemEventArgs e)
         {
-            ToolStripMenuItem item = sender as ToolStripMenuItem;
-            if (item == null)
+            e.DrawBackground();
+            if (e.Index >= 0 && e.Index < historyList.Items.Count)
+            {
+                var bounds = e.Bounds;
+                bounds.X += 4;
+                bounds.Width = Math.Max(1, bounds.Width - 8);
+                TextRenderer.DrawText(e.Graphics, (string)historyList.Items[e.Index], Font,
+                    bounds, e.ForeColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                    TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            }
+            e.DrawFocusRectangle();
+        }
+
+        private void HistoryList_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left || !historyList.ClientRectangle.Contains(e.Location))
                 return;
 
-            Text = item.Tag as string ?? item.Text;
-            FocusInput();
+            int index = historyList.IndexFromPoint(e.Location);
+            if (index >= 0) AcceptHistoryItem(index);
+        }
+
+        private void HistoryList_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                AcceptHistoryItem(historyList.SelectedIndex);
+                e.Handled = e.SuppressKeyPress = true;
+            }
+            else if (e.KeyCode == Keys.Escape)
+            {
+                historyMenu.Close(ToolStripDropDownCloseReason.Keyboard);
+                e.Handled = e.SuppressKeyPress = true;
+            }
+        }
+
+        private void AcceptHistoryItem(int index)
+        {
+            if (index < 0 || index >= historyList.Items.Count)
+                return;
+            Text = (string)historyList.Items[index];
             MoveCaretToEnd();
+            historyMenu.Close(ToolStripDropDownCloseReason.ItemClicked);
+        }
+
+        private void HistoryMenu_Closed(object sender, ToolStripDropDownClosedEventArgs e)
+        {
+            if (!IsDisposed && !Disposing && Enabled &&
+                (e.CloseReason == ToolStripDropDownCloseReason.ItemClicked || e.CloseReason == ToolStripDropDownCloseReason.Keyboard))
+                FocusInput();
         }
     }
 }

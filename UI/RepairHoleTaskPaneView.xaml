@@ -68,7 +68,7 @@
         </Grid.RowDefinitions>
 
         <!-- Step 1: Prompt & Scan Button -->
-        <TextBlock Grid.Row="0"
+        <TextBlock x:Name="ScanPrompt" Grid.Row="0"
                    Text="Chọn 1 mặt phẳng trong SOLIDWORKS:"
                    Foreground="#0D3560"
                    FontWeight="Bold"
@@ -76,7 +76,7 @@
                    TextTrimming="CharacterEllipsis"
                    Margin="2,2,2,4" />
 
-        <Button Grid.Row="1"
+        <Button x:Name="ScanAction" Grid.Row="1"
                 Content="Xác nhận"
                 Command="{Binding ScanCommand}"
                 Style="{StaticResource ModernButtonStyle}"
@@ -92,13 +92,35 @@
         <Grid Grid.Row="2"
               Visibility="{Binding TableVisibility}">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
+            <Border x:Name="NativeDiagram" Grid.Row="0" Visibility="Collapsed"
+                    Background="#F4F8FD" BorderBrush="#D2DCE6" BorderThickness="1"
+                    CornerRadius="3" Height="94" Margin="1,0,1,6">
+                <Viewbox Stretch="Uniform" StretchDirection="DownOnly" Margin="4">
+                    <Canvas Width="254" Height="82">
+                        <TextBlock Canvas.Left="5" Canvas.Top="0" Text="Nhập ô Repair để đổi thành:" FontSize="11.5" Foreground="#0D3560" />
+                        <Path Data="M 14,22 C 5,31 13,42 26,40 C 36,40 39,25 27,21 C 23,16 16,19 14,22 Z"
+                              Stroke="#64748B" StrokeThickness="2" Fill="White" />
+                        <Path Data="M 46,29 L 76,29 M 70,24 L 76,29 L 70,34" Stroke="#2563EB" StrokeThickness="2" />
+                        <Ellipse Canvas.Left="89" Canvas.Top="20" Width="20" Height="20" Stroke="#16A34A" StrokeThickness="2" Fill="White" />
+                        <TextBlock Canvas.Left="128" Canvas.Top="21" Text="4.2 → Ø4.2 mm" FontSize="12" FontWeight="Bold" Foreground="#0D3560" />
+                        <Path Data="M 7,59 C 2,72 15,75 29,70 C 35,70 40,58 32,56 C 22,57 13,54 7,59 Z"
+                              Stroke="#64748B" StrokeThickness="2" Fill="White" />
+                        <Path Data="M 46,64 L 76,64 M 70,59 L 76,64 L 70,69" Stroke="#2563EB" StrokeThickness="2" />
+                        <Rectangle Canvas.Left="83" Canvas.Top="60" Width="37" Height="8" RadiusX="4" RadiusY="4"
+                                   Stroke="#16A34A" StrokeThickness="2" Fill="White" />
+                        <TextBlock Canvas.Left="128" Canvas.Top="56" Text="5x25 → Slot 5×25" FontSize="12" FontWeight="Bold" Foreground="#0D3560" />
+                    </Canvas>
+                </Viewbox>
+            </Border>
+
             <!-- Table of Malformed Holes -->
-            <DataGrid Grid.Row="0"
+            <DataGrid x:Name="RepairGrid" Grid.Row="1"
                       ItemsSource="{Binding Rows}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
@@ -175,7 +197,7 @@
             </DataGrid>
 
             <!-- Guide Note -->
-            <TextBlock Grid.Row="1"
+            <TextBlock x:Name="GuideNote" Grid.Row="2"
                        Text="RCM chỉ để tham khảo. Nhập 4.2 (tròn), 5x25 (slot), để trống = bỏ qua."
                        Foreground="#444444"
                        FontSize="11.5"
@@ -183,7 +205,7 @@
                        Margin="2,4,2,6" />
 
             <!-- Action Buttons: Repair, Reset & Hủy -->
-            <Grid Grid.Row="2" Margin="2,0,2,2">
+            <Grid x:Name="RepairActions" Grid.Row="3" Margin="2,0,2,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="70" />

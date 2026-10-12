@@ -417,6 +417,26 @@ namespace ADDIN.Commands
             return string.Equals((direction ?? "").Trim(), "Spline Flow", StringComparison.OrdinalIgnoreCase);
         }
 
+        // Read-only readiness probe; call after Hole Wizard closes, outside its callbacks.
+        public bool CanContinuePendingHoleWizard()
+        {
+            if (!pendingHybridPattern) return false;
+            var active = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+            ModelDoc2 owner; string component;
+            return active != null && TryResolveMakeHoleContext(active, out owner, out component) &&
+                FindNewHoleWizardFeature(active) != null;
+        }
+
+        public string PendingPatternSummary
+        {
+            get
+            {
+                return "Số lỗ: " + pendingPatternCount + "\nBước thực tế: " +
+                    (pendingPatternSpacing * 1000).ToString("0.###", CultureInfo.InvariantCulture) + " mm\nBước tối đa P: " +
+                    pendingPatternMaxPitchMm.ToString("0.###", CultureInfo.InvariantCulture) + " mm";
+            }
+        }
+
         public bool PatternPendingHoleWizard()
         {
             curvePatternCommandStarted = false;
@@ -2158,11 +2178,12 @@ namespace ADDIN.Commands
             {
                 if (surface.IsPlane() && surface.PlaneParams is double[] array && array.Length >= 6)
                 {
+                    // ISurface.PlaneParams: normal XYZ, then root point XYZ (meters).
                     normal = Normalize(new double[3]
                     {
-                    array[3],
-                    array[4],
-                    array[5]
+                    array[0],
+                    array[1],
+                    array[2]
                     });
                     if (normal != null)
                     {
@@ -4956,6 +4977,8 @@ namespace ADDIN.Commands
                     return false;
                 }
                 double[] pointDistanceDimensionPosition = GetPointDistanceDimensionPosition(array, array2, pathCenter);
+                // Sketch point coordinates are local; dimension text uses model coordinates.
+                pointDistanceDimensionPosition = SketchPointToModelPoint(GetActiveSketch(model), pointDistanceDimensionPosition, log: false);
                 bool previousValue;
                 bool shouldRestore = TrySetInputDimensionOnCreate(model, enabled: false, out previousValue);
                 object obj = null;
@@ -4968,6 +4991,7 @@ namespace ADDIN.Commands
                     RestoreInputDimensionOnCreate(model, shouldRestore, previousValue);
                 }
                 DisplayDimension displayDimension = obj as DisplayDimension;
+                TrySetMakeHoleDimensionPosition(displayDimension, pointDistanceDimensionPosition);
                 Dimension dimension = null;
                 if (displayDimension != null)
                 {
@@ -5014,11 +5038,11 @@ namespace ADDIN.Commands
             double[] array2 = ((array == null) ? null : Normalize(Cross(array, new double[3] { 0.0, 0.0, 1.0 })));
             if (array2 == null)
             {
-                array2 = ((array != null) ? Normalize(Cross(array, new double[3] { 0.0, 1.0, 0.0 })) : new double[3] { 0.0, 0.01, 0.0 });
+                array2 = ((array != null) ? Normalize(Cross(array, new double[3] { 0.0, 1.0, 0.0 })) : new double[3] { 0.0, 1.0, 0.0 });
             }
             if (array2 == null)
             {
-                array2 = new double[3] { 0.0, 0.01, 0.0 };
+                array2 = new double[3] { 0.0, 1.0, 0.0 };
             }
             if (IsPoint(pathCenter))
             {
@@ -5028,7 +5052,7 @@ namespace ADDIN.Commands
                     array2 = Scale(array2, -1.0);
                 }
             }
-            return Add(left, Scale(array2, 0.01));
+            return Add(left, Scale(array2, 0.004));
         }
 
         private double[] GetPointListCenter(List<double[]> points)
@@ -5696,30 +5720,39 @@ namespace ADDIN.Commands
             {
                 return null;
             }
-            int index = Math.Max(0, Math.Min(points.Count - 1, points.Count / 12));
+            points = points.Where(IsPoint).ToList();
+            if (points.Count == 0)
+            {
+                return null;
+            }
+            List<double> cumulative = BuildCumulativeLengths(points);
+            double halfway = cumulative[cumulative.Count - 1] * 0.5;
+            int index = cumulative.FindIndex(distance => distance >= halfway);
+            double[] point = InterpolateByDistance(points, cumulative, halfway);
+            double[] tangent = GetSampleTangent(points, index);
             if (IsPoint(preferredPoint))
             {
                 double best = double.MaxValue;
-                for (int i = 0; i < points.Count; i++)
+                for (int i = 1; i < points.Count; i++)
                 {
-                    if (!IsPoint(points[i]))
+                    double[] delta = Subtract(points[i], points[i - 1]);
+                    double lengthSquared = Dot(delta, delta);
+                    if (lengthSquared <= 1E-14)
                     {
                         continue;
                     }
-                    double distance = Distance(points[i], preferredPoint);
+                    double fraction = Math.Max(0.0, Math.Min(1.0, Dot(Subtract(preferredPoint, points[i - 1]), delta) / lengthSquared));
+                    double[] projectedPoint = Add(points[i - 1], Scale(delta, fraction));
+                    double distance = Distance(projectedPoint, preferredPoint);
                     if (distance < best)
                     {
                         best = distance;
                         index = i;
+                        point = projectedPoint;
+                        tangent = Normalize(delta);
                     }
                 }
             }
-            double[] point = points[index];
-            if (!IsPoint(point))
-            {
-                point = points[0];
-            }
-            double[] tangent = GetSampleTangent(points, index);
             double[] offset = ((tangent == null) ? null : Normalize(Cross(tangent, new double[3] { 0.0, 0.0, 1.0 })));
             if (offset == null)
             {
@@ -5727,12 +5760,59 @@ namespace ADDIN.Commands
             }
             if (offset == null)
             {
-                offset = new double[3] { 0.0, 0.003, 0.0 };
+                offset = new double[3] { 0.0, 1.0, 0.0 };
             }
             double[] result = Add(point, Scale(offset, 0.004));
             Debug.WriteLine("[MAKE HOLE] Length dim position. pointIndex=" + index + ", nearClick=" + IsPoint(preferredPoint));
             return result;
         }
+        private List<double[]> GetDimensionSegmentPoints(SketchSegment segment)
+        {
+            // GetCurve can return an unbounded line (-10000..10000 m), not
+            // the visible sketch segment. Only use its actual trimmed span.
+            try
+            {
+                double[] start = GetSketchPointCoordinates(TryCall(segment, "GetStartPoint2"));
+                double[] end = GetSketchPointCoordinates(TryCall(segment, "GetEndPoint2"));
+                if (IsPoint(start) && IsPoint(end) && Distance(start, end) > 1E-07)
+                {
+                    if (segment.GetType() == (int)swSketchSegments_e.swSketchLINE)
+                    {
+                        return new List<double[]> { start, end };
+                    }
+                    Curve curve = segment.GetCurve() as Curve;
+                    if (curve != null)
+                    {
+                        if (!curve.IsTrimmedCurve())
+                        {
+                            Curve underlying = curve;
+                            curve = null;
+                            double segmentLength = segment.GetLength();
+                            foreach (double[][] bounds in new[] { new[] { start, end }, new[] { end, start } })
+                            {
+                                Curve trimmed = underlying.CreateTrimmedCurve2(bounds[0][0], bounds[0][1], bounds[0][2], bounds[1][0], bounds[1][1], bounds[1][2]);
+                                if (trimmed != null && trimmed.GetEndParams(out var firstParameter, out var lastParameter, out var _, out var _)
+                                    && Math.Abs(trimmed.GetLength3(firstParameter, lastParameter) - segmentLength) <= Math.Max(1E-07, segmentLength * 1E-06))
+                                {
+                                    curve = trimmed;
+                                    break;
+                                }
+                            }
+                        }
+                        if (TryGetCurveGeometry(curve, out var geometry))
+                        {
+                            return SampleCurve(geometry, 32);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[MAKE HOLE] Dimension segment bounds fallback: " + ex.Message);
+            }
+            return GetSketchSegmentPointsFallback(segment);
+        }
+
         private string TryCreateCurveLengthDimension(ModelDoc2 model, List<SketchSegment> segments)
         {
             if (model == null || segments == null || segments.Count == 0)
@@ -5746,21 +5826,20 @@ namespace ADDIN.Commands
             }
             try
             {
-                List<double[]> list = BuildSegmentSamplePoints(sketchSegment);
-                if (list == null || list.Count < 2)
-                {
-                    list = GetSketchSegmentPointsFallback(sketchSegment);
-                }
+                List<double[]> list = GetDimensionSegmentPoints(sketchSegment);
                 if (list == null || list.Count < 2)
                 {
                     Debug.WriteLine("[MAKE HOLE] Length dimension skip. No segment points.");
                     return null;
                 }
-                double[] array = GetCurveLengthDimensionPosition(list, lastMakeHoleSidePoint);
+                Sketch dimensionSketch = sketchSegment.GetSketch() as Sketch ?? GetActiveSketch(model);
+                double[] preferredSketchPoint = ModelPointToSketchPoint(dimensionSketch, lastMakeHoleSidePoint, log: false);
+                double[] array = GetCurveLengthDimensionPosition(list, preferredSketchPoint);
                 if (!IsPoint(array))
                 {
                     array = Scale(Add(list[0], list[list.Count - 1]), 0.5);
                 }
+                array = SketchPointToModelPoint(dimensionSketch, array, log: false);
                 model.ClearSelection2(All: true);
                 if (!SelectSketchSegment(sketchSegment, append: false))
                 {
@@ -5824,6 +5903,7 @@ namespace ADDIN.Commands
                         Debug.WriteLine("[MAKE HOLE] Set length dimension driven failed: " + ex.Message);
                     }
                 }
+                TrySetMakeHoleDimensionPosition(displayDimension, array);
                 string equationDimensionName = GetEquationDimensionName(dimension);
                 double dimensionMm = 0.0;
                 try
@@ -5855,6 +5935,24 @@ namespace ADDIN.Commands
                 {
                 }
                 return null;
+            }
+        }
+
+        private void TrySetMakeHoleDimensionPosition(DisplayDimension displayDimension, double[] modelPosition)
+        {
+            if (displayDimension == null || !IsPoint(modelPosition))
+            {
+                return;
+            }
+            try
+            {
+                Annotation annotation = displayDimension.GetAnnotation() as Annotation;
+                bool moved = annotation != null && annotation.SetPosition2(modelPosition[0], modelPosition[1], modelPosition[2]);
+                Debug.WriteLine("[MAKE HOLE] Dimension text positioned near path. ok=" + moved);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[MAKE HOLE] Dimension text position failed: " + ex.Message);
             }
         }
 
@@ -5982,10 +6080,24 @@ namespace ADDIN.Commands
                 return false;
             }
             TryRenamePendingPaintFeature(model, feature2, isPattern: true);
+            string done = "MAKE HOLE: đã rải " + Math.Max(2, pendingPatternCount) + " lỗ, bước " + (pendingPatternSpacing * 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + " mm.";
             ResetPendingMakeHole();
             Debug.WriteLine("[MAKE HOLE] Hybrid pattern completed.");
-            MessageBox.Show("Da pattern Hole Wizard vua tao.", "Make Hole", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+            // The holes are on the model already: a box here would only cost one more click.
+            ShowStatusBarText(done);
             return true;
+        }
+
+        private void ShowStatusBarText(string text)
+        {
+            try
+            {
+                (swApp?.Frame() as IFrame)?.SetStatusBarText(text);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[MAKE HOLE] Status bar text failed: " + ex.Message);
+            }
         }
 
         private void TrackHoleFeature(Feature holeFeature)
@@ -16149,15 +16261,16 @@ namespace ADDIN.Commands
                 }
                 double[] origin = new double[3]
                 {
-                array[0],
-                array[1],
-                array[2]
-                };
-                double[] array2 = Normalize(new double[3]
-                {
                 array[3],
                 array[4],
                 array[5]
+                };
+                // ISurface.PlaneParams stores the normal before the root point.
+                double[] array2 = Normalize(new double[3]
+                {
+                array[0],
+                array[1],
+                array[2]
                 });
                 if (array2 == null)
                 {
@@ -16629,6 +16742,7 @@ namespace ADDIN.Commands
 
             Feature positionFeature = null;
             Sketch positionSketch = null;
+            List<SketchPoint> createdPositionPoints = new List<SketchPoint>();
             bool sketchOpened = false;
             bool deleteFeatureAfterSketch = false;
             try
@@ -16672,15 +16786,25 @@ namespace ADDIN.Commands
                         continue;
                     }
 
-                    SketchPoint centerPoint = model.SketchManager.CreatePoint(
-                        centerSketch[0],
-                        centerSketch[1],
-                        0.0);
+                    SketchPoint centerPoint;
+                    bool previousAddToDb = model.SketchManager.AddToDB;
+                    try
+                    {
+                        // Avoid automatic snapping/relations to a neighboring RH-P.
+                        model.SketchManager.AddToDB = true;
+                        centerPoint = model.SketchManager.CreatePoint(
+                            centerSketch[0], centerSketch[1], 0.0);
+                    }
+                    finally
+                    {
+                        model.SketchManager.AddToDB = previousAddToDb;
+                    }
                     if (centerPoint == null)
                     {
                         continue;
                     }
                     createdPointCount++;
+                    createdPositionPoints.Add(centerPoint);
 
                     Feature pointFeature = (repairPointFeatures != null && index < repairPointFeatures.Count)
                         ? repairPointFeatures[index]
@@ -16820,6 +16944,17 @@ namespace ADDIN.Commands
             }
 
             createdCount = centers.Count;
+            if (!TryVerifyRepairPositionPoints(
+                    positionSketch, createdPositionPoints, centers, planeFrame,
+                    out string positionMessage))
+            {
+                message = positionMessage;
+                Debug.WriteLine("[REPAIR HOLE] Position verification failed: " + message);
+                TryDeleteRepairFeature(model, feature, includeAbsorbed: true);
+                createdCount = 0;
+                return null;
+            }
+            Debug.WriteLine("[REPAIR HOLE] " + positionMessage);
             feature.Name = isLoose
                 ? "RH-HW-Loose-" + (looseSize.WidthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
                     + "x" + (looseSize.LengthM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
@@ -16828,6 +16963,56 @@ namespace ADDIN.Commands
             Debug.WriteLine("[REPAIR HOLE] Hole Wizard verified. feature=" + SafeFeatureName(feature)
                 + ", holes=" + createdCount + ", " + verifyMessage);
             return feature;
+        }
+
+        private bool TryVerifyRepairPositionPoints(
+            Sketch sketch,
+            IList<SketchPoint> points,
+            IList<double[]> expectedCenters,
+            FacePlaneFrame frame,
+            out string message)
+        {
+            message = "";
+            if (sketch == null || points == null || expectedCenters == null
+                || points.Count != expectedCenters.Count)
+            {
+                message = "Không đủ điểm Position Sketch để kiểm tra tọa độ Repair.";
+                return false;
+            }
+            const double positionToleranceM = 0.00001; // 0.01 mm
+            double maximumErrorM = 0.0;
+            try
+            {
+                for (int i = 0; i < points.Count; i++)
+                {
+                    SketchPoint point = points[i];
+                    double[] actual = point == null ? null : SketchPointToModelPoint(
+                        sketch, new double[] { point.X, point.Y, point.Z }, log: false);
+                    double[] expected = ProjectRepairPointToSketchPlane(frame, expectedCenters[i]);
+                    if (!IsPoint(actual) || !IsPoint(expected))
+                    {
+                        message = "Không đọc được tọa độ điểm Repair " + (i + 1) + ".";
+                        return false;
+                    }
+                    double errorM = Distance(actual, expected);
+                    maximumErrorM = Math.Max(maximumErrorM, errorM);
+                    if (errorM > positionToleranceM)
+                    {
+                        message = "Điểm Repair " + (i + 1) + " bị bắt sai vị trí: lệch "
+                            + (errorM * 1000.0).ToString("0.###", CultureInfo.InvariantCulture)
+                            + " mm. Hãy Reset và quét lại mặt.";
+                        return false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                message = "Không kiểm tra được tọa độ điểm Repair: " + ex.Message;
+                return false;
+            }
+            message = "Position verified: " + points.Count + "/" + expectedCenters.Count
+                + ", maxErrorMm=" + (maximumErrorM * 1000.0).ToString("0.######", CultureInfo.InvariantCulture);
+            return true;
         }
 
         private bool TrySelectRepairHoleWizardFaceAtPoint(

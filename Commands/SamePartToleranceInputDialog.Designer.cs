@@ -42,8 +42,8 @@ namespace ADDIN.Commands
             this.lblUnitPrincipalMoment = new System.Windows.Forms.Label();
             this.lblUnitHoleLinear = new System.Windows.Forms.Label();
             this.lblUnitHoleRadius = new System.Windows.Forms.Label();
-            this.btnRun = new System.Windows.Forms.Button();
-            this.btnCancel = new System.Windows.Forms.Button();
+            this.btnRun = new ADDIN.UI.ModernButton();
+            this.btnCancel = new ADDIN.UI.ModernButton();
             this.pnlHeader.SuspendLayout();
             this.grpTolerance.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numAreaAbsolute)).BeginInit();
@@ -76,7 +76,7 @@ namespace ADDIN.Commands
             this.lblSubtitle.Name = "lblSubtitle";
             this.lblSubtitle.Size = new System.Drawing.Size(346, 15);
             this.lblSubtitle.TabIndex = 1;
-            this.lblSubtitle.Text = "Nhap gia tri dung sai truoc khi so sanh hinh hoc chi tiet";
+            this.lblSubtitle.Text = "Nhập dung sai trước khi so sánh hình học các chi tiết.";
             // 
             // lblTitle
             // 
@@ -87,7 +87,7 @@ namespace ADDIN.Commands
             this.lblTitle.Name = "lblTitle";
             this.lblTitle.Size = new System.Drawing.Size(250, 19);
             this.lblTitle.TabIndex = 0;
-            this.lblTitle.Text = "CHECK SAME PART - DUNG SAI";
+            this.lblTitle.Text = "Check Same Part – dung sai";
             // 
             // grpTolerance
             // 
@@ -123,7 +123,7 @@ namespace ADDIN.Commands
             this.grpTolerance.Size = new System.Drawing.Size(504, 338);
             this.grpTolerance.TabIndex = 1;
             this.grpTolerance.TabStop = false;
-            this.grpTolerance.Text = "Dung sai so sanh hinh hoc";
+            this.grpTolerance.Text = "Dung sai so sánh hình học";
             // 
             // lblAreaAbsolute
             // 
@@ -133,7 +133,7 @@ namespace ADDIN.Commands
             this.lblAreaAbsolute.Location = new System.Drawing.Point(24, 31);
             this.lblAreaAbsolute.Name = "lblAreaAbsolute";
             this.lblAreaAbsolute.TabIndex = 0;
-            this.lblAreaAbsolute.Text = "Dien tich - sai lech tuyet doi";
+            this.lblAreaAbsolute.Text = "Diện tích – sai lệch tuyệt đối";
             // lblAreaRelative
             // 
             this.lblAreaRelative.AutoSize = true;
@@ -142,7 +142,7 @@ namespace ADDIN.Commands
             this.lblAreaRelative.Location = new System.Drawing.Point(24, 68);
             this.lblAreaRelative.Name = "lblAreaRelative";
             this.lblAreaRelative.TabIndex = 1;
-            this.lblAreaRelative.Text = "Dien tich - sai lech tuong doi";
+            this.lblAreaRelative.Text = "Diện tích – sai lệch tương đối";
             // lblEdgeLength
             // 
             this.lblEdgeLength.AutoSize = true;
@@ -151,7 +151,7 @@ namespace ADDIN.Commands
             this.lblEdgeLength.Location = new System.Drawing.Point(24, 105);
             this.lblEdgeLength.Name = "lblEdgeLength";
             this.lblEdgeLength.TabIndex = 2;
-            this.lblEdgeLength.Text = "Tong chieu dai canh";
+            this.lblEdgeLength.Text = "Tổng chiều dài cạnh";
             // lblVolumeAbsolute
             // 
             this.lblVolumeAbsolute.AutoSize = true;
@@ -160,7 +160,7 @@ namespace ADDIN.Commands
             this.lblVolumeAbsolute.Location = new System.Drawing.Point(24, 142);
             this.lblVolumeAbsolute.Name = "lblVolumeAbsolute";
             this.lblVolumeAbsolute.TabIndex = 3;
-            this.lblVolumeAbsolute.Text = "The tich - sai lech tuyet doi";
+            this.lblVolumeAbsolute.Text = "Thể tích – sai lệch tuyệt đối";
             // lblVolumeRelative
             // 
             this.lblVolumeRelative.AutoSize = true;
@@ -169,7 +169,7 @@ namespace ADDIN.Commands
             this.lblVolumeRelative.Location = new System.Drawing.Point(24, 179);
             this.lblVolumeRelative.Name = "lblVolumeRelative";
             this.lblVolumeRelative.TabIndex = 4;
-            this.lblVolumeRelative.Text = "The tich - sai lech tuong doi";
+            this.lblVolumeRelative.Text = "Thể tích – sai lệch tương đối";
             // lblPrincipalMoment
             // 
             this.lblPrincipalMoment.AutoSize = true;
@@ -178,7 +178,7 @@ namespace ADDIN.Commands
             this.lblPrincipalMoment.Location = new System.Drawing.Point(24, 216);
             this.lblPrincipalMoment.Name = "lblPrincipalMoment";
             this.lblPrincipalMoment.TabIndex = 5;
-            this.lblPrincipalMoment.Text = "Momen chinh - sai lech tuong doi";
+            this.lblPrincipalMoment.Text = "Mômen chính – sai lệch tương đối";
             // lblHoleLinear
             // 
             this.lblHoleLinear.AutoSize = true;
@@ -187,7 +187,7 @@ namespace ADDIN.Commands
             this.lblHoleLinear.Location = new System.Drawing.Point(24, 253);
             this.lblHoleLinear.Name = "lblHoleLinear";
             this.lblHoleLinear.TabIndex = 6;
-            this.lblHoleLinear.Text = "Vi tri / chu vi / canh lo";
+            this.lblHoleLinear.Text = "Vị trí / chu vi / cạnh lỗ";
             // lblHoleRadius
             // 
             this.lblHoleRadius.AutoSize = true;
@@ -196,7 +196,7 @@ namespace ADDIN.Commands
             this.lblHoleRadius.Location = new System.Drawing.Point(24, 290);
             this.lblHoleRadius.Name = "lblHoleRadius";
             this.lblHoleRadius.TabIndex = 7;
-            this.lblHoleRadius.Text = "Ban kinh lo";
+            this.lblHoleRadius.Text = "Bán kính lỗ";
             // numAreaAbsolute
             // 
             this.numAreaAbsolute.DecimalPlaces = 3;
@@ -378,7 +378,7 @@ namespace ADDIN.Commands
             this.btnRun.Name = "btnRun";
             this.btnRun.Size = new System.Drawing.Size(132, 34);
             this.btnRun.TabIndex = 8;
-            this.btnRun.Text = "CHAY KIEM TRA";
+            this.btnRun.Text = "Chạy kiểm tra";
             this.btnRun.UseVisualStyleBackColor = false;
             this.btnRun.Click += new System.EventHandler(this.btnRun_Click);
             // 
@@ -395,7 +395,7 @@ namespace ADDIN.Commands
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(94, 34);
             this.btnCancel.TabIndex = 9;
-            this.btnCancel.Text = "HUY";
+            this.btnCancel.Text = "Hủy";
             this.btnCancel.UseVisualStyleBackColor = false;
             // 
             // SamePartToleranceInputDialog
@@ -418,7 +418,7 @@ namespace ADDIN.Commands
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "CHECK SAME PART - DUNG SAI";
+            this.Text = "Check Same Part – dung sai";
             this.pnlHeader.ResumeLayout(false);
             this.pnlHeader.PerformLayout();
             this.grpTolerance.ResumeLayout(false);
@@ -464,7 +464,7 @@ namespace ADDIN.Commands
         private System.Windows.Forms.Label lblUnitPrincipalMoment;
         private System.Windows.Forms.Label lblUnitHoleLinear;
         private System.Windows.Forms.Label lblUnitHoleRadius;
-        private System.Windows.Forms.Button btnRun;
-        private System.Windows.Forms.Button btnCancel;
+        private ADDIN.UI.ModernButton btnRun;
+        private ADDIN.UI.ModernButton btnCancel;
     }
 }

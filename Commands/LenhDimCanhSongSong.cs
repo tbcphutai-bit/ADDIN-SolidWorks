@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -12,7 +12,7 @@ namespace ADDIN.Commands
         private readonly ISldWorks swApp;
 
         private const double OrthoTolMm = 0.5;
-        private const double DimOffsetMm = 10.0;
+        private double DimOffsetMm = 10.0;
         private const double MinGapMm = 1.0;
         private const double MaxGapMm = 300.0;
         private const double MinOverlapMm = 2.0;

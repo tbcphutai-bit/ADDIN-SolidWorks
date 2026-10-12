@@ -11,6 +11,19 @@ namespace ADDIN.Commands
         private readonly Dictionary<string, BendTableWorkbookData> cache =
             new Dictionary<string, BendTableWorkbookData>(StringComparer.OrdinalIgnoreCase);
         private object excelApplication;
+        private readonly BendTableDatabase standardDatabase = new BendTableDatabase();
+
+        // Only the expected standard comes from the database. Actual table data
+        // stays independent so identical filenames cannot hide a mismatch.
+        public BendTableWorkbookData ReadStandard(string path)
+        {
+            return standardDatabase.Read(path);
+        }
+
+        internal IEnumerable<string> GetGrooveStandardPaths()
+        {
+            return standardDatabase.GetGrooveStandardPaths();
+        }
 
         public BendTableWorkbookData Read(string path)
         {
@@ -37,6 +50,20 @@ namespace ADDIN.Commands
             object usedRange = null;
             try
             {
+                if (string.Equals(Path.GetExtension(normalizedPath), ".xlsx", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        BendTableWorkbookData imported = BendTableXlsxImporter.Read(
+                            BendTableDatabase.ReadSource(normalizedPath), normalizedPath);
+                        if (imported.IsValid)
+                        {
+                            cache[normalizedPath] = imported;
+                            return imported;
+                        }
+                    }
+                    catch { } // Other Excel formulas retain the existing COM reader.
+                }
                 EnsureExcelApplication();
                 dynamic excel = excelApplication;
                 workbooks = excel.Workbooks;
@@ -105,12 +132,36 @@ namespace ADDIN.Commands
             excel.EnableEvents = false;
         }
 
-        private static void ParseBlocks(Array values, BendTableWorkbookData result)
+        internal static void ParseBlocks(Array values, BendTableWorkbookData result)
         {
             int rowMin = values.GetLowerBound(0);
             int rowMax = values.GetUpperBound(0);
             int colMin = values.GetLowerBound(1);
             int colMax = values.GetUpperBound(1);
+
+            // The grid can contain BD, BA, or K. Never infer its units/type
+            // from the filename or compare an inactive allowance property.
+            for (int row = rowMin; row <= rowMax; row++)
+            {
+                string label = NormalizeText(GetValue(values, row, colMin));
+                string text = NormalizeText(GetValue(values, row, colMin + 1));
+                if (label == "材料:" || label.Equals("Material:", StringComparison.OrdinalIgnoreCase))
+                    result.MaterialName = text;
+                if (label == "\u5358\u4F4D:" || label.Equals("Units:", StringComparison.OrdinalIgnoreCase))
+                    result.IsMillimeters = text == "ミリメータ" || text == "ミリメートル"
+                        || text.Equals("mm", StringComparison.OrdinalIgnoreCase)
+                        || text.Equals("millimeters", StringComparison.OrdinalIgnoreCase);
+                if (label == "\u7A2E\u985E:" || label.Equals("Type:", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (text == "ベンド展開長補正" || text.Equals("Bend Deduction", StringComparison.OrdinalIgnoreCase))
+                        result.ValueKind = BendTableValueKind.Deduction;
+                    else if (text == "ベンド許容差" || text.Equals("Bend Allowance", StringComparison.OrdinalIgnoreCase))
+                        result.ValueKind = BendTableValueKind.Allowance;
+                    else if (text.Equals("K-Factor", StringComparison.OrdinalIgnoreCase)
+                        || text.Equals("K Factor", StringComparison.OrdinalIgnoreCase) || text == "K係数")
+                        result.ValueKind = BendTableValueKind.KFactor;
+                }
+            }
 
             for (int row = rowMin; row <= rowMax; row++)
             {
@@ -124,7 +175,8 @@ namespace ADDIN.Commands
 
                 BendTableBlockData block = new BendTableBlockData
                 {
-                    ThicknessMm = thickness
+                    ThicknessMm = thickness,
+                    IsGroove = NormalizeText(GetValue(values, row, colMin + 3)) == "溝"
                 };
 
                 double coefficient;
@@ -262,6 +314,9 @@ namespace ADDIN.Commands
 
         public string FilePath { get; set; }
         public string Error { get; set; }
+        public string MaterialName { get; set; }
+        public bool IsMillimeters { get; set; }
+        public BendTableValueKind ValueKind { get; set; }
         public List<BendTableBlockData> Blocks { get; private set; }
         public bool IsValid
         {
@@ -284,6 +339,56 @@ namespace ADDIN.Commands
 
             return bestDifference <= 0.01 ? best : null;
         }
+
+        public bool TryGetDeduction(double thicknessMm, double angleDeg, double radiusMm,
+            out double deductionMm, out string detail)
+        {
+            deductionMm = 0;
+            detail = "";
+            if (!IsValid) { detail = Error ?? "BendTable khong hop le."; return false; }
+            if (!IsMillimeters || ValueKind == BendTableValueKind.Unknown)
+            { detail = "Chua xac dinh duoc loai gia tri/don vi mm cua BendTable."; return false; }
+            BendTableBlockData block = FindThickness(thicknessMm);
+            if (block == null)
+            { detail = "BendTable khong co block do day " + thicknessMm.ToString("0.###") + " mm."; return false; }
+            double value;
+            if (!block.TryGetValue(angleDeg, radiusMm, out value, out detail)) return false;
+            return BendValueMath.TryToDeduction(ValueKind, value, thicknessMm, angleDeg, radiusMm,
+                out deductionMm, out detail);
+        }
+    }
+
+    internal enum BendTableValueKind { Unknown, Deduction, Allowance, KFactor }
+
+    internal static class BendValueMath
+    {
+        public static bool IsFinite(double value)
+        { return !double.IsNaN(value) && !double.IsInfinity(value); }
+
+        public static bool TryToDeduction(BendTableValueKind kind, double value,
+            double thicknessMm, double angleDeg, double radiusMm, out double deductionMm, out string detail)
+        {
+            deductionMm = 0;
+            detail = "";
+            if (!IsFinite(value) || !IsFinite(thicknessMm) || !IsFinite(angleDeg)
+                || !IsFinite(radiusMm) || thicknessMm <= 0 || radiusMm < 0
+                || angleDeg <= 0 || angleDeg >= 180)
+            { detail = "Thieu gia tri hop le cua he so/do day/goc/R de quy doi BD."; return false; }
+            double radians = angleDeg * Math.PI / 180.0;
+            double setback = 2.0 * (radiusMm + thicknessMm) * Math.Tan(radians / 2.0);
+            if (kind == BendTableValueKind.Deduction) deductionMm = value;
+            else if (kind == BendTableValueKind.Allowance) deductionMm = setback - value;
+            else if (kind == BendTableValueKind.KFactor && value >= 0 && value <= 1)
+                deductionMm = setback - radians * (radiusMm + value * thicknessMm);
+            else { detail = "Loai he so khong ho tro hoac K-factor nam ngoai 0..1."; return false; }
+            if (!IsFinite(deductionMm)) { detail = "Gia tri BD quy doi khong hop le."; return false; }
+            return true;
+        }
+
+        // Kiku's block coefficient c is related to BD by BD = 2*c*tan(angle/2).
+        // This normalized value is useful for display; comparisons use BD itself.
+        public static double NormalizedCoefficient(double deductionMm, double angleDeg)
+        { return deductionMm / (2.0 * Math.Tan(angleDeg * Math.PI / 360.0)); }
     }
 
     internal sealed class BendTableBlockData
@@ -297,6 +402,7 @@ namespace ADDIN.Commands
 
         public double ThicknessMm { get; set; }
         public bool HasCoefficient { get; set; }
+        public bool IsGroove { get; set; }
         public double CoefficientMm { get; set; }
         public List<double> RadiiMm { get; private set; }
         public List<int> SourceColumns { get; private set; }
@@ -360,6 +466,8 @@ namespace ADDIN.Commands
 
             valueMm = lowRadiusValue
                 + ((highRadiusValue - lowRadiusValue) * angleFraction);
+            if (!BendValueMath.IsFinite(valueMm))
+            { detail = "Gia tri tra BendTable khong hop le."; return false; }
             return true;
         }
 

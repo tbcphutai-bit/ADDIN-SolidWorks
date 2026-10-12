@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -34,6 +34,7 @@ namespace ADDIN.Commands
 
             bool oldCommandInProgress = swApp.CommandInProgress;
             ModelView activeView = null;
+            bool oldGraphicsUpdate = true;
 
             try
             {
@@ -42,10 +43,12 @@ namespace ADDIN.Commands
                     + ", type=" + SafeModelType(activeModel));
                 activeView = activeModel?.ActiveView as ModelView;
                 if (activeView != null)
+                {
+                    oldGraphicsUpdate = activeView.EnableGraphicsUpdate;
                     activeView.EnableGraphicsUpdate = false;
+                }
 
                 swApp.CommandInProgress = true;
-                ResolveActiveAssemblyLightweight(activeModel);
 
                 result.CheckedCount = CountCheckedRows();
                 progressStarted?.Invoke(result.CheckedCount);
@@ -100,7 +103,7 @@ namespace ADDIN.Commands
             {
                 swApp.CommandInProgress = oldCommandInProgress;
                 if (activeView != null)
-                    activeView.EnableGraphicsUpdate = true;
+                    activeView.EnableGraphicsUpdate = oldGraphicsUpdate;
 
                 Debug.WriteLine("[URA OMOTE] ===== RUN END ===== processed=" + result.ProcessedCount
                     + ", results=" + result.Results.Count
@@ -366,20 +369,14 @@ namespace ADDIN.Commands
             if (!string.IsNullOrWhiteSpace(path))
             {
                 Debug.WriteLine("[URA OMOTE] Component check uses part path directly to avoid lightweight/reference cache.");
-                return CheckPart(path, bomBuhinNo, bomFileName, component.Name2);
+                return CheckPart(path, bomBuhinNo, bomFileName, component.Name2, SafeComponentConfiguration(component));
             }
 
-            ModelDoc2 model = component.GetModelDoc2() as ModelDoc2;
-            if (model != null)
-            {
-                Debug.WriteLine("[URA OMOTE] Component has no path; fallback to loaded model. title=" + SafeModelTitle(model));
-                return CheckModel(model, false, bomBuhinNo, bomFileName, component.Name2);
-            }
-
-            return CreateSkippedResult(bomBuhinNo, bomFileName, component.Name2, "", "Kh\u00F4ng c\u00F3 \u0111\u01B0\u1EDDng d\u1EABn part v\u00E0 kh\u00F4ng l\u1EA5y \u0111\u01B0\u1EE3c model");
+            return CreateCheckResult(bomBuhinNo, bomFileName, component.Name2, "",
+                "Component chua co file part da luu; chua the kiem tra tren ban sao.");
         }
 
-        public UraOmoteRowResult CheckPart(string partPath, string bomBuhinNo, string bomFileName, string componentName)
+        public UraOmoteRowResult CheckPart(string partPath, string bomBuhinNo, string bomFileName, string componentName, string configuration = "")
         {
             Debug.WriteLine("[URA OMOTE] Part check start. path=" + partPath + ", component=" + componentName);
             if (string.IsNullOrWhiteSpace(partPath))
@@ -388,66 +385,36 @@ namespace ADDIN.Commands
             if (!string.Equals(Path.GetExtension(partPath), ".SLDPRT", StringComparison.OrdinalIgnoreCase))
                 return CreateSkippedResult(bomBuhinNo, bomFileName, componentName, partPath, "Kh\u00F4ng ph\u1EA3i part");
 
-            int errors = 0;
-            int warnings = 0;
-            bool openedByChecker = false;
-            bool restorePartVisibility = false;
-            ModelDoc2 existingPart = swApp.GetOpenDocumentByName(partPath) as ModelDoc2;
-            ModelDoc2 part = null;
-            Debug.WriteLine("[URA OMOTE] GetOpenDocumentByName. found=" + (existingPart != null)
-                + ", title=" + SafeModelTitle(existingPart)
-                + ", path=" + SafeModelPath(existingPart));
-
-            if (existingPart == null)
-            {
-                swApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
-                restorePartVisibility = true;
-            }
-
-            // Always ask SOLIDWORKS to open the part by path. If it is only loaded
-            // as an assembly/drawing reference, this promotes it to a full part
-            // document; if it is already edited by the user, SOLIDWORKS returns
-            // that same in-memory document and preserves unsaved appearance edits.
-            part = swApp.OpenDoc6(
-                partPath,
-                (int)swDocumentTypes_e.swDocPART,
-                (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
-                "",
-                ref errors,
-                ref warnings) as ModelDoc2;
-            if (part == null)
-                part = existingPart;
-
-            openedByChecker = existingPart == null && part != null;
-            Debug.WriteLine("[URA OMOTE] OpenDoc6 full-part request. openedByChecker=" + openedByChecker
-                + ", returned=" + (part != null)
-                + ", sameAsExisting=" + ReferenceEquals(part, existingPart)
-                + ", title=" + SafeModelTitle(part)
-                + ", path=" + SafeModelPath(part)
-                + ", errors=" + errors + ", warnings=" + warnings);
-
-            if (restorePartVisibility)
-                swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART);
-
-            if (part == null)
-                return CreateSkippedResult(bomBuhinNo, bomFileName, componentName, partPath, "Kh\u00F4ng m\u1EDF \u0111\u01B0\u1EE3c part. errors=" + errors + ", warnings=" + warnings);
-
             try
             {
-                part.ForceRebuild3(false);
-                part.EditRebuild3();
-                Debug.WriteLine("[URA OMOTE] Full part rebuild completed before configuration scan.");
+                using (CheckPartWorkingCopy copy = CheckPartWorkingCopy.Open(swApp, partPath, configuration))
+                {
+                    UraOmoteRowResult result = CheckModel(copy.Model, bomBuhinNo, bomFileName,
+                        string.IsNullOrWhiteSpace(componentName) ? Path.GetFileNameWithoutExtension(partPath) : componentName);
+                    copy.ValidateSource();
+                    result.PartPath = copy.SourcePath;
+                    result.Note = "Kiem tra tren ban sao part da luu; " + result.Note;
+                    return result;
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[URA OMOTE] Full part rebuild ERROR: " + ex.Message);
+                Debug.WriteLine("[URA OMOTE] Part check ERROR: " + ex);
+                return CreateCheckResult(bomBuhinNo, bomFileName, componentName, partPath, ex.Message);
             }
-
-            return CheckModel(part, openedByChecker, bomBuhinNo, bomFileName, componentName);
         }
 
-        private UraOmoteRowResult CheckModel(ModelDoc2 part, bool closeAfterCheck, string bomBuhinNo, string bomFileName, string componentName)
+        private UraOmoteRowResult CreateCheckResult(string buhinNo, string fileName,
+            string componentName, string partPath, string note)
         {
+            UraOmoteRowResult result = CreateSkippedResult(buhinNo, fileName, componentName, partPath, note);
+            result.Status = "CHECK";
+            return result;
+        }
+
+        private UraOmoteRowResult CheckModel(ModelDoc2 part, string bomBuhinNo, string bomFileName, string componentName)
+        {
+            CheckPartWorkingCopy.RequireWorkingCopy(part);
             string originalConfig = "";
             string defaultConfig = "";
             string flatConfig = "";
@@ -459,8 +426,7 @@ namespace ADDIN.Commands
                 originalConfig = part.ConfigurationManager.ActiveConfiguration.Name;
                 Debug.WriteLine("[URA OMOTE] Model check start. title=" + SafeModelTitle(part)
                     + ", path=" + SafeModelPath(part)
-                    + ", originalConfig=" + originalConfig
-                    + ", closeAfter=" + closeAfterCheck);
+                    + ", originalConfig=" + originalConfig);
             }
             catch (Exception ex)
             {
@@ -483,7 +449,7 @@ namespace ADDIN.Commands
                     + ", default=" + defaultConfig
                     + ", flat=" + (hasFlatConfig ? flatConfig : "<missing>"));
                 bool defaultShown = ActivateConfiguration(part, defaultConfig);
-                part.EditRebuild3();
+                if (!defaultShown) throw new InvalidOperationException("Khong mo duoc configuration: " + defaultConfig);
                 Debug.WriteLine("[URA OMOTE] Show default configuration. ok=" + defaultShown
                     + ", active=" + SafeActiveConfiguration(part));
 
@@ -508,7 +474,7 @@ namespace ADDIN.Commands
                 if (hasFlatConfig)
                 {
                     bool flatShown = ActivateConfiguration(part, flatConfig);
-                    part.EditRebuild3();
+                    if (!flatShown) throw new InvalidOperationException("Khong mo duoc configuration: " + flatConfig);
                     originalFlatConfigPatternSuppressed = GetSuppressionState(flatPatternFeature);
                     Debug.WriteLine("[URA OMOTE] Show flat configuration. ok=" + flatShown
                         + ", active=" + SafeActiveConfiguration(part)
@@ -621,47 +587,7 @@ namespace ADDIN.Commands
             }
             finally
             {
-                try
-                {
-                    if (flatPatternFeature != null && originalDefaultFlatPatternSuppressed.HasValue && !string.IsNullOrWhiteSpace(defaultConfig))
-                    {
-                        part.ShowConfiguration2(defaultConfig);
-                        SetFlatPatternSuppressed(part, flatPatternFeature, originalDefaultFlatPatternSuppressed.Value);
-                        Debug.WriteLine("[URA OMOTE] Restore Default FlatPattern suppression=" + originalDefaultFlatPatternSuppressed.Value);
-                    }
-
-                    if (flatPatternFeature != null && originalFlatConfigPatternSuppressed.HasValue && !string.IsNullOrWhiteSpace(flatConfig))
-                    {
-                        part.ShowConfiguration2(flatConfig);
-                        SetFlatPatternSuppressed(part, flatPatternFeature, originalFlatConfigPatternSuppressed.Value);
-                        Debug.WriteLine("[URA OMOTE] Restore flat-config FlatPattern suppression=" + originalFlatConfigPatternSuppressed.Value);
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(originalConfig))
-                    {
-                        part.ShowConfiguration2(originalConfig);
-                        part.EditRebuild3();
-                        Debug.WriteLine("[URA OMOTE] Restore original configuration=" + originalConfig);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine("[URA OMOTE] Restore state ERROR: " + ex.Message);
-                }
-
-                if (closeAfterCheck)
-                {
-                    try
-                    {
-                        swApp.CloseDoc(part.GetTitle());
-                        Debug.WriteLine("[URA OMOTE] Closed checker-opened part=" + SafeModelTitle(part));
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine("[URA OMOTE] Close part ERROR: " + ex.Message);
-                    }
-                }
-
+                // The working copy is discarded by CheckPart; no restore rebuild is needed.
                 Debug.WriteLine("[URA OMOTE] Model check end. title=" + SafeModelTitle(part));
             }
         }
@@ -705,7 +631,8 @@ namespace ADDIN.Commands
                 if (string.Equals(SafeActiveConfiguration(part), configName, StringComparison.OrdinalIgnoreCase))
                     return true;
 
-                part.ShowConfiguration2(configName);
+                CheckPartWorkingCopy.RequireWorkingCopy(part);
+                if (!part.ShowConfiguration2(configName)) return false;
                 return string.Equals(SafeActiveConfiguration(part), configName, StringComparison.OrdinalIgnoreCase);
             }
             catch (Exception ex)
@@ -763,6 +690,7 @@ namespace ADDIN.Commands
 
             try
             {
+                CheckPartWorkingCopy.RequireWorkingCopy(part);
                 bool changed = flatPatternFeature.SetSuppression2(
                     suppressed
                         ? (int)swFeatureSuppressionAction_e.swSuppressFeature
@@ -770,8 +698,8 @@ namespace ADDIN.Commands
                     (int)swInConfigurationOpts_e.swThisConfiguration,
                     null);
 
-                part.ForceRebuild3(false);
-                part.EditRebuild3();
+                if (!changed || !part.EditRebuild3() || GetSuppressionState(flatPatternFeature) != suppressed)
+                    return false;
                 Debug.WriteLine("[URA OMOTE] Set FlatPattern suppression. config=" + SafeActiveConfiguration(part)
                     + ", requested=" + suppressed
                     + ", changed=" + changed
@@ -784,6 +712,161 @@ namespace ADDIN.Commands
                     + ", requested=" + suppressed + ", error=" + ex.Message);
                 return false;
             }
+        }
+
+        public static bool IsFlatDrawingView(SolidWorks.Interop.sldworks.View view)
+        {
+            if (view == null)
+                return false;
+            try { if (view.IsFlatPatternView()) return true; } catch { }
+            try
+            {
+                ModelDoc2 model = view.ReferencedDocument as ModelDoc2;
+                if (!(model is PartDoc)) return false;
+                string config = view.ReferencedConfiguration;
+                if (string.IsNullOrWhiteSpace(config)) return false;
+                Feature feature = model.FirstFeature() as Feature;
+                while (feature != null)
+                {
+                    if (feature.GetTypeName2() == "FlatPattern")
+                    {
+                        object state = feature.IsSuppressed2(
+                            (int)swInConfigurationOpts_e.swSpecifyConfiguration, new[] { config });
+                        Array states = state as Array;
+                        if ((state is bool && !(bool)state)
+                            || (states != null && states.Length > 0 && !Convert.ToBoolean(states.GetValue(0))))
+                            return true;
+                    }
+                    feature = feature.GetNextFeature() as Feature;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        public FlatDrawingViewSideResult CheckFlatDrawingView(SolidWorks.Interop.sldworks.View view)
+        {
+            var result = new FlatDrawingViewSideResult();
+            ModelDoc2 model = null;
+            CheckPartWorkingCopy workingCopy = null;
+            try
+            {
+                if (!IsFlatDrawingView(view))
+                {
+                    result.Message = "View không ở trạng thái 展開.";
+                    return result;
+                }
+                result.ViewName = view.Name ?? "";
+                ModelDoc2 referencedModel = view.ReferencedDocument as ModelDoc2;
+                string sourcePath = referencedModel == null ? "" : referencedModel.GetPathName();
+                if (string.IsNullOrWhiteSpace(sourcePath))
+                {
+                    result.Message = "Khong lay duoc file part da luu cua view 展開.";
+                    return result;
+                }
+                string config = view.ReferencedConfiguration ?? "";
+                result.Configuration = config;
+                if (string.IsNullOrWhiteSpace(config))
+                {
+                    result.Message = "Khong doc duoc configuration cua view 展開.";
+                    return result;
+                }
+                workingCopy = CheckPartWorkingCopy.Open(swApp, sourcePath, config);
+                model = workingCopy.Model;
+                PartDoc part = model as PartDoc;
+                if (part == null)
+                {
+                    result.Message = "Khong mo duoc ban sao part cua view 展開.";
+                    return result;
+                }
+                Feature flat = FindFlatPatternFeature(model);
+                if (flat == null || GetSuppressionState(flat) != false)
+                {
+                    result.Message = "Flat-Pattern chưa mở trong configuration của view.";
+                    return result;
+                }
+                string displayState = "";
+                try { displayState = view.DisplayState ?? ""; } catch { }
+                DisplayStateFaceMaterialSet appearances = ReadActiveDisplayStateFaceMaterials(model, displayState);
+                result.DisplayState = appearances.DisplayStateName;
+                if (!string.IsNullOrWhiteSpace(displayState) && !appearances.ReadSucceeded)
+                {
+                    result.Message = "Không đọc được màu mặt trong display state mà view 展開 tham chiếu: " + displayState;
+                    return result;
+                }
+                MathTransform transform = view.ModelToViewTransform;
+                MathUtility math = swApp.GetMathUtility() as MathUtility;
+                if (transform == null || math == null)
+                {
+                    result.Message = "Không đọc được hướng nhìn của view 展開.";
+                    return result;
+                }
+                Array bodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as Array;
+                if (bodies == null || bodies.Length != 1)
+                {
+                    result.Message = "View 展開 cần xác định được một body tấm duy nhất.";
+                    return result;
+                }
+                double frontArea = 0, backArea = 0, frontPink = 0, backPink = 0;
+                foreach (object bodyObject in bodies)
+                {
+                    Body2 body = bodyObject as Body2;
+                    Array faces = body?.GetFaces() as Array;
+                    if (faces == null) continue;
+                    foreach (object faceObject in faces)
+                    {
+                        Face2 face = faceObject as Face2;
+                        double[] normal = face?.Normal as double[];
+                        if (normal == null || normal.Length < 3) continue;
+                        MathVector vector = math.CreateVector(normal) as MathVector;
+                        vector = vector?.MultiplyTransform(transform) as MathVector;
+                        double[] inView = vector?.ArrayData as double[];
+                        if (inView == null || inView.Length < 3) continue;
+                        double length = Math.Sqrt(inView[0]*inView[0]+inView[1]*inView[1]+inView[2]*inView[2]);
+                        if (length < 1e-12) continue;
+                        double z = inView[2] / length;
+                        // Exclude thickness edges and non-face-on views.
+                        if (Math.Abs(z) < 0.98) continue;
+                        double area = face.GetArea();
+                        double[] material;
+                        bool hasAppearance = appearances.TryGet(face, out material);
+                        bool pink = hasAppearance ? IsPinkMaterial(material)
+                            : !appearances.Authoritative && TryGetPinkFaceMaterial(face, out material);
+                        if (z > 0) { frontArea += area; if (pink) frontPink += area; }
+                        else { backArea += area; if (pink) backPink += area; }
+                    }
+                }
+                workingCopy.ValidateSource();
+                result.FrontPinkAreaMm2 = frontPink * 1000000.0;
+                result.BackPinkAreaMm2 = backPink * 1000000.0;
+                result.PinkFacingViewer = ClassifyFlatPinkSide(frontArea, backArea, frontPink, backPink);
+                result.Message = result.PinkFacingViewer.HasValue
+                    ? (result.PinkFacingViewer.Value ? "View đang nhìn mặt hồng (ウラ)." : "View đang nhìn mặt omote (表); mặt hồng ở phía sau.")
+                    : "Không xác định được một mặt hồng duy nhất: thiếu màu, màu ở cả hai phía hoặc view không nhìn thẳng mặt tấm.";
+                Debug.WriteLine("[DRAWING FLAT SIDE] view=" + result.ViewName + " config=" + config
+                    + " displayState=" + result.DisplayState + " pinkFacingViewer=" + NullableBoolText(result.PinkFacingViewer)
+                    + " frontPinkMm2=" + result.FrontPinkAreaMm2 + " backPinkMm2=" + result.BackPinkAreaMm2);
+            }
+            catch (Exception ex)
+            {
+                result.PinkFacingViewer = null;
+                result.Message = "Không kiểm tra được mặt của view 展開: " + ex.Message;
+            }
+            finally
+            {
+                if (workingCopy != null) workingCopy.Dispose();
+            }
+            return result;
+        }
+
+        internal static bool? ClassifyFlatPinkSide(double frontArea, double backArea, double frontPink, double backPink)
+        {
+            if (frontArea <= 1e-12 || backArea <= 1e-12) return null;
+            const double fraction = 0.01;
+            bool front = frontPink > frontArea * fraction;
+            bool back = backPink > backArea * fraction;
+            if (front == back) return null;
+            return front;
         }
 
         private PaintFaceSummary CheckConfig(ModelDoc2 part, string configName, bool collectFaceReferences)
@@ -911,6 +994,7 @@ namespace ADDIN.Commands
         private sealed class DisplayStateFaceMaterialSet
         {
             public bool Authoritative { get; set; }
+            public bool ReadSucceeded { get; set; }
             public string DisplayStateName { get; set; }
             public readonly List<Face2> Faces = new List<Face2>();
             public readonly List<double[]> Materials = new List<double[]>();
@@ -940,7 +1024,7 @@ namespace ADDIN.Commands
             }
         }
 
-        private DisplayStateFaceMaterialSet ReadActiveDisplayStateFaceMaterials(ModelDoc2 part)
+        private DisplayStateFaceMaterialSet ReadActiveDisplayStateFaceMaterials(ModelDoc2 part, string requestedDisplayState = "")
         {
             DisplayStateFaceMaterialSet result = new DisplayStateFaceMaterialSet();
             try
@@ -954,7 +1038,17 @@ namespace ADDIN.Commands
                     return result;
                 }
 
-                result.DisplayStateName = Convert.ToString(displayStates.GetValue(0));
+                if (!string.IsNullOrWhiteSpace(requestedDisplayState))
+                {
+                    bool found = false;
+                    foreach (object state in displayStates)
+                        if (string.Equals(Convert.ToString(state), requestedDisplayState, StringComparison.OrdinalIgnoreCase))
+                            found = true;
+                    if (!found) return result;
+                }
+
+                result.DisplayStateName = string.IsNullOrWhiteSpace(requestedDisplayState)
+                    ? Convert.ToString(displayStates.GetValue(0)) : requestedDisplayState;
                 bool linked = false;
                 try
                 {
@@ -971,10 +1065,10 @@ namespace ADDIN.Commands
                 Array faces = rawFaces as Array;
                 Array properties = rawProperties as Array;
 
-                // A successful call on linked display states is authoritative even
-                // when it returns no face appearances; that means the face override
-                // was removed in the active display state.
-                result.Authoritative = linked && faces != null;
+                // Linked active states and an explicitly requested drawing-view
+                // state are authoritative, including an empty appearance list.
+                result.ReadSucceeded = faces != null && properties != null;
+                result.Authoritative = faces != null && (linked || !string.IsNullOrWhiteSpace(requestedDisplayState));
 
                 if (faces != null && properties != null)
                 {
@@ -1096,8 +1190,6 @@ namespace ADDIN.Commands
                     return null;
                 }
 
-                part.ForceRebuild3(false);
-                part.EditRebuild3();
                 DisplayStateFaceMaterialSet targetDisplayStateMaterials =
                     ReadActiveDisplayStateFaceMaterials(part);
                 int resolvedReferenceCount = 0;
@@ -1376,6 +1468,17 @@ namespace ADDIN.Commands
         public HashSet<int> HighlightRowIndexes { get; private set; }
     }
 
+    public sealed class FlatDrawingViewSideResult
+    {
+        public string ViewName { get; set; } = "";
+        public string Configuration { get; set; } = "";
+        public string DisplayState { get; set; } = "";
+        public bool? PinkFacingViewer { get; set; }
+        public double FrontPinkAreaMm2 { get; set; }
+        public double BackPinkAreaMm2 { get; set; }
+        public string Message { get; set; } = "";
+    }
+
     public class UraOmoteRowResult
     {
         public string Component { get; set; }
@@ -1435,18 +1538,21 @@ namespace ADDIN.Commands
 
                 dynamic xlApp = Activator.CreateInstance(excelType);
                 dynamic xlWB = xlApp.Workbooks.Add();
-                dynamic xlWS = xlWB.Sheets[1];
-                xlWS.Name = "Check Ura Omote";
+                using (var exportScope = new ExcelCheckExportScope(xlApp, "URA OMOTE"))
+                {
+                    dynamic xlWS = xlWB.Sheets[1];
+                    xlWS.Name = "Check Ura Omote";
 
-                WriteHeader(xlWS);
-                WriteRows(xlWS, reportRows);
+                    WriteHeader(xlWS);
+                    WriteRows(xlWS, reportRows);
 
-                int lastRow = reportRows.Count + 1;
-                if (lastRow > 1)
-                    TrySortExcelByBuhinNo(xlWS, lastRow);
+                    int lastRow = reportRows.Count + 1;
+                    if (lastRow > 1)
+                        TrySortExcelByBuhinNo(xlWS, lastRow);
 
-                xlWS.Columns.AutoFit();
-                AutoFitNoteColumn(xlWS, lastRow, 5);
+                    xlWS.Range["A1:E" + lastRow].Columns.AutoFit();
+                    AutoFitNoteColumn(xlWS, lastRow, 5);
+                }
                 xlApp.Visible = true;
             }
             catch (Exception ex)
@@ -1457,33 +1563,39 @@ namespace ADDIN.Commands
 
         private static void WriteHeader(dynamic xlWS)
         {
-            xlWS.Cells[1, 1].Value = "\u90E8\u54C1\u756A\u53F7";
-            xlWS.Cells[1, 2].Value = "S\u1ED1 m\u1EB7t h\u1ED3ng trong Default";
-            xlWS.Cells[1, 3].Value = "S\u1ED1 m\u1EB7t h\u1ED3ng trong Flat-Pattern";
-            xlWS.Cells[1, 4].Value = "Status";
-            xlWS.Cells[1, 5].Value = "Note";
+            ExcelCheckReportWriter.WriteHeaders(xlWS, new[] {
+                "\u90E8\u54C1\u756A\u53F7",
+                "S\u1ED1 m\u1EB7t h\u1ED3ng trong Default",
+                "S\u1ED1 m\u1EB7t h\u1ED3ng trong Flat-Pattern",
+                "Status",
+                "Note"
+            });
         }
 
         private static void WriteRows(dynamic xlWS, List<UraOmoteRowResult> results)
         {
+            var data = new object[results.Count, 5];
+            var fills = new ExcelCheckFillBatch(1, 5);
             int row = 2;
             foreach (UraOmoteRowResult result in results)
             {
-                xlWS.Cells[row, 1].Value = result.BuhinNo;
-                xlWS.Cells[row, 2].Value = result.DefaultPinkFaceCount;
-                xlWS.Cells[row, 3].Value = result.FlatPinkFaceCount;
-                xlWS.Cells[row, 4].Value = result.Status;
-                xlWS.Cells[row, 5].Value = result.Note;
+                data[row - 2, 0] = result.BuhinNo;
+                data[row - 2, 1] = result.DefaultPinkFaceCount;
+                data[row - 2, 2] = result.FlatPinkFaceCount;
+                data[row - 2, 3] = result.Status;
+                data[row - 2, 4] = result.Note;
 
                 if (result.Status == "NG")
-                    xlWS.Range["A" + row + ":E" + row].Interior.Color = Rgb(255, 199, 206);
+                    fills.Add(row, Rgb(255, 199, 206));
                 else if (result.Status == "CHECK")
-                    xlWS.Range["A" + row + ":E" + row].Interior.Color = Rgb(255, 235, 156);
+                    fills.Add(row, Rgb(255, 235, 156));
                 else if (result.Status == "SKIP")
-                    xlWS.Range["A" + row + ":E" + row].Interior.Color = Rgb(217, 217, 217);
+                    fills.Add(row, Rgb(217, 217, 217));
 
                 row++;
             }
+            ExcelCheckReportWriter.WriteBlock(xlWS, 2, 1, data);
+            fills.Apply(xlWS);
         }
 
         private static void AutoFitNoteColumn(dynamic sheet, int lastRow, int noteColumn)

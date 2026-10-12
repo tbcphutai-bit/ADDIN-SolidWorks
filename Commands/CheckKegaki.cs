@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -30,6 +30,7 @@ namespace ADDIN.Commands
             HashSet<string> checkedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool oldCommandInProgress = swApp.CommandInProgress;
             ModelView activeView = null;
+            bool oldGraphicsUpdate = true;
 
             Debug.WriteLine("[CHECK KEGAKI] ===== RUN START =====");
             try
@@ -37,10 +38,12 @@ namespace ADDIN.Commands
                 ModelDoc2 activeModel = swApp.ActiveDoc as ModelDoc2;
                 activeView = activeModel == null ? null : activeModel.ActiveView as ModelView;
                 if (activeView != null)
+                {
+                    oldGraphicsUpdate = activeView.EnableGraphicsUpdate;
                     activeView.EnableGraphicsUpdate = false;
+                }
 
                 swApp.CommandInProgress = true;
-                ResolveActiveAssemblyLightweight(activeModel);
 
                 result.CheckedCount = CountCheckedRows();
                 if (progressStarted != null)
@@ -81,7 +84,7 @@ namespace ADDIN.Commands
             {
                 swApp.CommandInProgress = oldCommandInProgress;
                 if (activeView != null)
-                    activeView.EnableGraphicsUpdate = true;
+                    activeView.EnableGraphicsUpdate = oldGraphicsUpdate;
                 checker.Dispose();
 
                 Debug.WriteLine("[CHECK KEGAKI] ===== RUN END ===== results="
@@ -211,7 +214,7 @@ namespace ADDIN.Commands
         }
     }
 
-    public sealed class KegakiChecker : IDisposable
+    public sealed partial class KegakiChecker : IDisposable
     {
         private const double BendTableToleranceMm = 0.001;
         private const string XToolBendTableDirectory =
@@ -251,14 +254,9 @@ namespace ADDIN.Commands
             if (!string.IsNullOrWhiteSpace(path))
                 return CheckPart(path, configuration, buhinNo, bomFileName, componentName);
 
-            ModelDoc2 model = null;
-            try { model = component.GetModelDoc2() as ModelDoc2; } catch { }
-            if (model != null)
-                return CheckModel(model, buhinNo, bomFileName, componentName, "");
-
             return SingleStatus(
                 "CHECK", buhinNo, bomFileName, componentName, path,
-                "Khong lay duoc model cua component");
+                "Component chua co file part da luu; chua the kiem tra tren ban sao.");
         }
 
         public List<KegakiBendResult> CheckPart(
@@ -274,70 +272,23 @@ namespace ADDIN.Commands
             if (!string.Equals(Path.GetExtension(partPath), ".SLDPRT", StringComparison.OrdinalIgnoreCase))
                 return SingleStatus("SKIP", buhinNo, bomFileName, componentName, partPath, "Khong phai part");
 
-            int errors = 0;
-            int warnings = 0;
-            bool openedByChecker = false;
-            bool restorePartVisibility = false;
-            ModelDoc2 part = swApp.GetOpenDocumentByName(partPath) as ModelDoc2;
-
             try
             {
-                if (part == null)
+                using (CheckPartWorkingCopy copy = CheckPartWorkingCopy.Open(swApp, partPath, configuration))
                 {
-                    swApp.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
-                    restorePartVisibility = true;
-                    part = swApp.OpenDoc6(
-                        partPath,
-                        (int)swDocumentTypes_e.swDocPART,
-                        (int)(swOpenDocOptions_e.swOpenDocOptions_Silent | swOpenDocOptions_e.swOpenDocOptions_ReadOnly),
-                        "",
-                        ref errors,
-                        ref warnings) as ModelDoc2;
-                    openedByChecker = part != null;
-                }
-
-                if (part == null)
-                    return SingleStatus("CHECK", buhinNo, bomFileName, componentName, partPath, "Khong mo duoc part");
-
-                string oldConfiguration = "";
-                try { oldConfiguration = part.ConfigurationManager.ActiveConfiguration.Name; } catch { }
-
-                try
-                {
-                    if (!string.IsNullOrWhiteSpace(configuration)
-                        && !string.Equals(oldConfiguration, configuration, StringComparison.OrdinalIgnoreCase))
-                    {
-                        part.ShowConfiguration2(configuration);
-                    }
-
-                    return CheckModel(part, buhinNo, bomFileName, componentName, partPath);
-                }
-                finally
-                {
-                    if (!openedByChecker
-                        && !string.IsNullOrWhiteSpace(oldConfiguration)
-                        && !string.Equals(oldConfiguration, configuration, StringComparison.OrdinalIgnoreCase))
-                    {
-                        try { part.ShowConfiguration2(oldConfiguration); } catch { }
-                    }
+                    List<KegakiBendResult> results = CheckModel(copy.Model, buhinNo, bomFileName,
+                        string.IsNullOrWhiteSpace(componentName) ? Path.GetFileNameWithoutExtension(partPath) : componentName,
+                        copy.SourcePath);
+                    copy.ValidateSource();
+                    foreach (KegakiBendResult row in results)
+                        row.Note = "Kiem tra tren ban sao part da luu; " + row.Note;
+                    return results;
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine("[CHECK KEGAKI] CheckPart ERROR: " + ex);
                 return SingleStatus("CHECK", buhinNo, bomFileName, componentName, partPath, ex.Message);
-            }
-            finally
-            {
-                if (openedByChecker && part != null)
-                {
-                    try { swApp.CloseDoc(part.GetTitle()); } catch { }
-                }
-
-                if (restorePartVisibility)
-                {
-                    try { swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART); } catch { }
-                }
             }
         }
 
@@ -359,6 +310,7 @@ namespace ADDIN.Commands
                 try { partPath = model.GetPathName(); } catch { }
             }
 
+            CheckPartWorkingCopy.RequireWorkingCopy(model);
             List<Feature> features = CollectFeatures(model);
             string materialDatabase;
             string materialCategory;
@@ -377,14 +329,13 @@ namespace ADDIN.Commands
                 string typeName = SafeFeatureType(feature);
                 if (string.Equals(typeName, "SheetMetal", StringComparison.OrdinalIgnoreCase))
                 {
+                    BendAllowanceInfo capturedDefault = null;
                     try
                     {
                         ISheetMetalFeatureData data = feature.GetDefinition() as ISheetMetalFeatureData;
                         if (data != null)
                         {
-                            BendAllowanceInfo allowance = BendAllowanceInfo.Capture(data.GetCustomBendAllowance());
-                            if (allowance != null)
-                                defaults.Add(allowance);
+                            capturedDefault = BendAllowanceInfo.Capture(data.GetCustomBendAllowance());
                             try
                             {
                                 double thickness = Math.Abs(data.Thickness);
@@ -398,6 +349,9 @@ namespace ADDIN.Commands
                     {
                         Debug.WriteLine("[CHECK KEGAKI] SheetMetal definition ERROR: " + ex.Message);
                     }
+                    // Keep an unreadable default in the collection. Dropping it
+                    // could attribute another body's scalar setting to this bend.
+                    defaults.Add(capturedDefault);
                 }
                 else if (IsBendFeatureType(typeName))
                 {
@@ -495,17 +449,35 @@ namespace ADDIN.Commands
                             "Khong xac dinh duoc nhom vat lieu");
                     }
                 }
-                else if (bendResult.IsOverride
-                    && !string.IsNullOrWhiteSpace(bendResult.OverrideBendTablePath))
+                else if (IsAlpolicMaterial(materialCheck.MaterialName))
                 {
-                    ApplyOverrideBendTableCheck(bendResult, materialCheck);
+                    if (bendResult.IsOverride && !string.IsNullOrWhiteSpace(bendResult.OverrideBendTablePath))
+                        ApplyBendTableIdentityCheck(bendResult, materialCheck);
+                    else
+                        ApplyMaterialCheck(bendResult, materialCheck);
                 }
                 else
                 {
-                    ApplyMaterialCheck(bendResult, materialCheck);
-                    ApplyOverrideMaterialCheck(bendResult, materialCheck);
+                    CopyMaterialIdentity(bendResult, materialCheck);
+                    bendResult.Status = MergeStatus(bendResult.Status, materialCheck.Status);
+                    if (materialCheck.Status == "CHECK")
+                        bendResult.Note = AppendNote(bendResult.Note, materialCheck.Note);
+                    if (IsGrooveRadius(bendResult.RadiusMm))
+                    {
+                        bendResult.BendTableGroup = "溝加工";
+                        CaptureIntendedGrooveLevel(model, bendFeature, bendResult);
+                    }
                 }
                 results.Add(bendResult);
+            }
+
+            Dictionary<int, FlatBendMeasurement> flatMeasurements = KegakiFlatPatternReader.Measure(
+                model, features, bends, results);
+            for (int i = 0; i < results.Count; i++)
+            {
+                FlatBendMeasurement measurement;
+                flatMeasurements.TryGetValue(i, out measurement);
+                ApplyPerBendValueCheck(results[i], sheetThicknesses, measurement);
             }
 
             foreach (Feature curvedFeature in curvedFeatures)
@@ -570,8 +542,15 @@ namespace ADDIN.Commands
             int otherSettingCount = 0;
             foreach (BendAllowanceInfo allowance in defaults)
             {
-                if (allowance == null)
-                    continue;
+                if (allowance == null || string.IsNullOrWhiteSpace(allowance.TypeName)
+                    || allowance.TypeName.StartsWith("Type ", StringComparison.OrdinalIgnoreCase)
+                    || (allowance.IsKFactorSetting() && (!allowance.HasKFactor
+                        || !BendValueMath.IsFinite(allowance.KFactor))))
+                {
+                    result.Status = "CHECK";
+                    result.Note = "Chua doc duoc day du Sheet-Metal setting cho feature cong.";
+                    return result;
+                }
                 if (allowance.IsKFactorSetting())
                     kFactors.Add(allowance.KFactor);
                 else
@@ -619,269 +598,73 @@ namespace ADDIN.Commands
             List<double> sheetThicknesses,
             bool isFlatSheet)
         {
-            MaterialTableCheck result = new MaterialTableCheck();
-            result.MaterialName = materialName;
-            result.MaterialDatabase = materialDatabase;
-            result.MaterialCategory = materialCategory;
-            result.MaterialGroup = ResolveMaterialGroup(result.MaterialName, materialCategory);
-
-            List<string> tableNames = new List<string>();
-            List<string> tableGroups = new List<string>();
-            if (defaults != null)
+            MaterialTableCheck result = new MaterialTableCheck
             {
-                foreach (BendAllowanceInfo allowance in defaults)
+                MaterialName = materialName,
+                MaterialDatabase = materialDatabase,
+                MaterialCategory = materialCategory,
+                MaterialGroup = ResolveMaterialGroup(materialName, materialCategory),
+                Status = "OK"
+            };
+            if (isFlatSheet && IsAlpolicMaterial(materialName)) result.MaterialGroup = "AL";
+            if (sheetThicknesses != null && sheetThicknesses.Count == 1)
+                result.SheetThicknessMm = sheetThicknesses[0] * 1000.0;
+            if (!isFlatSheet && !IsAlpolicMaterial(materialName))
+            {
+                var storedNames = new List<string>();
+                if (defaults != null) foreach (BendAllowanceInfo allowance in defaults)
                 {
-                    if (allowance == null || !allowance.HasBendTableFile())
-                        continue;
-
-                    string tableName = allowance.GetBendTableFileName();
-                    string tableGroup = NormalizeBendTableGroup(tableName);
-                    if (!string.IsNullOrWhiteSpace(tableName) && !tableNames.Contains(tableName))
-                        tableNames.Add(tableName);
-                    if (!string.IsNullOrWhiteSpace(tableGroup) && !tableGroups.Contains(tableGroup))
-                        tableGroups.Add(tableGroup);
+                    if (allowance == null || !allowance.HasBendTableFile()) continue;
+                    string storedName = allowance.GetBendTableFileName();
+                    if (!storedNames.Contains(storedName)) storedNames.Add(storedName);
+                    if (string.IsNullOrWhiteSpace(result.BendTablePath))
+                        result.BendTablePath = allowance.GetBendTableFilePath();
                 }
+                result.BendTableName = string.Join(" | ", storedNames.ToArray());
+                result.StandardBendTablePath = ResolveStandardBendTablePathForMaterialGroup(result.MaterialGroup);
+                result.StandardBendTableName = SafeFileName(result.StandardBendTablePath);
+                result.Status = string.IsNullOrWhiteSpace(result.MaterialGroup)
+                    || result.SheetThicknessMm <= 0 ? "CHECK" : "OK";
+                result.Note = result.Status == "OK"
+                    ? "He so bend duoc doi chieu tu du lieu trong model; ten bang chi de hien thi."
+                    : "Thieu nhom vat lieu hoac mot do day duy nhat de doi chieu he so bend.";
+                return result;
             }
-
-            result.BendTableName = string.Join(" | ", tableNames.ToArray());
-            result.BendTableGroup = string.Join(" | ", tableGroups.ToArray());
-
-            bool isGrooveTable = tableNames.Exists(IsGrooveBendTable);
-            if (isFlatSheet)
+            if (defaults == null || defaults.Count == 0)
             {
-                if (IsAlpolicMaterial(result.MaterialName))
-                    result.MaterialGroup = "AL";
-
-                if (string.IsNullOrWhiteSpace(result.MaterialName)
-                    || string.IsNullOrWhiteSpace(result.MaterialGroup)
-                    || defaults == null || defaults.Count == 0)
+                result.Status = "CHECK";
+                result.Note = "Khong doc duoc Bend Table mac dinh.";
+                return result;
+            }
+            var names = new List<string>();
+            string deepStatus = "OK";
+            foreach (BendAllowanceInfo allowance in defaults)
+            {
+                if (allowance == null || !allowance.HasBendTableFile())
                 {
-                    result.Status = "CHECK";
-                    result.Note = "Tam phang: chua du thong tin vat lieu/Bend Table de doi chieu";
+                    result.Status = MergeStatus(result.Status, "CHECK");
+                    deepStatus = MergeStatus(deepStatus, "CHECK");
+                    result.Note = AppendNote(result.Note, "Khong doc duoc Bend Table mac dinh.");
+                    continue;
                 }
-                else
-                {
-                    bool correctTable = defaults.TrueForAll(allowance => allowance != null
-                        && allowance.HasBendTableFile()
-                        && IsFlatSheetBendTable(result.MaterialGroup, allowance.GetBendTableFileName()));
-                    result.Status = correctTable ? "OK" : "NG";
-                    result.Note = "Tam phang " + result.MaterialName + " -> " + result.MaterialGroup
-                        + "; Bend Table " + result.BendTableName
-                        + (correctTable ? ": khop vat lieu" : ": KHONG KHOP vat lieu");
-                }
+                string name = allowance.GetBendTableFileName();
+                if (!names.Contains(name)) names.Add(name);
+                BendTableContentAssessment assessment = AssessTableContent(allowance, materialName,
+                    result.MaterialGroup, result.SheetThicknessMm, isFlatSheet);
+                CopyContentAssessment(result, assessment);
+                result.Status = MergeStatus(result.Status, assessment.Status);
+                deepStatus = MergeStatus(deepStatus, assessment.Status);
+                result.Note = AppendNote(result.Note, assessment.Detail);
             }
-            else if (IsAlpolicMaterial(result.MaterialName))
-            {
-                bool correctTable = defaults != null && defaults.Count > 0
-                    && defaults.TrueForAll(allowance => allowance != null
-                        && allowance.HasBendTableFile()
-                        && IsAlpolicBendTable(allowance.GetBendTableFileName()));
-                result.Status = correctTable ? "OK" : "NG";
-                result.BendTableGroup = isGrooveTable ? "溝加工" : result.BendTableGroup;
-                if (string.IsNullOrWhiteSpace(result.MaterialGroup))
-                    result.MaterialGroup = "Đặc cách";
-                result.Note = correctTable
-                    ? "Bend Table mac dinh Alpolic 0.8 hop le"
-                    : "Alpolic bat buoc dung Bend Table bao ranh 0.8 (溝0.8残シ)";
-            }
-            else if (isGrooveTable)
-            {
-                result.Status = "OK";
-                result.BendTableGroup = "溝加工";
-                if (string.IsNullOrWhiteSpace(result.MaterialGroup))
-                    result.MaterialGroup = "Đặc cách";
-                result.Note = "Bang phay ranh (" + result.BendTableName
-                    + "): Mien tru doi chieu nhom vat lieu";
-            }
-            else if (string.IsNullOrWhiteSpace(result.MaterialName))
-            {
-                result.Status = "CHECK";
-                result.Note = "Khong doc duoc vat lieu cua component";
-            }
-            else if (string.IsNullOrWhiteSpace(result.MaterialGroup))
-            {
-                result.Status = "CHECK";
-                result.Note = "Chua nhan dang nhom vat lieu: " + result.MaterialName;
-            }
-            else if (tableNames.Count == 0)
-            {
-                result.Status = "CHECK";
-                result.Note = "Vat lieu " + result.MaterialName + " -> " + result.MaterialGroup
-                    + "; khong doc duoc Bend Table mac dinh";
-            }
-            else if (tableGroups.Count == 0)
-            {
-                result.Status = "CHECK";
-                result.Note = "Khong nhan dang duoc nhom tu Bend Table: " + result.BendTableName;
-            }
-            else if (tableGroups.Count != 1
-                || !string.Equals(result.MaterialGroup, tableGroups[0], StringComparison.OrdinalIgnoreCase))
-            {
-                result.Status = "NG";
-                result.Note = "Vat lieu " + result.MaterialName + " -> " + result.MaterialGroup
-                    + "; Bend Table " + result.BendTableName + " -> "
-                    + (string.IsNullOrWhiteSpace(result.BendTableGroup) ? "khong ro" : result.BendTableGroup)
-                    + ": KHONG KHOP";
-            }
-            else
-            {
-                result.Status = "OK";
-                result.Note = "Vat lieu " + result.MaterialName + " -> " + result.MaterialGroup
-                    + "; Bend Table " + result.BendTableName + " -> " + result.BendTableGroup
-                    + ": khop";
-            }
-
-            ApplyDeepBendTableCheck(result, defaults, sheetThicknesses);
-
+            result.BendTableName = string.Join(" | ", names.ToArray());
+            result.DeepStatus = deepStatus;
+            result.DeepNote = result.Note;
+            result.Note = (isFlatSheet ? "Tam phang; " : "") + result.Note;
             Debug.WriteLine("[CHECK KEGAKI] material=" + result.MaterialName
-                + ", database=" + result.MaterialDatabase
-                + ", category=" + result.MaterialCategory
                 + ", materialGroup=" + result.MaterialGroup
                 + ", bendTable=" + result.BendTableName
-                + ", tableGroup=" + result.BendTableGroup
-                + ", status=" + result.Status);
+                + ", contentStatus=" + result.Status + ", " + result.Note);
             return result;
-        }
-
-        private void ApplyDeepBendTableCheck(
-            MaterialTableCheck result,
-            List<BendAllowanceInfo> defaults,
-            List<double> sheetThicknesses)
-        {
-            if (result == null)
-                return;
-
-            BendAllowanceInfo tableAllowance = null;
-            if (defaults != null)
-            {
-                foreach (BendAllowanceInfo allowance in defaults)
-                {
-                    if (allowance != null && allowance.HasBendTableFile())
-                    {
-                        tableAllowance = allowance;
-                        break;
-                    }
-                }
-            }
-
-            if (tableAllowance == null)
-                return;
-
-            if (sheetThicknesses == null || sheetThicknesses.Count == 0)
-            {
-                MergeDeepCheck(result, "CHECK", "Khong doc duoc do day de tra BendTable.");
-                return;
-            }
-
-            result.SheetThicknessMm = sheetThicknesses[0] * 1000.0;
-            string requestedPath = tableAllowance.GetBendTableFilePath();
-            string requestedName = tableAllowance.GetBendTableFileName();
-            result.BendTablePath = ResolveActualBendTablePath(requestedPath, requestedName);
-            result.StandardBendTablePath = ResolveStandardBendTablePath(requestedName);
-            result.StandardBendTableName = SafeFileName(result.StandardBendTablePath);
-
-            if (string.IsNullOrWhiteSpace(result.BendTablePath))
-            {
-                MergeDeepCheck(
-                    result,
-                    "CHECK",
-                    "Khong tim thay file BendTable thuc te: " + requestedName);
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(result.StandardBendTablePath))
-            {
-                MergeDeepCheck(
-                    result,
-                    "CHECK",
-                    "Khong tim thay BendTable chuan cho " + requestedName);
-                return;
-            }
-
-            BendTableWorkbookData actualWorkbook = bendTableReader.Read(result.BendTablePath);
-            BendTableWorkbookData standardWorkbook = bendTableReader.Read(result.StandardBendTablePath);
-            if (!actualWorkbook.IsValid)
-            {
-                MergeDeepCheck(result, "CHECK", "Khong doc duoc BendTable thuc te: " + actualWorkbook.Error);
-                return;
-            }
-            if (!standardWorkbook.IsValid)
-            {
-                MergeDeepCheck(result, "CHECK", "Khong doc duoc BendTable chuan: " + standardWorkbook.Error);
-                return;
-            }
-
-            result.ActualBlock = actualWorkbook.FindThickness(result.SheetThicknessMm);
-            result.StandardBlock = standardWorkbook.FindThickness(result.SheetThicknessMm);
-            if (result.ActualBlock == null)
-            {
-                MergeDeepCheck(
-                    result,
-                    "CHECK",
-                    "BendTable thuc te khong co block do day "
-                        + result.SheetThicknessMm.ToString("0.###") + " mm.");
-                return;
-            }
-            if (result.StandardBlock == null)
-            {
-                MergeDeepCheck(
-                    result,
-                    "CHECK",
-                    "BendTable chuan khong co block do day "
-                        + result.SheetThicknessMm.ToString("0.###") + " mm.");
-                return;
-            }
-
-            if (result.ActualBlock.HasCoefficient)
-                result.ActualCoefficientMm = result.ActualBlock.CoefficientMm;
-            if (result.StandardBlock.HasCoefficient)
-                result.StandardCoefficientMm = result.StandardBlock.CoefficientMm;
-
-            if (!result.ActualCoefficientMm.HasValue
-                || !result.StandardCoefficientMm.HasValue)
-            {
-                MergeDeepCheck(
-                    result,
-                    "CHECK",
-                    "Khong doc duoc he so be cua block BendTable.");
-                return;
-            }
-
-            double difference = Math.Abs(
-                result.ActualCoefficientMm.Value
-                - result.StandardCoefficientMm.Value);
-            string coefficientDetail = "\u677F\u539A "
-                + result.SheetThicknessMm.ToString("0.###")
-                + " mm; he so thuc te="
-                + FormatNullable(result.ActualCoefficientMm)
-                + " mm, chuan="
-                + FormatNullable(result.StandardCoefficientMm)
-                + " mm; chenh lech="
-                + difference.ToString("0.###") + " mm";
-            if (difference > BendTableToleranceMm)
-            {
-                MergeDeepCheck(
-                    result,
-                    "NG",
-                    coefficientDetail + "; HE SO KHONG KHOP");
-            }
-            else
-            {
-                MergeDeepCheck(
-                    result,
-                    "OK",
-                    coefficientDetail + "; BendTable khop chuan");
-            }
-        }
-
-        private static void MergeDeepCheck(
-            MaterialTableCheck result,
-            string status,
-            string note)
-        {
-            result.DeepStatus = status ?? "";
-            result.DeepNote = note ?? "";
-            result.Status = MergeStatus(result.Status, status);
-            result.Note = AppendNote(result.Note, note);
         }
 
         private static string ResolveActualBendTablePath(
@@ -891,6 +674,10 @@ namespace ADDIN.Commands
             if (!string.IsNullOrWhiteSpace(requestedPath) && File.Exists(requestedPath))
                 return requestedPath;
 
+            // A missing explicit path is unavailable evidence; a same-name
+            // file in another directory cannot establish its actual content.
+            if (!string.IsNullOrWhiteSpace(requestedPath) && Path.IsPathRooted(requestedPath))
+                return null;
             string path = FindFileIgnoreCase(XToolBendTableDirectory, requestedName);
             if (!string.IsNullOrWhiteSpace(path))
                 return path;
@@ -990,15 +777,18 @@ namespace ADDIN.Commands
                 bool useDefault = true;
                 object customAllowanceObj = null;
                 bool dataReadSuccess = false;
+                bool angleRead = false;
+                bool radiusRead = false;
+                bool defaultRead = false;
 
                 IOneBendFeatureData oneBend = defObj as IOneBendFeatureData;
                 if (oneBend != null)
                 {
                     dataReadSuccess = true;
-                    try { bendAngle = oneBend.BendAngle; } catch { }
-                    try { bendRadius = oneBend.BendRadius; } catch { }
+                    try { bendAngle = oneBend.BendAngle; angleRead = true; } catch { }
+                    try { bendRadius = oneBend.BendRadius; radiusRead = true; } catch { }
                     try { bendDown = oneBend.BendDown; } catch { }
-                    try { useDefault = oneBend.UseDefaultBendAllowance; } catch { }
+                    try { useDefault = oneBend.UseDefaultBendAllowance; defaultRead = true; } catch { }
                     try { customAllowanceObj = oneBend.GetCustomBendAllowance(); } catch { }
                 }
                 else
@@ -1007,9 +797,9 @@ namespace ADDIN.Commands
                     if (edgeFlange != null)
                     {
                         dataReadSuccess = true;
-                        try { bendAngle = edgeFlange.BendAngle; } catch { }
-                        try { bendRadius = edgeFlange.BendRadius; } catch { }
-                        try { useDefault = edgeFlange.UseDefaultBendAllowance; } catch { }
+                        try { bendAngle = edgeFlange.BendAngle; angleRead = true; } catch { }
+                        try { bendRadius = edgeFlange.BendRadius; radiusRead = true; } catch { }
+                        try { useDefault = edgeFlange.UseDefaultBendAllowance; defaultRead = true; } catch { }
                         try { customAllowanceObj = edgeFlange.GetCustomBendAllowance(); } catch { }
                     }
                 }
@@ -1019,9 +809,9 @@ namespace ADDIN.Commands
                     try
                     {
                         dynamic dynamicData = defObj;
-                        try { bendAngle = Convert.ToDouble(dynamicData.BendAngle); } catch { }
-                        try { bendRadius = Convert.ToDouble(dynamicData.BendRadius); } catch { }
-                        try { useDefault = Convert.ToBoolean(dynamicData.UseDefaultBendAllowance); } catch { }
+                        try { bendAngle = Convert.ToDouble(dynamicData.BendAngle); angleRead = true; } catch { }
+                        try { bendRadius = Convert.ToDouble(dynamicData.BendRadius); radiusRead = true; } catch { }
+                        try { useDefault = Convert.ToBoolean(dynamicData.UseDefaultBendAllowance); defaultRead = true; } catch { }
                         try { customAllowanceObj = dynamicData.GetCustomBendAllowance(); } catch { }
                         dataReadSuccess = true;
                     }
@@ -1038,13 +828,22 @@ namespace ADDIN.Commands
                 result.AngleDeg = Math.Abs(bendAngle * 180.0 / Math.PI);
                 result.RadiusMm = Math.Abs(bendRadius * 1000.0);
                 result.BendDown = bendDown;
+                result.HasBendGeometry = angleRead && radiusRead && defaultRead;
+                result.IsOverride = !useDefault;
+
+                if (!result.HasBendGeometry)
+                {
+                    result.Status = "CHECK";
+                    result.Note = "Khong doc duoc goc/R hoac cach ke thua setting cua bend.";
+                    return result;
+                }
 
                 BendAllowanceInfo bendAllowance = BendAllowanceInfo.Capture(customAllowanceObj);
+                result.EffectiveAllowance = useDefault
+                    ? ResolveUniqueStoredDefaultAllowance(defaults) : bendAllowance;
+                result.EffectiveBendSetting = result.EffectiveAllowance == null
+                    ? "Khong xac dinh" : result.EffectiveAllowance.Summary();
 
-                string activeTable = bendAllowance != null && bendAllowance.HasBendTableFile()
-                    ? bendAllowance.GetBendTableFileName()
-                    : (materialCheck != null ? materialCheck.BendTableName : "");
-                bool isGroove = IsGrooveBendTable(activeTable);
                 bool isAlpolic = materialCheck != null
                     && IsAlpolicMaterial(materialCheck.MaterialName);
 
@@ -1052,10 +851,21 @@ namespace ADDIN.Commands
                 if (IsLargeRadius(result.RadiusMm))
                 {
                     result.IsLargeRadiusBend = true;
-                    bool isKFactor05 = bendAllowance != null
-                        && bendAllowance.IsKFactorSetting()
-                        && Math.Abs(bendAllowance.KFactor - 0.5) <= 0.005;
+                    bool isKFactor05 = result.EffectiveAllowance != null
+                        && result.EffectiveAllowance.IsKFactorSetting()
+                        && result.EffectiveAllowance.HasKFactor
+                        && Math.Abs(result.EffectiveAllowance.KFactor - 0.5) <= 0.005;
                     result.IsOverride = true;
+                    if (result.EffectiveAllowance == null
+                        || string.IsNullOrWhiteSpace(result.EffectiveAllowance.TypeName)
+                        || result.EffectiveAllowance.TypeName.StartsWith("Type ", StringComparison.OrdinalIgnoreCase)
+                        || (result.EffectiveAllowance.IsKFactorSetting() && !result.EffectiveAllowance.HasKFactor))
+                    {
+                        result.Status = "CHECK";
+                        result.BendSetting = result.EffectiveBendSetting;
+                        result.Note = "R > 0.2mm: chua doc/anh xa duoc setting K-factor dang co hieu luc.";
+                        return result;
+                    }
 
                     if (isKFactor05)
                     {
@@ -1069,9 +879,7 @@ namespace ADDIN.Commands
                     else
                     {
                         result.Status = "NG";
-                        result.BendSetting = bendAllowance != null
-                            ? bendAllowance.Summary()
-                            : "Khong xac dinh";
+                        result.BendSetting = result.EffectiveBendSetting;
                         result.Note = "Cung luon lon (R="
                             + result.RadiusMm.ToString("0.###")
                             + " > " + radiusThresholdMm.ToString("0.###")
@@ -1081,126 +889,35 @@ namespace ADDIN.Commands
                     return result;
                 }
 
-                // Alpolic at R <= 0.2 uses the 0.8 groove table.
-                // Large-radius bends have already used the existing K-factor rule.
+                result.IsOverride = !useDefault;
+                result.BendSetting = useDefault ? "Default Sheet-Metal" : result.EffectiveBendSetting;
+                if (!useDefault && bendAllowance != null && bendAllowance.HasBendTableFile())
+                    result.OverrideBendTablePath = bendAllowance.GetBendTableFilePath();
+
+                // Alpolic retains its existing .8 table check and inverse skip.
                 if (isAlpolic)
                 {
-                    result.IsOverride = !useDefault;
-                    result.BendSetting = useDefault
-                        ? defaultSummary
-                        : (bendAllowance == null ? "Khong doc duoc" : bendAllowance.Summary());
-                    if (useDefault)
-                    {
-                        result.Status = "OK"; // Validated by the default material/table check.
-                        result.Note = "Alpolic dung thiet lap mac dinh; khong bat buoc R=0.2";
-                    }
-                    else if (bendAllowance == null)
-                    {
-                        result.Status = "CHECK";
-                        result.Note = "Khong doc duoc Bend Table rieng cua Alpolic";
-                    }
-                    else
-                    {
-                        bool correctTable = bendAllowance.HasBendTableFile()
-                            && IsAlpolicBendTable(bendAllowance.GetBendTableFileName());
-                        result.Status = correctTable ? "OK" : "NG";
-                        result.Note = correctTable
-                            ? "Alpolic dung Bend Table 0.8 hop le; khong bat buoc R=0.2"
-                            : "Alpolic bat buoc dung Bend Table bao ranh 0.8 (溝0.8残シ)";
-                        if (bendAllowance.HasBendTableFile())
-                            result.OverrideBendTablePath = bendAllowance.GetBendTableFilePath();
-                    }
+                    BendTableContentAssessment alpolicTable = AssessTableContent(result.EffectiveAllowance,
+                        materialCheck.MaterialName, materialCheck.MaterialGroup,
+                        materialCheck.SheetThicknessMm, false);
+                    result.Status = alpolicTable.Status;
+                    result.Note = alpolicTable.Detail;
                     return result;
                 }
 
-                if (isGroove)
+                bool grooveRadius = IsGrooveRadius(result.RadiusMm);
+                if (!grooveRadius && Math.Abs(result.RadiusMm - 0.1) > 0.03)
                 {
-                    if (Math.Abs(result.RadiusMm - 0.2) > 0.03)
-                    {
-                        result.Status = "NG";
-                        result.Note = "Dùng bảng bào rãnh (" + activeTable
-                            + ") bắt buộc vẽ R=0.2mm (Hiện tại: R="
-                            + result.RadiusMm.ToString("0.##") + "mm)";
-                        return result;
-                    }
-
-                    double remainMm = ExtractRemainThicknessFromTableName(activeTable);
-                    if (remainMm > 0.0 && materialCheck != null
-                        && materialCheck.SheetThicknessMm > 0.0
-                        && materialCheck.SheetThicknessMm <= remainMm)
-                    {
-                        result.Status = "NG";
-                        result.Note = "Tấm dày "
-                            + materialCheck.SheetThicknessMm.ToString("0.##")
-                            + "mm <= lượng phôi chừa lại " + remainMm.ToString("0.##")
-                            + "mm (" + activeTable + ")";
-                        return result;
-                    }
-                }
-                else
-                {
-                    if (Math.Abs(result.RadiusMm - 0.2) <= 0.03)
-                    {
-                        result.Status = "NG";
-                        result.Note = "Cạnh vẽ R=0.2mm (bào rãnh) nhưng gán nhầm bảng chấn thường ("
-                            + activeTable + ")";
-                        return result;
-                    }
-
-                    if (Math.Abs(result.RadiusMm - 0.1) > 0.03)
-                    {
-                        result.Status = "NG";
-                        result.Note = "Cạnh chấn thường bắt buộc vẽ R=0.1mm (Hiện tại: R="
-                            + result.RadiusMm.ToString("0.##") + "mm)";
-                        return result;
-                    }
-                }
-
-                result.IsOverride = !useDefault;
-
-                if (useDefault)
-                {
-                    result.Status = "OK";
-                    result.BendSetting = "Default Sheet-Metal";
-                    result.Note = "Dung he so mac dinh";
+                    result.Status = "NG";
+                    result.Note = "Canh be thuong phai R=0.1mm; canh bao phai R=0.2mm (Hien tai R="
+                        + result.RadiusMm.ToString("0.###") + "mm).";
                     return result;
                 }
-
-                result.BendSetting = bendAllowance == null ? "Khong doc duoc" : bendAllowance.Summary();
-                if (bendAllowance == null)
-                {
-                    result.Status = "CHECK";
-                    result.Note = "Bend dang override nhung khong doc duoc he so";
-                    return result;
-                }
-
-                if (bendAllowance.HasBendTableFile())
-                {
-                    result.OverrideBendTablePath = bendAllowance.GetBendTableFilePath();
-                    result.Status = "OK";
-                    result.Note = "Bend dung Bend Table rieng";
-                    return result;
-                }
-
-                if (defaults.Count == 0)
-                {
-                    result.Status = "CHECK";
-                    result.Note = "Bend dang override; khong doc duoc chuan Sheet-Metal de so sanh";
-                    return result;
-                }
-
-                foreach (BendAllowanceInfo defaultAllowance in defaults)
-                {
-                    if (bendAllowance.IsEquivalentTo(defaultAllowance))
-                    {
-                        result.Status = "OK";
-                        result.Note = "Override nhung giong thiet lap Sheet-Metal";
-                        return result;
-                    }
-                }
-
-                result.Status = "NG";
-                result.Note = "Bend override khac thiet lap Sheet-Metal";
+                result.BendTableGroup = grooveRadius ? "溝加工" : materialCheck == null ? "" : materialCheck.MaterialGroup;
+                result.Status = "OK";
+                result.Note = grooveRadius
+                    ? "R=0.2mm: cho doi chieu he so thuc te voi muc bao da chi dinh."
+                    : "R=0.1mm: cho doi chieu he so thuc te voi database theo vat lieu.";
                 return result;
             }
             catch (Exception ex)
@@ -1212,188 +929,32 @@ namespace ADDIN.Commands
             }
         }
 
-        private void ApplyOverrideBendTableCheck(
-            KegakiBendResult row,
-            MaterialTableCheck materialCheck)
+
+
+        private void ApplyBendTableIdentityCheck(KegakiBendResult row, MaterialTableCheck materialCheck)
         {
-            if (row == null || materialCheck == null)
-                return;
-
-            row.MaterialName = materialCheck.MaterialName ?? "";
-            row.MaterialGroup = materialCheck.MaterialGroup ?? "";
-            row.SheetThicknessMm = materialCheck.SheetThicknessMm;
-            row.BendCoefficientMm = null;
-            row.StandardBendCoefficientMm = null;
-            row.BendTableDeepStatus = "";
-            row.BendTableDeepNote = "";
-
-            string requestedPath = row.OverrideBendTablePath ?? "";
-            string requestedName = SafeFileName(requestedPath);
-            string actualPath = ResolveActualBendTablePath(requestedPath, requestedName);
-            string standardPath = ResolveStandardBendTablePathForMaterialGroup(
-                row.MaterialGroup);
-
-            row.BendTableName = !string.IsNullOrWhiteSpace(actualPath)
-                ? SafeFileName(actualPath)
-                : requestedName;
-            row.BendTableGroup = NormalizeBendTableGroup(row.BendTableName);
-            row.StandardBendTableName = SafeFileName(standardPath);
-
-            if (IsGrooveBendTable(row.BendTableName))
-            {
-                row.BendTableGroup = "溝加工";
-                row.Status = MergeStatus(row.Status, "OK");
-                row.Note = AppendNote(
-                    row.Note,
-                    "Bang phay ranh: mien tru doi chieu nhom vat lieu.");
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(row.MaterialGroup))
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "Khong co nhom vat lieu de chon Bend Table chuan.");
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(row.BendTableGroup))
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "Khong nhan dang duoc nhom cua Bend Table rieng "
-                        + row.BendTableName + ".");
-            }
-            else if (!string.Equals(
-                row.MaterialGroup,
-                row.BendTableGroup,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                row.Status = MergeStatus(row.Status, "NG");
-                row.Note = AppendNote(
-                    row.Note,
-                    "Bend Table rieng " + row.BendTableName + " -> "
-                        + row.BendTableGroup + ", khong khop vat lieu "
-                        + row.MaterialGroup);
-            }
-
-            if (string.IsNullOrWhiteSpace(actualPath))
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "Khong tim thay file BendTable thuc te: " + requestedName);
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(standardPath))
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "Khong tim thay BendTable chuan cho vat lieu "
-                        + row.MaterialGroup);
-                return;
-            }
-
-            if (row.SheetThicknessMm <= 0.0)
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "Khong doc duoc do day de tra BendTable rieng.");
-                return;
-            }
-
-            BendTableWorkbookData actualWorkbook = bendTableReader.Read(actualPath);
-            BendTableWorkbookData standardWorkbook = bendTableReader.Read(standardPath);
-            if (!actualWorkbook.IsValid)
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "Khong doc duoc BendTable thuc te: " + actualWorkbook.Error);
-                return;
-            }
-            if (!standardWorkbook.IsValid)
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "Khong doc duoc BendTable chuan: " + standardWorkbook.Error);
-                return;
-            }
-
-            BendTableBlockData actualBlock =
-                actualWorkbook.FindThickness(row.SheetThicknessMm);
-            BendTableBlockData standardBlock =
-                standardWorkbook.FindThickness(row.SheetThicknessMm);
-            if (actualBlock == null)
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "BendTable thuc te khong co block do day "
-                        + row.SheetThicknessMm.ToString("0.###") + " mm.");
-                return;
-            }
-            if (standardBlock == null)
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "BendTable chuan khong co block do day "
-                        + row.SheetThicknessMm.ToString("0.###") + " mm.");
-                return;
-            }
-
-            if (actualBlock.HasCoefficient)
-                row.BendCoefficientMm = actualBlock.CoefficientMm;
-            if (standardBlock.HasCoefficient)
-                row.StandardBendCoefficientMm = standardBlock.CoefficientMm;
-
-            if (!row.BendCoefficientMm.HasValue
-                || !row.StandardBendCoefficientMm.HasValue)
-            {
-                MergeRowDeepCheck(
-                    row,
-                    "CHECK",
-                    "Khong doc duoc he so be cua block BendTable.");
-                return;
-            }
-
-            double difference = Math.Abs(
-                row.BendCoefficientMm.Value
-                - row.StandardBendCoefficientMm.Value);
-            string detail = row.BendName + " dung " + row.BendTableName
-                + "; \u677F\u539A " + row.SheetThicknessMm.ToString("0.###")
-                + " mm; he so thuc te="
-                + FormatNullable(row.BendCoefficientMm)
-                + " mm, chuan=" + FormatNullable(row.StandardBendCoefficientMm)
-                + " mm; chenh lech=" + difference.ToString("0.###") + " mm";
-
-            MergeRowDeepCheck(
-                row,
-                difference > BendTableToleranceMm ? "NG" : "OK",
-                detail + (difference > BendTableToleranceMm
-                    ? "; HE SO KHONG KHOP"
-                    : "; he so khop chuan"));
+            CopyMaterialIdentity(row, materialCheck);
+            BendTableContentAssessment assessment = AssessTableContent(row.EffectiveAllowance,
+                row.MaterialName, row.MaterialGroup, row.SheetThicknessMm, false);
+            row.BendTableName = SafeFileName(assessment.ActualPath);
+            row.BendTableGroup = assessment.TableGroup;
+            row.StandardBendTableName = SafeFileName(assessment.StandardPath);
+            row.BendCoefficientMm = assessment.ActualCoefficientMm;
+            row.StandardBendCoefficientMm = assessment.StandardCoefficientMm;
+            row.BendTableDeepStatus = assessment.Status;
+            row.BendTableDeepNote = assessment.Detail;
+            row.Status = MergeStatus(row.Status, assessment.Status);
+            row.Note = AppendNote(row.Note, assessment.Detail);
         }
 
-        private static void MergeRowDeepCheck(
-            KegakiBendResult row,
-            string status,
-            string note)
+        private static void CompletePerBendCheck(KegakiBendResult row, string status, string note)
         {
-            if (row == null)
-                return;
-
-            row.BendTableDeepStatus = status ?? "";
-            row.BendTableDeepNote = note ?? "";
+            row.BendValueStatus = status;
+            row.BendValueNote = note;
             row.Status = MergeStatus(row.Status, status);
-            row.Note = AppendNote(row.Note, note);
+            row.Note = AppendNote(row.Note, "So he so bend: " + note);
+            Debug.WriteLine("[CHECK KEGAKI] bend=" + row.BendName + ", valueStatus=" + status
+                + ", source=" + row.BendValueSource + ", " + note);
         }
 
         private static string ResolveStandardBendTablePathForMaterialGroup(
@@ -1423,7 +984,8 @@ namespace ADDIN.Commands
             row.MaterialGroup = check.MaterialGroup ?? "";
             row.BendTableGroup = check.BendTableGroup ?? "";
             row.SheetThicknessMm = check.SheetThicknessMm;
-            row.BendTableName = SafeFileName(check.BendTablePath);
+            row.BendTableName = string.IsNullOrWhiteSpace(check.BendTableName)
+                ? SafeFileName(check.BendTablePath) : check.BendTableName;
             row.StandardBendTableName = check.StandardBendTableName ?? "";
             row.BendCoefficientMm = check.ActualCoefficientMm;
             row.StandardBendCoefficientMm = check.StandardCoefficientMm;
@@ -1444,7 +1006,8 @@ namespace ADDIN.Commands
             row.MaterialGroup = check.MaterialGroup ?? "";
             row.BendTableGroup = check.BendTableGroup ?? "";
             row.SheetThicknessMm = check.SheetThicknessMm;
-            row.BendTableName = SafeFileName(check.BendTablePath);
+            row.BendTableName = string.IsNullOrWhiteSpace(check.BendTableName)
+                ? SafeFileName(check.BendTablePath) : check.BendTableName;
             row.StandardBendTableName = check.StandardBendTableName ?? "";
             row.BendCoefficientMm = check.ActualCoefficientMm;
             row.StandardBendCoefficientMm = check.StandardCoefficientMm;
@@ -1452,36 +1015,7 @@ namespace ADDIN.Commands
             row.BendTableDeepNote = check.DeepNote ?? "";
         }
 
-        private static void ApplyOverrideMaterialCheck(
-            KegakiBendResult row,
-            MaterialTableCheck defaultCheck)
-        {
-            if (row == null || defaultCheck == null || !row.IsOverride)
-                return;
 
-            string overrideGroup = NormalizeBendTableGroup(row.BendSetting);
-            if (string.IsNullOrWhiteSpace(overrideGroup))
-                return;
-
-            if (string.IsNullOrWhiteSpace(defaultCheck.MaterialGroup))
-            {
-                row.Status = MergeStatus(row.Status, "CHECK");
-                row.Note = AppendNote(row.Note,
-                    "Khong co nhom vat lieu de so sanh Bend Table rieng " + row.BendSetting);
-                return;
-            }
-
-            if (!string.Equals(
-                defaultCheck.MaterialGroup,
-                overrideGroup,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                row.Status = "NG";
-                row.Note = AppendNote(row.Note,
-                    "Bend Table rieng " + row.BendSetting + " -> " + overrideGroup
-                    + ", khong khop vat lieu " + defaultCheck.MaterialGroup);
-            }
-        }
 
         private static string MergeStatus(string current, string added)
         {
@@ -1648,7 +1182,7 @@ namespace ADDIN.Commands
             string modelFolder = "";
             try
             {
-                string modelPath = model == null ? "" : model.GetPathName();
+                string modelPath = CheckPartWorkingCopy.GetSourcePath(model);
                 if (!string.IsNullOrWhiteSpace(modelPath))
                     modelFolder = Path.GetDirectoryName(modelPath);
             }
@@ -1968,81 +1502,13 @@ namespace ADDIN.Commands
             return "";
         }
 
-        private static bool IsAlpolicMaterial(string materialName)
+        internal static bool IsAlpolicMaterial(string materialName)
         {
             return (materialName ?? "").IndexOf("アルポリック",
                 StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static bool IsFlatSheetBendTable(string materialGroup, string tableName)
-        {
-            return !string.IsNullOrWhiteSpace(materialGroup)
-                && !IsGrooveBendTable(tableName)
-                && string.Equals(materialGroup, NormalizeBendTableGroup(tableName),
-                    StringComparison.OrdinalIgnoreCase);
-        }
 
-        private static bool IsAlpolicBendTable(string tableName)
-        {
-            return IsGrooveBendTable(tableName)
-                && Math.Abs(ExtractRemainThicknessFromTableName(tableName) - 0.8) <= 0.001;
-        }
-
-        private static bool IsGrooveBendTable(string tableName)
-        {
-            return !string.IsNullOrWhiteSpace(tableName)
-                && tableName.IndexOf("溝", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static double ExtractRemainThicknessFromTableName(string fileName)
-        {
-            if (string.IsNullOrWhiteSpace(fileName))
-                return 0.0;
-
-            try
-            {
-                int start = fileName.IndexOf("溝", StringComparison.Ordinal);
-                int end = fileName.IndexOf("残", StringComparison.Ordinal);
-                if (start >= 0 && end > start)
-                {
-                    string number = fileName.Substring(start + 1, end - start - 1).Trim();
-                    double value;
-                    if (double.TryParse(
-                            number,
-                            System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture,
-                            out value))
-                        return value;
-                }
-            }
-            catch { }
-
-            return 0.0;
-        }
-
-        private static string NormalizeBendTableGroup(string bendTableName)
-        {
-            string value = NormalizeLookupText(SafeFileName(bendTableName));
-            if (string.IsNullOrWhiteSpace(value))
-                return "";
-
-            if (value.Contains("SUS"))
-                return "SUS";
-            if (value.Contains("_AL_") || value.Contains("-AL-") || value.Contains(" AL ")
-                || value.EndsWith("_AL.XLSX", StringComparison.Ordinal))
-                return "AL";
-            if (value.Contains("_ST_") || value.Contains("-ST-") || value.Contains(" ST ")
-                || value.EndsWith("_ST.XLSX", StringComparison.Ordinal))
-                return "ST";
-            if (value.Contains("_CU_") || value.Contains("-CU-")
-                || value.Contains("_BS_") || value.Contains("_RBS_")
-                || value.Contains("RBS,BS,CU")
-                || value.EndsWith("_CU.XLSX", StringComparison.Ordinal))
-                return "CU";
-            if (value.Contains("_TI_") || value.Contains("-TI-"))
-                return "TI";
-            return "";
-        }
 
         private static string NormalizeLookupText(string value)
         {
@@ -2104,7 +1570,7 @@ namespace ADDIN.Commands
             List<string> values = new List<string>();
             foreach (BendAllowanceInfo item in defaults)
             {
-                string summary = item.Summary();
+                string summary = item == null ? "Khong doc duoc Sheet-Metal setting" : item.Summary();
                 if (!values.Contains(summary))
                     values.Add(summary);
             }
@@ -2432,6 +1898,9 @@ namespace ADDIN.Commands
         public double KFactor { get; private set; }
         public double BendAllowance { get; private set; }
         public double BendDeduction { get; private set; }
+        public bool HasKFactor { get; private set; }
+        public bool HasBendAllowance { get; private set; }
+        public bool HasBendDeduction { get; private set; }
         public string BendTableFile { get; private set; }
         public string BendCalculationTableFile { get; private set; }
 
@@ -2446,9 +1915,9 @@ namespace ADDIN.Commands
             try { info.Type = Convert.ToInt32(allowance.Type); } catch { info.Type = int.MinValue; }
             try { info.TypeName = Enum.GetName(typeof(swBendAllowanceTypes_e), info.Type) ?? ("Type " + info.Type); }
             catch { info.TypeName = "Type " + info.Type; }
-            try { info.KFactor = Convert.ToDouble(allowance.KFactor); } catch { }
-            try { info.BendAllowance = Convert.ToDouble(allowance.BendAllowance); } catch { }
-            try { info.BendDeduction = Convert.ToDouble(allowance.BendDeduction); } catch { }
+            try { info.KFactor = Convert.ToDouble(allowance.KFactor); info.HasKFactor = BendValueMath.IsFinite(info.KFactor); } catch { }
+            try { info.BendAllowance = Convert.ToDouble(allowance.BendAllowance); info.HasBendAllowance = BendValueMath.IsFinite(info.BendAllowance); } catch { }
+            try { info.BendDeduction = Convert.ToDouble(allowance.BendDeduction); info.HasBendDeduction = BendValueMath.IsFinite(info.BendDeduction); } catch { }
             try { info.BendTableFile = Convert.ToString(allowance.BendTableFile ?? ""); } catch { info.BendTableFile = ""; }
             // BendCalculationTableFile does not exist in older SOLIDWORKS
             // interop assemblies. Do not access it dynamically here because
@@ -2456,6 +1925,21 @@ namespace ADDIN.Commands
             info.BendCalculationTableFile = "";
 
             return info;
+        }
+
+        public bool TryGetDeduction(double thicknessMm, double angleDeg, double radiusMm,
+            out double deductionMm, out string detail)
+        {
+            BendTableValueKind kind = BendTableValueKind.Unknown;
+            double value = 0;
+            if (Type == (int)swBendAllowanceTypes_e.swBendAllowanceKFactor && HasKFactor)
+            { kind = BendTableValueKind.KFactor; value = KFactor; }
+            else if (Type == (int)swBendAllowanceTypes_e.swBendAllowanceDirect && HasBendAllowance)
+            { kind = BendTableValueKind.Allowance; value = BendAllowance * 1000.0; }
+            else if (Type == (int)swBendAllowanceTypes_e.swBendAllowanceDeduction && HasBendDeduction)
+            { kind = BendTableValueKind.Deduction; value = BendDeduction * 1000.0; }
+            return BendValueMath.TryToDeduction(kind, value, thicknessMm, angleDeg, radiusMm,
+                out deductionMm, out detail);
         }
 
         public bool IsEquivalentTo(BendAllowanceInfo other)
@@ -2621,6 +2105,24 @@ namespace ADDIN.Commands
         public string BendName { get; set; }
         public double AngleDeg { get; set; }
         public double RadiusMm { get; set; }
+        internal bool HasBendGeometry { get; set; }
+        internal BendAllowanceInfo EffectiveAllowance { get; set; }
+        public string IntendedGroovePropertyName { get; set; }
+        public double? IntendedGrooveCoefficientMm { get; set; }
+        public string IntendedGrooveError { get; set; }
+        public string EffectiveBendSetting { get; set; }
+        public string BendValueSource { get; set; }
+        public string BendValueStandardTable { get; set; }
+        public double? ActualBendDeductionMm { get; set; }
+        public double? MeasuredBendAllowanceMm { get; set; }
+        public double? MeasuredFlatLengthMm { get; set; }
+        public double? MeasuredOutsideLengthMm { get; set; }
+        public double? StandardBendDeductionMm { get; set; }
+        public double? BendDeductionDifferenceMm { get; set; }
+        public double? ActualEdgeCoefficientMm { get; set; }
+        public double? StandardEdgeCoefficientMm { get; set; }
+        public string BendValueStatus { get; set; }
+        public string BendValueNote { get; set; }
         public bool BendDown { get; set; }
         public bool IsOverride { get; set; }
         public bool IsLargeRadiusBend { get; set; }
@@ -2682,22 +2184,28 @@ namespace ADDIN.Commands
 
                 dynamic xlApp = Activator.CreateInstance(excelType);
                 dynamic xlWB = xlApp.Workbooks.Add();
-                dynamic xlWS = xlWB.Sheets[1];
-                xlWS.Name = "CHECK KEGAKI";
-
-                WriteHeader(xlWS);
-                WriteRows(xlWS, groupedResults);
-                int lastRow = groupedResults.Count + 1;
-                if (lastRow > 1)
+                using (var exportScope = new ExcelCheckExportScope(xlApp, "KEGAKI"))
                 {
-                    TrySort(xlWS, lastRow);
-                    xlWS.Range["B2:N" + lastRow].WrapText = true;
-                    xlWS.Range["A2:N" + lastRow].VerticalAlignment = -4160;
-                    SetReadableColumnWidths(xlWS);
-                    xlWS.Rows.AutoFit();
-                    AutoFitNoteColumn(xlWS, lastRow, 14);
-                }
+                    dynamic xlWS = xlWB.Sheets[1];
+                    xlWS.Name = "CHECK KEGAKI";
 
+                    WriteHeader(xlWS);
+                    WriteRows(xlWS, groupedResults);
+                    int lastRow = groupedResults.Count + 1;
+                    if (lastRow > 1)
+                    {
+                        TrySort(xlWS, lastRow);
+                        xlWS.Range["B2:N" + lastRow].WrapText = true;
+                        xlWS.Range["A2:N" + lastRow].VerticalAlignment = -4160;
+                        SetReadableColumnWidths(xlWS);
+                        AutoFitNoteColumn(xlWS, lastRow, 14);
+                    }
+
+                    dynamic detailSheet = xlWB.Sheets.Add(After: xlWS);
+                    detailSheet.Name = "HE SO TUNG BEND";
+                    WritePerBendRows(detailSheet, results);
+                    xlWS.Activate();
+                }
                 xlApp.Visible = true;
                 MessageBox.Show(
                     "\u0110\u00E3 xu\u1EA5t " + groupedResults.Count
@@ -2712,6 +2220,72 @@ namespace ADDIN.Commands
             {
                 MessageBox.Show("Loi xuat Excel: " + ex.Message, "CHECK KEGAKI", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private static void WritePerBendRows(dynamic sheet, List<KegakiBendResult> results)
+        {
+            string[] headers = {
+                "部品番号", "Vat lieu", "Bend", "板厚 (mm)", "Goc (deg)", "R (mm)",
+                "Setting ap dung", "He so canh quy doi (mm)", "He so bang quy doi (mm)",
+                "BD canh (mm)", "BendTable chuan", "BD bang (mm)", "Lech BD (mm)",
+                "So he so", "Status tong", "Nguon gia tri", "Note",
+                "Tong canh ngoai tai mat cat (mm)", "Chieu dai trai tai mat cat (mm)", "Vung bend trai / BA (mm)"
+            };
+            ExcelCheckReportWriter.WriteHeaders(sheet, headers);
+            sheet.Cells[1, 8].AddComment("Tinh nguoc tu hinh hoc Flat-Pattern: BD = tong canh ngoai - chieu dai trai; he so = BD / (2 * tan(goc bend / 2)). Tai 90 deg: he so = BD / 2.");
+            sheet.Cells[1, 9].AddComment("Quy doi tu o gia tri BendTable tai do day, goc va R cua bend. Co noi suy giua cac moc trong bang.");
+            sheet.Cells[1, 14].AddComment("So sanh BD tinh nguoc tu hinh hoc model voi BD bang chuan hien tai; dung sai 0.001 mm. Ten bang giong nhau van co the NG. R > 0.2 mm dung quy tac K=0.5 rieng.");
+            var reportRows = new List<KegakiBendResult>();
+            foreach (KegakiBendResult item in results)
+                if (!string.IsNullOrWhiteSpace(item.BendValueStatus)) reportRows.Add(item);
+            var data = new object[Math.Max(1, reportRows.Count), 20];
+            var fills = new ExcelCheckFillBatch(1, 20);
+            int r = 2;
+            foreach (KegakiBendResult row in reportRows)
+            {
+                if (string.IsNullOrWhiteSpace(row.BendValueStatus)) continue;
+                data[r - 2, 0] = row.BuhinNo;
+                data[r - 2, 1] = row.MaterialName;
+                data[r - 2, 2] = row.BendName;
+                data[r - 2, 3] = row.SheetThicknessMm > 0 ? (object)row.SheetThicknessMm : "";
+                data[r - 2, 4] = row.HasBendGeometry ? (object)row.AngleDeg : "";
+                data[r - 2, 5] = row.HasBendGeometry ? (object)row.RadiusMm : "";
+                data[r - 2, 6] = row.EffectiveBendSetting;
+                data[r - 2, 7] = row.ActualEdgeCoefficientMm.HasValue ? (object)row.ActualEdgeCoefficientMm.Value : "";
+                data[r - 2, 8] = row.StandardEdgeCoefficientMm.HasValue ? (object)row.StandardEdgeCoefficientMm.Value : "";
+                data[r - 2, 9] = row.ActualBendDeductionMm.HasValue ? (object)row.ActualBendDeductionMm.Value : "";
+                data[r - 2, 10] = row.BendValueStandardTable;
+                data[r - 2, 11] = row.StandardBendDeductionMm.HasValue ? (object)row.StandardBendDeductionMm.Value : "";
+                data[r - 2, 12] = row.BendDeductionDifferenceMm.HasValue ? (object)row.BendDeductionDifferenceMm.Value : "";
+                data[r - 2, 13] = row.BendValueStatus;
+                data[r - 2, 14] = row.Status;
+                data[r - 2, 15] = row.BendValueSource;
+                data[r - 2, 16] = row.BendValueNote;
+                data[r - 2, 17] = row.MeasuredOutsideLengthMm.HasValue ? (object)row.MeasuredOutsideLengthMm.Value : "";
+                data[r - 2, 18] = row.MeasuredFlatLengthMm.HasValue ? (object)row.MeasuredFlatLengthMm.Value : "";
+                data[r - 2, 19] = row.MeasuredBendAllowanceMm.HasValue ? (object)row.MeasuredBendAllowanceMm.Value : "";
+                if (row.BendValueStatus == "NG") fills.Add(r, Rgb(255, 199, 206));
+                else if (row.BendValueStatus == "CHECK") fills.Add(r, Rgb(255, 235, 156));
+                r++;
+            }
+            if (r == 2) data[0, 16] = "Khong co bend can doi chieu he so (tam phang/chi tiet dinh hinh).";
+            ExcelCheckReportWriter.WriteBlock(sheet, 2, 1, data);
+            fills.Apply(sheet);
+            int lastRow = Math.Max(2, r - 1);
+            sheet.Range["A1:T" + lastRow].Font.Name = "Calibri";
+            sheet.Range["A1:T" + lastRow].Font.Size = 11;
+            sheet.Range["A1:T1"].Font.Bold = true;
+            sheet.Range["A1:T1"].Interior.Color = Rgb(31, 78, 120);
+            sheet.Range["A1:T1"].Font.Color = Rgb(255, 255, 255);
+            sheet.Range["A1:T" + lastRow].WrapText = true;
+            sheet.Range["A1:T" + lastRow].VerticalAlignment = -4160;
+            sheet.Range["D2:M" + lastRow].NumberFormat = "0.0000";
+            sheet.Range["R2:T" + lastRow].NumberFormat = "0.0000";
+            double[] widths = { 12, 20, 22, 12, 12, 10, 28, 18, 18, 16, 28, 16, 16, 12, 12, 48, 64, 22, 22, 22 };
+            for (int c = 0; c < widths.Length; c++) sheet.Columns[c + 1].ColumnWidth = widths[c];
+            sheet.Range["A1:T" + lastRow].Rows.AutoFit();
+            sheet.Range["A1:T" + lastRow].AutoFilter();
+            ExcelCheckReportWriter.FreezeTopRow(sheet);
         }
 
         private static void WriteHeader(dynamic sheet)
@@ -2734,56 +2308,59 @@ namespace ADDIN.Commands
                 "Note"
             };
 
-            for (int i = 0; i < headers.Length; i++)
-                sheet.Cells[1, i + 1].Value = headers[i];
+            ExcelCheckReportWriter.WriteHeaders(sheet, headers);
         }
 
         private static void WriteRows(dynamic sheet, List<List<KegakiBendResult>> groups)
         {
+            var data = new object[groups.Count, 14];
+            var fills = new ExcelCheckFillBatch(1, 16);
             int excelRow = 2;
             foreach (List<KegakiBendResult> group in groups)
             {
                 KegakiBendResult first = group[0];
                 string groupStatus = GetGroupStatus(group);
 
-                sheet.Cells[excelRow, 1].Value = first.BuhinNo;
-                sheet.Cells[excelRow, 2].Value = JoinMaterial(group);
-                sheet.Cells[excelRow, 3].Value =
+                data[excelRow - 2, 0] = first.BuhinNo;
+                data[excelRow - 2, 1] = JoinMaterial(group);
+                data[excelRow - 2, 2] =
                     first.SheetThicknessMm > 0.0 ? (object)first.SheetThicknessMm : "";
-                sheet.Cells[excelRow, 4].Value = JoinDistinct(
+                data[excelRow - 2, 3] = JoinDistinct(
                     group,
                     delegate(KegakiBendResult row) { return row.BendTableName; });
-                sheet.Cells[excelRow, 5].Value =
+                data[excelRow - 2, 4] =
                     first.BendCoefficientMm.HasValue ? (object)first.BendCoefficientMm.Value : "";
-                sheet.Cells[excelRow, 6].Value = JoinDistinct(
+                data[excelRow - 2, 5] = JoinDistinct(
                     group,
                     delegate(KegakiBendResult row) { return row.StandardBendTableName; });
-                sheet.Cells[excelRow, 7].Value =
+                data[excelRow - 2, 6] =
                     first.StandardBendCoefficientMm.HasValue
                         ? (object)first.StandardBendCoefficientMm.Value
                         : "";
-                sheet.Cells[excelRow, 8].Value =
+                data[excelRow - 2, 7] =
                     first.BendCoefficientMm.HasValue
                     && first.StandardBendCoefficientMm.HasValue
                         ? (object)Math.Abs(
                             first.BendCoefficientMm.Value
                             - first.StandardBendCoefficientMm.Value)
                         : "";
-                sheet.Cells[excelRow, 9].Value = CleanSettingName(
+                data[excelRow - 2, 8] = CleanSettingName(
                     JoinDistinct(group, delegate(KegakiBendResult row) { return row.DefaultSetting; }));
-                sheet.Cells[excelRow, 10].Value = JoinBendNames(group, false);
-                sheet.Cells[excelRow, 11].Value = JoinBendNames(group, true);
-                sheet.Cells[excelRow, 12].Value = JoinOverrideSettings(group);
-                sheet.Cells[excelRow, 13].Value = groupStatus;
-                sheet.Cells[excelRow, 14].Value = BuildClearNote(group);
+                data[excelRow - 2, 9] = JoinBendNames(group, false);
+                data[excelRow - 2, 10] = JoinBendNames(group, true);
+                data[excelRow - 2, 11] = JoinOverrideSettings(group);
+                data[excelRow - 2, 12] = groupStatus;
+                data[excelRow - 2, 13] = BuildClearNote(group);
 
                 if (groupStatus == "NG")
-                    sheet.Range["A" + excelRow + ":P" + excelRow].Interior.Color = Rgb(255, 199, 206);
+                    fills.Add(excelRow, Rgb(255, 199, 206));
                 else if (groupStatus == "CHECK")
-                    sheet.Range["A" + excelRow + ":P" + excelRow].Interior.Color = Rgb(255, 235, 156);
+                    fills.Add(excelRow, Rgb(255, 235, 156));
 
                 excelRow++;
             }
+            ExcelCheckReportWriter.WriteBlock(sheet, 2, 1, data);
+            fills.Apply(sheet);
         }
 
         private static List<List<KegakiBendResult>> GroupResults(List<KegakiBendResult> results)
@@ -2885,13 +2462,13 @@ namespace ADDIN.Commands
                     continue;
 
                 string note = row.Note ?? "";
-                if (row.IsOverride && !string.IsNullOrWhiteSpace(row.BendName))
+                if (!string.IsNullOrWhiteSpace(row.BendName))
                     note = row.BendName + ": " + note;
                 AddDistinct(notes, note);
             }
 
             if (notes.Count == 0)
-                return "T\u1EA5t c\u1EA3 Bend d\u00F9ng setting chung";
+                return "Tat ca bend dat yeu cau; xem sheet HE SO TUNG BEND de doi chieu.";
 
             return string.Join("\n", notes.ToArray());
         }

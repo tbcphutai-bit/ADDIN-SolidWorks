@@ -103,40 +103,43 @@ namespace ADDIN.Commands
                 if (result.DfTk != null) sheetCount++;
                 if (result.UraOmote != null) sheetCount++;
                 if (result.Kegaki != null) sheetCount++;
-                PrepareSheetCount(excel, workbook, sheetCount);
-
-                dynamic summarySheet = workbook.Sheets[1];
-                summarySheet.Name = "TONG HOP";
-
-                List<SummaryRow> summaryRows = BuildSummaryRows(result, gridBom);
-                WriteSummary(summarySheet, summaryRows);
-                FreezeTopRow(summarySheet);
-
-                int sheetIndex = 2;
-                if (result.DfTk != null)
+                using (var exportScope = new ExcelCheckExportScope(excel, "URA/KEGAKI"))
                 {
-                    dynamic dfTkSheet = workbook.Sheets[sheetIndex++];
-                    dfTkSheet.Name = "CHECK DF-TK";
-                    WriteDfTk(dfTkSheet, result.DfTk);
-                    FreezeTopRow(dfTkSheet);
-                }
-                if (result.UraOmote != null)
-                {
-                    dynamic uraSheet = workbook.Sheets[sheetIndex++];
-                    uraSheet.Name = "CHECK URA OMOTE";
-                    WriteUraOmote(uraSheet, result.UraOmote);
-                    FreezeTopRow(uraSheet);
-                }
-                if (result.Kegaki != null)
-                {
-                    dynamic kegakiSheet = workbook.Sheets[sheetIndex++];
-                    kegakiSheet.Name = "CHECK KEGAKI";
-                    WriteKegaki(kegakiSheet, result.Kegaki);
-                    FreezeTopRow(kegakiSheet);
-                }
+                    PrepareSheetCount(excel, workbook, sheetCount);
 
-                summarySheet.Activate();
-                summarySheet.Range["A1"].Select();
+                    dynamic summarySheet = workbook.Sheets[1];
+                    summarySheet.Name = "TONG HOP";
+
+                    List<SummaryRow> summaryRows = BuildSummaryRows(result, gridBom);
+                    WriteSummary(summarySheet, summaryRows);
+                    FreezeTopRow(summarySheet);
+
+                    int sheetIndex = 2;
+                    if (result.DfTk != null)
+                    {
+                        dynamic dfTkSheet = workbook.Sheets[sheetIndex++];
+                        dfTkSheet.Name = "CHECK DF-TK";
+                        WriteDfTk(dfTkSheet, result.DfTk);
+                        FreezeTopRow(dfTkSheet);
+                    }
+                    if (result.UraOmote != null)
+                    {
+                        dynamic uraSheet = workbook.Sheets[sheetIndex++];
+                        uraSheet.Name = "CHECK URA OMOTE";
+                        WriteUraOmote(uraSheet, result.UraOmote);
+                        FreezeTopRow(uraSheet);
+                    }
+                    if (result.Kegaki != null)
+                    {
+                        dynamic kegakiSheet = workbook.Sheets[sheetIndex++];
+                        kegakiSheet.Name = "CHECK KEGAKI";
+                        WriteKegaki(kegakiSheet, result.Kegaki);
+                        FreezeTopRow(kegakiSheet);
+                    }
+
+                    summarySheet.Activate();
+                    summarySheet.Range["A1"].Select();
+                }
                 excel.Visible = true;
                 MessageBox.Show(
                     "Da xuat CHECK URA OMOTE KEGAKI thanh 1 file Excel gom "
@@ -341,28 +344,34 @@ namespace ADDIN.Commands
             };
             WriteHeaders(sheet, headers);
 
+            var data = new object[Math.Max(1, rows.Count), 8];
+            var fills = new ExcelCheckFillBatch(1, 8);
+            var skipped = new ExcelCheckFillBatch(6, 6);
             int excelRow = 2;
             foreach (SummaryRow row in rows)
             {
                 string overall = OverallStatus(row);
                 string processingStatus = ProcessingStatus(row);
-                sheet.Cells[excelRow, 1].Value = row.BuhinNo;
-                sheet.Cells[excelRow, 2].Value = row.Component;
-                sheet.Cells[excelRow, 3].Value = row.DfTk;
-                sheet.Cells[excelRow, 4].Value = row.UraOmote;
-                sheet.Cells[excelRow, 5].Value = row.Kegaki;
-                sheet.Cells[excelRow, 6].Value = processingStatus;
-                sheet.Cells[excelRow, 7].Value = overall;
-                sheet.Cells[excelRow, 8].Value = row.Note;
-                ApplyStatusColor(sheet.Range["A" + excelRow + ":H" + excelRow], overall);
+                data[excelRow - 2, 0] = row.BuhinNo;
+                data[excelRow - 2, 1] = row.Component;
+                data[excelRow - 2, 2] = row.DfTk;
+                data[excelRow - 2, 3] = row.UraOmote;
+                data[excelRow - 2, 4] = row.Kegaki;
+                data[excelRow - 2, 5] = processingStatus;
+                data[excelRow - 2, 6] = overall;
+                data[excelRow - 2, 7] = row.Note;
+                fills.AddStatus(excelRow, overall);
                 if (processingStatus.StartsWith("SKIP", StringComparison.OrdinalIgnoreCase))
-                    ApplyStatusColor(sheet.Cells[excelRow, 6], "SKIP");
+                    skipped.AddStatus(excelRow, "SKIP");
                 excelRow++;
             }
 
             if (rows.Count == 0)
-                sheet.Cells[2, 1].Value = "Khong co dong BOM nao duoc chon.";
+                data[0, 0] = "Khong co dong BOM nao duoc chon.";
 
+            ExcelCheckReportWriter.WriteBlock(sheet, 2, 1, data);
+            fills.Apply(sheet);
+            skipped.Apply(sheet);
             sheet.Columns[2].ColumnWidth = 28;
             int lastRow = Math.Max(2, excelRow - 1);
             FinishSheet(sheet, lastRow, 8);
@@ -405,41 +414,46 @@ namespace ADDIN.Commands
             };
             WriteHeaders(sheet, headers);
 
+            int count = result == null ? 0 : result.DiffResults.Count + result.CheckLogs.Count;
+            var data = new object[Math.Max(1, count), 12];
+            var fills = new ExcelCheckFillBatch(1, 12);
             int row = 2;
             if (result != null)
             {
                 foreach (DfTkResult item in result.DiffResults)
                 {
-                    sheet.Cells[row, 1].Value = item.BuhinNo;
-                    sheet.Cells[row, 2].Value = item.Component;
-                    sheet.Cells[row, 3].Value = item.OuterDf;
-                    sheet.Cells[row, 4].Value = item.OuterTk;
-                    sheet.Cells[row, 5].Value = item.InnerDf;
-                    sheet.Cells[row, 6].Value = item.InnerTk;
-                    sheet.Cells[row, 7].Value = item.AreaDf;
-                    sheet.Cells[row, 8].Value = item.AreaTk;
-                    sheet.Cells[row, 9].Value = item.GeometryDfSummary;
-                    sheet.Cells[row, 10].Value = item.GeometryTkSummary;
-                    sheet.Cells[row, 11].Value = "NG";
-                    sheet.Cells[row, 12].Value = item.DiffText;
-                    ApplyStatusColor(sheet.Range["A" + row + ":L" + row], "NG");
+                    data[row - 2, 0] = item.BuhinNo;
+                    data[row - 2, 1] = item.Component;
+                    data[row - 2, 2] = item.OuterDf;
+                    data[row - 2, 3] = item.OuterTk;
+                    data[row - 2, 4] = item.InnerDf;
+                    data[row - 2, 5] = item.InnerTk;
+                    data[row - 2, 6] = item.AreaDf;
+                    data[row - 2, 7] = item.AreaTk;
+                    data[row - 2, 8] = item.GeometryDfSummary;
+                    data[row - 2, 9] = item.GeometryTkSummary;
+                    data[row - 2, 10] = "NG";
+                    data[row - 2, 11] = item.DiffText;
+                    fills.AddStatus(row, "NG");
                     row++;
                 }
 
                 foreach (string checkLog in result.CheckLogs)
                 {
                     DfTkLogRow logRow = ParseDfTkCheckLog(checkLog);
-                    sheet.Cells[row, 1].Value = logRow.BuhinNo;
-                    sheet.Cells[row, 2].Value = logRow.Component;
-                    sheet.Cells[row, 11].Value = "SKIP";
-                    sheet.Cells[row, 12].Value = logRow.Note;
-                    ApplyStatusColor(sheet.Range["A" + row + ":L" + row], "SKIP");
+                    data[row - 2, 0] = logRow.BuhinNo;
+                    data[row - 2, 1] = logRow.Component;
+                    data[row - 2, 10] = "SKIP";
+                    data[row - 2, 11] = logRow.Note;
+                    fills.AddStatus(row, "SKIP");
                     row++;
                 }
             }
 
             if (row == 2)
-                sheet.Cells[2, 1].Value = "OK - Khong phat hien khac biet DF/TK.";
+                data[0, 0] = "OK - Khong phat hien khac biet DF/TK.";
+            ExcelCheckReportWriter.WriteBlock(sheet, 2, 1, data);
+            fills.Apply(sheet);
             sheet.Columns[2].ColumnWidth = 28;
             sheet.Columns[9].ColumnWidth = 24;
             sheet.Columns[10].ColumnWidth = 24;
@@ -458,26 +472,30 @@ namespace ADDIN.Commands
             };
             WriteHeaders(sheet, headers);
 
+            var data = new object[Math.Max(1, result == null ? 0 : result.Results.Count), 8];
+            var fills = new ExcelCheckFillBatch(1, 8);
             int row = 2;
             if (result != null)
             {
                 foreach (UraOmoteRowResult item in result.Results)
                 {
-                    sheet.Cells[row, 1].Value = item.BuhinNo;
-                    sheet.Cells[row, 2].Value = item.Status;
-                    sheet.Cells[row, 3].Value = item.Component;
-                    sheet.Cells[row, 4].Value = item.DefaultPinkFaceCount;
-                    sheet.Cells[row, 5].Value = item.DefaultPinkAreaMm2;
-                    sheet.Cells[row, 6].Value = item.FlatPinkFaceCount;
-                    sheet.Cells[row, 7].Value = item.FlatPinkAreaMm2;
-                    sheet.Cells[row, 8].Value = item.Note;
-                    ApplyStatusColor(sheet.Range["A" + row + ":H" + row], item.Status);
+                    data[row - 2, 0] = item.BuhinNo;
+                    data[row - 2, 1] = item.Status;
+                    data[row - 2, 2] = item.Component;
+                    data[row - 2, 3] = item.DefaultPinkFaceCount;
+                    data[row - 2, 4] = item.DefaultPinkAreaMm2;
+                    data[row - 2, 5] = item.FlatPinkFaceCount;
+                    data[row - 2, 6] = item.FlatPinkAreaMm2;
+                    data[row - 2, 7] = item.Note;
+                    fills.AddStatus(row, item.Status);
                     row++;
                 }
             }
 
             if (row == 2)
-                sheet.Cells[2, 1].Value = "Khong co du lieu CHECK URA OMOTE.";
+                data[0, 0] = "Khong co du lieu CHECK URA OMOTE.";
+            ExcelCheckReportWriter.WriteBlock(sheet, 2, 1, data);
+            fills.Apply(sheet);
             int lastRow = Math.Max(2, row - 1);
             FinishSheet(sheet, lastRow, 8);
             AutoFitNoteColumn(sheet, lastRow, 8);
@@ -495,6 +513,9 @@ namespace ADDIN.Commands
             };
             WriteHeaders(sheet, headers);
 
+            var data = new object[Math.Max(1, result == null ? 0 : result.Results.Count), 16];
+            var fills = new ExcelCheckFillBatch(1, 16);
+            var statuses = new ExcelCheckFillBatch(2, 2);
             int row = 2;
             string previousComponentKey = null;
             int componentIndex = -1;
@@ -520,57 +541,61 @@ namespace ADDIN.Commands
                     }
 
                     int rowBg = (componentIndex % 2 == 0) ? pastelColorA : pastelColorB;
-                    dynamic fullRow = sheet.Range["A" + row + ":P" + row];
-                    fullRow.Interior.Color = rowBg;
+                    fills.Add(row, rowBg);
 
-                    sheet.Cells[row, 1].Value =
+                    data[row - 2, 0] =
                         firstBendOfComponent ? item.BuhinNo : "";
-                    sheet.Cells[row, 2].Value = item.Status;
-                    sheet.Cells[row, 3].Value = item.Component;
-                    sheet.Cells[row, 4].Value = item.MaterialName;
-                    sheet.Cells[row, 5].Value =
+                    data[row - 2, 1] = item.Status;
+                    data[row - 2, 2] = item.Component;
+                    data[row - 2, 3] = item.MaterialName;
+                    data[row - 2, 4] =
                         item.SheetThicknessMm > 0.0 ? (object)item.SheetThicknessMm : "";
-                    sheet.Cells[row, 6].Value = item.BendTableName;
-                    sheet.Cells[row, 7].Value =
+                    data[row - 2, 5] = item.BendTableName;
+                    data[row - 2, 6] =
                         item.BendCoefficientMm.HasValue
                             ? (object)item.BendCoefficientMm.Value
                             : "";
-                    sheet.Cells[row, 8].Value = item.StandardBendTableName;
-                    sheet.Cells[row, 9].Value =
+                    data[row - 2, 7] = item.StandardBendTableName;
+                    data[row - 2, 8] =
                         item.StandardBendCoefficientMm.HasValue
                             ? (object)item.StandardBendCoefficientMm.Value
                             : "";
-                    sheet.Cells[row, 10].Value =
+                    data[row - 2, 9] =
                         item.BendCoefficientMm.HasValue
                         && item.StandardBendCoefficientMm.HasValue
                             ? (object)Math.Abs(
                                 item.BendCoefficientMm.Value
                                 - item.StandardBendCoefficientMm.Value)
                             : "";
-                    sheet.Cells[row, 11].Value = item.BendName;
-                    sheet.Cells[row, 12].Value = item.AngleDeg;
-                    sheet.Cells[row, 13].Value = item.RadiusMm;
-                    sheet.Cells[row, 14].Value = item.DefaultSetting;
-                    sheet.Cells[row, 15].Value = item.BendSetting;
-                    sheet.Cells[row, 16].Value = item.Note;
+                    data[row - 2, 10] = item.BendName;
+                    data[row - 2, 11] = item.AngleDeg;
+                    data[row - 2, 12] = item.RadiusMm;
+                    data[row - 2, 13] = item.DefaultSetting;
+                    data[row - 2, 14] = item.BendSetting;
+                    data[row - 2, 15] = item.Note;
 
-                    ApplyKegakiStatusCell(sheet.Cells[row, 2], item.Status);
+                    int? statusColor = ExcelCheckReportWriter.StatusColor(item.Status);
+                    if (Normalize(item.Status) == "OK") statusColor = Rgb(198, 239, 206);
+                    if (statusColor.HasValue) statuses.Add(row, statusColor.Value);
 
                     row++;
                 }
             }
 
             if (row == 2)
-                sheet.Cells[2, 1].Value = "Khong co du lieu CHECK KEGAKI.";
+                data[0, 0] = "Khong co du lieu CHECK KEGAKI.";
+            ExcelCheckReportWriter.WriteBlock(sheet, 2, 1, data);
+            fills.Apply(sheet);
+            statuses.Apply(sheet, true);
             int lastRow = Math.Max(2, row - 1);
+            if (row > 2) sheet.Range["B2:B" + lastRow].HorizontalAlignment = -4108;
             FinishSheet(sheet, lastRow, 16);
             AutoFitNoteColumn(sheet, lastRow, 16);
         }
 
         private static void WriteHeaders(dynamic sheet, string[] headers)
         {
-            for (int i = 0; i < headers.Length; i++)
-                sheet.Cells[1, i + 1].Value = headers[i];
+            ExcelCheckReportWriter.WriteHeaders(sheet, headers);
 
             dynamic header = sheet.Range[sheet.Cells[1, 1], sheet.Cells[1, headers.Length]];
             header.Font.Bold = true;
@@ -587,10 +612,10 @@ namespace ADDIN.Commands
             used.WrapText = true;
             sheet.Range[sheet.Cells[1, 1], sheet.Cells[lastRow, lastColumn]].AutoFilter();
 
+            used.Columns.AutoFit();
             for (int column = 1; column <= lastColumn; column++)
             {
                 dynamic excelColumn = sheet.Columns[column];
-                excelColumn.AutoFit();
                 double width = Convert.ToDouble(excelColumn.ColumnWidth);
                 if (width > 55.0)
                     excelColumn.ColumnWidth = 55.0;
@@ -598,17 +623,9 @@ namespace ADDIN.Commands
                     excelColumn.ColumnWidth = 9.0;
             }
 
+            // The note formatter below fits all report rows at their final widths.
+            // Avoid the old per-row COM loop and its redundant AutoFit.
             sheet.Rows[1].RowHeight = 30.0;
-            for (int row = 2; row <= lastRow; row++)
-            {
-                dynamic excelRow = sheet.Rows[row];
-                excelRow.AutoFit();
-                double height = Convert.ToDouble(excelRow.RowHeight);
-                if (height > 42.0)
-                    excelRow.RowHeight = 42.0;
-                else if (height < 18.0)
-                    excelRow.RowHeight = 18.0;
-            }
         }
 
         private static void AutoFitNoteColumn(dynamic sheet, int lastRow, int noteColumn)
@@ -854,4 +871,167 @@ namespace ADDIN.Commands
             return red + (green << 8) + (blue << 16);
         }
     }
+    // Shared by the three URA/KEGAKI report exporters. No SOLIDWORKS access.
+    internal static class ExcelCheckReportWriter
+    {
+        internal static string ColumnName(int column)
+        {
+            string name = "";
+            while (column > 0) { column--; name = (char)('A' + column % 26) + name; column /= 26; }
+            return name;
+        }
+
+        internal static void WriteHeaders(dynamic sheet, string[] headers)
+        {
+            var data = new object[1, headers.Length];
+            for (int i = 0; i < headers.Length; i++) data[0, i] = headers[i];
+            WriteBlock(sheet, 1, 1, data);
+        }
+
+        internal static void WriteBlock(dynamic sheet, int firstRow, int firstColumn, object[,] data)
+        {
+            int rows = data.GetLength(0), columns = data.GetLength(1);
+            if (rows == 0 || columns == 0) return;
+            const int chunkSize = 4096;
+            for (int offset = 0; offset < rows; offset += chunkSize)
+            {
+                int count = Math.Min(chunkSize, rows - offset);
+                object[,] chunk = data;
+                if (offset != 0 || count != rows)
+                {
+                    chunk = new object[count, columns];
+                    for (int r = 0; r < count; r++)
+                        for (int c = 0; c < columns; c++) chunk[r, c] = data[offset + r, c];
+                }
+                dynamic range = sheet.Range[ColumnName(firstColumn) + (firstRow + offset)
+                    + ":" + ColumnName(firstColumn + columns - 1) + (firstRow + offset + count - 1)];
+                try { range.Value2 = chunk; }
+                finally { Release((object)range); }
+            }
+        }
+
+        internal static void Release(object value)
+        {
+            if (value != null && System.Runtime.InteropServices.Marshal.IsComObject(value))
+                try { System.Runtime.InteropServices.Marshal.ReleaseComObject(value); } catch { }
+        }
+
+        internal static void FreezeTopRow(dynamic sheet)
+        {
+            dynamic window = null;
+            try
+            {
+                sheet.Activate(); window = sheet.Application.ActiveWindow;
+                if (window == null) return;
+                window.FreezePanes = false; window.SplitColumn = 0;
+                window.SplitRow = 1; window.FreezePanes = true;
+            }
+            catch { /* Optional presentation must not abort the data export. */ }
+            finally { Release((object)window); }
+        }
+
+        internal static int? StatusColor(string status)
+        {
+            string normalized = (status ?? "").Trim().ToUpperInvariant();
+            if (normalized == "NG") return 255 + (199 << 8) + (206 << 16);
+            if (normalized == "CHECK" || normalized == "SKIP") return 255 + (235 << 8) + (156 << 16);
+            return null;
+        }
+    }
+
+    internal sealed class ExcelCheckFillBatch
+    {
+        private sealed class Band { internal int First, Last; }
+        private readonly Dictionary<int, List<Band>> colors = new Dictionary<int, List<Band>>();
+        private readonly string firstColumn, lastColumn;
+
+        internal ExcelCheckFillBatch(int first, int last)
+        { firstColumn = ExcelCheckReportWriter.ColumnName(first); lastColumn = ExcelCheckReportWriter.ColumnName(last); }
+
+        internal void AddStatus(int row, string status)
+        {
+            int? color = ExcelCheckReportWriter.StatusColor(status);
+            if (color.HasValue) Add(row, color.Value);
+        }
+
+        internal void Add(int row, int color)
+        {
+            List<Band> bands;
+            if (!colors.TryGetValue(color, out bands)) { bands = new List<Band>(); colors.Add(color, bands); }
+            if (bands.Count > 0 && bands[bands.Count - 1].Last == row - 1) bands[bands.Count - 1].Last = row;
+            else bands.Add(new Band { First = row, Last = row });
+        }
+
+        internal void Apply(dynamic sheet, bool statusText = false)
+        {
+            foreach (KeyValuePair<int, List<Band>> item in colors)
+            {
+                var addresses = new List<string>();
+                int length = 0;
+                foreach (Band band in item.Value)
+                {
+                    string address = firstColumn + band.First + ":" + lastColumn + band.Last;
+                    // Keep the address below Excel's legacy 255 character limit.
+                    if (length + address.Length + 1 > 200 && addresses.Count > 0)
+                    { ApplyRange(sheet, string.Join(",", addresses.ToArray()), item.Key, statusText); addresses.Clear(); length = 0; }
+                    addresses.Add(address); length += address.Length + 1;
+                }
+                if (addresses.Count > 0) ApplyRange(sheet, string.Join(",", addresses.ToArray()), item.Key, statusText);
+            }
+        }
+
+        private static void ApplyRange(dynamic sheet, string address, int color, bool statusText)
+        {
+            dynamic range = sheet.Range[address];
+            try
+            {
+                range.Interior.Color = color;
+                if (statusText)
+                {
+                    int fontColor = color == 255 + (199 << 8) + (206 << 16) ? 156 + (6 << 16)
+                        : color == 198 + (239 << 8) + (206 << 16) ? (97 << 8) : 156 + (87 << 8);
+                    range.Font.Color = fontColor;
+                    range.Font.Bold = true;
+                }
+            }
+            finally { ExcelCheckReportWriter.Release((object)range); }
+        }
+    }
+
+    internal sealed class ExcelCheckExportScope : IDisposable
+    {
+        private readonly dynamic application;
+        private readonly bool updating, alerts, events;
+        private readonly int calculation;
+        private readonly System.Diagnostics.Stopwatch timer = System.Diagnostics.Stopwatch.StartNew();
+        private readonly string report;
+
+        internal ExcelCheckExportScope(dynamic excel, string name)
+        {
+            application = excel; report = name;
+            updating = (bool)excel.ScreenUpdating; alerts = (bool)excel.DisplayAlerts;
+            events = (bool)excel.EnableEvents; calculation = (int)excel.Calculation;
+            try
+            {
+                excel.ScreenUpdating = false; excel.DisplayAlerts = false;
+                excel.EnableEvents = false; excel.Calculation = -4135; // xlCalculationManual
+            }
+            catch { Restore(); throw; }
+        }
+
+        private void Restore()
+        {
+            try { application.Calculation = calculation; } catch { }
+            try { application.EnableEvents = events; } catch { }
+            try { application.DisplayAlerts = alerts; } catch { }
+            try { application.ScreenUpdating = updating; } catch { }
+        }
+
+        public void Dispose()
+        {
+            Restore();
+            System.Diagnostics.Debug.WriteLine("[CHECK EXCEL] " + report + " write/format ms=" + timer.ElapsedMilliseconds);
+        }
+    }
+
 }

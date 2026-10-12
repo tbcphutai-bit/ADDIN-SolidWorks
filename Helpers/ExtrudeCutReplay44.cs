@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using ADDIN.Commands;
 using ADDIN.Commands.MirrorV7;
 using SolidWorks.Interop.sldworks;
@@ -8,6 +10,894 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Helpers
 {
+    // A failed proof is not a wrong feature direction. This exception denotes a
+    // safely read but unusable BRep, not a native access violation/corrupt edit.
+    public sealed class BodyValidationUnavailable69 : InvalidOperationException
+    {
+        public BodyValidationUnavailable69(string message) : base(message) { }
+    }
+
+    public sealed class BodyHealthSnapshot69
+    {
+        public int FaultCount { get; internal set; } = -1;
+        public int FaceCount { get; internal set; }
+        public int EdgeCount { get; internal set; }
+        public string Details { get; internal set; }
+        public bool IsValid { get { return FaultCount == 0; } }
+        // Every fault read back as a face-face inconsistency on a Face entity.
+        public bool OnlyFaceFaceContact71 { get; internal set; }
+    }
+
+    public static class BodyAuditPolicy69
+    {
+        public static string FirstFaultStage(int source, int copy, int reflected)
+        {
+            if (source < 0 || copy < 0 || reflected < 0) return "CHECK_UNAVAILABLE";
+            if (source != 0) return "SOURCE_BEFORE_COPY";
+            if (copy != 0) return "COPY_BEFORE_REFLECTION";
+            return reflected != 0 ? "ORACLE_AFTER_REFLECTION" : "NONE";
+        }
+
+        // Diagnostic only. Neither this determinant nor sample displacement is
+        // allowed to replace native body equivalence or relax a tolerance.
+        public static string DescribeTransform(double[] data)
+        {
+            if (data == null || data.Length != 16 || data.Any(v => double.IsNaN(v) || double.IsInfinity(v)))
+                return "matrixAvailable=False";
+            double s = data[12];
+            double determinant = s * s * s * (data[0] * (data[4] * data[8] - data[5] * data[7]) -
+                data[1] * (data[3] * data[8] - data[5] * data[6]) +
+                data[2] * (data[3] * data[7] - data[4] * data[6]));
+            double translation = Math.Sqrt(data[9] * data[9] + data[10] * data[10] + data[11] * data[11]);
+            return "matrixAvailable=True effectiveDeterminant=" + determinant.ToString("R", CultureInfo.InvariantCulture) +
+                " translationLength_m=" + translation.ToString("R", CultureInfo.InvariantCulture) +
+                " matrix=[" + string.Join(",", data.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]";
+        }
+
+        public static bool CanRunBoolean(BodyHealthSnapshot69 target, BodyHealthSnapshot69 tool)
+        {
+            return target != null && target.IsValid && tool != null && tool.IsValid;
+        }
+
+        // Adjacent bend regions that touch at a corner are an accepted design
+        // practice; SOLIDWORKS reports them as swFaceFaceInconsistency on the
+        // touching faces. Two bodies qualify only when BOTH carry nothing but
+        // that fault class, in the same number. Any other fault, or a fault
+        // present on one side only, stays unusable. A native Boolean is still
+        // never attempted on such bodies; see NativeBodyCoincidence67.
+        public static bool SameToleratedSelfContact71(BodyHealthSnapshot69 expected, BodyHealthSnapshot69 actual)
+        {
+            return expected != null && actual != null && expected.FaultCount > 0 &&
+                expected.FaultCount == actual.FaultCount &&
+                expected.OnlyFaceFaceContact71 && actual.OnlyFaceFaceContact71;
+        }
+    }
+
+    public static class NativeBodyAudit69
+    {
+        private sealed class OracleTrace
+        {
+            public string Id, Label;
+            public BodyHealthSnapshot69 Source, Copy, Reflected;
+        }
+
+        // Weak managed keys: diagnostics must not extend the lifetime of a COM
+        // body or retain source documents, faces or native selection pointers.
+        private static readonly ConditionalWeakTable<Body2, OracleTrace> traces =
+            new ConditionalWeakTable<Body2, OracleTrace>();
+
+        public static BodyHealthSnapshot69 Read(Body2 body, string label, string stage)
+        {
+            if (body == null) throw new BodyValidationUnavailable69("BODY69 missing body: " + label + " stage=" + stage);
+            var faults = body.Check3;
+            int count = faults == null ? 0 : faults.Count;
+            var details = new List<string>();
+            bool onlyContact71 = count > 0 && count <= 32;
+            for (int i = 0; i < Math.Min(count, 32); i++)
+            {
+                int error = faults.get_ErrorCode(i);
+                object entity = faults.get_Entity2(i);
+                onlyContact71 &= error == (int)swFaultEntityErrorCode_e.swFaceFaceInconsistency && entity is Face2;
+                string description = "kind=" + (entity is Face2 ? "Face" : entity is Edge ? "Edge" :
+                    entity is Vertex ? "Vertex" : entity is Body2 ? "Body" : "Other");
+                var face = entity as Face2;
+                if (face != null)
+                {
+                    var surface = face.GetSurface() as Surface;
+                    var owner = face.GetFeature() as Feature;
+                    var box = face.GetBox() as double[];
+                    description += " surface=" + (surface == null ? "NONE" : surface.Identity().ToString(CultureInfo.InvariantCulture)) +
+                        " owner=" + (owner == null ? "NONE" : owner.Name + ":" + owner.GetTypeName2()) +
+                        " box=[" + (box == null ? "" : string.Join(",", box.Select(v => v.ToString("R", CultureInfo.InvariantCulture)))) + "]";
+                }
+                details.Add(i + ":" + error + ":" + (swFaultEntityErrorCode_e)error + ":" + description);
+            }
+            if (count > 32) details.Add("remaining=" + (count - 32));
+            var result = new BodyHealthSnapshot69 { FaultCount = count, FaceCount = body.GetFaceCount(),
+                EdgeCount = body.GetEdgeCount(), Details = count == 0 ? "NONE" : string.Join(";", details),
+                OnlyFaceFaceContact71 = onlyContact71 };
+            CreateMirrorPartPackage.LogDebug("[BODY69][HEALTH] label=" + label + " stage=" + stage +
+                " faults=" + result.FaultCount + " faces=" + result.FaceCount + " edges=" + result.EdgeCount +
+                " temporary=" + body.IsTemporaryBody() + " details={" + result.Details + "} geometryModified=False");
+            return result;
+        }
+
+        public static Body2 CopyAndReflect(Body2 source, MathTransform transform, string label)
+        {
+            var trace = new OracleTrace { Id = Guid.NewGuid().ToString("N"), Label = label };
+            string correlation = label + "/trace=" + trace.Id;
+            trace.Source = Read(source, correlation, "SOURCE_BEFORE_COPY");
+            Body2 copy = source.Copy2(false) as Body2;
+            if (copy == null) throw new BodyValidationUnavailable69("BODY69 Copy2 returned null: " + correlation);
+            trace.Copy = Read(copy, correlation, "COPY_BEFORE_REFLECTION");
+            if (transform == null || !copy.ApplyTransform(transform))
+                throw new BodyValidationUnavailable69("BODY69 reflection failed: " + correlation);
+            trace.Reflected = Read(copy, correlation, "ORACLE_AFTER_REFLECTION");
+            traces.Add(copy, trace);
+            CreateMirrorPartPackage.LogDebug("[BODY69][ORACLE_STAGES] label=" + label + " trace=" + trace.Id +
+                " sourceFaults=" + trace.Source.FaultCount + " copyFaults=" + trace.Copy.FaultCount +
+                " reflectedFaults=" + trace.Reflected.FaultCount + " firstFaultStage=" +
+                BodyAuditPolicy69.FirstFaultStage(trace.Source.FaultCount, trace.Copy.FaultCount, trace.Reflected.FaultCount) +
+                " " + BodyAuditPolicy69.DescribeTransform(transform.ArrayData as double[]) + " outputFeatureInserted=False");
+            string firstFault = BodyAuditPolicy69.FirstFaultStage(
+                trace.Source.FaultCount, trace.Copy.FaultCount, trace.Reflected.FaultCount);
+            if (firstFault != "NONE" && BodyAuditPolicy69.SameToleratedSelfContact71(trace.Source, trace.Copy) &&
+                BodyAuditPolicy69.SameToleratedSelfContact71(trace.Source, trace.Reflected))
+            {
+                CreateMirrorPartPackage.LogDebug("[BODY71][TOLERATED_SOURCE_SELF_CONTACT] label=" + label + " trace=" + trace.Id +
+                    " faults=" + trace.Source.FaultCount + " class=swFaceFaceInconsistency booleanProof=UNAVAILABLE" +
+                    " requiredProof=NATIVE_COINCIDENCE_IDENTITY");
+                return copy;
+            }
+            if (firstFault != "NONE")
+                throw new BodyValidationUnavailable69("BODY69 source oracle is unusable: " + correlation +
+                    " firstFaultStage=" + firstFault + " sourceFaults=" + trace.Source.FaultCount +
+                    " copyFaults=" + trace.Copy.FaultCount + " reflectedFaults=" + trace.Reflected.FaultCount +
+                    "; replay not attempted for this checkpoint; no direction conclusion; output not published.");
+            return copy;
+        }
+
+        public static void RequireCheckpoint(Body2 expected, Body2 actual, string label)
+        {
+            OracleTrace trace;
+            if (traces.TryGetValue(expected, out trace))
+                CreateMirrorPartPackage.LogDebug("[BODY69][CHECKPOINT_ORIGIN] label=" + label + " trace=" + trace.Id +
+                    " sourceLabel=" + trace.Label + " firstFaultStage=" +
+                    BodyAuditPolicy69.FirstFaultStage(trace.Source.FaultCount, trace.Copy.FaultCount, trace.Reflected.FaultCount));
+            var expectedHealth = Read(expected, label, "VERIFY_REFLECTED_ORACLE");
+            var actualHealth = Read(actual, label, "VERIFY_NATIVE_RESULT");
+            if (BodyAuditPolicy69.CanRunBoolean(expectedHealth, actualHealth)) return;
+            if (BodyAuditPolicy69.SameToleratedSelfContact71(expectedHealth, actualHealth))
+            {
+                CreateMirrorPartPackage.LogDebug("[BODY71][TOLERATED_SELF_CONTACT] label=" + label + " faults=" +
+                    expectedHealth.FaultCount + " expectedAndActualSameClass=True booleanWillBeSkipped=True");
+                return;
+            }
+            string origin = traces.TryGetValue(expected, out trace) ?
+                BodyAuditPolicy69.FirstFaultStage(trace.Source.FaultCount, trace.Copy.FaultCount, trace.Reflected.FaultCount) : "NOT_CAPTURED";
+            string message = "BODY69 verification unavailable: label=" + label + " oracleOrigin=" + origin +
+                " expectedFaults=" + expectedHealth.FaultCount + " actualFaults=" + actualHealth.FaultCount +
+                "; invalid inputs are not a direction mismatch; Boolean not attempted; output not published.";
+            CreateMirrorPartPackage.LogDebug("[BODY69][VERIFICATION_UNAVAILABLE] " + message);
+            throw new BodyValidationUnavailable69(message);
+        }
+
+        public static bool CheckBooleanInputs(Body2 target, Body2 tool, string label, string stage, BodyBooleanResult result)
+        {
+            var targetHealth = Read(target, label, stage + "_TARGET");
+            var toolHealth = Read(tool, label, stage + "_TOOL");
+            if (BodyAuditPolicy69.CanRunBoolean(targetHealth, toolHealth)) return true;
+            result.Success = false;
+            result.VerificationUnavailable69 = true;
+            result.ToleratedSelfContact71 = BodyAuditPolicy69.SameToleratedSelfContact71(targetHealth, toolHealth);
+            // Application sentinel, explicitly NOT a fictitious native 1058.
+            result.ErrorCode = -6901;
+            result.ErrorMessage = "BODY69 invalid Boolean inputs at " + stage +
+                ": targetFaults=" + targetHealth.FaultCount + " toolFaults=" + toolHealth.FaultCount;
+            CreateMirrorPartPackage.LogDebug("[BODY69][BOOLEAN_SKIPPED] label=" + label + " stage=" + stage +
+                " targetFaults=" + targetHealth.FaultCount + " toolFaults=" + toolHealth.FaultCount +
+                " nativeOperationCalled=False errorCode=-6901 success=False failureAcceptedAsEmpty=False");
+            return false;
+        }
+    }
+
+    // A typed native cut cannot add material. Full source checkpoints are its
+    // oracle evidence; local delta solids are needed only by qualified fallback.
+    // No part name, sketch frame, end condition or candidate direction is used here.
+    public static class NativeCutCachePolicy67
+    {
+        public static bool CanUse(bool suppressed, bool extrudeDefinition,
+            bool bossFeature, bool supportedCutType, bool completeRecipe)
+        {
+            return !suppressed && extrudeDefinition && !bossFeature &&
+                supportedCutType && completeRecipe;
+        }
+
+        public static bool CanUsePattern(bool suppressed, bool typedPattern, bool replayHandler)
+        {
+            return !suppressed && typedPattern && replayHandler;
+        }
+
+        public static bool IsPositiveFinite(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value) && value > 0.0;
+        }
+
+        public static bool HasRequiredSourceEvidence(bool fullCheckpoints, bool removedRequired,
+            bool removedAttempted, bool removedSuccess, int removedCount, double removedVolume)
+        {
+            return fullCheckpoints && (!removedRequired ||
+                (removedAttempted && removedSuccess && removedCount > 0 && IsPositiveFinite(removedVolume)));
+        }
+
+        public static bool IsExactDifference(bool missingSuccess, int missingCount,
+            bool extraSuccess, int extraCount)
+        {
+            // A Boolean failure is NOT an empty difference. Nonempty residuals
+            // cannot be accepted merely because their mass is below a tolerance.
+            return missingSuccess && extraSuccess && missingCount == 0 && extraCount == 0;
+        }
+
+        public static bool CanComplete(bool requested, bool replaySucceeded,
+            bool beforeExact, bool afterExact)
+        {
+            return requested && replaySucceeded && beforeExact && afterExact;
+        }
+    }
+
+    // Official geometric congruence API, restricted to identity in the original
+    // coordinate frame. This is a second proof, NOT treating failed Booleans as empty.
+    // https://help.solidworks.com/2023/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IBody2~GetCoincidenceTransform2.html
+    public static class NativeBodyCoincidence67
+    {
+        public static bool IsIdentity(double[] data)
+        {
+            if (data == null || data.Length != 16 || data.Any(v => double.IsNaN(v) || double.IsInfinity(v))) return false;
+            const double tolerance = 1e-10;
+            for (int i = 0; i < 9; i++)
+                if (Math.Abs(data[i] * data[12] - (i == 0 || i == 4 || i == 8 ? 1.0 : 0.0)) > tolerance) return false;
+            return Math.Abs(data[9]) <= tolerance && Math.Abs(data[10]) <= tolerance && Math.Abs(data[11]) <= tolerance;
+        }
+
+        public static bool CanRequest(bool missingSuccess, int missingCount, int missingError,
+            bool extraSuccess, int extraCount, int extraError)
+        {
+            int booleanFailure = (int)swBodyOperationError_e.swBodyOperationBooleanFail;
+            return (!missingSuccess || !extraSuccess) &&
+                (missingSuccess ? missingCount == 0 : missingError == booleanFailure) &&
+                (extraSuccess ? extraCount == 0 : extraError == booleanFailure);
+        }
+
+        public static bool Confirm(Body2 expected, Body2 actual, string label)
+        {
+            if (expected == null || actual == null || expected.GetType() != actual.GetType() ||
+                expected.GetFaceCount() != actual.GetFaceCount() || expected.GetEdgeCount() != actual.GetEdgeCount()) return false;
+            MathTransform forward, backward;
+            bool forwardShape = expected.GetCoincidenceTransform2(actual, out forward);
+            bool backwardShape = actual.GetCoincidenceTransform2(expected, out backward);
+            CreateMirrorPartPackage.LogDebug("[COINCIDENCE69][TRANSFORM] label=" + label + " direction=ACTUAL_TO_EXPECTED " +
+                BodyAuditPolicy69.DescribeTransform(forward == null ? null : forward.ArrayData as double[]) + " diagnosticOnly=True");
+            CreateMirrorPartPackage.LogDebug("[COINCIDENCE69][TRANSFORM] label=" + label + " direction=EXPECTED_TO_ACTUAL " +
+                BodyAuditPolicy69.DescribeTransform(backward == null ? null : backward.ArrayData as double[]) + " diagnosticOnly=True");
+            bool forwardIdentity = forwardShape && forward != null && IsIdentity(forward.ArrayData as double[]);
+            bool backwardIdentity = backwardShape && backward != null && IsIdentity(backward.ArrayData as double[]);
+            bool pass = forwardIdentity && backwardIdentity;
+            CreateMirrorPartPackage.LogDebug("[COINCIDENCE67][GEOMETRY_PROOF] label=" + label +
+                " forwardShape=" + forwardShape + " backwardShape=" + backwardShape +
+                " forwardIdentity=" + forwardIdentity + " backwardIdentity=" + backwardIdentity +
+                " booleanFailureAcceptedAsEmpty=False tolerance_m=1e-10 result=" + (pass ? "PASS" : "FAIL"));
+            return pass;
+        }
+
+        // Set by the mapped replay engine once a Fold/Unfold feature of the
+        // Part being mirrored has been replayed; cleared at the next capture.
+        public static bool RefoldResidualAllowed71;
+
+        // A natively re-folded bend is not bit-identical to the reflected
+        // source: both Booleans succeed but leave slivers where cuts cross the
+        // bend (native observation: 102 slivers totalling 0.03 mm3 on a
+        // 447 000 mm3 body, every vertex coincident). Accepted only for a Part
+        // that contains Fold/Unfold, and only with ALL of: equal face and edge
+        // counts, every vertex matched one-to-one within 1e-7 m, and a bounded
+        // sliver volume (see the limits below).
+        public static bool ConfirmRefoldResidual71(Body2 expected, Body2 actual,
+            BodyBooleanResult missing, BodyBooleanResult extra, string label)
+        {
+            if (!RefoldResidualAllowed71 || expected == null || actual == null || missing == null || extra == null ||
+                !missing.Success || !extra.Success || missing.Bodies == null || extra.Bodies == null) return false;
+            bool topology = expected.GetFaceCount() == actual.GetFaceCount() && expected.GetEdgeCount() == actual.GetEdgeCount();
+            bool vertices = false;
+            if (topology)
+            {
+                var a = (expected.GetVertices() as object[] ?? new object[0]).Cast<Vertex>().Select(v => v.GetPoint() as double[]).ToList();
+                var b = (actual.GetVertices() as object[] ?? new object[0]).Cast<Vertex>().Select(v => v.GetPoint() as double[]).ToList();
+                vertices = a.Count == b.Count;
+                foreach (double[] p in a)
+                {
+                    if (!vertices) break;
+                    int index = b.FindIndex(q => Math.Abs(p[0] - q[0]) <= 1e-7 && Math.Abs(p[1] - q[1]) <= 1e-7 && Math.Abs(p[2] - q[2]) <= 1e-7);
+                    if (index < 0) vertices = false; else b.RemoveAt(index);
+                }
+            }
+            double volume = ((double[])expected.GetMassProperties(1.0))[3];
+            double residual = missing.Bodies.Concat(extra.Bodies).Sum(x => ((double[])x.GetMassProperties(1.0))[3]);
+            // The slivers live on the re-folded (curved) faces. Expressed as a
+            // mean thickness over those faces, the deviation must stay within
+            // the 1e-7 m point tolerance used by every other gate; a 1e-5
+            // share of the body volume is an additional hard cap.
+            double curvedArea = (expected.GetFaces() as object[] ?? new object[0]).Cast<Face2>()
+                .Where(f => ((Surface)f.GetSurface()).Identity() != (int)swSurfaceTypes_e.PLANE_TYPE).Sum(f => f.GetArea());
+            double thickness = curvedArea > 0 ? residual / curvedArea : double.NaN;
+            // Thickest single sliver (2 x volume / its own skin): a mean cannot see a
+            // local error such as one hole wall. Same 5e-6 m limit as the surface-chain proof.
+            double thickestPiece = 0;
+            foreach (Body2 piece in missing.Bodies.Concat(extra.Bodies))
+            {
+                double pieceSkin = (piece.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Sum(f => f.GetArea());
+                if (pieceSkin > 0) thickestPiece = Math.Max(thickestPiece, 2 * ((double[])piece.GetMassProperties(1.0))[3] / pieceSkin);
+            }
+            bool pass = topology && vertices && volume > 0 && thickness <= 1e-7 && residual <= volume * 1e-5 && thickestPiece <= 5e-6;
+            CreateMirrorPartPackage.LogDebug("[BODY71][REFOLD_RESIDUAL] label=" + label + " topologyEqual=" + topology +
+                " verticesEqual_1e-7=" + vertices + " slivers=" + (missing.Bodies.Count + extra.Bodies.Count) +
+                " residual_mm3=" + (residual * 1e9).ToString("F4", CultureInfo.InvariantCulture) +
+                " curvedArea_mm2=" + (curvedArea * 1e6).ToString("F1", CultureInfo.InvariantCulture) +
+                " meanThickness_m=" + thickness.ToString("E2", CultureInfo.InvariantCulture) +
+                " thickestPiece_m=" + thickestPiece.ToString("E2", CultureInfo.InvariantCulture) +
+                " relativeVolume=" + (volume > 0 ? residual / volume : double.NaN).ToString("E2", CultureInfo.InvariantCulture) +
+                " limits=thickness1E-7,volume1E-5 result=" + (pass ? "PASS" : "FAIL"));
+            return pass;
+        }
+
+        // Set once an in-context Offset Surface chain has been re-attached to a
+        // fixed reflected surface in this run; cleared at the next capture.
+        public static bool SurfaceChainResidualAllowed71;
+
+        // User decision (option A1): a Part whose cut surface hangs from an
+        // in-context Offset Surface keeps that surface chain editable. Native
+        // Surface-Extend builds a corner of the reflected surface differently
+        // (12 vertices against 11, every edge order tried), and where the
+        // surface border runs along the border of the sheet this leaves a
+        // sliver: natively one extra vertex and corners 1.4-2.9e-6 m from the
+        // reflected source. Accepted only for such a Part and only with ALL of:
+        // both Boolean differences computed; every vertex of either body within
+        // 5e-6 m of a vertex of the other; total difference at most 5e-7 m as
+        // a mean thickness over the body skin and at most 5e-4 of its volume
+        // (natively, after Unfold: all vertices equal to 1e-14 m, six slivers
+        // of 3.6 mm3 together, 1.6e-8 m mean thickness).
+        // Native area integration of a re-folded curved face moved by up to
+        // 1.6e-4 between two bodies with identical topology and vertices (a
+        // 358 000 mm2 face of 44 m radius); planar faces are exact to 1e-4.
+        // Faces are paired by area alone (sorted): a natively re-folded face can
+        // come back as another surface type than the reflected source face.
+        private static double FaceAreaNoise71(double surfaceType)
+        {
+            return surfaceType == (int)swSurfaceTypes_e.PLANE_TYPE ? 1e-4 : 5e-4;
+        }
+
+        // User decision of 2026-10-07 for the same Part classes (in-context surface
+        // chain, Lofted Bend base re-attached to reflected geometry): a local
+        // difference of up to 0.1 mm against the reflected source is accepted. Slivers
+        // stay under 5e-6 m; anything thicker is measured skin against skin, and the
+        // largest value a run accepted is kept for the log.
+        // Second decision, same day: from the first re-Fold of the run onward up to
+        // 0.2 mm. The Fold of SOLIDWORKS itself is not mirror-symmetric: on a Part
+        // whose Lofted Bend matched the mirror image to 1e-9 m and whose every
+        // feature in the flat state matched exactly, the folded result lay 0.149 mm
+        // from the mirror image inside one curved face (150 mm3, 1.1e-3 of the
+        // volume). The flat pattern is not affected. The mean and volume limits of
+        // the reduced proof follow: 5e-6 m and 5e-3 after a Fold, 5e-7 m and 5e-4 before.
+        public static bool FoldReplayed71;
+        public static double LocalDeviationLimit71 { get { return FoldReplayed71 ? 2e-4 : 1e-4; } }
+        private static double MeanDeviationLimit71 { get { return FoldReplayed71 ? 5e-6 : 5e-7; } }
+        private static double VolumeShareLimit71 { get { return FoldReplayed71 ? 5e-3 : 5e-4; } }
+        public static double LargestAcceptedDeviation71;
+
+        // Third decision, 2026-10-08: the 0.1 mm limit holds for every Part, not only
+        // for the two classes above ("lệch 0.1mm vẫn ok"; the case was a plain sheet
+        // whose mirrored body lay 3.72e-6 m from the mirror image after a cut - a
+        // difference the Boolean comparison passes unseen in most places and reports
+        // where a sliver stands alone). This reduced proof therefore runs for any
+        // Part once the exact proofs have failed; its evidence and limits are
+        // unchanged, and what it accepts is logged and kept as before.
+        public static bool ConfirmSurfaceChainResidual71(Body2 expected, Body2 actual, string label)
+        {
+            if (expected == null || actual == null) return false;
+            const double reach = 5e-6;
+            var a = (expected.GetVertices() as object[] ?? new object[0]).Cast<Vertex>().Select(v => v.GetPoint() as double[]).ToList();
+            var b = (actual.GetVertices() as object[] ?? new object[0]).Cast<Vertex>().Select(v => v.GetPoint() as double[]).ToList();
+            Func<List<double[]>, List<double[]>, double> farthest = (from, to) => from.Count == 0 || to.Count == 0 ? double.PositiveInfinity
+                : from.Max(p => to.Min(q => Math.Sqrt((p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]) + (p[2] - q[2]) * (p[2] - q[2]))));
+            double forward = farthest(a, b), backward = farthest(b, a);
+            double volume = ((double[])expected.GetMassProperties(1.0))[3], residual = double.NaN;
+            bool booleans = false, cornersNotPaired = false;
+            double thickestPiece = 0, skinDeviation = double.NaN;
+            skinDeviationAt71 = null;
+            int skinSamples = 0, skinSamplesBack = 0;
+            string evidence = "BOTH_DIFFERENCES";
+            if (forward <= reach && backward <= reach)
+            {
+                BodyBooleanResult missing = BodyOperationsHelper.BooleanCutStrict(expected, actual, label + "_CHAIN71_MISSING");
+                BodyBooleanResult extra = BodyOperationsHelper.BooleanCutStrict(actual, expected, label + "_CHAIN71_EXTRA");
+                bool missingDone = missing.Success && missing.Bodies != null, extraDone = extra.Success && extra.Bodies != null;
+                // Thickest single difference piece (2 x volume / its own skin). The mean over
+                // the whole body hides a local error: natively a 6 mm hole whose wall came
+                // out differently after Fold left pieces up to 69e-6 m thick while the mean
+                // was 1e-8 m.
+                foreach (Body2 piece in (missingDone ? missing.Bodies : new List<Body2>()).Concat(extraDone ? extra.Bodies : new List<Body2>()))
+                {
+                    double pieceSkin = (piece.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Sum(f => f.GetArea());
+                    double pieceVolume = ((double[])piece.GetMassProperties(1.0))[3];
+                    if (pieceSkin > 0) thickestPiece = Math.Max(thickestPiece, 2 * pieceVolume / pieceSkin);
+                }
+                booleans = missingDone && extraDone;
+                if (booleans) residual = missing.Bodies.Concat(extra.Bodies).Sum(x => ((double[])x.GetMassProperties(1.0))[3]);
+                else if (!missingDone && !extraDone)
+                {
+                    // Natively, after Fold of a Part with many cuts, the kernel
+                    // computes neither difference of the two near-coincident
+                    // bodies. Without any Boolean the proof is: equal face and
+                    // edge counts and vertex counts, every face paired by surface
+                    // type and area (1e-4), volumes within 5e-4, and every sample
+                    // point of every edge of the reflected source body lying on
+                    // the skin of the result within 5e-6 m.
+                    var fa = (expected.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Select(f => new[] { (double)((Surface)f.GetSurface()).Identity(), f.GetArea() }).OrderBy(f => f[1]).ToList();
+                    var actualFaces = (actual.GetFaces() as object[] ?? new object[0]).Cast<Face2>().ToList();
+                    var fb = actualFaces.Select(f => new[] { (double)((Surface)f.GetSurface()).Identity(), f.GetArea() }).OrderBy(f => f[1]).ToList();
+                    bool faces = fa.Count == fb.Count && expected.GetEdgeCount() == actual.GetEdgeCount() && a.Count == b.Count &&
+                        Enumerable.Range(0, fa.Count).All(i => Math.Abs(fa[i][1] - fb[i][1]) <= Math.Max(1e-12, fa[i][1] * FaceAreaNoise71(fa[i][0] == fb[i][0] ? fa[i][0] : -1)));
+                    double other = ((double[])actual.GetMassProperties(1.0))[3];
+                    double offSkin = double.PositiveInfinity; int samples = 0;
+                    if (faces && Math.Abs(other - volume) <= volume * 5e-4)
+                    {
+                        offSkin = 0;
+                        try
+                        {
+                            foreach (Edge edge in (expected.GetEdges() as object[] ?? new object[0]).Cast<Edge>())
+                                foreach (double[] p in SketchOperationsHelper.SampleEdge24(edge))
+                                {
+                                    samples++;
+                                    offSkin = Math.Max(offSkin, actualFaces.Min(f =>
+                                    {
+                                        var near = f.GetClosestPointOn(p[0], p[1], p[2]) as double[];
+                                        return near == null || near.Length < 3 ? double.PositiveInfinity
+                                            : Math.Sqrt((near[0] - p[0]) * (near[0] - p[0]) + (near[1] - p[1]) * (near[1] - p[1]) + (near[2] - p[2]) * (near[2] - p[2]));
+                                    }));
+                                    if (offSkin > reach) break;
+                                }
+                        }
+                        catch (InvalidOperationException) { offSkin = double.PositiveInfinity; }
+                    }
+                    int firstDifferent = fa.Count != fb.Count ? -1 : Enumerable.Range(0, fa.Count).FirstOrDefault(i => Math.Abs(fa[i][1] - fb[i][1]) > Math.Max(1e-12, fa[i][1] * FaceAreaNoise71(fa[i][0] == fb[i][0] ? fa[i][0] : -1)));
+                    CreateMirrorPartPackage.LogDebug("[BODY71][SURFACE_CHAIN_FACES] label=" + label + " faces=" + fa.Count + "/" + fb.Count + " edges=" + expected.GetEdgeCount() + "/" + actual.GetEdgeCount() +
+                        " vertices=" + a.Count + "/" + b.Count + " types=" + string.Join(",", fa.GroupBy(f => f[0]).Select(g => g.Key + "x" + g.Count())) + " | " + string.Join(",", fb.GroupBy(f => f[0]).Select(g => g.Key + "x" + g.Count())) +
+                        (fa.Count == fb.Count ? " firstDifferent=" + firstDifferent + " expected=" + fa[firstDifferent][0] + ":" + (fa[firstDifferent][1] * 1e6).ToString("F4", CultureInfo.InvariantCulture) +
+                            " actual=" + fb[firstDifferent][0] + ":" + (fb[firstDifferent][1] * 1e6).ToString("F4", CultureInfo.InvariantCulture) : ""));
+                    CreateMirrorPartPackage.LogDebug("[BODY71][SURFACE_CHAIN_NO_BOOLEAN] label=" + label + " facesPaired=" + faces +
+                        " volumeRelative=" + (Math.Abs(other - volume) / volume).ToString("E2", CultureInfo.InvariantCulture) +
+                        " edgeSamples=" + samples + " farthestOffSkin_m=" + offSkin.ToString("E2", CultureInfo.InvariantCulture));
+                    if (offSkin <= reach)
+                    {
+                        booleans = true;
+                        evidence = "NO_DIFFERENCE_COMPUTABLE_EDGES_ON_SKIN_PLUS_FACE_PAIRING";
+                        residual = 0;
+                    }
+                    else if (!faces && fa.Count == fb.Count && expected.GetEdgeCount() == actual.GetEdgeCount() && a.Count == b.Count)
+                    {
+                        // Same topology, faces not paired by area (natively 6 mm hole walls of
+                        // 37.72 against 37.91 mm2 after Fold) and no difference computable: the
+                        // two skins are measured against each other, and the difference of the
+                        // two volumes stands in for the difference volume (limits at the end).
+                        skinDeviation = Math.Max(SkinDeviation71(expected, actual, LocalDeviationLimit71 * 10, out skinSamples),
+                            SkinDeviation71(actual, expected, LocalDeviationLimit71 * 10, out skinSamplesBack));
+                        CreateMirrorPartPackage.LogDebug("[BODY71][SURFACE_CHAIN_SKIN] label=" + label + " skinDeviation_m=" + skinDeviation.ToString("E2", CultureInfo.InvariantCulture) +
+                            " samples=" + skinSamples + "/" + skinSamplesBack + " volumeRelative=" + (Math.Abs(other - volume) / volume).ToString("E2", CultureInfo.InvariantCulture) +
+                            " expectedVolume_mm3=" + (volume * 1e9).ToString("F3", CultureInfo.InvariantCulture) + " actualVolume_mm3=" + (other * 1e9).ToString("F3", CultureInfo.InvariantCulture));
+                        if (skinDeviation <= LocalDeviationLimit71)
+                        {
+                            booleans = true;
+                            evidence = "NO_DIFFERENCE_COMPUTABLE_SKIN_DEVIATION_PLUS_VOLUME";
+                            residual = Math.Abs(other - volume);
+                        }
+                    }
+                }
+                else if (missingDone || extraDone)
+                {
+                    // Natively, after Fold, one difference of two near-coincident
+                    // re-folded bodies is computed (slivers) and the other one
+                    // fails inside the kernel. The computed one then counts
+                    // twice, and the bodies must in addition have equal face
+                    // and edge counts, every face paired by surface type and
+                    // area (1e-4), and volumes within 5e-4.
+                    var fa = (expected.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Select(f => new[] { (double)((Surface)f.GetSurface()).Identity(), f.GetArea() }).OrderBy(f => f[1]).ToList();
+                    var fb = (actual.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Select(f => new[] { (double)((Surface)f.GetSurface()).Identity(), f.GetArea() }).OrderBy(f => f[1]).ToList();
+                    bool faces = fa.Count == fb.Count && expected.GetEdgeCount() == actual.GetEdgeCount() &&
+                        Enumerable.Range(0, fa.Count).All(i => Math.Abs(fa[i][1] - fb[i][1]) <= Math.Max(1e-12, fa[i][1] * FaceAreaNoise71(fa[i][0] == fb[i][0] ? fa[i][0] : -1)));
+                    double other = ((double[])actual.GetMassProperties(1.0))[3];
+                    CreateMirrorPartPackage.LogDebug("[BODY71][SURFACE_CHAIN_FACE_LIST] label=" + label + " computedDifference_mm3=" +
+                        ((missingDone ? missing.Bodies : extra.Bodies).Sum(x => ((double[])x.GetMassProperties(1.0))[3]) * 1e9).ToString("F4", CultureInfo.InvariantCulture) +
+                        " pieces=" + string.Join(" ", (missingDone ? missing.Bodies : extra.Bodies).Select(x =>
+                        {
+                            var m = (double[])x.GetMassProperties(1.0);
+                            double skinOfPiece = (x.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Sum(f => f.GetArea());
+                            return "[v_mm3=" + (m[3] * 1e9).ToString("F4", CultureInfo.InvariantCulture) + " at_mm=" + (m[0] * 1e3).ToString("F1", CultureInfo.InvariantCulture) + "," +
+                                (m[1] * 1e3).ToString("F1", CultureInfo.InvariantCulture) + "," + (m[2] * 1e3).ToString("F1", CultureInfo.InvariantCulture) +
+                                " thickness_um=" + (skinOfPiece > 0 ? 2 * m[3] / skinOfPiece * 1e6 : double.NaN).ToString("F3", CultureInfo.InvariantCulture) + "]";
+                        })) +
+                        " expected=" + string.Join(" ", fa.Select(f => f[0] + ":" + (f[1] * 1e6).ToString("F3", CultureInfo.InvariantCulture))) +
+                        " | actual=" + string.Join(" ", fb.Select(f => f[0] + ":" + (f[1] * 1e6).ToString("F3", CultureInfo.InvariantCulture))));
+                    CreateMirrorPartPackage.LogDebug("[BODY71][SURFACE_CHAIN_ONE_SIDED] label=" + label + " missingDone=" + missingDone + " extraDone=" + extraDone +
+                        " facesPaired=" + faces + " faceCounts=" + fa.Count + "/" + fb.Count + " edges=" + expected.GetEdgeCount() + "/" + actual.GetEdgeCount() +
+                        " volumeRelative=" + (Math.Abs(other - volume) / volume).ToString("E2", CultureInfo.InvariantCulture) +
+                        " worstFaceArea=" + (fa.Count == fb.Count && fa.Count > 0 ? Enumerable.Range(0, fa.Count).Max(i => Math.Abs(fa[i][1] - fb[i][1]) / Math.Max(1e-12, fa[i][1])) : double.NaN).ToString("E2", CultureInfo.InvariantCulture));
+                    // Volume cap 5e-4 here: on the re-folded 44 m radius spline faces the
+                    // native mass integration itself moved by 2.2e-4 (and face areas by
+                    // 1e-4) between two bodies whose vertices agree to 1e-13 m.
+                    if (faces && a.Count == b.Count && Math.Abs(other - volume) <= volume * 5e-4)
+                    {
+                        booleans = true;
+                        evidence = "ONE_DIFFERENCE_PLUS_FACE_PAIRING";
+                        residual = 2 * (missingDone ? missing.Bodies : extra.Bodies).Sum(x => ((double[])x.GetMassProperties(1.0))[3]);
+                    }
+                    else if (fa.Count == fb.Count && expected.GetEdgeCount() == actual.GetEdgeCount() && a.Count == b.Count &&
+                        Math.Abs(other - volume) <= volume * 5e-4)
+                    {
+                        // Same topology, a face of another area (natively a 6 mm hole wall of
+                        // 46.87 against 37.86 mm2 after Fold of a Lofted Bend): the faces are
+                        // not paired by area but measured, skin against skin.
+                        skinDeviation = Math.Max(SkinDeviation71(expected, actual, LocalDeviationLimit71 * 10, out skinSamples),
+                            SkinDeviation71(actual, expected, LocalDeviationLimit71 * 10, out skinSamplesBack));
+                        if (skinDeviation <= LocalDeviationLimit71)
+                        {
+                            booleans = true;
+                            evidence = "ONE_DIFFERENCE_PLUS_SKIN_DEVIATION";
+                            residual = 2 * (missingDone ? missing.Bodies : extra.Bodies).Sum(x => ((double[])x.GetMassProperties(1.0))[3]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Corners that do not pair: natively a
+                // Curve Driven Pattern of holes on a 44 m radius sheet gave the mirror
+                // image with eight more corners than the reflected source (edges the
+                // source body has in one piece; volumes equal to 4e-8, skins 1.5e-9 m
+                // apart), 65e-6 m from the nearest source corner and, after a Move
+                // Face, 19.5 mm from it. A corner in the middle of an edge of the other
+                // body says nothing about the shape, so the corners are not compared
+                // here: the two skins are measured against each other - every edge of
+                // either body, its ends included, against the faces of the other - and
+                // the difference of the volumes stands in for the difference volume
+                // (limits at the end). The numbers of faces need not be equal either
+                // (natively the body of an Unfold with 74 against 76 corners and one
+                // face in two pieces): a face missing from one body has edges that lie
+                // off the skin of the other, and that is measured.
+                cornersNotPaired = true;
+                CreateMirrorPartPackage.LogDebug("[BODY71][SURFACE_CHAIN_CORNERS_NOT_PAIRED] label=" + label + " faces=" + expected.GetFaceCount() + "/" + actual.GetFaceCount() +
+                    " edges=" + expected.GetEdgeCount() + "/" + actual.GetEdgeCount() + " vertices=" + a.Count + "/" + b.Count);
+                double other = ((double[])actual.GetMassProperties(1.0))[3];
+                if (Math.Abs(other - volume) <= volume * VolumeShareLimit71)
+                {
+                    skinDeviation = Math.Max(SkinDeviation71(expected, actual, LocalDeviationLimit71 * 10, out skinSamples),
+                        SkinDeviation71(actual, expected, LocalDeviationLimit71 * 10, out skinSamplesBack));
+                    if (skinDeviation <= LocalDeviationLimit71)
+                    {
+                        booleans = true;
+                        evidence = "CORNERS_NOT_PAIRED_SKIN_DEVIATION_PLUS_VOLUME";
+                        residual = Math.Abs(other - volume);
+                    }
+                }
+            }
+            // The difference is judged as a mean thickness over the whole skin of
+            // the body (a thin sheet has little volume, so a volume share alone
+            // says little); a share of the volume is a hard cap. Limits below.
+            double skin = (expected.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Sum(f => f.GetArea());
+            double thickness = skin > 0 ? residual / skin : double.NaN;
+            // Limits 5e-7 m and 5e-4: a natively re-folded 44 m radius sheet with all
+            // vertices equal to 3e-10 m measured 1.01e-7 m and 1.04e-4, still far
+            // inside the micrometre deviation the user accepted for these Parts.
+            bool pass = booleans && volume > 0 && thickness <= MeanDeviationLimit71 && residual <= volume * VolumeShareLimit71 && thickestPiece <= LocalDeviationLimit71;
+            // A piece thicker than 5e-6 m is a local difference, not a sliver: then the two
+            // skins are measured against each other and must stay inside the local limit.
+            if (pass && thickestPiece > 5e-6 && double.IsNaN(skinDeviation))
+                skinDeviation = Math.Max(SkinDeviation71(expected, actual, LocalDeviationLimit71 * 10, out skinSamples),
+                    SkinDeviation71(actual, expected, LocalDeviationLimit71 * 10, out skinSamplesBack));
+            if (pass && !double.IsNaN(skinDeviation)) pass = skinDeviation <= LocalDeviationLimit71;
+            if (pass)
+                LargestAcceptedDeviation71 = Math.Max(LargestAcceptedDeviation71,
+                    Math.Max(cornersNotPaired ? 0 : Math.Max(forward, backward), Math.Max(thickestPiece, double.IsNaN(skinDeviation) ? 0 : skinDeviation)));
+            CreateMirrorPartPackage.LogDebug("[BODY71][SURFACE_CHAIN_RESIDUAL] label=" + label + " vertices=" + a.Count + "/" + b.Count +
+                " meanThickness_m=" + thickness.ToString("E2", CultureInfo.InvariantCulture) +
+                " thickestPiece_m=" + thickestPiece.ToString("E2", CultureInfo.InvariantCulture) +
+                " skinDeviation_m=" + skinDeviation.ToString("E2", CultureInfo.InvariantCulture) + " skinSamples=" + skinSamples + "/" + skinSamplesBack +
+                (skinDeviationAt71 == null ? "" : " farthestAt_mm=" + (skinDeviationAt71[0] * 1e3).ToString("F2", CultureInfo.InvariantCulture) + "," +
+                    (skinDeviationAt71[1] * 1e3).ToString("F2", CultureInfo.InvariantCulture) + "," + (skinDeviationAt71[2] * 1e3).ToString("F2", CultureInfo.InvariantCulture) +
+                    (skinDeviationAt71[4] > 0 ? "(face)" : "(edge)")) +
+                " farthestVertex_m=" + Math.Max(forward, backward).ToString("E2", CultureInfo.InvariantCulture) +
+                " booleans=" + booleans + " residual_mm3=" + (residual * 1e9).ToString("F4", CultureInfo.InvariantCulture) +
+                " relativeVolume=" + (volume > 0 ? residual / volume : double.NaN).ToString("E2", CultureInfo.InvariantCulture) +
+                " evidence=" + evidence + " limits=vertex5E-6,thickness" + MeanDeviationLimit71.ToString("E0", CultureInfo.InvariantCulture) +
+                ",volume" + VolumeShareLimit71.ToString("E0", CultureInfo.InvariantCulture) + ",piece" + LocalDeviationLimit71.ToString("E0", CultureInfo.InvariantCulture) +
+                ",skin" + LocalDeviationLimit71.ToString("E0", CultureInfo.InvariantCulture) + " afterFold=" + FoldReplayed71 + " result=" + (pass ? "PASS" : "FAIL"));
+            return pass;
+        }
+
+        // Farthest sampled point of the skin of one body from the skin of the other:
+        // 33 points on every edge and a 7 x 7 parameter grid on every face, each grid
+        // point taken on the trimmed face itself. Stops at the first point beyond
+        // stopAbove. A face of the other body is only asked when its box is nearer than
+        // the best distance found so far.
+        // Both directions, for a caller that has two bodies with equal corners and
+        // needs to know how far their skins are apart. Kept as the run's accepted
+        // deviation when it is inside the local limit.
+        public static double MeasureSkinDeviation71(Body2 expected, Body2 actual, string label)
+        {
+            skinDeviationAt71 = null;
+            int forward, backward;
+            double deviation = Math.Max(SkinDeviation71(expected, actual, LocalDeviationLimit71 * 10, out forward),
+                SkinDeviation71(actual, expected, LocalDeviationLimit71 * 10, out backward));
+            CreateMirrorPartPackage.LogDebug("[BODY71][SKIN_DEVIATION] label=" + label + " deviation_m=" + deviation.ToString("E2", CultureInfo.InvariantCulture) +
+                " samples=" + forward + "/" + backward + (skinDeviationAt71 == null ? "" : " farthestAt_mm=" +
+                    (skinDeviationAt71[0] * 1e3).ToString("F2", CultureInfo.InvariantCulture) + "," + (skinDeviationAt71[1] * 1e3).ToString("F2", CultureInfo.InvariantCulture) + "," +
+                    (skinDeviationAt71[2] * 1e3).ToString("F2", CultureInfo.InvariantCulture) + (skinDeviationAt71[4] > 0 ? "(face)" : "(edge)")) +
+                " limit_m=" + LocalDeviationLimit71.ToString("E0", CultureInfo.InvariantCulture));
+            if (deviation <= LocalDeviationLimit71) LargestAcceptedDeviation71 = Math.Max(LargestAcceptedDeviation71, deviation);
+            return deviation;
+        }
+
+        // Where the last measurement found its farthest point (model space, metres).
+        private static double[] skinDeviationAt71;
+
+        private static double SkinDeviation71(Body2 from, Body2 to, double stopAbove, out int samples)
+        {
+            // Measured on copies, and the copies are held until the measurement is
+            // over. Thousands of calls go to faces and edges; a temporary body that
+            // nothing refers to any more is released by the runtime in the middle of
+            // such a loop, and its faces with it (natively RPC_E_DISCONNECTED on a
+            // face, once after 35 s and once at the first call).
+            // The same pair of bodies is proved at several checkpoints of a run (candidate,
+            // feature, final, after reopening); one measurement of 6 000 points on a Part
+            // with 45 faces took 3.5 minutes. A pair with the same mass properties,
+            // face and edge counts as a pair already measured in this run is that pair.
+            string key = BodyFingerprint71(from) + "|" + BodyFingerprint71(to) + "|" + stopAbove.ToString("R", CultureInfo.InvariantCulture);
+            Tuple<double, int, double[]> known;
+            double[] previous = skinDeviationAt71;
+            if (!skinDeviations71.TryGetValue(key, out known))
+            {
+                Body2 fromCopy = from.Copy() as Body2 ?? from, toCopy = to.Copy() as Body2 ?? to;
+                skinDeviationAt71 = null;
+                try
+                {
+                    double measured = SkinDeviationOfCopies71(fromCopy, toCopy, stopAbove, out samples);
+                    known = Tuple.Create(measured, samples, skinDeviationAt71);
+                    skinDeviations71[key] = known;
+                }
+                finally { GC.KeepAlive(fromCopy); GC.KeepAlive(toCopy); GC.KeepAlive(from); GC.KeepAlive(to); }
+            }
+            samples = known.Item2;
+            skinDeviationAt71 = previous != null && (known.Item3 == null || previous[3] >= known.Item3[3]) ? previous : known.Item3;
+            return known.Item1;
+        }
+
+        private static readonly Dictionary<string, Tuple<double, int, double[]>> skinDeviations71 =
+            new Dictionary<string, Tuple<double, int, double[]>>(StringComparer.Ordinal);
+
+        // Cleared with the other per-run state when a run captures its source.
+        public static void ResetSkinDeviations71() { skinDeviations71.Clear(); }
+
+        // Eight significant digits: two reflected copies of one body differ in the last
+        // digits of their mass properties (natively no pair repeated at full precision).
+        private static string BodyFingerprint71(Body2 body)
+        {
+            var mass = body.GetMassProperties(1.0) as double[] ?? new double[0];
+            return body.GetFaceCount() + "/" + body.GetEdgeCount() + "/" + string.Join(",", mass.Select(v => v.ToString("G8", CultureInfo.InvariantCulture)));
+        }
+
+        private static double SkinDeviationOfCopies71(Body2 from, Body2 to, double stopAbove, out int samples)
+        {
+            samples = 0;
+            var targets = (to.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Select(f => new KeyValuePair<Face2, double[]>(f, f.GetBox() as double[])).ToList();
+            if (targets.Count == 0 || targets.Any(t => t.Value == null || t.Value.Length < 6)) return double.PositiveInfinity;
+            Func<double[], double> off = p =>
+            {
+                double best = double.PositiveInfinity;
+                foreach (var t in targets.Select(t => new { Face = t.Key, Gap = Math.Sqrt(Enumerable.Range(0, 3).Sum(i =>
+                    {
+                        double d = Math.Max(0, Math.Max(Math.Min(t.Value[i], t.Value[i + 3]) - p[i], p[i] - Math.Max(t.Value[i], t.Value[i + 3])));
+                        return d * d;
+                    })) }).OrderBy(t => t.Gap))
+                {
+                    if (t.Gap >= best || best <= 1e-9) break;
+                    var near = t.Face.GetClosestPointOn(p[0], p[1], p[2]) as double[];
+                    if (near == null || near.Length < 3) continue;
+                    best = Math.Min(best, Math.Sqrt((near[0] - p[0]) * (near[0] - p[0]) + (near[1] - p[1]) * (near[1] - p[1]) + (near[2] - p[2]) * (near[2] - p[2])));
+                }
+                return best;
+            };
+            double worst = 0;
+            foreach (Edge edge in (from.GetEdges() as object[] ?? new object[0]).Cast<Edge>())
+            {
+                var parameters = edge.GetCurveParams2() as double[];
+                if (parameters == null || parameters.Length < 8 || parameters[6] == parameters[7]) return double.PositiveInfinity;
+                for (int i = 0; i <= 32; i++)
+                {
+                    var value = edge.Evaluate2(parameters[6] + (parameters[7] - parameters[6]) * i / 32.0, 0) as double[];
+                    if (value == null || value.Length < 3) return double.PositiveInfinity;
+                    samples++;
+                    double here = off(value);
+                    if (here > worst) { worst = here; if (skinDeviationAt71 == null || here > skinDeviationAt71[3]) skinDeviationAt71 = new[] { value[0], value[1], value[2], here, 0.0 }; }
+                    if (worst > stopAbove) return worst;
+                }
+            }
+            foreach (Face2 face in (from.GetFaces() as object[] ?? new object[0]).Cast<Face2>())
+            {
+                var surface = face.GetSurface() as Surface;
+                var uv = face.GetUVBounds() as double[];
+                if (surface == null || uv == null || uv.Length < 4) return double.PositiveInfinity;
+                for (int i = 1; i <= 7; i++)
+                    for (int j = 1; j <= 7; j++)
+                    {
+                        var raw = surface.Evaluate(uv[0] + (uv[1] - uv[0]) * i / 8.0, uv[2] + (uv[3] - uv[2]) * j / 8.0, 0, 0) as double[];
+                        if (raw == null || raw.Length < 3) continue;
+                        var on = face.GetClosestPointOn(raw[0], raw[1], raw[2]) as double[];
+                        if (on == null || on.Length < 3) continue;
+                        samples++;
+                        double here = off(on);
+                        if (here > worst) { worst = here; if (skinDeviationAt71 == null || here > skinDeviationAt71[3]) skinDeviationAt71 = new[] { on[0], on[1], on[2], here, 1.0 }; }
+                        if (worst > stopAbove) return worst;
+                    }
+            }
+            return samples == 0 ? double.PositiveInfinity : worst;
+        }
+
+        // Reduced proof for two bodies that both carry the accepted self-contact
+        // class, where a Boolean cannot run and Confirm's 1e-10 identity is not
+        // reachable (the native congruence fit itself is only ~1e-7 accurate on
+        // such bodies). ALL of: equal face/edge counts; every vertex matched
+        // one-to-one within 1e-7 m; every face matched one-to-one by surface
+        // type and area (1e-6 relative); congruent in both directions with a
+        // fit that moves no point of the body by more than 1e-6 m; volume
+        // within 1e-4 relative (integration over self-contact is not exact).
+        public static bool ConfirmSelfContact71(Body2 expected, Body2 actual, string label)
+        {
+            const double pointTolerance = 1e-7, fitTolerance = 1e-6;
+            string reason = null;
+            double fit = double.NaN, volumeError = double.NaN;
+            if (expected == null || actual == null || expected.GetFaceCount() != actual.GetFaceCount() ||
+                expected.GetEdgeCount() != actual.GetEdgeCount()) reason = "TOPOLOGY_COUNT";
+            if (reason == null && !BodyAuditPolicy69.SameToleratedSelfContact71(
+                NativeBodyAudit69.Read(expected, label, "SELF_CONTACT_EXPECTED"),
+                NativeBodyAudit69.Read(actual, label, "SELF_CONTACT_ACTUAL"))) reason = "NOT_SELF_CONTACT_CLASS";
+            if (reason == null)
+            {
+                var a = (expected.GetVertices() as object[] ?? new object[0]).Cast<Vertex>().Select(v => v.GetPoint() as double[]).ToList();
+                var b = (actual.GetVertices() as object[] ?? new object[0]).Cast<Vertex>().Select(v => v.GetPoint() as double[]).ToList();
+                if (a.Count != b.Count) reason = "VERTEX_COUNT";
+                foreach (double[] p in a)
+                {
+                    if (reason != null) break;
+                    int index = b.FindIndex(q => Math.Abs(p[0] - q[0]) <= pointTolerance &&
+                        Math.Abs(p[1] - q[1]) <= pointTolerance && Math.Abs(p[2] - q[2]) <= pointTolerance);
+                    if (index < 0) reason = "VERTEX_POSITION"; else b.RemoveAt(index);
+                }
+            }
+            if (reason == null)
+            {
+                // Pair faces by surface type and bounding box, then compare area,
+                // so a mismatch names the face instead of shifting a sorted list.
+                // The self-contact region itself is not well defined: SOLIDWORKS
+                // trims the touching bend faces slightly differently when the
+                // flange is rebuilt (measured ~2e-5 relative with all vertices
+                // coincident). Only faces of the features that own a faulted
+                // face in the native result get the 1e-4 area tolerance; every
+                // other face keeps 1e-6.
+                // Native observation (ks2): the differing faces are every bend
+                // face meeting at the touching corner, including bends that own
+                // no fault and share no vertex with the faulted ones. So, for a
+                // body pair in the accepted self-contact class (re-checked at
+                // the top of this method), curved faces get the 1e-4 area
+                // tolerance. Planar faces keep 1e-6.
+                Func<Body2, bool, List<Tuple<int, double, double[], bool>>> faces = (body, native) =>
+                    (body.GetFaces() as object[] ?? new object[0]).Cast<Face2>().Select(f =>
+                    {
+                        int identity = ((Surface)f.GetSurface()).Identity();
+                        return Tuple.Create(identity, f.GetArea(), f.GetBox() as double[],
+                            native && identity != (int)swSurfaceTypes_e.PLANE_TYPE);
+                    }).ToList();
+                var fa = faces(expected, false); var fb = faces(actual, true);
+                var mismatches = new List<string>();
+                int relaxed = 0;
+                foreach (var face in fa)
+                {
+                    int index = fb.FindIndex(o => o.Item1 == face.Item1 && face.Item3 != null && o.Item3 != null &&
+                        Enumerable.Range(0, 6).All(i => Math.Abs(face.Item3[i] - o.Item3[i]) <= 1e-6));
+                    string box = face.Item3 == null ? "" : string.Join(",", face.Item3.Select(v => (v * 1000).ToString("F3", CultureInfo.InvariantCulture)));
+                    if (index < 0) mismatches.Add("NO_COUNTERPART type=" + face.Item1 + " area_mm2=" + (face.Item2 * 1e6).ToString("F4", CultureInfo.InvariantCulture) + " box_mm=[" + box + "]");
+                    else
+                    {
+                        double areaError = Math.Abs(face.Item2 - fb[index].Item2);
+                        if (areaError > Math.Max(1e-12, face.Item2 * 1e-6) && fb[index].Item4 && areaError <= face.Item2 * 1e-4)
+                        {
+                            relaxed++;
+                            CreateMirrorPartPackage.LogDebug("[BODY71][CONTACT_FACE_AREA] label=" + label + " type=" + face.Item1 +
+                                " expected_mm2=" + (face.Item2 * 1e6).ToString("F4", CultureInfo.InvariantCulture) +
+                                " actual_mm2=" + (fb[index].Item2 * 1e6).ToString("F4", CultureInfo.InvariantCulture) +
+                                " relative=" + (areaError / face.Item2).ToString("E2", CultureInfo.InvariantCulture) + " tolerance=1E-4 curvedFaceOfSelfContactBody=True");
+                        }
+                        else if (areaError > Math.Max(1e-12, face.Item2 * 1e-6))
+                            mismatches.Add("AREA type=" + face.Item1 + " expected_mm2=" + (face.Item2 * 1e6).ToString("F4", CultureInfo.InvariantCulture) +
+                                " actual_mm2=" + (fb[index].Item2 * 1e6).ToString("F4", CultureInfo.InvariantCulture) + " box_mm=[" + box + "]");
+                        fb.RemoveAt(index);
+                    }
+                }
+                foreach (var extra in fb)
+                    mismatches.Add("EXTRA_ACTUAL type=" + extra.Item1 + " area_mm2=" + (extra.Item2 * 1e6).ToString("F4", CultureInfo.InvariantCulture) +
+                        " box_mm=[" + (extra.Item3 == null ? "" : string.Join(",", extra.Item3.Select(v => (v * 1000).ToString("F3", CultureInfo.InvariantCulture)))) + "]");
+                foreach (string mismatch in mismatches.Take(12))
+                    CreateMirrorPartPackage.LogDebug("[BODY71][FACE_MISMATCH] label=" + label + " " + mismatch);
+                if (mismatches.Count > 0) reason = "FACE_TYPE_OR_AREA count=" + mismatches.Count;
+            }
+            if (reason == null)
+            {
+                MathTransform forward, backward;
+                bool forwardShape = expected.GetCoincidenceTransform2(actual, out forward);
+                bool backwardShape = actual.GetCoincidenceTransform2(expected, out backward);
+                double[] box = expected.GetBodyBox() as double[];
+                double reach = box == null ? double.NaN : Math.Sqrt(Enumerable.Range(0, 3).Sum(i =>
+                    Math.Pow(Math.Max(Math.Abs(box[i]), Math.Abs(box[i + 3])), 2)));
+                fit = Math.Max(FitDisplacement71(forwardShape ? forward : null, reach),
+                    FitDisplacement71(backwardShape ? backward : null, reach));
+                if (!(fit <= fitTolerance)) reason = "CONGRUENCE_FIT";
+            }
+            if (reason == null)
+            {
+                double va = ((double[])expected.GetMassProperties(1.0))[3], vb = ((double[])actual.GetMassProperties(1.0))[3];
+                volumeError = Math.Abs(va - vb) / Math.Abs(va);
+                if (!(volumeError <= 1e-4)) reason = "VOLUME";
+            }
+            CreateMirrorPartPackage.LogDebug("[BODY71][REDUCED_PROOF] label=" + label +
+                " boolean=SKIPPED_SELF_CONTACT vertices_m=" + pointTolerance.ToString("R", CultureInfo.InvariantCulture) +
+                " congruenceFit_m=" + fit.ToString("R", CultureInfo.InvariantCulture) +
+                " volumeRelativeError=" + volumeError.ToString("R", CultureInfo.InvariantCulture) +
+                " result=" + (reason == null ? "PASS" : "FAIL reason=" + reason));
+            return reason == null;
+        }
+
+        // Upper bound of how far the congruence fit moves any point within
+        // `reach` of the origin: |translation| + ||scale*R - I|| * reach.
+        private static double FitDisplacement71(MathTransform transform, double reach)
+        {
+            double[] data = transform == null ? null : transform.ArrayData as double[];
+            if (data == null || data.Length != 16 || data.Any(v => double.IsNaN(v) || double.IsInfinity(v))) return double.NaN;
+            double rotation = 0;
+            for (int i = 0; i < 9; i++)
+                rotation += Math.Pow(data[i] * data[12] - (i == 0 || i == 4 || i == 8 ? 1.0 : 0.0), 2);
+            return Math.Sqrt(data[9] * data[9] + data[10] * data[10] + data[11] * data[11]) + Math.Sqrt(rotation) * reach;
+        }
+
+        public static bool ConfirmUnavailableBoolean(Body2 expected, Body2 actual,
+            BodyBooleanResult missing, BodyBooleanResult extra, string label)
+        {
+            if (missing != null && extra != null && missing.VerificationUnavailable69 && extra.VerificationUnavailable69 &&
+                missing.ToleratedSelfContact71 && extra.ToleratedSelfContact71)
+            {
+                // Both bodies carry the same accepted self-contact class, so a
+                // Boolean was never attempted. Congruence at identity, in both
+                // directions, with equal topology counts is the whole proof.
+                return ConfirmSelfContact71(expected, actual, label);
+            }
+            if (missing != null && extra != null && (missing.VerificationUnavailable69 || extra.VerificationUnavailable69))
+            {
+                CreateMirrorPartPackage.LogDebug("[COINCIDENCE69][SKIPPED] label=" + label +
+                    " reason=INVALID_BREP_INPUTS result=UNPROVED failureAcceptedAsEmpty=False");
+                return false;
+            }
+            return missing != null && extra != null && CanRequest(
+                missing.Success, missing.Bodies == null ? -1 : missing.Bodies.Count, missing.ErrorCode,
+                extra.Success, extra.Bodies == null ? -1 : extra.Bodies.Count, extra.ErrorCode) &&
+                Confirm(expected, actual, label);
+        }
+    }
+
     public sealed class ExtrudeCutRecipe44
     {
         public double[] SketchNormal;
@@ -398,7 +1288,7 @@ namespace ADDIN.Helpers
 
         public static void ApplyReflectedCut44(ModelDoc2 model, Feature feature, Feature profile,
             CutAuditSnapshot21 audit, PlaneData plane, double? fallbackDepth54 = null,
-            bool? reverseOverride54 = null)
+            bool? reverseOverride54 = null, bool? flipOverride71 = null)
         {
             if (audit == null || audit.Recipe44 == null || !string.IsNullOrEmpty(audit.CaptureError))
                 throw new InvalidOperationException("CUT44: complete source recipe required. " + (audit == null ? "" : audit.CaptureError));
@@ -426,7 +1316,7 @@ namespace ADDIN.Helpers
                 bool directionOpposed = CutOrientation44.Opposed(CutOrientation44.Reflect(recipe.SourceDirection, plane.Normal), targetDirection);
                 bool reverse = reverseOverride54 ?? (audit.ReverseDirection50 ^ directionOpposed);
                 // det(local 2D reflection) = -dot(targetNormal, reflected sourceNormal).
-                bool flip = audit.FlipSideToCut50 ^ (audit.ProfileKind50 == "OPEN" && !normalOpposed);
+                bool flip = flipOverride71 ?? (audit.FlipSideToCut50 ^ (audit.ProfileKind50 == "OPEN" && !normalOpposed));
                 if (dir1 != null || dir2 != null) d.SetDirectionReference(dir1, dir2);
                 d.ReverseDirection = reverse;
                 d.FlipSideToCut = flip;
@@ -454,6 +1344,20 @@ namespace ADDIN.Helpers
                     " endConditionPreserved=" + !fallbackDepth54.HasValue +
                     (fallbackDepth54.HasValue ? " fallback=UpToSurfaceToBlind depth_m=" + fallbackDepth54.Value.ToString("R") : ""));
                 committed = feature.ModifyDefinition(d, model, null);
+                // A cut made from chosen regions of its sketch has no side to flip, even
+                // when that sketch also holds open figures and counts as an open profile
+                // (natively seven slot regions between two open arcs). When the flip
+                // derived for an open profile is refused there, the source value stays.
+                if (!committed && !flipOverride71.HasValue && flip != audit.FlipSideToCut50 &&
+                    audit.SelectedContours71 != null && audit.SelectedContours71.Any(c => c != null && c.Region))
+                {
+                    d.ReleaseSelectionAccess();
+                    access = false;
+                    CreateMirrorPartPackage.LogDebug("[CUT71][REGION_CUT_FLIP_REFUSED] feature=" + feature.Name + " derivedFlip=" + flip +
+                        " sourceFlip=" + audit.FlipSideToCut50 + " retry=SOURCE_FLIP");
+                    ApplyReflectedCut44(model, feature, profile, audit, plane, fallbackDepth54, reverseOverride54, audit.FlipSideToCut50);
+                    return;
+                }
                 if (!committed) throw new InvalidOperationException("CUT44: atomic ModifyDefinition rejected; no ThroughAll fallback. feature=" + feature.Name);
                 var read = feature.GetDefinition() as IExtrudeFeatureData2;
                 if (read == null) throw new InvalidOperationException("CUT44: committed definition unavailable.");

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Windows.Forms;
@@ -7,7 +7,7 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    public class DimKichThuocLo
+    public partial class DimKichThuocLo
     {
         private const string CenterMarkNamePrefix = "ADDIN_DIM_HOLE_CENTER_";
 
@@ -49,12 +49,16 @@ namespace ADDIN.Commands
             public HoleInfo Representative;
             public Feature SeedFeature;
             public int PatternCount;
+            public bool LinearPattern;
+            public Feature PatternFeature;
         }
 
         private class PatternSeedInfo
         {
             public Feature SeedFeature;
             public int PatternCount;
+            public bool LinearPattern;
+            public Feature PatternFeature;
             public double CenterX;
             public double CenterY;
             public double Radius;
@@ -165,6 +169,7 @@ namespace ADDIN.Commands
                 int diameterCount = 0;
                 int positionCount = 0;
                 int pitchCount = 0;
+                var dimensionedLinearPatterns = new HashSet<Feature>();
                 for (int groupIndex = 0; groupIndex < layouts.Count; groupIndex++)
                 {
                     HoleLayout layout = layouts[groupIndex];
@@ -180,8 +185,12 @@ namespace ADDIN.Commands
                         CreateHolePositionDimension(model, view, hole, layout))
                         positionCount++;
 
-                    if (CreatePatternPitchDimension(model, view, layout, bounds, holeGroups))
+                    if ((!group.LinearPattern || !dimensionedLinearPatterns.Contains(group.PatternFeature)) &&
+                        CreatePatternPitchDimension(model, view, layout, bounds, holeGroups))
+                    {
                         pitchCount++;
+                        if (group.LinearPattern) dimensionedLinearPatterns.Add(group.PatternFeature);
+                    }
                 }
 
                 model.ClearSelection2(true);
@@ -1428,7 +1437,13 @@ namespace ADDIN.Commands
                     feature != null;
                     feature = feature.GetNextFeature() as Feature)
                 {
-                    if (!string.Equals(SafeFeatureTypeName(feature), "CurvePattern", StringComparison.OrdinalIgnoreCase))
+                    string patternType = SafeFeatureTypeName(feature);
+                    if (string.Equals(patternType, "LPattern", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CollectLinearPatternSeeds(result, feature, mathUtil, viewTransform);
+                        continue;
+                    }
+                    if (!string.Equals(patternType, "CurvePattern", StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     ICurveDrivenPatternFeatureData data = feature.GetDefinition() as ICurveDrivenPatternFeatureData;
@@ -1473,6 +1488,69 @@ namespace ADDIN.Commands
 
             Debug.WriteLine("[DIM HOLE SEED] targets=" + result.Count);
             return result;
+        }
+
+        private void CollectLinearPatternSeeds(
+            List<PatternSeedInfo> result,
+            Feature pattern,
+            MathUtility mathUtil,
+            MathTransform viewTransform)
+        {
+            try
+            {
+                var data = pattern.GetDefinition() as ILinearPatternFeatureData;
+                if (data == null) return;
+                int count = Math.Max(data.D1TotalInstances, data.D2TotalInstances);
+                if (count <= 1) return;
+                // Read the feature array without AccessSelections: rolling back the
+                // referenced Part would invalidate the visible Drawing edges.
+                Array features = data.PatternFeatureArray as Array;
+                if (features == null) return;
+                foreach (object item in features)
+                {
+                    Feature seedFeature = item as Feature;
+                    if (seedFeature == null) continue;
+                    bool foundRoundSeed = false;
+                    Array faces = seedFeature.GetFaces() as Array;
+                    if (faces == null) continue;
+                    foreach (object faceItem in faces)
+                    {
+                        Face2 face = faceItem as Face2;
+                        Surface surface = face?.GetSurface() as Surface;
+                        if (surface == null || !surface.IsCylinder() || !HasFullCircularEdge(face)) continue;
+                        double[] cylinder = ConvertToDoubleArray(surface.CylinderParams);
+                        if (cylinder == null || cylinder.Length < 7) continue;
+                        double[] center = TransformPoint(mathUtil, viewTransform, new[] { cylinder[0], cylinder[1], cylinder[2] });
+                        double radius = Math.Abs(cylinder[6]);
+                        if (!IsPoint(center) || radius <= 0) continue;
+                        // One cut can contain several independent round holes.
+                        // Full-circle edges distinguish them from the ends of a slot.
+                        AddUniquePatternSeed(result, new PatternSeedInfo {
+                            SeedFeature = seedFeature, PatternCount = count, LinearPattern = true, PatternFeature = pattern,
+                            CenterX = center[0], CenterY = center[1], Radius = radius
+                        });
+                        foundRoundSeed = true;
+                    }
+                    if (!foundRoundSeed)
+                    {
+                        var seed = CreatePatternSeedInfo(seedFeature, count, mathUtil, viewTransform);
+                        if (seed != null) { seed.LinearPattern = true; seed.PatternFeature = pattern; AddUniquePatternSeed(result, seed); }
+                    }
+                }
+            }
+            catch (Exception ex) { Debug.WriteLine("[DIM HOLE SEED] linear read failed: " + ex.Message); }
+        }
+
+        private bool HasFullCircularEdge(Face2 face)
+        {
+            Array edges = face.GetEdges() as Array;
+            if (edges == null) return false;
+            foreach (object item in edges)
+            {
+                var curve = (item as Edge)?.GetCurve() as Curve;
+                if (curve != null && curve.IsCircle() && IsFullCircle(curve)) return true;
+            }
+            return false;
         }
 
         private PatternSeedInfo CreatePatternSeedInfo(
@@ -1606,9 +1684,9 @@ namespace ADDIN.Commands
         {
             foreach (PatternSeedInfo seed in seeds)
             {
-                if (ReferenceEquals(seed.SeedFeature, candidate.SeedFeature) ||
-                    (Distance(seed.CenterX, seed.CenterY, candidate.CenterX, candidate.CenterY) < 0.00002 &&
-                    Math.Abs(seed.Radius - candidate.Radius) < 0.00002))
+                if (seed.IsSlot == candidate.IsSlot &&
+                    Distance(seed.CenterX, seed.CenterY, candidate.CenterX, candidate.CenterY) < 0.00002 &&
+                    Math.Abs(seed.Radius - candidate.Radius) < 0.00002)
                     return;
             }
 
@@ -1655,7 +1733,9 @@ namespace ADDIN.Commands
 
                 bestGroup.Representative = bestHole;
                 bestGroup.SeedFeature = seed.SeedFeature;
-                bestGroup.PatternCount = seed.PatternCount;
+                bestGroup.LinearPattern = seed.LinearPattern;
+                bestGroup.PatternFeature = seed.PatternFeature;
+                bestGroup.PatternCount = seed.LinearPattern ? bestGroup.Holes.Count : seed.PatternCount;
                 assigned.Add(bestGroup);
                 Debug.WriteLine("[DIM HOLE SEED] mapped feature=" + SafeFeatureName(seed.SeedFeature) +
                     " -> diaMm=" + (GetComparableRadius(bestHole) * 2000.0).ToString("0.###") +
@@ -1768,7 +1848,7 @@ namespace ADDIN.Commands
                 double contourY = layout.Contour != null
                     ? layout.Contour.MidY
                     : hole.CenterY;
-                double verticalOffset = 0.007 + lane * 0.005;
+                double verticalOffset = nativeCalloutOffsetM + lane * nativeLaneStepM;
                 layout.CalloutY = contourY + (layout.Above ? verticalOffset : -verticalOffset);
 
                 if (layout.Above)
@@ -2386,7 +2466,9 @@ namespace ADDIN.Commands
                 if (group == null || group.Holes == null)
                     continue;
 
-                if (!ReferenceEquals(group, seedGroup) && group.SeedFeature != null)
+                // A nearby parallel row belongs to another seed in the same cut,
+                // not to this row's linear pitch (e.g. 20 mm versus 300 mm).
+                if (!ReferenceEquals(group, seedGroup) && (seedGroup.LinearPattern || group.SeedFeature != null))
                     continue;
 
                 foreach (HoleInfo candidate in group.Holes)

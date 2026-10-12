@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -20,6 +21,19 @@ namespace ADDIN.Commands
         private readonly ProgressBar progressBar;
         private readonly Control invoker;
         private HashSet<int> pendingCheckboxRows;
+        private bool pendingDragCheckboxGroup;
+        private bool dragEventsConfigured;
+        private bool rowDragActive;
+        private bool rowDragMoved;
+        private bool dragStartsAtCheckbox;
+        private bool sweepCheckedValue;
+        private int dragAnchorRow = -1;
+        private int lastSweepRow = -1;
+        private int checkboxGestureVersion;
+        private Point dragStartPoint;
+        private Point dragMousePoint;
+        private HashSet<DataGridViewRow> completedDragRows;
+        private readonly HashSet<DataGridViewRow> sweptCheckboxRows = new HashSet<DataGridViewRow>();
         private bool cancelRequested;
         private bool checkInProgress;
         private KetQuaSoSanhDfTk cachedDfTkResult;
@@ -47,18 +61,20 @@ namespace ADDIN.Commands
         {
             gridBom.MultiSelect = true;
             gridBom.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            ConfigureDragSelection();
             ConfigureGridForContext(BomCommandContext.None);
             ResetProgress();
         }
 
         public void LoadBom(Func<bool> isCancellationRequested = null)
         {
+            ResetDragSelection();
             InvalidateDfTkCache();
             LoadedBomContext = BomCommandContext.None;
             ConfigureGridForContext(BomCommandContext.None);
             if (bomLoader == null)
             {
-                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                lblStatus.Text = "Chưa kết nối SOLIDWORKS.";
                 return;
             }
 
@@ -66,7 +82,7 @@ namespace ADDIN.Commands
 
             if (swTable == null)
             {
-                lblStatus.Text = "Khong tim thay Custom BOM. Hay chon bang BOM trong SOLIDWORKS.";
+                lblStatus.Text = "Không tìm thấy bảng BOM. Chọn bảng BOM trong bản vẽ rồi bấm Cập nhật.";
                 return;
             }
 
@@ -80,13 +96,14 @@ namespace ADDIN.Commands
                 bomLoader.LoadBOMTableToGrid(gridBom, swTable, isCancellationRequested);
                 if (isCancellationRequested != null && isCancellationRequested())
                 {
-                    lblStatus.Text = "Da huy CAP NHAT BOM.";
+                    lblStatus.Text = "Đã dừng Cập nhật BOM.";
                     return;
                 }
 
                 chkSelectAll.Checked = true;
                 SetAllChecked(true);
                 SortGridByBuhinNoAscending();
+                AutoFitBomGrid();
             }
             finally
             {
@@ -95,8 +112,8 @@ namespace ADDIN.Commands
 
             string bomLabel = LoadedBomContext == BomCommandContext.Unit
                 ? "BOM UNIT"
-                : "BOM chi tiet";
-            lblStatus.Text = "Da load " + bomLabel + ": " + gridBom.Rows.Count + " dong";
+                : "BOM chi tiết";
+            lblStatus.Text = "Đã nạp " + bomLabel + ": " + gridBom.Rows.Count + " dòng";
         }
 
         private void SortGridByBuhinNoAscending()
@@ -134,11 +151,12 @@ namespace ADDIN.Commands
 
         public void ClearBom()
         {
+            ResetDragSelection();
             InvalidateDfTkCache();
             bomLoader?.ClearBomGrid(gridBom);
             LoadedBomContext = BomCommandContext.None;
             ConfigureGridForContext(BomCommandContext.None);
-            lblStatus.Text = "Da xoa BOM";
+            lblStatus.Text = "Đã xóa bảng BOM.";
         }
 
         private void ConfigureGridForContext(BomCommandContext context)
@@ -147,17 +165,20 @@ namespace ADDIN.Commands
                 return;
 
             bool isUnit = context == BomCommandContext.Unit;
-            gridBom.Columns[1].HeaderText = "部品番号";
+            gridBom.Columns[1].HeaderText = "部品\n番号";
             gridBom.Columns[2].HeaderText = isUnit ? "合番" : "材質";
             gridBom.Columns[2].Visible = true;
             gridBom.Columns[3].HeaderText = "板厚";
             gridBom.Columns[3].Visible = !isUnit;
             gridBom.Columns[4].HeaderText = "数量";
             gridBom.Columns[5].HeaderText = "部品ファイル名";
+
+            UI.GridStyler.ConfigureColumns(gridBom);
         }
 
         public void SetAllChecked(bool isChecked)
         {
+            ResetDragSelection();
             foreach (DataGridViewRow row in gridBom.Rows)
             {
                 if (row.IsNewRow)
@@ -175,55 +196,193 @@ namespace ADDIN.Commands
                 gridBom.CommitEdit(DataGridViewDataErrorContexts.Commit);
         }
 
+        private void ConfigureDragSelection()
+        {
+            if (dragEventsConfigured) return;
+            dragEventsConfigured = true;
+            gridBom.MouseDown += GridBom_MouseDown;
+            gridBom.MouseMove += GridBom_MouseMove;
+            gridBom.MouseUp += GridBom_MouseUp;
+            gridBom.MouseCaptureChanged += GridBom_MouseCaptureChanged;
+            gridBom.Scroll += GridBom_Scroll;
+            gridBom.RowsRemoved += (sender, args) => ResetDragSelection();
+            gridBom.Sorted += (sender, args) => ResetDragSelection();
+        }
+
+        private void GridBom_MouseDown(object sender, MouseEventArgs e)
+        {
+            rowDragActive = false;
+            rowDragMoved = false;
+            sweptCheckboxRows.Clear();
+            checkboxGestureVersion++;
+            if (e.Button != MouseButtons.Left) return;
+            DataGridView.HitTestInfo hit = gridBom.HitTest(e.X, e.Y);
+            if (hit.Type != DataGridViewHitTestType.Cell || !IsBomRow(hit.RowIndex))
+            {
+                completedDragRows = null;
+                return;
+            }
+            dragStartsAtCheckbox = hit.ColumnIndex == 0;
+            if (!dragStartsAtCheckbox) completedDragRows = null;
+            rowDragActive = true;
+            dragAnchorRow = lastSweepRow = hit.RowIndex;
+            dragStartPoint = dragMousePoint = e.Location;
+            sweepCheckedValue = !Convert.ToBoolean(gridBom.Rows[hit.RowIndex].Cells[0].Value ?? false);
+        }
+
+        private void GridBom_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!rowDragActive) return;
+            if ((e.Button & MouseButtons.Left) == MouseButtons.None)
+            {
+                FinishRowDrag();
+                return;
+            }
+            dragMousePoint = e.Location;
+            ContinueRowDrag();
+        }
+
+        private void GridBom_Scroll(object sender, ScrollEventArgs e)
+        {
+            if (rowDragActive) ContinueRowDrag();
+        }
+
+        private void ContinueRowDrag()
+        {
+            if (dragMousePoint.X < 0 || dragMousePoint.X >= gridBom.ClientSize.Width) return;
+            Size threshold = SystemInformation.DragSize;
+            Rectangle startArea = new Rectangle(dragStartPoint.X - threshold.Width / 2,
+                dragStartPoint.Y - threshold.Height / 2, threshold.Width, threshold.Height);
+            if (!rowDragMoved && startArea.Contains(dragMousePoint)) return;
+            int rowIndex = gridBom.HitTest(dragMousePoint.X, dragMousePoint.Y).RowIndex;
+            // DataGridView handles capture and edge scrolling. Follow the visible
+            // boundary row when the pointer has moved above or below its cells.
+            if (rowIndex < 0 && gridBom.FirstDisplayedScrollingRowIndex >= 0)
+            {
+                int first = gridBom.FirstDisplayedScrollingRowIndex;
+                Rectangle bounds = gridBom.GetRowDisplayRectangle(first, false);
+                if (dragMousePoint.Y < bounds.Top) rowIndex = first;
+                else
+                {
+                    int last = first;
+                    for (int i = first; i < gridBom.Rows.Count; i++)
+                    {
+                        if (gridBom.Rows[i].Displayed) last = i;
+                    }
+                    int bottom = Math.Min(gridBom.ClientSize.Height,
+                        gridBom.GetRowDisplayRectangle(last, false).Bottom);
+                    if (dragMousePoint.Y >= bottom) rowIndex = last;
+                }
+            }
+            if (!IsBomRow(rowIndex) || !IsBomRow(dragAnchorRow)) return;
+            if (!rowDragMoved && rowIndex == dragAnchorRow) return;
+            rowDragMoved = true;
+            if (!dragStartsAtCheckbox) return;
+            pendingCheckboxRows = null;
+            pendingDragCheckboxGroup = false;
+            gridBom.CancelEdit();
+            for (int i = Math.Min(lastSweepRow, rowIndex); i <= Math.Max(lastSweepRow, rowIndex); i++)
+            {
+                if (!IsBomRow(i) || !gridBom.Rows[i].Visible) continue;
+                DataGridViewRow row = gridBom.Rows[i];
+                sweptCheckboxRows.Add(row);
+                row.Cells[0].Value = sweepCheckedValue;
+            }
+            lastSweepRow = rowIndex;
+            gridBom.EndEdit();
+        }
+
+        private bool IsBomRow(int index)
+        {
+            return index >= 0 && index < gridBom.Rows.Count && !gridBom.Rows[index].IsNewRow;
+        }
+
+        private void GridBom_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left) FinishRowDrag();
+        }
+
+        private void GridBom_MouseCaptureChanged(object sender, EventArgs e)
+        {
+            if (!gridBom.Capture) FinishRowDrag();
+        }
+
+        private void FinishRowDrag()
+        {
+            if (!rowDragActive) return;
+            if (rowDragMoved)
+            {
+                // Painting checkboxes finishes its own operation. Only a drag
+                // on the data cells prepares a later checkbox group click.
+                completedDragRows = dragStartsAtCheckbox ? null : new HashSet<DataGridViewRow>(
+                    GetSelectedRowIndexes().Select(index => gridBom.Rows[index]));
+                if (completedDragRows != null && completedDragRows.Count < 2) completedDragRows = null;
+            }
+            rowDragActive = false;
+            rowDragMoved = false;
+        }
+
+        private void ResetDragSelection()
+        {
+            rowDragActive = rowDragMoved = pendingDragCheckboxGroup = false;
+            completedDragRows = null;
+            pendingCheckboxRows = null;
+            sweptCheckboxRows.Clear();
+            checkboxGestureVersion++;
+        }
+
         public void BeginCheckboxSelection(int rowIndex, int columnIndex)
         {
-            if (rowIndex < 0 || columnIndex != 0)
-                return;
-
+            pendingCheckboxRows = null;
+            pendingDragCheckboxGroup = false;
+            sweptCheckboxRows.Clear();
+            checkboxGestureVersion++;
+            if (!IsBomRow(rowIndex) || columnIndex != 0) return;
+            HashSet<int> selectedIndexes = GetSelectedRowIndexes();
+            pendingDragCheckboxGroup = completedDragRows != null &&
+                completedDragRows.Contains(gridBom.Rows[rowIndex]) &&
+                completedDragRows.SetEquals(selectedIndexes.Select(index => gridBom.Rows[index]));
             bool modifierSelectionRequested =
                 (Control.ModifierKeys & (Keys.Control | Keys.Shift)) != Keys.None;
-            bool selectedRegionExists =
-                gridBom.SelectedCells.Count > 1 || gridBom.SelectedRows.Count > 1;
-
-            // A normal click must affect only the checkbox under the mouse.
-            // A highlighted region, or Ctrl/Shift, intentionally applies the
-            // checkbox value to every row represented by the selection.
-            pendingCheckboxRows = modifierSelectionRequested || selectedRegionExists
-                ? GetSelectedRowIndexes()
-                : new HashSet<int>();
+            // A deliberate row drag also requests a group change. An ordinary
+            // click still changes one checkbox, regardless of stale highlights.
+            pendingCheckboxRows = modifierSelectionRequested || pendingDragCheckboxGroup
+                ? selectedIndexes : new HashSet<int>();
             pendingCheckboxRows.Add(rowIndex);
         }
 
         public void ApplyCheckboxSelection(int rowIndex, int columnIndex)
         {
-            if (rowIndex < 0 || columnIndex != 0)
-                return;
-
-            HashSet<int> rowIndexes = pendingCheckboxRows;
-            if (rowIndexes == null || rowIndexes.Count == 0)
-            {
-                rowIndexes = new HashSet<int>();
-                rowIndexes.Add(rowIndex);
-            }
-
+            if (!IsBomRow(rowIndex) || columnIndex != 0) return;
+            CommitCurrentCellIfDirty();
+            DataGridViewRow target = gridBom.Rows[rowIndex];
+            bool swept = sweptCheckboxRows.Count > 0;
+            HashSet<int> indexes = pendingCheckboxRows;
+            bool restoreDragSelection = pendingDragCheckboxGroup;
+            int gestureVersion = checkboxGestureVersion;
+            pendingCheckboxRows = null;
+            pendingDragCheckboxGroup = false;
+            if (indexes == null || indexes.Count == 0) indexes = new HashSet<int> { rowIndex };
+            DataGridViewRow[] rows = swept ? sweptCheckboxRows.ToArray() :
+                indexes.Where(IsBomRow).Select(index => gridBom.Rows[index]).ToArray();
+            bool newValue = swept ? sweepCheckedValue : Convert.ToBoolean(target.Cells[0].Value ?? false);
+            if (invoker.IsDisposed || invoker.Disposing || !invoker.IsHandleCreated) return;
             invoker.BeginInvoke(new Action(() =>
             {
-                bool newValue = Convert.ToBoolean(gridBom.Rows[rowIndex].Cells[0].Value ?? false);
-
-                foreach (int index in rowIndexes)
+                if (gridBom.IsDisposed || gridBom.Disposing || target.DataGridView != gridBom) return;
+                foreach (DataGridViewRow row in rows)
                 {
-                    if (index < 0 || index >= gridBom.Rows.Count)
-                        continue;
-
-                    DataGridViewRow row = gridBom.Rows[index];
-                    if (row.IsNewRow)
-                        continue;
-
-                    row.Cells[0].Value = newValue;
+                    if (row.DataGridView == gridBom && !row.IsNewRow) row.Cells[0].Value = newValue;
                 }
-
-                pendingCheckboxRows = null;
                 gridBom.EndEdit();
+                if (restoreDragSelection && gestureVersion == checkboxGestureVersion)
+                {
+                    gridBom.ClearSelection();
+                    foreach (DataGridViewRow row in rows)
+                    {
+                        if (row.DataGridView == gridBom && !row.IsNewRow) row.Selected = true;
+                    }
+                }
             }));
         }
 
@@ -232,20 +391,29 @@ namespace ADDIN.Commands
             if (e.KeyCode != Keys.Space || gridBom.SelectedCells.Count == 0)
                 return;
 
+            rowDragActive = rowDragMoved = pendingDragCheckboxGroup = false;
+            pendingCheckboxRows = null;
+            sweptCheckboxRows.Clear();
+            checkboxGestureVersion++;
             bool check = !AreAllSelectedRowsChecked();
             SetSelectedRowsChecked(check);
             e.Handled = true;
+            e.SuppressKeyPress = true;
         }
 
         public void AutoFitBomGrid()
         {
+            if (gridBom == null || gridBom.Columns.Count < 6)
+                return;
+
+            UI.GridStyler.ConfigureColumns(gridBom);
         }
 
         public bool CheckDfTk()
         {
             if (swApp == null)
             {
-                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                lblStatus.Text = "Chưa kết nối SOLIDWORKS.";
                 return false;
             }
 
@@ -275,7 +443,7 @@ namespace ADDIN.Commands
         {
             if (swApp == null)
             {
-                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                lblStatus.Text = "Chưa kết nối SOLIDWORKS.";
                 return;
             }
 
@@ -302,7 +470,7 @@ namespace ADDIN.Commands
         {
             if (swApp == null)
             {
-                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                lblStatus.Text = "Chưa kết nối SOLIDWORKS.";
                 return;
             }
 
@@ -332,7 +500,7 @@ namespace ADDIN.Commands
         {
             if (swApp == null)
             {
-                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                lblStatus.Text = "Chưa kết nối SOLIDWORKS.";
                 return;
             }
 
@@ -367,7 +535,7 @@ namespace ADDIN.Commands
         {
             if (swApp == null)
             {
-                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                lblStatus.Text = "Chưa kết nối SOLIDWORKS.";
                 return;
             }
 
@@ -404,7 +572,7 @@ namespace ADDIN.Commands
         {
             if (swApp == null)
             {
-                lblStatus.Text = "Chua ket noi SOLIDWORKS.";
+                lblStatus.Text = "Chưa kết nối SOLIDWORKS.";
                 return;
             }
             if (options == null)
@@ -425,7 +593,7 @@ namespace ADDIN.Commands
                 {
                     currentStep++;
                     lblStatus.Text = "CHECK URA/KEGAKI " + currentStep + "/" + totalSteps
-                        + ": dang kiem tra \u30A6\u30E9\u8868...";
+                        + ": đang kiểm tra \u30A6\u30E9\u8868...";
                     combined.UraOmote = new CheckUraOmoteRunner(swApp, gridBom)
                         .Run(BeginProgress, UpdateProgress, IsCancelRequested);
                 }
@@ -434,7 +602,7 @@ namespace ADDIN.Commands
                 {
                     currentStep++;
                     lblStatus.Text = "CHECK URA/KEGAKI " + currentStep + "/" + totalSteps
-                        + ": dang kiem tra KEGAKI...";
+                        + ": đang kiểm tra KEGAKI...";
                     combined.Kegaki = new CheckKegakiRunner(swApp, gridBom)
                         .Run(BeginProgress, UpdateProgress, IsCancelRequested);
                 }
@@ -450,7 +618,7 @@ namespace ADDIN.Commands
 
             if (combined.Canceled || IsCancelRequested())
             {
-                lblStatus.Text = "Da huy CHECK URA/KEGAKI.";
+                lblStatus.Text = "Đã dừng CHECK URA/KEGAKI.";
                 return;
             }
 
@@ -463,12 +631,12 @@ namespace ADDIN.Commands
                 checkedCount = Math.Max(checkedCount, combined.Kegaki.CheckedCount);
             if (checkedCount == 0)
             {
-                lblStatus.Text = "Chua chon chi tiet nao de CHECK URA/KEGAKI.";
+                lblStatus.Text = "Chưa tick chi tiết nào để CHECK URA/KEGAKI.";
                 return;
             }
 
             ExcelCombinedCheckExporter.Export(combined, gridBom);
-            lblStatus.Text = "CHECK URA/KEGAKI xong. Da xuat Excel gom "
+            lblStatus.Text = "CHECK URA/KEGAKI xong. Đã xuất Excel gồm "
                 + (totalSteps + 1) + " sheet.";
         }
 
@@ -603,7 +771,7 @@ namespace ADDIN.Commands
                 return;
 
             cancelRequested = true;
-            lblStatus.Text = "Dang huy lenh kiem tra...";
+            lblStatus.Text = "Đang dừng lệnh kiểm tra…";
             Application.DoEvents();
         }
 
@@ -664,50 +832,50 @@ namespace ADDIN.Commands
 
             if (result.Canceled)
             {
-                lblStatus.Text = "Da huy CHECK DF/TK. Da xu ly: " + result.ProcessedCount + "/" + result.CheckedCount;
+                lblStatus.Text = "Đã dừng CHECK DF/TK. Đã xử lý: " + result.ProcessedCount + "/" + result.CheckedCount;
                 return;
             }
 
             if (result.CheckedCount == 0)
             {
-                lblStatus.Text = "Chua chon chi tiet nao de CHECK DF/TK.";
+                lblStatus.Text = "Chưa tick chi tiết nào để CHECK DF/TK.";
                 return;
             }
 
             if (result.DiffResults.Count == 0)
             {
-                string message = "Khong co chi tiet nao khac nhau.";
+                string message = "Không có chi tiết nào khác nhau.";
                 if (result.SkippedCount > 0)
-                    message += " Bo qua " + result.SkippedCount + " dong khong co duong dan part.";
+                    message += " Bỏ qua " + result.SkippedCount + " dòng không có đường dẫn Part.";
                 if (result.CheckLogs.Count > 0)
-                    message += " Co " + result.CheckLogs.Count + " dong log kiem tra.";
+                    message += " Có " + result.CheckLogs.Count + " dòng log kiểm tra.";
 
                 lblStatus.Text = message;
-                MessageBox.Show(message, "Ket qua kiem tra", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(message, "Kết quả kiểm tra", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             ExcelDfTkExporter.Export(result.DiffResults, result.CheckLogs);
-            lblStatus.Text = "CHECK DF/TK xong. Da chon: " + result.CheckedCount + ", khac nhau: " + result.DiffResults.Count;
+            lblStatus.Text = "CHECK DF/TK xong. Đã chọn: " + result.CheckedCount + ", khác nhau: " + result.DiffResults.Count;
         }
 
         private void ShowUraOmoteResult(UraOmoteCheckResult result)
         {
             if (result == null)
             {
-                lblStatus.Text = "Khong co ket qua Check ウラ 表.";
+                lblStatus.Text = "Không có kết quả Check ウラ 表.";
                 return;
             }
 
             if (result.Canceled)
             {
-                lblStatus.Text = "Da huy Check ウラ 表. Da xu ly: " + result.ProcessedCount + "/" + result.CheckedCount;
+                lblStatus.Text = "Đã dừng Check ウラ 表. Đã xử lý: " + result.ProcessedCount + "/" + result.CheckedCount;
                 return;
             }
 
             if (result.CheckedCount == 0)
             {
-                lblStatus.Text = "Chua chon chi tiet nao de Check ウラ 表.";
+                lblStatus.Text = "Chưa tick chi tiết nào để Check ウラ 表.";
                 return;
             }
 
@@ -723,30 +891,30 @@ namespace ADDIN.Commands
                     checkCount++;
             }
 
-            lblStatus.Text = "Check ウラ 表 xong. Da chon: " + result.CheckedCount
+            lblStatus.Text = "Check ウラ 表 xong. Đã chọn: " + result.CheckedCount
                 + ", NG: " + ngCount
                 + ", CHECK: " + checkCount
-                + ", bo qua: " + result.SkippedCount;
+                + ", bỏ qua: " + result.SkippedCount;
         }
 
         private void ShowKegakiResult(KegakiCheckResult result)
         {
             if (result == null)
             {
-                lblStatus.Text = "Khong co ket qua CHECK KEGAKI.";
+                lblStatus.Text = "Không có kết quả CHECK KEGAKI.";
                 return;
             }
 
             if (result.Canceled)
             {
-                lblStatus.Text = "Da huy CHECK KEGAKI. Da xu ly: "
+                lblStatus.Text = "Đã dừng CHECK KEGAKI. Đã xử lý: "
                     + result.ProcessedCount + "/" + result.CheckedCount;
                 return;
             }
 
             if (result.CheckedCount == 0)
             {
-                lblStatus.Text = "Chua chon chi tiet nao de CHECK KEGAKI.";
+                lblStatus.Text = "Chưa tick chi tiết nào để CHECK KEGAKI.";
                 return;
             }
 
@@ -766,52 +934,52 @@ namespace ADDIN.Commands
                     overrideCount++;
             }
 
-            lblStatus.Text = "CHECK KEGAKI xong. Da chon: " + result.CheckedCount
+            lblStatus.Text = "CHECK KEGAKI xong. Đã chọn: " + result.CheckedCount
                 + ", bend override: " + overrideCount
                 + ", NG: " + ngCount
                 + ", CHECK: " + checkCount
-                + ", bo qua: " + result.SkippedCount;
+                + ", bỏ qua: " + result.SkippedCount;
         }
 
         private void ShowRoundResult(RoundHoleCheckResult result)
         {
             if (result == null)
             {
-                lblStatus.Text = "Khong co ket qua CHECK ROUND.";
+                lblStatus.Text = "Không có kết quả CHECK ROUND.";
                 return;
             }
 
             if (result.Canceled)
             {
-                lblStatus.Text = "Da huy CHECK ROUND. Da xu ly: "
+                lblStatus.Text = "Đã dừng CHECK ROUND. Đã xử lý: "
                     + result.ProcessedCount + "/" + result.CheckedCount;
                 return;
             }
 
             if (result.CheckedCount == 0)
             {
-                lblStatus.Text = "Chua chon chi tiet nao de CHECK ROUND.";
+                lblStatus.Text = "Chưa tick chi tiết nào để CHECK ROUND.";
                 return;
             }
 
             int previewCount = RoundHolePreviewForm.ShowPreview(result.Results);
             int exportedCount = ExcelRoundHoleExporter.Export(result.Results);
             RoundHolePreviewForm.BringLatestToFront();
-            string message = "CHECK ROUND xong. Lo tron: " + result.RoundHoleCount
-                + ", lo dai: " + result.SlotHoleCount
+            string message = "CHECK ROUND xong. Lỗ tròn: " + result.RoundHoleCount
+                + ", lỗ dài: " + result.SlotHoleCount
                 + ", NG: " + result.NgCount
                 + ", CHECK: " + result.CheckCount
-                + ", bo qua: " + result.SkippedCount + ".";
+                + ", bỏ qua: " + result.SkippedCount + ".";
 
             if (previewCount > 0)
-                message += " Da mo preview 2D cho " + previewCount + " chi tiet.";
+                message += " Đã mở preview 2D cho " + previewCount + " chi tiết.";
             else if (result.NgCount + result.CheckCount > 0)
-                message += " Khong tao duoc preview 2D cho ket qua nay.";
+                message += " Không tạo được preview 2D cho kết quả này.";
 
             if (exportedCount > 0)
-                message += " Da xuat Excel " + exportedCount + " dong can kiem tra.";
+                message += " Đã xuất Excel " + exportedCount + " dòng cần kiểm tra.";
             else
-                message += " Khong co lo bat thuong de xuat Excel.";
+                message += " Không có lỗ bất thường để xuất Excel.";
 
             lblStatus.Text = message;
             MessageBox.Show(
@@ -841,20 +1009,20 @@ namespace ADDIN.Commands
         {
             if (result == null)
             {
-                lblStatus.Text = "Khong co ket qua CHECK SAME PART.";
+                lblStatus.Text = "Không có kết quả CHECK SAME PART.";
                 return;
             }
 
             if (result.Canceled)
             {
-                lblStatus.Text = "Da huy CHECK SAME PART. Da xu ly: "
+                lblStatus.Text = "Đã dừng CHECK SAME PART. Đã xử lý: "
                     + result.ProcessedCount + "/" + result.CheckedCount;
                 return;
             }
 
             if (result.CheckedCount == 0)
             {
-                lblStatus.Text = "Chua chon chi tiet nao de CHECK SAME PART.";
+                lblStatus.Text = "Chưa tick chi tiết nào để CHECK SAME PART.";
                 return;
             }
 
@@ -867,20 +1035,20 @@ namespace ADDIN.Commands
             int sameGeometry = result.Groups.Count(group => group.Status == "SAME GEOMETRY");
             int sameFlat = result.Groups.Count(group => group.Status == "SAME FLAT");
             int mirrorCheck = result.Groups.Count(group => group.Status == "CHECK MIRROR");
-            string message = "CHECK SAME PART xong. Nhom trung hoan toan: " + sameFull
-                + ", trung hinh hoc: " + sameGeometry
-                + ", chi trung Flat-Pattern: " + sameFlat
-                + ", mirror/can doi chieu: " + mirrorCheck
-                + ", can kiem tra: " + result.Errors.Count + ".";
+            string message = "CHECK SAME PART xong. Nhóm trùng hoàn toàn: " + sameFull
+                + ", trùng hình học: " + sameGeometry
+                + ", chỉ trùng Flat-Pattern: " + sameFlat
+                + ", mirror/cần đối chiếu: " + mirrorCheck
+                + ", cần kiểm tra: " + result.Errors.Count + ".";
 
             if (exportedCount > 0)
             {
-                message += " Da xuat Excel " + exportedCount + " dong.";
+                message += " Đã xuất Excel " + exportedCount + " dòng.";
                 if (!string.IsNullOrWhiteSpace(exportedPath))
                     message += " File: " + exportedPath;
             }
             else
-                message += " Khong tim thay nhom chi tiet giong nhau.";
+                message += " Không tìm thấy nhóm chi tiết giống nhau.";
             if (!string.IsNullOrWhiteSpace(result.DebugLogPath))
                 message += " Debug: " + result.DebugLogPath;
 
@@ -900,13 +1068,13 @@ namespace ADDIN.Commands
         private string BuildDebugResultText(KetQuaSoSanhDfTk result)
         {
             if (result == null)
-                return "Khong co ket qua CHECK DF/TK.";
+                return "Không có kết quả CHECK DF/TK.";
 
             List<string> lines = new List<string>
             {
                 "CHECK DF/TK DEBUG",
                 "Da chon: " + result.CheckedCount,
-                "Da xu ly: " + result.ProcessedCount,
+                "Đã xử lý: " + result.ProcessedCount,
                 "Khac nhau: " + result.DiffResults.Count,
                 "Bo qua: " + result.SkippedCount,
                 "Log: " + result.CheckLogs.Count,

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -9,13 +9,13 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    internal sealed class ChangeHoleNameCommand
+    internal sealed partial class ChangeHoleNameCommand
     {
         private readonly ISldWorks app;
 
         public ChangeHoleNameCommand(ISldWorks app) { this.app = app; }
 
-        public void Run(string label)
+        public void Run(string label, bool showSuccess = true)
         {
             label = (label ?? "").Trim();
             if (label.Length == 0)
@@ -94,7 +94,7 @@ namespace ADDIN.Commands
                             ", Diameter=" + family.DiameterMm + ", Label=" + label);
                     }
                 }
-                MessageBox.Show("Da gan Hole Type cho " + families.Count + " ho lo (" + changed + " feature).",
+                if (showSuccess) MessageBox.Show("Da gan Hole Type cho " + families.Count + " ho lo (" + changed + " feature).",
                     "CHANGE NAME HOLE", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)

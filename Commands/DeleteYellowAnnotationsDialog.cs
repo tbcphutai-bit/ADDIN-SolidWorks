@@ -7,6 +7,7 @@ namespace ADDIN.Commands
         public DeleteYellowAnnotationsDialog()
         {
             InitializeComponent();
+            UI.TaiDialog.Apply(this, btnDelete, UI.ModernButtonKind.Danger);
         }
 
         public bool DeleteDimension => chkDimension.Checked;

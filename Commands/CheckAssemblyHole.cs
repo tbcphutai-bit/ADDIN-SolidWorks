@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -168,6 +168,7 @@ namespace ADDIN.Commands
             {
                 validationWatch.Stop();
                 profile.ValidationMs = validationWatch.ElapsedMilliseconds;
+                PublishResultText("Hay mo Assembly can kiem tra truoc khi chay CHECK HOLE.");
                 MessageBox.Show(
                     "Hay mo Assembly can kiem tra truoc khi chay CHECK HOLE.",
                     "CHECK HOLE",
@@ -183,6 +184,7 @@ namespace ADDIN.Commands
             {
                 validationWatch.Stop();
                 profile.ValidationMs = validationWatch.ElapsedMilliseconds;
+                PublishResultText("Hay thoat khoi Sketch dang edit truoc khi chay CHECK HOLE.");
                 MessageBox.Show(
                     "Hay thoat khoi Sketch dang edit truoc khi chay CHECK HOLE.",
                     "CHECK HOLE",
@@ -227,6 +229,7 @@ namespace ADDIN.Commands
                     resolveWatch.Stop();
                     profile.ResolveMs = resolveWatch.ElapsedMilliseconds;
                     Debug.WriteLine("[CHECK HOLE ASSY] RESOLVE aborted: " + resolveError);
+                    PublishResultText(resolveError);
                     MessageBox.Show(
                         resolveError,
                         "CHECK HOLE",
@@ -247,6 +250,7 @@ namespace ADDIN.Commands
                 if (IsCanceled())
                 {
                     Debug.WriteLine("[CHECK HOLE ASSY] Canceled while reading components.");
+                    PublishResultText("Da huy CHECK HOLE.");
                     MessageBox.Show("Da huy CHECK HOLE.", "CHECK HOLE");
                     return;
                 }
@@ -346,7 +350,7 @@ namespace ADDIN.Commands
                     + System.Environment.NewLine + "Chi so sanh cac lop vat lieu ke nhau (khe ho toi da "
                     + FormatMm(AdjacentFaceGapM) + " mm).";
 
-                List<string> issueDescriptions = BuildIssueDescriptions(ngResults, patternIssues, 8);
+                List<string> issueDescriptions = BuildIssueDescriptions(ngResults, patternIssues, int.MaxValue);
                 if (issueDescriptions.Count > 0)
                     detailText += System.Environment.NewLine + System.Environment.NewLine
                         + "Chi tiet NG:"

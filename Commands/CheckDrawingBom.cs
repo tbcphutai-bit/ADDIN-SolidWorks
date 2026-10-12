@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
@@ -112,6 +113,8 @@ namespace ADDIN.Commands
         public int TotalSelected { get; set; }
         public int ProcessedCount { get; set; }
         public bool Canceled { get; set; }
+        public string Message { get; set; } = "";
+        public string ReportPath { get; set; } = "";
 
         public int OkCount
         {
@@ -205,7 +208,19 @@ namespace ADDIN.Commands
             Action<int> beginProgress,
             Action<int, int> updateProgress,
             Action finishProgress,
-            Func<bool> isCancelRequested)
+            Func<bool> isCancelRequested, bool silent = false, string reportDirectory = null)
+        {
+            if (silent)
+                using (var display = new DrawingCommandDisplayScope(swApp))
+                    return RunBatchCore(beginProgress, updateProgress, finishProgress, isCancelRequested, true, reportDirectory);
+            return RunBatchCore(beginProgress, updateProgress, finishProgress, isCancelRequested, false, reportDirectory);
+        }
+
+        private DrawingBatchCheckResult RunBatchCore(
+            Action<int> beginProgress,
+            Action<int, int> updateProgress,
+            Action finishProgress,
+            Func<bool> isCancelRequested, bool silent, string reportDirectory)
         {
             DrawingBatchCheckResult result = new DrawingBatchCheckResult();
 
@@ -217,13 +232,13 @@ namespace ADDIN.Commands
 
                 if (swApp == null)
                 {
-                    ShowWarning("Chưa kết nối SOLIDWORKS.");
+                    if (!silent) ShowWarning("Chưa kết nối SOLIDWORKS."); result.Message = "Chưa kết nối SOLIDWORKS.";
                     return result;
                 }
 
                 if (bomGrid == null || bomGrid.Rows.Count == 0)
                 {
-                    ShowWarning("Bảng BOM (dgvModelBom) chưa có dữ liệu.\nVui lòng bấm 'CẬP NHẬT' để tải BOM trước khi kiểm tra.");
+                    result.Message = "Hãy Load BOM trước khi kiểm tra Drawing."; if (!silent) ShowWarning(result.Message);
                     return result;
                 }
 
@@ -244,11 +259,12 @@ namespace ADDIN.Commands
 
                 if (checkedRows.Count == 0)
                 {
-                    ShowWarning("Hãy tick ít nhất một chi tiết trước.");
+                    result.Message = "Hãy tick ít nhất một chi tiết trước."; if (!silent) ShowWarning(result.Message);
                     return result;
                 }
 
                 LogDebug($"Total selected BOM rows = {checkedRows.Count}");
+
 
                 ModelDoc2 originalDocument = swApp.ActiveDoc as ModelDoc2;
                 string originalTitle = originalDocument != null ? originalDocument.GetTitle() : "";
@@ -283,6 +299,9 @@ namespace ADDIN.Commands
                         Component = componentName
                     };
 
+                    ModelDoc2 drawingDoc = null;
+                    bool openedByCommand = false;
+
                     try
                     {
                         string resolvedPartPath = "";
@@ -306,10 +325,7 @@ namespace ADDIN.Commands
                             continue;
                         }
 
-                        bool wasAlreadyOpen = swApp.GetOpenDocumentByName(drawingPath) != null;
-                        bool openedByCommand = false;
-
-                        ModelDoc2 drawingDoc = OpenDrawingDocumentSilent(drawingPath, out openedByCommand);
+                        drawingDoc = OpenDrawingDocumentSilent(drawingPath, out openedByCommand);
                         if (drawingDoc == null)
                         {
                             itemResult.Status = DrawingBomCheckStatus.Warning;
@@ -332,15 +348,6 @@ namespace ADDIN.Commands
                             $"model={Path.GetFileName(itemResult.PartPath ?? "")} " +
                             $"drawing={Path.GetFileName(drawingPath)} status={itemResult.Status}");
 
-                        if (openedByCommand && !wasAlreadyOpen)
-                        {
-                            try
-                            {
-                                swApp.CloseDoc(drawingDoc.GetTitle());
-                            }
-                            catch { }
-                        }
-
                         result.Items.Add(itemResult);
                         result.ProcessedCount++;
                     }
@@ -351,6 +358,14 @@ namespace ADDIN.Commands
                         itemResult.Note = "Lỗi xử lý: " + exItem.Message;
                         result.Items.Add(itemResult);
                         result.ProcessedCount++;
+                    }
+                    finally
+                    {
+                        if (openedByCommand && drawingDoc != null)
+                        {
+                            try { swApp.CloseDoc(drawingDoc.GetTitle()); }
+                            catch { }
+                        }
                     }
                 }
 
@@ -366,18 +381,33 @@ namespace ADDIN.Commands
 
                 finishProgress?.Invoke();
 
+                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " + result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning.";
                 if (result.ProcessedCount > 0)
                 {
-                    ExcelDrawingCheckExporter.Export(result);
+                    if (silent)
+                    {
+                        string root = reportDirectory ?? Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "TAI_TOOL", "CHECK_DRAWING");
+                        string output = Path.Combine(root, DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + "_" + Guid.NewGuid().ToString("N").Substring(0, 6));
+                        result.ReportPath = Path.Combine(output, "CHECK_DRAWING.xlsx");
+                        Directory.CreateDirectory(output);
+                        File.WriteAllText(Path.ChangeExtension(result.ReportPath, ".json"),
+                            new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = 50000000 }.Serialize(result),
+                            new UTF8Encoding(true));
+                        // Silent controls dialogs; CHECK DRAWING keeps its
+                        // original summary and grouped detail report layout.
+                        ExcelDrawingCheckExporter.ExportToFile(result, result.ReportPath);
+                    }
+                    else ExcelDrawingCheckExporter.Export(result);
                 }
 
-                ShowBatchSummaryDialog(result);
+                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " + result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning."; if (!silent) ShowBatchSummaryDialog(result);
             }
             catch (Exception ex)
             {
                 finishProgress?.Invoke();
                 LogDebug($"[BATCH ERROR] {ex}");
-                MessageBox.Show(
+                result.Message = ex.Message;
+                if (!silent) MessageBox.Show(
                     "Đã xảy ra lỗi khi thực hiện CHECK DRAWING Batch:\n" + ex.Message,
                     "CHECK DRAWING — ERROR",
                     MessageBoxButtons.OK,
@@ -388,6 +418,8 @@ namespace ADDIN.Commands
         }
 
         #endregion
+
+        internal sealed class DrawingReferenceSnapshot : BomDrawingReference { }
 
         #region Single Drawing Check (CheckOneDrawing - Complete 12-Field Verification)
 
@@ -498,6 +530,10 @@ namespace ADDIN.Commands
                     bomQuantity);
             }
 
+            // 表/ウラ applies only to Part drawings. UNIT/Assembly drawings
+            // return above without inspecting or reporting the flat view side.
+            AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
+
             BomNumberValues bomNumbers = GetBomNumberValues(bomRow);
             itemResult.Fields.Add(CompareBomNumbers(bomNumbers));
             DrawingBomFieldResult gobanTotalField = CompareBomGobanTotal(bomNumbers);
@@ -599,6 +635,184 @@ namespace ADDIN.Commands
         #endregion
 
         #region Title Block Exact Geometric & Property Recognition (3 Blocks)
+
+        private void AddFlatPatternSideChecks(DrawingCheckItemResult itemResult,
+            DrawingDoc drawing, string sheetName, List<NoteDiagnosticInfo> notes, SheetFrameBounds frameBounds)
+        {
+            var markers = notes.Where(n => !n.IsHidden && NormalizeFlatSideMarker(n.DisplayedText) != "").ToList();
+            markers.AddRange(ScanFlatSideBlockMarkers(drawing, sheetName, frameBounds));
+            if (markers.Count == 0) return;
+            var views = new List<SolidWorks.Interop.sldworks.View>();
+            var otherViewNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            SolidWorks.Interop.sldworks.View view = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+            while (view != null)
+            {
+                if (IsViewOnSheet(view, sheetName))
+                {
+                    if (UraOmoteChecker.IsFlatDrawingView(view)) views.Add(view);
+                    else if (view.Type != (int)swDrawingViewTypes_e.swDrawingSheet)
+                        otherViewNames.Add(view.Name ?? "");
+                }
+                view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
+            }
+            var field = new DrawingBomFieldResult
+            {
+                FieldName = "表/ウラ ↔ 展開",
+                BomValue = "表 → mặt omote; ウラ → mặt hồng",
+                Source = "DRAWING_FLAT_SIDE",
+                Status = DrawingBomCheckStatus.OK
+            };
+            var checker = new UraOmoteChecker(swApp);
+            var actual = new List<string>();
+            var messages = new List<string>();
+            var cache = new Dictionary<string, FlatDrawingViewSideResult>(StringComparer.OrdinalIgnoreCase);
+            foreach (NoteDiagnosticInfo marker in markers)
+            {
+                string expected = NormalizeFlatSideMarker(marker.DisplayedText);
+                var candidates = views.Where(v => string.Equals(v.Name, marker.ViewName, StringComparison.OrdinalIgnoreCase)).ToList();
+                // Notes owned by a formed/section view do not describe a flat view.
+                if (candidates.Count == 0 && otherViewNames.Contains(marker.ViewName ?? "")) continue;
+                if (candidates.Count == 0 && marker.HasPosition)
+                {
+                    candidates = views.Where(v => IsFlatMarkerInsideOutline(marker.X, marker.Y, GetFlatViewOutline(v))).ToList();
+                }
+                DrawingBomCheckStatus status;
+                string message;
+                if (candidates.Count != 1)
+                {
+                    status = DrawingBomCheckStatus.Warning;
+                    message = "Chữ " + expected + " không gắn được với một view 展開 duy nhất.";
+                    actual.Add(expected + ": chưa xác định view");
+                }
+                else
+                {
+                    string name = candidates[0].Name ?? "";
+                    FlatDrawingViewSideResult side;
+                    if (!cache.TryGetValue(name, out side))
+                    {
+                        side = checker.CheckFlatDrawingView(candidates[0]);
+                        cache.Add(name, side);
+                    }
+                    status = CompareFlatSideMarker(expected, side.PinkFacingViewer);
+                    message = name + ": chữ " + expected + "; " + side.Message;
+                    actual.Add(name + ": " + expected + " / " + (side.PinkFacingViewer.HasValue
+                        ? side.PinkFacingViewer.Value ? "mặt hồng" : "mặt omote" : "chưa đọc được mặt"));
+                }
+                if (!field.HasDrawingLocation || status == DrawingBomCheckStatus.NG)
+                {
+                    field.HasDrawingLocation = marker.HasPosition;
+                    field.DrawingX = marker.X;
+                    field.DrawingY = marker.Y;
+                    field.DrawingViewName = candidates.Count == 1 ? candidates[0].Name : marker.ViewName;
+                }
+                if (status == DrawingBomCheckStatus.NG || field.Status != DrawingBomCheckStatus.NG && status == DrawingBomCheckStatus.Warning)
+                    field.Status = status;
+                messages.Add(message);
+                LogDebug($"[FLAT SIDE NOTE] text={expected} owner={marker.ViewName} status={status} message={message}");
+            }
+            if (actual.Count == 0) return;
+            field.DrawingValue = string.Join(" / ", actual);
+            field.Message = string.Join(" | ", messages);
+            itemResult.Fields.Add(field);
+        }
+
+        private List<NoteDiagnosticInfo> ScanFlatSideBlockMarkers(
+            DrawingDoc drawing, string sheetName, SheetFrameBounds frameBounds)
+        {
+            var result = new List<NoteDiagnosticInfo>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            MathUtility math = swApp.GetMathUtility() as MathUtility;
+            SolidWorks.Interop.sldworks.View view = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+            while (view != null)
+            {
+                try
+                {
+                    if (IsViewOnSheet(view, sheetName))
+                    {
+                        Sketch sketch = view.GetSketch() as Sketch;
+                        Array instances = sketch?.GetSketchBlockInstances() as Array;
+                        if (instances != null)
+                        {
+                            MathTransform sketchToSheet = sketch.ModelToSketchTransform?.IInverse();
+                            foreach (object instanceObject in instances)
+                            {
+                                SketchBlockInstance instance = instanceObject as SketchBlockInstance;
+                                if (instance == null || instance.Visible == (int)swAnnotationVisibilityState_e.swAnnotationHidden)
+                                    continue;
+                                // Read placed instances on this sheet, not unused block definitions.
+                                Array blockNotes = instance.Definition?.GetNotes() as Array;
+                                if (blockNotes == null) continue;
+                                foreach (object noteObject in blockNotes)
+                                {
+                                    Note note = noteObject as Note;
+                                    if (note == null) continue;
+                                    Annotation annotation = note.GetAnnotation() as Annotation;
+                                    NoteDiagnosticInfo info = ExtractNoteInfo(note, annotation, view.Name, sheetName, result.Count + 1);
+                                    if (info.IsHidden || NormalizeFlatSideMarker(info.DisplayedText) == "") continue;
+                                    info.Name = "Block:" + instance.Name + "/" + info.Name;
+                                    info.Type = "Block note";
+                                    info.Source = "SKETCH_BLOCK";
+                                    info.HasPosition = false;
+                                    try
+                                    {
+                                        double[] local = annotation?.GetPosition() as double[];
+                                        MathTransform blockToSketch = instance.BlockToSketchTransform;
+                                        if (math != null && local != null && local.Length >= 3
+                                            && blockToSketch != null && sketchToSheet != null)
+                                        {
+                                            MathPoint point = math.CreatePoint(local) as MathPoint;
+                                            point = point?.MultiplyTransform(blockToSketch) as MathPoint;
+                                            point = point?.MultiplyTransform(sketchToSheet) as MathPoint;
+                                            double[] position = point?.ArrayData as double[];
+                                            if (position != null && position.Length >= 2)
+                                            {
+                                                info.X = position[0];
+                                                info.Y = position[1];
+                                                info.HasPosition = true;
+                                            }
+                                        }
+                                    }
+                                    catch { }
+                                    if (!info.HasPosition || IsNoteInsideFrame(info, frameBounds))
+                                        TryAddUniqueNote(result, seen, info);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex) { LogDebug("[FLAT SIDE BLOCK] view=" + view.Name + " error=" + ex.Message); }
+                view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
+            }
+            return result;
+        }
+
+        internal static string NormalizeFlatSideMarker(string text)
+        {
+            string value = Regex.Replace(text ?? "", "<[^>]*>", "").Normalize(NormalizationForm.FormKC);
+            value = Regex.Replace(value, @"[\s()○◯〇]", "");
+            return value == "表" || value == "ウラ" ? value : "";
+        }
+
+        internal static bool IsFlatMarkerInsideOutline(double x, double y, double[] outline)
+        {
+            const double allowance = 0.003;
+            return outline != null && outline.Length >= 4
+                && x >= outline[0]-allowance && x <= outline[2]+allowance
+                && y >= outline[1]-allowance && y <= outline[3]+allowance;
+        }
+
+        private static double[] GetFlatViewOutline(SolidWorks.Interop.sldworks.View view)
+        {
+            try { return view.GetOutline() as double[]; }
+            catch { return null; }
+        }
+
+        internal static DrawingBomCheckStatus CompareFlatSideMarker(string marker, bool? pinkFacingViewer)
+        {
+            if ((marker != "表" && marker != "ウラ") || !pinkFacingViewer.HasValue)
+                return DrawingBomCheckStatus.Warning;
+            return pinkFacingViewer.Value == (marker == "ウラ") ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+        }
 
         private static void SaveDrawingValueLocation(
             DrawingDisplayedData data,
@@ -1159,6 +1373,7 @@ namespace ADDIN.Commands
                 foreach (TableCellDiagnosticInfo headerCell in table.Cells)
                 {
                     if (headerCell == null ||
+                        Regex.IsMatch(headerCell.DisplayedText ?? "", @"\$PRP(?:SHEET|VIEW)?\s*:", RegexOptions.IgnoreCase) ||
                         !HeaderMatchesLogicalName(
                             CleanTableCellText(headerCell.DisplayedText),
                             "合番"))
@@ -1173,7 +1388,7 @@ namespace ADDIN.Commands
                         @"^.*?合番\s*[:：]?\s*",
                         "");
 
-                    if (TryAddCombinedGobanEntries(
+                    if (TryAddDisplayedGobanEntries(
                             result, dedupe, table, headerCell, inlineValue))
                     {
                         continue;
@@ -1188,7 +1403,10 @@ namespace ADDIN.Commands
                         string combined =
                             CleanTableCellText(valueCell?.DisplayedText ?? "");
 
-                        if (!TryAddCombinedGobanEntries(
+                        if (IsPartGobanValueBoundary(combined))
+                            break;
+
+                        if (!TryAddDisplayedGobanEntries(
                                 result, dedupe, table, valueCell, combined))
                         {
                             continue;
@@ -1210,10 +1428,10 @@ namespace ADDIN.Commands
                         string combined =
                             CleanTableCellText(valueCell?.DisplayedText ?? "");
 
-                        if (HeaderMatchesLogicalName(combined, "合番"))
+                        if (IsPartGobanValueBoundary(combined))
                             break;
 
-                        if (!TryAddCombinedGobanEntries(
+                        if (!TryAddDisplayedGobanEntries(
                                 result, dedupe, table, valueCell, combined))
                             continue;
                         break;
@@ -1235,6 +1453,35 @@ namespace ADDIN.Commands
             }
 
             return result;
+        }
+
+        private static bool IsPartGobanValueBoundary(string text)
+        {
+            string value = NormalizeText(CleanTableCellText(text ?? ""))
+                .Replace(" ", "").Replace("　", "").Trim();
+            foreach (string header in new[] { "合番", "数量", "部品番号", "W", "L", "材質", "板厚", "仕上げ", "重量", "重量/1ユニット" })
+                if (string.Equals(value, header, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+
+        private static bool TryAddDisplayedGobanEntries(
+            List<PartGobanQuantityEntry> result, HashSet<string> dedupe,
+            TableDiagnosticInfo table, TableCellDiagnosticInfo cell, string text)
+        {
+            string value = CleanTableCellText(text);
+            if (string.IsNullOrWhiteSpace(value) || IsPartGobanValueBoundary(value) ||
+                Regex.IsMatch(value, @"\$PRP(?:SHEET|VIEW)?\s*:", RegexOptions.IgnoreCase))
+                return false;
+            if (TryAddCombinedGobanEntries(result, dedupe, table, cell, value))
+                return true;
+
+            // Some title blocks display a code or delivery instruction without
+            // a quantity, for example ※単品搬入. Preserve that drawing cell;
+            // do not require a colon or derive its value from model/BOM data.
+            AddPartGobanQuantityEntry(result, dedupe, new PartGobanQuantityEntry {
+                Goban = value, DisplayText = value, Table = table, GobanCell = cell });
+            return true;
         }
 
         private static void AddPartGobanQuantityEntry(
@@ -4344,6 +4591,38 @@ namespace ADDIN.Commands
             try
             {
                 object tag = row.Tag;
+                // Background rows carry file/configuration names rather than
+                // Component2 objects belonging to the user's SOLIDWORKS process.
+                var snapshot = tag as BomDrawingReference;
+                if (snapshot != null && swApp != null)
+                {
+                    ModelDoc2 compModel = swApp.GetOpenDocumentByName(snapshot.ModelPath ?? "") as ModelDoc2;
+                    if (compModel == null)
+                    {
+                        ModelDoc2 active = swApp.ActiveDoc as ModelDoc2;
+                        DrawingDoc activeDrawing = active as DrawingDoc;
+                        ModelDoc2 referenced; string referencedConfiguration;
+                        GetPrimaryReferencedModel(activeDrawing, out referenced, out referencedConfiguration);
+                        if (referenced != null && string.Equals(referenced.GetPathName(), snapshot.ModelPath,
+                            StringComparison.OrdinalIgnoreCase)) compModel = referenced;
+                    }
+                    if (compModel != null)
+                    {
+                        string cfg = snapshot.Configuration ?? "";
+                        CaptureRequiredPropertyLinkAudits(compModel, cfg, propertyLinkAudits);
+                        if (string.IsNullOrWhiteSpace(w)) w = GetModelCustomProperty(compModel, cfg, "W");
+                        if (string.IsNullOrWhiteSpace(l)) l = GetModelCustomProperty(compModel, cfg, "L");
+                        if (string.IsNullOrWhiteSpace(material)) material = GetModelCustomProperty(compModel, cfg, "材質");
+                        if (string.IsNullOrWhiteSpace(thickness)) thickness = GetModelCustomProperty(compModel, cfg, "板厚");
+                        if (string.IsNullOrWhiteSpace(goban)) goban = GetModelCustomProperty(compModel, cfg, "合番");
+                        if (string.IsNullOrWhiteSpace(tehaiNo)) tehaiNo = GetModelCustomProperty(compModel, cfg, "手配番号");
+                        if (string.IsNullOrWhiteSpace(tehaiNo)) tehaiNo = GetModelCustomProperty(compModel, "", "手配番号");
+                        if (string.IsNullOrWhiteSpace(jobNo)) jobNo = GetModelCustomProperty(compModel, cfg, "工事番号");
+                        if (string.IsNullOrWhiteSpace(jobNo)) jobNo = GetModelCustomProperty(compModel, "", "工事番号");
+                        if (string.IsNullOrWhiteSpace(siteName)) siteName = GetModelCustomProperty(compModel, cfg, "現場名");
+                        if (string.IsNullOrWhiteSpace(productName)) productName = GetModelCustomProperty(compModel, cfg, "品名");
+                    }
+                }
                 if (tag is object[] comps && comps.Length > 0)
                 {
                     foreach (object obj in comps)
@@ -4568,6 +4847,19 @@ namespace ADDIN.Commands
 
         #region Path Resolution & Silent Document Helpers
 
+        internal string ResolveBomDrawingPath(DataGridViewRow row, ModelDoc2 bomDocument, out string partPath)
+        { return ResolveDrawingPath(row, BuildSearchDirectories(bomDocument), out partPath); }
+
+        internal string ReadDisplayedDxfName(ModelDoc2 model)
+        {
+            var drawing = model as DrawingDoc;
+            if (drawing == null) return "";
+            var sheet = drawing.GetCurrentSheet() as Sheet;
+            string name = ResolveCurrentSheetName(drawing, sheet);
+            var bounds = ResolveSheetFrameBounds(sheet);
+            return ExtractAllTitleBlockValues(ScanCurrentSheetNotes(drawing, name, bounds),
+                ScanCurrentSheetTables(drawing, name, model, bounds), model).DxfFileName;
+        }
         private string ResolveDrawingPath(
             DataGridViewRow row,
             List<string> searchDirectories,
@@ -4576,6 +4868,13 @@ namespace ADDIN.Commands
             resolvedPartPath = "";
             if (row == null)
                 return "";
+
+            var snapshot = row.Tag as BomDrawingReference;
+            if (snapshot != null)
+            {
+                resolvedPartPath = snapshot.ModelPath ?? "";
+                return snapshot.DrawingPath ?? "";
+            }
 
             string fileName = GetCellText(row, 5);
             string baseName = Path.GetFileNameWithoutExtension(fileName);
@@ -5058,10 +5357,13 @@ namespace ADDIN.Commands
             double x = 0;
             double y = 0;
             bool hasPosition = false;
+            bool isHidden = false;
             string annName = "";
 
             if (ann != null)
             {
+                try { isHidden = ann.Visible == (int)swAnnotationVisibilityState_e.swAnnotationHidden; }
+                catch { }
                 try
                 {
                     annName = ann.GetName() ?? "";
@@ -5105,6 +5407,7 @@ namespace ADDIN.Commands
                 RawText = rawText,
                 Source = source,
                 HasPosition = hasPosition,
+                IsHidden = isHidden,
                 X = x,
                 Y = y
             };
@@ -5972,7 +6275,7 @@ namespace ADDIN.Commands
             return sb.ToString();
         }
 
-        private void NavigateToDrawingField(
+        internal void NavigateToDrawingField(
             string drawingPath,
             DrawingBomFieldResult field)
         {
@@ -6620,6 +6923,7 @@ namespace ADDIN.Commands
             public string RawText { get; set; }
             public string Source { get; set; }
             public bool HasPosition { get; set; }
+            public bool IsHidden { get; set; }
             public double X { get; set; }
             public double Y { get; set; }
         }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
@@ -6,7 +6,7 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    public class ChinhTiLeDrawingView
+    public partial class ChinhTiLeDrawingView
     {
         private readonly ISldWorks swApp;
 

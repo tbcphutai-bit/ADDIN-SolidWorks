@@ -30,12 +30,17 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
         public Dictionary<int, int> ExternalFlangeProfiles { get; private set; }
         // Explicit regenerated OneBend -> EdgeFlange and UiBend -> OneBend relationships.
         public Dictionary<int, int> GeneratedBendOwners { get; private set; }
+        // Only blind native flanges with reflected hinge/support/profile/body
+        // proof qualify removal of their old sketch's external constraints.
+        // Keep mandatory hinge face owners as SOURCE IDs, not runtime labels.
+        public Dictionary<int, int[]> NativeFlangeHingeParents70 { get; private set; }
         public MirrorInPlaceExecutionContextV7()
         {
             ReplacementReferences = new Dictionary<int, PersistReferenceV7>();
             ReplacementTargetNames = new Dictionary<int, string>();
             ExternalFlangeProfiles = new Dictionary<int, int>();
             GeneratedBendOwners = new Dictionary<int, int>();
+            NativeFlangeHingeParents70 = new Dictionary<int, int[]>();
         }
     }
 
@@ -51,6 +56,11 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
         public bool MutationExecuted { get; internal set; }
         public bool BaseGeometryVerified { get; internal set; }
         public bool OutputPublished { get; internal set; }
+        // Configurations other than the one the Part was mirrored in that carry
+        // features of their own (nearly always the flat-pattern configuration):
+        // "KHONG CO" when there are none, "PASS" when each one was shown and is
+        // the mirror image of the source's, otherwise what failed.
+        public string OtherConfigurations { get; internal set; }
     }
 
     public sealed class FeatureReplayJournalV7

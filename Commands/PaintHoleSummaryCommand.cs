@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -71,6 +71,26 @@ namespace ADDIN.Commands
             }
         }
 
+        internal PaintHoleScanResult ScanForNativePage()
+        {
+            ModelDoc2 model = swApp == null ? null : swApp.ActiveDoc as ModelDoc2;
+            if (model == null || (model.GetType() != (int)swDocumentTypes_e.swDocPART && model.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY))
+                throw new InvalidOperationException("Hãy mở Part hoặc Assembly để Đếm Hole.");
+            bool previous = swApp.CommandInProgress;
+            try
+            {
+                swApp.CommandInProgress = true;
+                if (!ResolveLightweightComponents(model)) throw new InvalidOperationException("Chưa Resolve đủ component; hãy Resolve rồi quét lại.");
+                HoleMetadataService.Initialize(swApp);
+                return Scan(model);
+            }
+            finally { swApp.CommandInProgress = previous; }
+        }
+        internal void ExportNativeResult(PaintHoleScanResult result)
+        {
+            if (result == null || result.TotalFeatureRows == 0) throw new InvalidOperationException("Không có dữ liệu lỗ để xuất Excel.");
+            ExportToExcel(result);
+        }
         private bool ResolveLightweightComponents(ModelDoc2 activeModel)
         {
             if (activeModel.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
@@ -84,7 +104,7 @@ namespace ADDIN.Commands
             {
                 int before = assembly.GetLightWeightComponentCount();
                 int unavailableBefore = CountUnavailableComponentModels(assembly);
-                if (before <= 0 && unavailableBefore == 0)
+                if (unavailableBefore == 0)
                     return true;
 
                 Debug.WriteLine("[PAINT HOLE] Resolve before scan. lightweight=" + before +
@@ -95,7 +115,7 @@ namespace ADDIN.Commands
                 int unavailableAfter = CountUnavailableComponentModels(assembly);
                 Debug.WriteLine("[PAINT HOLE] Resolve result. lightweight=" + after +
                     ", unavailableModels=" + unavailableAfter);
-                if (after > 0)
+                if (after > 0 && unavailableAfter > 0)
                 {
                     MessageBox.Show(
                         "Con component Lightweight. Hay Resolve chung roi chay lai DEM HOLE.",
@@ -127,10 +147,10 @@ namespace ADDIN.Commands
             foreach (object item in components)
             {
                 Component2 component = item as Component2;
-                if (component == null) continue;
+                if (component == null || ShouldSkipComponent(component)) continue;
                 try
                 {
-                    if (!component.IsSuppressed() && component.GetModelDoc2() == null) count++;
+                    if (component.GetModelDoc2() == null) count++;
                 }
                 catch { count++; }
             }
@@ -208,7 +228,12 @@ namespace ADDIN.Commands
         {
             try
             {
-                return component.IsEnvelope() || component.ExcludeFromBOM || component.IsSuppressed() || component.IsHidden(false);
+                for (Component2 current = component; current != null; current = current.GetParent() as Component2)
+                {
+                    if (current.IsEnvelope() || current.ExcludeFromBOM || current.IsSuppressed() || current.IsHidden(false))
+                        return true;
+                }
+                return false;
             }
             catch
             {
@@ -620,7 +645,7 @@ namespace ADDIN.Commands
             return separator >= 0 ? componentName.Substring(separator + 1) : componentName;
         }
 
-        private class PaintHoleScanResult
+        internal class PaintHoleScanResult
         {
             public readonly Dictionary<string, HoleSummary> Summary = new Dictionary<string, HoleSummary>(StringComparer.OrdinalIgnoreCase);
             public readonly List<HoleRecord> Records = new List<HoleRecord>();
@@ -640,14 +665,14 @@ namespace ADDIN.Commands
             }
         }
 
-        private class HoleSummary
+        internal class HoleSummary
         {
             public string HoleKey;
             public string HoleLabel;
             public int Quantity;
         }
 
-        private class HoleRecord
+        internal class HoleRecord
         {
             public string HoleKey;
             public string HoleLabel;

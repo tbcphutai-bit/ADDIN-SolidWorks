@@ -71,7 +71,7 @@ namespace ADDIN.Commands
                     }
                 }
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             // Fallback: manual matrix multiplication
             try
@@ -92,7 +92,7 @@ namespace ADDIN.Commands
                     return new double[] { tx, ty, tz };
                 }
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             return new double[] { point[0], point[1], point[2] };
         }
@@ -103,6 +103,7 @@ namespace ADDIN.Commands
             double minDist = double.MaxValue;
             for (int i = 0; i < points.Count; i++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 double[] p = points[i];
                 if (p == null || p.Length < 2) continue;
                 double dx = (pt[0] - p[0]) * 1000.0;
@@ -186,6 +187,7 @@ namespace ADDIN.Commands
             {
                 foreach (var dl in displayLines)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     double d = SegmentToSegmentDistance(x1, y1, x2, y2, dl.StartX, dl.StartY, dl.EndX, dl.EndY);
                     if (d < minDistMeters) minDistMeters = d;
                 }
@@ -195,6 +197,7 @@ namespace ADDIN.Commands
             {
                 foreach (var ep in displayEndpoints)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     if (ep != null && ep.Length >= 2)
                     {
                         double d = PointToSegmentDistance(ep[0], ep[1], x1, y1, x2, y2);
@@ -215,6 +218,7 @@ namespace ADDIN.Commands
             int len = Math.Min(a.Length, b.Length);
             for (int i = 0; i < len; i++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 double diff = a[i] - b[i];
                 if (Math.Abs(diff) > 1e-6)
                 {
@@ -246,7 +250,7 @@ namespace ADDIN.Commands
                         else if (curve.IsBcurve()) curveType = "BCURVE";
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
 
                 try
                 {
@@ -260,7 +264,7 @@ namespace ADDIN.Commands
                         else if (cpd.CurveType == 3003) curveType = "ELLIPSE";
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
 
                 if (pt1 == null || pt2 == null)
                 {
@@ -271,7 +275,7 @@ namespace ADDIN.Commands
                         if (v1 != null) pt1 = v1.GetPoint() as double[];
                         if (v2 != null) pt2 = v2.GetPoint() as double[];
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
                 }
             }
             else if (entity is ISilhouetteEdge silEdge)
@@ -295,7 +299,7 @@ namespace ADDIN.Commands
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
             }
             else if (entity is ISketchSegment skSeg)
             {
@@ -329,7 +333,7 @@ namespace ADDIN.Commands
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
             }
 
             if (pt1 == null || pt2 == null || pt1.Length < 3 || pt2.Length < 3)
@@ -375,10 +379,11 @@ namespace ADDIN.Commands
                 {
                     foreach (object compObj in visibleComps)
                     {
+                        RepairDanglingDimensions.CheckRepairReadBudget();
                         if (compObj is Component2 comp)
                         {
                             string compName = null;
-                            try { compName = comp.Name2; } catch {}
+                            try { compName = comp.Name2; } catch (RepairDimReadLimitException) { throw; } catch {}
                             string compKey = RepairDimCandidateFinder.GetComponentOccurrenceKey(comp);
 
                             Array visibleEdges = currentView.GetVisibleEntities2(
@@ -389,6 +394,7 @@ namespace ADDIN.Commands
                             {
                                 foreach (object edgeObj in visibleEdges)
                                 {
+                                    RepairDanglingDimensions.CheckRepairReadBudget();
                                     if (edgeObj != null)
                                     {
                                         entries.Add(new VisibleEdgeOwnerEntry
@@ -414,12 +420,13 @@ namespace ADDIN.Commands
                             null,
                             (int)swViewEntityType_e.swViewEntityType_Edge) as Array;
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
 
                     if (visibleEdges != null)
                     {
                         foreach (object edgeObj in visibleEdges)
                         {
+                            RepairDanglingDimensions.CheckRepairReadBudget();
                             if (edgeObj != null)
                             {
                                 entries.Add(new VisibleEdgeOwnerEntry
@@ -434,7 +441,7 @@ namespace ADDIN.Commands
                     }
                 }
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             return entries;
         }
@@ -470,7 +477,7 @@ namespace ADDIN.Commands
                     return comp;
                 }
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             try
             {
@@ -483,7 +490,7 @@ namespace ADDIN.Commands
                     return comp;
                 }
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             // --------------------------------------------------
             // B. PRIMARY FALLBACK: MODEL EDGE -> DRAWING VIEW ENTITY -> DRAWING COMPONENT
@@ -496,7 +503,7 @@ namespace ADDIN.Commands
                 {
                     drawingObj = currentView.GetCorrespondingEntity(modelEntity);
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
 
                 if (drawingObj != null)
                 {
@@ -523,7 +530,7 @@ namespace ADDIN.Commands
                                 if (viewGeom != null) viewGeom.DrawingComponentNullCount++;
                             }
                         }
-                        catch {}
+                        catch (RepairDimReadLimitException) { throw; } catch {}
                     }
                 }
                 else
@@ -544,6 +551,7 @@ namespace ADDIN.Commands
 
                 foreach (var entry in visibleEdgeEntries)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     if (entry.Edge == null) continue;
                     try
                     {
@@ -566,7 +574,7 @@ namespace ADDIN.Commands
                             unsupportedCount++;
                         }
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
                 }
 
                 if (matchedKeys.Count == 1 && matchedComp != null)
@@ -633,6 +641,9 @@ namespace ADDIN.Commands
 
             // Pre-build VisibleEdgeOwnerEntries for fallback
             List<VisibleEdgeOwnerEntry> visibleEdgeEntries = BuildVisibleEdgeOwnerEntries(currentView);
+            // Part entries have no component to resolve. Comparing each polyline
+            // to every Part edge with IsSame cannot produce an owner.
+            if (visibleEdgeEntries.TrueForAll(e => e.Component == null)) visibleEdgeEntries.Clear();
 
             if (!string.IsNullOrEmpty(vPrefix))
             {
@@ -663,6 +674,7 @@ namespace ADDIN.Commands
                         viewGeom.ViewXformScale = viewGeom.ScaleDecimal;
                         viewGeom.ViewXformStatus = "FALLBACK_POSITION";
                     }
+                    catch (RepairDimReadLimitException) { throw; }
                     catch
                     {
                         viewGeom.ViewXformScale = viewGeom.ScaleDecimal;
@@ -670,6 +682,7 @@ namespace ADDIN.Commands
                     }
                 }
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch (Exception ex)
             {
                 viewGeom.ViewXformStatus = "EX: " + ex.Message;
@@ -687,6 +700,7 @@ namespace ADDIN.Commands
                 viewGeom.DisplayModeRaw = currentView.GetDisplayMode2();
                 viewGeom.DisplayModeName = ((swDisplayMode_e)viewGeom.DisplayModeRaw).ToString();
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch (Exception ex)
             {
                 viewGeom.DisplayModeName = "EX: " + ex.Message;
@@ -696,13 +710,13 @@ namespace ADDIN.Commands
             {
                 viewGeom.FacettedHlr = currentView.GetFacettedHlrDisplay();
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             try
             {
                 viewGeom.DisplayEdgesInShaded = currentView.GetDisplayEdgesInShadedMode();
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             // PolyLine Count Precheck (both CrossHatch 0 and 1)
             int ptCount0 = 0;
@@ -712,6 +726,7 @@ namespace ADDIN.Commands
                 viewGeom.PolylineCountOption0 = currentView.GetPolyLineCount5((short)0, out ptCount0);
                 viewGeom.PolylinePointCountOption0 = ptCount0;
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch (Exception ex)
             {
                 viewGeom.PolylineApiStatus = "EXCEPTION_COUNT0: " + ex.Message;
@@ -722,6 +737,7 @@ namespace ADDIN.Commands
                 viewGeom.PolylineCountOption1 = currentView.GetPolyLineCount5((short)1, out ptCount1);
                 viewGeom.PolylinePointCountOption1 = ptCount1;
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch (Exception ex)
             {
                 viewGeom.PolylineApiStatus = "EXCEPTION_COUNT1: " + ex.Message;
@@ -740,6 +756,7 @@ namespace ADDIN.Commands
             {
                 entitiesObj = currentView.GetPolylines7((short)1, out polylinesDataObj);
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch (Exception ex)
             {
                 viewGeom.PolylineApiStatus = "EXCEPTION_GETPOLYLINES7: " + ex.GetType().FullName + " | " + ex.Message;
@@ -756,6 +773,7 @@ namespace ADDIN.Commands
                 {
                     entitiesObj = currentView.GetPolylines6((short)1, out polylinesDataObj);
                 }
+                catch (RepairDimReadLimitException) { throw; }
                 catch (Exception ex)
                 {
                     if (string.IsNullOrEmpty(viewGeom.PolylineApiStatus) || viewGeom.PolylineApiStatus == "NOT_RUN")
@@ -781,6 +799,7 @@ namespace ADDIN.Commands
                 int maxSample = Math.Min(10, entityArr.Length);
                 for (int i = 0; i < maxSample; i++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     object item = entityArr.GetValue(i);
                     if (item == null)
                     {
@@ -804,16 +823,18 @@ namespace ADDIN.Commands
                 int len = polylineArr.Length;
                 for (int i = 0; i < len; i++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     try
                     {
                         rawDoubles.Add(Convert.ToDouble(polylineArr.GetValue(i)));
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
                 }
 
                 int maxDbl = Math.Min(40, rawDoubles.Count);
                 for (int i = 0; i < maxDbl; i++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     viewGeom.RawDoubleSample.Add(rawDoubles[i]);
                 }
             }
@@ -824,6 +845,7 @@ namespace ADDIN.Commands
                 int dumpEnd = Math.Min(4990, rawDoubles.Count - 1);
                 for (int d = 4880; d <= dumpEnd; d++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     viewGeom.RawBoundarySamples.Add($"RAW[{d}] = {rawDoubles[d].ToString("R", CultureInfo.InvariantCulture)}");
                 }
             }
@@ -831,6 +853,7 @@ namespace ADDIN.Commands
             // Candidate Starts around 4920
             for (int offset = 4917; offset <= 4922; offset++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (offset + 1 < rawDoubles.Count)
                 {
                     viewGeom.CandidateHeaderSamples.Add($"Offset {offset}: TypeCandidate={rawDoubles[offset].ToString("R", CultureInfo.InvariantCulture)}, GeomSizeCandidate={rawDoubles[offset + 1].ToString("R", CultureInfo.InvariantCulture)}");
@@ -854,6 +877,7 @@ namespace ADDIN.Commands
 
             for (int recordIndex = 0; recordIndex < expectedRecords; recordIndex++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (cursor >= rawDoubles.Count)
                 {
                     viewGeom.PolylineParserStatus = "CURSOR_OVERFLOW";
@@ -897,7 +921,7 @@ namespace ADDIN.Commands
                                     else if (diag.CurveIsBcurve == true) expectedTypeFromCurve = 3;
                                 }
                             }
-                            catch {}
+                            catch (RepairDimReadLimitException) { throw; } catch {}
                         }
                         else if (correspondingEntity is ISketchSegment skSeg)
                         {
@@ -923,7 +947,7 @@ namespace ADDIN.Commands
                                     expectedTypeFromCurve = 0;
                                 }
                             }
-                            catch {}
+                            catch (RepairDimReadLimitException) { throw; } catch {}
                         }
                     }
                 }
@@ -1117,6 +1141,7 @@ namespace ADDIN.Commands
                 List<double[]> localPts = new List<double[]>();
                 for (int p = 0; p < numPolyPoints; p++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     localPts.Add(new double[] {
                         rawDoubles[cursor + p * 3],
                         rawDoubles[cursor + p * 3 + 1],
@@ -1177,8 +1202,8 @@ namespace ADDIN.Commands
                         viewGeom.DirectOwnerResolvedCount++;
                     }
 
-                    try { canonCompName = canonComp.Name2; } catch {}
-                    try { canonCompPath = canonComp.GetPathName(); } catch {}
+                    try { canonCompName = canonComp.Name2; } catch (RepairDimReadLimitException) { throw; } catch {}
+                    try { canonCompPath = canonComp.GetPathName(); } catch (RepairDimReadLimitException) { throw; } catch {}
                     canonCompKey = RepairDimCandidateFinder.GetComponentOccurrenceKey(canonComp);
                 }
                 else
@@ -1202,6 +1227,7 @@ namespace ADDIN.Commands
                 List<double[]> sheetPts = new List<double[]>();
                 for (int p = 0; p < localPts.Count; p++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     sheetPts.Add(ViewLocalToSheet(localPts[p], viewGeom.ViewX, viewGeom.ViewY, effectiveScale));
                 }
 
@@ -1329,6 +1355,7 @@ namespace ADDIN.Commands
             int sumDeclaredGeomSize = 0;
             foreach (var r in viewGeom.RecordDiagnostics)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (r.Type == 0 && r.GeomDataSize > 0)
                 {
                     nonZeroRecords.Add(r);
@@ -1341,6 +1368,7 @@ namespace ADDIN.Commands
 
             for (int b = 0; b < nonZeroRecords.Count; b++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 var recDiag = nonZeroRecords[b];
                 int blockSize = recDiag.GeomDataSize;
 
@@ -1367,6 +1395,7 @@ namespace ADDIN.Commands
 
                     for (int i = 0; i < blockSize; i++)
                     {
+                        RepairDanglingDimensions.CheckRepairReadBudget();
                         block.Values.Add(rawDoubles[tailCursor + i]);
                     }
 
@@ -1393,7 +1422,7 @@ namespace ADDIN.Commands
                                     }
                                 }
                             }
-                            catch {}
+                            catch (RepairDimReadLimitException) { throw; } catch {}
                         }
                     }
 
@@ -1462,6 +1491,7 @@ namespace ADDIN.Commands
             {
                 foreach (var p in viewPolylines)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     if (string.Equals(p.EdgeSignature, anchorSig, StringComparison.OrdinalIgnoreCase))
                     {
                         matches.Add(p);
@@ -1474,6 +1504,7 @@ namespace ADDIN.Commands
             {
                 foreach (var p in viewPolylines)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     if (object.ReferenceEquals(p.ModelEntity, dimInfo.AnchorEntity))
                     {
                         matches.Add(p);
@@ -1486,6 +1517,7 @@ namespace ADDIN.Commands
             {
                 foreach (var p in viewPolylines)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     if (!string.IsNullOrEmpty(p.ComponentName) &&
                         (string.Equals(p.ComponentName, dimInfo.AnchorComponentName, StringComparison.OrdinalIgnoreCase) ||
                          p.ComponentName.EndsWith(dimInfo.AnchorComponentName, StringComparison.OrdinalIgnoreCase) ||
@@ -1508,7 +1540,7 @@ namespace ADDIN.Commands
                                     }
                                 }
                             }
-                            catch {}
+                            catch (RepairDimReadLimitException) { throw; } catch {}
                         }
                     }
                 }
@@ -1530,7 +1562,7 @@ namespace ADDIN.Commands
             MathUtility mathUtil = null;
             if (swApp != null)
             {
-                try { mathUtil = swApp.GetMathUtility() as MathUtility; } catch {}
+                try { mathUtil = swApp.GetMathUtility() as MathUtility; } catch (RepairDimReadLimitException) { throw; } catch {}
             }
 
             ExtractedEdgeInfo info = new ExtractedEdgeInfo
@@ -1556,7 +1588,7 @@ namespace ADDIN.Commands
                         info.ComponentOccurrenceKey = occName + "|" + modPath;
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
             }
 
             double[] startModelPt = null;
@@ -1577,7 +1609,7 @@ namespace ADDIN.Commands
                             else if (curve.IsBcurve()) info.GeometryType = "BCURVE";
                         }
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
 
                     try
                     {
@@ -1600,7 +1632,7 @@ namespace ADDIN.Commands
                             }
                         }
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
 
                     if (startModelPt == null || endModelPt == null)
                     {
@@ -1611,7 +1643,7 @@ namespace ADDIN.Commands
                             if (vStart != null) startModelPt = vStart.GetPoint() as double[];
                             if (vEnd != null) endModelPt = vEnd.GetPoint() as double[];
                         }
-                        catch {}
+                        catch (RepairDimReadLimitException) { throw; } catch {}
                     }
                 }
                 else if (entity is ISilhouetteEdge silEdge)
@@ -1635,7 +1667,7 @@ namespace ADDIN.Commands
                             }
                         }
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
                 }
                 else if (entity is ISketchSegment skSeg)
                 {
@@ -1670,10 +1702,10 @@ namespace ADDIN.Commands
                             }
                         }
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
                 }
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             if (startModelPt == null || endModelPt == null)
             {
@@ -1687,14 +1719,14 @@ namespace ADDIN.Commands
             MathTransform compXform = null;
             if (comp != null)
             {
-                try { compXform = comp.Transform2; } catch {}
+                try { compXform = comp.Transform2; } catch (RepairDimReadLimitException) { throw; } catch {}
             }
             info.HasComponentTransform = (compXform != null);
 
             MathTransform viewXform = null;
             if (view != null)
             {
-                try { viewXform = view.ModelToViewTransform; } catch {}
+                try { viewXform = view.ModelToViewTransform; } catch (RepairDimReadLimitException) { throw; } catch {}
             }
             info.HasViewTransform = (viewXform != null);
 
@@ -1950,7 +1982,7 @@ namespace ADDIN.Commands
             return "SLANTED";
         }
 
-        public static DisplayWitnessProfile BuildDisplayWitnessProfile(List<DisplayDimLine> lines, double[] annotPos = null)
+        public static DisplayWitnessProfile BuildDisplayWitnessProfile(List<DisplayDimLine> lines, double[] annotPos = null, bool checkReadBudget = true)
         {
             DisplayWitnessProfile profile = new DisplayWitnessProfile();
             if (lines == null || lines.Count < 3)
@@ -1966,6 +1998,8 @@ namespace ADDIN.Commands
             List<DisplayDimLine> validLines = new List<DisplayDimLine>();
             foreach (var l in lines)
             {
+                // A provisional DIM must finish verification/cleanup before cancellation.
+                if (checkReadBudget) RepairDanglingDimensions.CheckRepairReadBudget();
                 double dx = l.EndX - l.StartX;
                 double dy = l.EndY - l.StartY;
                 double len = Math.Sqrt(dx * dx + dy * dy);
@@ -1988,6 +2022,7 @@ namespace ADDIN.Commands
 
             for (int i = 0; i < validLines.Count; i++)
             {
+                if (checkReadBudget) RepairDanglingDimensions.CheckRepairReadBudget();
                 var l1 = validLines[i];
                 double dx1 = l1.EndX - l1.StartX;
                 double dy1 = l1.EndY - l1.StartY;
@@ -1998,6 +2033,7 @@ namespace ADDIN.Commands
 
                 for (int j = i + 1; j < validLines.Count; j++)
                 {
+                    if (checkReadBudget) RepairDanglingDimensions.CheckRepairReadBudget();
                     var l2 = validLines[j];
                     double dx2 = l2.EndX - l2.StartX;
                     double dy2 = l2.EndY - l2.StartY;
@@ -2011,6 +2047,7 @@ namespace ADDIN.Commands
 
                     for (int k = 0; k < validLines.Count; k++)
                     {
+                        if (checkReadBudget) RepairDanglingDimensions.CheckRepairReadBudget();
                         if (k == i || k == j) continue;
                         var ld = validLines[k];
                         double dxd = ld.EndX - ld.StartX;
@@ -2205,6 +2242,7 @@ namespace ADDIN.Commands
             {
                 bInfo.IsBroken = view.IsBroken();
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch
             {
                 bInfo.IsBroken = false;
@@ -2213,7 +2251,7 @@ namespace ADDIN.Commands
             if (!bInfo.IsBroken) return bInfo;
 
             double[] viewPos = null;
-            try { viewPos = view.Position as double[]; } catch {}
+            try { viewPos = view.Position as double[]; } catch (RepairDimReadLimitException) { throw; } catch {}
             double vx = (viewPos != null && viewPos.Length >= 2) ? viewPos[0] : 0.0;
             double vy = (viewPos != null && viewPos.Length >= 2) ? viewPos[1] : 0.0;
 
@@ -2225,6 +2263,7 @@ namespace ADDIN.Commands
                     bInfo.BreakCount = blArr.Length;
                     for (int i = 0; i < blArr.Length; i++)
                     {
+                        RepairDanglingDimensions.CheckRepairReadBudget();
                         BreakLine bl = blArr[i] as BreakLine;
                         if (bl != null)
                         {
@@ -2253,11 +2292,11 @@ namespace ADDIN.Commands
                 else
                 {
                     int blCount2 = 0;
-                    try { blCount2 = view.GetBreakLineCount2(out int size); } catch {}
+                    try { blCount2 = view.GetBreakLineCount2(out int size); } catch (RepairDimReadLimitException) { throw; } catch {}
                     bInfo.BreakCount = blCount2;
                 }
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             return bInfo;
         }
@@ -2295,6 +2334,7 @@ namespace ADDIN.Commands
             {
                 foreach (var bl in brokenInfo.BreakLines)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     bool breakAffectsDim = (isDimHorizontal && bl.OrientationRaw == 1) || (!isDimHorizontal && bl.OrientationRaw == 0);
                     if (!breakAffectsDim) continue;
 
@@ -2350,6 +2390,7 @@ namespace ADDIN.Commands
                 info.RawY = sp.Y;
                 info.RawZ = sp.Z;
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch
             {
                 info.ResolutionStatus = "POINT_ANCHOR_OBJECT_INVALID";
@@ -2361,21 +2402,21 @@ namespace ADDIN.Commands
                 object idObj = sp.GetID();
                 if (idObj is int[] idArr && idArr.Length > 0) info.PointID = idArr[0];
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             Sketch liveSketch = null;
-            try { liveSketch = sp.GetSketch() as Sketch; } catch {}
+            try { liveSketch = sp.GetSketch() as Sketch; } catch (RepairDimReadLimitException) { throw; } catch {}
             info.OwnerSketch = liveSketch;
 
             Sketch viewSketch = null;
-            try { viewSketch = view?.GetSketch() as Sketch; } catch {}
+            try { viewSketch = view?.GetSketch() as Sketch; } catch (RepairDimReadLimitException) { throw; } catch {}
 
             try
             {
                 Feature skFeat = liveSketch as Feature;
                 info.SketchFeatureName = skFeat?.GetNameForSelection(out string _) ?? "";
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             if (liveSketch != null && viewSketch != null)
             {
@@ -2397,16 +2438,16 @@ namespace ADDIN.Commands
             }
 
             double[] viewPos = null;
-            try { viewPos = view?.Position as double[]; } catch {}
+            try { viewPos = view?.Position as double[]; } catch (RepairDimReadLimitException) { throw; } catch {}
             double vx = (viewPos != null && viewPos.Length >= 2) ? viewPos[0] : 0.0;
             double vy = (viewPos != null && viewPos.Length >= 2) ? viewPos[1] : 0.0;
 
             double[] scaleRatio = null;
-            try { scaleRatio = view?.ScaleRatio as double[]; } catch {}
+            try { scaleRatio = view?.ScaleRatio as double[]; } catch (RepairDimReadLimitException) { throw; } catch {}
             double scaleDecimal = (scaleRatio != null && scaleRatio.Length >= 2 && scaleRatio[1] > 0) ? (scaleRatio[0] / scaleRatio[1]) : 1.0;
 
             MathUtility mathUtil = null;
-            try { mathUtil = swApp?.GetMathUtility() as MathUtility; } catch {}
+            try { mathUtil = swApp?.GetMathUtility() as MathUtility; } catch (RepairDimReadLimitException) { throw; } catch {}
 
             List<PointCoordinateHypothesis> rawHypotheses = new List<PointCoordinateHypothesis>();
 
@@ -2465,7 +2506,7 @@ namespace ADDIN.Commands
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
             }
 
             // Hypothesis 4: VIEW_MODELTOVIEW_DIRECT
@@ -2489,7 +2530,7 @@ namespace ADDIN.Commands
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
             }
 
             // Evaluate all hypotheses against DisplayWitnessProfile
@@ -2498,6 +2539,7 @@ namespace ADDIN.Commands
 
             foreach (var hyp in rawHypotheses)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (profile != null && profile.IsValid && profile.Witness1GeometryPoint != null && profile.Witness2GeometryPoint != null)
                 {
                     double d1 = Math.Sqrt(Math.Pow(hyp.SheetXY[0] - profile.Witness1GeometryPoint[0], 2) + Math.Pow(hyp.SheetXY[1] - profile.Witness1GeometryPoint[1], 2)) * 1000.0;
@@ -2544,6 +2586,7 @@ namespace ADDIN.Commands
             bool hasSide1 = false, hasSide2 = false;
             foreach (var m in matched)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (m.MatchedWitnessSide == 1) hasSide1 = true;
                 if (m.MatchedWitnessSide == 2) hasSide2 = true;
             }

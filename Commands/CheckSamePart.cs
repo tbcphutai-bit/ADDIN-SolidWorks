@@ -1760,6 +1760,7 @@ namespace ADDIN.Commands
             List<string> faces = new List<string>();
             List<string> edges = new List<string>();
             List<double[]> vertices = new List<double[]>();
+            List<CircularEdgePlacement> circularEdges = new List<CircularEdgePlacement>();
 
             foreach (object faceObject in ToObjectArray(body.GetFaces()))
             {
@@ -1795,6 +1796,7 @@ namespace ADDIN.Commands
                 double length = 0;
                 string type = "U";
                 double radius = 0;
+                CurveParamData edgeParameters = null;
                 try
                 {
                     Curve curve = edge.GetCurve() as Curve;
@@ -1802,9 +1804,9 @@ namespace ADDIN.Commands
                     {
                         try
                         {
-                            CurveParamData parameters = edge.GetCurveParams3();
-                            if (parameters != null)
-                                length = curve.GetLength3(parameters.UMinValue, parameters.UMaxValue);
+                            edgeParameters = edge.GetCurveParams3();
+                            if (edgeParameters != null)
+                                length = curve.GetLength3(edgeParameters.UMinValue, edgeParameters.UMaxValue);
                         }
                         catch { }
                         if (curve.IsLine()) type = "L";
@@ -1813,7 +1815,10 @@ namespace ADDIN.Commands
                             type = "C";
                             double[] circle = curve.CircleParams as double[];
                             if (circle != null && circle.Length > 6)
+                            {
                                 radius = circle[6];
+                                circularEdges.Add(ReadCircularEdgePlacement(curve, circle, length, edgeParameters));
+                            }
                         }
                         else
                         {
@@ -1845,7 +1850,8 @@ namespace ADDIN.Commands
             return "B:" + box
                 + "|F:" + faces.Count + ":" + string.Join(",", faces)
                 + "|E:" + edges.Count + ":" + string.Join(",", edges)
-                + "|V:" + vertices.Count + ":" + string.Join(",", distances);
+                + "|V:" + vertices.Count + ":" + string.Join(",", distances)
+                + "|CP:" + BuildCircularPlacementToken(vertices, circularEdges, LengthScale, isCancellationRequested);
         }
 
         private static string CreateCandidateBodyToken(
@@ -1855,6 +1861,7 @@ namespace ADDIN.Commands
             List<long> faceAreas = new List<long>();
             List<string> edges = new List<string>();
             List<double[]> vertices = ReadVertices(body);
+            List<CircularEdgePlacement> circularEdges = new List<CircularEdgePlacement>();
 
             foreach (object faceObject in ToObjectArray(body.GetFaces()))
             {
@@ -1875,6 +1882,7 @@ namespace ADDIN.Commands
                 double length = 0;
                 double radius = 0;
                 string type = "U";
+                CurveParamData edgeParameters = null;
                 try
                 {
                     Curve curve = edge.GetCurve() as Curve;
@@ -1882,9 +1890,9 @@ namespace ADDIN.Commands
                     {
                         try
                         {
-                            CurveParamData parameters = edge.GetCurveParams3();
-                            if (parameters != null)
-                                length = curve.GetLength3(parameters.UMinValue, parameters.UMaxValue);
+                            edgeParameters = edge.GetCurveParams3();
+                            if (edgeParameters != null)
+                                length = curve.GetLength3(edgeParameters.UMinValue, edgeParameters.UMaxValue);
                         }
                         catch { }
                         if (curve.IsLine()) type = "L";
@@ -1893,7 +1901,10 @@ namespace ADDIN.Commands
                             type = "C";
                             double[] circle = curve.CircleParams as double[];
                             if (circle != null && circle.Length > 6)
+                            {
                                 radius = circle[6];
+                                circularEdges.Add(ReadCircularEdgePlacement(curve, circle, length, edgeParameters));
+                            }
                         }
                     }
                 }
@@ -1913,7 +1924,76 @@ namespace ADDIN.Commands
             // khi cung mot body duoc xay theo truc/huong khac, du hinh hoc trung nhau.
             return "F:" + faceAreas.Count + ":" + string.Join(",", faceAreas)
                 + "|E:" + edges.Count + ":" + string.Join(",", edges)
-                + "|V:" + vertices.Count + ":" + string.Join(",", distances);
+                + "|V:" + vertices.Count + ":" + string.Join(",", distances)
+                + "|CP:" + BuildCircularPlacementToken(vertices, circularEdges, CandidateLengthScale, isCancellationRequested);
+        }
+
+        internal sealed class CircularEdgePlacement
+        {
+            internal double[] Center;
+            internal double[] Axis;
+            internal double Radius;
+            internal double Length;
+            internal double[] ArcMidpoint;
+        }
+
+        private static CircularEdgePlacement ReadCircularEdgePlacement(
+            Curve curve, double[] circle, double length, CurveParamData parameters)
+        {
+            CircularEdgePlacement placement = new CircularEdgePlacement
+            {
+                Center = new[] { circle[0], circle[1], circle[2] },
+                Axis = new[] { circle[3], circle[4], circle[5] },
+                Radius = circle[6],
+                Length = length
+            };
+            // A full circle has an arbitrary seam. Use its center and plane;
+            // only a trimmed arc has a geometrically meaningful midpoint.
+            if (parameters != null && length > 0
+                && Math.Abs(length - 2.0 * Math.PI * placement.Radius) > 1e-8)
+            {
+                double[] point = curve.Evaluate2(
+                    (parameters.UMinValue + parameters.UMaxValue) * 0.5, 0) as double[];
+                if (point != null && point.Length >= 3)
+                    placement.ArcMidpoint = new[] { point[0], point[1], point[2] };
+            }
+            return placement;
+        }
+
+        internal static string BuildCircularPlacementToken(
+            List<double[]> vertices, List<CircularEdgePlacement> circularEdges,
+            double scale, Func<bool> isCancellationRequested)
+        {
+            if (circularEdges.Count == 0)
+                return "NONE";
+            // Closed circular edges can have no vertices. Radius/length and
+            // outer-vertex distances alone lose the positions of those holes.
+            List<double[]> points = DistinctPoints(vertices
+                .Concat(circularEdges.Select(edge => edge.Center))
+                .Concat(circularEdges.Where(edge => edge.ArcMidpoint != null)
+                    .Select(edge => edge.ArcMidpoint)), 1e-9);
+            List<string> tokens = new List<string>();
+            foreach (CircularEdgePlacement edge in circularEdges)
+            {
+                ThrowIfCanceled(isCancellationRequested);
+                double axisLength = Math.Sqrt(edge.Axis.Sum(value => value * value));
+                if (axisLength <= 1e-12)
+                    throw new InvalidOperationException("Khong doc duoc truc canh tron de so sanh.");
+                List<string> positions = points.Select(point =>
+                {
+                    double planeDistance = Math.Abs(
+                        (point[0] - edge.Center[0]) * edge.Axis[0]
+                        + (point[1] - edge.Center[1]) * edge.Axis[1]
+                        + (point[2] - edge.Center[2]) * edge.Axis[2]) / axisLength;
+                    return Quantize(Distance(point, edge.Center), scale)
+                        + ":" + Quantize(planeDistance, scale);
+                }).OrderBy(value => value, StringComparer.Ordinal).ToList();
+                tokens.Add("R" + Quantize(edge.Radius, scale)
+                    + "|L" + Quantize(edge.Length, scale)
+                    + "|D" + string.Join(",", positions));
+            }
+            tokens.Sort(StringComparer.Ordinal);
+            return Hash(string.Join(";", tokens));
         }
 
         private static List<double[]> ReadVertices(Body2 body)

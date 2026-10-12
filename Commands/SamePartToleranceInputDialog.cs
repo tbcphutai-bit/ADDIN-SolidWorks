@@ -10,6 +10,7 @@ namespace ADDIN.Commands
         public SamePartToleranceInputDialog()
         {
             InitializeComponent();
+            UI.TaiDialog.Apply(this, btnRun);
             LoadValues(lastOptions);
         }
 

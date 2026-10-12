@@ -8,7 +8,7 @@ using SolidWorks.Interop.swpublished;
 
 namespace ADDIN.UI
 {
-    // Native SOLIDWORKS PropertyManager for the two workflows of one AUTO SPLINE command.
+    // Native SOLIDWORKS PropertyManager for AUTO SPLINE creation and movement.
     [ComVisible(true)]
     [ClassInterface(ClassInterfaceType.AutoDispatch)]
     public sealed class AutoSplinePropertyManagerPage : PropertyManagerPage2Handler9
@@ -21,8 +21,15 @@ namespace ADDIN.UI
         private const int SplineGroupId = 6;
         private const int MoveHintId = 7;
         private const int SplineBoxId = 8;
+        private const int Create2DOptionId = 9;
+        private const int Create2DHintId = 10;
+        private const int CreateTwoEdgesOptionId = 11;
+        private const int SecondEdgeGroupId = 12;
+        private const int SecondEdgeBoxId = 13;
+        private const int TwoEdgesHintId = 14;
         private const int EdgeMark = 1;
         private const int SplineMark = 2;
+        private const int SecondEdgeMark = 4;
 
         private readonly ISldWorks app;
         private readonly IWin32Window owner;
@@ -31,18 +38,31 @@ namespace ADDIN.UI
         private PropertyManagerPage2 page;
         private PropertyManagerPageOption createOption;
         private PropertyManagerPageOption moveOption;
+        private PropertyManagerPageOption create2DOption;
+        private PropertyManagerPageOption createTwoEdgesOption;
         private PropertyManagerPageSelectionbox edgeBox;
+        private PropertyManagerPageSelectionbox secondEdgeBox;
         private PropertyManagerPageSelectionbox splineBox;
         private PropertyManagerPageControl moveHint;
+        private PropertyManagerPageControl create2DHint;
+        private PropertyManagerPageControl twoEdgesHint;
         private PropertyManagerPageControl splineBoxControl;
         private PropertyManagerPageGroup splineGroup;
         private PropertyManagerPageGroup targetGroup;
+        private PropertyManagerPageGroup secondEdgeGroup;
         private Timer modeRefreshTimer;
         private bool? displayedMoveMode;
+        private bool? displayedCreate2DMode;
+        private bool? displayedCreateTwoEdgesMode;
         private bool moveMode;
+        private bool create2DMode;
+        private bool createTwoEdgesMode;
         private bool shown;
+        private bool closing;
+        private bool refreshingModeDisplay;
         private bool executeAfterClose;
         private Edge selectedEdge;
+        private Edge selectedSecondEdge;
         private SketchSpline selectedSpline;
 
         public AutoSplinePropertyManagerPage(
@@ -60,12 +80,25 @@ namespace ADDIN.UI
 
         public void Dismiss()
         {
-            if (shown && page != null)
+            if (!shown) return;
+            // Close can pump the UI message loop before OnClose is delivered.
+            // Invalidate pending refreshes before entering native teardown.
+            closing = true;
+            shown = false;
+            CancelModeRefresh();
+            if (page != null)
                 page.Close(false);
         }
 
         public void Show()
         {
+            if (shown) return;
+            closing = false;
+            executeAfterClose = false;
+            displayedMoveMode = null;
+            displayedCreate2DMode = null;
+            displayedCreateTwoEdgesMode = null;
+            CancelModeRefresh();
             if (model == null ||
                 model.GetType() != (int)swDocumentTypes_e.swDocPART)
             {
@@ -98,8 +131,18 @@ namespace ADDIN.UI
                 as PropertyManagerPageGroup;
             createOption = modeGroup.AddControl2(CreateOptionId,
                 (short)swPropertyManagerPageControlType_e.swControlType_Option,
-                "Tạo spline mới từ cạnh", align, controlOptions,
+                "Tạo spline 3D từ cạnh", align, controlOptions,
                 "Chọn một Edge để tạo 3D spline mới.") as PropertyManagerPageOption;
+            createTwoEdgesOption = modeGroup.AddControl2(CreateTwoEdgesOptionId,
+                (short)swPropertyManagerPageControlType_e.swControlType_Option,
+                "Gộp 2 cạnh thành spline 3D", align, controlOptions,
+                "Chọn hai cạnh nối tiếp để tạo một spline 3D liên tục.")
+                as PropertyManagerPageOption;
+            create2DOption = modeGroup.AddControl2(Create2DOptionId,
+                (short)swPropertyManagerPageControlType_e.swControlType_Option,
+                "Tạo spline 2D từ cạnh", align, controlOptions,
+                "Edit 2D Sketch rồi chọn cạnh Surface/Body nằm trên mặt phẳng Sketch.")
+                as PropertyManagerPageOption;
             moveOption = modeGroup.AddControl2(MoveOptionId,
                 (short)swPropertyManagerPageControlType_e.swControlType_Option,
                 "Di chuyển spline hiện có", align, controlOptions,
@@ -128,6 +171,18 @@ namespace ADDIN.UI
 
             targetGroup = page.AddGroupBox(TargetGroupId,
                 "Cạnh tạo spline mới", groupOptions) as PropertyManagerPageGroup;
+            create2DHint = targetGroup.AddControl2(Create2DHintId,
+                (short)swPropertyManagerPageControlType_e.swControlType_Label,
+                "Edit 2D Sketch trước. Chọn cạnh nằm trên mặt phẳng Sketch.",
+                align, controlOptions,
+                "Chia điểm đều theo chiều dài cạnh, dùng ít fit point nhất đã kiểm tra, sai số ≤ 0,20 mm.")
+                as PropertyManagerPageControl;
+            twoEdgesHint = targetGroup.AddControl2(TwoEdgesHintId,
+                (short)swPropertyManagerPageControlType_e.swControlType_Label,
+                "Chọn 2 cạnh nối tiếp nhau. Thoát 2D Sketch trước khi dùng.",
+                align, controlOptions,
+                "Một spline liên tục; điểm chia đều trên tổng chiều dài hai cạnh, sai số ≤ 0,20 mm.")
+                as PropertyManagerPageControl;
             edgeBox = targetGroup.AddControl2(EdgeBoxId,
                 (short)swPropertyManagerPageControlType_e.swControlType_Selectionbox,
                 "Chọn cạnh spline Surface/Body", align, controlOptions,
@@ -138,82 +193,177 @@ namespace ADDIN.UI
             edgeBox.Height = 36;
             edgeBox.SetSelectionFilters(new int[] { (int)swSelectType_e.swSelEDGES });
 
-            if (createOption == null || moveOption == null || edgeBox == null ||
+            secondEdgeGroup = page.AddGroupBox(SecondEdgeGroupId,
+                "2. Cạnh thứ hai nối tiếp", groupOptions) as PropertyManagerPageGroup;
+            secondEdgeBox = secondEdgeGroup.AddControl2(SecondEdgeBoxId,
+                (short)swPropertyManagerPageControlType_e.swControlType_Selectionbox,
+                "Chọn cạnh thứ hai", align, controlOptions,
+                "Chọn cạnh Surface/Body nối với một endpoint của cạnh thứ nhất.")
+                as PropertyManagerPageSelectionbox;
+            secondEdgeBox.Mark = SecondEdgeMark;
+            secondEdgeBox.SingleEntityOnly = true;
+            secondEdgeBox.Height = 36;
+            secondEdgeBox.SetSelectionFilters(new int[] { (int)swSelectType_e.swSelEDGES });
+
+            if (createOption == null || create2DOption == null || create2DHint == null ||
+                createTwoEdgesOption == null || twoEdgesHint == null ||
+                secondEdgeGroup == null || secondEdgeBox == null ||
+                moveOption == null || edgeBox == null ||
                 splineGroup == null || splineBox == null ||
                 splineBoxControl == null || moveHint == null ||
                 targetGroup == null)
                 throw new InvalidOperationException("Không tạo đủ mục chọn AUTO SPLINE.");
 
-            createOption.Checked = !moveMode;
-            moveOption.Checked = moveMode;
+            bool initialMoveMode = moveMode;
+            bool initialCreate2DMode = create2DMode;
+            bool initialCreateTwoEdgesMode = createTwoEdgesMode;
+            createOption.Checked = !initialMoveMode && !initialCreate2DMode && !initialCreateTwoEdgesMode;
+            createTwoEdgesOption.Checked = initialCreateTwoEdgesMode;
+            create2DOption.Checked = initialCreate2DMode;
+            moveOption.Checked = initialMoveMode;
+            moveMode = initialMoveMode;
+            create2DMode = initialCreate2DMode;
+            createTwoEdgesMode = initialCreateTwoEdgesMode;
             splineGroup.Visible = moveMode;
             splineGroup.Expanded = moveMode;
             moveHint.Visible = moveMode;
             splineBoxControl.Visible = moveMode;
+            create2DHint.Visible = create2DMode;
+            twoEdgesHint.Visible = createTwoEdgesMode;
+            secondEdgeGroup.Visible = createTwoEdgesMode;
+            secondEdgeGroup.Expanded = createTwoEdgesMode;
             targetGroup.Caption = moveMode
                 ? "2. Spline đích: cạnh Surface/Body"
-                : "Cạnh tạo spline mới";
+                : create2DMode ? "Cạnh tạo spline trong 2D Sketch"
+                : createTwoEdgesMode ? "1. Cạnh thứ nhất" : "Cạnh tạo spline 3D";
             page.Show2(0);
+            if (closing || page == null) return;
             shown = true;
             RestoreInitialSelection();
-            // SOLIDWORKS can defer PropertyManager layout changes made during a
-            // radio-button COM callback. Reconcile on its UI message loop.
-            modeRefreshTimer = new Timer { Interval = 75 };
-            modeRefreshTimer.Tick += OnModeRefreshTick;
-            modeRefreshTimer.Start();
             RefreshModeDisplay();
+        }
+
+        private void ScheduleModeRefresh()
+        {
+            if (!shown || closing ||
+                (displayedMoveMode == moveMode && displayedCreate2DMode == create2DMode &&
+                 displayedCreateTwoEdgesMode == createTwoEdgesMode)) return;
+            // Defer only the requested layout change until the radio-button
+            // callback returns. Never poll Checked on a native COM control.
+            if (modeRefreshTimer == null)
+            {
+                modeRefreshTimer = new Timer { Interval = 1 };
+                modeRefreshTimer.Tick += OnModeRefreshTick;
+            }
+            modeRefreshTimer.Stop();
+            modeRefreshTimer.Start();
+        }
+
+        private void CancelModeRefresh()
+        {
+            Timer timer = modeRefreshTimer;
+            modeRefreshTimer = null;
+            if (timer == null) return;
+            timer.Stop();
+            timer.Tick -= OnModeRefreshTick;
+            timer.Dispose();
         }
 
         private void OnModeRefreshTick(object sender, EventArgs e)
         {
-            if (!shown || moveOption == null) return;
-            bool selectedMode = moveOption.Checked;
-            if (selectedMode != moveMode)
-            {
-                moveMode = selectedMode;
-                displayedMoveMode = null;
-            }
-            if (displayedMoveMode != moveMode)
-                RefreshModeDisplay();
+            // Ignore a queued callback from a timer that has already been
+            // cancelled, including callbacks from an earlier page opening.
+            if (!ReferenceEquals(sender, modeRefreshTimer)) return;
+            CancelModeRefresh();
+            if (!shown || closing ||
+                (displayedMoveMode == moveMode && displayedCreate2DMode == create2DMode &&
+                 displayedCreateTwoEdgesMode == createTwoEdgesMode)) return;
+            RefreshModeDisplay();
         }
 
         private void RefreshModeDisplay()
         {
-            if (!shown) return;
-            // Release focus from the source selection box before hiding it.
-            if (!moveMode) edgeBox.SetSelectionFocus();
-            targetGroup.Caption = moveMode
-                ? "2. Spline đích: cạnh Surface/Body"
-                : "Cạnh tạo spline mới";
-            moveHint.Visible = moveMode;
-            splineBoxControl.Visible = moveMode;
-            splineGroup.Expanded = moveMode;
-            splineGroup.Visible = moveMode;
-            if (moveMode && selectedSpline == null)
-                splineBox.SetSelectionFocus();
-            displayedMoveMode = moveMode;
-            UpdateReadyState();
+            if (!shown || closing || refreshingModeDisplay) return;
+            refreshingModeDisplay = true;
+            try
+            {
+                bool modeForDisplay = moveMode;
+                bool create2DForDisplay = create2DMode;
+                bool createTwoEdgesForDisplay = createTwoEdgesMode;
+                // Focus changes can re-enter SolidWorks and close the page.
+                // Check the managed lifetime again after each native call.
+                if (!modeForDisplay) edgeBox.SetSelectionFocus();
+                if (!shown || closing) return;
+                targetGroup.Caption = modeForDisplay
+                    ? "2. Spline đích: cạnh Surface/Body"
+                    : create2DForDisplay ? "Cạnh tạo spline trong 2D Sketch"
+                    : createTwoEdgesForDisplay ? "1. Cạnh thứ nhất" : "Cạnh tạo spline 3D";
+                if (!shown || closing) return;
+                create2DHint.Visible = create2DForDisplay;
+                if (!shown || closing) return;
+                twoEdgesHint.Visible = createTwoEdgesForDisplay;
+                if (!shown || closing) return;
+                secondEdgeGroup.Expanded = createTwoEdgesForDisplay;
+                if (!shown || closing) return;
+                secondEdgeGroup.Visible = createTwoEdgesForDisplay;
+                if (!shown || closing) return;
+                moveHint.Visible = modeForDisplay;
+                if (!shown || closing) return;
+                splineBoxControl.Visible = modeForDisplay;
+                if (!shown || closing) return;
+                splineGroup.Expanded = modeForDisplay;
+                if (!shown || closing) return;
+                splineGroup.Visible = modeForDisplay;
+                if (!shown || closing) return;
+                if (modeForDisplay && selectedSpline == null)
+                    splineBox.SetSelectionFocus();
+                if (!shown || closing) return;
+                displayedMoveMode = modeForDisplay;
+                displayedCreate2DMode = create2DForDisplay;
+                displayedCreateTwoEdgesMode = createTwoEdgesForDisplay;
+                UpdateReadyState();
+            }
+            finally
+            {
+                refreshingModeDisplay = false;
+            }
+            ScheduleModeRefresh();
         }
 
         private void CaptureInitialSelection()
         {
+            selectedEdge = null;
+            selectedSecondEdge = null;
+            selectedSpline = null;
+            moveMode = false;
+            createTwoEdgesMode = false;
+            Sketch activeSketch = model.SketchManager.ActiveSketch as Sketch;
+            create2DMode = activeSketch != null && !activeSketch.Is3D();
             SelectionMgr manager = model.SelectionManager as SelectionMgr;
             if (manager == null) return;
             int count = manager.GetSelectedObjectCount2(-1);
             if (count < 1 || count > 2) return;
 
             Edge edge = null;
+            Edge secondEdge = null;
             SketchSpline spline = null;
             for (int i = 1; i <= count; i++)
             {
                 object item = manager.GetSelectedObject6(i, -1);
-                if (item is Edge) edge = (Edge)item;
+                if (item is Edge)
+                {
+                    if (edge == null) edge = (Edge)item;
+                    else secondEdge = (Edge)item;
+                }
                 else if (spline == null)
                     spline = EdgeToEqualSplineCommand.ResolveSelectedSketchSpline(model, item);
             }
             selectedEdge = edge;
+            selectedSecondEdge = secondEdge;
             selectedSpline = count == 2 ? spline : null;
             moveMode = selectedEdge != null && selectedSpline != null;
+            createTwoEdgesMode = selectedEdge != null && selectedSecondEdge != null;
+            if (moveMode || createTwoEdgesMode) create2DMode = false;
         }
 
         private void RestoreInitialSelection()
@@ -222,8 +372,11 @@ namespace ADDIN.UI
             if (selectedEdge != null) SelectWithMark(selectedEdge, false, EdgeMark);
             if (moveMode && selectedSpline != null)
                 SelectWithMark(selectedSpline, selectedEdge != null, SplineMark);
+            if (createTwoEdgesMode && selectedSecondEdge != null)
+                SelectWithMark(selectedSecondEdge, selectedEdge != null, SecondEdgeMark);
             if (selectedEdge == null) edgeBox.SetSelectionFocus();
             else if (moveMode && selectedSpline == null) splineBox.SetSelectionFocus();
+            else if (createTwoEdgesMode && selectedSecondEdge == null) secondEdgeBox.SetSelectionFocus();
         }
 
         private bool SelectWithMark(object item, bool append, int mark)
@@ -240,7 +393,7 @@ namespace ADDIN.UI
 
         private void UpdateReadyState()
         {
-            if (page == null || !shown) return;
+            if (page == null || !shown || closing) return;
             SelectionMgr manager = model.SelectionManager as SelectionMgr;
             bool edgeReady = manager != null &&
                 manager.GetSelectedObjectCount2(EdgeMark) == 1 &&
@@ -250,9 +403,21 @@ namespace ADDIN.UI
                  manager.GetSelectedObjectCount2(SplineMark) == 1 &&
                  EdgeToEqualSplineCommand.ResolveSelectedSketchSpline(model,
                      manager.GetSelectedObject6(1, SplineMark)) != null);
+            bool secondEdgeReady = !createTwoEdgesMode ||
+                (manager != null && manager.GetSelectedObjectCount2(SecondEdgeMark) == 1 &&
+                 manager.GetSelectedObject6(1, SecondEdgeMark) is Edge);
+            bool sketchReady = true;
+            if (create2DMode || createTwoEdgesMode)
+            {
+                Sketch activeSketch = model.SketchManager.ActiveSketch as Sketch;
+                sketchReady = create2DMode
+                    ? activeSketch != null && !activeSketch.Is3D()
+                    : activeSketch == null || activeSketch.Is3D();
+            }
+            if (page == null || !shown || closing) return;
             page.EnableButton(
                 (int)swPropertyManagerPageButtons_e.swPropertyManagerPageButton_Ok,
-                edgeReady && splineReady);
+                edgeReady && splineReady && secondEdgeReady && sketchReady);
         }
 
         private void Notify(string message, swMessageBoxIcon_e icon)
@@ -265,6 +430,11 @@ namespace ADDIN.UI
         public void AfterActivation() { }
         public void OnClose(int reason)
         {
+            // OnClose runs before the native page and its controls are torn
+            // down. AfterClose is too late to stop UI timer callbacks safely.
+            closing = true;
+            shown = false;
+            CancelModeRefresh();
             executeAfterClose = reason ==
                 (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay;
             if (!executeAfterClose) return;
@@ -276,27 +446,44 @@ namespace ADDIN.UI
                 manager.GetSelectedObjectCount2(SplineMark) != 1
                     ? null : EdgeToEqualSplineCommand.ResolveSelectedSketchSpline(
                         model, manager.GetSelectedObject6(1, SplineMark));
+            selectedSecondEdge = !createTwoEdgesMode || manager == null ||
+                manager.GetSelectedObjectCount2(SecondEdgeMark) != 1
+                    ? null : manager.GetSelectedObject6(1, SecondEdgeMark) as Edge;
         }
         public void AfterClose()
         {
+            closing = true;
             shown = false;
-            if (modeRefreshTimer != null)
-            {
-                modeRefreshTimer.Stop();
-                modeRefreshTimer.Tick -= OnModeRefreshTick;
-                modeRefreshTimer.Dispose();
-                modeRefreshTimer = null;
-            }
+            CancelModeRefresh();
             page = null;
+            createOption = null;
+            moveOption = null;
+            create2DOption = null;
+            createTwoEdgesOption = null;
+            edgeBox = null;
+            secondEdgeBox = null;
+            splineBox = null;
+            moveHint = null;
+            create2DHint = null;
+            twoEdgesHint = null;
+            splineBoxControl = null;
+            splineGroup = null;
+            targetGroup = null;
+            secondEdgeGroup = null;
             closed?.Invoke(this);
             if (!executeAfterClose) return;
 
-            if (selectedEdge == null || (moveMode && selectedSpline == null))
+            if (selectedEdge == null || (moveMode && selectedSpline == null) ||
+                (createTwoEdgesMode && selectedSecondEdge == null))
             {
                 Notify(moveMode
                     ? "Chọn 2 đường spline: spline nguồn trong 3D Sketch " +
                       "đang Edit và cạnh spline đích của Surface/Body."
-                    : "Chọn 1 Edge Surface/Body để tạo spline.",
+                    : create2DMode
+                        ? "Edit 2D Sketch, chọn 1 cạnh Surface/Body trên mặt phẳng Sketch."
+                        : createTwoEdgesMode
+                        ? "Chọn 2 cạnh Surface/Body nối tiếp trong hai ô chọn cạnh."
+                        : "Chọn 1 Edge Surface/Body để tạo spline.",
                     swMessageBoxIcon_e.swMbInformation);
                 return;
             }
@@ -316,10 +503,15 @@ namespace ADDIN.UI
                 bool selected = SelectWithMark(selectedEdge, false, 0);
                 if (selected && moveMode)
                     selected = SelectWithMark(selectedSpline, true, 0);
+                if (selected && createTwoEdgesMode)
+                    selected = SelectWithMark(selectedSecondEdge, true, 0);
                 if (!selected)
                     throw new InvalidOperationException(
                         "Không khôi phục được cạnh/spline đã chọn.");
-                new EdgeToEqualSplineCommand(app).Run(owner, moveMode);
+                var command = new EdgeToEqualSplineCommand(app);
+                if (createTwoEdgesMode) command.RunCreate3DFromTwoEdges(owner);
+                else if (create2DMode) command.RunCreate2D(owner);
+                else command.Run(owner, moveMode);
             }
             catch (Exception ex)
             {
@@ -330,7 +522,12 @@ namespace ADDIN.UI
 
         public bool OnHelp()
         {
-            Notify("TẠO: chọn một Edge, bấm dấu ✓.\n\n" +
+            Notify("TẠO 3D: chọn một Edge, bấm dấu ✓.\n\n" +
+                   "GỘP 2 CẠNH: chọn hai cạnh Surface/Body nối tiếp trong hai ô chọn, bấm dấu ✓. " +
+                   "Tạo một spline liên tục trong 3D Sketch đang Edit hoặc 3D Sketch mới. " +
+                   "Điểm chia đều trên tổng chiều dài hai cạnh, sai số ≤ 0,20 mm.\n\n" +
+                   "TẠO 2D: Edit 2D Sketch, chọn cạnh Surface/Body nằm trên mặt phẳng Sketch, " +
+                   "rồi bấm dấu ✓. Spline được thêm vào Sketch đang Edit; điểm chia đều, sai số ≤ 0,20 mm.\n\n" +
                    "DI CHUYỂN: Edit 3D Sketch, chọn hai đường spline: " +
                    "spline nguồn trong Sketch và cạnh spline đích " +
                    "của Surface/Body, rồi bấm dấu ✓.\n\n" +
@@ -350,9 +547,15 @@ namespace ADDIN.UI
         public void OnCheckboxCheck(int id, bool isChecked) { }
         public void OnOptionCheck(int id)
         {
-            if (id != CreateOptionId && id != MoveOptionId) return;
+            if (closing || (id != CreateOptionId && id != MoveOptionId &&
+                id != Create2DOptionId && id != CreateTwoEdgesOptionId)) return;
             moveMode = id == MoveOptionId;
+            create2DMode = id == Create2DOptionId;
+            createTwoEdgesMode = id == CreateTwoEdgesOptionId;
             displayedMoveMode = null;
+            displayedCreate2DMode = null;
+            displayedCreateTwoEdgesMode = null;
+            ScheduleModeRefresh();
         }
         public void OnButtonPress(int id) { }
         public void OnTextboxChanged(int id, string value) { }
@@ -363,6 +566,7 @@ namespace ADDIN.UI
         public void OnSelectionboxFocusChanged(int id) { }
         public void OnSelectionboxListChanged(int id, int count)
         {
+            if (refreshingModeDisplay) return;
             UpdateReadyState();
         }
         public void OnSelectionboxCalloutCreated(int id) { }
@@ -370,7 +574,9 @@ namespace ADDIN.UI
         public bool OnSubmitSelection(int id, object selection, int type,
             ref string itemText)
         {
+            if (closing) return false;
             if (id == EdgeBoxId) return selection is Edge;
+            if (id == SecondEdgeBoxId) return createTwoEdgesMode && selection is Edge;
             return id == SplineBoxId && moveMode &&
                 EdgeToEqualSplineCommand.ResolveSelectedSketchSpline(
                     model, selection) != null;

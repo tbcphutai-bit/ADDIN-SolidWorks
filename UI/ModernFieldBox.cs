@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace ADDIN.UI
 {
+    // A caption at the left of the input it hosts.
     public class ModernFieldBox : Panel
     {
         [Category("Appearance")]
@@ -21,15 +22,9 @@ namespace ADDIN.UI
         {
             base.OnPaint(e);
             string text = !string.IsNullOrEmpty(LabelText) ? LabelText : Text;
-            if (!string.IsNullOrEmpty(text))
-            {
-                e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-                using (var font = new Font("Segoe UI", 8.75F, FontStyle.Bold))
-                {
-                    TextRenderer.DrawText(e.Graphics, text, font, new Point(2, Height / 2 - 8), Color.FromArgb(71, 85, 105),
-                        TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-                }
-            }
+            if (string.IsNullOrEmpty(text)) return;
+            TextRenderer.DrawText(e.Graphics, text, TaiTheme.Body, new Rectangle(TaiTheme.Px(this, 2), 0, TaiTheme.Px(this, 50), Height), TaiTheme.TextMuted,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
         }
     }
 }

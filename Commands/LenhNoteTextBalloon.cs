@@ -1,7 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
@@ -9,13 +11,40 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    public class LenhNoteTextBalloon
+    public partial class LenhNoteTextBalloon
     {
         private readonly ISldWorks swApp;
         private readonly IWin32Window owner;
         private readonly HistoryTextBox noteComboBox;
         private readonly HistoryTextBox textComboBox;
         private readonly ComboBox balloonPropertyComboBox;
+        private readonly string historyDirectory;
+        private readonly Dictionary<string, SavedItemsSnapshot> savedItemsCache =
+            new Dictionary<string, SavedItemsSnapshot>(StringComparer.OrdinalIgnoreCase);
+        private static readonly CompareInfo JapaneseTextComparison = CultureInfo.GetCultureInfo("ja-JP").CompareInfo;
+        private List<string> sortedTextSource;
+        private List<string> sortedTextItems;
+
+        private sealed class SavedItemsSnapshot
+        {
+            public string SourcePath;
+            public DateTime LastWriteTimeUtc;
+            public long Length;
+            public List<string> Items;
+        }
+
+        private sealed class DisplayDimensionIdentityComparer : IEqualityComparer<DisplayDimension>
+        {
+            public bool Equals(DisplayDimension left, DisplayDimension right)
+            {
+                return ReferenceEquals(left, right);
+            }
+
+            public int GetHashCode(DisplayDimension dimension)
+            {
+                return RuntimeHelpers.GetHashCode(dimension);
+            }
+        }
 
         public LenhNoteTextBalloon(
             ISldWorks app,
@@ -23,12 +52,26 @@ namespace ADDIN.Commands
             HistoryTextBox noteList,
             HistoryTextBox textList,
             ComboBox balloonPropertyList)
+            : this(app, dialogOwner, noteList, textList, balloonPropertyList,
+                Path.Combine(System.Environment.GetFolderPath(
+                    System.Environment.SpecialFolder.ApplicationData), "ADDIN"))
+        {
+        }
+
+        internal LenhNoteTextBalloon(
+            ISldWorks app,
+            IWin32Window dialogOwner,
+            HistoryTextBox noteList,
+            HistoryTextBox textList,
+            ComboBox balloonPropertyList,
+            string savedHistoryDirectory)
         {
             swApp = app;
             owner = dialogOwner;
             noteComboBox = noteList;
             textComboBox = textList;
             balloonPropertyComboBox = balloonPropertyList;
+            historyDirectory = savedHistoryDirectory;
 
             LoadSavedItems(noteComboBox, GetSavedNotePath());
             LoadSavedItems(textComboBox, GetSavedTextPath());
@@ -88,20 +131,35 @@ namespace ADDIN.Commands
                     return;
             }
 
-            AddSavedItem(textComboBox, GetSavedTextPath(), text);
-
-            DisplayDimension displayDimension = GetSelectedDisplayDimension(model);
-            if (displayDimension == null)
+            List<DisplayDimension> displayDimensions = GetSelectedDisplayDimensions(model);
+            if (displayDimensions.Count == 0)
             {
-                MessageBox.Show("Hay chon 1 dimension truoc.", "Text", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Hay chon dimension truoc. Giu Ctrl de chon nhieu dimension.", "Text", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            List<string> savedTexts = ReadSavedItems(GetSavedTextPath());
-            string currentSuffix = displayDimension.GetText((int)swDimensionTextParts_e.swDimensionTextSuffix);
-            string newSuffix = BuildDimensionSuffix(currentSuffix, text, savedTexts);
-            displayDimension.SetText((int)swDimensionTextParts_e.swDimensionTextSuffix, newSuffix);
-            model.GraphicsRedraw2();
+            List<string> savedTexts = AddSavedItem(textComboBox, GetSavedTextPath(), text);
+            bool changed = false;
+            try
+            {
+                foreach (DisplayDimension displayDimension in displayDimensions)
+                {
+                    string currentSuffix = displayDimension.GetText((int)swDimensionTextParts_e.swDimensionTextSuffix);
+                    string newSuffix = BuildDimensionSuffix(currentSuffix, text, savedTexts);
+                    if (string.Equals(currentSuffix ?? "", newSuffix, StringComparison.Ordinal))
+                        continue;
+
+                    displayDimension.SetText((int)swDimensionTextParts_e.swDimensionTextSuffix, newSuffix);
+                    changed = true;
+                }
+            }
+            finally
+            {
+                // Refresh once for the whole batch, including changes already
+                // applied if a later dimension fails. Preserve the selection.
+                if (changed)
+                    model.GraphicsRedraw2();
+            }
         }
 
         public void DeleteSelectedText()
@@ -425,28 +483,30 @@ namespace ADDIN.Commands
             return string.IsNullOrWhiteSpace(resolvedVal) ? valOut : resolvedVal;
         }
 
-        private DisplayDimension GetSelectedDisplayDimension(ModelDoc2 model)
+        private List<DisplayDimension> GetSelectedDisplayDimensions(ModelDoc2 model)
         {
+            List<DisplayDimension> dimensions = new List<DisplayDimension>();
             SelectionMgr selMgr = model.SelectionManager as SelectionMgr;
             if (selMgr == null)
-                return null;
+                return dimensions;
 
+            HashSet<DisplayDimension> seen = new HashSet<DisplayDimension>(new DisplayDimensionIdentityComparer());
             int count = selMgr.GetSelectedObjectCount2(-1);
             for (int i = 1; i <= count; i++)
             {
                 object selectedObject = selMgr.GetSelectedObject6(i, -1);
 
                 DisplayDimension displayDimension = selectedObject as DisplayDimension;
-                if (displayDimension != null)
-                    return displayDimension;
-
-                Annotation annotation = selectedObject as Annotation;
-                displayDimension = annotation?.GetSpecificAnnotation() as DisplayDimension;
-                if (displayDimension != null)
-                    return displayDimension;
+                if (displayDimension == null)
+                {
+                    Annotation annotation = selectedObject as Annotation;
+                    displayDimension = annotation?.GetSpecificAnnotation() as DisplayDimension;
+                }
+                if (displayDimension != null && seen.Add(displayDimension))
+                    dimensions.Add(displayDimension);
             }
 
-            return null;
+            return dimensions;
         }
 
         private string BuildDimensionSuffix(string currentSuffix, string text, List<string> savedTexts)
@@ -526,31 +586,68 @@ namespace ADDIN.Commands
             if (comboBox == null)
                 return;
 
-            comboBox.ClearItems();
-
             List<string> items = ReadSavedItems(path);
-            foreach (string item in items)
-                comboBox.AddItem(item);
+            UpdateSavedItemList(comboBox, items);
 
             if (comboBox.ItemCount > 0)
-                comboBox.Text = comboBox.GetItem(0);
+                comboBox.Text = items[0];
 
             comboBox.MoveCaretToEnd();
         }
 
-        private void AddSavedItem(HistoryTextBox comboBox, string path, string text)
+        private void UpdateSavedItemList(HistoryTextBox comboBox, List<string> items)
         {
-            if (comboBox == null || string.IsNullOrWhiteSpace(text))
+            if (ReferenceEquals(comboBox, textComboBox))
+            {
+                // Only sort the displayed list; suffix replacement keeps its
+                // existing history order. Cache this view until history changes.
+                if (!ReferenceEquals(sortedTextSource, items))
+                {
+                    sortedTextItems = new List<string>(items);
+                    sortedTextItems.Sort(CompareSavedTexts);
+                    sortedTextSource = items;
+                }
+                items = sortedTextItems;
+            }
+
+            bool unchanged = comboBox.ItemCount == items.Count;
+            for (int i = 0; unchanged && i < items.Count; i++)
+                unchanged = string.Equals(comboBox.GetItem(i), items[i], StringComparison.Ordinal);
+
+            if (unchanged)
                 return;
 
-            List<string> items = ReadSavedItems(path);
-            if (!ContainsText(items, text))
-                items.Add(text);
+            comboBox.ClearItems();
+            foreach (string item in items)
+                comboBox.AddItem(item);
+        }
 
-            WriteSavedItems(path, items);
-            LoadSavedItems(comboBox, path);
+        private static int CompareSavedTexts(string left, string right)
+        {
+            int order = JapaneseTextComparison.Compare(left, right,
+                CompareOptions.IgnoreCase | CompareOptions.IgnoreKanaType |
+                CompareOptions.IgnoreWidth | CompareOptions.StringSort);
+            return order != 0 ? order : string.Compare(left, right, StringComparison.Ordinal);
+        }
+
+        private List<string> AddSavedItem(HistoryTextBox comboBox, string path, string text)
+        {
+            List<string> items = ReadSavedItems(path);
+            if (comboBox == null || string.IsNullOrWhiteSpace(text))
+                return items;
+
+            if (!ContainsText(items, text))
+            {
+                // Commit a new snapshot only after the file write succeeds.
+                items = new List<string>(items);
+                items.Add(text);
+                WriteSavedItems(path, items);
+            }
+
+            UpdateSavedItemList(comboBox, items);
             comboBox.Text = text;
             comboBox.MoveCaretToEnd();
+            return items;
         }
 
         private void DeleteSelectedItem(HistoryTextBox comboBox, string path)
@@ -563,41 +660,64 @@ namespace ADDIN.Commands
                 return;
 
             List<string> items = ReadSavedItems(path);
-            for (int i = items.Count - 1; i >= 0; i--)
+            if (ContainsText(items, text))
             {
-                if (string.Equals(items[i], text, StringComparison.Ordinal))
-                    items.RemoveAt(i);
+                items = new List<string>(items);
+                items.RemoveAll(item => string.Equals(item, text, StringComparison.Ordinal));
+                WriteSavedItems(path, items);
             }
 
-            WriteSavedItems(path, items);
-            LoadSavedItems(comboBox, path);
-            if (!ContainsText(items, text))
-                comboBox.Text = "";
+            UpdateSavedItemList(comboBox, items);
+            comboBox.Text = "";
         }
 
         private List<string> ReadSavedItems(string path)
         {
-            List<string> items = new List<string>();
-            if (!File.Exists(path))
+            FileInfo source = new FileInfo(path);
+            bool legacyNote = false;
+            if (!source.Exists && string.Equals(path, GetSavedNotePath(), StringComparison.OrdinalIgnoreCase))
             {
-                string oldNotePath = GetOldSavedNotePath();
-                if (path == GetSavedNotePath() && File.Exists(oldNotePath))
+                FileInfo oldNote = new FileInfo(GetOldSavedNotePath());
+                if (oldNote.Exists)
                 {
-                    string oldText = File.ReadAllText(oldNotePath).Trim();
-                    if (!string.IsNullOrWhiteSpace(oldText))
-                        items.Add(oldText);
+                    source = oldNote;
+                    legacyNote = true;
                 }
-
-                return items;
             }
 
-            string[] lines = File.ReadAllLines(path);
-            foreach (string line in lines)
+            DateTime lastWriteTimeUtc = source.Exists ? source.LastWriteTimeUtc : DateTime.MinValue;
+            long length = source.Exists ? source.Length : -1;
+            SavedItemsSnapshot snapshot;
+            if (savedItemsCache.TryGetValue(path, out snapshot) &&
+                string.Equals(snapshot.SourcePath, source.FullName, StringComparison.OrdinalIgnoreCase) &&
+                snapshot.LastWriteTimeUtc == lastWriteTimeUtc && snapshot.Length == length)
+                return snapshot.Items;
+
+            List<string> items = new List<string>();
+            if (source.Exists && legacyNote)
             {
-                string item = DecodeItem(line);
-                if (!string.IsNullOrWhiteSpace(item) && !ContainsText(items, item))
-                    items.Add(item);
+                string oldText = File.ReadAllText(source.FullName).Trim();
+                if (!string.IsNullOrWhiteSpace(oldText))
+                    items.Add(oldText);
             }
+            else if (source.Exists)
+            {
+                HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string line in File.ReadAllLines(source.FullName))
+                {
+                    string item = DecodeItem(line);
+                    if (!string.IsNullOrWhiteSpace(item) && seen.Add(item))
+                        items.Add(item);
+                }
+            }
+
+            savedItemsCache[path] = new SavedItemsSnapshot
+            {
+                SourcePath = source.FullName,
+                LastWriteTimeUtc = lastWriteTimeUtc,
+                Length = length,
+                Items = items
+            };
 
             return items;
         }
@@ -614,6 +734,14 @@ namespace ADDIN.Commands
             }
 
             File.WriteAllLines(path, lines.ToArray());
+            FileInfo writtenFile = new FileInfo(path);
+            savedItemsCache[path] = new SavedItemsSnapshot
+            {
+                SourcePath = writtenFile.FullName,
+                LastWriteTimeUtc = writtenFile.LastWriteTimeUtc,
+                Length = writtenFile.Length,
+                Items = items
+            };
         }
 
         private bool ContainsText(List<string> items, string text)
@@ -646,26 +774,17 @@ namespace ADDIN.Commands
 
         private string GetSavedNotePath()
         {
-            return Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
-                "ADDIN",
-                "component-notes.txt");
+            return Path.Combine(historyDirectory, "component-notes.txt");
         }
 
         private string GetSavedTextPath()
         {
-            return Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
-                "ADDIN",
-                "component-texts.txt");
+            return Path.Combine(historyDirectory, "component-texts.txt");
         }
 
         private string GetOldSavedNotePath()
         {
-            return Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
-                "ADDIN",
-                "component-note.txt");
+            return Path.Combine(historyDirectory, "component-note.txt");
         }
     }
 }

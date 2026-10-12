@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -344,7 +344,8 @@ namespace ADDIN.Commands
                     + "\nDrawing chua duoc luu.";
                 if (errors.Count > 0) summary += "\n\n" + string.Join("\n", errors);
                 Debug.WriteLine("[DIM MAT CAT] " + summary);
-                Msg(summary, errors.Count == 0 ? swMessageBoxIcon_e.swMbInformation : swMessageBoxIcon_e.swMbWarning);
+                if (nativeShowCompletion || errors.Count > 0 || created.Count == 0)
+                    Msg(summary, errors.Count == 0 ? swMessageBoxIcon_e.swMbInformation : swMessageBoxIcon_e.swMbWarning);
             }
             catch (Exception ex)
             {

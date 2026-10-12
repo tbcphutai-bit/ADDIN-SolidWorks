@@ -32,8 +32,8 @@
             this.chkDimension = new System.Windows.Forms.CheckBox();
             this.chkBalloon = new System.Windows.Forms.CheckBox();
             this.chkText = new System.Windows.Forms.CheckBox();
-            this.btnDelete = new System.Windows.Forms.Button();
-            this.btnCancel = new System.Windows.Forms.Button();
+            this.btnDelete = new ADDIN.UI.ModernButton();
+            this.btnCancel = new ADDIN.UI.ModernButton();
             this.SuspendLayout();
             // 
             // lblTitle
@@ -137,7 +137,7 @@
         private System.Windows.Forms.CheckBox chkDimension;
         private System.Windows.Forms.CheckBox chkBalloon;
         private System.Windows.Forms.CheckBox chkText;
-        private System.Windows.Forms.Button btnDelete;
-        private System.Windows.Forms.Button btnCancel;
+        private ADDIN.UI.ModernButton btnDelete;
+        private ADDIN.UI.ModernButton btnCancel;
     }
 }

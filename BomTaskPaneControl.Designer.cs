@@ -1,2365 +1,5406 @@
-namespace ADDIN
-{
-    partial class BomTaskPaneControl
-    {
-        /// <summary> 
-        /// Required designer variable.
-        /// </summary>
-        private System.ComponentModel.IContainer components = null;
-
-        /// <summary> 
-        /// Clean up any resources being used.
-        /// </summary>
-        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-            base.Dispose(disposing);
-        }
-
-        #region Component Designer generated code
-
-        /// <summary> 
-        /// Required method for Designer support - do not modify 
-        /// the contents of this method with the code editor.
-        /// </summary>
-        private void InitializeComponent()
-        {            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+namespace ADDIN
+
+
+
+{
+
+
+
+    partial class BomTaskPaneControl
+
+
+
+    {
+
+
+
+        /// <summary> 
+
+
+
+        /// Required designer variable.
+
+
+
+        /// </summary>
+
+
+
+        private System.ComponentModel.IContainer components = null;
+
+
+
+
+
+
+
+        /// <summary> 
+
+
+
+        /// Clean up any resources being used.
+
+
+
+        /// </summary>
+
+
+
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+
+
+
+        protected override void Dispose(bool disposing)
+
+
+
+        {
+
+
+
+            if (disposing && (components != null))
+
+
+
+            {
+
+
+
+                components.Dispose();
+
+
+
+            }
+
+
+
+            base.Dispose(disposing);
+
+
+
+        }
+
+
+
+
+
+
+
+        #region Component Designer generated code
+
+
+
+
+
+
+
+        /// <summary> 
+
+
+
+        /// Required method for Designer support - do not modify 
+
+
+
+        /// the contents of this method with the code editor.
+
+
+
+        /// </summary>
+
+
+
+        private void InitializeComponent()
+
+
+
+        {
+
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
+
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
+
             this.tabBom = new ADDIN.UI.ModernTabControl();
+
             this.tabDrawing = new System.Windows.Forms.TabPage();
+
             this.tabDrawingPages = new ADDIN.UI.ModernTabControl();
+
             this.tabDrawingBom = new System.Windows.Forms.TabPage();
-            this.button1 = new ADDIN.UI.ModernButton();
-            this.chkSelectAll = new System.Windows.Forms.CheckBox();
-            this.dgvModelBom = new System.Windows.Forms.DataGridView();
-            this.Column5 = new System.Windows.Forms.DataGridViewCheckBoxColumn();
-            this.Column1 = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Column3 = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Column6 = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Column4 = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Column2 = new System.Windows.Forms.DataGridViewTextBoxColumn();
+
+            this.cardAssemblyDrawing = new ADDIN.UI.ModernCard();
+
             this.button2 = new ADDIN.UI.ModernButton();
+
             this.btnOpenAssem = new ADDIN.UI.ModernButton();
+
             this.btnCheckBalloon = new ADDIN.UI.ModernButton();
-            this.btnCheckDfTk = new ADDIN.UI.ModernButton();
-            this.btnCheckAll = new ADDIN.UI.ModernButton();
-            this.btnCheckRound = new ADDIN.UI.ModernButton();
-            this.btnCheckSamePart = new ADDIN.UI.ModernButton();
+
             this.btnCheckDrawingBom = new ADDIN.UI.ModernButton();
+
+            this.cardSheetMetal = new ADDIN.UI.ModernCard();
+
+            this.btnCheckDfTk = new ADDIN.UI.ModernButton();
+
+            this.btnCheckAll = new ADDIN.UI.ModernButton();
+
+            this.btnCheckRound = new ADDIN.UI.ModernButton();
+
+            this.btnCheckSamePart = new ADDIN.UI.ModernButton();
+
+            this.lblBomBadge = new System.Windows.Forms.Label();
+
+            this.lblBomCount = new System.Windows.Forms.Label();
+
+            this.button1 = new ADDIN.UI.ModernButton();
+
+            this.chkSelectAll = new System.Windows.Forms.CheckBox();
+
+            this.dgvModelBom = new System.Windows.Forms.DataGridView();
+
+            this.Column5 = new System.Windows.Forms.DataGridViewCheckBoxColumn();
+
+            this.Column1 = new System.Windows.Forms.DataGridViewTextBoxColumn();
+
+            this.Column3 = new System.Windows.Forms.DataGridViewTextBoxColumn();
+
+            this.Column6 = new System.Windows.Forms.DataGridViewTextBoxColumn();
+
+            this.Column4 = new System.Windows.Forms.DataGridViewTextBoxColumn();
+
+            this.Column2 = new System.Windows.Forms.DataGridViewTextBoxColumn();
+
             this.progressCheck = new System.Windows.Forms.ProgressBar();
+
             this.lblStatus = new System.Windows.Forms.Label();
+
             this.lblTitle = new System.Windows.Forms.Label();
+
             this.btnClearBom = new ADDIN.UI.ModernButton();
+
             this.btnLoadBom = new ADDIN.UI.ModernButton();
+
             this.tabComponentDrawing = new System.Windows.Forms.TabPage();
+
             this.groupBox3 = new ADDIN.UI.ModernCard();
+
             this.btnDimKichThuocLo = new ADDIN.UI.ModernButton();
+
             this.btnRepairDim = new ADDIN.UI.ModernButton();
+
             this.btnVCutSection = new ADDIN.UI.ModernButton();
+
             this.btnDimKegaki = new ADDIN.UI.ModernButton();
+
             this.btnFixScale = new ADDIN.UI.ModernButton();
+
             this.btnSplineToArcs = new ADDIN.UI.ModernButton();
+
             this.btnDimMatCat = new ADDIN.UI.ModernButton();
+
             this.dimvang = new ADDIN.UI.ModernButton();
+
             this.grpComponentBom = new ADDIN.UI.ModernCard();
+
             this.btnInsertBalloon = new ADDIN.UI.ModernButton();
+
             this.cboBalloonProperty = new System.Windows.Forms.ComboBox();
+
             this.btnDeleteText = new ADDIN.UI.ModernButton();
+
             this.btnText = new ADDIN.UI.ModernButton();
+
             this.cboSide = new ADDIN.Commands.HistoryTextBox();
+
             this.btnDeleteNote = new ADDIN.UI.ModernButton();
+
             this.btnNote = new ADDIN.UI.ModernButton();
+
             this.cboBendLine = new ADDIN.Commands.HistoryTextBox();
+
             this.grpComponentSize = new ADDIN.UI.ModernCard();
+
             this.btnGetWL = new ADDIN.UI.ModernButton();
+
             this.groupBox2 = new ADDIN.UI.ModernFieldBox();
+
             this.txtLength = new System.Windows.Forms.TextBox();
+
             this.groupBox1 = new ADDIN.UI.ModernFieldBox();
+
             this.txtWidth = new System.Windows.Forms.TextBox();
+
             this.btnRotateCcw = new ADDIN.UI.ModernButton();
+
             this.btnRotateCw = new ADDIN.UI.ModernButton();
+
             this.btnHorizontalAlignment = new ADDIN.UI.ModernButton();
+
             this.tabModel = new System.Windows.Forms.TabPage();
+
             this.tabModelPages = new ADDIN.UI.ModernTabControl();
+
             this.tabModelPropsPage = new System.Windows.Forms.TabPage();
+
             this.panelModelProps = new System.Windows.Forms.Panel();
+
             this.btnModelUpdateProps = new ADDIN.UI.ModernButton();
+
             this.btnModelResetProps = new ADDIN.UI.ModernButton();
+
             this.btnModelApplyProps = new ADDIN.UI.ModernButton();
+
             this.txtModelFinish = new System.Windows.Forms.TextBox();
+
             this.lblModelFinish = new System.Windows.Forms.Label();
+
             this.txtModelQty = new System.Windows.Forms.TextBox();
+
             this.lblModelQty = new System.Windows.Forms.Label();
+
             this.txtModelGoban = new System.Windows.Forms.TextBox();
+
             this.lblModelGoban = new System.Windows.Forms.Label();
+
             this.txtModelThickness = new System.Windows.Forms.TextBox();
+
             this.lblModelThickness = new System.Windows.Forms.Label();
+
             this.txtModelMaterial = new System.Windows.Forms.TextBox();
+
             this.lblModelMaterial = new System.Windows.Forms.Label();
+
             this.txtModelName = new System.Windows.Forms.TextBox();
+
             this.lblModelName = new System.Windows.Forms.Label();
+
             this.tabModelEditPage = new System.Windows.Forms.TabPage();
+
             this.panelModelCommands = new System.Windows.Forms.Panel();
+
             this.btnMakeHole = new ADDIN.UI.ModernButton();
+
             this.btnRepairHole = new ADDIN.UI.ModernButton();
+
             this.btnPaintHoleSummary = new ADDIN.UI.ModernButton();
+
             this.grpMakeHoleOptions = new System.Windows.Forms.GroupBox();
+
             this.pnlMakeHoleDiagram = new System.Windows.Forms.Panel();
+
             this.lblMakeHoleDirection = new System.Windows.Forms.Label();
+
             this.cboMakeHoleDirection = new System.Windows.Forms.ComboBox();
+
             this.lblMakeHoleEdgeOffset = new System.Windows.Forms.Label();
+
             this.txtMakeHoleEdgeOffset = new System.Windows.Forms.TextBox();
+
             this.lblMakeHoleLeftOffset = new System.Windows.Forms.Label();
+
             this.txtMakeHoleLeftOffset = new System.Windows.Forms.TextBox();
+
             this.lblMakeHoleRightOffset = new System.Windows.Forms.Label();
+
             this.txtMakeHoleRightOffset = new System.Windows.Forms.TextBox();
+
             this.lblMakeHolePitch = new System.Windows.Forms.Label();
+
             this.txtMakeHolePitch = new System.Windows.Forms.TextBox();
+
             this.lblRepairHoleType = new System.Windows.Forms.Label();
+
             this.cboRepairHoleType = new System.Windows.Forms.ComboBox();
+
             this.lblRepairHoleDiameter = new System.Windows.Forms.Label();
+
             this.cboRepairHoleDiameter = new System.Windows.Forms.ComboBox();
+
             this.btnDeleteMakeHoleSize = new ADDIN.UI.ModernButton();
+
             this.chkMakeHolePaint = new System.Windows.Forms.CheckBox();
+
             this.lblMakeHolePaintName = new System.Windows.Forms.Label();
+
             this.txtMakeHolePaintName = new System.Windows.Forms.TextBox();
+
             this.btnMakeHoleAccept = new ADDIN.UI.ModernButton();
+
             this.btnMakeHoleUpdate = new ADDIN.UI.ModernButton();
+
             this.btnMakeHolePattern = new ADDIN.UI.ModernButton();
+
             this.btnMakeHoleReset = new ADDIN.UI.ModernButton();
+
             this.elementHostRepairHole = new System.Windows.Forms.Integration.ElementHost();
+
             this.tabModelMacroPage = new System.Windows.Forms.TabPage();
+
             this.vCutBendAssignmentControl = new ADDIN.UI.VCutBendAssignmentControl();
+
             this.btnVCutPropertySetup = new ADDIN.UI.ModernButton();
+
             this.lblCheckAssemblyHoleResult = new System.Windows.Forms.Label();
+
             this.btnRepair3DSpline = new ADDIN.UI.ModernButton();
+
             this.btnEdgeToEqualSpline = new ADDIN.UI.ModernButton();
+
             this.btnMirrorPart = new ADDIN.UI.ModernButton();
+
             this.btnCheckAssemblyHole = new ADDIN.UI.ModernButton();
+
             this.btnCheckKegaki = new ADDIN.UI.ModernButton();
+
             this.btnCheckUraOmote = new ADDIN.UI.ModernButton();
+
             this.tabBom.SuspendLayout();
+
             this.tabDrawing.SuspendLayout();
+
             this.tabDrawingPages.SuspendLayout();
+
             this.tabDrawingBom.SuspendLayout();
+
+            this.cardAssemblyDrawing.SuspendLayout();
+
+            this.cardSheetMetal.SuspendLayout();
+
             ((System.ComponentModel.ISupportInitialize)(this.dgvModelBom)).BeginInit();
+
             this.tabComponentDrawing.SuspendLayout();
+
             this.groupBox3.SuspendLayout();
+
             this.grpComponentBom.SuspendLayout();
+
             this.grpComponentSize.SuspendLayout();
+
             this.groupBox2.SuspendLayout();
+
             this.groupBox1.SuspendLayout();
+
             this.tabModel.SuspendLayout();
+
             this.tabModelPages.SuspendLayout();
+
             this.tabModelPropsPage.SuspendLayout();
+
             this.panelModelProps.SuspendLayout();
+
             this.tabModelEditPage.SuspendLayout();
+
             this.panelModelCommands.SuspendLayout();
+
             this.grpMakeHoleOptions.SuspendLayout();
+
             this.tabModelMacroPage.SuspendLayout();
+
             this.SuspendLayout();
+
             // 
+
             // tabBom
+
             // 
-            this.tabBom.ActiveTabColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(103)))), ((int)(((byte)(198)))));
-            this.tabBom.ActiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
-            this.tabBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(222)))), ((int)(((byte)(228)))));
+
+            this.tabBom.ActiveTabColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.tabBom.ActiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(78)))), ((int)(((byte)(216)))));
+
+            this.tabBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
             this.tabBom.Controls.Add(this.tabDrawing);
+
             this.tabBom.Controls.Add(this.tabModel);
+
             this.tabBom.Dock = System.Windows.Forms.DockStyle.Fill;
+
             this.tabBom.DrawMode = System.Windows.Forms.TabDrawMode.OwnerDrawFixed;
-            this.tabBom.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabBom.HeaderBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
+
+            this.tabBom.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabBom.HeaderBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(232)))), ((int)(((byte)(240)))));
+
             this.tabBom.InactiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(116)))), ((int)(((byte)(139)))));
-            this.tabBom.ItemSize = new System.Drawing.Size(110, 30);
+
+            this.tabBom.ItemSize = new System.Drawing.Size(116, 32);
+
             this.tabBom.Location = new System.Drawing.Point(0, 0);
+
             this.tabBom.Name = "tabBom";
+
             this.tabBom.Padding = new System.Drawing.Point(14, 6);
+
             this.tabBom.SelectedIndex = 0;
+
             this.tabBom.Size = new System.Drawing.Size(400, 577);
+
             this.tabBom.TabIndex = 12;
+
             // 
+
             // tabDrawing
+
             // 
-            this.tabDrawing.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
+
+            this.tabDrawing.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
             this.tabDrawing.Controls.Add(this.tabDrawingPages);
-            this.tabDrawing.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabDrawing.Location = new System.Drawing.Point(4, 34);
+
+            this.tabDrawing.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabDrawing.Location = new System.Drawing.Point(4, 36);
+
             this.tabDrawing.Name = "tabDrawing";
+
             this.tabDrawing.Padding = new System.Windows.Forms.Padding(3);
-            this.tabDrawing.Size = new System.Drawing.Size(392, 539);
+
+            this.tabDrawing.Size = new System.Drawing.Size(392, 537);
+
             this.tabDrawing.TabIndex = 0;
+
             this.tabDrawing.Text = "Drawing";
+
             // 
+
             // tabDrawingPages
+
             // 
-            this.tabDrawingPages.ActiveTabColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(103)))), ((int)(((byte)(198)))));
-            this.tabDrawingPages.ActiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
-            this.tabDrawingPages.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(222)))), ((int)(((byte)(228)))));
+
+            this.tabDrawingPages.ActiveTabColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.tabDrawingPages.ActiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.tabDrawingPages.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(232)))), ((int)(((byte)(240)))));
+
             this.tabDrawingPages.Controls.Add(this.tabDrawingBom);
+
             this.tabDrawingPages.Controls.Add(this.tabComponentDrawing);
+
             this.tabDrawingPages.Dock = System.Windows.Forms.DockStyle.Fill;
+
             this.tabDrawingPages.DrawMode = System.Windows.Forms.TabDrawMode.OwnerDrawFixed;
-            this.tabDrawingPages.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabDrawingPages.HeaderBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
+
+            this.tabDrawingPages.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabDrawingPages.HeaderBackColor = System.Drawing.Color.White;
+
             this.tabDrawingPages.InactiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(116)))), ((int)(((byte)(139)))));
-            this.tabDrawingPages.ItemSize = new System.Drawing.Size(110, 30);
+
+            this.tabDrawingPages.ItemSize = new System.Drawing.Size(126, 30);
+
             this.tabDrawingPages.Location = new System.Drawing.Point(3, 3);
+
             this.tabDrawingPages.Name = "tabDrawingPages";
+
             this.tabDrawingPages.Padding = new System.Drawing.Point(14, 6);
+
             this.tabDrawingPages.SelectedIndex = 0;
-            this.tabDrawingPages.Size = new System.Drawing.Size(386, 533);
+
+            this.tabDrawingPages.Size = new System.Drawing.Size(386, 531);
+
             this.tabDrawingPages.TabIndex = 14;
+
+            this.tabDrawingPages.TabStyle = ADDIN.UI.ModernTabStyle.Underline;
+
             // 
+
             // tabDrawingBom
+
             // 
-            this.tabDrawingBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
+
+            this.tabDrawingBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.tabDrawingBom.Controls.Add(this.cardAssemblyDrawing);
+
+            this.tabDrawingBom.Controls.Add(this.cardSheetMetal);
+
+            this.tabDrawingBom.Controls.Add(this.lblBomBadge);
+
+            this.tabDrawingBom.Controls.Add(this.lblBomCount);
+
             this.tabDrawingBom.Controls.Add(this.button1);
+
             this.tabDrawingBom.Controls.Add(this.chkSelectAll);
+
             this.tabDrawingBom.Controls.Add(this.dgvModelBom);
-            this.tabDrawingBom.Controls.Add(this.button2);
-            this.tabDrawingBom.Controls.Add(this.btnOpenAssem);
-            this.tabDrawingBom.Controls.Add(this.btnCheckBalloon);
-            this.tabDrawingBom.Controls.Add(this.btnCheckDfTk);
-            this.tabDrawingBom.Controls.Add(this.btnCheckAll);
-            this.tabDrawingBom.Controls.Add(this.btnCheckRound);
-            this.tabDrawingBom.Controls.Add(this.btnCheckSamePart);
-            this.tabDrawingBom.Controls.Add(this.btnCheckDrawingBom);
+
             this.tabDrawingBom.Controls.Add(this.progressCheck);
+
             this.tabDrawingBom.Controls.Add(this.lblStatus);
+
             this.tabDrawingBom.Controls.Add(this.lblTitle);
+
             this.tabDrawingBom.Controls.Add(this.btnClearBom);
+
             this.tabDrawingBom.Controls.Add(this.btnLoadBom);
-            this.tabDrawingBom.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+
+            this.tabDrawingBom.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
             this.tabDrawingBom.Location = new System.Drawing.Point(4, 34);
+
             this.tabDrawingBom.Name = "tabDrawingBom";
+
             this.tabDrawingBom.Padding = new System.Windows.Forms.Padding(3);
-            this.tabDrawingBom.Size = new System.Drawing.Size(378, 495);
+
+            this.tabDrawingBom.Size = new System.Drawing.Size(378, 493);
+
             this.tabDrawingBom.TabIndex = 0;
+
             this.tabDrawingBom.Text = "Drawing BOM";
+
             // 
-            // button1
+
+            // cardAssemblyDrawing
+
             // 
-            this.button1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.button1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(238)))), ((int)(((byte)(242)))));
-            this.button1.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(188)))), ((int)(((byte)(198)))));
-            this.button1.BorderRadius = 3;
-            this.button1.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.button1.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(188)))), ((int)(((byte)(198)))));
-            this.button1.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(225)))), ((int)(((byte)(232)))));
-            this.button1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.button1.Font = new System.Drawing.Font("Meiryo UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.button1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(50)))), ((int)(((byte)(60)))), ((int)(((byte)(75)))));
-            this.button1.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(225)))), ((int)(((byte)(232)))));
-            this.button1.Location = new System.Drawing.Point(249, 451);
-            this.button1.Name = "button1";
-            this.button1.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(238)))), ((int)(((byte)(242)))));
-            this.button1.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.button1.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(212)))), ((int)(((byte)(222)))));
-            this.button1.Size = new System.Drawing.Size(104, 32);
-            this.button1.TabIndex = 13;
-            this.button1.Text = "CANCEL";
-            this.button1.UseVisualStyleBackColor = false;
-            // 
-            // chkSelectAll
-            // 
-            this.chkSelectAll.AutoSize = true;
-            this.chkSelectAll.Font = new System.Drawing.Font("Meiryo UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.chkSelectAll.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(45)))), ((int)(((byte)(55)))), ((int)(((byte)(72)))));
-            this.chkSelectAll.Location = new System.Drawing.Point(12, 178);
-            this.chkSelectAll.Name = "chkSelectAll";
-            this.chkSelectAll.Size = new System.Drawing.Size(85, 19);
-            this.chkSelectAll.TabIndex = 11;
-            this.chkSelectAll.Text = "Select All";
-            this.chkSelectAll.UseVisualStyleBackColor = true;
-            // 
-            // dgvModelBom
-            // 
-            this.dgvModelBom.AllowUserToAddRows = false;
-            this.dgvModelBom.AllowUserToDeleteRows = false;
-            this.dgvModelBom.AllowUserToOrderColumns = true;
-            this.dgvModelBom.AllowUserToResizeRows = false;
-            dataGridViewCellStyle1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(234)))), ((int)(((byte)(242)))), ((int)(((byte)(250)))));
-            this.dgvModelBom.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
-            this.dgvModelBom.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
+
+            this.cardAssemblyDrawing.AccentColor = System.Drawing.Color.FromArgb(((int)(((byte)(79)))), ((int)(((byte)(70)))), ((int)(((byte)(229)))));
+
+            this.cardAssemblyDrawing.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.dgvModelBom.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.DisplayedCells;
-            this.dgvModelBom.BackgroundColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(245)))), ((int)(((byte)(248)))));
-            this.dgvModelBom.ColumnHeadersBorderStyle = System.Windows.Forms.DataGridViewHeaderBorderStyle.Single;
-            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(244)))), ((int)(((byte)(248)))));
-            dataGridViewCellStyle2.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            dataGridViewCellStyle2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(115)))), ((int)(((byte)(230)))));
-            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(244)))), ((int)(((byte)(248)))));
-            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(115)))), ((int)(((byte)(230)))));
-            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.dgvModelBom.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
-            this.dgvModelBom.ColumnHeadersHeight = 26;
-            this.dgvModelBom.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-            this.dgvModelBom.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-            this.Column5,
-            this.Column1,
-            this.Column3,
-            this.Column6,
-            this.Column4,
-            this.Column2});
-            dataGridViewCellStyle3.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle3.BackColor = System.Drawing.Color.White;
-            dataGridViewCellStyle3.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            dataGridViewCellStyle3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            dataGridViewCellStyle3.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            dataGridViewCellStyle3.SelectionBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(235)))), ((int)(((byte)(255)))));
-            dataGridViewCellStyle3.SelectionForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(50)))), ((int)(((byte)(110)))));
-            dataGridViewCellStyle3.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.dgvModelBom.DefaultCellStyle = dataGridViewCellStyle3;
-            this.dgvModelBom.EnableHeadersVisualStyles = false;
-            this.dgvModelBom.GridColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(195)))), ((int)(((byte)(206)))));
-            this.dgvModelBom.Location = new System.Drawing.Point(12, 227);
-            this.dgvModelBom.Name = "dgvModelBom";
-            this.dgvModelBom.RowHeadersVisible = false;
-            this.dgvModelBom.RowTemplate.Height = 24;
-            this.dgvModelBom.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgvModelBom.Size = new System.Drawing.Size(354, 214);
-            this.dgvModelBom.TabIndex = 3;
+
+            this.cardAssemblyDrawing.BackColor = System.Drawing.Color.White;
+
+            this.cardAssemblyDrawing.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(232)))), ((int)(((byte)(240)))));
+
+            this.cardAssemblyDrawing.BorderRadius = 8;
+
+            this.cardAssemblyDrawing.Controls.Add(this.button2);
+
+            this.cardAssemblyDrawing.Controls.Add(this.btnOpenAssem);
+
+            this.cardAssemblyDrawing.Controls.Add(this.btnCheckBalloon);
+
+            this.cardAssemblyDrawing.Controls.Add(this.btnCheckDrawingBom);
+
+            this.cardAssemblyDrawing.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.cardAssemblyDrawing.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.cardAssemblyDrawing.HeaderTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.cardAssemblyDrawing.Location = new System.Drawing.Point(6, 86);
+
+            this.cardAssemblyDrawing.Name = "cardAssemblyDrawing";
+
+            this.cardAssemblyDrawing.ShowHeaderDivider = true;
+
+            this.cardAssemblyDrawing.Size = new System.Drawing.Size(366, 54);
+
+            this.cardAssemblyDrawing.TabIndex = 2;
+
+            this.cardAssemblyDrawing.Text = "CỤM LẮP RÁP & BẢN VẼ (ASSEMBLY & DRAWING)";
+
             // 
-            // Column5
-            // 
-            this.Column5.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
-            this.Column5.HeaderText = "✔";
-            this.Column5.MinimumWidth = 32;
-            this.Column5.Name = "Column5";
-            this.Column5.Width = 36;
-            // 
-            // Column1
-            // 
-            this.Column1.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.Column1.FillWeight = 110F;
-            this.Column1.HeaderText = "部品番号";
-            this.Column1.Name = "Column1";
-            // 
-            // Column3
-            // 
-            this.Column3.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.Column3.FillWeight = 75F;
-            this.Column3.HeaderText = "材質";
-            this.Column3.Name = "Column3";
-            // 
-            // Column6
-            // 
-            this.Column6.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.Column6.FillWeight = 55F;
-            this.Column6.HeaderText = "板厚";
-            this.Column6.Name = "Column6";
-            // 
-            // Column4
-            // 
-            this.Column4.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.Column4.FillWeight = 50F;
-            this.Column4.HeaderText = "数量";
-            this.Column4.Name = "Column4";
-            // 
-            // Column2
-            // 
-            this.Column2.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.Column2.FillWeight = 170F;
-            this.Column2.HeaderText = "部品ファイル名";
-            this.Column2.Name = "Column2";
-            // 
+
             // button2
+
             // 
-            this.button2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(225)))), ((int)(((byte)(250)))));
+
+            this.button2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(239)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+
             this.button2.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
-            this.button2.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(145)))), ((int)(((byte)(185)))), ((int)(((byte)(235)))));
-            this.button2.BorderRadius = 3;
+
+            this.button2.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(191)))), ((int)(((byte)(219)))), ((int)(((byte)(254)))));
+
+            this.button2.BorderRadius = 6;
+
             this.button2.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.button2.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(145)))), ((int)(((byte)(185)))), ((int)(((byte)(235)))));
-            this.button2.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(212)))), ((int)(((byte)(245)))));
+
+            this.button2.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(191)))), ((int)(((byte)(219)))), ((int)(((byte)(254)))));
+
+            this.button2.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(219)))), ((int)(((byte)(234)))), ((int)(((byte)(254)))));
+
             this.button2.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.button2.Font = new System.Drawing.Font("Meiryo UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.button2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(55)))), ((int)(((byte)(115)))));
-            this.button2.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(212)))), ((int)(((byte)(245)))));
+
+            this.button2.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.button2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(58)))), ((int)(((byte)(138)))));
+
+            this.button2.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(219)))), ((int)(((byte)(234)))), ((int)(((byte)(254)))));
+
+            this.button2.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.button2.IconColor = System.Drawing.Color.Empty;
+
             this.button2.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.button2.Location = new System.Drawing.Point(13, 128);
+
+            this.button2.Location = new System.Drawing.Point(6, 22);
+
             this.button2.Name = "button2";
-            this.button2.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(225)))), ((int)(((byte)(250)))));
+
+            this.button2.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(239)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+
             this.button2.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.button2.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(198)))), ((int)(((byte)(238)))));
-            this.button2.Size = new System.Drawing.Size(84, 38);
+
+            this.button2.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(195)))), ((int)(((byte)(220)))), ((int)(((byte)(248)))));
+
+            this.button2.Size = new System.Drawing.Size(84, 26);
+
             this.button2.TabIndex = 11;
-            this.button2.Text = "XẾP\r\nUNIT";
+
+            this.button2.Text = "Unit";
+
             this.button2.UseVisualStyleBackColor = false;
+
             // 
+
             // btnOpenAssem
+
             // 
-            this.btnOpenAssem.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(222)))), ((int)(((byte)(248)))));
+
+            this.btnOpenAssem.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(238)))), ((int)(((byte)(242)))), ((int)(((byte)(255)))));
+
             this.btnOpenAssem.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
-            this.btnOpenAssem.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(175)))), ((int)(((byte)(225)))));
-            this.btnOpenAssem.BorderRadius = 3;
+
+            this.btnOpenAssem.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(199)))), ((int)(((byte)(210)))), ((int)(((byte)(254)))));
+
+            this.btnOpenAssem.BorderRadius = 6;
+
             this.btnOpenAssem.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnOpenAssem.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(175)))), ((int)(((byte)(225)))));
-            this.btnOpenAssem.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(208)))), ((int)(((byte)(242)))));
+
+            this.btnOpenAssem.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(199)))), ((int)(((byte)(210)))), ((int)(((byte)(254)))));
+
+            this.btnOpenAssem.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(231)))), ((int)(((byte)(255)))));
+
             this.btnOpenAssem.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnOpenAssem.Font = new System.Drawing.Font("Meiryo UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnOpenAssem.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(45)))), ((int)(((byte)(110)))));
-            this.btnOpenAssem.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(208)))), ((int)(((byte)(242)))));
+
+            this.btnOpenAssem.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnOpenAssem.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(49)))), ((int)(((byte)(46)))), ((int)(((byte)(129)))));
+
+            this.btnOpenAssem.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(231)))), ((int)(((byte)(255)))));
+
+            this.btnOpenAssem.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnOpenAssem.IconColor = System.Drawing.Color.Empty;
+
             this.btnOpenAssem.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnOpenAssem.Location = new System.Drawing.Point(103, 128);
+
+            this.btnOpenAssem.Location = new System.Drawing.Point(94, 22);
+
             this.btnOpenAssem.Name = "btnOpenAssem";
-            this.btnOpenAssem.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(222)))), ((int)(((byte)(248)))));
+
+            this.btnOpenAssem.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(238)))), ((int)(((byte)(242)))), ((int)(((byte)(255)))));
+
             this.btnOpenAssem.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.btnOpenAssem.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(192)))), ((int)(((byte)(235)))));
-            this.btnOpenAssem.Size = new System.Drawing.Size(84, 38);
+
+            this.btnOpenAssem.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(215)))), ((int)(((byte)(246)))));
+
+            this.btnOpenAssem.Size = new System.Drawing.Size(84, 26);
+
             this.btnOpenAssem.TabIndex = 12;
-            this.btnOpenAssem.Text = "OPEN\r\nASSEM";
+
+            this.btnOpenAssem.Text = "Assem";
+
             this.btnOpenAssem.UseVisualStyleBackColor = false;
+
             // 
+
             // btnCheckBalloon
+
             // 
-            this.btnCheckBalloon.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(244)))), ((int)(((byte)(200)))));
+
+            this.btnCheckBalloon.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(247)))), ((int)(((byte)(254)))), ((int)(((byte)(231)))));
+
             this.btnCheckBalloon.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
-            this.btnCheckBalloon.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(212)))), ((int)(((byte)(135)))));
-            this.btnCheckBalloon.BorderRadius = 3;
+
+            this.btnCheckBalloon.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(217)))), ((int)(((byte)(249)))), ((int)(((byte)(157)))));
+
+            this.btnCheckBalloon.BorderRadius = 6;
+
             this.btnCheckBalloon.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnCheckBalloon.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(212)))), ((int)(((byte)(135)))));
-            this.btnCheckBalloon.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(234)))), ((int)(((byte)(180)))));
+
+            this.btnCheckBalloon.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(217)))), ((int)(((byte)(249)))), ((int)(((byte)(157)))));
+
+            this.btnCheckBalloon.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(252)))), ((int)(((byte)(203)))));
+
             this.btnCheckBalloon.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckBalloon.Font = new System.Drawing.Font("Meiryo UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnCheckBalloon.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(85)))), ((int)(((byte)(15)))));
-            this.btnCheckBalloon.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(234)))), ((int)(((byte)(180)))));
+
+            this.btnCheckBalloon.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnCheckBalloon.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(54)))), ((int)(((byte)(83)))), ((int)(((byte)(20)))));
+
+            this.btnCheckBalloon.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(252)))), ((int)(((byte)(203)))));
+
+            this.btnCheckBalloon.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckBalloon.IconColor = System.Drawing.Color.Empty;
+
             this.btnCheckBalloon.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnCheckBalloon.Location = new System.Drawing.Point(195, 128);
+
+            this.btnCheckBalloon.Location = new System.Drawing.Point(182, 22);
+
             this.btnCheckBalloon.Name = "btnCheckBalloon";
-            this.btnCheckBalloon.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(244)))), ((int)(((byte)(200)))));
+
+            this.btnCheckBalloon.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(247)))), ((int)(((byte)(254)))), ((int)(((byte)(231)))));
+
             this.btnCheckBalloon.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.btnCheckBalloon.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(222)))), ((int)(((byte)(160)))));
-            this.btnCheckBalloon.Size = new System.Drawing.Size(84, 38);
+
+            this.btnCheckBalloon.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(210)))), ((int)(((byte)(232)))), ((int)(((byte)(185)))));
+
+            this.btnCheckBalloon.Size = new System.Drawing.Size(84, 26);
+
             this.btnCheckBalloon.TabIndex = 15;
-            this.btnCheckBalloon.Text = "CHECK\r\nBALLOON";
+
+            this.btnCheckBalloon.Text = "Balloon";
+
             this.btnCheckBalloon.UseVisualStyleBackColor = false;
+
             // 
-            // btnCheckDfTk
-            // 
-            this.btnCheckDfTk.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(195)))), ((int)(((byte)(230)))), ((int)(((byte)(245)))));
-            this.btnCheckDfTk.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
-            this.btnCheckDfTk.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(130)))), ((int)(((byte)(190)))), ((int)(((byte)(225)))));
-            this.btnCheckDfTk.BorderRadius = 3;
-            this.btnCheckDfTk.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnCheckDfTk.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(130)))), ((int)(((byte)(190)))), ((int)(((byte)(225)))));
-            this.btnCheckDfTk.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(175)))), ((int)(((byte)(218)))), ((int)(((byte)(240)))));
-            this.btnCheckDfTk.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckDfTk.Font = new System.Drawing.Font("Meiryo UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnCheckDfTk.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(60)))), ((int)(((byte)(100)))));
-            this.btnCheckDfTk.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(175)))), ((int)(((byte)(218)))), ((int)(((byte)(240)))));
-            this.btnCheckDfTk.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnCheckDfTk.Location = new System.Drawing.Point(12, 84);
-            this.btnCheckDfTk.Name = "btnCheckDfTk";
-            this.btnCheckDfTk.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(195)))), ((int)(((byte)(230)))), ((int)(((byte)(245)))));
-            this.btnCheckDfTk.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.btnCheckDfTk.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(155)))), ((int)(((byte)(205)))), ((int)(((byte)(232)))));
-            this.btnCheckDfTk.Size = new System.Drawing.Size(80, 38);
-            this.btnCheckDfTk.TabIndex = 10;
-            this.btnCheckDfTk.Text = "CHECK\r\nDF/TK";
-            this.btnCheckDfTk.UseVisualStyleBackColor = false;
-            // 
-            // btnCheckAll
-            // 
-            this.btnCheckAll.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(228)))), ((int)(((byte)(218)))), ((int)(((byte)(248)))));
-            this.btnCheckAll.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
-            this.btnCheckAll.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(160)))), ((int)(((byte)(225)))));
-            this.btnCheckAll.BorderRadius = 3;
-            this.btnCheckAll.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnCheckAll.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(160)))), ((int)(((byte)(225)))));
-            this.btnCheckAll.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(202)))), ((int)(((byte)(242)))));
-            this.btnCheckAll.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckAll.Font = new System.Drawing.Font("Meiryo UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnCheckAll.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(25)))), ((int)(((byte)(105)))));
-            this.btnCheckAll.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(202)))), ((int)(((byte)(242)))));
-            this.btnCheckAll.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnCheckAll.Location = new System.Drawing.Point(98, 84);
-            this.btnCheckAll.Name = "btnCheckAll";
-            this.btnCheckAll.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(228)))), ((int)(((byte)(218)))), ((int)(((byte)(248)))));
-            this.btnCheckAll.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.btnCheckAll.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(182)))), ((int)(((byte)(235)))));
-            this.btnCheckAll.Size = new System.Drawing.Size(96, 38);
-            this.btnCheckAll.TabIndex = 16;
-            this.btnCheckAll.Text = "CHECK ウラ表\r\nKEGAKI";
-            this.btnCheckAll.UseVisualStyleBackColor = false;
-            // 
-            // btnCheckRound
-            // 
-            this.btnCheckRound.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(240)))), ((int)(((byte)(230)))));
-            this.btnCheckRound.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
-            this.btnCheckRound.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(185)))));
-            this.btnCheckRound.BorderRadius = 3;
-            this.btnCheckRound.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnCheckRound.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(185)))));
-            this.btnCheckRound.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(230)))), ((int)(((byte)(218)))));
-            this.btnCheckRound.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckRound.Font = new System.Drawing.Font("Meiryo UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnCheckRound.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(75)))), ((int)(((byte)(60)))));
-            this.btnCheckRound.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(230)))), ((int)(((byte)(218)))));
-            this.btnCheckRound.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnCheckRound.Location = new System.Drawing.Point(200, 84);
-            this.btnCheckRound.Name = "btnCheckRound";
-            this.btnCheckRound.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(240)))), ((int)(((byte)(230)))));
-            this.btnCheckRound.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.btnCheckRound.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(218)))), ((int)(((byte)(205)))));
-            this.btnCheckRound.Size = new System.Drawing.Size(80, 38);
-            this.btnCheckRound.TabIndex = 17;
-            this.btnCheckRound.Text = "CHECK\r\nROUND";
-            this.btnCheckRound.UseVisualStyleBackColor = false;
-            // 
-            // btnCheckSamePart
-            // 
-            this.btnCheckSamePart.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(225)))), ((int)(((byte)(205)))));
-            this.btnCheckSamePart.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
-            this.btnCheckSamePart.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(230)))), ((int)(((byte)(175)))), ((int)(((byte)(135)))));
-            this.btnCheckSamePart.BorderRadius = 3;
-            this.btnCheckSamePart.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnCheckSamePart.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(230)))), ((int)(((byte)(175)))), ((int)(((byte)(135)))));
-            this.btnCheckSamePart.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(210)))), ((int)(((byte)(185)))));
-            this.btnCheckSamePart.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckSamePart.Font = new System.Drawing.Font("Meiryo UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnCheckSamePart.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(110)))), ((int)(((byte)(50)))), ((int)(((byte)(10)))));
-            this.btnCheckSamePart.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(210)))), ((int)(((byte)(185)))));
-            this.btnCheckSamePart.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnCheckSamePart.Location = new System.Drawing.Point(286, 84);
-            this.btnCheckSamePart.Name = "btnCheckSamePart";
-            this.btnCheckSamePart.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(225)))), ((int)(((byte)(205)))));
-            this.btnCheckSamePart.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.btnCheckSamePart.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(195)))), ((int)(((byte)(165)))));
-            this.btnCheckSamePart.Size = new System.Drawing.Size(80, 38);
-            this.btnCheckSamePart.TabIndex = 18;
-            this.btnCheckSamePart.Text = "CHECK SAME\r\nPART";
-            this.btnCheckSamePart.UseVisualStyleBackColor = false;
-            // 
+
             // btnCheckDrawingBom
+
             // 
-            this.btnCheckDrawingBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(235)))), ((int)(((byte)(190)))));
+
+            this.btnCheckDrawingBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(247)))), ((int)(((byte)(237)))));
+
             this.btnCheckDrawingBom.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
-            this.btnCheckDrawingBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(228)))), ((int)(((byte)(192)))), ((int)(((byte)(115)))));
-            this.btnCheckDrawingBom.BorderRadius = 3;
+
+            this.btnCheckDrawingBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(215)))), ((int)(((byte)(170)))));
+
+            this.btnCheckDrawingBom.BorderRadius = 6;
+
             this.btnCheckDrawingBom.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnCheckDrawingBom.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(228)))), ((int)(((byte)(192)))), ((int)(((byte)(115)))));
-            this.btnCheckDrawingBom.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(224)))), ((int)(((byte)(170)))));
+
+            this.btnCheckDrawingBom.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(215)))), ((int)(((byte)(170)))));
+
+            this.btnCheckDrawingBom.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(237)))), ((int)(((byte)(213)))));
+
             this.btnCheckDrawingBom.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckDrawingBom.Font = new System.Drawing.Font("Meiryo UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnCheckDrawingBom.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(110)))), ((int)(((byte)(70)))), ((int)(((byte)(10)))));
-            this.btnCheckDrawingBom.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(224)))), ((int)(((byte)(170)))));
+
+            this.btnCheckDrawingBom.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnCheckDrawingBom.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(124)))), ((int)(((byte)(45)))), ((int)(((byte)(18)))));
+
+            this.btnCheckDrawingBom.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(237)))), ((int)(((byte)(213)))));
+
+            this.btnCheckDrawingBom.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckDrawingBom.IconColor = System.Drawing.Color.Empty;
+
             this.btnCheckDrawingBom.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnCheckDrawingBom.Location = new System.Drawing.Point(286, 128);
+
+            this.btnCheckDrawingBom.Location = new System.Drawing.Point(270, 22);
+
             this.btnCheckDrawingBom.Name = "btnCheckDrawingBom";
-            this.btnCheckDrawingBom.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(235)))), ((int)(((byte)(190)))));
+
+            this.btnCheckDrawingBom.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(247)))), ((int)(((byte)(237)))));
+
             this.btnCheckDrawingBom.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
-            this.btnCheckDrawingBom.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(210)))), ((int)(((byte)(148)))));
-            this.btnCheckDrawingBom.Size = new System.Drawing.Size(80, 38);
+
+            this.btnCheckDrawingBom.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(215)))), ((int)(((byte)(170)))));
+
+            this.btnCheckDrawingBom.Size = new System.Drawing.Size(88, 26);
+
             this.btnCheckDrawingBom.TabIndex = 19;
-            this.btnCheckDrawingBom.Text = "CHECK\r\nDRAWING";
+
+            this.btnCheckDrawingBom.Text = "Drawing";
+
             this.btnCheckDrawingBom.UseVisualStyleBackColor = false;
+
             // 
-            // progressCheck
+
+            // cardSheetMetal
+
             // 
-            this.progressCheck.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            this.cardSheetMetal.AccentColor = System.Drawing.Color.FromArgb(((int)(((byte)(2)))), ((int)(((byte)(132)))), ((int)(((byte)(199)))));
+
+            this.cardSheetMetal.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.progressCheck.Location = new System.Drawing.Point(12, 203);
-            this.progressCheck.Name = "progressCheck";
-            this.progressCheck.Size = new System.Drawing.Size(354, 16);
-            this.progressCheck.TabIndex = 12;
-            this.progressCheck.Visible = false;
-            // 
-            // lblStatus
-            // 
-            this.lblStatus.AutoEllipsis = true;
-            this.lblStatus.Font = new System.Drawing.Font("Meiryo UI", 8.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblStatus.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(88)))), ((int)(((byte)(98)))));
-            this.lblStatus.Location = new System.Drawing.Point(12, 42);
-            this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(354, 34);
-            this.lblStatus.TabIndex = 8;
-            this.lblStatus.Text = "Dang cho ket noi...";
-            this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            // 
-            // lblTitle
-            // 
-            this.lblTitle.AutoSize = true;
-            this.lblTitle.Font = new System.Drawing.Font("Meiryo UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblTitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
-            this.lblTitle.Location = new System.Drawing.Point(12, 16);
-            this.lblTitle.Name = "lblTitle";
-            this.lblTitle.Size = new System.Drawing.Size(116, 17);
-            this.lblTitle.TabIndex = 7;
-            this.lblTitle.Text = "DRAWING BOM";
-            // 
-            // btnClearBom
-            // 
-            this.btnClearBom.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnClearBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(210)))), ((int)(((byte)(212)))));
-            this.btnClearBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(140)))), ((int)(((byte)(145)))));
-            this.btnClearBom.BorderRadius = 3;
-            this.btnClearBom.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnClearBom.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(140)))), ((int)(((byte)(145)))));
-            this.btnClearBom.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(190)))), ((int)(((byte)(194)))));
-            this.btnClearBom.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnClearBom.Font = new System.Drawing.Font("Meiryo UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnClearBom.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(20)))), ((int)(((byte)(25)))));
-            this.btnClearBom.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(190)))), ((int)(((byte)(194)))));
-            this.btnClearBom.Location = new System.Drawing.Point(137, 451);
-            this.btnClearBom.Name = "btnClearBom";
-            this.btnClearBom.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(210)))), ((int)(((byte)(212)))));
-            this.btnClearBom.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnClearBom.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(170)))), ((int)(((byte)(175)))));
-            this.btnClearBom.Size = new System.Drawing.Size(104, 32);
-            this.btnClearBom.TabIndex = 5;
-            this.btnClearBom.Text = "XÓA BẢNG";
-            this.btnClearBom.UseVisualStyleBackColor = false;
-            // 
-            // btnLoadBom
-            // 
-            this.btnLoadBom.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnLoadBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(175)))), ((int)(((byte)(212)))), ((int)(((byte)(250)))));
-            this.btnLoadBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(105)))), ((int)(((byte)(165)))), ((int)(((byte)(230)))));
-            this.btnLoadBom.BorderRadius = 3;
-            this.btnLoadBom.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnLoadBom.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(105)))), ((int)(((byte)(165)))), ((int)(((byte)(230)))));
-            this.btnLoadBom.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(152)))), ((int)(((byte)(198)))), ((int)(((byte)(245)))));
-            this.btnLoadBom.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnLoadBom.Font = new System.Drawing.Font("Meiryo UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnLoadBom.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(45)))), ((int)(((byte)(105)))));
-            this.btnLoadBom.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(152)))), ((int)(((byte)(198)))), ((int)(((byte)(245)))));
-            this.btnLoadBom.Location = new System.Drawing.Point(25, 451);
-            this.btnLoadBom.Name = "btnLoadBom";
-            this.btnLoadBom.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(175)))), ((int)(((byte)(212)))), ((int)(((byte)(250)))));
-            this.btnLoadBom.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnLoadBom.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(130)))), ((int)(((byte)(182)))), ((int)(((byte)(238)))));
-            this.btnLoadBom.Size = new System.Drawing.Size(104, 32);
-            this.btnLoadBom.TabIndex = 4;
-            this.btnLoadBom.Text = "CẬP NHẬT";
-            this.btnLoadBom.UseVisualStyleBackColor = false;
-            // 
-            // tabComponentDrawing
-            // 
-            this.tabComponentDrawing.AutoScroll = true;
-            this.tabComponentDrawing.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.tabComponentDrawing.Controls.Add(this.groupBox3);
-            this.tabComponentDrawing.Controls.Add(this.grpComponentBom);
-            this.tabComponentDrawing.Controls.Add(this.grpComponentSize);
-            this.tabComponentDrawing.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabComponentDrawing.Location = new System.Drawing.Point(4, 34);
-            this.tabComponentDrawing.Name = "tabComponentDrawing";
-            this.tabComponentDrawing.Padding = new System.Windows.Forms.Padding(3);
-            this.tabComponentDrawing.Size = new System.Drawing.Size(378, 495);
-            this.tabComponentDrawing.TabIndex = 1;
-            this.tabComponentDrawing.Text = "Component Drawing";
-            // 
-            // groupBox3
-            // 
-            this.groupBox3.AccentColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(110)))), ((int)(((byte)(210)))));
-            this.groupBox3.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.groupBox3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(249)))), ((int)(((byte)(251)))));
-            this.groupBox3.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(220)))), ((int)(((byte)(228)))));
-            this.groupBox3.BorderRadius = 6;
-            this.groupBox3.Controls.Add(this.btnDimKichThuocLo);
-            this.groupBox3.Controls.Add(this.btnRepairDim);
-            this.groupBox3.Controls.Add(this.btnVCutSection);
-            this.groupBox3.Controls.Add(this.btnDimKegaki);
-            this.groupBox3.Controls.Add(this.btnFixScale);
-            this.groupBox3.Controls.Add(this.btnSplineToArcs);
-            this.groupBox3.Controls.Add(this.btnDimMatCat);
-            this.groupBox3.Controls.Add(this.dimvang);
-            this.groupBox3.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.groupBox3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
-            this.groupBox3.HeaderTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(48)))), ((int)(((byte)(70)))));
-            this.groupBox3.Location = new System.Drawing.Point(6, 341);
-            this.groupBox3.Name = "groupBox3";
-            this.groupBox3.ShowHeaderDivider = true;
-            this.groupBox3.Size = new System.Drawing.Size(213, 238);
-            this.groupBox3.TabIndex = 2;
-            this.groupBox3.Text = "MACRO TOOLS";
-            // 
-            // btnDimKichThuocLo
-            // 
-            this.btnDimKichThuocLo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(208)))), ((int)(((byte)(244)))), ((int)(((byte)(222)))));
-            this.btnDimKichThuocLo.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(140)))), ((int)(((byte)(210)))), ((int)(((byte)(170)))));
-            this.btnDimKichThuocLo.BorderRadius = 3;
-            this.btnDimKichThuocLo.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnDimKichThuocLo.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(140)))), ((int)(((byte)(210)))), ((int)(((byte)(170)))));
-            this.btnDimKichThuocLo.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(234)))), ((int)(((byte)(205)))));
-            this.btnDimKichThuocLo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnDimKichThuocLo.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnDimKichThuocLo.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(80)))), ((int)(((byte)(45)))));
-            this.btnDimKichThuocLo.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(234)))), ((int)(((byte)(205)))));
-            this.btnDimKichThuocLo.Image = global::ADDIN.Properties.Resources.DimKichThuocLo;
-            this.btnDimKichThuocLo.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnDimKichThuocLo.Location = new System.Drawing.Point(186, 132);
-            this.btnDimKichThuocLo.Name = "btnDimKichThuocLo";
-            this.btnDimKichThuocLo.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(208)))), ((int)(((byte)(244)))), ((int)(((byte)(222)))));
-            this.btnDimKichThuocLo.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnDimKichThuocLo.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(162)))), ((int)(((byte)(222)))), ((int)(((byte)(186)))));
-            this.btnDimKichThuocLo.Size = new System.Drawing.Size(126, 44);
-            this.btnDimKichThuocLo.TabIndex = 6;
-            this.btnDimKichThuocLo.Text = "Dim kich\r\nthuoc lo";
-            this.btnDimKichThuocLo.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.btnDimKichThuocLo.UseVisualStyleBackColor = false;
-            // 
-            // btnRepairDim
-            // 
-            this.btnRepairDim.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(224)))));
-            this.btnRepairDim.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(170)))));
-            this.btnRepairDim.BorderRadius = 3;
-            this.btnRepairDim.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnRepairDim.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(170)))));
-            this.btnRepairDim.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(195)))), ((int)(((byte)(208)))));
-            this.btnRepairDim.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnRepairDim.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnRepairDim.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(22)))), ((int)(((byte)(45)))));
-            this.btnRepairDim.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(195)))), ((int)(((byte)(208)))));
-            this.btnRepairDim.Location = new System.Drawing.Point(50, 178);
-            this.btnRepairDim.Name = "btnRepairDim";
-            this.btnRepairDim.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(224)))));
-            this.btnRepairDim.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
-            this.btnRepairDim.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(175)))), ((int)(((byte)(190)))));
-            this.btnRepairDim.Size = new System.Drawing.Size(126, 40);
-            this.btnRepairDim.TabIndex = 8;
-            this.btnRepairDim.Text = "REPAIR DIM";
-            this.btnRepairDim.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.btnRepairDim.UseVisualStyleBackColor = false;
-            // 
-            // btnVCutSection
-            // 
-            this.btnVCutSection.BackColor = System.Drawing.Color.Transparent;
-            this.btnVCutSection.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(210)))), ((int)(((byte)(216)))), ((int)(((byte)(224)))));
-            this.btnVCutSection.BorderRadius = 5;
-            this.btnVCutSection.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnVCutSection.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnVCutSection.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnVCutSection.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
-            this.btnVCutSection.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(234)))), ((int)(((byte)(240)))), ((int)(((byte)(247)))));
-            this.btnVCutSection.Image = global::ADDIN.Properties.Resources.VCutSection;
-            this.btnVCutSection.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnVCutSection.Location = new System.Drawing.Point(186, 178);
-            this.btnVCutSection.Name = "btnVCutSection";
-            this.btnVCutSection.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(246)))), ((int)(((byte)(248)))), ((int)(((byte)(250)))));
-            this.btnVCutSection.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnVCutSection.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(228)))), ((int)(((byte)(238)))));
-            this.btnVCutSection.Size = new System.Drawing.Size(126, 40);
-            this.btnVCutSection.TabIndex = 9;
-            this.btnVCutSection.Text = "V-CUT\r\nSECTION";
-            this.btnVCutSection.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.btnVCutSection.UseVisualStyleBackColor = false;
-            // 
-            // btnDimKegaki
-            // 
-            this.btnDimKegaki.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(218)))), ((int)(((byte)(248)))));
-            this.btnDimKegaki.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(160)))), ((int)(((byte)(222)))));
-            this.btnDimKegaki.BorderRadius = 3;
-            this.btnDimKegaki.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnDimKegaki.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(160)))), ((int)(((byte)(222)))));
-            this.btnDimKegaki.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
-            this.btnDimKegaki.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnDimKegaki.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnDimKegaki.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(65)))), ((int)(((byte)(28)))), ((int)(((byte)(105)))));
-            this.btnDimKegaki.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
-            this.btnDimKegaki.Image = global::ADDIN.Properties.Resources.DimKegaki;
-            this.btnDimKegaki.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnDimKegaki.Location = new System.Drawing.Point(50, 78);
-            this.btnDimKegaki.Name = "btnDimKegaki";
-            this.btnDimKegaki.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(218)))), ((int)(((byte)(248)))));
-            this.btnDimKegaki.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
-            this.btnDimKegaki.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(180)))), ((int)(((byte)(230)))));
-            this.btnDimKegaki.Size = new System.Drawing.Size(126, 44);
-            this.btnDimKegaki.TabIndex = 5;
-            this.btnDimKegaki.Text = "Dim\r\nkegaki";
-            this.btnDimKegaki.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.btnDimKegaki.UseVisualStyleBackColor = false;
-            // 
-            // btnFixScale
-            // 
-            this.btnFixScale.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(226)))), ((int)(((byte)(202)))));
-            this.btnFixScale.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(230)))), ((int)(((byte)(175)))), ((int)(((byte)(132)))));
-            this.btnFixScale.BorderRadius = 3;
-            this.btnFixScale.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnFixScale.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(230)))), ((int)(((byte)(175)))), ((int)(((byte)(132)))));
-            this.btnFixScale.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(210)))), ((int)(((byte)(180)))));
-            this.btnFixScale.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnFixScale.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnFixScale.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(115)))), ((int)(((byte)(52)))), ((int)(((byte)(10)))));
-            this.btnFixScale.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(210)))), ((int)(((byte)(180)))));
-            this.btnFixScale.Image = global::ADDIN.Properties.Resources.FixScale;
-            this.btnFixScale.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnFixScale.Location = new System.Drawing.Point(186, 78);
-            this.btnFixScale.Name = "btnFixScale";
-            this.btnFixScale.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(226)))), ((int)(((byte)(202)))));
-            this.btnFixScale.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
-            this.btnFixScale.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(192)))), ((int)(((byte)(158)))));
-            this.btnFixScale.Size = new System.Drawing.Size(126, 44);
-            this.btnFixScale.TabIndex = 4;
-            this.btnFixScale.Text = "Fix ti le";
-            this.btnFixScale.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.btnFixScale.UseVisualStyleBackColor = false;
-            // 
-            // btnSplineToArcs
-            // 
-            this.btnSplineToArcs.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
-            this.btnSplineToArcs.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
-            this.btnSplineToArcs.BorderRadius = 3;
-            this.btnSplineToArcs.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnSplineToArcs.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
-            this.btnSplineToArcs.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(215)))), ((int)(((byte)(248)))));
-            this.btnSplineToArcs.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnSplineToArcs.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnSplineToArcs.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(60)))), ((int)(((byte)(118)))));
-            this.btnSplineToArcs.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(215)))), ((int)(((byte)(248)))));
-            this.btnSplineToArcs.Image = global::ADDIN.Properties.Resources.SplineToArcs;
-            this.btnSplineToArcs.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnSplineToArcs.Location = new System.Drawing.Point(50, 132);
-            this.btnSplineToArcs.Name = "btnSplineToArcs";
-            this.btnSplineToArcs.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
-            this.btnSplineToArcs.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnSplineToArcs.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(158)))), ((int)(((byte)(200)))), ((int)(((byte)(242)))));
-            this.btnSplineToArcs.Size = new System.Drawing.Size(126, 44);
-            this.btnSplineToArcs.TabIndex = 7;
-            this.btnSplineToArcs.Text = "Spline\r\n→ cung R";
-            this.btnSplineToArcs.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.btnSplineToArcs.UseVisualStyleBackColor = false;
-            // 
-            // btnDimMatCat
-            // 
-            this.btnDimMatCat.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(195)))), ((int)(((byte)(238)))), ((int)(((byte)(235)))));
-            this.btnDimMatCat.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(125)))), ((int)(((byte)(202)))), ((int)(((byte)(195)))));
-            this.btnDimMatCat.BorderRadius = 3;
-            this.btnDimMatCat.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnDimMatCat.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(125)))), ((int)(((byte)(202)))), ((int)(((byte)(195)))));
-            this.btnDimMatCat.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(228)))), ((int)(((byte)(224)))));
-            this.btnDimMatCat.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnDimMatCat.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnDimMatCat.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(72)))), ((int)(((byte)(70)))));
-            this.btnDimMatCat.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(228)))), ((int)(((byte)(224)))));
-            this.btnDimMatCat.Image = global::ADDIN.Properties.Resources.DimMatCat;
-            this.btnDimMatCat.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnDimMatCat.Location = new System.Drawing.Point(186, 24);
-            this.btnDimMatCat.Name = "btnDimMatCat";
-            this.btnDimMatCat.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(195)))), ((int)(((byte)(238)))), ((int)(((byte)(235)))));
-            this.btnDimMatCat.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
-            this.btnDimMatCat.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(148)))), ((int)(((byte)(215)))), ((int)(((byte)(210)))));
-            this.btnDimMatCat.Size = new System.Drawing.Size(126, 44);
-            this.btnDimMatCat.TabIndex = 3;
-            this.btnDimMatCat.Text = "Dim\r\nmat cat";
-            this.btnDimMatCat.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.btnDimMatCat.UseVisualStyleBackColor = false;
-            // 
-            // dimvang
-            // 
-            this.dimvang.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(234)))), ((int)(((byte)(165)))));
-            this.dimvang.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(185)))), ((int)(((byte)(80)))));
-            this.dimvang.BorderRadius = 3;
-            this.dimvang.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.dimvang.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(185)))), ((int)(((byte)(80)))));
-            this.dimvang.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(220)))), ((int)(((byte)(138)))));
-            this.dimvang.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.dimvang.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.dimvang.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(115)))), ((int)(((byte)(65)))), ((int)(((byte)(5)))));
-            this.dimvang.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(220)))), ((int)(((byte)(138)))));
-            this.dimvang.Image = global::ADDIN.Properties.Resources.DimVang;
-            this.dimvang.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.dimvang.Location = new System.Drawing.Point(50, 24);
-            this.dimvang.Name = "dimvang";
-            this.dimvang.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(234)))), ((int)(((byte)(165)))));
-            this.dimvang.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
-            this.dimvang.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(205)))), ((int)(((byte)(112)))));
-            this.dimvang.Size = new System.Drawing.Size(126, 44);
-            this.dimvang.TabIndex = 3;
-            this.dimvang.Text = "Xoa DIM\r\nmau vang";
-            this.dimvang.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.dimvang.UseVisualStyleBackColor = false;
-            // 
-            // grpComponentBom
-            // 
-            this.grpComponentBom.AccentColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(110)))), ((int)(((byte)(210)))));
-            this.grpComponentBom.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.grpComponentBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(249)))), ((int)(((byte)(251)))));
-            this.grpComponentBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(220)))), ((int)(((byte)(228)))));
-            this.grpComponentBom.BorderRadius = 6;
-            this.grpComponentBom.Controls.Add(this.btnInsertBalloon);
-            this.grpComponentBom.Controls.Add(this.cboBalloonProperty);
-            this.grpComponentBom.Controls.Add(this.btnDeleteText);
-            this.grpComponentBom.Controls.Add(this.btnText);
-            this.grpComponentBom.Controls.Add(this.cboSide);
-            this.grpComponentBom.Controls.Add(this.btnDeleteNote);
-            this.grpComponentBom.Controls.Add(this.btnNote);
-            this.grpComponentBom.Controls.Add(this.cboBendLine);
-            this.grpComponentBom.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.grpComponentBom.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
-            this.grpComponentBom.HeaderTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(48)))), ((int)(((byte)(70)))));
-            this.grpComponentBom.Location = new System.Drawing.Point(6, 196);
-            this.grpComponentBom.Name = "grpComponentBom";
-            this.grpComponentBom.ShowHeaderDivider = true;
-            this.grpComponentBom.Size = new System.Drawing.Size(213, 139);
-            this.grpComponentBom.TabIndex = 1;
-            this.grpComponentBom.Text = "TEXT & BALLOON";
-            // 
-            // btnInsertBalloon
-            // 
-            this.btnInsertBalloon.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnInsertBalloon.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnInsertBalloon.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnInsertBalloon.BorderRadius = 3;
-            this.btnInsertBalloon.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnInsertBalloon.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnInsertBalloon.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnInsertBalloon.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnInsertBalloon.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnInsertBalloon.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnInsertBalloon.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnInsertBalloon.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnInsertBalloon.Location = new System.Drawing.Point(135, 93);
-            this.btnInsertBalloon.Name = "btnInsertBalloon";
-            this.btnInsertBalloon.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnInsertBalloon.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnInsertBalloon.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnInsertBalloon.Size = new System.Drawing.Size(68, 28);
-            this.btnInsertBalloon.TabIndex = 8;
-            this.btnInsertBalloon.Text = "Balloon";
-            this.btnInsertBalloon.UseVisualStyleBackColor = false;
-            // 
-            // cboBalloonProperty
-            // 
-            this.cboBalloonProperty.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.cboBalloonProperty.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cboBalloonProperty.FormattingEnabled = true;
-            this.cboBalloonProperty.Items.AddRange(new object[] {
-            "部品番号",
-            "合番"});
-            this.cboBalloonProperty.Location = new System.Drawing.Point(12, 96);
-            this.cboBalloonProperty.Name = "cboBalloonProperty";
-            this.cboBalloonProperty.Size = new System.Drawing.Size(79, 23);
-            this.cboBalloonProperty.TabIndex = 6;
-            // 
-            // btnDeleteText
-            // 
-            this.btnDeleteText.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnDeleteText.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnDeleteText.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnDeleteText.BorderRadius = 3;
-            this.btnDeleteText.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnDeleteText.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnDeleteText.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnDeleteText.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnDeleteText.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnDeleteText.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnDeleteText.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnDeleteText.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnDeleteText.Location = new System.Drawing.Point(101, 58);
-            this.btnDeleteText.Name = "btnDeleteText";
-            this.btnDeleteText.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnDeleteText.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnDeleteText.Size = new System.Drawing.Size(28, 28);
-            this.btnDeleteText.TabIndex = 9;
-            this.btnDeleteText.UseVisualStyleBackColor = false;
-            // 
-            // btnText
-            // 
-            this.btnText.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnText.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnText.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnText.BorderRadius = 3;
-            this.btnText.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnText.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnText.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnText.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnText.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnText.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnText.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnText.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnText.Location = new System.Drawing.Point(135, 58);
-            this.btnText.Name = "btnText";
-            this.btnText.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnText.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnText.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnText.Size = new System.Drawing.Size(68, 28);
-            this.btnText.TabIndex = 5;
-            this.btnText.Text = "Text";
-            this.btnText.UseVisualStyleBackColor = false;
-            // 
-            // cboSide
-            // 
-            this.cboSide.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.cboSide.BackColor = System.Drawing.SystemColors.Window;
-            this.cboSide.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.cboSide.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.cboSide.Location = new System.Drawing.Point(12, 61);
-            this.cboSide.MinimumSize = new System.Drawing.Size(40, 23);
-            this.cboSide.Name = "cboSide";
-            this.cboSide.Padding = new System.Windows.Forms.Padding(3, 3, 0, 2);
-            this.cboSide.Size = new System.Drawing.Size(79, 23);
-            this.cboSide.TabIndex = 4;
-            // 
-            // btnDeleteNote
-            // 
-            this.btnDeleteNote.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnDeleteNote.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnDeleteNote.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnDeleteNote.BorderRadius = 3;
-            this.btnDeleteNote.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnDeleteNote.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnDeleteNote.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnDeleteNote.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnDeleteNote.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnDeleteNote.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnDeleteNote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnDeleteNote.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnDeleteNote.Location = new System.Drawing.Point(101, 23);
-            this.btnDeleteNote.Name = "btnDeleteNote";
-            this.btnDeleteNote.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnDeleteNote.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnDeleteNote.Size = new System.Drawing.Size(28, 28);
-            this.btnDeleteNote.TabIndex = 10;
-            this.btnDeleteNote.UseVisualStyleBackColor = false;
-            // 
-            // btnNote
-            // 
-            this.btnNote.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnNote.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnNote.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnNote.BorderRadius = 3;
-            this.btnNote.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnNote.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnNote.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnNote.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnNote.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnNote.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnNote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnNote.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnNote.Location = new System.Drawing.Point(135, 23);
-            this.btnNote.Name = "btnNote";
-            this.btnNote.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnNote.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnNote.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnNote.Size = new System.Drawing.Size(68, 28);
-            this.btnNote.TabIndex = 3;
-            this.btnNote.Text = "Note";
-            this.btnNote.UseVisualStyleBackColor = false;
-            // 
-            // cboBendLine
-            // 
-            this.cboBendLine.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.cboBendLine.BackColor = System.Drawing.SystemColors.Window;
-            this.cboBendLine.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.cboBendLine.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.cboBendLine.Location = new System.Drawing.Point(12, 26);
-            this.cboBendLine.MinimumSize = new System.Drawing.Size(40, 23);
-            this.cboBendLine.Name = "cboBendLine";
-            this.cboBendLine.Padding = new System.Windows.Forms.Padding(3, 3, 0, 2);
-            this.cboBendLine.Size = new System.Drawing.Size(79, 23);
-            this.cboBendLine.TabIndex = 2;
-            // 
-            // grpComponentSize
-            // 
-            this.grpComponentSize.AccentColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(110)))), ((int)(((byte)(210)))));
-            this.grpComponentSize.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.grpComponentSize.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(249)))), ((int)(((byte)(251)))));
-            this.grpComponentSize.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(220)))), ((int)(((byte)(228)))));
-            this.grpComponentSize.BorderRadius = 6;
-            this.grpComponentSize.Controls.Add(this.btnGetWL);
-            this.grpComponentSize.Controls.Add(this.groupBox2);
-            this.grpComponentSize.Controls.Add(this.groupBox1);
-            this.grpComponentSize.Controls.Add(this.btnRotateCcw);
-            this.grpComponentSize.Controls.Add(this.btnRotateCw);
-            this.grpComponentSize.Controls.Add(this.btnHorizontalAlignment);
-            this.grpComponentSize.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.grpComponentSize.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
-            this.grpComponentSize.HeaderTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(48)))), ((int)(((byte)(70)))));
-            this.grpComponentSize.Location = new System.Drawing.Point(6, 6);
-            this.grpComponentSize.Name = "grpComponentSize";
-            this.grpComponentSize.ShowHeaderDivider = true;
-            this.grpComponentSize.Size = new System.Drawing.Size(281, 180);
-            this.grpComponentSize.TabIndex = 0;
-            this.grpComponentSize.Text = "VIEW SIZE";
-            // 
-            // btnGetWL
-            // 
-            this.btnGetWL.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnGetWL.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnGetWL.BorderRadius = 3;
-            this.btnGetWL.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnGetWL.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnGetWL.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnGetWL.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnGetWL.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnGetWL.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnGetWL.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnGetWL.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnGetWL.Location = new System.Drawing.Point(282, 19);
-            this.btnGetWL.Name = "btnGetWL";
-            this.btnGetWL.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnGetWL.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnGetWL.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnGetWL.Size = new System.Drawing.Size(72, 88);
-            this.btnGetWL.TabIndex = 9;
-            this.btnGetWL.Text = "Lay W,L";
-            this.btnGetWL.UseVisualStyleBackColor = false;
-            this.btnGetWL.Click += new System.EventHandler(this.btnGetWL_Click_1);
-            // 
-            // groupBox2
-            // 
-            this.groupBox2.BackColor = System.Drawing.Color.Transparent;
-            this.groupBox2.Controls.Add(this.txtLength);
-            this.groupBox2.Font = new System.Drawing.Font("Meiryo UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.groupBox2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.groupBox2.LabelText = "";
-            this.groupBox2.Location = new System.Drawing.Point(13, 65);
-            this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Size = new System.Drawing.Size(259, 42);
-            this.groupBox2.TabIndex = 8;
-            this.groupBox2.Text = "Length";
-            // 
-            // txtLength
-            // 
-            this.txtLength.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.txtLength.Location = new System.Drawing.Point(9, 17);
-            this.txtLength.Name = "txtLength";
-            this.txtLength.ReadOnly = true;
-            this.txtLength.Size = new System.Drawing.Size(241, 22);
-            this.txtLength.TabIndex = 0;
-            this.txtLength.TabStop = false;
-            // 
-            // groupBox1
-            // 
-            this.groupBox1.BackColor = System.Drawing.Color.Transparent;
-            this.groupBox1.Controls.Add(this.txtWidth);
-            this.groupBox1.Font = new System.Drawing.Font("Meiryo UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.groupBox1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.groupBox1.LabelText = "";
-            this.groupBox1.Location = new System.Drawing.Point(13, 19);
-            this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(259, 42);
-            this.groupBox1.TabIndex = 7;
-            this.groupBox1.Text = "Width";
-            // 
-            // txtWidth
-            // 
-            this.txtWidth.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.txtWidth.Location = new System.Drawing.Point(9, 17);
-            this.txtWidth.Name = "txtWidth";
-            this.txtWidth.ReadOnly = true;
-            this.txtWidth.Size = new System.Drawing.Size(241, 22);
-            this.txtWidth.TabIndex = 0;
-            this.txtWidth.TabStop = false;
-            // 
-            // btnRotateCcw
-            // 
-            this.btnRotateCcw.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnRotateCcw.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnRotateCcw.BorderRadius = 3;
-            this.btnRotateCcw.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnRotateCcw.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnRotateCcw.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnRotateCcw.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnRotateCcw.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnRotateCcw.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnRotateCcw.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnRotateCcw.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnRotateCcw.Location = new System.Drawing.Point(171, 138);
-            this.btnRotateCcw.Name = "btnRotateCcw";
-            this.btnRotateCcw.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnRotateCcw.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnRotateCcw.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnRotateCcw.Size = new System.Drawing.Size(160, 30);
-            this.btnRotateCcw.TabIndex = 6;
-            this.btnRotateCcw.TabStop = false;
-            this.btnRotateCcw.Text = "Ro90-c";
-            this.btnRotateCcw.UseVisualStyleBackColor = false;
-            // 
-            // btnRotateCw
-            // 
-            this.btnRotateCw.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnRotateCw.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnRotateCw.BorderRadius = 3;
-            this.btnRotateCw.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnRotateCw.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnRotateCw.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnRotateCw.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnRotateCw.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnRotateCw.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnRotateCw.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnRotateCw.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnRotateCw.Location = new System.Drawing.Point(12, 138);
-            this.btnRotateCw.Name = "btnRotateCw";
-            this.btnRotateCw.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnRotateCw.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnRotateCw.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnRotateCw.Size = new System.Drawing.Size(160, 30);
-            this.btnRotateCw.TabIndex = 5;
-            this.btnRotateCw.TabStop = false;
-            this.btnRotateCw.Text = "Ro90+c";
-            this.btnRotateCw.UseVisualStyleBackColor = false;
-            // 
-            // btnHorizontalAlignment
-            // 
-            this.btnHorizontalAlignment.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnHorizontalAlignment.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnHorizontalAlignment.BorderRadius = 3;
-            this.btnHorizontalAlignment.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnHorizontalAlignment.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
-            this.btnHorizontalAlignment.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnHorizontalAlignment.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnHorizontalAlignment.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnHorizontalAlignment.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnHorizontalAlignment.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
-            this.btnHorizontalAlignment.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.btnHorizontalAlignment.Location = new System.Drawing.Point(13, 112);
-            this.btnHorizontalAlignment.Name = "btnHorizontalAlignment";
-            this.btnHorizontalAlignment.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
-            this.btnHorizontalAlignment.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.btnHorizontalAlignment.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
-            this.btnHorizontalAlignment.Size = new System.Drawing.Size(330, 30);
-            this.btnHorizontalAlignment.TabIndex = 4;
-            this.btnHorizontalAlignment.TabStop = false;
-            this.btnHorizontalAlignment.Text = "HorizontalAlignment";
-            this.btnHorizontalAlignment.UseVisualStyleBackColor = false;
-            // 
-            // tabModel
-            // 
-            this.tabModel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.tabModel.Controls.Add(this.tabModelPages);
-            this.tabModel.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabModel.Location = new System.Drawing.Point(4, 34);
-            this.tabModel.Name = "tabModel";
-            this.tabModel.Padding = new System.Windows.Forms.Padding(3);
-            this.tabModel.Size = new System.Drawing.Size(392, 539);
-            this.tabModel.TabIndex = 1;
-            this.tabModel.Text = "Model";
-            // 
-            // tabModelPages
-            // 
-            this.tabModelPages.ActiveTabColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(103)))), ((int)(((byte)(198)))));
-            this.tabModelPages.ActiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
-            this.tabModelPages.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(222)))), ((int)(((byte)(228)))));
-            this.tabModelPages.Controls.Add(this.tabModelPropsPage);
-            this.tabModelPages.Controls.Add(this.tabModelEditPage);
-            this.tabModelPages.Controls.Add(this.tabModelMacroPage);
-            this.tabModelPages.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tabModelPages.DrawMode = System.Windows.Forms.TabDrawMode.OwnerDrawFixed;
-            this.tabModelPages.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabModelPages.HeaderBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.tabModelPages.InactiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(116)))), ((int)(((byte)(139)))));
-            this.tabModelPages.ItemSize = new System.Drawing.Size(110, 30);
-            this.tabModelPages.Location = new System.Drawing.Point(3, 3);
-            this.tabModelPages.Name = "tabModelPages";
-            this.tabModelPages.Padding = new System.Drawing.Point(14, 6);
-            this.tabModelPages.SelectedIndex = 0;
-            this.tabModelPages.Size = new System.Drawing.Size(386, 533);
-            this.tabModelPages.TabIndex = 2;
-            // 
-            // tabModelPropsPage
-            // 
-            this.tabModelPropsPage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.tabModelPropsPage.Controls.Add(this.panelModelProps);
-            this.tabModelPropsPage.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabModelPropsPage.Location = new System.Drawing.Point(4, 34);
-            this.tabModelPropsPage.Name = "tabModelPropsPage";
-            this.tabModelPropsPage.Padding = new System.Windows.Forms.Padding(3);
-            this.tabModelPropsPage.Size = new System.Drawing.Size(378, 495);
-            this.tabModelPropsPage.TabIndex = 0;
-            this.tabModelPropsPage.Text = "Props";
-            // 
-            // panelModelProps
-            // 
-            this.panelModelProps.AutoScroll = true;
-            this.panelModelProps.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.panelModelProps.Controls.Add(this.btnModelUpdateProps);
-            this.panelModelProps.Controls.Add(this.btnModelResetProps);
-            this.panelModelProps.Controls.Add(this.btnModelApplyProps);
-            this.panelModelProps.Controls.Add(this.txtModelFinish);
-            this.panelModelProps.Controls.Add(this.lblModelFinish);
-            this.panelModelProps.Controls.Add(this.txtModelQty);
-            this.panelModelProps.Controls.Add(this.lblModelQty);
-            this.panelModelProps.Controls.Add(this.txtModelGoban);
-            this.panelModelProps.Controls.Add(this.lblModelGoban);
-            this.panelModelProps.Controls.Add(this.txtModelThickness);
-            this.panelModelProps.Controls.Add(this.lblModelThickness);
-            this.panelModelProps.Controls.Add(this.txtModelMaterial);
-            this.panelModelProps.Controls.Add(this.lblModelMaterial);
-            this.panelModelProps.Controls.Add(this.txtModelName);
-            this.panelModelProps.Controls.Add(this.lblModelName);
-            this.panelModelProps.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelModelProps.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.panelModelProps.Location = new System.Drawing.Point(3, 3);
-            this.panelModelProps.Name = "panelModelProps";
-            this.panelModelProps.Size = new System.Drawing.Size(372, 489);
-            this.panelModelProps.TabIndex = 1;
-            // 
-            // btnModelUpdateProps
-            // 
-            this.btnModelUpdateProps.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
-            this.btnModelUpdateProps.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
-            this.btnModelUpdateProps.BorderRadius = 3;
-            this.btnModelUpdateProps.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnModelUpdateProps.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
-            this.btnModelUpdateProps.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
-            this.btnModelUpdateProps.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(216)))), ((int)(((byte)(248)))));
-            this.btnModelUpdateProps.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnModelUpdateProps.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnModelUpdateProps.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(60)))), ((int)(((byte)(118)))));
-            this.btnModelUpdateProps.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(216)))), ((int)(((byte)(248)))));
-            this.btnModelUpdateProps.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
-            this.btnModelUpdateProps.Location = new System.Drawing.Point(178, 8);
-            this.btnModelUpdateProps.Name = "btnModelUpdateProps";
-            this.btnModelUpdateProps.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
-            this.btnModelUpdateProps.Padding = new System.Windows.Forms.Padding(0, 4, 0, 3);
-            this.btnModelUpdateProps.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
-            this.btnModelUpdateProps.Size = new System.Drawing.Size(66, 66);
-            this.btnModelUpdateProps.TabIndex = 19;
-            this.btnModelUpdateProps.Text = "refresh";
-            this.btnModelUpdateProps.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.btnModelUpdateProps.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
-            this.btnModelUpdateProps.UseVisualStyleBackColor = false;
-            // 
-            // btnModelResetProps
-            // 
-            this.btnModelResetProps.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
-            this.btnModelResetProps.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
-            this.btnModelResetProps.BorderRadius = 3;
-            this.btnModelResetProps.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnModelResetProps.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
-            this.btnModelResetProps.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
-            this.btnModelResetProps.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
-            this.btnModelResetProps.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnModelResetProps.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnModelResetProps.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(25)))), ((int)(((byte)(25)))));
-            this.btnModelResetProps.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
-            this.btnModelResetProps.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
-            this.btnModelResetProps.Location = new System.Drawing.Point(98, 8);
-            this.btnModelResetProps.Name = "btnModelResetProps";
-            this.btnModelResetProps.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
-            this.btnModelResetProps.Padding = new System.Windows.Forms.Padding(0, 4, 0, 3);
-            this.btnModelResetProps.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
-            this.btnModelResetProps.Size = new System.Drawing.Size(66, 66);
-            this.btnModelResetProps.TabIndex = 18;
-            this.btnModelResetProps.Text = "reset";
-            this.btnModelResetProps.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.btnModelResetProps.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
-            this.btnModelResetProps.UseVisualStyleBackColor = false;
-            // 
-            // btnModelApplyProps
-            // 
-            this.btnModelApplyProps.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(242)))), ((int)(((byte)(218)))));
-            this.btnModelApplyProps.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(138)))), ((int)(((byte)(208)))), ((int)(((byte)(162)))));
-            this.btnModelApplyProps.BorderRadius = 3;
-            this.btnModelApplyProps.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnModelApplyProps.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(138)))), ((int)(((byte)(208)))), ((int)(((byte)(162)))));
-            this.btnModelApplyProps.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(168)))), ((int)(((byte)(222)))), ((int)(((byte)(188)))));
-            this.btnModelApplyProps.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(234)))), ((int)(((byte)(204)))));
-            this.btnModelApplyProps.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnModelApplyProps.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnModelApplyProps.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(82)))), ((int)(((byte)(38)))));
-            this.btnModelApplyProps.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(234)))), ((int)(((byte)(204)))));
-            this.btnModelApplyProps.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
-            this.btnModelApplyProps.Location = new System.Drawing.Point(18, 8);
-            this.btnModelApplyProps.Name = "btnModelApplyProps";
-            this.btnModelApplyProps.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(242)))), ((int)(((byte)(218)))));
-            this.btnModelApplyProps.Padding = new System.Windows.Forms.Padding(0, 4, 0, 3);
-            this.btnModelApplyProps.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(168)))), ((int)(((byte)(222)))), ((int)(((byte)(188)))));
-            this.btnModelApplyProps.Size = new System.Drawing.Size(66, 66);
-            this.btnModelApplyProps.TabIndex = 17;
-            this.btnModelApplyProps.Text = "apply";
-            this.btnModelApplyProps.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.btnModelApplyProps.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
-            this.btnModelApplyProps.UseVisualStyleBackColor = false;
-            // 
-            // txtModelFinish
-            // 
-            this.txtModelFinish.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelFinish.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelFinish.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
-            this.txtModelFinish.Location = new System.Drawing.Point(36, 384);
-            this.txtModelFinish.Name = "txtModelFinish";
-            this.txtModelFinish.Size = new System.Drawing.Size(294, 25);
-            this.txtModelFinish.TabIndex = 11;
-            // 
-            // lblModelFinish
-            // 
-            this.lblModelFinish.AutoSize = true;
-            this.lblModelFinish.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelFinish.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
-            this.lblModelFinish.Location = new System.Drawing.Point(36, 362);
-            this.lblModelFinish.Name = "lblModelFinish";
-            this.lblModelFinish.Size = new System.Drawing.Size(48, 18);
-            this.lblModelFinish.TabIndex = 10;
-            this.lblModelFinish.Text = "仕上げ";
-            // 
-            // txtModelQty
-            // 
-            this.txtModelQty.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelQty.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelQty.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
-            this.txtModelQty.Location = new System.Drawing.Point(36, 330);
-            this.txtModelQty.Name = "txtModelQty";
-            this.txtModelQty.Size = new System.Drawing.Size(294, 25);
-            this.txtModelQty.TabIndex = 9;
-            // 
-            // lblModelQty
-            // 
-            this.lblModelQty.AutoSize = true;
-            this.lblModelQty.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelQty.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
-            this.lblModelQty.Location = new System.Drawing.Point(36, 308);
-            this.lblModelQty.Name = "lblModelQty";
-            this.lblModelQty.Size = new System.Drawing.Size(36, 18);
-            this.lblModelQty.TabIndex = 8;
-            this.lblModelQty.Text = "数量";
-            // 
-            // txtModelGoban
-            // 
-            this.txtModelGoban.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelGoban.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelGoban.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
-            this.txtModelGoban.Location = new System.Drawing.Point(36, 276);
-            this.txtModelGoban.Name = "txtModelGoban";
-            this.txtModelGoban.Size = new System.Drawing.Size(294, 25);
-            this.txtModelGoban.TabIndex = 7;
-            // 
-            // lblModelGoban
-            // 
-            this.lblModelGoban.AutoSize = true;
-            this.lblModelGoban.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelGoban.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
-            this.lblModelGoban.Location = new System.Drawing.Point(36, 254);
-            this.lblModelGoban.Name = "lblModelGoban";
-            this.lblModelGoban.Size = new System.Drawing.Size(36, 18);
-            this.lblModelGoban.TabIndex = 6;
-            this.lblModelGoban.Text = "合番";
-            // 
-            // txtModelThickness
-            // 
-            this.txtModelThickness.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelThickness.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelThickness.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
-            this.txtModelThickness.Location = new System.Drawing.Point(36, 222);
-            this.txtModelThickness.Name = "txtModelThickness";
-            this.txtModelThickness.Size = new System.Drawing.Size(294, 25);
-            this.txtModelThickness.TabIndex = 5;
-            // 
-            // lblModelThickness
-            // 
-            this.lblModelThickness.AutoSize = true;
-            this.lblModelThickness.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelThickness.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
-            this.lblModelThickness.Location = new System.Drawing.Point(36, 200);
-            this.lblModelThickness.Name = "lblModelThickness";
-            this.lblModelThickness.Size = new System.Drawing.Size(36, 18);
-            this.lblModelThickness.TabIndex = 4;
-            this.lblModelThickness.Text = "板厚";
-            // 
-            // txtModelMaterial
-            // 
-            this.txtModelMaterial.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelMaterial.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelMaterial.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
-            this.txtModelMaterial.Location = new System.Drawing.Point(36, 168);
-            this.txtModelMaterial.Name = "txtModelMaterial";
-            this.txtModelMaterial.Size = new System.Drawing.Size(294, 25);
-            this.txtModelMaterial.TabIndex = 3;
-            // 
-            // lblModelMaterial
-            // 
-            this.lblModelMaterial.AutoSize = true;
-            this.lblModelMaterial.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelMaterial.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
-            this.lblModelMaterial.Location = new System.Drawing.Point(36, 146);
-            this.lblModelMaterial.Name = "lblModelMaterial";
-            this.lblModelMaterial.Size = new System.Drawing.Size(36, 18);
-            this.lblModelMaterial.TabIndex = 2;
-            this.lblModelMaterial.Text = "材質";
-            // 
-            // txtModelName
-            // 
-            this.txtModelName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtModelName.Font = new System.Drawing.Font("Meiryo UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtModelName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
-            this.txtModelName.Location = new System.Drawing.Point(36, 114);
-            this.txtModelName.Name = "txtModelName";
-            this.txtModelName.Size = new System.Drawing.Size(294, 25);
-            this.txtModelName.TabIndex = 1;
-            // 
-            // lblModelName
-            // 
-            this.lblModelName.AutoSize = true;
-            this.lblModelName.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblModelName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
-            this.lblModelName.Location = new System.Drawing.Point(36, 92);
-            this.lblModelName.Name = "lblModelName";
-            this.lblModelName.Size = new System.Drawing.Size(36, 18);
-            this.lblModelName.TabIndex = 0;
-            this.lblModelName.Text = "品名";
-            // 
-            // tabModelEditPage
-            // 
-            this.tabModelEditPage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.tabModelEditPage.Controls.Add(this.panelModelCommands);
-            this.tabModelEditPage.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabModelEditPage.Location = new System.Drawing.Point(4, 34);
-            this.tabModelEditPage.Name = "tabModelEditPage";
-            this.tabModelEditPage.Padding = new System.Windows.Forms.Padding(3);
-            this.tabModelEditPage.Size = new System.Drawing.Size(378, 495);
-            this.tabModelEditPage.TabIndex = 1;
-            this.tabModelEditPage.Text = "Edit";
-            // 
-            // panelModelCommands
-            // 
-            this.panelModelCommands.AutoScroll = true;
-            this.panelModelCommands.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.panelModelCommands.Controls.Add(this.btnMakeHole);
-            this.panelModelCommands.Controls.Add(this.btnRepairHole);
-            this.panelModelCommands.Controls.Add(this.btnPaintHoleSummary);
-            this.panelModelCommands.Controls.Add(this.grpMakeHoleOptions);
-            this.panelModelCommands.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelModelCommands.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.panelModelCommands.Location = new System.Drawing.Point(3, 3);
-            this.panelModelCommands.Name = "panelModelCommands";
-            this.panelModelCommands.Padding = new System.Windows.Forms.Padding(18, 16, 8, 8);
-            this.panelModelCommands.Size = new System.Drawing.Size(372, 489);
-            this.panelModelCommands.TabIndex = 0;
-            // 
-            // btnMakeHole
-            // 
-            this.btnMakeHole.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
-            this.btnMakeHole.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
-            this.btnMakeHole.BorderRadius = 3;
-            this.btnMakeHole.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnMakeHole.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
-            this.btnMakeHole.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
-            this.btnMakeHole.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(216)))), ((int)(((byte)(248)))));
-            this.btnMakeHole.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMakeHole.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnMakeHole.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(60)))), ((int)(((byte)(118)))));
-            this.btnMakeHole.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(216)))), ((int)(((byte)(248)))));
-            this.btnMakeHole.Image = global::ADDIN.Properties.Resources.MakeHole;
-            this.btnMakeHole.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
-            this.btnMakeHole.Location = new System.Drawing.Point(18, 16);
-            this.btnMakeHole.Name = "btnMakeHole";
-            this.btnMakeHole.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
-            this.btnMakeHole.Padding = new System.Windows.Forms.Padding(0, 4, 0, 4);
-            this.btnMakeHole.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
-            this.btnMakeHole.Size = new System.Drawing.Size(96, 78);
-            this.btnMakeHole.TabIndex = 2;
-            this.btnMakeHole.Text = "Make hole";
-            this.btnMakeHole.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.btnMakeHole.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
-            this.btnMakeHole.UseVisualStyleBackColor = false;
-            // 
-            // btnRepairHole
-            // 
-            this.btnRepairHole.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(230)))), ((int)(((byte)(198)))));
-            this.btnRepairHole.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(180)))), ((int)(((byte)(125)))));
-            this.btnRepairHole.BorderRadius = 3;
-            this.btnRepairHole.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnRepairHole.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(180)))), ((int)(((byte)(125)))));
-            this.btnRepairHole.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(200)))), ((int)(((byte)(155)))));
-            this.btnRepairHole.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(218)))), ((int)(((byte)(178)))));
-            this.btnRepairHole.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnRepairHole.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnRepairHole.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(115)))), ((int)(((byte)(58)))), ((int)(((byte)(8)))));
-            this.btnRepairHole.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(218)))), ((int)(((byte)(178)))));
-            this.btnRepairHole.Image = global::ADDIN.Properties.Resources.RepairHole;
-            this.btnRepairHole.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
-            this.btnRepairHole.Location = new System.Drawing.Point(126, 16);
-            this.btnRepairHole.Name = "btnRepairHole";
-            this.btnRepairHole.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(230)))), ((int)(((byte)(198)))));
-            this.btnRepairHole.Padding = new System.Windows.Forms.Padding(0, 4, 0, 4);
-            this.btnRepairHole.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(200)))), ((int)(((byte)(155)))));
-            this.btnRepairHole.Size = new System.Drawing.Size(96, 78);
-            this.btnRepairHole.TabIndex = 3;
-            this.btnRepairHole.TabStop = false;
-            this.btnRepairHole.Text = "Repair Hole";
-            this.btnRepairHole.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.btnRepairHole.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
-            this.btnRepairHole.UseVisualStyleBackColor = false;
-            // 
-            // btnPaintHoleSummary
-            // 
-            this.btnPaintHoleSummary.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(242)))), ((int)(((byte)(236)))));
-            this.btnPaintHoleSummary.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(132)))), ((int)(((byte)(208)))), ((int)(((byte)(195)))));
-            this.btnPaintHoleSummary.BorderRadius = 3;
-            this.btnPaintHoleSummary.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnPaintHoleSummary.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(132)))), ((int)(((byte)(208)))), ((int)(((byte)(195)))));
-            this.btnPaintHoleSummary.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(220)))), ((int)(((byte)(210)))));
-            this.btnPaintHoleSummary.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(182)))), ((int)(((byte)(232)))), ((int)(((byte)(224)))));
-            this.btnPaintHoleSummary.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnPaintHoleSummary.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnPaintHoleSummary.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(78)))), ((int)(((byte)(70)))));
-            this.btnPaintHoleSummary.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(182)))), ((int)(((byte)(232)))), ((int)(((byte)(224)))));
-            this.btnPaintHoleSummary.Image = global::ADDIN.Properties.Resources.CountHole;
-            this.btnPaintHoleSummary.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
-            this.btnPaintHoleSummary.Location = new System.Drawing.Point(234, 16);
-            this.btnPaintHoleSummary.Name = "btnPaintHoleSummary";
-            this.btnPaintHoleSummary.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(242)))), ((int)(((byte)(236)))));
-            this.btnPaintHoleSummary.Padding = new System.Windows.Forms.Padding(0, 4, 0, 4);
-            this.btnPaintHoleSummary.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(220)))), ((int)(((byte)(210)))));
-            this.btnPaintHoleSummary.Size = new System.Drawing.Size(96, 78);
-            this.btnPaintHoleSummary.TabIndex = 5;
-            this.btnPaintHoleSummary.TabStop = false;
-            this.btnPaintHoleSummary.Text = "Dem hole";
-            this.btnPaintHoleSummary.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.btnPaintHoleSummary.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
-            this.btnPaintHoleSummary.UseVisualStyleBackColor = false;
-            // 
-            // grpMakeHoleOptions
-            // 
-            this.grpMakeHoleOptions.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.grpMakeHoleOptions.Controls.Add(this.pnlMakeHoleDiagram);
-            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleDirection);
-            this.grpMakeHoleOptions.Controls.Add(this.cboMakeHoleDirection);
-            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleEdgeOffset);
-            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHoleEdgeOffset);
-            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleLeftOffset);
-            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHoleLeftOffset);
-            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleRightOffset);
-            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHoleRightOffset);
-            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHolePitch);
-            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHolePitch);
-            this.grpMakeHoleOptions.Controls.Add(this.lblRepairHoleType);
-            this.grpMakeHoleOptions.Controls.Add(this.cboRepairHoleType);
-            this.grpMakeHoleOptions.Controls.Add(this.lblRepairHoleDiameter);
-            this.grpMakeHoleOptions.Controls.Add(this.cboRepairHoleDiameter);
-            this.grpMakeHoleOptions.Controls.Add(this.btnDeleteMakeHoleSize);
-            this.grpMakeHoleOptions.Controls.Add(this.chkMakeHolePaint);
-            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHolePaintName);
-            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHolePaintName);
-            this.grpMakeHoleOptions.Controls.Add(this.btnMakeHoleAccept);
-            this.grpMakeHoleOptions.Controls.Add(this.btnMakeHoleUpdate);
-            this.grpMakeHoleOptions.Controls.Add(this.btnMakeHolePattern);
-            this.grpMakeHoleOptions.Controls.Add(this.btnMakeHoleReset);
-            this.grpMakeHoleOptions.Controls.Add(this.elementHostRepairHole);
-            this.grpMakeHoleOptions.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.grpMakeHoleOptions.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
-            this.grpMakeHoleOptions.Location = new System.Drawing.Point(18, 110);
-            this.grpMakeHoleOptions.Name = "grpMakeHoleOptions";
-            this.grpMakeHoleOptions.Size = new System.Drawing.Size(268, 516);
-            this.grpMakeHoleOptions.TabIndex = 4;
-            this.grpMakeHoleOptions.TabStop = false;
-            this.grpMakeHoleOptions.Text = "Make Hole";
-            this.grpMakeHoleOptions.Visible = false;
-            // 
-            // pnlMakeHoleDiagram
-            // 
-            this.pnlMakeHoleDiagram.BackColor = System.Drawing.Color.White;
-            this.pnlMakeHoleDiagram.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pnlMakeHoleDiagram.Location = new System.Drawing.Point(16, 24);
-            this.pnlMakeHoleDiagram.Name = "pnlMakeHoleDiagram";
-            this.pnlMakeHoleDiagram.Size = new System.Drawing.Size(304, 105);
-            this.pnlMakeHoleDiagram.TabIndex = 0;
-            // 
-            // lblMakeHoleDirection
-            // 
-            this.lblMakeHoleDirection.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblMakeHoleDirection.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblMakeHoleDirection.Location = new System.Drawing.Point(16, 144);
-            this.lblMakeHoleDirection.Name = "lblMakeHoleDirection";
-            this.lblMakeHoleDirection.Size = new System.Drawing.Size(76, 18);
-            this.lblMakeHoleDirection.TabIndex = 7;
-            this.lblMakeHoleDirection.Text = "Direction";
-            // 
-            // cboMakeHoleDirection
-            // 
-            this.cboMakeHoleDirection.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cboMakeHoleDirection.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.cboMakeHoleDirection.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.cboMakeHoleDirection.FormattingEnabled = true;
-            this.cboMakeHoleDirection.Items.AddRange(new object[] {
-            "Curve Flow",
-            "Line Flow",
-            "Spline Flow"});
-            this.cboMakeHoleDirection.Location = new System.Drawing.Point(16, 161);
-            this.cboMakeHoleDirection.Name = "cboMakeHoleDirection";
-            this.cboMakeHoleDirection.Size = new System.Drawing.Size(304, 23);
-            this.cboMakeHoleDirection.TabIndex = 8;
-            // 
-            // lblMakeHoleEdgeOffset
-            // 
-            this.lblMakeHoleEdgeOffset.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblMakeHoleEdgeOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblMakeHoleEdgeOffset.Location = new System.Drawing.Point(16, 186);
-            this.lblMakeHoleEdgeOffset.Name = "lblMakeHoleEdgeOffset";
-            this.lblMakeHoleEdgeOffset.Size = new System.Drawing.Size(76, 18);
-            this.lblMakeHoleEdgeOffset.TabIndex = 9;
-            this.lblMakeHoleEdgeOffset.Text = "Dim Edge X";
-            // 
-            // txtMakeHoleEdgeOffset
-            // 
-            this.txtMakeHoleEdgeOffset.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtMakeHoleEdgeOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtMakeHoleEdgeOffset.Location = new System.Drawing.Point(16, 203);
-            this.txtMakeHoleEdgeOffset.Name = "txtMakeHoleEdgeOffset";
-            this.txtMakeHoleEdgeOffset.Size = new System.Drawing.Size(304, 23);
-            this.txtMakeHoleEdgeOffset.TabIndex = 10;
-            this.txtMakeHoleEdgeOffset.Text = "20";
-            // 
-            // lblMakeHoleLeftOffset
-            // 
-            this.lblMakeHoleLeftOffset.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblMakeHoleLeftOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblMakeHoleLeftOffset.Location = new System.Drawing.Point(16, 228);
-            this.lblMakeHoleLeftOffset.Name = "lblMakeHoleLeftOffset";
-            this.lblMakeHoleLeftOffset.Size = new System.Drawing.Size(70, 18);
-            this.lblMakeHoleLeftOffset.TabIndex = 11;
-            this.lblMakeHoleLeftOffset.Text = "Dim Left L";
-            // 
-            // txtMakeHoleLeftOffset
-            // 
-            this.txtMakeHoleLeftOffset.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtMakeHoleLeftOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtMakeHoleLeftOffset.Location = new System.Drawing.Point(16, 245);
-            this.txtMakeHoleLeftOffset.Name = "txtMakeHoleLeftOffset";
-            this.txtMakeHoleLeftOffset.Size = new System.Drawing.Size(304, 23);
-            this.txtMakeHoleLeftOffset.TabIndex = 12;
-            this.txtMakeHoleLeftOffset.Text = "50";
-            // 
-            // lblMakeHoleRightOffset
-            // 
-            this.lblMakeHoleRightOffset.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblMakeHoleRightOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblMakeHoleRightOffset.Location = new System.Drawing.Point(16, 270);
-            this.lblMakeHoleRightOffset.Name = "lblMakeHoleRightOffset";
-            this.lblMakeHoleRightOffset.Size = new System.Drawing.Size(76, 18);
-            this.lblMakeHoleRightOffset.TabIndex = 13;
-            this.lblMakeHoleRightOffset.Text = "Dim Right R";
-            // 
-            // txtMakeHoleRightOffset
-            // 
-            this.txtMakeHoleRightOffset.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtMakeHoleRightOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtMakeHoleRightOffset.Location = new System.Drawing.Point(16, 287);
-            this.txtMakeHoleRightOffset.Name = "txtMakeHoleRightOffset";
-            this.txtMakeHoleRightOffset.Size = new System.Drawing.Size(304, 23);
-            this.txtMakeHoleRightOffset.TabIndex = 14;
-            this.txtMakeHoleRightOffset.Text = "50";
-            // 
-            // lblMakeHolePitch
-            // 
-            this.lblMakeHolePitch.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblMakeHolePitch.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblMakeHolePitch.Location = new System.Drawing.Point(16, 312);
-            this.lblMakeHolePitch.Name = "lblMakeHolePitch";
-            this.lblMakeHolePitch.Size = new System.Drawing.Size(70, 18);
-            this.lblMakeHolePitch.TabIndex = 15;
-            this.lblMakeHolePitch.Text = "Pitch @";
-            // 
-            // txtMakeHolePitch
-            // 
-            this.txtMakeHolePitch.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtMakeHolePitch.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtMakeHolePitch.Location = new System.Drawing.Point(16, 329);
-            this.txtMakeHolePitch.Name = "txtMakeHolePitch";
-            this.txtMakeHolePitch.Size = new System.Drawing.Size(304, 23);
-            this.txtMakeHolePitch.TabIndex = 16;
-            this.txtMakeHolePitch.Text = "300";
-            // 
-            // lblRepairHoleType
-            // 
-            this.lblRepairHoleType.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblRepairHoleType.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblRepairHoleType.Location = new System.Drawing.Point(16, 148);
-            this.lblRepairHoleType.Name = "lblRepairHoleType";
-            this.lblRepairHoleType.Size = new System.Drawing.Size(76, 18);
-            this.lblRepairHoleType.TabIndex = 21;
-            this.lblRepairHoleType.Text = "Hole Type";
-            this.lblRepairHoleType.Visible = false;
-            // 
-            // cboRepairHoleType
-            // 
-            this.cboRepairHoleType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cboRepairHoleType.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.cboRepairHoleType.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.cboRepairHoleType.FormattingEnabled = true;
-            this.cboRepairHoleType.Items.AddRange(new object[] {
-            "丸穴",
-            "ルーズホル穴"});
-            this.cboRepairHoleType.Location = new System.Drawing.Point(92, 145);
-            this.cboRepairHoleType.Name = "cboRepairHoleType";
-            this.cboRepairHoleType.Size = new System.Drawing.Size(228, 23);
-            this.cboRepairHoleType.TabIndex = 22;
-            this.cboRepairHoleType.Visible = false;
-            // 
-            // lblRepairHoleDiameter
-            // 
-            this.lblRepairHoleDiameter.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblRepairHoleDiameter.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblRepairHoleDiameter.Location = new System.Drawing.Point(16, 180);
-            this.lblRepairHoleDiameter.Name = "lblRepairHoleDiameter";
-            this.lblRepairHoleDiameter.Size = new System.Drawing.Size(76, 18);
-            this.lblRepairHoleDiameter.TabIndex = 23;
-            this.lblRepairHoleDiameter.Text = "Hole Size";
-            this.lblRepairHoleDiameter.Visible = false;
-            // 
-            // cboRepairHoleDiameter
-            // 
-            this.cboRepairHoleDiameter.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.cboRepairHoleDiameter.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.cboRepairHoleDiameter.FormattingEnabled = true;
-            this.cboRepairHoleDiameter.Items.AddRange(new object[] {
-            "3.3",
-            "4.2",
-            "5.2",
-            "6.2",
-            "6.5",
-            "8",
-            "10"});
-            this.cboRepairHoleDiameter.Location = new System.Drawing.Point(92, 177);
-            this.cboRepairHoleDiameter.Name = "cboRepairHoleDiameter";
-            this.cboRepairHoleDiameter.Size = new System.Drawing.Size(166, 23);
-            this.cboRepairHoleDiameter.TabIndex = 24;
-            this.cboRepairHoleDiameter.Text = "4.2";
-            this.cboRepairHoleDiameter.Visible = false;
-            // 
-            // btnDeleteMakeHoleSize
-            // 
-            this.btnDeleteMakeHoleSize.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
-            this.btnDeleteMakeHoleSize.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
-            this.btnDeleteMakeHoleSize.BorderRadius = 3;
-            this.btnDeleteMakeHoleSize.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnDeleteMakeHoleSize.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
-            this.btnDeleteMakeHoleSize.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
-            this.btnDeleteMakeHoleSize.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
-            this.btnDeleteMakeHoleSize.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnDeleteMakeHoleSize.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnDeleteMakeHoleSize.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(25)))), ((int)(((byte)(25)))));
-            this.btnDeleteMakeHoleSize.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
-            this.btnDeleteMakeHoleSize.Location = new System.Drawing.Point(264, 177);
-            this.btnDeleteMakeHoleSize.Name = "btnDeleteMakeHoleSize";
-            this.btnDeleteMakeHoleSize.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
-            this.btnDeleteMakeHoleSize.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
-            this.btnDeleteMakeHoleSize.Size = new System.Drawing.Size(56, 23);
-            this.btnDeleteMakeHoleSize.TabIndex = 25;
-            this.btnDeleteMakeHoleSize.Text = "削除";
-            this.btnDeleteMakeHoleSize.UseVisualStyleBackColor = false;
-            this.btnDeleteMakeHoleSize.Visible = false;
-            // 
-            // chkMakeHolePaint
-            // 
-            this.chkMakeHolePaint.AutoSize = true;
-            this.chkMakeHolePaint.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.chkMakeHolePaint.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.chkMakeHolePaint.Location = new System.Drawing.Point(16, 352);
-            this.chkMakeHolePaint.Name = "chkMakeHolePaint";
-            this.chkMakeHolePaint.Size = new System.Drawing.Size(50, 19);
-            this.chkMakeHolePaint.TabIndex = 23;
-            this.chkMakeHolePaint.Text = "塗装";
-            this.chkMakeHolePaint.UseVisualStyleBackColor = true;
-            // 
-            // lblMakeHolePaintName
-            // 
-            this.lblMakeHolePaintName.AutoSize = true;
-            this.lblMakeHolePaintName.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblMakeHolePaintName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
-            this.lblMakeHolePaintName.Location = new System.Drawing.Point(16, 378);
-            this.lblMakeHolePaintName.Name = "lblMakeHolePaintName";
-            this.lblMakeHolePaintName.Size = new System.Drawing.Size(75, 15);
-            this.lblMakeHolePaintName.TabIndex = 24;
-            this.lblMakeHolePaintName.Text = "Name hole";
-            // 
-            // txtMakeHolePaintName
-            // 
-            this.txtMakeHolePaintName.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.txtMakeHolePaintName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
-            this.txtMakeHolePaintName.Location = new System.Drawing.Point(16, 395);
-            this.txtMakeHolePaintName.Name = "txtMakeHolePaintName";
-            this.txtMakeHolePaintName.Size = new System.Drawing.Size(304, 23);
-            this.txtMakeHolePaintName.TabIndex = 25;
-            // 
-            // btnMakeHoleAccept
-            // 
-            this.btnMakeHoleAccept.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(242)))), ((int)(((byte)(218)))));
-            this.btnMakeHoleAccept.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(138)))), ((int)(((byte)(208)))), ((int)(((byte)(162)))));
-            this.btnMakeHoleAccept.BorderRadius = 3;
-            this.btnMakeHoleAccept.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnMakeHoleAccept.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(138)))), ((int)(((byte)(208)))), ((int)(((byte)(162)))));
-            this.btnMakeHoleAccept.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(168)))), ((int)(((byte)(222)))), ((int)(((byte)(188)))));
-            this.btnMakeHoleAccept.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(234)))), ((int)(((byte)(204)))));
-            this.btnMakeHoleAccept.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMakeHoleAccept.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnMakeHoleAccept.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(82)))), ((int)(((byte)(38)))));
-            this.btnMakeHoleAccept.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(234)))), ((int)(((byte)(204)))));
-            this.btnMakeHoleAccept.Location = new System.Drawing.Point(16, 428);
-            this.btnMakeHoleAccept.Name = "btnMakeHoleAccept";
-            this.btnMakeHoleAccept.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(242)))), ((int)(((byte)(218)))));
-            this.btnMakeHoleAccept.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(168)))), ((int)(((byte)(222)))), ((int)(((byte)(188)))));
-            this.btnMakeHoleAccept.Size = new System.Drawing.Size(148, 32);
-            this.btnMakeHoleAccept.TabIndex = 17;
-            this.btnMakeHoleAccept.Text = "Accept";
-            this.btnMakeHoleAccept.UseVisualStyleBackColor = false;
-            // 
-            // btnMakeHoleUpdate
-            // 
-            this.btnMakeHoleUpdate.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(235)))), ((int)(((byte)(180)))));
-            this.btnMakeHoleUpdate.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(228)))), ((int)(((byte)(192)))), ((int)(((byte)(105)))));
-            this.btnMakeHoleUpdate.BorderRadius = 3;
-            this.btnMakeHoleUpdate.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnMakeHoleUpdate.Enabled = false;
-            this.btnMakeHoleUpdate.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(228)))), ((int)(((byte)(192)))), ((int)(((byte)(105)))));
-            this.btnMakeHoleUpdate.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(210)))), ((int)(((byte)(125)))));
-            this.btnMakeHoleUpdate.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(224)))), ((int)(((byte)(150)))));
-            this.btnMakeHoleUpdate.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMakeHoleUpdate.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnMakeHoleUpdate.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(115)))), ((int)(((byte)(68)))), ((int)(((byte)(8)))));
-            this.btnMakeHoleUpdate.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(224)))), ((int)(((byte)(150)))));
-            this.btnMakeHoleUpdate.Location = new System.Drawing.Point(172, 428);
-            this.btnMakeHoleUpdate.Name = "btnMakeHoleUpdate";
-            this.btnMakeHoleUpdate.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(235)))), ((int)(((byte)(180)))));
-            this.btnMakeHoleUpdate.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(210)))), ((int)(((byte)(125)))));
-            this.btnMakeHoleUpdate.Size = new System.Drawing.Size(148, 32);
-            this.btnMakeHoleUpdate.TabIndex = 20;
-            this.btnMakeHoleUpdate.Text = "UPDATE HOLE";
-            this.btnMakeHoleUpdate.UseVisualStyleBackColor = false;
-            // 
-            // btnMakeHolePattern
-            // 
-            this.btnMakeHolePattern.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(220)))), ((int)(((byte)(250)))));
-            this.btnMakeHolePattern.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(182)))), ((int)(((byte)(162)))), ((int)(((byte)(228)))));
-            this.btnMakeHolePattern.BorderRadius = 3;
-            this.btnMakeHolePattern.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnMakeHolePattern.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(182)))), ((int)(((byte)(162)))), ((int)(((byte)(228)))));
-            this.btnMakeHolePattern.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(180)))), ((int)(((byte)(232)))));
-            this.btnMakeHolePattern.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(202)))), ((int)(((byte)(242)))));
-            this.btnMakeHolePattern.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMakeHolePattern.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnMakeHolePattern.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(65)))), ((int)(((byte)(30)))), ((int)(((byte)(110)))));
-            this.btnMakeHolePattern.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(202)))), ((int)(((byte)(242)))));
-            this.btnMakeHolePattern.Location = new System.Drawing.Point(172, 468);
-            this.btnMakeHolePattern.Name = "btnMakeHolePattern";
-            this.btnMakeHolePattern.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(220)))), ((int)(((byte)(250)))));
-            this.btnMakeHolePattern.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(180)))), ((int)(((byte)(232)))));
-            this.btnMakeHolePattern.Size = new System.Drawing.Size(148, 32);
-            this.btnMakeHolePattern.TabIndex = 18;
-            this.btnMakeHolePattern.Text = "Pattern";
-            this.btnMakeHolePattern.UseVisualStyleBackColor = false;
-            this.btnMakeHolePattern.Visible = false;
-            // 
-            // btnMakeHoleReset
-            // 
-            this.btnMakeHoleReset.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
-            this.btnMakeHoleReset.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
-            this.btnMakeHoleReset.BorderRadius = 3;
-            this.btnMakeHoleReset.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnMakeHoleReset.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
-            this.btnMakeHoleReset.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
-            this.btnMakeHoleReset.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
-            this.btnMakeHoleReset.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMakeHoleReset.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnMakeHoleReset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(25)))), ((int)(((byte)(25)))));
-            this.btnMakeHoleReset.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
-            this.btnMakeHoleReset.Location = new System.Drawing.Point(16, 468);
-            this.btnMakeHoleReset.Name = "btnMakeHoleReset";
-            this.btnMakeHoleReset.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
-            this.btnMakeHoleReset.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
-            this.btnMakeHoleReset.Size = new System.Drawing.Size(148, 32);
-            this.btnMakeHoleReset.TabIndex = 19;
-            this.btnMakeHoleReset.Text = "Reset";
-            this.btnMakeHoleReset.UseVisualStyleBackColor = false;
-            // 
-            // elementHostRepairHole
-            // 
-            this.elementHostRepairHole.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.elementHostRepairHole.Location = new System.Drawing.Point(12, 22);
-            this.elementHostRepairHole.Name = "elementHostRepairHole";
-            this.elementHostRepairHole.Size = new System.Drawing.Size(244, 380);
-            this.elementHostRepairHole.TabIndex = 20;
-            this.elementHostRepairHole.Text = "elementHostRepairHole";
-            this.elementHostRepairHole.Visible = false;
-            this.elementHostRepairHole.Child = null;
-            // 
-            // tabModelMacroPage
-            // 
-            this.tabModelMacroPage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.tabModelMacroPage.Controls.Add(this.vCutBendAssignmentControl);
-            this.tabModelMacroPage.Controls.Add(this.btnVCutPropertySetup);
-            this.tabModelMacroPage.Controls.Add(this.lblCheckAssemblyHoleResult);
-            this.tabModelMacroPage.Controls.Add(this.btnRepair3DSpline);
-            this.tabModelMacroPage.Controls.Add(this.btnEdgeToEqualSpline);
-            this.tabModelMacroPage.Controls.Add(this.btnMirrorPart);
-            this.tabModelMacroPage.Controls.Add(this.btnCheckAssemblyHole);
-            this.tabModelMacroPage.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.tabModelMacroPage.Location = new System.Drawing.Point(4, 34);
-            this.tabModelMacroPage.Name = "tabModelMacroPage";
-            this.tabModelMacroPage.Padding = new System.Windows.Forms.Padding(3);
-            this.tabModelMacroPage.Size = new System.Drawing.Size(378, 495);
-            this.tabModelMacroPage.TabIndex = 2;
-            this.tabModelMacroPage.Text = "Macro";
-            // 
-            // vCutBendAssignmentControl
-            // 
-            this.vCutBendAssignmentControl.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
-            this.vCutBendAssignmentControl.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.vCutBendAssignmentControl.Font = new System.Drawing.Font("Meiryo UI", 9F);
-            this.vCutBendAssignmentControl.Location = new System.Drawing.Point(3, 3);
-            this.vCutBendAssignmentControl.Name = "vCutBendAssignmentControl";
-            this.vCutBendAssignmentControl.Size = new System.Drawing.Size(372, 489);
-            this.vCutBendAssignmentControl.TabIndex = 21;
-            this.vCutBendAssignmentControl.Visible = false;
-            // 
-            // btnVCutPropertySetup
-            // 
-            this.btnVCutPropertySetup.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(242)))), ((int)(((byte)(240)))));
-            this.btnVCutPropertySetup.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(119)))), ((int)(((byte)(177)))), ((int)(((byte)(169)))));
-            this.btnVCutPropertySetup.BorderRadius = 5;
-            this.btnVCutPropertySetup.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnVCutPropertySetup.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnVCutPropertySetup.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnVCutPropertySetup.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(27)))), ((int)(((byte)(93)))), ((int)(((byte)(87)))));
-            this.btnVCutPropertySetup.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(229)))), ((int)(((byte)(226)))));
-            this.btnVCutPropertySetup.Image = global::ADDIN.Properties.Resources.SetBendLine3D;
-            this.btnVCutPropertySetup.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.btnVCutPropertySetup.Location = new System.Drawing.Point(18, 132);
-            this.btnVCutPropertySetup.Name = "btnVCutPropertySetup";
-            this.btnVCutPropertySetup.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(242)))), ((int)(((byte)(240)))));
-            this.btnVCutPropertySetup.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
-            this.btnVCutPropertySetup.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(217)))), ((int)(((byte)(213)))));
-            this.btnVCutPropertySetup.Size = new System.Drawing.Size(145, 48);
-            this.btnVCutPropertySetup.TabIndex = 20;
-            this.btnVCutPropertySetup.Text = "Set Bend line\r\n曲げ線設定";
-            this.btnVCutPropertySetup.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
-            this.btnVCutPropertySetup.UseVisualStyleBackColor = false;
-            // 
-            // lblCheckAssemblyHoleResult
-            // 
-            this.lblCheckAssemblyHoleResult.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+
+            this.cardSheetMetal.BackColor = System.Drawing.Color.White;
+
+            this.cardSheetMetal.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(232)))), ((int)(((byte)(240)))));
+
+            this.cardSheetMetal.BorderRadius = 8;
+
+            this.cardSheetMetal.Controls.Add(this.btnCheckDfTk);
+
+            this.cardSheetMetal.Controls.Add(this.btnCheckAll);
+
+            this.cardSheetMetal.Controls.Add(this.btnCheckRound);
+
+            this.cardSheetMetal.Controls.Add(this.btnCheckSamePart);
+
+            this.cardSheetMetal.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.cardSheetMetal.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.cardSheetMetal.HeaderTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.cardSheetMetal.Location = new System.Drawing.Point(6, 28);
+
+            this.cardSheetMetal.Name = "cardSheetMetal";
+
+            this.cardSheetMetal.ShowHeaderDivider = true;
+
+            this.cardSheetMetal.Size = new System.Drawing.Size(366, 54);
+
+            this.cardSheetMetal.TabIndex = 1;
+
+            this.cardSheetMetal.Text = "KIỂM TRA KIM LOẠI TẤM (DETAIL BOM)";
+
+            // 
+
+            // btnCheckDfTk
+
+            // 
+
+            this.btnCheckDfTk.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
+
+            this.btnCheckDfTk.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
+
+            this.btnCheckDfTk.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(186)))), ((int)(((byte)(230)))), ((int)(((byte)(253)))));
+
+            this.btnCheckDfTk.BorderRadius = 6;
+
+            this.btnCheckDfTk.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnCheckDfTk.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(186)))), ((int)(((byte)(230)))), ((int)(((byte)(253)))));
+
+            this.btnCheckDfTk.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(242)))), ((int)(((byte)(254)))));
+
+            this.btnCheckDfTk.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnCheckDfTk.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnCheckDfTk.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(74)))), ((int)(((byte)(110)))));
+
+            this.btnCheckDfTk.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(242)))), ((int)(((byte)(254)))));
+
+            this.btnCheckDfTk.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckDfTk.IconColor = System.Drawing.Color.Empty;
+
+            this.btnCheckDfTk.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnCheckDfTk.Location = new System.Drawing.Point(6, 22);
+
+            this.btnCheckDfTk.Name = "btnCheckDfTk";
+
+            this.btnCheckDfTk.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
+
+            this.btnCheckDfTk.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
+
+            this.btnCheckDfTk.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(186)))), ((int)(((byte)(230)))), ((int)(((byte)(253)))));
+
+            this.btnCheckDfTk.Size = new System.Drawing.Size(84, 26);
+
+            this.btnCheckDfTk.TabIndex = 10;
+
+            this.btnCheckDfTk.Text = "DF/TK";
+
+            this.btnCheckDfTk.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnCheckAll
+
+            // 
+
+            this.btnCheckAll.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(245)))), ((int)(((byte)(255)))));
+
+            this.btnCheckAll.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
+
+            this.btnCheckAll.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(233)))), ((int)(((byte)(213)))), ((int)(((byte)(255)))));
+
+            this.btnCheckAll.BorderRadius = 6;
+
+            this.btnCheckAll.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnCheckAll.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(233)))), ((int)(((byte)(213)))), ((int)(((byte)(255)))));
+
+            this.btnCheckAll.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(232)))), ((int)(((byte)(255)))));
+
+            this.btnCheckAll.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnCheckAll.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnCheckAll.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(88)))), ((int)(((byte)(28)))), ((int)(((byte)(135)))));
+
+            this.btnCheckAll.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(232)))), ((int)(((byte)(255)))));
+
+            this.btnCheckAll.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckAll.IconColor = System.Drawing.Color.Empty;
+
+            this.btnCheckAll.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnCheckAll.Location = new System.Drawing.Point(94, 22);
+
+            this.btnCheckAll.Name = "btnCheckAll";
+
+            this.btnCheckAll.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(245)))), ((int)(((byte)(255)))));
+
+            this.btnCheckAll.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
+
+            this.btnCheckAll.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(233)))), ((int)(((byte)(213)))), ((int)(((byte)(255)))));
+
+            this.btnCheckAll.Size = new System.Drawing.Size(84, 26);
+
+            this.btnCheckAll.TabIndex = 16;
+
+            this.btnCheckAll.Text = "Kegaki";
+
+            this.btnCheckAll.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnCheckRound
+
+            // 
+
+            this.btnCheckRound.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(253)))), ((int)(((byte)(250)))));
+
+            this.btnCheckRound.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
+
+            this.btnCheckRound.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(153)))), ((int)(((byte)(246)))), ((int)(((byte)(228)))));
+
+            this.btnCheckRound.BorderRadius = 6;
+
+            this.btnCheckRound.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnCheckRound.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(153)))), ((int)(((byte)(246)))), ((int)(((byte)(228)))));
+
+            this.btnCheckRound.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(204)))), ((int)(((byte)(251)))), ((int)(((byte)(241)))));
+
+            this.btnCheckRound.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnCheckRound.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnCheckRound.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(19)))), ((int)(((byte)(78)))), ((int)(((byte)(74)))));
+
+            this.btnCheckRound.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(204)))), ((int)(((byte)(251)))), ((int)(((byte)(241)))));
+
+            this.btnCheckRound.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckRound.IconColor = System.Drawing.Color.Empty;
+
+            this.btnCheckRound.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnCheckRound.Location = new System.Drawing.Point(182, 22);
+
+            this.btnCheckRound.Name = "btnCheckRound";
+
+            this.btnCheckRound.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(253)))), ((int)(((byte)(250)))));
+
+            this.btnCheckRound.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
+
+            this.btnCheckRound.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(153)))), ((int)(((byte)(246)))), ((int)(((byte)(228)))));
+
+            this.btnCheckRound.Size = new System.Drawing.Size(84, 26);
+
+            this.btnCheckRound.TabIndex = 17;
+
+            this.btnCheckRound.Text = "Round";
+
+            this.btnCheckRound.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnCheckSamePart
+
+            // 
+
+            this.btnCheckSamePart.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(252)))), ((int)(((byte)(232)))));
+
+            this.btnCheckSamePart.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
+
+            this.btnCheckSamePart.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(240)))), ((int)(((byte)(138)))));
+
+            this.btnCheckSamePart.BorderRadius = 6;
+
+            this.btnCheckSamePart.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnCheckSamePart.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(240)))), ((int)(((byte)(138)))));
+
+            this.btnCheckSamePart.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(249)))), ((int)(((byte)(195)))));
+
+            this.btnCheckSamePart.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnCheckSamePart.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnCheckSamePart.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(113)))), ((int)(((byte)(63)))), ((int)(((byte)(18)))));
+
+            this.btnCheckSamePart.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(249)))), ((int)(((byte)(195)))));
+
+            this.btnCheckSamePart.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckSamePart.IconColor = System.Drawing.Color.Empty;
+
+            this.btnCheckSamePart.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnCheckSamePart.Location = new System.Drawing.Point(270, 22);
+
+            this.btnCheckSamePart.Name = "btnCheckSamePart";
+
+            this.btnCheckSamePart.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(252)))), ((int)(((byte)(232)))));
+
+            this.btnCheckSamePart.Padding = new System.Windows.Forms.Padding(2, 0, 2, 0);
+
+            this.btnCheckSamePart.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(240)))), ((int)(((byte)(138)))));
+
+            this.btnCheckSamePart.Size = new System.Drawing.Size(88, 26);
+
+            this.btnCheckSamePart.TabIndex = 18;
+
+            this.btnCheckSamePart.Text = "Same";
+
+            this.btnCheckSamePart.UseVisualStyleBackColor = false;
+
+            // 
+
+            // lblBomBadge
+
+            // 
+
+            this.lblBomBadge.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.lblBomBadge.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.lblBomBadge.Font = new System.Drawing.Font("Segoe UI", 7.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblBomBadge.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(116)))), ((int)(((byte)(139)))));
+
+            this.lblBomBadge.Location = new System.Drawing.Point(284, 6);
+
+            this.lblBomBadge.Name = "lblBomBadge";
+
+            this.lblBomBadge.Size = new System.Drawing.Size(88, 20);
+
+            this.lblBomBadge.TabIndex = 20;
+
+            this.lblBomBadge.Text = "BOM Drawing";
+
+            this.lblBomBadge.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+
+            // 
+
+            // lblBomCount
+
+            // 
+
+            this.lblBomCount.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.lblBomCount.Font = new System.Drawing.Font("Segoe UI", 8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblBomCount.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(116)))), ((int)(((byte)(139)))));
+
+            this.lblBomCount.Location = new System.Drawing.Point(272, 144);
+
+            this.lblBomCount.Name = "lblBomCount";
+
+            this.lblBomCount.Size = new System.Drawing.Size(100, 18);
+
+            this.lblBomCount.TabIndex = 21;
+
+            this.lblBomCount.Text = "4 chi tiết";
+
+            this.lblBomCount.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+
+            // 
+
+            // button1
+
+            // 
+
+            this.button1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+
+            this.button1.BackColor = System.Drawing.Color.White;
+
+            this.button1.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(232)))), ((int)(((byte)(240)))));
+
+            this.button1.BorderRadius = 6;
+
+            this.button1.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.button1.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(232)))), ((int)(((byte)(240)))));
+
+            this.button1.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.button1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.button1.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.button1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(51)))), ((int)(((byte)(65)))), ((int)(((byte)(85)))));
+
+            this.button1.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.button1.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.button1.IconColor = System.Drawing.Color.Empty;
+
+            this.button1.Location = new System.Drawing.Point(250, 450);
+
+            this.button1.Name = "button1";
+
+            this.button1.NormalColor = System.Drawing.Color.White;
+
+            this.button1.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.button1.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.button1.Size = new System.Drawing.Size(116, 34);
+
+            this.button1.TabIndex = 13;
+
+            this.button1.Text = "Cancel";
+
+            this.button1.UseVisualStyleBackColor = false;
+
+            // 
+
+            // chkSelectAll
+
+            // 
+
+            this.chkSelectAll.AutoSize = true;
+
+            this.chkSelectAll.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.chkSelectAll.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.chkSelectAll.Location = new System.Drawing.Point(6, 144);
+
+            this.chkSelectAll.Name = "chkSelectAll";
+
+            this.chkSelectAll.Size = new System.Drawing.Size(174, 19);
+
+            this.chkSelectAll.TabIndex = 11;
+
+            this.chkSelectAll.Text = "Chọn tất cả (Select All)";
+
+            this.chkSelectAll.UseVisualStyleBackColor = true;
+
+            // 
+
+            // dgvModelBom
+
+            // 
+
+            this.dgvModelBom.AllowUserToAddRows = false;
+
+            this.dgvModelBom.AllowUserToDeleteRows = false;
+
+            this.dgvModelBom.AllowUserToOrderColumns = true;
+
+            this.dgvModelBom.AllowUserToResizeRows = false;
+
+            dataGridViewCellStyle1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.dgvModelBom.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+
+            this.dgvModelBom.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+
             | System.Windows.Forms.AnchorStyles.Left) 
+
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.lblCheckAssemblyHoleResult.Font = new System.Drawing.Font("Meiryo UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.lblCheckAssemblyHoleResult.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(35)))), ((int)(((byte)(45)))), ((int)(((byte)(55)))));
+
+            this.dgvModelBom.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.DisplayedCells;
+
+            this.dgvModelBom.BackgroundColor = System.Drawing.Color.White;
+
+            this.dgvModelBom.BorderStyle = System.Windows.Forms.BorderStyle.None;
+
+            this.dgvModelBom.CellBorderStyle = System.Windows.Forms.DataGridViewCellBorderStyle.SingleHorizontal;
+
+            this.dgvModelBom.ColumnHeadersBorderStyle = System.Windows.Forms.DataGridViewHeaderBorderStyle.None;
+
+            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+
+            dataGridViewCellStyle2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            dataGridViewCellStyle2.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            dataGridViewCellStyle2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(51)))), ((int)(((byte)(65)))), ((int)(((byte)(85)))));
+
+            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(51)))), ((int)(((byte)(65)))), ((int)(((byte)(85)))));
+
+            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
+
+            this.dgvModelBom.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
+
+            this.dgvModelBom.ColumnHeadersHeight = 36;
+
+            this.dgvModelBom.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+
+            this.dgvModelBom.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+
+            this.Column5,
+
+            this.Column1,
+
+            this.Column3,
+
+            this.Column6,
+
+            this.Column4,
+
+            this.Column2});
+
+            dataGridViewCellStyle3.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+
+            dataGridViewCellStyle3.BackColor = System.Drawing.Color.White;
+
+            dataGridViewCellStyle3.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            dataGridViewCellStyle3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
+
+            dataGridViewCellStyle3.Padding = new System.Windows.Forms.Padding(6, 0, 6, 0);
+
+            dataGridViewCellStyle3.SelectionBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(239)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+
+            dataGridViewCellStyle3.SelectionForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(58)))), ((int)(((byte)(138)))));
+
+            dataGridViewCellStyle3.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+
+            this.dgvModelBom.DefaultCellStyle = dataGridViewCellStyle3;
+
+            this.dgvModelBom.EnableHeadersVisualStyles = false;
+
+            this.dgvModelBom.GridColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.dgvModelBom.Location = new System.Drawing.Point(6, 168);
+
+            this.dgvModelBom.Name = "dgvModelBom";
+
+            this.dgvModelBom.RowHeadersVisible = false;
+
+            this.dgvModelBom.RowTemplate.Height = 28;
+
+            this.dgvModelBom.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+
+            this.dgvModelBom.Size = new System.Drawing.Size(366, 274);
+
+            this.dgvModelBom.TabIndex = 3;
+
+            // 
+
+            // Column5
+
+            // 
+
+            this.Column5.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
+
+            this.Column5.HeaderText = "✔";
+
+            this.Column5.MinimumWidth = 32;
+
+            this.Column5.Name = "Column5";
+
+            this.Column5.Width = 36;
+
+            // 
+
+            // Column1
+
+            // 
+
+            this.Column1.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
+
+            this.Column1.HeaderText = "部品\n番号";
+
+            this.Column1.MinimumWidth = 38;
+
+            this.Column1.Width = 42;
+
+            this.Column1.Name = "Column1";
+
+            // 
+
+            // Column3
+
+            // 
+
+            this.Column3.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.DisplayedCells;
+
+            this.Column3.MinimumWidth = 72;
+
+            this.Column3.HeaderText = "材質";
+
+            this.Column3.Name = "Column3";
+
+            // 
+
+            // Column6
+
+            // 
+
+            this.Column6.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.DisplayedCells;
+
+            this.Column6.MinimumWidth = 44;
+
+            this.Column6.HeaderText = "板厚";
+
+            this.Column6.Name = "Column6";
+
+            // 
+
+            // Column4
+
+            // 
+
+            this.Column4.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.DisplayedCells;
+
+            this.Column4.MinimumWidth = 44;
+
+            this.Column4.HeaderText = "数量";
+
+            this.Column4.Name = "Column4";
+
+            // 
+
+            // Column2
+
+            // 
+
+            this.Column2.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+
+            this.Column2.FillWeight = 170F;
+
+            this.Column2.MinimumWidth = 100;
+
+            this.Column2.HeaderText = "部品ファイル名";
+
+            this.Column2.Name = "Column2";
+
+            // 
+
+            // progressCheck
+
+            // 
+
+            this.progressCheck.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.progressCheck.Location = new System.Drawing.Point(6, 164);
+
+            this.progressCheck.Name = "progressCheck";
+
+            this.progressCheck.Size = new System.Drawing.Size(366, 4);
+
+            this.progressCheck.TabIndex = 12;
+
+            this.progressCheck.Visible = false;
+
+            // 
+
+            // lblStatus
+
+            // 
+
+            this.lblStatus.AutoEllipsis = true;
+
+            this.lblStatus.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblStatus.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(149)))), ((int)(((byte)(93)))));
+
+            this.lblStatus.Location = new System.Drawing.Point(6, 7);
+
+            this.lblStatus.Name = "lblStatus";
+
+            this.lblStatus.Size = new System.Drawing.Size(260, 20);
+
+            this.lblStatus.TabIndex = 8;
+
+            this.lblStatus.Text = "● Đã kết nối SOLIDWORKS";
+
+            this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            // 
+
+            // lblTitle
+
+            // 
+
+            this.lblTitle.AutoSize = true;
+
+            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblTitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
+
+            this.lblTitle.Location = new System.Drawing.Point(-500, -500);
+
+            this.lblTitle.Name = "lblTitle";
+
+            this.lblTitle.Size = new System.Drawing.Size(116, 17);
+
+            this.lblTitle.TabIndex = 7;
+
+            this.lblTitle.Text = "DRAWING BOM";
+
+            this.lblTitle.Visible = false;
+
+            // 
+
+            // btnClearBom
+
+            // 
+
+            this.btnClearBom.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+
+            this.btnClearBom.BackColor = System.Drawing.Color.White;
+
+            this.btnClearBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(202)))), ((int)(((byte)(202)))));
+
+            this.btnClearBom.BorderRadius = 6;
+
+            this.btnClearBom.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnClearBom.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(202)))), ((int)(((byte)(202)))));
+
+            this.btnClearBom.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(242)))), ((int)(((byte)(242)))));
+
+            this.btnClearBom.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnClearBom.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnClearBom.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(38)))), ((int)(((byte)(38)))));
+
+            this.btnClearBom.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(242)))), ((int)(((byte)(242)))));
+
+            this.btnClearBom.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnClearBom.IconColor = System.Drawing.Color.Empty;
+
+            this.btnClearBom.Location = new System.Drawing.Point(128, 450);
+
+            this.btnClearBom.Name = "btnClearBom";
+
+            this.btnClearBom.NormalColor = System.Drawing.Color.White;
+
+            this.btnClearBom.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnClearBom.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(226)))), ((int)(((byte)(226)))));
+
+            this.btnClearBom.Size = new System.Drawing.Size(116, 34);
+
+            this.btnClearBom.TabIndex = 5;
+
+            this.btnClearBom.Text = "Xóa bảng";
+
+            this.btnClearBom.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnLoadBom
+
+            // 
+
+            this.btnLoadBom.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+
+            this.btnLoadBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.btnLoadBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(78)))), ((int)(((byte)(216)))));
+
+            this.btnLoadBom.BorderRadius = 6;
+
+            this.btnLoadBom.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnLoadBom.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(78)))), ((int)(((byte)(216)))));
+
+            this.btnLoadBom.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(78)))), ((int)(((byte)(216)))));
+
+            this.btnLoadBom.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnLoadBom.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnLoadBom.ForeColor = System.Drawing.Color.White;
+
+            this.btnLoadBom.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(78)))), ((int)(((byte)(216)))));
+
+            this.btnLoadBom.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnLoadBom.IconColor = System.Drawing.Color.Empty;
+
+            this.btnLoadBom.Location = new System.Drawing.Point(6, 450);
+
+            this.btnLoadBom.Name = "btnLoadBom";
+
+            this.btnLoadBom.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.btnLoadBom.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnLoadBom.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(64)))), ((int)(((byte)(175)))));
+
+            this.btnLoadBom.Size = new System.Drawing.Size(118, 34);
+
+            this.btnLoadBom.TabIndex = 4;
+
+            this.btnLoadBom.Text = "Cập nhật";
+
+            this.btnLoadBom.UseVisualStyleBackColor = false;
+
+            // 
+
+            // tabComponentDrawing
+
+            // 
+
+            this.tabComponentDrawing.AutoScroll = true;
+
+            this.tabComponentDrawing.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.tabComponentDrawing.Controls.Add(this.groupBox3);
+
+            this.tabComponentDrawing.Controls.Add(this.grpComponentBom);
+
+            this.tabComponentDrawing.Controls.Add(this.grpComponentSize);
+
+            this.tabComponentDrawing.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabComponentDrawing.Location = new System.Drawing.Point(4, 34);
+
+            this.tabComponentDrawing.Name = "tabComponentDrawing";
+
+            this.tabComponentDrawing.Padding = new System.Windows.Forms.Padding(3);
+
+            this.tabComponentDrawing.Size = new System.Drawing.Size(378, 493);
+
+            this.tabComponentDrawing.TabIndex = 1;
+
+            this.tabComponentDrawing.Text = "Component Drawing";
+
+            // 
+
+            // groupBox3
+
+            // 
+
+            this.groupBox3.AccentColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(110)))), ((int)(((byte)(210)))));
+
+            this.groupBox3.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.groupBox3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(249)))), ((int)(((byte)(251)))));
+
+            this.groupBox3.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(220)))), ((int)(((byte)(228)))));
+
+            this.groupBox3.BorderRadius = 6;
+
+            this.groupBox3.Controls.Add(this.btnDimKichThuocLo);
+
+            this.groupBox3.Controls.Add(this.btnRepairDim);
+
+            this.groupBox3.Controls.Add(this.btnVCutSection);
+
+            this.groupBox3.Controls.Add(this.btnDimKegaki);
+
+            this.groupBox3.Controls.Add(this.btnFixScale);
+
+            this.groupBox3.Controls.Add(this.btnSplineToArcs);
+
+            this.groupBox3.Controls.Add(this.btnDimMatCat);
+
+            this.groupBox3.Controls.Add(this.dimvang);
+
+            this.groupBox3.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.groupBox3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
+
+            this.groupBox3.HeaderTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(48)))), ((int)(((byte)(70)))));
+
+            this.groupBox3.Location = new System.Drawing.Point(6, 341);
+
+            this.groupBox3.Name = "groupBox3";
+
+            this.groupBox3.ShowHeaderDivider = true;
+
+            this.groupBox3.Size = new System.Drawing.Size(179, 238);
+
+            this.groupBox3.TabIndex = 2;
+
+            this.groupBox3.Text = "MACRO TOOLS";
+
+            // 
+
+            // btnDimKichThuocLo
+
+            // 
+
+            this.btnDimKichThuocLo.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(208)))), ((int)(((byte)(244)))), ((int)(((byte)(222)))));
+
+            this.btnDimKichThuocLo.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(140)))), ((int)(((byte)(210)))), ((int)(((byte)(170)))));
+
+            this.btnDimKichThuocLo.BorderRadius = 3;
+
+            this.btnDimKichThuocLo.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnDimKichThuocLo.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(140)))), ((int)(((byte)(210)))), ((int)(((byte)(170)))));
+
+            this.btnDimKichThuocLo.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(234)))), ((int)(((byte)(205)))));
+
+            this.btnDimKichThuocLo.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnDimKichThuocLo.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnDimKichThuocLo.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(80)))), ((int)(((byte)(45)))));
+
+            this.btnDimKichThuocLo.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(234)))), ((int)(((byte)(205)))));
+
+            this.btnDimKichThuocLo.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnDimKichThuocLo.IconColor = System.Drawing.Color.Empty;
+
+            this.btnDimKichThuocLo.Image = global::ADDIN.Properties.Resources.DimKichThuocLo;
+
+            this.btnDimKichThuocLo.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnDimKichThuocLo.Location = new System.Drawing.Point(186, 132);
+
+            this.btnDimKichThuocLo.Name = "btnDimKichThuocLo";
+
+            this.btnDimKichThuocLo.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(208)))), ((int)(((byte)(244)))), ((int)(((byte)(222)))));
+
+            this.btnDimKichThuocLo.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnDimKichThuocLo.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(162)))), ((int)(((byte)(222)))), ((int)(((byte)(186)))));
+
+            this.btnDimKichThuocLo.Size = new System.Drawing.Size(126, 44);
+
+            this.btnDimKichThuocLo.TabIndex = 6;
+
+            this.btnDimKichThuocLo.Text = "DIM lỗ\r\nKích thước";
+
+            this.btnDimKichThuocLo.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.btnDimKichThuocLo.UseCompactTextLayout = true;
+
+            this.btnDimKichThuocLo.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnRepairDim
+
+            // 
+
+            this.btnRepairDim.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(224)))));
+
+            this.btnRepairDim.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(170)))));
+
+            this.btnRepairDim.BorderRadius = 3;
+
+            this.btnRepairDim.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnRepairDim.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(170)))));
+
+            this.btnRepairDim.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(195)))), ((int)(((byte)(208)))));
+
+            this.btnRepairDim.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnRepairDim.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnRepairDim.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(22)))), ((int)(((byte)(45)))));
+
+            this.btnRepairDim.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(195)))), ((int)(((byte)(208)))));
+
+            this.btnRepairDim.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnRepairDim.IconColor = System.Drawing.Color.Empty;
+
+            this.btnRepairDim.Location = new System.Drawing.Point(50, 178);
+
+            this.btnRepairDim.Name = "btnRepairDim";
+
+            this.btnRepairDim.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(224)))));
+
+            this.btnRepairDim.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+
+            this.btnRepairDim.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(175)))), ((int)(((byte)(190)))));
+
+            this.btnRepairDim.Size = new System.Drawing.Size(126, 40);
+
+            this.btnRepairDim.TabIndex = 8;
+
+            this.btnRepairDim.Text = "Repair DIM\r\nSửa tham chiếu";
+
+            this.btnRepairDim.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.btnRepairDim.UseCompactTextLayout = true;
+
+            this.btnRepairDim.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnVCutSection
+
+            // 
+
+            this.btnVCutSection.BackColor = System.Drawing.Color.Transparent;
+
+            this.btnVCutSection.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(210)))), ((int)(((byte)(216)))), ((int)(((byte)(224)))));
+
+            this.btnVCutSection.BorderRadius = 5;
+
+            this.btnVCutSection.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnVCutSection.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnVCutSection.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnVCutSection.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.btnVCutSection.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(234)))), ((int)(((byte)(240)))), ((int)(((byte)(247)))));
+
+            this.btnVCutSection.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnVCutSection.IconColor = System.Drawing.Color.Empty;
+
+            this.btnVCutSection.Image = global::ADDIN.Properties.Resources.VCutSection;
+
+            this.btnVCutSection.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnVCutSection.Location = new System.Drawing.Point(186, 178);
+
+            this.btnVCutSection.Name = "btnVCutSection";
+
+            this.btnVCutSection.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(246)))), ((int)(((byte)(248)))), ((int)(((byte)(250)))));
+
+            this.btnVCutSection.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnVCutSection.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(228)))), ((int)(((byte)(238)))));
+
+            this.btnVCutSection.Size = new System.Drawing.Size(126, 40);
+
+            this.btnVCutSection.TabIndex = 9;
+
+            this.btnVCutSection.Text = "Section\r\n断面図";
+
+            this.btnVCutSection.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.btnVCutSection.UseCompactTextLayout = true;
+
+            this.btnVCutSection.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnDimKegaki
+
+            // 
+
+            this.btnDimKegaki.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(218)))), ((int)(((byte)(248)))));
+
+            this.btnDimKegaki.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(160)))), ((int)(((byte)(222)))));
+
+            this.btnDimKegaki.BorderRadius = 3;
+
+            this.btnDimKegaki.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnDimKegaki.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(160)))), ((int)(((byte)(222)))));
+
+            this.btnDimKegaki.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
+
+            this.btnDimKegaki.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnDimKegaki.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnDimKegaki.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(65)))), ((int)(((byte)(28)))), ((int)(((byte)(105)))));
+
+            this.btnDimKegaki.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
+
+            this.btnDimKegaki.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnDimKegaki.IconColor = System.Drawing.Color.Empty;
+
+            this.btnDimKegaki.Image = global::ADDIN.Properties.Resources.DimKegaki;
+
+            this.btnDimKegaki.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnDimKegaki.Location = new System.Drawing.Point(50, 78);
+
+            this.btnDimKegaki.Name = "btnDimKegaki";
+
+            this.btnDimKegaki.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(218)))), ((int)(((byte)(248)))));
+
+            this.btnDimKegaki.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+
+            this.btnDimKegaki.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(180)))), ((int)(((byte)(230)))));
+
+            this.btnDimKegaki.Size = new System.Drawing.Size(126, 44);
+
+            this.btnDimKegaki.TabIndex = 5;
+
+            this.btnDimKegaki.Text = "DIM\r\nKegaki";
+
+            this.btnDimKegaki.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.btnDimKegaki.UseCompactTextLayout = true;
+
+            this.btnDimKegaki.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnFixScale
+
+            // 
+
+            this.btnFixScale.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(226)))), ((int)(((byte)(202)))));
+
+            this.btnFixScale.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(230)))), ((int)(((byte)(175)))), ((int)(((byte)(132)))));
+
+            this.btnFixScale.BorderRadius = 3;
+
+            this.btnFixScale.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnFixScale.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(230)))), ((int)(((byte)(175)))), ((int)(((byte)(132)))));
+
+            this.btnFixScale.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(210)))), ((int)(((byte)(180)))));
+
+            this.btnFixScale.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnFixScale.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnFixScale.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(115)))), ((int)(((byte)(52)))), ((int)(((byte)(10)))));
+
+            this.btnFixScale.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(210)))), ((int)(((byte)(180)))));
+
+            this.btnFixScale.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnFixScale.IconColor = System.Drawing.Color.Empty;
+
+            this.btnFixScale.Image = global::ADDIN.Properties.Resources.FixScale;
+
+            this.btnFixScale.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnFixScale.Location = new System.Drawing.Point(186, 78);
+
+            this.btnFixScale.Name = "btnFixScale";
+
+            this.btnFixScale.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(226)))), ((int)(((byte)(202)))));
+
+            this.btnFixScale.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+
+            this.btnFixScale.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(192)))), ((int)(((byte)(158)))));
+
+            this.btnFixScale.Size = new System.Drawing.Size(126, 44);
+
+            this.btnFixScale.TabIndex = 4;
+
+            this.btnFixScale.Text = "Fix tỉ lệ\r\nDrawing View";
+
+            this.btnFixScale.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.btnFixScale.UseCompactTextLayout = true;
+
+            this.btnFixScale.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnSplineToArcs
+
+            // 
+
+            this.btnSplineToArcs.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
+
+            this.btnSplineToArcs.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
+
+            this.btnSplineToArcs.BorderRadius = 3;
+
+            this.btnSplineToArcs.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnSplineToArcs.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
+
+            this.btnSplineToArcs.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(215)))), ((int)(((byte)(248)))));
+
+            this.btnSplineToArcs.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnSplineToArcs.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnSplineToArcs.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(60)))), ((int)(((byte)(118)))));
+
+            this.btnSplineToArcs.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(215)))), ((int)(((byte)(248)))));
+
+            this.btnSplineToArcs.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnSplineToArcs.IconColor = System.Drawing.Color.Empty;
+
+            this.btnSplineToArcs.Image = global::ADDIN.Properties.Resources.SplineToArcs;
+
+            this.btnSplineToArcs.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnSplineToArcs.Location = new System.Drawing.Point(50, 132);
+
+            this.btnSplineToArcs.Name = "btnSplineToArcs";
+
+            this.btnSplineToArcs.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
+
+            this.btnSplineToArcs.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnSplineToArcs.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(158)))), ((int)(((byte)(200)))), ((int)(((byte)(242)))));
+
+            this.btnSplineToArcs.Size = new System.Drawing.Size(126, 44);
+
+            this.btnSplineToArcs.TabIndex = 7;
+
+            this.btnSplineToArcs.Text = "Spline\r\n→ Cung R";
+
+            this.btnSplineToArcs.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.btnSplineToArcs.UseCompactTextLayout = true;
+
+            this.btnSplineToArcs.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnDimMatCat
+
+            // 
+
+            this.btnDimMatCat.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(195)))), ((int)(((byte)(238)))), ((int)(((byte)(235)))));
+
+            this.btnDimMatCat.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(125)))), ((int)(((byte)(202)))), ((int)(((byte)(195)))));
+
+            this.btnDimMatCat.BorderRadius = 3;
+
+            this.btnDimMatCat.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnDimMatCat.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(125)))), ((int)(((byte)(202)))), ((int)(((byte)(195)))));
+
+            this.btnDimMatCat.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(228)))), ((int)(((byte)(224)))));
+
+            this.btnDimMatCat.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnDimMatCat.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnDimMatCat.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(72)))), ((int)(((byte)(70)))));
+
+            this.btnDimMatCat.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(228)))), ((int)(((byte)(224)))));
+
+            this.btnDimMatCat.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnDimMatCat.IconColor = System.Drawing.Color.Empty;
+
+            this.btnDimMatCat.Image = global::ADDIN.Properties.Resources.DimMatCat;
+
+            this.btnDimMatCat.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnDimMatCat.Location = new System.Drawing.Point(186, 24);
+
+            this.btnDimMatCat.Name = "btnDimMatCat";
+
+            this.btnDimMatCat.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(195)))), ((int)(((byte)(238)))), ((int)(((byte)(235)))));
+
+            this.btnDimMatCat.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+
+            this.btnDimMatCat.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(148)))), ((int)(((byte)(215)))), ((int)(((byte)(210)))));
+
+            this.btnDimMatCat.Size = new System.Drawing.Size(126, 44);
+
+            this.btnDimMatCat.TabIndex = 3;
+
+            this.btnDimMatCat.Text = "DIM\r\nMặt cắt";
+
+            this.btnDimMatCat.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.btnDimMatCat.UseCompactTextLayout = true;
+
+            this.btnDimMatCat.UseVisualStyleBackColor = false;
+
+            // 
+
+            // dimvang
+
+            // 
+
+            this.dimvang.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(234)))), ((int)(((byte)(165)))));
+
+            this.dimvang.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(185)))), ((int)(((byte)(80)))));
+
+            this.dimvang.BorderRadius = 3;
+
+            this.dimvang.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.dimvang.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(185)))), ((int)(((byte)(80)))));
+
+            this.dimvang.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(220)))), ((int)(((byte)(138)))));
+
+            this.dimvang.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.dimvang.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.dimvang.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(115)))), ((int)(((byte)(65)))), ((int)(((byte)(5)))));
+
+            this.dimvang.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(220)))), ((int)(((byte)(138)))));
+
+            this.dimvang.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.dimvang.IconColor = System.Drawing.Color.Empty;
+
+            this.dimvang.Image = global::ADDIN.Properties.Resources.DimVang;
+
+            this.dimvang.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.dimvang.Location = new System.Drawing.Point(50, 24);
+
+            this.dimvang.Name = "dimvang";
+
+            this.dimvang.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(234)))), ((int)(((byte)(165)))));
+
+            this.dimvang.Padding = new System.Windows.Forms.Padding(8, 0, 8, 0);
+
+            this.dimvang.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(242)))), ((int)(((byte)(205)))), ((int)(((byte)(112)))));
+
+            this.dimvang.Size = new System.Drawing.Size(126, 44);
+
+            this.dimvang.TabIndex = 3;
+
+            this.dimvang.Text = "Xóa DIM\r\nMàu vàng";
+
+            this.dimvang.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.dimvang.UseCompactTextLayout = true;
+
+            this.dimvang.UseVisualStyleBackColor = false;
+
+            // 
+
+            // grpComponentBom
+
+            // 
+
+            this.grpComponentBom.AccentColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(110)))), ((int)(((byte)(210)))));
+
+            this.grpComponentBom.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.grpComponentBom.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(249)))), ((int)(((byte)(251)))));
+
+            this.grpComponentBom.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(220)))), ((int)(((byte)(228)))));
+
+            this.grpComponentBom.BorderRadius = 6;
+
+            this.grpComponentBom.Controls.Add(this.btnInsertBalloon);
+
+            this.grpComponentBom.Controls.Add(this.cboBalloonProperty);
+
+            this.grpComponentBom.Controls.Add(this.btnDeleteText);
+
+            this.grpComponentBom.Controls.Add(this.btnText);
+
+            this.grpComponentBom.Controls.Add(this.cboSide);
+
+            this.grpComponentBom.Controls.Add(this.btnDeleteNote);
+
+            this.grpComponentBom.Controls.Add(this.btnNote);
+
+            this.grpComponentBom.Controls.Add(this.cboBendLine);
+
+            this.grpComponentBom.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.grpComponentBom.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
+
+            this.grpComponentBom.HeaderTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(48)))), ((int)(((byte)(70)))));
+
+            this.grpComponentBom.Location = new System.Drawing.Point(6, 196);
+
+            this.grpComponentBom.Name = "grpComponentBom";
+
+            this.grpComponentBom.ShowHeaderDivider = true;
+
+            this.grpComponentBom.Size = new System.Drawing.Size(179, 139);
+
+            this.grpComponentBom.TabIndex = 1;
+
+            this.grpComponentBom.Text = "TEXT & BALLOON";
+
+            // 
+
+            // btnInsertBalloon
+
+            // 
+
+            this.btnInsertBalloon.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.btnInsertBalloon.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnInsertBalloon.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnInsertBalloon.BorderRadius = 3;
+
+            this.btnInsertBalloon.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnInsertBalloon.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnInsertBalloon.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnInsertBalloon.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnInsertBalloon.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnInsertBalloon.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnInsertBalloon.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnInsertBalloon.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnInsertBalloon.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnInsertBalloon.IconColor = System.Drawing.Color.Empty;
+
+            this.btnInsertBalloon.Location = new System.Drawing.Point(101, 93);
+
+            this.btnInsertBalloon.Name = "btnInsertBalloon";
+
+            this.btnInsertBalloon.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnInsertBalloon.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnInsertBalloon.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnInsertBalloon.Size = new System.Drawing.Size(68, 28);
+
+            this.btnInsertBalloon.TabIndex = 8;
+
+            this.btnInsertBalloon.Text = "Balloon";
+
+            this.btnInsertBalloon.UseVisualStyleBackColor = false;
+
+            // 
+
+            // cboBalloonProperty
+
+            // 
+
+            this.cboBalloonProperty.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.cboBalloonProperty.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+
+            this.cboBalloonProperty.FormattingEnabled = true;
+
+            this.cboBalloonProperty.Items.AddRange(new object[] {
+
+            "部品番号",
+
+            "合番"});
+
+            this.cboBalloonProperty.Location = new System.Drawing.Point(12, 96);
+
+            this.cboBalloonProperty.Name = "cboBalloonProperty";
+
+            this.cboBalloonProperty.Size = new System.Drawing.Size(45, 23);
+
+            this.cboBalloonProperty.TabIndex = 6;
+
+            // 
+
+            // btnDeleteText
+
+            // 
+
+            this.btnDeleteText.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.btnDeleteText.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnDeleteText.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnDeleteText.BorderRadius = 3;
+
+            this.btnDeleteText.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnDeleteText.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnDeleteText.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnDeleteText.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnDeleteText.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnDeleteText.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnDeleteText.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnDeleteText.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnDeleteText.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnDeleteText.IconColor = System.Drawing.Color.Empty;
+
+            this.btnDeleteText.Location = new System.Drawing.Point(67, 58);
+
+            this.btnDeleteText.Name = "btnDeleteText";
+
+            this.btnDeleteText.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnDeleteText.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnDeleteText.Size = new System.Drawing.Size(28, 28);
+
+            this.btnDeleteText.TabIndex = 9;
+
+            this.btnDeleteText.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnText
+
+            // 
+
+            this.btnText.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.btnText.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnText.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnText.BorderRadius = 3;
+
+            this.btnText.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnText.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnText.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnText.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnText.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnText.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnText.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnText.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnText.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnText.IconColor = System.Drawing.Color.Empty;
+
+            this.btnText.Location = new System.Drawing.Point(101, 58);
+
+            this.btnText.Name = "btnText";
+
+            this.btnText.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnText.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnText.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnText.Size = new System.Drawing.Size(68, 28);
+
+            this.btnText.TabIndex = 5;
+
+            this.btnText.Text = "Text";
+
+            this.btnText.UseVisualStyleBackColor = false;
+
+            // 
+
+            // cboSide
+
+            // 
+
+            this.cboSide.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.cboSide.BackColor = System.Drawing.SystemColors.Window;
+
+            this.cboSide.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+
+            this.cboSide.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.cboSide.Location = new System.Drawing.Point(12, 61);
+
+            this.cboSide.MinimumSize = new System.Drawing.Size(40, 23);
+
+            this.cboSide.Name = "cboSide";
+
+            this.cboSide.Padding = new System.Windows.Forms.Padding(3, 3, 0, 2);
+
+            this.cboSide.Size = new System.Drawing.Size(45, 23);
+
+            this.cboSide.TabIndex = 4;
+
+            // 
+
+            // btnDeleteNote
+
+            // 
+
+            this.btnDeleteNote.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.btnDeleteNote.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnDeleteNote.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnDeleteNote.BorderRadius = 3;
+
+            this.btnDeleteNote.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnDeleteNote.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnDeleteNote.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnDeleteNote.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnDeleteNote.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnDeleteNote.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnDeleteNote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnDeleteNote.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnDeleteNote.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnDeleteNote.IconColor = System.Drawing.Color.Empty;
+
+            this.btnDeleteNote.Location = new System.Drawing.Point(67, 23);
+
+            this.btnDeleteNote.Name = "btnDeleteNote";
+
+            this.btnDeleteNote.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnDeleteNote.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnDeleteNote.Size = new System.Drawing.Size(28, 28);
+
+            this.btnDeleteNote.TabIndex = 10;
+
+            this.btnDeleteNote.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnNote
+
+            // 
+
+            this.btnNote.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.btnNote.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnNote.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnNote.BorderRadius = 3;
+
+            this.btnNote.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnNote.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnNote.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnNote.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnNote.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnNote.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnNote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnNote.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnNote.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnNote.IconColor = System.Drawing.Color.Empty;
+
+            this.btnNote.Location = new System.Drawing.Point(101, 23);
+
+            this.btnNote.Name = "btnNote";
+
+            this.btnNote.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnNote.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnNote.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnNote.Size = new System.Drawing.Size(68, 28);
+
+            this.btnNote.TabIndex = 3;
+
+            this.btnNote.Text = "Note";
+
+            this.btnNote.UseVisualStyleBackColor = false;
+
+            // 
+
+            // cboBendLine
+
+            // 
+
+            this.cboBendLine.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.cboBendLine.BackColor = System.Drawing.SystemColors.Window;
+
+            this.cboBendLine.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+
+            this.cboBendLine.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.cboBendLine.Location = new System.Drawing.Point(12, 26);
+
+            this.cboBendLine.MinimumSize = new System.Drawing.Size(40, 23);
+
+            this.cboBendLine.Name = "cboBendLine";
+
+            this.cboBendLine.Padding = new System.Windows.Forms.Padding(3, 3, 0, 2);
+
+            this.cboBendLine.Size = new System.Drawing.Size(45, 23);
+
+            this.cboBendLine.TabIndex = 2;
+
+            // 
+
+            // grpComponentSize
+
+            // 
+
+            this.grpComponentSize.AccentColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(110)))), ((int)(((byte)(210)))));
+
+            this.grpComponentSize.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.grpComponentSize.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(249)))), ((int)(((byte)(251)))));
+
+            this.grpComponentSize.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(220)))), ((int)(((byte)(228)))));
+
+            this.grpComponentSize.BorderRadius = 6;
+
+            this.grpComponentSize.Controls.Add(this.btnGetWL);
+
+            this.grpComponentSize.Controls.Add(this.groupBox2);
+
+            this.grpComponentSize.Controls.Add(this.groupBox1);
+
+            this.grpComponentSize.Controls.Add(this.btnRotateCcw);
+
+            this.grpComponentSize.Controls.Add(this.btnRotateCw);
+
+            this.grpComponentSize.Controls.Add(this.btnHorizontalAlignment);
+
+            this.grpComponentSize.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.grpComponentSize.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(65)))), ((int)(((byte)(115)))));
+
+            this.grpComponentSize.HeaderTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(48)))), ((int)(((byte)(70)))));
+
+            this.grpComponentSize.Location = new System.Drawing.Point(6, 6);
+
+            this.grpComponentSize.Name = "grpComponentSize";
+
+            this.grpComponentSize.ShowHeaderDivider = true;
+
+            this.grpComponentSize.Size = new System.Drawing.Size(247, 180);
+
+            this.grpComponentSize.TabIndex = 0;
+
+            this.grpComponentSize.Text = "VIEW SIZE";
+
+            // 
+
+            // btnGetWL
+
+            // 
+
+            this.btnGetWL.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnGetWL.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnGetWL.BorderRadius = 3;
+
+            this.btnGetWL.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnGetWL.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnGetWL.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnGetWL.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnGetWL.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnGetWL.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnGetWL.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnGetWL.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnGetWL.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnGetWL.IconColor = System.Drawing.Color.Empty;
+
+            this.btnGetWL.Location = new System.Drawing.Point(282, 19);
+
+            this.btnGetWL.Name = "btnGetWL";
+
+            this.btnGetWL.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnGetWL.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnGetWL.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnGetWL.Size = new System.Drawing.Size(72, 88);
+
+            this.btnGetWL.TabIndex = 9;
+
+            this.btnGetWL.Text = "Lay W,L";
+
+            this.btnGetWL.UseVisualStyleBackColor = false;
+
+            this.btnGetWL.Click += new System.EventHandler(this.btnGetWL_Click_1);
+
+            // 
+
+            // groupBox2
+
+            // 
+
+            this.groupBox2.BackColor = System.Drawing.Color.Transparent;
+
+            this.groupBox2.Controls.Add(this.txtLength);
+
+            this.groupBox2.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.groupBox2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
+
+            this.groupBox2.LabelText = "";
+
+            this.groupBox2.Location = new System.Drawing.Point(13, 65);
+
+            this.groupBox2.Name = "groupBox2";
+
+            this.groupBox2.Size = new System.Drawing.Size(259, 42);
+
+            this.groupBox2.TabIndex = 8;
+
+            this.groupBox2.Text = "Length";
+
+            // 
+
+            // txtLength
+
+            // 
+
+            this.txtLength.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+
+            this.txtLength.Location = new System.Drawing.Point(9, 17);
+
+            this.txtLength.Name = "txtLength";
+
+            this.txtLength.ReadOnly = true;
+
+            this.txtLength.Size = new System.Drawing.Size(241, 22);
+
+            this.txtLength.TabIndex = 0;
+
+            this.txtLength.TabStop = false;
+
+            // 
+
+            // groupBox1
+
+            // 
+
+            this.groupBox1.BackColor = System.Drawing.Color.Transparent;
+
+            this.groupBox1.Controls.Add(this.txtWidth);
+
+            this.groupBox1.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.groupBox1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
+
+            this.groupBox1.LabelText = "";
+
+            this.groupBox1.Location = new System.Drawing.Point(13, 19);
+
+            this.groupBox1.Name = "groupBox1";
+
+            this.groupBox1.Size = new System.Drawing.Size(259, 42);
+
+            this.groupBox1.TabIndex = 7;
+
+            this.groupBox1.Text = "Width";
+
+            // 
+
+            // txtWidth
+
+            // 
+
+            this.txtWidth.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+
+            this.txtWidth.Location = new System.Drawing.Point(9, 17);
+
+            this.txtWidth.Name = "txtWidth";
+
+            this.txtWidth.ReadOnly = true;
+
+            this.txtWidth.Size = new System.Drawing.Size(241, 22);
+
+            this.txtWidth.TabIndex = 0;
+
+            this.txtWidth.TabStop = false;
+
+            // 
+
+            // btnRotateCcw
+
+            // 
+
+            this.btnRotateCcw.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnRotateCcw.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnRotateCcw.BorderRadius = 3;
+
+            this.btnRotateCcw.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnRotateCcw.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnRotateCcw.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnRotateCcw.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnRotateCcw.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnRotateCcw.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnRotateCcw.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnRotateCcw.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnRotateCcw.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnRotateCcw.IconColor = System.Drawing.Color.Empty;
+
+            this.btnRotateCcw.Location = new System.Drawing.Point(171, 138);
+
+            this.btnRotateCcw.Name = "btnRotateCcw";
+
+            this.btnRotateCcw.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnRotateCcw.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnRotateCcw.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnRotateCcw.Size = new System.Drawing.Size(160, 30);
+
+            this.btnRotateCcw.TabIndex = 6;
+
+            this.btnRotateCcw.TabStop = false;
+
+            this.btnRotateCcw.Text = "Ro90-c";
+
+            this.btnRotateCcw.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnRotateCw
+
+            // 
+
+            this.btnRotateCw.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnRotateCw.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnRotateCw.BorderRadius = 3;
+
+            this.btnRotateCw.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnRotateCw.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnRotateCw.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnRotateCw.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnRotateCw.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnRotateCw.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnRotateCw.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnRotateCw.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnRotateCw.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnRotateCw.IconColor = System.Drawing.Color.Empty;
+
+            this.btnRotateCw.Location = new System.Drawing.Point(12, 138);
+
+            this.btnRotateCw.Name = "btnRotateCw";
+
+            this.btnRotateCw.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnRotateCw.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnRotateCw.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnRotateCw.Size = new System.Drawing.Size(160, 30);
+
+            this.btnRotateCw.TabIndex = 5;
+
+            this.btnRotateCw.TabStop = false;
+
+            this.btnRotateCw.Text = "Ro90+c";
+
+            this.btnRotateCw.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnHorizontalAlignment
+
+            // 
+
+            this.btnHorizontalAlignment.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnHorizontalAlignment.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnHorizontalAlignment.BorderRadius = 3;
+
+            this.btnHorizontalAlignment.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnHorizontalAlignment.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(195)))), ((int)(((byte)(235)))));
+
+            this.btnHorizontalAlignment.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnHorizontalAlignment.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnHorizontalAlignment.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnHorizontalAlignment.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnHorizontalAlignment.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(20)))), ((int)(((byte)(60)))), ((int)(((byte)(115)))));
+
+            this.btnHorizontalAlignment.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
+
+            this.btnHorizontalAlignment.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnHorizontalAlignment.IconColor = System.Drawing.Color.Empty;
+
+            this.btnHorizontalAlignment.Location = new System.Drawing.Point(13, 112);
+
+            this.btnHorizontalAlignment.Name = "btnHorizontalAlignment";
+
+            this.btnHorizontalAlignment.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(215)))), ((int)(((byte)(230)))), ((int)(((byte)(248)))));
+
+            this.btnHorizontalAlignment.Padding = new System.Windows.Forms.Padding(4, 0, 4, 0);
+
+            this.btnHorizontalAlignment.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(208)))), ((int)(((byte)(238)))));
+
+            this.btnHorizontalAlignment.Size = new System.Drawing.Size(330, 30);
+
+            this.btnHorizontalAlignment.TabIndex = 4;
+
+            this.btnHorizontalAlignment.TabStop = false;
+
+            this.btnHorizontalAlignment.Text = "HorizontalAlignment";
+
+            this.btnHorizontalAlignment.UseVisualStyleBackColor = false;
+
+            // 
+
+            // tabModel
+
+            // 
+
+            this.tabModel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.tabModel.Controls.Add(this.tabModelPages);
+
+            this.tabModel.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabModel.Location = new System.Drawing.Point(4, 36);
+
+            this.tabModel.Name = "tabModel";
+
+            this.tabModel.Padding = new System.Windows.Forms.Padding(3);
+
+            this.tabModel.Size = new System.Drawing.Size(392, 537);
+
+            this.tabModel.TabIndex = 1;
+
+            this.tabModel.Text = "Model";
+
+            // 
+
+            // tabModelPages
+
+            // 
+
+            this.tabModelPages.ActiveTabColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.tabModelPages.ActiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.tabModelPages.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(226)))), ((int)(((byte)(232)))), ((int)(((byte)(240)))));
+
+            this.tabModelPages.Controls.Add(this.tabModelPropsPage);
+
+            this.tabModelPages.Controls.Add(this.tabModelEditPage);
+
+            this.tabModelPages.Controls.Add(this.tabModelMacroPage);
+
+            this.tabModelPages.Dock = System.Windows.Forms.DockStyle.Fill;
+
+            this.tabModelPages.DrawMode = System.Windows.Forms.TabDrawMode.OwnerDrawFixed;
+
+            this.tabModelPages.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabModelPages.HeaderBackColor = System.Drawing.Color.White;
+
+            this.tabModelPages.InactiveTextColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(116)))), ((int)(((byte)(139)))));
+
+            this.tabModelPages.ItemSize = new System.Drawing.Size(110, 30);
+
+            this.tabModelPages.Location = new System.Drawing.Point(3, 3);
+
+            this.tabModelPages.Name = "tabModelPages";
+
+            this.tabModelPages.Padding = new System.Drawing.Point(14, 6);
+
+            this.tabModelPages.SelectedIndex = 0;
+
+            this.tabModelPages.Size = new System.Drawing.Size(386, 531);
+
+            this.tabModelPages.TabIndex = 2;
+
+            this.tabModelPages.TabStyle = ADDIN.UI.ModernTabStyle.Underline;
+
+            // 
+
+            // tabModelPropsPage
+
+            // 
+
+            this.tabModelPropsPage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.tabModelPropsPage.Controls.Add(this.panelModelProps);
+
+            this.tabModelPropsPage.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabModelPropsPage.Location = new System.Drawing.Point(4, 34);
+
+            this.tabModelPropsPage.Name = "tabModelPropsPage";
+
+            this.tabModelPropsPage.Padding = new System.Windows.Forms.Padding(3);
+
+            this.tabModelPropsPage.Size = new System.Drawing.Size(378, 493);
+
+            this.tabModelPropsPage.TabIndex = 0;
+
+            this.tabModelPropsPage.Text = "Props";
+
+            // 
+
+            // panelModelProps
+
+            // 
+
+            this.panelModelProps.AutoScroll = true;
+
+            this.panelModelProps.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.panelModelProps.Controls.Add(this.btnModelUpdateProps);
+
+            this.panelModelProps.Controls.Add(this.btnModelResetProps);
+
+            this.panelModelProps.Controls.Add(this.btnModelApplyProps);
+
+            this.panelModelProps.Controls.Add(this.txtModelFinish);
+
+            this.panelModelProps.Controls.Add(this.lblModelFinish);
+
+            this.panelModelProps.Controls.Add(this.txtModelQty);
+
+            this.panelModelProps.Controls.Add(this.lblModelQty);
+
+            this.panelModelProps.Controls.Add(this.txtModelGoban);
+
+            this.panelModelProps.Controls.Add(this.lblModelGoban);
+
+            this.panelModelProps.Controls.Add(this.txtModelThickness);
+
+            this.panelModelProps.Controls.Add(this.lblModelThickness);
+
+            this.panelModelProps.Controls.Add(this.txtModelMaterial);
+
+            this.panelModelProps.Controls.Add(this.lblModelMaterial);
+
+            this.panelModelProps.Controls.Add(this.txtModelName);
+
+            this.panelModelProps.Controls.Add(this.lblModelName);
+
+            this.panelModelProps.Dock = System.Windows.Forms.DockStyle.Fill;
+
+            this.panelModelProps.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.panelModelProps.Location = new System.Drawing.Point(3, 3);
+
+            this.panelModelProps.Name = "panelModelProps";
+
+            this.panelModelProps.Size = new System.Drawing.Size(372, 487);
+
+            this.panelModelProps.TabIndex = 1;
+
+            // 
+
+            // btnModelUpdateProps
+
+            // 
+
+            this.btnModelUpdateProps.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
+
+            this.btnModelUpdateProps.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
+
+            this.btnModelUpdateProps.BorderRadius = 3;
+
+            this.btnModelUpdateProps.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnModelUpdateProps.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
+
+            this.btnModelUpdateProps.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
+
+            this.btnModelUpdateProps.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(216)))), ((int)(((byte)(248)))));
+
+            this.btnModelUpdateProps.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnModelUpdateProps.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnModelUpdateProps.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(60)))), ((int)(((byte)(118)))));
+
+            this.btnModelUpdateProps.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(216)))), ((int)(((byte)(248)))));
+
+            this.btnModelUpdateProps.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnModelUpdateProps.IconColor = System.Drawing.Color.Empty;
+
+            this.btnModelUpdateProps.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
+
+            this.btnModelUpdateProps.Location = new System.Drawing.Point(178, 8);
+
+            this.btnModelUpdateProps.Name = "btnModelUpdateProps";
+
+            this.btnModelUpdateProps.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
+
+            this.btnModelUpdateProps.Padding = new System.Windows.Forms.Padding(0, 4, 0, 3);
+
+            this.btnModelUpdateProps.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
+
+            this.btnModelUpdateProps.Size = new System.Drawing.Size(66, 66);
+
+            this.btnModelUpdateProps.TabIndex = 19;
+
+            this.btnModelUpdateProps.Text = "Reload";
+
+            this.btnModelUpdateProps.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
+
+            this.btnModelUpdateProps.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
+
+            this.btnModelUpdateProps.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnModelResetProps
+
+            // 
+
+            this.btnModelResetProps.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
+
+            this.btnModelResetProps.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
+
+            this.btnModelResetProps.BorderRadius = 3;
+
+            this.btnModelResetProps.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnModelResetProps.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
+
+            this.btnModelResetProps.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
+
+            this.btnModelResetProps.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
+
+            this.btnModelResetProps.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnModelResetProps.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnModelResetProps.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(25)))), ((int)(((byte)(25)))));
+
+            this.btnModelResetProps.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
+
+            this.btnModelResetProps.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnModelResetProps.IconColor = System.Drawing.Color.Empty;
+
+            this.btnModelResetProps.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
+
+            this.btnModelResetProps.Location = new System.Drawing.Point(98, 8);
+
+            this.btnModelResetProps.Name = "btnModelResetProps";
+
+            this.btnModelResetProps.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
+
+            this.btnModelResetProps.Padding = new System.Windows.Forms.Padding(0, 4, 0, 3);
+
+            this.btnModelResetProps.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
+
+            this.btnModelResetProps.Size = new System.Drawing.Size(66, 66);
+
+            this.btnModelResetProps.TabIndex = 18;
+
+            this.btnModelResetProps.Text = "Clear";
+
+            this.btnModelResetProps.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
+
+            this.btnModelResetProps.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
+
+            this.btnModelResetProps.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnModelApplyProps
+
+            // 
+
+            this.btnModelApplyProps.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(242)))), ((int)(((byte)(218)))));
+
+            this.btnModelApplyProps.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(138)))), ((int)(((byte)(208)))), ((int)(((byte)(162)))));
+
+            this.btnModelApplyProps.BorderRadius = 3;
+
+            this.btnModelApplyProps.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnModelApplyProps.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(138)))), ((int)(((byte)(208)))), ((int)(((byte)(162)))));
+
+            this.btnModelApplyProps.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(168)))), ((int)(((byte)(222)))), ((int)(((byte)(188)))));
+
+            this.btnModelApplyProps.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(234)))), ((int)(((byte)(204)))));
+
+            this.btnModelApplyProps.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnModelApplyProps.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnModelApplyProps.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(82)))), ((int)(((byte)(38)))));
+
+            this.btnModelApplyProps.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(188)))), ((int)(((byte)(234)))), ((int)(((byte)(204)))));
+
+            this.btnModelApplyProps.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnModelApplyProps.IconColor = System.Drawing.Color.Empty;
+
+            this.btnModelApplyProps.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
+
+            this.btnModelApplyProps.Location = new System.Drawing.Point(18, 8);
+
+            this.btnModelApplyProps.Name = "btnModelApplyProps";
+
+            this.btnModelApplyProps.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(205)))), ((int)(((byte)(242)))), ((int)(((byte)(218)))));
+
+            this.btnModelApplyProps.Padding = new System.Windows.Forms.Padding(0, 4, 0, 3);
+
+            this.btnModelApplyProps.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(168)))), ((int)(((byte)(222)))), ((int)(((byte)(188)))));
+
+            this.btnModelApplyProps.Size = new System.Drawing.Size(66, 66);
+
+            this.btnModelApplyProps.TabIndex = 17;
+
+            this.btnModelApplyProps.Text = "Apply";
+
+            this.btnModelApplyProps.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
+
+            this.btnModelApplyProps.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
+
+            this.btnModelApplyProps.UseVisualStyleBackColor = false;
+
+            // 
+
+            // txtModelFinish
+
+            // 
+
+            this.txtModelFinish.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.txtModelFinish.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtModelFinish.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+
+            this.txtModelFinish.Location = new System.Drawing.Point(36, 384);
+
+            this.txtModelFinish.Name = "txtModelFinish";
+
+            this.txtModelFinish.Size = new System.Drawing.Size(294, 25);
+
+            this.txtModelFinish.TabIndex = 11;
+
+            // 
+
+            // lblModelFinish
+
+            // 
+
+            this.lblModelFinish.AutoSize = true;
+
+            this.lblModelFinish.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblModelFinish.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+
+            this.lblModelFinish.Location = new System.Drawing.Point(36, 362);
+
+            this.lblModelFinish.Name = "lblModelFinish";
+
+            this.lblModelFinish.Size = new System.Drawing.Size(48, 18);
+
+            this.lblModelFinish.TabIndex = 10;
+
+            this.lblModelFinish.Text = "仕上げ";
+
+            // 
+
+            // txtModelQty
+
+            // 
+
+            this.txtModelQty.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.txtModelQty.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtModelQty.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+
+            this.txtModelQty.Location = new System.Drawing.Point(36, 330);
+
+            this.txtModelQty.Name = "txtModelQty";
+
+            this.txtModelQty.Size = new System.Drawing.Size(294, 25);
+
+            this.txtModelQty.TabIndex = 9;
+
+            // 
+
+            // lblModelQty
+
+            // 
+
+            this.lblModelQty.AutoSize = true;
+
+            this.lblModelQty.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblModelQty.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+
+            this.lblModelQty.Location = new System.Drawing.Point(36, 308);
+
+            this.lblModelQty.Name = "lblModelQty";
+
+            this.lblModelQty.Size = new System.Drawing.Size(36, 18);
+
+            this.lblModelQty.TabIndex = 8;
+
+            this.lblModelQty.Text = "数量";
+
+            // 
+
+            // txtModelGoban
+
+            // 
+
+            this.txtModelGoban.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.txtModelGoban.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtModelGoban.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+
+            this.txtModelGoban.Location = new System.Drawing.Point(36, 276);
+
+            this.txtModelGoban.Name = "txtModelGoban";
+
+            this.txtModelGoban.Size = new System.Drawing.Size(294, 25);
+
+            this.txtModelGoban.TabIndex = 7;
+
+            // 
+
+            // lblModelGoban
+
+            // 
+
+            this.lblModelGoban.AutoSize = true;
+
+            this.lblModelGoban.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblModelGoban.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+
+            this.lblModelGoban.Location = new System.Drawing.Point(36, 254);
+
+            this.lblModelGoban.Name = "lblModelGoban";
+
+            this.lblModelGoban.Size = new System.Drawing.Size(36, 18);
+
+            this.lblModelGoban.TabIndex = 6;
+
+            this.lblModelGoban.Text = "合番";
+
+            // 
+
+            // txtModelThickness
+
+            // 
+
+            this.txtModelThickness.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.txtModelThickness.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtModelThickness.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+
+            this.txtModelThickness.Location = new System.Drawing.Point(36, 222);
+
+            this.txtModelThickness.Name = "txtModelThickness";
+
+            this.txtModelThickness.Size = new System.Drawing.Size(294, 25);
+
+            this.txtModelThickness.TabIndex = 5;
+
+            // 
+
+            // lblModelThickness
+
+            // 
+
+            this.lblModelThickness.AutoSize = true;
+
+            this.lblModelThickness.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblModelThickness.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+
+            this.lblModelThickness.Location = new System.Drawing.Point(36, 200);
+
+            this.lblModelThickness.Name = "lblModelThickness";
+
+            this.lblModelThickness.Size = new System.Drawing.Size(36, 18);
+
+            this.lblModelThickness.TabIndex = 4;
+
+            this.lblModelThickness.Text = "板厚";
+
+            // 
+
+            // txtModelMaterial
+
+            // 
+
+            this.txtModelMaterial.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.txtModelMaterial.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtModelMaterial.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+
+            this.txtModelMaterial.Location = new System.Drawing.Point(36, 168);
+
+            this.txtModelMaterial.Name = "txtModelMaterial";
+
+            this.txtModelMaterial.Size = new System.Drawing.Size(294, 25);
+
+            this.txtModelMaterial.TabIndex = 3;
+
+            // 
+
+            // lblModelMaterial
+
+            // 
+
+            this.lblModelMaterial.AutoSize = true;
+
+            this.lblModelMaterial.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblModelMaterial.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+
+            this.lblModelMaterial.Location = new System.Drawing.Point(36, 146);
+
+            this.lblModelMaterial.Name = "lblModelMaterial";
+
+            this.lblModelMaterial.Size = new System.Drawing.Size(36, 18);
+
+            this.lblModelMaterial.TabIndex = 2;
+
+            this.lblModelMaterial.Text = "材質";
+
+            // 
+
+            // txtModelName
+
+            // 
+
+            this.txtModelName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.txtModelName.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtModelName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(15)))), ((int)(((byte)(25)))));
+
+            this.txtModelName.Location = new System.Drawing.Point(36, 114);
+
+            this.txtModelName.Name = "txtModelName";
+
+            this.txtModelName.Size = new System.Drawing.Size(294, 25);
+
+            this.txtModelName.TabIndex = 1;
+
+            // 
+
+            // lblModelName
+
+            // 
+
+            this.lblModelName.AutoSize = true;
+
+            this.lblModelName.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblModelName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(30)))), ((int)(((byte)(40)))));
+
+            this.lblModelName.Location = new System.Drawing.Point(36, 92);
+
+            this.lblModelName.Name = "lblModelName";
+
+            this.lblModelName.Size = new System.Drawing.Size(36, 18);
+
+            this.lblModelName.TabIndex = 0;
+
+            this.lblModelName.Text = "品名";
+
+            // 
+
+            // tabModelEditPage
+
+            // 
+
+            this.tabModelEditPage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.tabModelEditPage.Controls.Add(this.panelModelCommands);
+
+            this.tabModelEditPage.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabModelEditPage.Location = new System.Drawing.Point(4, 34);
+
+            this.tabModelEditPage.Name = "tabModelEditPage";
+
+            this.tabModelEditPage.Padding = new System.Windows.Forms.Padding(3);
+
+            this.tabModelEditPage.Size = new System.Drawing.Size(378, 495);
+
+            this.tabModelEditPage.TabIndex = 1;
+
+            this.tabModelEditPage.Text = "Edit";
+
+            // 
+
+            // panelModelCommands
+
+            // 
+
+            this.panelModelCommands.AutoScroll = true;
+
+            this.panelModelCommands.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.panelModelCommands.Controls.Add(this.btnMakeHole);
+
+            this.panelModelCommands.Controls.Add(this.btnRepairHole);
+
+            this.panelModelCommands.Controls.Add(this.btnPaintHoleSummary);
+
+            this.panelModelCommands.Controls.Add(this.grpMakeHoleOptions);
+
+            this.panelModelCommands.Dock = System.Windows.Forms.DockStyle.Fill;
+
+            this.panelModelCommands.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.panelModelCommands.Location = new System.Drawing.Point(3, 3);
+
+            this.panelModelCommands.Name = "panelModelCommands";
+
+            this.panelModelCommands.Padding = new System.Windows.Forms.Padding(18, 16, 8, 8);
+
+            this.panelModelCommands.Size = new System.Drawing.Size(372, 489);
+
+            this.panelModelCommands.TabIndex = 0;
+
+            // 
+
+            // btnMakeHole
+
+            // 
+
+            this.btnMakeHole.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(247)))), ((int)(((byte)(255)))));
+
+            this.btnMakeHole.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.btnMakeHole.BorderRadius = 6;
+
+            this.btnMakeHole.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnMakeHole.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(37)))), ((int)(((byte)(99)))), ((int)(((byte)(235)))));
+
+            this.btnMakeHole.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(219)))), ((int)(((byte)(234)))), ((int)(((byte)(254)))));
+
+            this.btnMakeHole.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(244)))), ((int)(((byte)(255)))));
+
+            this.btnMakeHole.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnMakeHole.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnMakeHole.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.btnMakeHole.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(244)))), ((int)(((byte)(255)))));
+
+            this.btnMakeHole.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHole.IconColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHole.Image = global::ADDIN.Properties.Resources.MakeHole;
+
+            this.btnMakeHole.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
+
+            this.btnMakeHole.Location = new System.Drawing.Point(18, 16);
+
+            this.btnMakeHole.Name = "btnMakeHole";
+
+            this.btnMakeHole.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(247)))), ((int)(((byte)(255)))));
+
+            this.btnMakeHole.Padding = new System.Windows.Forms.Padding(0, 6, 0, 6);
+
+            this.btnMakeHole.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(219)))), ((int)(((byte)(234)))), ((int)(((byte)(254)))));
+
+            this.btnMakeHole.Size = new System.Drawing.Size(96, 78);
+
+            this.btnMakeHole.TabIndex = 2;
+
+            this.btnMakeHole.Text = "Make hole";
+
+            this.btnMakeHole.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
+
+            this.btnMakeHole.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
+
+            this.btnMakeHole.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnRepairHole
+
+            // 
+
+            this.btnRepairHole.BackColor = System.Drawing.Color.White;
+
+            this.btnRepairHole.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnRepairHole.BorderRadius = 6;
+
+            this.btnRepairHole.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnRepairHole.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnRepairHole.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(243)))), ((int)(((byte)(199)))));
+
+            this.btnRepairHole.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(251)))), ((int)(((byte)(235)))));
+
+            this.btnRepairHole.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnRepairHole.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnRepairHole.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(51)))), ((int)(((byte)(65)))), ((int)(((byte)(85)))));
+
+            this.btnRepairHole.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(251)))), ((int)(((byte)(235)))));
+
+            this.btnRepairHole.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnRepairHole.IconColor = System.Drawing.Color.Empty;
+
+            this.btnRepairHole.Image = global::ADDIN.Properties.Resources.RepairHole;
+
+            this.btnRepairHole.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
+
+            this.btnRepairHole.Location = new System.Drawing.Point(126, 16);
+
+            this.btnRepairHole.Name = "btnRepairHole";
+
+            this.btnRepairHole.NormalColor = System.Drawing.Color.White;
+
+            this.btnRepairHole.Padding = new System.Windows.Forms.Padding(0, 6, 0, 6);
+
+            this.btnRepairHole.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(243)))), ((int)(((byte)(199)))));
+
+            this.btnRepairHole.Size = new System.Drawing.Size(96, 78);
+
+            this.btnRepairHole.TabIndex = 3;
+
+            this.btnRepairHole.TabStop = false;
+
+            this.btnRepairHole.Text = "Repair Hole";
+
+            this.btnRepairHole.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
+
+            this.btnRepairHole.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
+
+            this.btnRepairHole.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnPaintHoleSummary
+
+            // 
+
+            this.btnPaintHoleSummary.BackColor = System.Drawing.Color.White;
+
+            this.btnPaintHoleSummary.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnPaintHoleSummary.BorderRadius = 6;
+
+            this.btnPaintHoleSummary.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnPaintHoleSummary.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnPaintHoleSummary.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(209)))), ((int)(((byte)(250)))), ((int)(((byte)(229)))));
+
+            this.btnPaintHoleSummary.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(253)))), ((int)(((byte)(245)))));
+
+            this.btnPaintHoleSummary.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnPaintHoleSummary.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnPaintHoleSummary.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(51)))), ((int)(((byte)(65)))), ((int)(((byte)(85)))));
+
+            this.btnPaintHoleSummary.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(253)))), ((int)(((byte)(245)))));
+
+            this.btnPaintHoleSummary.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnPaintHoleSummary.IconColor = System.Drawing.Color.Empty;
+
+            this.btnPaintHoleSummary.Image = global::ADDIN.Properties.Resources.CountHole;
+
+            this.btnPaintHoleSummary.ImageAlign = System.Drawing.ContentAlignment.TopCenter;
+
+            this.btnPaintHoleSummary.Location = new System.Drawing.Point(234, 16);
+
+            this.btnPaintHoleSummary.Name = "btnPaintHoleSummary";
+
+            this.btnPaintHoleSummary.NormalColor = System.Drawing.Color.White;
+
+            this.btnPaintHoleSummary.Padding = new System.Windows.Forms.Padding(0, 6, 0, 6);
+
+            this.btnPaintHoleSummary.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(209)))), ((int)(((byte)(250)))), ((int)(((byte)(229)))));
+
+            this.btnPaintHoleSummary.Size = new System.Drawing.Size(96, 78);
+
+            this.btnPaintHoleSummary.TabIndex = 5;
+
+            this.btnPaintHoleSummary.TabStop = false;
+
+            this.btnPaintHoleSummary.Text = "Dem hole";
+
+            this.btnPaintHoleSummary.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
+
+            this.btnPaintHoleSummary.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageAboveText;
+
+            this.btnPaintHoleSummary.UseVisualStyleBackColor = false;
+
+            // 
+
+            // grpMakeHoleOptions
+
+            // 
+
+            this.grpMakeHoleOptions.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.grpMakeHoleOptions.Controls.Add(this.pnlMakeHoleDiagram);
+
+            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleDirection);
+
+            this.grpMakeHoleOptions.Controls.Add(this.cboMakeHoleDirection);
+
+            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleEdgeOffset);
+
+            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHoleEdgeOffset);
+
+            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleLeftOffset);
+
+            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHoleLeftOffset);
+
+            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHoleRightOffset);
+
+            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHoleRightOffset);
+
+            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHolePitch);
+
+            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHolePitch);
+
+            this.grpMakeHoleOptions.Controls.Add(this.lblRepairHoleType);
+
+            this.grpMakeHoleOptions.Controls.Add(this.cboRepairHoleType);
+
+            this.grpMakeHoleOptions.Controls.Add(this.lblRepairHoleDiameter);
+
+            this.grpMakeHoleOptions.Controls.Add(this.cboRepairHoleDiameter);
+
+            this.grpMakeHoleOptions.Controls.Add(this.btnDeleteMakeHoleSize);
+
+            this.grpMakeHoleOptions.Controls.Add(this.chkMakeHolePaint);
+
+            this.grpMakeHoleOptions.Controls.Add(this.lblMakeHolePaintName);
+
+            this.grpMakeHoleOptions.Controls.Add(this.txtMakeHolePaintName);
+
+            this.grpMakeHoleOptions.Controls.Add(this.btnMakeHoleAccept);
+
+            this.grpMakeHoleOptions.Controls.Add(this.btnMakeHoleUpdate);
+
+            this.grpMakeHoleOptions.Controls.Add(this.btnMakeHolePattern);
+
+            this.grpMakeHoleOptions.Controls.Add(this.btnMakeHoleReset);
+
+            this.grpMakeHoleOptions.Controls.Add(this.elementHostRepairHole);
+
+            this.grpMakeHoleOptions.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.grpMakeHoleOptions.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.grpMakeHoleOptions.Location = new System.Drawing.Point(18, 110);
+
+            this.grpMakeHoleOptions.Name = "grpMakeHoleOptions";
+
+            this.grpMakeHoleOptions.Size = new System.Drawing.Size(234, 516);
+
+            this.grpMakeHoleOptions.TabIndex = 4;
+
+            this.grpMakeHoleOptions.TabStop = false;
+
+            this.grpMakeHoleOptions.Text = "THÔNG SỐ LỖ (MAKE HOLE OPTIONS)";
+
+            this.grpMakeHoleOptions.Visible = false;
+
+            // 
+
+            // pnlMakeHoleDiagram
+
+            // 
+
+            this.pnlMakeHoleDiagram.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(250)))), ((int)(((byte)(252)))));
+
+            this.pnlMakeHoleDiagram.BorderStyle = System.Windows.Forms.BorderStyle.None;
+
+            this.pnlMakeHoleDiagram.Location = new System.Drawing.Point(12, 22);
+
+            this.pnlMakeHoleDiagram.Name = "pnlMakeHoleDiagram";
+
+            this.pnlMakeHoleDiagram.Size = new System.Drawing.Size(304, 88);
+
+            this.pnlMakeHoleDiagram.TabIndex = 0;
+
+            // 
+
+            // lblMakeHoleDirection
+
+            // 
+
+            this.lblMakeHoleDirection.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblMakeHoleDirection.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(71)))), ((int)(((byte)(85)))), ((int)(((byte)(105)))));
+
+            this.lblMakeHoleDirection.Location = new System.Drawing.Point(16, 144);
+
+            this.lblMakeHoleDirection.Name = "lblMakeHoleDirection";
+
+            this.lblMakeHoleDirection.Size = new System.Drawing.Size(76, 18);
+
+            this.lblMakeHoleDirection.TabIndex = 7;
+
+            this.lblMakeHoleDirection.Text = "Direction";
+
+            // 
+
+            // cboMakeHoleDirection
+
+            // 
+
+            this.cboMakeHoleDirection.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+
+            this.cboMakeHoleDirection.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.cboMakeHoleDirection.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.cboMakeHoleDirection.FormattingEnabled = true;
+
+            this.cboMakeHoleDirection.Items.AddRange(new object[] {
+
+            "Curve Flow",
+
+            "Line Flow",
+
+            "Spline Flow"});
+
+            this.cboMakeHoleDirection.Location = new System.Drawing.Point(16, 161);
+
+            this.cboMakeHoleDirection.Name = "cboMakeHoleDirection";
+
+            this.cboMakeHoleDirection.Size = new System.Drawing.Size(304, 23);
+
+            this.cboMakeHoleDirection.TabIndex = 8;
+
+            // 
+
+            // lblMakeHoleEdgeOffset
+
+            // 
+
+            this.lblMakeHoleEdgeOffset.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblMakeHoleEdgeOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(71)))), ((int)(((byte)(85)))), ((int)(((byte)(105)))));
+
+            this.lblMakeHoleEdgeOffset.Location = new System.Drawing.Point(16, 186);
+
+            this.lblMakeHoleEdgeOffset.Name = "lblMakeHoleEdgeOffset";
+
+            this.lblMakeHoleEdgeOffset.Size = new System.Drawing.Size(76, 18);
+
+            this.lblMakeHoleEdgeOffset.TabIndex = 9;
+
+            this.lblMakeHoleEdgeOffset.Text = "Dim Edge X";
+
+            // 
+
+            // txtMakeHoleEdgeOffset
+
+            // 
+
+            this.txtMakeHoleEdgeOffset.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtMakeHoleEdgeOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.txtMakeHoleEdgeOffset.Location = new System.Drawing.Point(16, 203);
+
+            this.txtMakeHoleEdgeOffset.Name = "txtMakeHoleEdgeOffset";
+
+            this.txtMakeHoleEdgeOffset.Size = new System.Drawing.Size(304, 23);
+
+            this.txtMakeHoleEdgeOffset.TabIndex = 10;
+
+            this.txtMakeHoleEdgeOffset.Text = "20";
+
+            this.txtMakeHoleEdgeOffset.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+
+            // 
+
+            // lblMakeHoleLeftOffset
+
+            // 
+
+            this.lblMakeHoleLeftOffset.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblMakeHoleLeftOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(71)))), ((int)(((byte)(85)))), ((int)(((byte)(105)))));
+
+            this.lblMakeHoleLeftOffset.Location = new System.Drawing.Point(16, 228);
+
+            this.lblMakeHoleLeftOffset.Name = "lblMakeHoleLeftOffset";
+
+            this.lblMakeHoleLeftOffset.Size = new System.Drawing.Size(70, 18);
+
+            this.lblMakeHoleLeftOffset.TabIndex = 11;
+
+            this.lblMakeHoleLeftOffset.Text = "Dim Left L";
+
+            // 
+
+            // txtMakeHoleLeftOffset
+
+            // 
+
+            this.txtMakeHoleLeftOffset.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtMakeHoleLeftOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.txtMakeHoleLeftOffset.Location = new System.Drawing.Point(16, 245);
+
+            this.txtMakeHoleLeftOffset.Name = "txtMakeHoleLeftOffset";
+
+            this.txtMakeHoleLeftOffset.Size = new System.Drawing.Size(304, 23);
+
+            this.txtMakeHoleLeftOffset.TabIndex = 12;
+
+            this.txtMakeHoleLeftOffset.Text = "50";
+
+            this.txtMakeHoleLeftOffset.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+
+            // 
+
+            // lblMakeHoleRightOffset
+
+            // 
+
+            this.lblMakeHoleRightOffset.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblMakeHoleRightOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(71)))), ((int)(((byte)(85)))), ((int)(((byte)(105)))));
+
+            this.lblMakeHoleRightOffset.Location = new System.Drawing.Point(16, 270);
+
+            this.lblMakeHoleRightOffset.Name = "lblMakeHoleRightOffset";
+
+            this.lblMakeHoleRightOffset.Size = new System.Drawing.Size(76, 18);
+
+            this.lblMakeHoleRightOffset.TabIndex = 13;
+
+            this.lblMakeHoleRightOffset.Text = "Dim Right R";
+
+            // 
+
+            // txtMakeHoleRightOffset
+
+            // 
+
+            this.txtMakeHoleRightOffset.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtMakeHoleRightOffset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.txtMakeHoleRightOffset.Location = new System.Drawing.Point(16, 287);
+
+            this.txtMakeHoleRightOffset.Name = "txtMakeHoleRightOffset";
+
+            this.txtMakeHoleRightOffset.Size = new System.Drawing.Size(304, 23);
+
+            this.txtMakeHoleRightOffset.TabIndex = 14;
+
+            this.txtMakeHoleRightOffset.Text = "50";
+
+            this.txtMakeHoleRightOffset.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+
+            // 
+
+            // lblMakeHolePitch
+
+            // 
+
+            this.lblMakeHolePitch.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblMakeHolePitch.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(71)))), ((int)(((byte)(85)))), ((int)(((byte)(105)))));
+
+            this.lblMakeHolePitch.Location = new System.Drawing.Point(16, 312);
+
+            this.lblMakeHolePitch.Name = "lblMakeHolePitch";
+
+            this.lblMakeHolePitch.Size = new System.Drawing.Size(70, 18);
+
+            this.lblMakeHolePitch.TabIndex = 15;
+
+            this.lblMakeHolePitch.Text = "Pitch @";
+
+            // 
+
+            // txtMakeHolePitch
+
+            // 
+
+            this.txtMakeHolePitch.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtMakeHolePitch.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+
+            this.txtMakeHolePitch.Location = new System.Drawing.Point(16, 329);
+
+            this.txtMakeHolePitch.Name = "txtMakeHolePitch";
+
+            this.txtMakeHolePitch.Size = new System.Drawing.Size(304, 23);
+
+            this.txtMakeHolePitch.TabIndex = 16;
+
+            this.txtMakeHolePitch.Text = "300";
+
+            this.txtMakeHolePitch.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+
+            // 
+
+            // lblRepairHoleType
+
+            // 
+
+            this.lblRepairHoleType.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblRepairHoleType.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
+
+            this.lblRepairHoleType.Location = new System.Drawing.Point(16, 148);
+
+            this.lblRepairHoleType.Name = "lblRepairHoleType";
+
+            this.lblRepairHoleType.Size = new System.Drawing.Size(76, 18);
+
+            this.lblRepairHoleType.TabIndex = 21;
+
+            this.lblRepairHoleType.Text = "Hole Type";
+
+            this.lblRepairHoleType.Visible = false;
+
+            // 
+
+            // cboRepairHoleType
+
+            // 
+
+            this.cboRepairHoleType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+
+            this.cboRepairHoleType.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.cboRepairHoleType.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
+
+            this.cboRepairHoleType.FormattingEnabled = true;
+
+            this.cboRepairHoleType.Items.AddRange(new object[] {
+
+            "丸穴",
+
+            "ルーズホル穴"});
+
+            this.cboRepairHoleType.Location = new System.Drawing.Point(92, 145);
+
+            this.cboRepairHoleType.Name = "cboRepairHoleType";
+
+            this.cboRepairHoleType.Size = new System.Drawing.Size(228, 23);
+
+            this.cboRepairHoleType.TabIndex = 22;
+
+            this.cboRepairHoleType.Visible = false;
+
+            // 
+
+            // lblRepairHoleDiameter
+
+            // 
+
+            this.lblRepairHoleDiameter.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblRepairHoleDiameter.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
+
+            this.lblRepairHoleDiameter.Location = new System.Drawing.Point(16, 180);
+
+            this.lblRepairHoleDiameter.Name = "lblRepairHoleDiameter";
+
+            this.lblRepairHoleDiameter.Size = new System.Drawing.Size(76, 18);
+
+            this.lblRepairHoleDiameter.TabIndex = 23;
+
+            this.lblRepairHoleDiameter.Text = "Hole Size";
+
+            this.lblRepairHoleDiameter.Visible = false;
+
+            // 
+
+            // cboRepairHoleDiameter
+
+            // 
+
+            this.cboRepairHoleDiameter.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.cboRepairHoleDiameter.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
+
+            this.cboRepairHoleDiameter.FormattingEnabled = true;
+
+            this.cboRepairHoleDiameter.Items.AddRange(new object[] {
+
+            "3.3",
+
+            "4.2",
+
+            "5.2",
+
+            "6.2",
+
+            "6.5",
+
+            "8",
+
+            "10"});
+
+            this.cboRepairHoleDiameter.Location = new System.Drawing.Point(92, 177);
+
+            this.cboRepairHoleDiameter.Name = "cboRepairHoleDiameter";
+
+            this.cboRepairHoleDiameter.Size = new System.Drawing.Size(166, 23);
+
+            this.cboRepairHoleDiameter.TabIndex = 24;
+
+            this.cboRepairHoleDiameter.Text = "4.2";
+
+            this.cboRepairHoleDiameter.Visible = false;
+
+            // 
+
+            // btnDeleteMakeHoleSize
+
+            // 
+
+            this.btnDeleteMakeHoleSize.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
+
+            this.btnDeleteMakeHoleSize.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
+
+            this.btnDeleteMakeHoleSize.BorderRadius = 3;
+
+            this.btnDeleteMakeHoleSize.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnDeleteMakeHoleSize.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(150)))), ((int)(((byte)(150)))));
+
+            this.btnDeleteMakeHoleSize.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
+
+            this.btnDeleteMakeHoleSize.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
+
+            this.btnDeleteMakeHoleSize.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnDeleteMakeHoleSize.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnDeleteMakeHoleSize.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(25)))), ((int)(((byte)(25)))));
+
+            this.btnDeleteMakeHoleSize.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(198)))), ((int)(((byte)(198)))));
+
+            this.btnDeleteMakeHoleSize.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnDeleteMakeHoleSize.IconColor = System.Drawing.Color.Empty;
+
+            this.btnDeleteMakeHoleSize.Location = new System.Drawing.Point(264, 177);
+
+            this.btnDeleteMakeHoleSize.Name = "btnDeleteMakeHoleSize";
+
+            this.btnDeleteMakeHoleSize.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(215)))), ((int)(((byte)(215)))));
+
+            this.btnDeleteMakeHoleSize.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(175)))), ((int)(((byte)(175)))));
+
+            this.btnDeleteMakeHoleSize.Size = new System.Drawing.Size(56, 23);
+
+            this.btnDeleteMakeHoleSize.TabIndex = 25;
+
+            this.btnDeleteMakeHoleSize.Text = "削除";
+
+            this.btnDeleteMakeHoleSize.UseVisualStyleBackColor = false;
+
+            this.btnDeleteMakeHoleSize.Visible = false;
+
+            // 
+
+            // chkMakeHolePaint
+
+            // 
+
+            this.chkMakeHolePaint.AutoSize = true;
+
+            this.chkMakeHolePaint.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.chkMakeHolePaint.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
+
+            this.chkMakeHolePaint.Location = new System.Drawing.Point(16, 352);
+
+            this.chkMakeHolePaint.Name = "chkMakeHolePaint";
+
+            this.chkMakeHolePaint.Size = new System.Drawing.Size(50, 19);
+
+            this.chkMakeHolePaint.TabIndex = 23;
+
+            this.chkMakeHolePaint.Text = "塗装";
+
+            this.chkMakeHolePaint.UseVisualStyleBackColor = true;
+
+            // 
+
+            // lblMakeHolePaintName
+
+            // 
+
+            this.lblMakeHolePaintName.AutoSize = true;
+
+            this.lblMakeHolePaintName.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblMakeHolePaintName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(68)))), ((int)(((byte)(80)))));
+
+            this.lblMakeHolePaintName.Location = new System.Drawing.Point(16, 378);
+
+            this.lblMakeHolePaintName.Name = "lblMakeHolePaintName";
+
+            this.lblMakeHolePaintName.Size = new System.Drawing.Size(75, 15);
+
+            this.lblMakeHolePaintName.TabIndex = 24;
+
+            this.lblMakeHolePaintName.Text = "Name hole";
+
+            // 
+
+            // txtMakeHolePaintName
+
+            // 
+
+            this.txtMakeHolePaintName.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.txtMakeHolePaintName.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
+
+            this.txtMakeHolePaintName.Location = new System.Drawing.Point(16, 395);
+
+            this.txtMakeHolePaintName.Name = "txtMakeHolePaintName";
+
+            this.txtMakeHolePaintName.Size = new System.Drawing.Size(304, 23);
+
+            this.txtMakeHolePaintName.TabIndex = 25;
+
+            // 
+
+            // btnMakeHoleAccept
+
+            // 
+
+            this.btnMakeHoleAccept.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(150)))), ((int)(((byte)(105)))));
+
+            this.btnMakeHoleAccept.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(4)))), ((int)(((byte)(120)))), ((int)(((byte)(87)))));
+
+            this.btnMakeHoleAccept.BorderRadius = 5;
+
+            this.btnMakeHoleAccept.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnMakeHoleAccept.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(4)))), ((int)(((byte)(120)))), ((int)(((byte)(87)))));
+
+            this.btnMakeHoleAccept.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(6)))), ((int)(((byte)(95)))), ((int)(((byte)(70)))));
+
+            this.btnMakeHoleAccept.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(4)))), ((int)(((byte)(120)))), ((int)(((byte)(87)))));
+
+            this.btnMakeHoleAccept.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnMakeHoleAccept.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnMakeHoleAccept.ForeColor = System.Drawing.Color.White;
+
+            this.btnMakeHoleAccept.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(4)))), ((int)(((byte)(120)))), ((int)(((byte)(87)))));
+
+            this.btnMakeHoleAccept.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHoleAccept.IconColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHoleAccept.Location = new System.Drawing.Point(16, 428);
+
+            this.btnMakeHoleAccept.Name = "btnMakeHoleAccept";
+
+            this.btnMakeHoleAccept.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(150)))), ((int)(((byte)(105)))));
+
+            this.btnMakeHoleAccept.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(6)))), ((int)(((byte)(95)))), ((int)(((byte)(70)))));
+
+            this.btnMakeHoleAccept.Size = new System.Drawing.Size(148, 32);
+
+            this.btnMakeHoleAccept.TabIndex = 17;
+
+            this.btnMakeHoleAccept.Text = "Accept";
+
+            this.btnMakeHoleAccept.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnMakeHoleUpdate
+
+            // 
+
+            this.btnMakeHoleUpdate.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.btnMakeHoleUpdate.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnMakeHoleUpdate.BorderRadius = 5;
+
+            this.btnMakeHoleUpdate.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnMakeHoleUpdate.Enabled = false;
+
+            this.btnMakeHoleUpdate.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnMakeHoleUpdate.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(253)))), ((int)(((byte)(230)))), ((int)(((byte)(138)))));
+
+            this.btnMakeHoleUpdate.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(243)))), ((int)(((byte)(199)))));
+
+            this.btnMakeHoleUpdate.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnMakeHoleUpdate.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnMakeHoleUpdate.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(148)))), ((int)(((byte)(163)))), ((int)(((byte)(184)))));
+
+            this.btnMakeHoleUpdate.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(243)))), ((int)(((byte)(199)))));
+
+            this.btnMakeHoleUpdate.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHoleUpdate.IconColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHoleUpdate.Location = new System.Drawing.Point(172, 428);
+
+            this.btnMakeHoleUpdate.Name = "btnMakeHoleUpdate";
+
+            this.btnMakeHoleUpdate.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.btnMakeHoleUpdate.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(253)))), ((int)(((byte)(230)))), ((int)(((byte)(138)))));
+
+            this.btnMakeHoleUpdate.Size = new System.Drawing.Size(148, 32);
+
+            this.btnMakeHoleUpdate.TabIndex = 20;
+
+            this.btnMakeHoleUpdate.Text = "UPDATE HOLE";
+
+            this.btnMakeHoleUpdate.UseVisualStyleBackColor = false;
+
+            // 
+
+            // btnMakeHolePattern
+
+            // 
+
+            this.btnMakeHolePattern.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(243)))), ((int)(((byte)(255)))));
+
+            this.btnMakeHolePattern.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(221)))), ((int)(((byte)(214)))), ((int)(((byte)(254)))));
+
+            this.btnMakeHolePattern.BorderRadius = 5;
+
+            this.btnMakeHolePattern.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnMakeHolePattern.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(221)))), ((int)(((byte)(214)))), ((int)(((byte)(254)))));
+
+            this.btnMakeHolePattern.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(221)))), ((int)(((byte)(214)))), ((int)(((byte)(254)))));
+
+            this.btnMakeHolePattern.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(237)))), ((int)(((byte)(233)))), ((int)(((byte)(254)))));
+
+            this.btnMakeHolePattern.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnMakeHolePattern.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnMakeHolePattern.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(109)))), ((int)(((byte)(40)))), ((int)(((byte)(217)))));
+
+            this.btnMakeHolePattern.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(237)))), ((int)(((byte)(233)))), ((int)(((byte)(254)))));
+
+            this.btnMakeHolePattern.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHolePattern.IconColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHolePattern.Location = new System.Drawing.Point(172, 468);
+
+            this.btnMakeHolePattern.Name = "btnMakeHolePattern";
+
+            this.btnMakeHolePattern.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(243)))), ((int)(((byte)(255)))));
+
+            this.btnMakeHolePattern.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(221)))), ((int)(((byte)(214)))), ((int)(((byte)(254)))));
+
+            this.btnMakeHolePattern.Size = new System.Drawing.Size(148, 32);
+
+            this.btnMakeHolePattern.TabIndex = 18;
+
+            this.btnMakeHolePattern.Text = "Pattern";
+
+            this.btnMakeHolePattern.UseVisualStyleBackColor = false;
+
+            this.btnMakeHolePattern.Visible = false;
+
+            // 
+
+            // btnMakeHoleReset
+
+            // 
+
+            this.btnMakeHoleReset.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(242)))), ((int)(((byte)(242)))));
+
+            this.btnMakeHoleReset.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(202)))), ((int)(((byte)(202)))));
+
+            this.btnMakeHoleReset.BorderRadius = 5;
+
+            this.btnMakeHoleReset.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnMakeHoleReset.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(202)))), ((int)(((byte)(202)))));
+
+            this.btnMakeHoleReset.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(252)))), ((int)(((byte)(165)))), ((int)(((byte)(165)))));
+
+            this.btnMakeHoleReset.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(226)))), ((int)(((byte)(226)))));
+
+            this.btnMakeHoleReset.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnMakeHoleReset.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnMakeHoleReset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(38)))), ((int)(((byte)(38)))));
+
+            this.btnMakeHoleReset.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(226)))), ((int)(((byte)(226)))));
+
+            this.btnMakeHoleReset.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHoleReset.IconColor = System.Drawing.Color.Empty;
+
+            this.btnMakeHoleReset.Location = new System.Drawing.Point(16, 468);
+
+            this.btnMakeHoleReset.Name = "btnMakeHoleReset";
+
+            this.btnMakeHoleReset.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(242)))), ((int)(((byte)(242)))));
+
+            this.btnMakeHoleReset.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(252)))), ((int)(((byte)(165)))), ((int)(((byte)(165)))));
+
+            this.btnMakeHoleReset.Size = new System.Drawing.Size(148, 32);
+
+            this.btnMakeHoleReset.TabIndex = 19;
+
+            this.btnMakeHoleReset.Text = "Reset";
+
+            this.btnMakeHoleReset.UseVisualStyleBackColor = false;
+
+            // 
+
+            // elementHostRepairHole
+
+            // 
+
+            this.elementHostRepairHole.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.elementHostRepairHole.Location = new System.Drawing.Point(12, 22);
+
+            this.elementHostRepairHole.Name = "elementHostRepairHole";
+
+            this.elementHostRepairHole.Size = new System.Drawing.Size(210, 380);
+
+            this.elementHostRepairHole.TabIndex = 20;
+
+            this.elementHostRepairHole.Text = "elementHostRepairHole";
+
+            this.elementHostRepairHole.Visible = false;
+
+            this.elementHostRepairHole.Child = null;
+
+            // 
+
+            // tabModelMacroPage
+
+            // 
+
+            this.tabModelMacroPage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.tabModelMacroPage.Controls.Add(this.vCutBendAssignmentControl);
+
+            this.tabModelMacroPage.Controls.Add(this.btnVCutPropertySetup);
+
+            this.tabModelMacroPage.Controls.Add(this.lblCheckAssemblyHoleResult);
+
+            this.tabModelMacroPage.Controls.Add(this.btnRepair3DSpline);
+
+            this.tabModelMacroPage.Controls.Add(this.btnEdgeToEqualSpline);
+
+            this.tabModelMacroPage.Controls.Add(this.btnMirrorPart);
+
+            this.tabModelMacroPage.Controls.Add(this.btnCheckAssemblyHole);
+
+            this.tabModelMacroPage.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.tabModelMacroPage.Location = new System.Drawing.Point(4, 34);
+
+            this.tabModelMacroPage.Name = "tabModelMacroPage";
+
+            this.tabModelMacroPage.Padding = new System.Windows.Forms.Padding(3);
+
+            this.tabModelMacroPage.Size = new System.Drawing.Size(378, 495);
+
+            this.tabModelMacroPage.TabIndex = 2;
+
+            this.tabModelMacroPage.Text = "Macro";
+
+            // 
+
+            // vCutBendAssignmentControl
+
+            // 
+
+            this.vCutBendAssignmentControl.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
+            this.vCutBendAssignmentControl.Dock = System.Windows.Forms.DockStyle.Fill;
+
+            this.vCutBendAssignmentControl.Font = new System.Drawing.Font("Segoe UI", 9F);
+
+            this.vCutBendAssignmentControl.Location = new System.Drawing.Point(3, 3);
+
+            this.vCutBendAssignmentControl.Name = "vCutBendAssignmentControl";
+
+            this.vCutBendAssignmentControl.Size = new System.Drawing.Size(372, 489);
+
+            this.vCutBendAssignmentControl.TabIndex = 21;
+
+            this.vCutBendAssignmentControl.Visible = false;
+
+            // 
+
+            // btnVCutPropertySetup
+
+            // 
+
+            this.btnVCutPropertySetup.BackColor = System.Drawing.Color.White;
+
+            this.btnVCutPropertySetup.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnVCutPropertySetup.BorderRadius = 6;
+
+            this.btnVCutPropertySetup.Cursor = System.Windows.Forms.Cursors.Hand;
+
+            this.btnVCutPropertySetup.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+
+            this.btnVCutPropertySetup.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnVCutPropertySetup.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.btnVCutPropertySetup.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(251)))), ((int)(((byte)(235)))));
+
+            this.btnVCutPropertySetup.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnVCutPropertySetup.IconColor = System.Drawing.Color.Empty;
+
+            this.btnVCutPropertySetup.Image = global::ADDIN.Properties.Resources.SetBendLine3D;
+
+            this.btnVCutPropertySetup.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            this.btnVCutPropertySetup.Location = new System.Drawing.Point(18, 132);
+
+            this.btnVCutPropertySetup.Name = "btnVCutPropertySetup";
+
+            this.btnVCutPropertySetup.NormalColor = System.Drawing.Color.White;
+
+            this.btnVCutPropertySetup.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
+
+            this.btnVCutPropertySetup.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(254)))), ((int)(((byte)(243)))), ((int)(((byte)(199)))));
+
+            this.btnVCutPropertySetup.Size = new System.Drawing.Size(145, 48);
+
+            this.btnVCutPropertySetup.TabIndex = 20;
+
+            this.btnVCutPropertySetup.Text = "Set Bend line\r\n曲げ線設定";
+
+            this.btnVCutPropertySetup.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
+            this.btnVCutPropertySetup.UseVisualStyleBackColor = false;
+
+            // 
+
+            // lblCheckAssemblyHoleResult
+
+            // 
+
+            this.lblCheckAssemblyHoleResult.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+
+            | System.Windows.Forms.AnchorStyles.Left) 
+
+            | System.Windows.Forms.AnchorStyles.Right)));
+
+            this.lblCheckAssemblyHoleResult.BackColor = System.Drawing.Color.White;
+
+            this.lblCheckAssemblyHoleResult.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+
+            this.lblCheckAssemblyHoleResult.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.lblCheckAssemblyHoleResult.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(71)))), ((int)(((byte)(85)))), ((int)(((byte)(105)))));
+
             this.lblCheckAssemblyHoleResult.Location = new System.Drawing.Point(18, 132);
+
             this.lblCheckAssemblyHoleResult.Name = "lblCheckAssemblyHoleResult";
+
             this.lblCheckAssemblyHoleResult.Padding = new System.Windows.Forms.Padding(8, 6, 8, 6);
+
             this.lblCheckAssemblyHoleResult.Size = new System.Drawing.Size(342, 195);
+
             this.lblCheckAssemblyHoleResult.TabIndex = 0;
+
             // 
+
             // btnRepair3DSpline
+
             // 
-            this.btnRepair3DSpline.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
-            this.btnRepair3DSpline.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(195)))));
-            this.btnRepair3DSpline.BorderRadius = 3;
+
+            this.btnRepair3DSpline.BackColor = System.Drawing.Color.White;
+
+            this.btnRepair3DSpline.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnRepair3DSpline.BorderRadius = 6;
+
             this.btnRepair3DSpline.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnRepair3DSpline.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(195)))));
-            this.btnRepair3DSpline.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(215)))), ((int)(((byte)(205)))));
-            this.btnRepair3DSpline.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+
+            this.btnRepair3DSpline.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnRepair3DSpline.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(231)))), ((int)(((byte)(255)))));
+
+            this.btnRepair3DSpline.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(238)))), ((int)(((byte)(242)))), ((int)(((byte)(255)))));
+
             this.btnRepair3DSpline.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnRepair3DSpline.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnRepair3DSpline.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(75)))), ((int)(((byte)(72)))));
-            this.btnRepair3DSpline.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+
+            this.btnRepair3DSpline.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnRepair3DSpline.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.btnRepair3DSpline.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(238)))), ((int)(((byte)(242)))), ((int)(((byte)(255)))));
+
+            this.btnRepair3DSpline.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnRepair3DSpline.IconColor = System.Drawing.Color.Empty;
+
             this.btnRepair3DSpline.Image = global::ADDIN.Properties.Resources.RepairSpline3D;
+
             this.btnRepair3DSpline.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
             this.btnRepair3DSpline.Location = new System.Drawing.Point(126, 72);
+
             this.btnRepair3DSpline.Name = "btnRepair3DSpline";
-            this.btnRepair3DSpline.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
+
+            this.btnRepair3DSpline.NormalColor = System.Drawing.Color.White;
+
             this.btnRepair3DSpline.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
-            this.btnRepair3DSpline.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(215)))), ((int)(((byte)(205)))));
+
+            this.btnRepair3DSpline.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(231)))), ((int)(((byte)(255)))));
+
             this.btnRepair3DSpline.Size = new System.Drawing.Size(108, 48);
+
             this.btnRepair3DSpline.TabIndex = 3;
+
             this.btnRepair3DSpline.Text = "REPAIR 3D\r\nSPLINE";
+
             this.btnRepair3DSpline.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
             this.btnRepair3DSpline.UseVisualStyleBackColor = false;
+
             this.btnRepair3DSpline.Click += new System.EventHandler(this.btnRepair3DSpline_Click);
+
             // 
+
             // btnEdgeToEqualSpline
+
             // 
-            this.btnEdgeToEqualSpline.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
-            this.btnEdgeToEqualSpline.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(195)))));
-            this.btnEdgeToEqualSpline.BorderRadius = 3;
+
+            this.btnEdgeToEqualSpline.BackColor = System.Drawing.Color.White;
+
+            this.btnEdgeToEqualSpline.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnEdgeToEqualSpline.BorderRadius = 6;
+
             this.btnEdgeToEqualSpline.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnEdgeToEqualSpline.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(195)))));
-            this.btnEdgeToEqualSpline.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(215)))), ((int)(((byte)(205)))));
-            this.btnEdgeToEqualSpline.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+
+            this.btnEdgeToEqualSpline.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnEdgeToEqualSpline.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(204)))), ((int)(((byte)(251)))), ((int)(((byte)(241)))));
+
+            this.btnEdgeToEqualSpline.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(253)))), ((int)(((byte)(250)))));
+
             this.btnEdgeToEqualSpline.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnEdgeToEqualSpline.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnEdgeToEqualSpline.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(75)))), ((int)(((byte)(72)))));
-            this.btnEdgeToEqualSpline.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+
+            this.btnEdgeToEqualSpline.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnEdgeToEqualSpline.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.btnEdgeToEqualSpline.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(253)))), ((int)(((byte)(250)))));
+
+            this.btnEdgeToEqualSpline.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnEdgeToEqualSpline.IconColor = System.Drawing.Color.Empty;
+
             this.btnEdgeToEqualSpline.Image = global::ADDIN.Properties.Resources.AutoSpline3D;
+
             this.btnEdgeToEqualSpline.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
             this.btnEdgeToEqualSpline.Location = new System.Drawing.Point(246, 16);
+
             this.btnEdgeToEqualSpline.Name = "btnEdgeToEqualSpline";
-            this.btnEdgeToEqualSpline.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
+
+            this.btnEdgeToEqualSpline.NormalColor = System.Drawing.Color.White;
+
             this.btnEdgeToEqualSpline.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
-            this.btnEdgeToEqualSpline.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(215)))), ((int)(((byte)(205)))));
+
+            this.btnEdgeToEqualSpline.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(204)))), ((int)(((byte)(251)))), ((int)(((byte)(241)))));
+
             this.btnEdgeToEqualSpline.Size = new System.Drawing.Size(108, 48);
+
             this.btnEdgeToEqualSpline.TabIndex = 2;
+
             this.btnEdgeToEqualSpline.Text = "AUTO\r\nSPLINE";
+
             this.btnEdgeToEqualSpline.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
             this.btnEdgeToEqualSpline.UseVisualStyleBackColor = false;
+
             this.btnEdgeToEqualSpline.Click += new System.EventHandler(this.btnEdgeToEqualSpline_Click);
+
             // 
+
             // btnMirrorPart
+
             // 
-            this.btnMirrorPart.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
-            this.btnMirrorPart.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(195)))));
-            this.btnMirrorPart.BorderRadius = 3;
+
+            this.btnMirrorPart.BackColor = System.Drawing.Color.White;
+
+            this.btnMirrorPart.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnMirrorPart.BorderRadius = 6;
+
             this.btnMirrorPart.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnMirrorPart.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(205)))), ((int)(((byte)(195)))));
-            this.btnMirrorPart.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(215)))), ((int)(((byte)(205)))));
-            this.btnMirrorPart.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+
+            this.btnMirrorPart.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnMirrorPart.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(209)))), ((int)(((byte)(250)))), ((int)(((byte)(229)))));
+
+            this.btnMirrorPart.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(253)))), ((int)(((byte)(245)))));
+
             this.btnMirrorPart.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnMirrorPart.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnMirrorPart.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(12)))), ((int)(((byte)(75)))), ((int)(((byte)(72)))));
-            this.btnMirrorPart.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(228)))), ((int)(((byte)(220)))));
+
+            this.btnMirrorPart.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnMirrorPart.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.btnMirrorPart.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(253)))), ((int)(((byte)(245)))));
+
+            this.btnMirrorPart.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnMirrorPart.IconColor = System.Drawing.Color.Empty;
+
             this.btnMirrorPart.Image = global::ADDIN.Properties.Resources.MirrorPart3D;
+
             this.btnMirrorPart.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
             this.btnMirrorPart.Location = new System.Drawing.Point(126, 16);
+
             this.btnMirrorPart.Name = "btnMirrorPart";
-            this.btnMirrorPart.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(198)))), ((int)(((byte)(238)))), ((int)(((byte)(232)))));
+
+            this.btnMirrorPart.NormalColor = System.Drawing.Color.White;
+
             this.btnMirrorPart.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
-            this.btnMirrorPart.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(160)))), ((int)(((byte)(215)))), ((int)(((byte)(205)))));
+
+            this.btnMirrorPart.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(209)))), ((int)(((byte)(250)))), ((int)(((byte)(229)))));
+
             this.btnMirrorPart.Size = new System.Drawing.Size(108, 48);
+
             this.btnMirrorPart.TabIndex = 1;
+
             this.btnMirrorPart.Text = "MIRROR\r\nPART";
+
             this.btnMirrorPart.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
             this.btnMirrorPart.UseVisualStyleBackColor = false;
+
             // 
+
             // btnCheckAssemblyHole
+
             // 
-            this.btnCheckAssemblyHole.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
-            this.btnCheckAssemblyHole.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
-            this.btnCheckAssemblyHole.BorderRadius = 3;
+
+            this.btnCheckAssemblyHole.BackColor = System.Drawing.Color.White;
+
+            this.btnCheckAssemblyHole.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnCheckAssemblyHole.BorderRadius = 6;
+
             this.btnCheckAssemblyHole.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnCheckAssemblyHole.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(135)))), ((int)(((byte)(188)))), ((int)(((byte)(238)))));
-            this.btnCheckAssemblyHole.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
-            this.btnCheckAssemblyHole.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(216)))), ((int)(((byte)(248)))));
+
+            this.btnCheckAssemblyHole.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(203)))), ((int)(((byte)(213)))), ((int)(((byte)(225)))));
+
+            this.btnCheckAssemblyHole.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(219)))), ((int)(((byte)(234)))), ((int)(((byte)(254)))));
+
+            this.btnCheckAssemblyHole.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(239)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+
             this.btnCheckAssemblyHole.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckAssemblyHole.Font = new System.Drawing.Font("Meiryo UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-            this.btnCheckAssemblyHole.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(60)))), ((int)(((byte)(118)))));
-            this.btnCheckAssemblyHole.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(185)))), ((int)(((byte)(216)))), ((int)(((byte)(248)))));
+
+            this.btnCheckAssemblyHole.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
+            this.btnCheckAssemblyHole.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+
+            this.btnCheckAssemblyHole.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(239)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+
+            this.btnCheckAssemblyHole.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckAssemblyHole.IconColor = System.Drawing.Color.Empty;
+
             this.btnCheckAssemblyHole.Image = global::ADDIN.Properties.Resources.CheckHole3D;
+
             this.btnCheckAssemblyHole.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
             this.btnCheckAssemblyHole.Location = new System.Drawing.Point(18, 16);
+
             this.btnCheckAssemblyHole.Name = "btnCheckAssemblyHole";
-            this.btnCheckAssemblyHole.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(202)))), ((int)(((byte)(228)))), ((int)(((byte)(252)))));
+
+            this.btnCheckAssemblyHole.NormalColor = System.Drawing.Color.White;
+
             this.btnCheckAssemblyHole.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
-            this.btnCheckAssemblyHole.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(165)))), ((int)(((byte)(200)))), ((int)(((byte)(240)))));
+
+            this.btnCheckAssemblyHole.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(219)))), ((int)(((byte)(234)))), ((int)(((byte)(254)))));
+
             this.btnCheckAssemblyHole.Size = new System.Drawing.Size(96, 48);
+
             this.btnCheckAssemblyHole.TabIndex = 0;
+
             this.btnCheckAssemblyHole.Text = "CHECK\r\nHOLE";
+
             this.btnCheckAssemblyHole.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
+
             this.btnCheckAssemblyHole.UseVisualStyleBackColor = false;
+
             // 
+
             // btnCheckKegaki
+
             // 
+
             this.btnCheckKegaki.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(220)))), ((int)(((byte)(250)))));
+
             this.btnCheckKegaki.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
+
             this.btnCheckKegaki.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(182)))), ((int)(((byte)(162)))), ((int)(((byte)(228)))));
+
             this.btnCheckKegaki.BorderRadius = 3;
+
             this.btnCheckKegaki.Cursor = System.Windows.Forms.Cursors.Hand;
+
             this.btnCheckKegaki.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(182)))), ((int)(((byte)(162)))), ((int)(((byte)(228)))));
+
             this.btnCheckKegaki.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(180)))), ((int)(((byte)(232)))));
+
             this.btnCheckKegaki.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(202)))), ((int)(((byte)(242)))));
+
             this.btnCheckKegaki.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckKegaki.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+
+            this.btnCheckKegaki.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
             this.btnCheckKegaki.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(65)))), ((int)(((byte)(30)))), ((int)(((byte)(110)))));
+
             this.btnCheckKegaki.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(202)))), ((int)(((byte)(242)))));
+
+            this.btnCheckKegaki.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckKegaki.IconColor = System.Drawing.Color.Empty;
+
             this.btnCheckKegaki.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
             this.btnCheckKegaki.Location = new System.Drawing.Point(242, 116);
+
             this.btnCheckKegaki.Name = "btnCheckKegaki";
+
             this.btnCheckKegaki.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(220)))), ((int)(((byte)(250)))));
+
             this.btnCheckKegaki.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
+
             this.btnCheckKegaki.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(180)))), ((int)(((byte)(232)))));
+
             this.btnCheckKegaki.Size = new System.Drawing.Size(90, 42);
+
             this.btnCheckKegaki.TabIndex = 14;
+
             this.btnCheckKegaki.Text = "CHECK\r\nKEGAKI";
+
             this.btnCheckKegaki.UseVisualStyleBackColor = false;
+
             this.btnCheckKegaki.Visible = false;
+
             // 
+
             // btnCheckUraOmote
+
             // 
+
             this.btnCheckUraOmote.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(208)))), ((int)(((byte)(244)))), ((int)(((byte)(222)))));
+
             this.btnCheckUraOmote.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
+
             this.btnCheckUraOmote.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(142)))), ((int)(((byte)(212)))), ((int)(((byte)(165)))));
+
             this.btnCheckUraOmote.BorderRadius = 3;
+
             this.btnCheckUraOmote.Cursor = System.Windows.Forms.Cursors.Hand;
+
             this.btnCheckUraOmote.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(142)))), ((int)(((byte)(212)))), ((int)(((byte)(165)))));
+
             this.btnCheckUraOmote.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(222)))), ((int)(((byte)(190)))));
+
             this.btnCheckUraOmote.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(236)))), ((int)(((byte)(208)))));
+
             this.btnCheckUraOmote.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnCheckUraOmote.Font = new System.Drawing.Font("Meiryo UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+
+            this.btnCheckUraOmote.Font = new System.Drawing.Font("Segoe UI", 8.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
             this.btnCheckUraOmote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(80)))), ((int)(((byte)(45)))));
+
             this.btnCheckUraOmote.HoverColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(236)))), ((int)(((byte)(208)))));
+
+            this.btnCheckUraOmote.IconBoxBorderColor = System.Drawing.Color.Empty;
+
+            this.btnCheckUraOmote.IconColor = System.Drawing.Color.Empty;
+
             this.btnCheckUraOmote.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
             this.btnCheckUraOmote.Location = new System.Drawing.Point(144, 116);
+
             this.btnCheckUraOmote.Name = "btnCheckUraOmote";
+
             this.btnCheckUraOmote.NormalColor = System.Drawing.Color.FromArgb(((int)(((byte)(208)))), ((int)(((byte)(244)))), ((int)(((byte)(222)))));
+
             this.btnCheckUraOmote.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
+
             this.btnCheckUraOmote.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(222)))), ((int)(((byte)(190)))));
+
             this.btnCheckUraOmote.Size = new System.Drawing.Size(90, 42);
+
             this.btnCheckUraOmote.TabIndex = 13;
+
             this.btnCheckUraOmote.Text = "CHECK\r\nウラ表";
+
             this.btnCheckUraOmote.UseVisualStyleBackColor = false;
+
             this.btnCheckUraOmote.Visible = false;
+
             // 
+
             // BomTaskPaneControl
+
             // 
+
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(236)))), ((int)(((byte)(236)))));
+
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+
             this.Controls.Add(this.tabBom);
-            this.Font = new System.Drawing.Font("Meiryo UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
+
+            this.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+
             this.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(22)))), ((int)(((byte)(28)))));
+
             this.Name = "BomTaskPaneControl";
+
             this.Size = new System.Drawing.Size(400, 577);
+
             this.tabBom.ResumeLayout(false);
+
             this.tabDrawing.ResumeLayout(false);
+
             this.tabDrawingPages.ResumeLayout(false);
+
             this.tabDrawingBom.ResumeLayout(false);
+
             this.tabDrawingBom.PerformLayout();
+
+            this.cardAssemblyDrawing.ResumeLayout(false);
+
+            this.cardSheetMetal.ResumeLayout(false);
+
             ((System.ComponentModel.ISupportInitialize)(this.dgvModelBom)).EndInit();
+
             this.tabComponentDrawing.ResumeLayout(false);
+
             this.groupBox3.ResumeLayout(false);
+
             this.grpComponentBom.ResumeLayout(false);
+
             this.grpComponentSize.ResumeLayout(false);
+
             this.groupBox2.ResumeLayout(false);
+
             this.groupBox2.PerformLayout();
+
             this.groupBox1.ResumeLayout(false);
+
             this.groupBox1.PerformLayout();
+
             this.tabModel.ResumeLayout(false);
+
             this.tabModelPages.ResumeLayout(false);
+
             this.tabModelPropsPage.ResumeLayout(false);
+
             this.panelModelProps.ResumeLayout(false);
+
             this.panelModelProps.PerformLayout();
+
             this.tabModelEditPage.ResumeLayout(false);
+
             this.panelModelCommands.ResumeLayout(false);
+
             this.grpMakeHoleOptions.ResumeLayout(false);
+
             this.grpMakeHoleOptions.PerformLayout();
+
             this.tabModelMacroPage.ResumeLayout(false);
+
             this.ResumeLayout(false);
 
-        }
-
-        #endregion
-        private ADDIN.UI.ModernTabControl tabBom;
-        private System.Windows.Forms.TabPage tabDrawing;
-        private ADDIN.UI.ModernTabControl tabDrawingPages;
-        private System.Windows.Forms.TabPage tabDrawingBom;
-        private System.Windows.Forms.TabPage tabComponentDrawing;
-        private ADDIN.UI.ModernCard grpComponentSize;
-        private ADDIN.UI.ModernButton btnGetWL;
-        private ADDIN.UI.ModernButton btnRotateCcw;
-        private ADDIN.UI.ModernButton btnRotateCw;
-        private ADDIN.UI.ModernButton btnHorizontalAlignment;
-        private ADDIN.UI.ModernCard grpComponentBom;
-        private ADDIN.UI.ModernButton btnInsertBalloon;
-        private System.Windows.Forms.ComboBox cboBalloonProperty;
-        private ADDIN.UI.ModernButton btnDeleteText;
-        private ADDIN.UI.ModernButton btnText;
-        private ADDIN.Commands.HistoryTextBox cboSide;
-        private ADDIN.UI.ModernButton btnDeleteNote;
-        private ADDIN.UI.ModernButton btnNote;
-        private ADDIN.Commands.HistoryTextBox cboBendLine;
-        private System.Windows.Forms.TabPage tabModel;
-        private System.Windows.Forms.DataGridView dgvModelBom;
-        private ADDIN.UI.ModernButton btnLoadBom;
-        private ADDIN.UI.ModernButton btnClearBom;
-        private System.Windows.Forms.Label lblTitle;
-        private System.Windows.Forms.Label lblStatus;
-        private ADDIN.UI.ModernButton btnCheckDfTk;
-        private ADDIN.UI.ModernButton btnCheckUraOmote;
-        private ADDIN.UI.ModernButton btnCheckKegaki;
-        private System.Windows.Forms.ProgressBar progressCheck;
-        private System.Windows.Forms.DataGridViewCheckBoxColumn Column5;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column1;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column3;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column6;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column4;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Column2;
-        private System.Windows.Forms.CheckBox chkSelectAll;
-        private ADDIN.UI.ModernButton button1;
-        private ADDIN.UI.ModernFieldBox groupBox2;
-        private ADDIN.UI.ModernFieldBox groupBox1;
-        private System.Windows.Forms.TextBox txtWidth;
-        private System.Windows.Forms.TextBox txtLength;
-        private ADDIN.UI.ModernCard groupBox3;
-        private ADDIN.UI.ModernButton btnDimKegaki;
-        private ADDIN.UI.ModernButton btnDimKichThuocLo;
-        private ADDIN.UI.ModernButton btnFixScale;
-        private ADDIN.UI.ModernButton dimvang;
-        private ADDIN.UI.ModernButton button2;
-        private ADDIN.UI.ModernButton btnOpenAssem;
-        private ADDIN.UI.ModernButton btnCheckBalloon;
-        private ADDIN.UI.ModernButton btnCheckAll;
-        private ADDIN.UI.ModernButton btnCheckRound;
-        private ADDIN.UI.ModernButton btnCheckSamePart;
-        private ADDIN.UI.ModernButton btnCheckDrawingBom;
-        private ADDIN.UI.ModernButton btnMakeHole;
-        private System.Windows.Forms.Panel panelModelCommands;
-        private ADDIN.UI.ModernButton btnRepairHole;
-        private System.Windows.Forms.GroupBox grpMakeHoleOptions;
-        private System.Windows.Forms.Panel pnlMakeHoleDiagram;
-        private System.Windows.Forms.Label lblMakeHoleDirection;
-        private System.Windows.Forms.ComboBox cboMakeHoleDirection;
-        private System.Windows.Forms.Label lblMakeHoleEdgeOffset;
-        private System.Windows.Forms.TextBox txtMakeHoleEdgeOffset;
-        private System.Windows.Forms.Label lblMakeHoleLeftOffset;
-        private System.Windows.Forms.TextBox txtMakeHoleLeftOffset;
-        private System.Windows.Forms.Label lblMakeHoleRightOffset;
-        private System.Windows.Forms.TextBox txtMakeHoleRightOffset;
-        private System.Windows.Forms.Label lblMakeHolePitch;
-        private System.Windows.Forms.TextBox txtMakeHolePitch;
-        private System.Windows.Forms.Label lblRepairHoleType;
-        private System.Windows.Forms.ComboBox cboRepairHoleType;
-        private System.Windows.Forms.Label lblRepairHoleDiameter;
-        private System.Windows.Forms.ComboBox cboRepairHoleDiameter;
-        private ADDIN.UI.ModernButton btnDeleteMakeHoleSize;
-        private System.Windows.Forms.CheckBox chkMakeHolePaint;
-        private ADDIN.UI.ModernButton btnMakeHoleUpdate;
-        private ADDIN.UI.ModernButton btnMakeHoleAccept;
-        private ADDIN.UI.ModernButton btnMakeHolePattern;
-        private ADDIN.UI.ModernButton btnMakeHoleReset;
-        private ADDIN.UI.ModernButton btnPaintHoleSummary;
-        private ADDIN.UI.ModernTabControl tabModelPages;
-        private System.Windows.Forms.TabPage tabModelPropsPage;
-        private System.Windows.Forms.TabPage tabModelEditPage;
-        private System.Windows.Forms.TabPage tabModelMacroPage;
-        private ADDIN.UI.VCutBendAssignmentControl vCutBendAssignmentControl;
-        private ADDIN.UI.ModernButton btnVCutPropertySetup;
-        private System.Windows.Forms.Label lblCheckAssemblyHoleResult;
-        private ADDIN.UI.ModernButton btnCheckAssemblyHole;
-        private ADDIN.UI.ModernButton btnMirrorPart;
-        private ADDIN.UI.ModernButton btnEdgeToEqualSpline;
-        private ADDIN.UI.ModernButton btnRepair3DSpline;
-        private System.Windows.Forms.Panel panelModelProps;
-        private ADDIN.UI.ModernButton btnModelApplyProps;
-        private ADDIN.UI.ModernButton btnModelResetProps;
-        private ADDIN.UI.ModernButton btnModelUpdateProps;
-        private System.Windows.Forms.TextBox txtModelFinish;
-        private System.Windows.Forms.Label lblModelFinish;
-        private System.Windows.Forms.TextBox txtModelQty;
-        private System.Windows.Forms.Label lblModelQty;
-        private System.Windows.Forms.TextBox txtModelGoban;
-        private System.Windows.Forms.Label lblModelGoban;
-        private System.Windows.Forms.TextBox txtModelThickness;
-        private System.Windows.Forms.Label lblModelThickness;
-        private System.Windows.Forms.TextBox txtModelMaterial;
-        private System.Windows.Forms.Label lblModelMaterial;
-        private System.Windows.Forms.TextBox txtModelName;
-        private System.Windows.Forms.Label lblModelName;
-        private ADDIN.UI.ModernButton btnDimMatCat;
-        private ADDIN.UI.ModernButton btnSplineToArcs;
-        private ADDIN.UI.ModernButton btnRepairDim;
-        private ADDIN.UI.ModernButton btnVCutSection;
-        private System.Windows.Forms.Integration.ElementHost elementHostRepairHole;
-    }
-}
-
-
+
+
+        }
+
+
+
+
+
+
+
+        #endregion
+
+
+
+        private ADDIN.UI.ModernTabControl tabBom;
+
+
+
+        private System.Windows.Forms.TabPage tabDrawing;
+
+
+
+        private ADDIN.UI.ModernTabControl tabDrawingPages;
+
+
+
+        private System.Windows.Forms.TabPage tabDrawingBom;
+
+
+
+        private System.Windows.Forms.TabPage tabComponentDrawing;
+
+
+
+        private ADDIN.UI.ModernCard grpComponentSize;
+
+
+
+        private ADDIN.UI.ModernButton btnGetWL;
+
+
+
+        private ADDIN.UI.ModernButton btnRotateCcw;
+
+
+
+        private ADDIN.UI.ModernButton btnRotateCw;
+
+
+
+        private ADDIN.UI.ModernButton btnHorizontalAlignment;
+
+
+
+        private ADDIN.UI.ModernCard grpComponentBom;
+
+
+
+        private ADDIN.UI.ModernButton btnInsertBalloon;
+
+
+
+        private System.Windows.Forms.ComboBox cboBalloonProperty;
+
+
+
+        private ADDIN.UI.ModernButton btnDeleteText;
+
+
+
+        private ADDIN.UI.ModernButton btnText;
+
+
+
+        private ADDIN.Commands.HistoryTextBox cboSide;
+
+
+
+        private ADDIN.UI.ModernButton btnDeleteNote;
+
+
+
+        private ADDIN.UI.ModernButton btnNote;
+
+
+
+        private ADDIN.Commands.HistoryTextBox cboBendLine;
+
+
+
+        private System.Windows.Forms.TabPage tabModel;
+
+
+
+        private System.Windows.Forms.DataGridView dgvModelBom;
+
+
+
+        private ADDIN.UI.ModernButton btnLoadBom;
+
+
+
+        private ADDIN.UI.ModernButton btnClearBom;
+
+
+
+        private System.Windows.Forms.Label lblTitle;
+
+
+
+        private System.Windows.Forms.Label lblStatus;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckDfTk;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckUraOmote;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckKegaki;
+
+
+
+        private System.Windows.Forms.ProgressBar progressCheck;
+
+
+
+        private System.Windows.Forms.DataGridViewCheckBoxColumn Column5;
+
+
+
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column1;
+
+
+
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column3;
+
+
+
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column6;
+
+
+
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column4;
+
+
+
+        private System.Windows.Forms.DataGridViewTextBoxColumn Column2;
+
+
+
+        private System.Windows.Forms.CheckBox chkSelectAll;
+
+
+
+        private ADDIN.UI.ModernButton button1;
+
+
+
+        private ADDIN.UI.ModernFieldBox groupBox2;
+
+
+
+        private ADDIN.UI.ModernFieldBox groupBox1;
+
+
+
+        private System.Windows.Forms.TextBox txtWidth;
+
+
+
+        private System.Windows.Forms.TextBox txtLength;
+
+
+
+        private ADDIN.UI.ModernCard groupBox3;
+
+
+
+        private ADDIN.UI.ModernButton btnDimKegaki;
+
+
+
+        private ADDIN.UI.ModernButton btnDimKichThuocLo;
+
+
+
+        private ADDIN.UI.ModernButton btnFixScale;
+
+
+
+        private ADDIN.UI.ModernButton dimvang;
+
+
+
+        private ADDIN.UI.ModernButton button2;
+
+
+
+        private ADDIN.UI.ModernButton btnOpenAssem;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckBalloon;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckAll;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckRound;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckSamePart;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckDrawingBom;
+
+
+
+        private ADDIN.UI.ModernButton btnMakeHole;
+
+
+
+        private System.Windows.Forms.Panel panelModelCommands;
+
+
+
+        private ADDIN.UI.ModernButton btnRepairHole;
+
+
+
+        private System.Windows.Forms.GroupBox grpMakeHoleOptions;
+
+
+
+        private System.Windows.Forms.Panel pnlMakeHoleDiagram;
+
+
+
+        private System.Windows.Forms.Label lblMakeHoleDirection;
+
+
+
+        private System.Windows.Forms.ComboBox cboMakeHoleDirection;
+
+
+
+        private System.Windows.Forms.Label lblMakeHoleEdgeOffset;
+
+
+
+        private System.Windows.Forms.TextBox txtMakeHoleEdgeOffset;
+
+
+
+        private System.Windows.Forms.Label lblMakeHoleLeftOffset;
+
+
+
+        private System.Windows.Forms.TextBox txtMakeHoleLeftOffset;
+
+
+
+        private System.Windows.Forms.Label lblMakeHoleRightOffset;
+
+
+
+        private System.Windows.Forms.TextBox txtMakeHoleRightOffset;
+
+
+
+        private System.Windows.Forms.Label lblMakeHolePitch;
+
+
+
+        private System.Windows.Forms.TextBox txtMakeHolePitch;
+
+
+
+        private System.Windows.Forms.Label lblRepairHoleType;
+
+
+
+        private System.Windows.Forms.ComboBox cboRepairHoleType;
+
+
+
+        private System.Windows.Forms.Label lblRepairHoleDiameter;
+
+
+
+        private System.Windows.Forms.ComboBox cboRepairHoleDiameter;
+
+
+
+        private ADDIN.UI.ModernButton btnDeleteMakeHoleSize;
+
+
+
+        private System.Windows.Forms.CheckBox chkMakeHolePaint;
+
+
+
+        private ADDIN.UI.ModernButton btnMakeHoleUpdate;
+
+
+
+        private ADDIN.UI.ModernButton btnMakeHoleAccept;
+
+
+
+        private ADDIN.UI.ModernButton btnMakeHolePattern;
+
+
+
+        private ADDIN.UI.ModernButton btnMakeHoleReset;
+
+
+
+        private ADDIN.UI.ModernButton btnPaintHoleSummary;
+
+
+
+        private ADDIN.UI.ModernTabControl tabModelPages;
+
+
+
+        private System.Windows.Forms.TabPage tabModelPropsPage;
+
+
+
+        private System.Windows.Forms.TabPage tabModelEditPage;
+
+
+
+        private System.Windows.Forms.TabPage tabModelMacroPage;
+
+
+
+        private ADDIN.UI.VCutBendAssignmentControl vCutBendAssignmentControl;
+
+
+
+        private ADDIN.UI.ModernButton btnVCutPropertySetup;
+
+
+
+        private System.Windows.Forms.Label lblCheckAssemblyHoleResult;
+
+
+
+        private ADDIN.UI.ModernButton btnCheckAssemblyHole;
+
+
+
+        private ADDIN.UI.ModernButton btnMirrorPart;
+
+
+
+        private ADDIN.UI.ModernButton btnEdgeToEqualSpline;
+
+
+
+        private ADDIN.UI.ModernButton btnRepair3DSpline;
+
+
+
+        private System.Windows.Forms.Panel panelModelProps;
+
+
+
+        private ADDIN.UI.ModernButton btnModelApplyProps;
+
+
+
+        private ADDIN.UI.ModernButton btnModelResetProps;
+
+
+
+        private ADDIN.UI.ModernButton btnModelUpdateProps;
+
+
+
+        private System.Windows.Forms.TextBox txtModelFinish;
+
+
+
+        private System.Windows.Forms.Label lblModelFinish;
+
+
+
+        private System.Windows.Forms.TextBox txtModelQty;
+
+
+
+        private System.Windows.Forms.Label lblModelQty;
+
+
+
+        private System.Windows.Forms.TextBox txtModelGoban;
+
+
+
+        private System.Windows.Forms.Label lblModelGoban;
+
+
+
+        private System.Windows.Forms.TextBox txtModelThickness;
+
+
+
+        private System.Windows.Forms.Label lblModelThickness;
+
+
+
+        private System.Windows.Forms.TextBox txtModelMaterial;
+
+
+
+        private System.Windows.Forms.Label lblModelMaterial;
+
+
+
+        private System.Windows.Forms.TextBox txtModelName;
+
+
+
+        private System.Windows.Forms.Label lblModelName;
+
+
+
+        private ADDIN.UI.ModernButton btnDimMatCat;
+
+
+
+        private ADDIN.UI.ModernButton btnSplineToArcs;
+
+
+
+        private ADDIN.UI.ModernButton btnRepairDim;
+
+
+
+        private ADDIN.UI.ModernButton btnVCutSection;
+
+
+
+        private System.Windows.Forms.Integration.ElementHost elementHostRepairHole;
+
+        private ADDIN.UI.ModernCard cardSheetMetal;
+
+        private ADDIN.UI.ModernCard cardAssemblyDrawing;
+
+        private System.Windows.Forms.Label lblBomBadge;
+
+        private System.Windows.Forms.Label lblBomCount;
+
+
+
+    }
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+

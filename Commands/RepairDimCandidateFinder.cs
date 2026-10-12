@@ -20,13 +20,13 @@ namespace ADDIN.Commands
             {
                 occurrenceName = comp.Name2 ?? "";
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             try
             {
                 modelPath = comp.GetPathName() ?? "";
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             occurrenceName = occurrenceName.Trim();
             modelPath = modelPath.Trim();
@@ -90,6 +90,7 @@ namespace ADDIN.Commands
                 else
                     geomInfo.ScaleRatio = $"{view.ScaleDecimal:F3}";
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch
             {
                 geomInfo.ScaleRatio = "<unavailable>";
@@ -101,6 +102,7 @@ namespace ADDIN.Commands
             {
                 scaleDecimal = view.ScaleDecimal;
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch
             {
                 scaleDecimal = 1.0;
@@ -120,7 +122,7 @@ namespace ADDIN.Commands
                     geomInfo.Outline = new double[] { o[0], o[1], o[2], o[3] };
                 }
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             // Enumerate Components in View
             if (!string.IsNullOrEmpty(vPrefix))
@@ -134,7 +136,7 @@ namespace ADDIN.Commands
                 object compsObj = view.GetVisibleComponents();
                 if (compsObj is object[] arr) comps = arr;
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             if (!string.IsNullOrEmpty(vPrefix))
             {
@@ -154,6 +156,7 @@ namespace ADDIN.Commands
 
                 foreach (object compObj in comps)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     Component2 comp = compObj as Component2;
                     if (comp == null) continue;
 
@@ -166,6 +169,7 @@ namespace ADDIN.Commands
                             geomInfo.VisibleEdgeCount += edgeArr.Length;
                             foreach (object edge in edgeArr)
                             {
+                                RepairDanglingDimensions.CheckRepairReadBudget();
                                 ExtractedEdgeInfo edgeInfo = RepairDimGeometry.ExtractEdgeGeometry(swApp, edge, comp, view, null, false);
                                 if (edgeInfo != null && !string.IsNullOrEmpty(edgeInfo.Signature))
                                 {
@@ -177,7 +181,7 @@ namespace ADDIN.Commands
                             }
                         }
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
 
                     // 2. Visible Silhouette Edges
                     try
@@ -188,6 +192,7 @@ namespace ADDIN.Commands
                             geomInfo.VisibleSilhouetteCount += silArr.Length;
                             foreach (object sil in silArr)
                             {
+                                RepairDanglingDimensions.CheckRepairReadBudget();
                                 ExtractedEdgeInfo edgeInfo = RepairDimGeometry.ExtractEdgeGeometry(swApp, sil, comp, view, null, true);
                                 if (edgeInfo != null && !string.IsNullOrEmpty(edgeInfo.Signature))
                                 {
@@ -199,7 +204,7 @@ namespace ADDIN.Commands
                             }
                         }
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
 
                     // 3. Vertices (for stats)
                     try
@@ -210,7 +215,7 @@ namespace ADDIN.Commands
                             geomInfo.VisibleVertexCount += vertArr.Length;
                         }
                     }
-                    catch {}
+                    catch (RepairDimReadLimitException) { throw; } catch {}
                 }
 
                 if (!string.IsNullOrEmpty(vPrefix))
@@ -237,6 +242,7 @@ namespace ADDIN.Commands
                         geomInfo.VisibleEdgeCount += edgeArr.Length;
                         foreach (object edge in edgeArr)
                         {
+                            RepairDanglingDimensions.CheckRepairReadBudget();
                             ExtractedEdgeInfo edgeInfo = RepairDimGeometry.ExtractEdgeGeometry(swApp, edge, null, view, null, false);
                             if (edgeInfo != null && !string.IsNullOrEmpty(edgeInfo.Signature))
                             {
@@ -248,7 +254,7 @@ namespace ADDIN.Commands
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
 
                 // 2. Silhouette Edges
                 try
@@ -259,6 +265,7 @@ namespace ADDIN.Commands
                         geomInfo.VisibleSilhouetteCount += silArr.Length;
                         foreach (object sil in silArr)
                         {
+                            RepairDanglingDimensions.CheckRepairReadBudget();
                             ExtractedEdgeInfo edgeInfo = RepairDimGeometry.ExtractEdgeGeometry(swApp, sil, null, view, null, true);
                             if (edgeInfo != null && !string.IsNullOrEmpty(edgeInfo.Signature))
                             {
@@ -270,7 +277,7 @@ namespace ADDIN.Commands
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
 
                 // 3. Vertices
                 try
@@ -281,7 +288,7 @@ namespace ADDIN.Commands
                         geomInfo.VisibleVertexCount += vertArr.Length;
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
 
                 if (!string.IsNullOrEmpty(vPrefix))
                 {
@@ -295,11 +302,13 @@ namespace ADDIN.Commands
                 geomInfo.Polylines = RepairDimGeometry.EnumerateDrawingPolylines(swApp, view, geomInfo, vPrefix);
                 foreach (var p in geomInfo.Polylines)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     if (p.ModelEntity is IEdge) geomInfo.MappedPolylineEdgeCount++;
                     else if (p.ModelEntity is ISilhouetteEdge) geomInfo.SilhouettePolylineCount++;
                     else geomInfo.UnmappedPolylineCount++;
                 }
             }
+            catch (RepairDimReadLimitException) { throw; }
             catch (Exception ex)
             {
                 geomInfo.PolylineApiStatus = "EXCEPTION: " + ex.GetType().FullName + " | " + ex.Message;
@@ -337,6 +346,7 @@ namespace ADDIN.Commands
                         int lCount = dd.GetLineCount();
                         for (int li = 0; li < lCount; li++)
                         {
+                            RepairDanglingDimensions.CheckRepairReadBudget();
                             object lObj = dd.GetLineAtIndex3(li);
                             if (lObj is double[] lArr && lArr.Length >= 10)
                             {
@@ -367,7 +377,7 @@ namespace ADDIN.Commands
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
             }
 
             dimInfo.DisplayLineSegments = displayLineSegments;
@@ -431,27 +441,27 @@ namespace ADDIN.Commands
             {
                 dc = anchorIEntity?.GetDrawingComponent(view);
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             Component2 anchorComp = null;
             if (dc != null)
             {
-                try { anchorComp = dc.Component; } catch {}
+                try { anchorComp = dc.Component; } catch (RepairDimReadLimitException) { throw; } catch {}
             }
             if (anchorComp == null && anchorIEntity != null)
             {
-                try { anchorComp = anchorIEntity.GetComponent() as Component2; } catch {}
+                try { anchorComp = anchorIEntity.GetComponent() as Component2; } catch (RepairDimReadLimitException) { throw; } catch {}
             }
 
             dimInfo.AnchorComponent = anchorComp;
             if (anchorComp != null)
             {
-                try { dimInfo.AnchorComponentName = anchorComp.Name2; } catch {}
-                try { dimInfo.AnchorComponentPath = anchorComp.GetPathName(); } catch {}
+                try { dimInfo.AnchorComponentName = anchorComp.Name2; } catch (RepairDimReadLimitException) { throw; } catch {}
+                try { dimInfo.AnchorComponentPath = anchorComp.GetPathName(); } catch (RepairDimReadLimitException) { throw; } catch {}
             }
             else if (dc != null)
             {
-                try { dimInfo.AnchorComponentName = dc.Name; } catch {}
+                try { dimInfo.AnchorComponentName = dc.Name; } catch (RepairDimReadLimitException) { throw; } catch {}
             }
 
             dimInfo.AnchorOccurrenceKey = GetComponentOccurrenceKey(dimInfo.AnchorComponent);
@@ -487,11 +497,13 @@ namespace ADDIN.Commands
             dimInfo.AnchorPolylineMatches = RepairDimGeometry.FindAnchorPolylineMatches(dimInfo, viewGeom.Polylines);
             foreach (var match in dimInfo.AnchorPolylineMatches)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (displayEndpoints.Count > 0 && match.SheetPoints != null && match.SheetPoints.Count > 0)
                 {
                     double minD = double.MaxValue;
                     foreach (var pt in match.SheetPoints)
                     {
+                        RepairDanglingDimensions.CheckRepairReadBudget();
                         double d = RepairDimGeometry.ComputeMinDistanceToPoints(pt, displayEndpoints);
                         if (d < minD) minD = d;
                     }
@@ -559,6 +571,7 @@ namespace ADDIN.Commands
             HashSet<int> anchorRecordIndices = new HashSet<int>();
             foreach (var m in dimInfo.AnchorPolylineMatches)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 anchorRecordIndices.Add(m.RawRecordIndex);
             }
 
@@ -588,6 +601,7 @@ namespace ADDIN.Commands
 
             foreach (DrawingPolylineEdgeInfo cand in viewGeom.RepairLineRecords)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (cand == null || cand.SheetStart == null || cand.SheetEnd == null)
                     continue;
 
@@ -831,6 +845,7 @@ namespace ADDIN.Commands
 
             for (int i = 0; i < candidateList.Count; i++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 candidateList[i].Rank = i + 1;
             }
 
@@ -851,6 +866,7 @@ namespace ADDIN.Commands
                 int nearCount = 0;
                 foreach (var cand in viewGeom.RepairLineRecords)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     if (cand == null || cand.SheetStart == null || cand.SheetEnd == null) continue;
                     double cMidX = (cand.SheetStart[0] + cand.SheetEnd[0]) * 0.5;
                     double cMidY = (cand.SheetStart[1] + cand.SheetEnd[1]) * 0.5;
@@ -960,6 +976,7 @@ namespace ADDIN.Commands
             // Side candidate search using 2D closest point on segment
             foreach (DrawingPolylineEdgeInfo cand in viewGeom.RepairLineRecords)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (cand == null || cand.SheetStart == null || cand.SheetEnd == null)
                     continue;
 
@@ -1082,8 +1099,10 @@ namespace ADDIN.Commands
             // Evaluate all Pair combinations with exhaustive diagnostics
             foreach (var s1 in side1List)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 foreach (var s2 in side2List)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     double sx = s2.AttachPoint[0] - s1.AttachPoint[0];
                     double sy = s2.AttachPoint[1] - s1.AttachPoint[1];
 
@@ -1228,9 +1247,11 @@ namespace ADDIN.Commands
             List<FullyLostPairCandidate> uniquePairs = new List<FullyLostPairCandidate>();
             foreach (var p in rawValidPairs)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 bool isDup = false;
                 for (int ui = 0; ui < uniquePairs.Count; ui++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     var existing = uniquePairs[ui];
                     bool matchDirect = (IsGeometricallyIdentical(existing.Side1.EdgeInfo, p.Side1.EdgeInfo) && IsGeometricallyIdentical(existing.Side2.EdgeInfo, p.Side2.EdgeInfo));
                     bool matchSwapped = (IsGeometricallyIdentical(existing.Side1.EdgeInfo, p.Side2.EdgeInfo) && IsGeometricallyIdentical(existing.Side2.EdgeInfo, p.Side1.EdgeInfo));
@@ -1273,6 +1294,7 @@ namespace ADDIN.Commands
 
             for (int r = 0; r < uniquePairs.Count; r++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 uniquePairs[r].Rank = r + 1;
             }
 
@@ -1401,6 +1423,7 @@ namespace ADDIN.Commands
 
             foreach (DrawingPolylineEdgeInfo cand in viewGeom.RepairLineRecords)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (cand == null || cand.SheetStart == null || cand.SheetEnd == null || cand.ModelEntity == null)
                     continue;
 
@@ -1486,9 +1509,11 @@ namespace ADDIN.Commands
             List<PointAnchorProbeCandidate> physical = new List<PointAnchorProbeCandidate>();
             foreach (var c in discovered)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 bool isDup = false;
                 for (int pi = 0; pi < physical.Count; pi++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     var ex = physical[pi];
                     if (IsGeometricallyIdentical(ex.EdgeInfo, c.EdgeInfo))
                     {
@@ -1507,6 +1532,7 @@ namespace ADDIN.Commands
             physical.Sort((a, b) => a.MinProximityMm.CompareTo(b.MinProximityMm));
             for (int i = 0; i < physical.Count; i++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 physical[i].CandidateIndex = i + 1;
             }
 
@@ -1593,6 +1619,7 @@ namespace ADDIN.Commands
             // 5. Search Missing Counterpart in viewGeom.RepairLineRecords (Route C)
             foreach (DrawingPolylineEdgeInfo cand in viewGeom.RepairLineRecords)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 if (cand == null || cand.SheetStart == null || cand.SheetEnd == null || cand.ModelEntity == null)
                     continue;
 
@@ -1728,9 +1755,11 @@ namespace ADDIN.Commands
             List<PointAnchorEdgeCandidate> uniqueCandidates = new List<PointAnchorEdgeCandidate>();
             foreach (var c in rawCandidates)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 bool isDup = false;
                 for (int ui = 0; ui < uniqueCandidates.Count; ui++)
                 {
+                    RepairDanglingDimensions.CheckRepairReadBudget();
                     var ex = uniqueCandidates[ui];
                     if (IsGeometricallyIdentical(ex.EdgeInfo, c.EdgeInfo))
                     {
@@ -1759,6 +1788,7 @@ namespace ADDIN.Commands
 
             for (int r = 0; r < uniqueCandidates.Count; r++)
             {
+                RepairDanglingDimensions.CheckRepairReadBudget();
                 uniqueCandidates[r].Rank = r + 1;
             }
 

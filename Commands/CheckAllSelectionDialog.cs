@@ -8,6 +8,7 @@ namespace ADDIN.Commands
         public CheckAllSelectionDialog()
         {
             InitializeComponent();
+            UI.TaiDialog.Apply(this, btnRun);
             UpdateSelectionState();
         }
 
@@ -24,7 +25,7 @@ namespace ADDIN.Commands
             if (chkUraOmote.Checked) selectedCount++;
             if (chkKegaki.Checked) selectedCount++;
 
-            lblSelectionCount.Text = "Da chon " + selectedCount + "/2 lenh";
+            lblSelectionCount.Text = "Đã chọn " + selectedCount + "/2 lệnh";
             btnRun.Enabled = selectedCount > 0;
         }
 

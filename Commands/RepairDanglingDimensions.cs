@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -12,7 +12,7 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    public static class RepairDanglingDimensions
+    public static partial class RepairDanglingDimensions
     {
         private const string REPAIR_DIM_BUILD = "STEP21_FULL_HOLE_AND_CIRCLE_DIMENSION_REPAIR_20260906";
 
@@ -40,6 +40,7 @@ namespace ADDIN.Commands
 
         private sealed class BatchTargetSnapshot
         {
+            public bool ExactIdentityOnly { get; set; }
             public int TargetIndex { get; set; }
             public string SheetName { get; set; }
             public string ViewName { get; set; }
@@ -168,10 +169,7 @@ namespace ADDIN.Commands
                 foreach (string sheetName in sheetNames)
                 {
                     swDrawing.ActivateSheet(sheetName);
-                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                    SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-                    while (currentView != null)
+                    foreach (var currentView in ReadCurrentRepairViews(swDrawing))
                     {
                         vIdx++;
                         string cViewName = "";
@@ -183,8 +181,7 @@ namespace ADDIN.Commands
                         int viewDisplayCount = 0;
                         int viewDanglingCount = 0;
 
-                        DisplayDimension dd = currentView.GetFirstDisplayDimension5() as DisplayDimension;
-                        while (dd != null)
+                        foreach (var dd in ReadRepairDimensions(currentView))
                         {
                             viewDisplayCount++;
                             Annotation a = dd.GetAnnotation() as Annotation;
@@ -192,7 +189,6 @@ namespace ADDIN.Commands
                             {
                                 viewDanglingCount++;
                             }
-                            dd = dd.GetNext5() as DisplayDimension;
                         }
 
                         totalPass1Display += viewDisplayCount;
@@ -222,7 +218,6 @@ namespace ADDIN.Commands
                             LogDebug($"  GEOMETRY_SCAN_SKIPPED_NO_DANGLING (View '{cViewName}')");
                         }
 
-                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
                     }
                 }
             }
@@ -359,24 +354,19 @@ namespace ADDIN.Commands
                 try
                 {
                     swDrawing.ActivateSheet(disc.SheetName);
-                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                    SolidWorks.Interop.sldworks.View cView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-                    while (cView != null)
+                    foreach (var cView in ReadCurrentRepairViews(swDrawing))
                     {
                         if (string.Equals(cView.GetName2() ?? "", disc.ViewName, StringComparison.OrdinalIgnoreCase))
                         {
                             int dCount = 0;
-                            DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
-                            while (dd != null)
+                            foreach (var dd in ReadRepairDimensions(cView))
                             {
                                 Annotation a = dd.GetAnnotation() as Annotation;
                                 if (a != null && a.IsDangling()) dCount++;
-                                dd = dd.GetNext5() as DisplayDimension;
                             }
                             disc.DanglingDimCount = dCount;
                             break;
                         }
-                        cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
                     }
                 }
                 catch {}
@@ -426,11 +416,8 @@ namespace ADDIN.Commands
                     LogDebug($"\n=== PASS2 TARGET VIEW START: '{targetDisc.ViewName}' (Sheet: '{targetDisc.SheetName}', Dangling: {targetDisc.DanglingDimCount}) ===");
 
                     swDrawing.ActivateSheet(targetDisc.SheetName);
-                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                    SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
                     SolidWorks.Interop.sldworks.View targetView = null;
-                    while (currentView != null)
+                    foreach (var currentView in ReadCurrentRepairViews(swDrawing))
                     {
                         string vName = currentView.GetName2() ?? "";
                         if (string.Equals(vName, targetDisc.ViewName, StringComparison.OrdinalIgnoreCase))
@@ -438,7 +425,6 @@ namespace ADDIN.Commands
                             targetView = currentView;
                             break;
                         }
-                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
                     }
 
                     if (targetView == null)
@@ -488,7 +474,7 @@ namespace ADDIN.Commands
                     bool viewModelResolved = (viewRefExists || refDocExists || refDoc != null) ||
                                              (string.IsNullOrEmpty(viewRefModelName) || !IsValidSolidWorksFilePath(viewRefModelName));
 
-                    ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, targetView, vPrefix);
+                    ViewGeometryInfo viewGeom = GetRepairViewGeometry(swApp, targetView, vPrefix);
 
                     LogDebug($"\n--------------------------------------------------");
                     LogDebug($"VIEW: {viewGeom.ViewName} (Type: {viewGeom.ViewTypeString})");
@@ -502,8 +488,7 @@ namespace ADDIN.Commands
                     LogDebug($"  Repair Line Records    : {viewGeom.RepairLineRecords.Count}");
                     LogDebug($"--------------------------------------------------");
 
-                    DisplayDimension dispDim = targetView.GetFirstDisplayDimension5() as DisplayDimension;
-                    while (dispDim != null)
+                    foreach (var dispDim in ReadRepairDimensions(targetView))
                     {
                         Annotation annot = dispDim.GetAnnotation() as Annotation;
                         bool isDangling = (annot != null) && annot.IsDangling();
@@ -555,7 +540,6 @@ namespace ADDIN.Commands
                             }
                         }
 
-                        dispDim = dispDim.GetNext5() as DisplayDimension;
                     }
                 }
             }
@@ -666,24 +650,18 @@ namespace ADDIN.Commands
                     foreach (string sheetName in sheetNames)
                     {
                         swDrawing.ActivateSheet(sheetName);
-                        SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                        SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-                        while (currentView != null)
+                        foreach (var currentView in ReadCurrentRepairViews(swDrawing))
                         {
                             int viewDanglingCount = 0;
-                            DisplayDimension testDd = currentView.GetFirstDisplayDimension5() as DisplayDimension;
-                            while (testDd != null)
+                            foreach (var testDd in ReadRepairDimensions(currentView))
                             {
                                 Annotation a = testDd.GetAnnotation() as Annotation;
                                 if (a != null && a.IsDangling()) viewDanglingCount++;
-                                testDd = testDd.GetNext5() as DisplayDimension;
                             }
 
                             if (viewDanglingCount == 0)
                             {
                                 LogDebug($"GEOMETRY_SCAN_SKIPPED_NO_DANGLING (Phase 3 View '{currentView.GetName2() ?? ""}')");
-                                currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
                                 continue;
                             }
 
@@ -695,10 +673,9 @@ namespace ADDIN.Commands
                                 try { viewModelResolved = File.Exists(viewRefModelName); } catch { viewModelResolved = false; }
                             }
 
-                            ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, currentView);
+                            ViewGeometryInfo viewGeom = GetRepairViewGeometry(swApp, currentView);
 
-                            DisplayDimension dispDim = currentView.GetFirstDisplayDimension5() as DisplayDimension;
-                            while (dispDim != null)
+                            foreach (var dispDim in ReadRepairDimensions(currentView))
                             {
                                 Annotation annot = dispDim.GetAnnotation() as Annotation;
                                 if (annot != null && annot.IsDangling())
@@ -739,9 +716,7 @@ namespace ADDIN.Commands
                                         });
                                     }
                                 }
-                                dispDim = dispDim.GetNext5() as DisplayDimension;
                             }
-                            currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
                         }
                     }
                 }
@@ -819,24 +794,18 @@ namespace ADDIN.Commands
                     foreach (string sName in sheetNames)
                     {
                         swDrawing.ActivateSheet(sName);
-                        SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                        SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-                        while (cView != null)
+                        foreach (var cView in ReadCurrentRepairViews(swDrawing))
                         {
                             int viewDanglingCount = 0;
-                            DisplayDimension testDd = cView.GetFirstDisplayDimension5() as DisplayDimension;
-                            while (testDd != null)
+                            foreach (var testDd in ReadRepairDimensions(cView))
                             {
                                 Annotation a = testDd.GetAnnotation() as Annotation;
                                 if (a != null && a.IsDangling()) viewDanglingCount++;
-                                testDd = testDd.GetNext5() as DisplayDimension;
                             }
 
                             if (viewDanglingCount == 0)
                             {
                                 LogDebug($"GEOMETRY_SCAN_SKIPPED_NO_DANGLING (Phase 4 View '{cView.GetName2() ?? ""}')");
-                                cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
                                 continue;
                             }
 
@@ -848,9 +817,8 @@ namespace ADDIN.Commands
                                 try { vResolved = File.Exists(vModel); } catch { vResolved = false; }
                             }
 
-                            ViewGeometryInfo vGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, cView);
-                            DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
-                            while (dd != null)
+                            ViewGeometryInfo vGeom = GetRepairViewGeometry(swApp, cView);
+                            foreach (var dd in ReadRepairDimensions(cView))
                             {
                                 Annotation a = dd.GetAnnotation() as Annotation;
                                 if (a != null && a.IsDangling())
@@ -888,9 +856,7 @@ namespace ADDIN.Commands
                                         });
                                     }
                                 }
-                                dd = dd.GetNext5() as DisplayDimension;
                             }
-                            cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
                         }
                     }
                 }
@@ -998,14 +964,10 @@ namespace ADDIN.Commands
                     foreach (string sName in sheetNames)
                     {
                         swDrawing.ActivateSheet(sName);
-                        SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                        SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-                        while (cView != null)
+                        foreach (var cView in ReadCurrentRepairViews(swDrawing))
                         {
-                            DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
                             List<DisplayDimension> danglingInView = new List<DisplayDimension>();
-                            while (dd != null)
+                            foreach (var dd in ReadRepairDimensions(cView))
                             {
                                 finalTotalDisplay++;
                                 Annotation a = dd.GetAnnotation() as Annotation;
@@ -1014,7 +976,6 @@ namespace ADDIN.Commands
                                     finalTotalDangling++;
                                     danglingInView.Add(dd);
                                 }
-                                dd = dd.GetNext5() as DisplayDimension;
                             }
 
                             if (danglingInView.Count > 0)
@@ -1027,7 +988,7 @@ namespace ADDIN.Commands
                                     try { vResolved = File.Exists(vModel); } catch { vResolved = false; }
                                 }
 
-                                ViewGeometryInfo vGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, cView);
+                                ViewGeometryInfo vGeom = GetRepairViewGeometry(swApp, cView);
                                 foreach (var dDim in danglingInView)
                                 {
                                     Annotation a = dDim.GetAnnotation() as Annotation;
@@ -1066,7 +1027,6 @@ namespace ADDIN.Commands
                                 LogDebug($"GEOMETRY_SCAN_SKIPPED_NO_DANGLING (Phase 5 View '{cView.GetName2() ?? ""}')");
                             }
 
-                            cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
                         }
                     }
                 }
@@ -1168,25 +1128,22 @@ namespace ADDIN.Commands
             sbLog.AppendLine($"Old Value: {(target.SystemValue.HasValue ? $"{target.SystemValue.Value * 1000.0:F6} mm" : "<null>")}");
             sbLog.AppendLine($"Dimension Type: {target.DimensionType}");
 
-            try { swDrawing.ActivateSheet(target.SheetName); } catch {}
+            ActivateRepairSheet(swDrawing, target.SheetName);
 
             SolidWorks.Interop.sldworks.View targetView = null;
             DisplayDimension targetDispDim = null;
             Annotation targetAnnot = null;
 
-            SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-            SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-            while (cView != null)
+            foreach (var cView in ReadCurrentRepairViews(swDrawing))
             {
                 string vName = cView.GetName2() ?? "";
-                if (vName.Equals(target.ViewName, StringComparison.OrdinalIgnoreCase) ||
+                if (target.ExactIdentityOnly ? string.Equals(vName, target.ViewName, StringComparison.Ordinal) :
+                    (vName.Equals(target.ViewName, StringComparison.OrdinalIgnoreCase) ||
                     vName.IndexOf(target.ViewName, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    target.ViewName.IndexOf(vName, StringComparison.OrdinalIgnoreCase) >= 0)
+                    target.ViewName.IndexOf(vName, StringComparison.OrdinalIgnoreCase) >= 0))
                 {
                     targetView = cView;
-                    DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
-                    while (dd != null)
+                    foreach (var dd in ReadRepairDimensions(cView))
                     {
                         Annotation a = dd.GetAnnotation() as Annotation;
                         if (a != null && a.IsDangling())
@@ -1199,6 +1156,8 @@ namespace ADDIN.Commands
                                              (!string.IsNullOrEmpty(target.DimensionName) && !string.IsNullOrEmpty(aName) && aName.Equals(target.DimensionName, StringComparison.OrdinalIgnoreCase)) ||
                                              (!string.IsNullOrEmpty(target.DimensionName) && !string.IsNullOrEmpty(dFull) && dFull.IndexOf(target.DimensionName, StringComparison.OrdinalIgnoreCase) >= 0);
 
+                            if (target.ExactIdentityOnly)
+                                nameMatch = NativeIdentityMatches(vName, dFull, aName, target.ViewName, target.OldDimFullName, target.DimensionName);
                             if (nameMatch)
                             {
                                 targetDispDim = dd;
@@ -1206,11 +1165,9 @@ namespace ADDIN.Commands
                                 break;
                             }
                         }
-                        dd = dd.GetNext5() as DisplayDimension;
                     }
                     if (targetDispDim != null) break;
                 }
-                cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
             }
 
             if (targetView == null || targetDispDim == null || targetAnnot == null)
@@ -1222,7 +1179,7 @@ namespace ADDIN.Commands
             }
 
             DanglingDimensionInfo info = ExtractDanglingInfo(target.SheetName, target.ViewName, targetDispDim, targetAnnot);
-            ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, targetView);
+            ViewGeometryInfo viewGeom = GetRepairViewGeometry(swApp, targetView);
             RepairDimCandidateFinder.AnalyzeCandidatesForDimension(swApp, info, viewGeom, targetView, targetDispDim);
             ClassifyFailureMode(info, viewGeom, true, targetView.GetReferencedModelName() ?? "");
 
@@ -1790,7 +1747,7 @@ namespace ADDIN.Commands
             }
             catch {}
 
-            DisplayWitnessProfile newWitnessProfile = RepairDimGeometry.BuildDisplayWitnessProfile(newDisplayLines, newPosAfterMove);
+            DisplayWitnessProfile newWitnessProfile = RepairDimGeometry.BuildDisplayWitnessProfile(newDisplayLines, newPosAfterMove, false);
 
             double w1DeltaMm = 999.0;
             double w2DeltaMm = 999.0;
@@ -2014,25 +1971,23 @@ namespace ADDIN.Commands
             sbLog.AppendLine($"Old Value: {(target.SystemValue.HasValue ? $"{target.SystemValue.Value * 1000.0:F6} mm" : "<null>")}");
             sbLog.AppendLine($"Dimension Type: {target.DimensionType}");
 
-            try { swDrawing.ActivateSheet(target.SheetName); } catch {}
+            ActivateRepairSheet(swDrawing, target.SheetName);
 
             SolidWorks.Interop.sldworks.View targetView = null;
             DisplayDimension targetDispDim = null;
             Annotation targetAnnot = null;
 
-            SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-            SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-            while (cView != null && targetDispDim == null)
+            foreach (var cView in ReadCurrentRepairViews(swDrawing))
             {
+                if (targetDispDim != null) break;
                 string vName = cView.GetName2() ?? "";
-                if (vName.Equals(target.ViewName, StringComparison.OrdinalIgnoreCase) ||
+                if (target.ExactIdentityOnly ? string.Equals(vName, target.ViewName, StringComparison.Ordinal) :
+                    (vName.Equals(target.ViewName, StringComparison.OrdinalIgnoreCase) ||
                     vName.IndexOf(target.ViewName, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    target.ViewName.IndexOf(vName, StringComparison.OrdinalIgnoreCase) >= 0)
+                    target.ViewName.IndexOf(vName, StringComparison.OrdinalIgnoreCase) >= 0))
                 {
                     targetView = cView;
-                    DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
-                    while (dd != null)
+                    foreach (var dd in ReadRepairDimensions(cView))
                     {
                         Annotation a = dd.GetAnnotation() as Annotation;
                         if (a != null && a.IsDangling())
@@ -2045,6 +2000,8 @@ namespace ADDIN.Commands
                                              (!string.IsNullOrEmpty(target.DimensionName) && !string.IsNullOrEmpty(aName) && aName.Equals(target.DimensionName, StringComparison.OrdinalIgnoreCase)) ||
                                              (!string.IsNullOrEmpty(target.DimensionName) && !string.IsNullOrEmpty(dFull) && dFull.IndexOf(target.DimensionName, StringComparison.OrdinalIgnoreCase) >= 0);
 
+                            if (target.ExactIdentityOnly)
+                                nameMatch = NativeIdentityMatches(vName, dFull, aName, target.ViewName, target.OldDimFullName, target.DimensionName);
                             if (nameMatch)
                             {
                                 targetDispDim = dd;
@@ -2052,10 +2009,8 @@ namespace ADDIN.Commands
                                 break;
                             }
                         }
-                        dd = dd.GetNext5() as DisplayDimension;
                     }
                 }
-                cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
             }
 
             if (targetDispDim == null || targetAnnot == null || targetView == null)
@@ -2068,7 +2023,7 @@ namespace ADDIN.Commands
 
             sbLog.AppendLine("STEP13 A TARGET_REACQUIRED");
 
-            ViewGeometryInfo viewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, targetView);
+            ViewGeometryInfo viewGeom = GetRepairViewGeometry(swApp, targetView);
             DanglingDimensionInfo info = ExtractDanglingInfo(target.SheetName, target.ViewName, targetDispDim, targetAnnot);
 
             bool isPointAnchor = IsSketchPointSelectionType(info.AnchorEntityType) &&
@@ -2324,6 +2279,9 @@ namespace ADDIN.Commands
 
             for (int pi = 0; pi < probeDecision.PhysicalProbeCandidates.Count; pi++)
             {
+                // Previous trial has already been cleaned up. Stop before creating another DIM.
+                if (!RepairTrialsCanContinue())
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "PROBE_TIME_LIMIT" };
                 var cand = probeDecision.PhysicalProbeCandidates[pi];
                 probesAttempted++;
 
@@ -2510,7 +2468,7 @@ namespace ADDIN.Commands
                 }
                 catch {}
 
-                DisplayWitnessProfile provWitnessProfile = RepairDimGeometry.BuildDisplayWitnessProfile(provDisplayLines, provPos ?? oldPos);
+                DisplayWitnessProfile provWitnessProfile = RepairDimGeometry.BuildDisplayWitnessProfile(provDisplayLines, provPos ?? oldPos, false);
                 bool witnessPairMatch = false;
                 double w1DeltaMm = double.MaxValue, w2DeltaMm = double.MaxValue;
 
@@ -2900,7 +2858,7 @@ namespace ADDIN.Commands
             }
             catch {}
 
-            DisplayWitnessProfile newProfile = RepairDimGeometry.BuildDisplayWitnessProfile(newDisplayLines, newPos ?? oldPos);
+            DisplayWitnessProfile newProfile = RepairDimGeometry.BuildDisplayWitnessProfile(newDisplayLines, newPos ?? oldPos, false);
             bool finalWitnessPairMatch = false;
             double finalW1DeltaMm = double.MaxValue, finalW2DeltaMm = double.MaxValue;
 
@@ -3050,25 +3008,22 @@ namespace ADDIN.Commands
         {
             string tPrefix = $"BATCH T{targetNum:D2}";
 
-            try { swDrawing.ActivateSheet(target.SheetName); } catch {}
+            ActivateRepairSheet(swDrawing, target.SheetName);
 
             SolidWorks.Interop.sldworks.View targetView = null;
             DisplayDimension targetDispDim = null;
             Annotation targetAnnot = null;
 
-            SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-            SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-            while (cView != null)
+            foreach (var cView in ReadCurrentRepairViews(swDrawing))
             {
                 string vName = cView.GetName2() ?? "";
-                if (vName.Equals(target.ViewName, StringComparison.OrdinalIgnoreCase) ||
+                if (target.ExactIdentityOnly ? string.Equals(vName, target.ViewName, StringComparison.Ordinal) :
+                    (vName.Equals(target.ViewName, StringComparison.OrdinalIgnoreCase) ||
                     vName.IndexOf(target.ViewName, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    target.ViewName.IndexOf(vName, StringComparison.OrdinalIgnoreCase) >= 0)
+                    target.ViewName.IndexOf(vName, StringComparison.OrdinalIgnoreCase) >= 0))
                 {
                     targetView = cView;
-                    DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
-                    while (dd != null)
+                    foreach (var dd in ReadRepairDimensions(cView))
                     {
                         Annotation a = dd.GetAnnotation() as Annotation;
                         if (a != null && a.IsDangling())
@@ -3091,6 +3046,8 @@ namespace ADDIN.Commands
                                 nameMatch = true;
                             }
 
+                            if (target.ExactIdentityOnly)
+                                nameMatch = NativeIdentityMatches(vName, dFull, aName, target.ViewName, target.OldDimFullName, target.DimensionName);
                             if (nameMatch)
                             {
                                 targetDispDim = dd;
@@ -3098,11 +3055,9 @@ namespace ADDIN.Commands
                                 break;
                             }
                         }
-                        dd = dd.GetNext5() as DisplayDimension;
                     }
                     if (targetDispDim != null) break;
                 }
-                cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
             }
 
             if (targetView == null || targetDispDim == null || targetAnnot == null)
@@ -3129,7 +3084,7 @@ namespace ADDIN.Commands
 
             LogDebug($"{tPrefix} B CLASSIFIER_VERIFIED");
 
-            ViewGeometryInfo freshViewGeom = RepairDimCandidateFinder.EnumerateViewGeometry(swApp, targetView);
+            ViewGeometryInfo freshViewGeom = GetRepairViewGeometry(swApp, targetView);
             DanglingDimensionInfo freshInfo = ExtractDanglingInfo(target.SheetName, target.ViewName, targetDispDim, targetAnnot);
             RepairDimCandidateFinder.AnalyzeCandidatesForDimension(swApp, freshInfo, freshViewGeom, targetView, targetDispDim);
             ClassifyFailureMode(freshInfo, freshViewGeom, viewModelResolved, viewRefModelName);
@@ -4051,18 +4006,14 @@ namespace ADDIN.Commands
                 foreach (var disc in targetViews)
                 {
                     try { swDrawing.ActivateSheet(disc.SheetName); } catch {}
-                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                    SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-                    while (currentView != null)
+                    foreach (var currentView in ReadCurrentRepairViews(swDrawing))
                     {
                         string vName = currentView.GetName2() ?? "";
                         if (string.Equals(vName, disc.ViewName, StringComparison.OrdinalIgnoreCase))
                         {
                             try { swDrawing.ActivateView(vName); } catch {}
 
-                            DisplayDimension dd = currentView.GetFirstDisplayDimension5() as DisplayDimension;
-                            while (dd != null)
+                            foreach (var dd in ReadRepairDimensions(currentView))
                             {
                                 Annotation a = dd.GetAnnotation() as Annotation;
                                 if (a != null && a.IsDangling())
@@ -4099,10 +4050,8 @@ namespace ADDIN.Commands
                                         }
                                     }
                                 }
-                                dd = dd.GetNext5() as DisplayDimension;
                             }
                         }
-                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
                     }
                 }
             }
@@ -4140,10 +4089,7 @@ namespace ADDIN.Commands
                 foreach (var disc in targetViews)
                 {
                     try { swDrawing.ActivateSheet(disc.SheetName); } catch {}
-                    SolidWorks.Interop.sldworks.View sheetView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                    SolidWorks.Interop.sldworks.View currentView = sheetView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-                    while (currentView != null)
+                    foreach (var currentView in ReadCurrentRepairViews(swDrawing))
                     {
                         string vName = currentView.GetName2() ?? "";
                         if (string.Equals(vName, disc.ViewName, StringComparison.OrdinalIgnoreCase))
@@ -4167,15 +4113,13 @@ namespace ADDIN.Commands
 
                             // Collect all dangling dimensions in this view
                             List<DisplayDimension> candidateDims = new List<DisplayDimension>();
-                            DisplayDimension dd = currentView.GetFirstDisplayDimension5() as DisplayDimension;
-                            while (dd != null)
+                            foreach (var dd in ReadRepairDimensions(currentView))
                             {
                                 Annotation a = dd.GetAnnotation() as Annotation;
                                 if (a != null && a.IsDangling())
                                 {
                                     candidateDims.Add(dd);
                                 }
-                                dd = dd.GetNext5() as DisplayDimension;
                             }
 
                             LogDebug($"  View '{vName}': Found {candidateDims.Count} dangling dimension(s).");
@@ -4280,7 +4224,6 @@ namespace ADDIN.Commands
                         }
 
                         if (runningDanglingCount == 0) break;
-                        currentView = currentView.GetNextView() as SolidWorks.Interop.sldworks.View;
                     }
 
                     if (runningDanglingCount == 0) break;
@@ -4521,7 +4464,8 @@ namespace ADDIN.Commands
             if (newDangling || newAttached < 1 || !valMatch)
             {
                 LogDebug($"New dim verification failed: Dangling={newDangling}, Attached={newAttached}, ValMatch={valMatch} (Old={oldSysVal * 1000.0:F3}mm, New={newSysVal * 1000.0:F3}mm, Delta={deltaValMm:F3}mm)");
-                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_VERIFY_FAILED");
+                if (!DeleteProvisionalDimension(swModel, newDisp, "PASS0C_VERIFY_FAILED"))
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                 swModel.ClearSelection2(true);
                 string failReason = newDangling ? "NEW_DIM_DANGLING" : (newAttached < 1 ? "NEW_ATTACHED_EMPTY" : "VALUE_MISMATCH");
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = failReason };
@@ -4534,7 +4478,8 @@ namespace ADDIN.Commands
                 if (newIsVertAttached.HasValue && newIsVertAttached.Value != targetIsVertAttached.Value)
                 {
                     LogDebug($"Pass 0C verification failed: Orientation mismatch (Target vertical={targetIsVertAttached.Value}, New vertical={newIsVertAttached.Value})");
-                    DeleteProvisionalDimension(swModel, newDisp, "PASS0C_ORIENTATION_MISMATCH");
+                    if (!DeleteProvisionalDimension(swModel, newDisp, "PASS0C_ORIENTATION_MISMATCH"))
+                        return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                     swModel.ClearSelection2(true);
                     return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "ORIENTATION_MISMATCH" };
                 }
@@ -4567,7 +4512,8 @@ namespace ADDIN.Commands
             if (!selectOk)
             {
                 LogDebug($"Safe delete selection failed for '{oldDimFullName}'. Cleaning up new dim.");
-                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SAFE_DELETE_SELECTION_FAILED");
+                if (!DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SAFE_DELETE_SELECTION_FAILED"))
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "SAFE_DELETE_SELECTION_FAILED" };
             }
@@ -4579,7 +4525,8 @@ namespace ADDIN.Commands
             if (!deleteResult)
             {
                 LogDebug($"DeleteSelection2 returned false for '{oldDimFullName}'. Cleaning up new dim.");
-                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_DELETE_RETURNED_FALSE");
+                if (!DeleteProvisionalDimension(swModel, newDisp, "PASS0C_DELETE_RETURNED_FALSE"))
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DELETE_RETURNED_FALSE" };
             }
 
@@ -4791,10 +4738,11 @@ namespace ADDIN.Commands
                 SolidWorks.Interop.sldworks.View baseV = view.GetBaseView() as SolidWorks.Interop.sldworks.View;
                 if (baseV != null) viewsToCheck.Add(baseV);
             }
-            catch {}
+            catch (RepairDimReadLimitException) { throw; } catch {}
 
             for (int vIdx = 0; vIdx < viewsToCheck.Count; vIdx++)
             {
+                CheckRepairReadBudget();
                 var v = viewsToCheck[vIdx];
                 bool isDirectView = (vIdx == 0);
 
@@ -4806,6 +4754,7 @@ namespace ADDIN.Commands
                     {
                         foreach (object bl in blArr)
                         {
+                            CheckRepairReadBudget();
                             if (bl is ISketchSegment seg)
                             {
                                 double[] midS = null;
@@ -4841,26 +4790,28 @@ namespace ADDIN.Commands
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
 
                 // 2. Visible Edges
                 List<IEdge> viewEdges = new List<IEdge>();
                 try
                 {
                     object[] comps = null;
-                    try { comps = v.GetVisibleComponents() as object[]; } catch {}
+                    try { comps = v.GetVisibleComponents() as object[]; } catch (RepairDimReadLimitException) { throw; } catch {}
                     if (comps != null && comps.Length > 0)
                     {
                         foreach (object cObj in comps)
                         {
+                            CheckRepairReadBudget();
                             if (cObj is Component2 comp)
                             {
                                 object[] edges = null;
-                                try { edges = v.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_Edge) as object[]; } catch {}
+                                try { edges = v.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_Edge) as object[]; } catch (RepairDimReadLimitException) { throw; } catch {}
                                 if (edges != null)
                                 {
                                     foreach (object eObj in edges)
                                     {
+                                        CheckRepairReadBudget();
                                         if (eObj is IEdge edge && !viewEdges.Contains(edge)) viewEdges.Add(edge);
                                     }
                                 }
@@ -4870,20 +4821,22 @@ namespace ADDIN.Commands
                     else
                     {
                         object[] edges = null;
-                        try { edges = v.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Edge) as object[]; } catch {}
+                        try { edges = v.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Edge) as object[]; } catch (RepairDimReadLimitException) { throw; } catch {}
                         if (edges != null)
                         {
                             foreach (object eObj in edges)
                             {
+                                CheckRepairReadBudget();
                                 if (eObj is IEdge edge && !viewEdges.Contains(edge)) viewEdges.Add(edge);
                             }
                         }
                     }
                 }
-                catch {}
+                catch (RepairDimReadLimitException) { throw; } catch {}
 
                 foreach (var edge in viewEdges)
                 {
+                    CheckRepairReadBudget();
                     double[] midS = null;
                     double[] midM = null;
                     double[] sS = null;
@@ -5065,7 +5018,7 @@ namespace ADDIN.Commands
             foreach (var pair in pairs)
             {
                 triedCount++;
-                if (triedCount > 200) break; // Limit search to top 200 pairs to ensure responsiveness
+                if (triedCount > 200 || !RepairTrialsCanContinue()) break; // Limit search to top 200 pairs to ensure responsiveness
 
                 swModel.ClearSelection2(true);
                 bool s1 = SelectEntityInView(selMgr, swModel, swApp, currentView, pair.Ent1, false);
@@ -5150,7 +5103,8 @@ namespace ADDIN.Commands
                     {
                         LogDebug($"  [Trial #{triedCount}] Failed: Dangling={newDangling}, Attached={newAttached}, Val={(newSysVal.HasValue ? (newSysVal.Value * 1000.0).ToString("F3") : "null")}mm (Target={targetMm:F3}mm, Delta={(newSysVal.HasValue ? deltaValMm.ToString("F3") : "N/A")}mm)");
                     }
-                    DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_VERIFY_FAILED");
+                    if (!DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_VERIFY_FAILED"))
+                        return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                     swModel.ClearSelection2(true);
                     continue;
                 }
@@ -5164,7 +5118,8 @@ namespace ADDIN.Commands
                         {
                             LogDebug($"  [Trial #{triedCount}] Rejected: Orientation mismatch (Target vertical={targetIsVertical.Value}, New vertical={newIsVert.Value})");
                         }
-                        DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_ORIENTATION_MISMATCH");
+                        if (!DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_ORIENTATION_MISMATCH"))
+                            return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                         swModel.ClearSelection2(true);
                         continue;
                     }
@@ -5199,7 +5154,8 @@ namespace ADDIN.Commands
                 if (!selectOk)
                 {
                     LogDebug($"Safe delete selection failed for '{oldDimFullName}'. Cleaning up new dim.");
-                    DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_SAFE_DELETE_SELECTION_FAILED");
+                    if (!DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_SAFE_DELETE_SELECTION_FAILED"))
+                        return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                     swModel.ClearSelection2(true);
                     continue;
                 }
@@ -5211,7 +5167,8 @@ namespace ADDIN.Commands
                 if (!deleteResult)
                 {
                     LogDebug($"DeleteSelection2 returned false for '{oldDimFullName}'. Cleaning up new dim.");
-                    DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_DELETE_RETURNED_FALSE");
+                    if (!DeleteProvisionalDimension(swModel, newDisp, "CANDIDATE_PAIR_DELETE_RETURNED_FALSE"))
+                        return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                     continue;
                 }
 
@@ -5338,7 +5295,8 @@ namespace ADDIN.Commands
 
             if (newDangling || newAttached < 1 || !valMatch)
             {
-                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_VERIFY_FAILED");
+                if (!DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_VERIFY_FAILED"))
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "ATTACHED_SINGLE_VERIFY_FAILED" };
             }
@@ -5368,7 +5326,8 @@ namespace ADDIN.Commands
 
             if (!selectOk)
             {
-                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_SAFE_DELETE_SELECTION_FAILED");
+                if (!DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_SAFE_DELETE_SELECTION_FAILED"))
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                 swModel.ClearSelection2(true);
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "SAFE_DELETE_SELECTION_FAILED" };
             }
@@ -5379,7 +5338,8 @@ namespace ADDIN.Commands
 
             if (!deleteResult)
             {
-                DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_DELETE_RETURNED_FALSE");
+                if (!DeleteProvisionalDimension(swModel, newDisp, "PASS0C_SINGLE_DELETE_RETURNED_FALSE"))
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                 return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "DELETE_RETURNED_FALSE" };
             }
 
@@ -5484,7 +5444,7 @@ namespace ADDIN.Commands
             {
                 var cand = item.Item1;
                 triedCount++;
-                if (triedCount > 50) break;
+                if (triedCount > 50 || !RepairTrialsCanContinue()) break;
 
                 swModel.ClearSelection2(true);
                 bool sel = SelectEntityInView(selMgr, swModel, swApp, currentView, cand, false);
@@ -5560,7 +5520,8 @@ namespace ADDIN.Commands
                     {
                         LogDebug($"  [SingleEntity Trial #{triedCount}] Failed: Dangling={newDangling}, Attached={newAttached}, Val={(newSysVal.HasValue ? (newSysVal.Value * 1000.0).ToString("F3") : "null")}mm (Target={targetMm:F3}mm, Delta={(newSysVal.HasValue ? deltaValMm.ToString("F3") : "N/A")}mm)");
                     }
-                    DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_VERIFY_FAILED");
+                    if (!DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_VERIFY_FAILED"))
+                        return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                     swModel.ClearSelection2(true);
                     continue;
                 }
@@ -5593,7 +5554,8 @@ namespace ADDIN.Commands
                 if (!selectOk)
                 {
                     LogDebug($"Safe delete selection failed for '{oldDimFullName}'. Cleaning up new dim.");
-                    DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_SAFE_DELETE_SELECTION_FAILED");
+                    if (!DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_SAFE_DELETE_SELECTION_FAILED"))
+                        return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                     swModel.ClearSelection2(true);
                     continue;
                 }
@@ -5605,7 +5567,8 @@ namespace ADDIN.Commands
                 if (!deleteResult)
                 {
                     LogDebug($"DeleteSelection2 returned false for '{oldDimFullName}'. Cleaning up new dim.");
-                    DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_DELETE_RETURNED_FALSE");
+                    if (!DeleteProvisionalDimension(swModel, newDisp, "SINGLE_ENTITY_DELETE_RETURNED_FALSE"))
+                        return new SingleTargetRepairResult { Status = SingleTargetStatus.Failed, Reason = "PROVISIONAL_CLEANUP_FAILED", IsUnsafeState = true };
                     continue;
                 }
 
@@ -5909,60 +5872,42 @@ namespace ADDIN.Commands
             out int totalDisplayDims,
             out int totalDanglingDims)
         {
-            totalDisplayDims = 0;
-            totalDanglingDims = 0;
-
+            totalDisplayDims = 0; totalDanglingDims = 0;
             if (swDrawing == null) return;
 
-            string initialSheet = "";
-            try
-            {
-                Sheet cur = swDrawing.GetCurrentSheet() as Sheet;
-                if (cur != null) initialSheet = cur.GetName();
-            }
-            catch {}
-
-            try
-            {
-                string[] sheetNames = swDrawing.GetSheetNames() as string[];
-                if (sheetNames == null) return;
-
-                foreach (string sName in sheetNames)
-                {
-                    try { swDrawing.ActivateSheet(sName); } catch {}
-                    SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                    SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-                    while (cView != null)
-                    {
-                        DisplayDimension dd = cView.GetFirstDisplayDimension5() as DisplayDimension;
-                        while (dd != null)
-                        {
-                            totalDisplayDims++;
-                            Annotation a = dd.GetAnnotation() as Annotation;
-                            bool isDang = (a != null) && a.IsDangling();
-
-                            if (isDang)
-                            {
-                                totalDanglingDims++;
-                            }
-
-                            dd = dd.GetNext5() as DisplayDimension;
-                        }
-
-                        cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
-                    }
+            // GetViews returns one array per sheet, with the sheet view at index 0.
+            // Counting must not activate/rebuild sheets or invalidate target geometry.
+            Array sheets = swDrawing.GetViews() as Array;
+            if (sheets != null) {
+                foreach (object entry in sheets) {
+                    var views = entry as Array;
+                    if (views == null) throw new InvalidOperationException("Không đọc đủ View để kiểm chứng Repair Dim.");
+                    CountRepairViews(views.Cast<object>().Skip(1).OfType<SolidWorks.Interop.sldworks.View>(), ref totalDisplayDims, ref totalDanglingDims);
                 }
+                return;
             }
-            catch (Exception ex)
-            {
-                LogDebug("CountTotalDrawingDimensions Exception: " + ex.Message);
+
+            var current = swDrawing.GetCurrentSheet() as Sheet;
+            string initial = current == null ? "" : current.GetName();
+            try {
+                var names = swDrawing.GetSheetNames() as string[];
+                if (names == null) throw new InvalidOperationException("Không đọc đủ Sheet để kiểm chứng Repair Dim.");
+                foreach (string name in names) {
+                    ActivateRepairSheet(swDrawing, name);
+                    CountRepairViews(ReadCurrentRepairViews(swDrawing), ref totalDisplayDims, ref totalDanglingDims);
+                }
+            } finally {
+                if (!string.IsNullOrEmpty(initial)) ActivateRepairSheet(swDrawing, initial);
             }
-            finally
-            {
-                if (!string.IsNullOrEmpty(initialSheet))
-                {
-                    try { swDrawing.ActivateSheet(initialSheet); } catch {}
+        }
+
+        private static void CountRepairViews(IEnumerable<SolidWorks.Interop.sldworks.View> views, ref int display, ref int dangling)
+        {
+            foreach (var view in views) {
+                foreach (var dimension in ReadRepairDimensions(view)) {
+                    display++;
+                    var annotation = dimension.GetAnnotation() as Annotation;
+                    if (annotation != null && annotation.IsDangling()) dangling++;
                 }
             }
         }
@@ -6068,10 +6013,7 @@ namespace ADDIN.Commands
                 {
                     foreach (string sName in sheetNames)
                     {
-                        SolidWorks.Interop.sldworks.View sView = swDrawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                        SolidWorks.Interop.sldworks.View cView = sView?.GetNextView() as SolidWorks.Interop.sldworks.View;
-
-                        while (cView != null)
+                        foreach (var cView in ReadCurrentRepairViews(swDrawing))
                         {
                             string refModelPath = "";
                             try { refModelPath = cView.GetReferencedModelName() ?? ""; } catch {}
@@ -6105,7 +6047,6 @@ namespace ADDIN.Commands
                                 }
                             }
 
-                            cView = cView.GetNextView() as SolidWorks.Interop.sldworks.View;
                         }
                     }
                 }

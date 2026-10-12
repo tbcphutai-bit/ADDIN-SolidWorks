@@ -55,7 +55,7 @@ namespace ADDIN.Commands
             this.lblSubtitle.Name = "lblSubtitle";
             this.lblSubtitle.Size = new System.Drawing.Size(245, 15);
             this.lblSubtitle.TabIndex = 1;
-            this.lblSubtitle.Text = "Chon noi dung can kiem tra va xuat Excel";
+            this.lblSubtitle.Text = "Chọn nội dung cần kiểm tra; kết quả xuất ra Excel.";
             // 
             // lblTitle
             // 
@@ -66,8 +66,8 @@ namespace ADDIN.Commands
             this.lblTitle.Name = "lblTitle";
             this.lblTitle.Size = new System.Drawing.Size(203, 20);
             this.lblTitle.TabIndex = 0;
-            this.lblTitle.Text = "CHECK \u30A6\u30E9\u8868 KEGAKI - CHON LENH";
-            // 
+            this.lblTitle.Text = "Check ウラ表 / Kegaki";
+            //
             // lblInstruction
             // 
             this.lblInstruction.AutoSize = true;
@@ -77,7 +77,7 @@ namespace ADDIN.Commands
             this.lblInstruction.Name = "lblInstruction";
             this.lblInstruction.Size = new System.Drawing.Size(184, 15);
             this.lblInstruction.TabIndex = 1;
-            this.lblInstruction.Text = "Mac dinh da chon san ca hai lenh.";
+            this.lblInstruction.Text = "Mặc định chạy cả hai. Bỏ tick lệnh không cần.";
             // 
             // pnlCheckList
             // 
@@ -102,7 +102,7 @@ namespace ADDIN.Commands
             this.lblKegakiDescription.Name = "lblKegakiDescription";
             this.lblKegakiDescription.Size = new System.Drawing.Size(120, 15);
             this.lblKegakiDescription.TabIndex = 5;
-            this.lblKegakiDescription.Text = "Bend Table / he so be";
+            this.lblKegakiDescription.Text = "Bend Table / hệ số bẻ";
             // 
             // lblUraDescription
             // 
@@ -113,7 +113,7 @@ namespace ADDIN.Commands
             this.lblUraDescription.Name = "lblUraDescription";
             this.lblUraDescription.Size = new System.Drawing.Size(112, 15);
             this.lblUraDescription.TabIndex = 4;
-            this.lblUraDescription.Text = "Mat truoc / mat sau";
+            this.lblUraDescription.Text = "Mặt trước / mặt sau";
             // 
             // lblDfTkDescription
             // 
@@ -136,7 +136,7 @@ namespace ADDIN.Commands
             this.chkKegaki.Name = "chkKegaki";
             this.chkKegaki.Size = new System.Drawing.Size(150, 28);
             this.chkKegaki.TabIndex = 2;
-            this.chkKegaki.Text = "CHECK KEGAKI";
+            this.chkKegaki.Text = "Check Kegaki";
             this.chkKegaki.UseVisualStyleBackColor = true;
             this.chkKegaki.CheckedChanged += new System.EventHandler(this.CheckOption_CheckedChanged);
             // 
@@ -150,7 +150,7 @@ namespace ADDIN.Commands
             this.chkUraOmote.Name = "chkUraOmote";
             this.chkUraOmote.Size = new System.Drawing.Size(150, 28);
             this.chkUraOmote.TabIndex = 1;
-            this.chkUraOmote.Text = "CHECK \u30A6\u30E9\u8868";
+            this.chkUraOmote.Text = "Check ウラ表";
             this.chkUraOmote.UseVisualStyleBackColor = true;
             this.chkUraOmote.CheckedChanged += new System.EventHandler(this.CheckOption_CheckedChanged);
             // 
@@ -177,7 +177,7 @@ namespace ADDIN.Commands
             this.lblSelectionCount.Name = "lblSelectionCount";
             this.lblSelectionCount.Size = new System.Drawing.Size(101, 15);
             this.lblSelectionCount.TabIndex = 3;
-            this.lblSelectionCount.Text = "Da chon 2/2 lenh";
+            this.lblSelectionCount.Text = "Đã chọn 2/2 lệnh";
             // 
             // btnRun
             // 
@@ -191,7 +191,7 @@ namespace ADDIN.Commands
             this.btnRun.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(90)))), ((int)(((byte)(158)))));
             this.btnRun.Size = new System.Drawing.Size(92, 30);
             this.btnRun.TabIndex = 4;
-            this.btnRun.Text = "CHẠY";
+            this.btnRun.Text = "Chạy";
             this.btnRun.UseVisualStyleBackColor = false;
             this.btnRun.Click += new System.EventHandler(this.btnRun_Click);
             // 
@@ -208,7 +208,7 @@ namespace ADDIN.Commands
             this.btnCancel.PressColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(223)))), ((int)(((byte)(221)))));
             this.btnCancel.Size = new System.Drawing.Size(92, 30);
             this.btnCancel.TabIndex = 5;
-            this.btnCancel.Text = "HỦY";
+            this.btnCancel.Text = "Hủy";
             this.btnCancel.UseVisualStyleBackColor = false;
             // 
             // CheckAllSelectionDialog
@@ -233,7 +233,7 @@ namespace ADDIN.Commands
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "CHECK \u30A6\u30E9\u8868 KEGAKI";
+            this.Text = "Check ウラ表 / Kegaki";
             this.pnlHeader.ResumeLayout(false);
             this.pnlHeader.PerformLayout();
             this.pnlCheckList.ResumeLayout(false);

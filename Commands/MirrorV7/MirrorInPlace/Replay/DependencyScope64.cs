@@ -52,4 +52,46 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             return missing.OrderBy(id => id).ToArray();
         }
     }
+
+    // A suppressed command is not evidence that its native recipe can be
+    // regenerated in the current configuration. Choose only a configuration
+    // in which the SOURCE command was active and its checkpoint was captured.
+    // Names are opaque configuration identities, not "flat"/Part-name rules.
+    internal static class DependencyConfiguration70
+    {
+        internal static string[] ActiveSourceConfigurations(IDictionary<string, bool> suppression)
+        {
+            if (suppression == null || suppression.Count == 0 || suppression.Keys.Any(string.IsNullOrEmpty))
+                throw new InvalidOperationException("DEPENDENCY70 source configuration mask unavailable.");
+            return suppression.Where(p => !p.Value).Select(p => p.Key).OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        }
+
+        internal static string SelectReconstruction(IDictionary<string, bool> suppression,
+            IEnumerable<string> verified, string current)
+        {
+            var active = ActiveSourceConfigurations(suppression);
+            var captured = new HashSet<string>(verified ?? new string[0], StringComparer.Ordinal);
+            if (string.IsNullOrEmpty(current) || !suppression.ContainsKey(current))
+                throw new InvalidOperationException("DEPENDENCY70 current configuration not in source snapshot.");
+            if (active.Length == 0 || active.Any(c => !captured.Contains(c)))
+                throw new InvalidOperationException("DEPENDENCY70 no complete source-active reconstruction evidence; native insertion disabled.");
+            return active.Contains(current, StringComparer.Ordinal) ? current : active[0];
+        }
+    }
+
+    internal static class DependencyHistory70
+    {
+        internal static bool IsOriginalSourceOrder(IEnumerable<int> survivingSourceOrder, IEnumerable<int> actualSourceOrder)
+        {
+            if (survivingSourceOrder == null || actualSourceOrder == null)
+                throw new InvalidOperationException("DEPENDENCY70 native history snapshot unavailable.");
+            var expected = survivingSourceOrder.ToArray();
+            var actual = actualSourceOrder.ToArray();
+            if (expected.Length == 0 || expected.Distinct().Count() != expected.Length ||
+                actual.Length != expected.Length || actual.Distinct().Count() != actual.Length ||
+                !new HashSet<int>(expected).SetEquals(actual))
+                throw new InvalidOperationException("DEPENDENCY70 native history identities missing/duplicated/unexpected.");
+            return expected.SequenceEqual(actual);
+        }
+    }
 }

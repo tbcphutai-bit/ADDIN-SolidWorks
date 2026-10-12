@@ -27,6 +27,10 @@ namespace ADDIN.HoleManagement
                 if (definition is WizardHoleFeatureData2) return HoleFeatureKind.Wizard;
                 if (definition is SimpleHoleFeatureData2) return HoleFeatureKind.Simple;
                 string type = feature.GetTypeName2() ?? "";
+                // Instant3D returns ICE from GetTypeName2; GetTypeName exposes
+                // the underlying Cut/CutThin/Hole feature type.
+                if (string.Equals(type, "ICE", StringComparison.OrdinalIgnoreCase))
+                    type = feature.GetTypeName() ?? "";
                 if (string.Equals(type, "Hole", StringComparison.OrdinalIgnoreCase)) return HoleFeatureKind.Simple;
                 if (string.Equals(type, "Cut", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(type, "CutThin", StringComparison.OrdinalIgnoreCase)) return HoleFeatureKind.CutCandidate;

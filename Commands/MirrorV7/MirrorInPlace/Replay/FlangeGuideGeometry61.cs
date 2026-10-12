@@ -84,4 +84,145 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             return (value % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
         }
     }
+
+    // Numeric correspondence only, NOT a geometry acceptance test. Coordinates
+    // are expressed in each measured profile's directed hinge/outward frame.
+    // Normalization permits a native length dimension to regenerate a different
+    // size. Every final point must still be read back at the exact guide position.
+    internal sealed class FlangeIdentityPrimitive68
+    {
+        internal int Type;
+        internal bool Construction, Circle;
+        internal double[] Start, End, Center, Middle;
+        internal string StartKey, EndKey, CenterKey;
+    }
+
+    internal sealed class FlangeIdentityMove68
+    {
+        internal string PointKey;
+        internal int TargetPrimitive, TargetRole;
+    }
+
+    internal static class FlangeIdentityGeometry68
+    {
+        internal static List<FlangeIdentityMove68> Plan(IList<FlangeIdentityPrimitive68> native,
+            IList<FlangeIdentityPrimitive68> target)
+        {
+            if (native == null || target == null || native.Count == 0 || native.Count != target.Count || native.Count > 256)
+                throw new InvalidOperationException("FLANGE68 native/guide topology differs; no entity was deleted.");
+            var left = Normalize(native);
+            var right = Normalize(target);
+            var candidates = Enumerable.Range(0, left.Count).Select(i => Enumerable.Range(0, right.Count)
+                .Where(j => Compatible(left[i], right[j])).ToArray()).ToArray();
+            int[] assignment = Match(candidates, -1, -1);
+            if (assignment == null)
+                throw new InvalidOperationException("FLANGE68 no native/guide primitive correspondence; no point was moved.");
+            // A perfect matching alone is not a unique matching. Forbid each
+            // chosen edge in turn; any alternative complete match is ambiguous.
+            for (int i = 0; i < assignment.Length; i++)
+                if (Match(candidates, i, assignment[i]) != null)
+                    throw new InvalidOperationException("FLANGE68 ambiguous primitive correspondence; no name/order tie-break.");
+            var moves = new Dictionary<string, FlangeIdentityMove68>(StringComparer.Ordinal);
+            for (int i = 0; i < assignment.Length; i++)
+            {
+                int j = assignment[i];
+                bool direct = Same(left[i].Start, right[j].Start) &&
+                    (left[i].Circle || Same(left[i].End, right[j].End));
+                bool reverse = !left[i].Circle && Same(left[i].Start, right[j].End) && Same(left[i].End, right[j].Start);
+                if (direct == reverse)
+                    throw new InvalidOperationException("FLANGE68 ambiguous endpoint direction; no point was moved.");
+                // Shared-point consistency is checked in physical canonical
+                // coordinates, NOT normalized bounds (which can hide a gap).
+                Add(moves, native[i].StartKey, j, direct ? 0 : 1, target);
+                if (!native[i].Circle) Add(moves, native[i].EndKey, j, direct ? 1 : 0, target);
+                if (native[i].Type == 1) Add(moves, native[i].CenterKey, j, 2, target);
+            }
+            return moves.Values.ToList();
+        }
+
+        static void Add(Dictionary<string, FlangeIdentityMove68> moves, string key, int target, int role,
+            IList<FlangeIdentityPrimitive68> geometry)
+        {
+            if (string.IsNullOrEmpty(key)) throw new InvalidOperationException("FLANGE68 native point ID unavailable.");
+            FlangeIdentityMove68 previous;
+            if (moves.TryGetValue(key, out previous))
+            {
+                if (!Same(Point(geometry[previous.TargetPrimitive], previous.TargetRole), Point(geometry[target], role)))
+                    throw new InvalidOperationException("FLANGE68 one shared native point has conflicting guide targets.");
+                return;
+            }
+            moves.Add(key, new FlangeIdentityMove68 { PointKey = key, TargetPrimitive = target, TargetRole = role });
+        }
+
+        internal static double[] Point(FlangeIdentityPrimitive68 p, int role)
+        {
+            if (role == 0) return p.Start;
+            if (role == 1) return p.End;
+            if (role == 2) return p.Center;
+            throw new InvalidOperationException("FLANGE68 invalid point role.");
+        }
+
+        static List<FlangeIdentityPrimitive68> Normalize(IList<FlangeIdentityPrimitive68> profile)
+        {
+            foreach (var p in profile)
+            {
+                if (p == null || (p.Type != 0 && p.Type != 1) || (p.Circle && p.Type != 1))
+                    throw new InvalidOperationException("FLANGE68 unsupported native primitive; original IDs retained.");
+                Validate(p.Start);
+                if (!p.Circle) Validate(p.End);
+                if (p.Type == 1) { Validate(p.Center); if (!p.Circle) Validate(p.Middle); }
+            }
+            var points = profile.SelectMany(p => new[] { p.Start, p.End, p.Center, p.Middle }).Where(p => p != null).ToList();
+            double[] min = { points.Min(p => p[0]), points.Min(p => p[1]) };
+            double[] size = { points.Max(p => p[0]) - min[0], points.Max(p => p[1]) - min[1] };
+            if (size.Any(v => double.IsNaN(v) || double.IsInfinity(v) || v <= 1e-9))
+                throw new InvalidOperationException("FLANGE68 degenerate native profile bounds.");
+            Func<double[], double[]> normalized = p => p == null ? null : new[] { (p[0] - min[0]) / size[0], (p[1] - min[1]) / size[1] };
+            return profile.Select(p => new FlangeIdentityPrimitive68 { Type = p.Type, Construction = p.Construction,
+                Circle = p.Circle, Start = normalized(p.Start), End = normalized(p.End), Center = normalized(p.Center),
+                Middle = normalized(p.Middle) }).ToList();
+        }
+
+        static void Validate(double[] p)
+        {
+            if (p == null || p.Length != 2 || p.Any(v => double.IsNaN(v) || double.IsInfinity(v)))
+                throw new InvalidOperationException("FLANGE68 invalid canonical coordinates.");
+        }
+
+        static bool Same(double[] a, double[] b)
+        {
+            if (a == null || b == null) return a == null && b == null;
+            return Math.Abs(a[0] - b[0]) <= 1e-7 && Math.Abs(a[1] - b[1]) <= 1e-7;
+        }
+
+        static bool Compatible(FlangeIdentityPrimitive68 a, FlangeIdentityPrimitive68 b)
+        {
+            return a.Type == b.Type && a.Construction == b.Construction && a.Circle == b.Circle &&
+                Same(a.Center, b.Center) && Same(a.Middle, b.Middle) &&
+                ((Same(a.Start, b.Start) && (a.Circle || Same(a.End, b.End))) ||
+                (!a.Circle && Same(a.Start, b.End) && Same(a.End, b.Start)));
+        }
+
+        static int[] Match(int[][] candidates, int excludedLeft, int excludedRight)
+        {
+            var rightToLeft = Enumerable.Repeat(-1, candidates.Length).ToArray();
+            for (int i = 0; i < candidates.Length; i++)
+                if (!Augment(i, candidates, rightToLeft, new bool[candidates.Length], excludedLeft, excludedRight)) return null;
+            var result = new int[candidates.Length];
+            for (int j = 0; j < rightToLeft.Length; j++) result[rightToLeft[j]] = j;
+            return result;
+        }
+
+        static bool Augment(int left, int[][] candidates, int[] rightToLeft, bool[] visited, int excludedLeft, int excludedRight)
+        {
+            foreach (int right in candidates[left])
+            {
+                if (visited[right] || (left == excludedLeft && right == excludedRight)) continue;
+                visited[right] = true;
+                if (rightToLeft[right] < 0 || Augment(rightToLeft[right], candidates, rightToLeft, visited, excludedLeft, excludedRight))
+                { rightToLeft[right] = left; return true; }
+            }
+            return false;
+        }
+    }
 }

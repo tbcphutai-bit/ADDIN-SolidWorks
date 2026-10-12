@@ -1,0 +1,411 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{E52285D7-B8F0-48B7-883A-0E18EEAEA85A}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ADDIN</RootNamespace>
+    <AssemblyName>ADDIN</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <RegisterForComInterop>false</RegisterForComInterop>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>tai.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>C:\Tao moi\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <RegisterForComInterop>false</RegisterForComInterop>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="SolidWorks.Interop.sldworks">
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.sldworks.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="SolidWorks.Interop.swconst">
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.swconst.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="SolidWorks.Interop.swpublished">
+      <HintPath>$(USERPROFILE)\Downloads\SolidWorks.Interop.swpublished.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsFormsIntegration" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BomTaskPaneControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="BomTaskPaneControl.Designer.cs">
+      <DependentUpon>BomTaskPaneControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\AutoSplinePropertyManagerPage.cs" />
+    <Compile Include="UI\MakeHolePageValues.cs" />
+    <Compile Include="UI\MakeHolePropertyManagerPage.cs" />
+    <Compile Include="UI\MakeHoleNativeWorkflow.cs" />
+    <Compile Include="UI\NativeCommandPropertyManagerPage.cs" />
+    <Compile Include="UI\RepairHolePropertyManagerPage.cs" />
+    <Compile Include="UI\CountHolePropertyManagerPage.cs" />
+    <Compile Include="UI\VCutPropertyManagerPages.cs" />
+    <Compile Include="UI\NativeHoleVCutWorkflow.cs" />
+    <Compile Include="UI\MirrorAssemblyPropertyManagerPage.cs" />
+    <Compile Include="UI\VCutBendAssignmentControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\VCutBendAssignmentControl.Designer.cs">
+      <DependentUpon>VCutBendAssignmentControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="BomLoader.cs" />
+    <Compile Include="BomOccurrenceCounter.cs" />
+    <Compile Include="Commands\CreateMirrorPartPackage.cs" />
+    <Compile Include="Commands\Repair3DSplineCommand.cs" />
+    <Compile Include="Diagnostics\SketchReferenceDiagnostic.cs" />
+    <Compile Include="Commands\MirrorV7\BipartiteEquivalenceMatcherV7.cs" />
+    <Compile Include="Commands\MirrorV7\BodyMirrorVerifierV7.cs" />
+    <Compile Include="Commands\MirrorV7\CanonicalPartMirrorPlaneV7.cs" />
+    <Compile Include="Commands\MirrorV7\CrossDocumentReferenceAuditV7.cs" />
+    <Compile Include="Commands\MirrorV7\FeatureDefinitionCaptureV7.cs" />
+    <Compile Include="Commands\MirrorV7\FeatureReconstructionInventoryV7.cs" />
+    <Compile Include="Commands\MirrorV7\FeatureTreeScannerV7.cs" />
+    <Compile Include="Commands\MirrorV7\FeatureTypeHelperV7.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Core\MirrorInPlaceModels.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Core\MirrorInPlaceOrchestrator.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Diagnostics\BaseFeatureDiagnosticEngine.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Handlers\FeatureDispatcher.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Mutation\BaseSketchMutationEngine.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\RollbackReplayEngine.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\DependencyScope64.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\DependencyReplay64.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\EdgeFlangeReplay.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\FlangeGuideGeometry61.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\FlangeGuideSketch61.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Replay\ChiralFeatureReplay45.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Validation\SemanticValidator.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorSourceBaselineV7.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorV7Context.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorV7Diagnostics.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorV7Plane.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorV7Types.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorWorkingCopyV7.cs" />
+    <Compile Include="Commands\MirrorV7\NativePartMirrorV7.cs" />
+    <Compile Include="Commands\MirrorV7\PartCapabilityAuditV7.cs" />
+    <Compile Include="Commands\MirrorV7\PartMirrorEngineV7.cs" />
+    <Compile Include="Commands\MirrorV7\PartReflectionTransformV7.cs" />
+    <Compile Include="Commands\MirrorV7\PersistReferenceV7.cs" />
+    <Compile Include="Commands\MirrorV7\PersistentReferenceAuditResultV7.cs" />
+    <Compile Include="Commands\MirrorV7\PersistentReferenceAuditV7.cs" />
+    <Compile Include="Commands\MirrorV7\PersistentReferenceServiceV7.cs" />
+    <Compile Include="Commands\MirrorV7\ReflectionApiTransformV7.cs" />
+    <Compile Include="Commands\MirrorV7\ReflectionMathSelfTestV7.cs" />
+    <Compile Include="Commands\MirrorV7\SingleSketchMutationServiceV7.cs" />
+    <Compile Include="Commands\MirrorV7\SingleSketchMutationV7Types.cs" />
+    <Compile Include="Commands\MirrorV7\SingleSketchMutationVerifierV7.cs" />
+    <Compile Include="Commands\MirrorV7\SingleSketchTargetBuilderV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchIntegrityValidatorV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchMirrorPlanV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchMirrorPlannerV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchMutationGuardV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchMutationMathV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchOwnershipGuardV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchOwnershipResolverV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSelectionResultV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSnapshotAuditResultV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSnapshotAuditV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSnapshotServiceV7.cs" />
+    <Compile Include="Commands\MirrorV7\SketchSnapshotV7.cs" />
+    <Compile Include="Commands\MirrorV7\SlotCopyComparisonV7.cs" />
+    <Compile Include="Commands\MirrorV7\UnconstrainedLineSketchReflectionV7.cs" />
+    <Compile Include="Commands\MirrorV7\WorkingCopyEquivalenceAuditV7.cs" />
+    <Compile Include="Commands\DeleteYellowAnnotationsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\DeleteYellowAnnotationsDialog.Designer.cs">
+      <DependentUpon>DeleteYellowAnnotationsDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\SplineArcOptionsDialog.Designer.cs">
+      <DependentUpon>SplineArcOptionsDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\ThaoTacBomTaskPane.cs" />
+    <Compile Include="Commands\XoaBalloonMauVang.cs" />
+    <Compile Include="Commands\XoaDimMauVang.cs" />
+    <Compile Include="Commands\TaoDimKegaki.cs" />
+    <Compile Include="Commands\AutoVCutSectionCommand.cs" />
+    <Compile Include="Commands\AutoVCutSectionCommand.Assembly.cs" />
+    <Compile Include="Commands\VCutPropertySetupCommand.cs" />
+    <Compile Include="Commands\BendTableCellReader.cs" />
+    <Compile Include="Commands\VCutFeatureTagStore.cs" />
+    <Compile Include="UI\VCutNoticeDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\VCutNoticeDialog.Designer.cs">
+      <DependentUpon>VCutNoticeDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\HistoryTextBox.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Commands\LenhNoteTextBalloon.cs" />
+    <Compile Include="Commands\LenhDimCanhSongSong.cs" />
+    <Compile Include="Commands\SplineArcOptions.cs" />
+    <Compile Include="Commands\SplineArcOptionsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\SplineToArcsCommand.cs" />
+    <Compile Include="Commands\ChinhTiLeDrawingView.cs" />
+    <Compile Include="Commands\XoaTextMauVang.cs" />
+    <Compile Include="Commands\XoayDrawingView.cs" />
+    <Compile Include="Commands\XepUnitDrawing.cs" />
+    <Compile Include="Commands\LenhMakeHole.cs" />
+    <Compile Include="Commands\MakeHoleOptions.cs" />
+    <Compile Include="Commands\SoSanhDfTk.cs" />
+    <Compile Include="Commands\CheckUraOmote.cs" />
+    <Compile Include="Commands\CheckKegaki.cs" />
+    <Compile Include="Commands\BendTableDeepReader.cs" />
+    <Compile Include="Commands\KegakiFlatPatternReader.cs" />
+    <Compile Include="Commands\CheckPartWorkingCopy.cs" />
+    <Compile Include="Commands\CheckAll.cs" />
+    <Compile Include="Commands\CheckAllSelectionDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\CheckAllSelectionDialog.Designer.cs">
+      <DependentUpon>CheckAllSelectionDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\CheckBalloon.cs" />
+    <Compile Include="Commands\CheckDrawingBom.cs" />
+    <Compile Include="Commands\ExcelDrawingCheckExporter.cs" />
+    <Compile Include="Commands\CheckRound.cs" />
+    <Compile Include="Commands\CheckSamePart.cs" />
+    <Compile Include="Commands\SamePartToleranceInputDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\SamePartToleranceInputDialog.Designer.cs">
+      <DependentUpon>SamePartToleranceInputDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\CheckAssemblyHole.cs" />
+    <Compile Include="Commands\RoundHolePreviewForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\DimKichThuocLo.cs" />
+    <Compile Include="Commands\LenhDimCanhSongSong.Envelope.cs" />
+    <Compile Include="Commands\SectionProfilePlanner.cs" />
+    <Compile Include="Commands\RepairDimModels.cs" />
+    <Compile Include="Commands\RepairDimGeometry.cs" />
+    <Compile Include="Commands\RepairDimCandidateFinder.cs" />
+    <Compile Include="Commands\RepairDanglingDimensions.cs" />
+    <Compile Include="Commands\PaintHoleSummaryCommand.cs" />
+    <Compile Include="Commands\ChangeHoleNameCommand.cs" />
+    <Compile Include="HoleManagement\HoleNamePresetManager.cs" />
+    <Compile Include="HoleManagement\HoleFeatureClassifier.cs" />
+    <Compile Include="HoleManagement\HoleMetadataService.cs" />
+    <Compile Include="HoleManagement\HoleGeometryAnalyzer.cs" />
+    <Compile Include="HoleManagement\HoleFamilyResolver.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Helpers\SlotSchemeOverride.cs" />
+    <Compile Include="Helpers\ExtrudeCutRecoveryHelper.cs" />
+    <Compile Include="Helpers\TopologyEdgeMatcher.cs" />
+    <Compile Include="Helpers\SketchOperationsHelper.cs" />
+    <Compile Include="Helpers\SketchPointMatcher47.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Core\FeatureTreeLayout50.cs" />
+    <Compile Include="Commands\MirrorV7\MirrorInPlace\Core\AssemblyMirror71.cs" />
+    <Compile Include="Helpers\ExtrudeCutReplay44.cs" />
+    <Compile Include="Helpers\EdgeFlangeRepairManager.cs" />
+    <Compile Include="Helpers\FeatureOptionsCaptureHelper.cs" />
+    <Compile Include="UI\UIHelper.cs" />
+    <Compile Include="UI\ModernButton.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\ModernFieldBox.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\ModernCard.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\ModernTabControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\GridStyler.cs" />
+    <Compile Include="UI\RelayCommand.cs" />
+    <Compile Include="UI\RepairHoleRowViewModel.cs" />
+    <Compile Include="UI\RepairHoleViewModel.cs" />
+    <Compile Include="UI\RepairHoleTaskPaneView.xaml.cs">
+      <DependentUpon>RepairHoleTaskPaneView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Commands\DxfCheckModels.cs" />
+    <Compile Include="Commands\DxfCheckReader.cs" />
+    <Compile Include="Commands\DxfCheckGeometry.cs" />
+    <Compile Include="Commands\DxfCheckEngine.cs" />
+    <Compile Include="Commands\DxfCheckExport.cs" />
+    <Compile Include="UI\DxfCheckForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\DxfCheckTaskPaneIntegration.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Commands\DxfLayerStatistics.cs" />
+    <Compile Include="Commands\DxfContourCheck.cs" />
+    <Compile Include="Commands\DxfEdgeHoleCheck.cs" />
+    <Compile Include="UI\BomCommandLayout.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="SWAddin.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Commands\EdgeToEqualSplineCommand.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="tai.snk" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="UI\RepairHoleTaskPaneView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="BomTaskPaneControl.resx">
+      <DependentUpon>BomTaskPaneControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Commands\CheckAllSelectionDialog.resx">
+      <DependentUpon>CheckAllSelectionDialog.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Commands\DeleteYellowAnnotationsDialog.resx">
+      <DependentUpon>DeleteYellowAnnotationsDialog.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Commands\SamePartToleranceInputDialog.resx">
+      <DependentUpon>SamePartToleranceInputDialog.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Blocks\プレーナー○印.sldblk">
+      <LogicalName>ADDIN.Blocks.Circle.sldblk</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Blocks\プレーナー◎印.sldblk">
+      <LogicalName>ADDIN.Blocks.DoubleCircle.sldblk</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Blocks\プレーナー●印.sldblk">
+      <LogicalName>ADDIN.Blocks.FilledCircle.sldblk</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="icons20.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\DimMatCat.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\dimkegaki.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\dimvang.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\Eraser.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\Ruler.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\Scale Fit.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\check.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\counthole.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\checkhole3d.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\makehole.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\repairhole.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\setbendline3d.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\autospline3d.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\repairspline3d.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\splinetoarcs.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\dimkichthuoclo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\vcutsection.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent Condition="'$(KillSolidWorksOnBuild)' == 'true'">taskkill /f /im sldworks.exe /fi "status eq running" 2&gt;nul &amp; set errorlevel=0</PreBuildEvent>
+    <PostBuildEvent>copy /Y "$(TargetDir)$(TargetName).dll" "C:\Tao moi\ADDIN.dll" &amp; copy /Y "$(TargetDir)$(TargetName).pdb" "C:\Tao moi\ADDIN.pdb" 2&gt;nul &amp; set errorlevel=0</PostBuildEvent>
+  </PropertyGroup>
+</Project>

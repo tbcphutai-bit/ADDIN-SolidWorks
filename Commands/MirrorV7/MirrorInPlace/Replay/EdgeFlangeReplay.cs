@@ -17,6 +17,7 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             internal bool ReverseOffset, ReversePositionOffset, UsePositionOffset, LockAngle;
             internal readonly List<FlangePair33> Pairs = new List<FlangePair33>();
             internal readonly List<FlangeBend52> Bends = new List<FlangeBend52>();
+            internal readonly HashSet<int> NativeHingeParentIds70 = new HashSet<int>();
         }
 
         internal sealed class FlangeBend52
@@ -33,13 +34,14 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                         .Select(edge => SampleEdge(edge).Select(transform).ToArray()).ToArray() }).ToList();
         }
 
-        private static bool SameBendFaces52(List<FlangeSupport33> expected, List<FlangeSupport33> actual)
+        private static bool SameBendFaces52(List<FlangeSupport33> expected, List<FlangeSupport33> actual,
+            double tolerance = 1e-7)
         {
             return expected.Count > 0 && actual.Count > 0 &&
                 BipartiteEquivalenceMatcherV7.Match(expected, actual, (a, b) =>
                     a.Boundaries.Length > 0 && b.Boundaries.Length > 0 &&
                     BipartiteEquivalenceMatcherV7.Match(a.Boundaries.ToList(), b.Boundaries.ToList(),
-                        (x, y) => BipartiteEquivalenceMatcherV7.SameEdgeSamples(x, y, 1e-7)).HasPerfectMatching)
+                        (x, y) => BipartiteEquivalenceMatcherV7.SameEdgeSamples(x, y, tolerance)).HasPerfectMatching)
                     .HasPerfectMatching;
         }
 
@@ -97,6 +99,17 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                 var edges = (data.Edges as Array ?? new object[0]).Cast<object>().Select(e => e as Edge).ToList();
                 if (edges.Count == 0 || edges.Any(e => e == null))
                     throw new InvalidOperationException("FLANGE33 missing source attachments.");
+                if (recipe.OffsetType == (int)swFlangeOffsetTypes_e.swFlangeOffsetBlind)
+                    foreach (var nativeFace70 in edges.SelectMany(e =>
+                        (e.GetTwoAdjacentFaces2() as object[] ?? new object[0]).OfType<Face2>()))
+                    {
+                        var nativeOwner70 = nativeFace70.GetFeature() as Feature;
+                        var sourceParent70 = nativeOwner70 == null ? null : context.SourceGraph.Nodes.SingleOrDefault(n =>
+                            n.Name == nativeOwner70.Name && n.TypeName == FeatureTypeHelperV7.GetEffectiveType(nativeOwner70));
+                        if (sourceParent70 == null || sourceParent70.TreeOrder >= sourceOwner52.TreeOrder)
+                            throw new InvalidOperationException("FLANGE70 native hinge parent cannot be captured as a source identity.");
+                        recipe.NativeHingeParentIds70.Add(sourceParent70.TreeOrder);
+                    }
                 var names = profiles.Keys.ToList();
                 var sourceSamples = edges.Select(SampleEdge).ToList();
                 // Direct references and an overlapping hinge are strongest evidence.
@@ -486,7 +499,10 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             // while the regenerated profile still uses the opposite length direction.
             // Commit the native length/position options in a fresh definition before
             // judging the final frames. This is not a redraw of an attached sketch.
-            ResolveFlangeDirections48(context, item, recipe, sketchNames, guides);
+            // Both CreateFeature and AddEdges can regenerate absorbed profiles.
+            // A new sketch attachment needs the same post-bind identity-preserving
+            // correction even when the containing feature keeps its original ID.
+            ResolveFlangeDirections48(context, item, recipe, sketchNames, guides, !inherited);
             VerifyFinalFlangeProfiles61(context, sketchNames, guides);
             RemoveFlangeGuides61(context, item, guides);
             VerifyOptions27(item);
@@ -656,6 +672,22 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             var candidates = recipe.Bends.Select(b => Enumerable.Range(0, targets.Count)
                 .Where(i => SameBendFaces52(b.Faces, faces[i])).ToArray()).ToList();
             var assignment = FlangeGeometry33.UniqueAssignment(candidates, targets.Count);
+            // The whole body is already proved above. This step only labels
+            // which regenerated bend is which. Where bends touch at a corner
+            // the trim curves differ by more than 1e-7 although every vertex
+            // coincides, so widen the boundary tolerance stepwise; the
+            // assignment must still be one-to-one and unique at that step.
+            foreach (double tolerance71 in new[] { 1e-6, 1e-5, 1e-4 })
+            {
+                if (assignment != null) break;
+                candidates = recipe.Bends.Select(b => Enumerable.Range(0, targets.Count)
+                    .Where(i => SameBendFaces52(b.Faces, faces[i], tolerance71)).ToArray()).ToList();
+                assignment = FlangeGeometry33.UniqueAssignment(candidates, targets.Count);
+                MirrorV7Diagnostics.Log("[FLANGE71][BEND_LABEL_TOLERANCE] feature=" + item.Feature.Name +
+                    " boundaryTolerance_m=" + tolerance71.ToString("R", System.Globalization.CultureInfo.InvariantCulture) +
+                    " candidates=" + string.Join(",", candidates.Select(c => c.Length)) +
+                    " unique=" + (assignment != null) + " bodyAlreadyProved=True");
+            }
             if (assignment == null)
                 throw new InvalidOperationException("FLANGE52 bend geometry mapping missing/ambiguous; candidates=" +
                     string.Join(",", candidates.Select(c => c.Length)) + " sourceFaces=" +
@@ -706,6 +738,13 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
             var sourceOwner = context.SourceGraph.Nodes.Single(n => n.TreeOrder == item.Feature.TreeOrder);
             int end = context.SourceGraph.Nodes.Where(n => n.TreeOrder > sourceOwner.TreeOrder &&
                 n.Depth <= sourceOwner.Depth).Select(n => n.TreeOrder).DefaultIfEmpty(int.MaxValue).Min();
+            if (recipe.NativeHingeParentIds70.Count > 0)
+            {
+                context.NativeFlangeHingeParents70.Add(sourceOwner.TreeOrder, recipe.NativeHingeParentIds70.OrderBy(id => id).ToArray());
+                MirrorV7Diagnostics.Log("[FLANGE70][HINGE_PARENT_PROOF] sourceId=" + sourceOwner.TreeOrder +
+                    " requiredIds=" + string.Join(",", recipe.NativeHingeParentIds70.OrderBy(id => id)) +
+                    " sourceOffset=BLIND hingeAndSupportsReflected=True profileAndBody=PASS");
+            }
             for (int i = 0; i < generatedNames.Count; i++)
             {
                 var pair = recipe.Pairs[i];
@@ -771,7 +810,7 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
         // against the captured body oracle; never infer direction from a part name.
         private static void ResolveFlangeDirections48(MirrorInPlaceExecutionContextV7 context,
             FeatureReplayCheckpointV7 item, FlangeRecipe33 recipe,
-            IList<string> profileNames, IList<FlangeGuide61> guides)
+            IList<string> profileNames, IList<FlangeGuide61> guides, bool nativeProfilesRebound68)
         {
             var model = context.WorkingDocument;
             var feature = item.Feature.Feature;
@@ -795,8 +834,8 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                     // Even the original flags require this distinct transaction after
                     // binding: getter equality did not prove native frame equality in
                     // the live regression. Never change the bend angle to compensate
-                    // for an unsettled length direction. Copied user constraints stay
-                    // intact; only disposable recreated drivers have a cleanup step.
+                    // for an unsettled length direction. Absorbed native driver
+                    // point/segment identities, constraints and dimensions stay intact.
                     SetFlangeDirections48(context, feature, candidate.Item1, candidate.Item2);
                     feature = ((PartDoc)model).FeatureByName(item.Feature.Name) as Feature;
                     RequireHealthyNativeFlange66(feature, "DIRECTION_COMMIT");
@@ -811,8 +850,8 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                         throw new System.IO.InvalidDataException("FLANGE62 direction candidate caused native rebuild error; " +
                             state + " errorCode=" + nativeError + "; remaining candidates not attempted.");
                     EnsureFeatureHasNoError(feature, "FLANGE48 native rebuild");
-                    if (item.WasNativeReplacement)
-                        ReacquireAndRedrawNativeFlangeProfiles64(context, item, recipe, profileNames, guides);
+                    if (nativeProfilesRebound68)
+                        ReacquireAndRedrawNativeFlangeProfiles64(context, item, recipe, profileNames, guides, nativeProfilesRebound68);
                     VerifyFinalFlangeProfiles61(context, profileNames, guides);
                     BaseSketchMutationEngineV7.VerifyCurrentSolids(context, item.ReflectedBodyOracle);
                     MirrorV7Diagnostics.Log("[FLANGE48][ORACLE] feature=" + feature.Name +
@@ -824,6 +863,12 @@ namespace ADDIN.Commands.MirrorV7.MirrorInPlace
                         " " + state + " tested=" + (candidates.IndexOf(candidate) + 1) +
                         " available=" + candidates.Count + " result=PASS");
                     return;
+                }
+                catch (ADDIN.Helpers.BodyValidationUnavailable69 ex)
+                {
+                    MirrorV7Diagnostics.Log("[FLANGE69][PROOF_UNAVAILABLE] feature=" + feature.Name +
+                        " " + state + " remainingCandidatesSkipped=True result=UNPROVED reason=" + ex.Message);
+                    throw;
                 }
                 catch (InvalidOperationException ex)
                 {
