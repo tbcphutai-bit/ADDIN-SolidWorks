@@ -219,6 +219,12 @@
     </Compile>
     <Compile Include="Commands\BendMinimumSummary.cs" />
     <Compile Include="Commands\BendCheckSession.cs" />
+    <Compile Include="Commands\BendCheckPlanningDraft.cs" />
+    <Compile Include="Commands\BendToolProfiles\ToolProfileGeometry.cs" />
+    <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
+    <Compile Include="Commands\BendToolProfiles\ToolDxfReader.cs" />
+    <Compile Include="Commands\BendToolProfiles\ToolProfileLibrary.cs" />
+    <Compile Include="Commands\BendToolProfiles\ToolProfileLibrarySession.cs" />
     <Compile Include="UI\BendCheckForm.cs">
       <SubType>Form</SubType>
     </Compile>
