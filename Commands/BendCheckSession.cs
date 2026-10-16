@@ -17,6 +17,7 @@ namespace ADDIN.Commands
         internal readonly List<Component2> Instances = new List<Component2>();
         internal List<VCutPropertySetupCommand.BendRow> Rows = new List<VCutPropertySetupCommand.BendRow>();
         internal ModelDoc2 Model;
+        internal BendCheckPlanningDraft PlanningDraft;
         internal CheckPartWorkingCopy Copy;
         internal BendMinimumContext Context => Rows.Select(r => r.MinimumContext).FirstOrDefault(c => c != null);
         internal BendMinimumSummary Summary => BendMinimumSummary.Create(Rows);
@@ -29,7 +30,7 @@ namespace ADDIN.Commands
             return (path ?? "").ToUpperInvariant() + "\n" + (configuration ?? "").ToUpperInvariant() +
                 (modified || string.IsNullOrEmpty(path) ? "\n@" + instance : "");
         }
-        internal void Invalidate() { Current = false; Context?.Invalidate(); }
+        internal void Invalidate() { Current = false; PlanningDraft = null; Context?.Invalidate(); }
         public void Dispose() { Current = false; Copy?.Dispose(); Copy = null; Model = null; }
     }
 
@@ -191,6 +192,9 @@ namespace ADDIN.Commands
                 if (model.GetUpdateStamp() != stamp || !IsHostActive)
                 { item.Invalidate(); throw new InvalidOperationException("Model đổi trong khi đọc. Quét lại."); }
                 if (item.Rows.Count == 0) item.Error = "Không có nếp chấn được hỗ trợ.";
+                // Candidate orders are not collision-checked: never display manufacturing PASS.
+                item.PlanningDraft = BendCheckPlanningDraft.Create(item.Rows);
+                Debug.WriteLine("[BEND PLAN DRAFT] " + item.PlanningDraft.ToJson());
             }
             catch (Exception ex) { item.Error = ex.Message; item.Context?.Invalidate(); }
             finally { item.Done = true; }
