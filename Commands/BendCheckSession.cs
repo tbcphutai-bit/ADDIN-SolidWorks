@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using ADDIN.Commands.BendTools;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -18,6 +19,12 @@ namespace ADDIN.Commands
         internal List<VCutPropertySetupCommand.BendRow> Rows = new List<VCutPropertySetupCommand.BendRow>();
         internal ModelDoc2 Model;
         private BendCheckPlanningDraft planningDraft;
+        private ToolProfileLibrarySnapshot toolProfiles;
+        internal ToolProfileLibrarySnapshot ToolProfiles
+        {
+            get { return Current && Context?.Current != false && toolProfiles?.Current == true ? toolProfiles : null; }
+            set { toolProfiles = value; }
+        }
         // A shared Set Bend Line context can be invalidated before this window's
         // next timer tick. Never expose its old planning snapshot as current.
         internal BendCheckPlanningDraft PlanningDraft
@@ -37,12 +44,12 @@ namespace ADDIN.Commands
             return (path ?? "").ToUpperInvariant() + "\n" + (configuration ?? "").ToUpperInvariant() +
                 (modified || string.IsNullOrEmpty(path) ? "\n@" + instance : "");
         }
-        internal void Invalidate() { Current = false; PlanningDraft = null; Context?.Invalidate(); }
-        public void Dispose() { Current = false; planningDraft = null; Copy?.Dispose(); Copy = null; Model = null; }
+        internal void Invalidate() { Current = false; PlanningDraft = null; toolProfiles = null; Context?.Invalidate(); }
+        public void Dispose() { Current = false; planningDraft = null; toolProfiles = null; Copy?.Dispose(); Copy = null; Model = null; }
     }
 
-    // All SolidWorks calls in this class run on the task pane's STA. Only the
-    // Excel provider runs on a worker. Geometry is captured once per file/config.
+    // All SolidWorks calls in this class run on the task pane's STA. File
+    // providers run on workers. Geometry is captured once per file/config.
     internal sealed class BendCheckSession : IDisposable
     {
         private readonly ISldWorks app;
@@ -51,6 +58,9 @@ namespace ADDIN.Commands
         internal readonly List<BendCheckItem> Items = new List<BendCheckItem>();
         private readonly HashSet<string> selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Func<List<VCutPropertySetupCommand.BendRow>> sharedRows;
+        private readonly ToolProfileLibrarySession toolLibrary;
+        internal ToolProfileLibrarySnapshot ToolLibrary => toolLibrary.Snapshot;
+        internal string ToolLibraryDiagnosticError => toolLibrary.DiagnosticError;
         private readonly string hostConfiguration;
         private int hostStamp;
         private bool disposed;
@@ -58,8 +68,11 @@ namespace ADDIN.Commands
         internal bool HasSelection => selected.Count > 0;
 
         internal BendCheckSession(ISldWorks app, ModelDoc2 host, Func<List<VCutPropertySetupCommand.BendRow>> sharedRows)
+            : this(app, host, sharedRows, new ToolProfileLibraryProvider()) { }
+        internal BendCheckSession(ISldWorks app, ModelDoc2 host, Func<List<VCutPropertySetupCommand.BendRow>> sharedRows, ToolProfileLibraryProvider toolProvider)
         {
             this.app = app; Host = host; this.sharedRows = sharedRows;
+            toolLibrary = new ToolProfileLibrarySession(toolProvider);
             IsAssembly = host.GetType() == (int)swDocumentTypes_e.swDocASSEMBLY;
             if (!IsAssembly && host.GetType() != (int)swDocumentTypes_e.swDocPART)
                 throw new InvalidOperationException("Mở Part hoặc Assembly.");
@@ -118,6 +131,9 @@ namespace ADDIN.Commands
             }
             Items.Sort((a, b) => { int n = StringComparer.CurrentCultureIgnoreCase.Compare(a.Name, b.Name); return n != 0 ? n : StringComparer.Ordinal.Compare(a.Configuration, b.Configuration); });
             hostStamp = Host.GetUpdateStamp();
+            // Read company files once for the session, on a managed I/O worker.
+            // It neither receives COM objects nor blocks the existing Min scan.
+            toolLibrary.Refresh();
         }
         private void Visit(Component2 component, HashSet<string> visited)
         {
@@ -202,7 +218,7 @@ namespace ADDIN.Commands
                 CapturePlanningDraft(item);
             }
             catch (Exception ex) { item.Error = ex.Message; item.Context?.Invalidate(); }
-            finally { item.Done = true; }
+            finally { item.Done = true; item.ToolProfiles = toolLibrary.Snapshot; }
         }
         private static void CapturePlanningDraft(BendCheckItem item)
         {
@@ -221,6 +237,10 @@ namespace ADDIN.Commands
         }
         internal bool CheckHostStamp()
         {
+            // Reuse the existing polling point without changing UI/event code.
+            // A failed DXF read has its own snapshot; it never sets item.Error.
+            try { toolLibrary.Poll(); foreach (var item in Items) if (item.Current) item.ToolProfiles = toolLibrary.Snapshot; }
+            catch (Exception ex) { toolLibrary.RecordDiagnosticFailure(ex); }
             try { return IsHostActive && !IsEditing && Host.GetUpdateStamp() == hostStamp; } catch { return false; }
         }
         internal bool CheckItem(BendCheckItem item)
@@ -242,7 +262,7 @@ namespace ADDIN.Commands
             if (!IsAssembly || !IsHostActive || item == null) return;
             try { Host.ClearSelection2(true); item.Instances.FirstOrDefault()?.Select4(false, null, false); Host.GraphicsRedraw2(); } catch { }
         }
-        public void Dispose() { if (disposed) return; disposed = true; foreach (var item in Items) item.Dispose(); }
+        public void Dispose() { if (disposed) return; disposed = true; toolLibrary.Dispose(); foreach (var item in Items) item.Dispose(); }
     }
 
     internal sealed partial class VCutPropertySetupCommand
