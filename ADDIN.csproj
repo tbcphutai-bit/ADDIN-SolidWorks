@@ -120,6 +120,7 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Commands\NativeToolBridges.cs" />
+    <Compile Include="Commands\BendCheck\BendCheckCommand.cs" />
     <Compile Include="Commands\RepairDanglingDimensions.Native.cs" />
     <Compile Include="UI\MirrorAssemblyPropertyManagerPage.cs" />
     <Compile Include="UI\VCutBendAssignmentControl.cs">
