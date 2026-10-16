@@ -50,6 +50,13 @@ namespace ADDIN
             return Commands.CreateMirrorPartPackage.RunSelfTest(swApp, manifestPathOrJson);
         }
 
+        // Bend Check: read-only backend entry point. Does not open a form or modify the part.
+        // Initial version reports candidates as UNVERIFIED until geometry/clearance evaluators exist.
+        public string RunBendCheckJson()
+        {
+            return new Commands.BendCheck.BendCheckCommand().AnalyzeToJson(swApp);
+        }
+
         public bool ConnectToSW(object ThisSW, int cookie)
         {
             var startup = Stopwatch.StartNew();
