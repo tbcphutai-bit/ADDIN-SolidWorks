@@ -17,7 +17,14 @@ namespace ADDIN.Commands
         internal readonly List<Component2> Instances = new List<Component2>();
         internal List<VCutPropertySetupCommand.BendRow> Rows = new List<VCutPropertySetupCommand.BendRow>();
         internal ModelDoc2 Model;
-        internal BendCheckPlanningDraft PlanningDraft;
+        private BendCheckPlanningDraft planningDraft;
+        // A shared Set Bend Line context can be invalidated before this window's
+        // next timer tick. Never expose its old planning snapshot as current.
+        internal BendCheckPlanningDraft PlanningDraft
+        {
+            get { return Current && Context?.Current != false ? planningDraft : null; }
+            set { planningDraft = value; }
+        }
         internal CheckPartWorkingCopy Copy;
         internal BendMinimumContext Context => Rows.Select(r => r.MinimumContext).FirstOrDefault(c => c != null);
         internal BendMinimumSummary Summary => BendMinimumSummary.Create(Rows);
@@ -31,7 +38,7 @@ namespace ADDIN.Commands
                 (modified || string.IsNullOrEmpty(path) ? "\n@" + instance : "");
         }
         internal void Invalidate() { Current = false; PlanningDraft = null; Context?.Invalidate(); }
-        public void Dispose() { Current = false; Copy?.Dispose(); Copy = null; Model = null; }
+        public void Dispose() { Current = false; planningDraft = null; Copy?.Dispose(); Copy = null; Model = null; }
     }
 
     // All SolidWorks calls in this class run on the task pane's STA. Only the
@@ -192,12 +199,25 @@ namespace ADDIN.Commands
                 if (model.GetUpdateStamp() != stamp || !IsHostActive)
                 { item.Invalidate(); throw new InvalidOperationException("Model đổi trong khi đọc. Quét lại."); }
                 if (item.Rows.Count == 0) item.Error = "Không có nếp chấn được hỗ trợ.";
-                // Candidate orders are not collision-checked: never display manufacturing PASS.
-                item.PlanningDraft = BendCheckPlanningDraft.Create(item.Rows);
-                Debug.WriteLine("[BEND PLAN DRAFT] " + item.PlanningDraft.ToJson());
+                CapturePlanningDraft(item);
             }
             catch (Exception ex) { item.Error = ex.Message; item.Context?.Invalidate(); }
             finally { item.Done = true; }
+        }
+        private static void CapturePlanningDraft(BendCheckItem item)
+        {
+            // Planning is optional diagnostic data. Its adapter/serializer/debug
+            // listener must not convert a successful Check Min capture to Error.
+            BendCheckPlanningDraft draft;
+            try { draft = BendCheckPlanningDraft.Create(item.Rows); }
+            catch (Exception ex)
+            {
+                draft = new BendCheckPlanningDraft { SourceRowCount = item.Rows.Count,
+                    Reason = "Planning draft failed; candidate orders suppressed.", DiagnosticError = ex.Message };
+            }
+            item.PlanningDraft = draft;
+            try { Debug.WriteLine("[BEND PLAN DRAFT] " + draft.ToJson()); }
+            catch (Exception ex) { draft.DiagnosticError = "Planning debug output failed: " + ex.Message; }
         }
         internal bool CheckHostStamp()
         {

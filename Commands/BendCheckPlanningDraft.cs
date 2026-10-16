@@ -14,8 +14,10 @@ namespace ADDIN.Commands
         public string Status = Unverified;
         public readonly List<BendPlanningBend> Bends = new List<BendPlanningBend>();
         public readonly List<BendPlanningOrder> CandidateOrders = new List<BendPlanningOrder>();
+        public int SourceRowCount;
         public bool Exhaustive;
         public string Reason = "";
+        public string DiagnosticError;
         public string Scope = "Check Min bend inventory only; no tooling, motion or collision evaluation.";
 
         internal static BendCheckPlanningDraft Create(IList<VCutPropertySetupCommand.BendRow> source)
@@ -25,9 +27,26 @@ namespace ADDIN.Commands
             {
                 result.Reason = "No recognized bend rows available."; return result;
             }
+            result.SourceRowCount = source.Count;
+            var errors = new HashSet<string>(StringComparer.Ordinal);
+            var featureIds = new HashSet<int>();
+            var persistentIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < source.Count; i++)
             {
                 var row = source[i];
+                if (row == null)
+                {
+                    errors.Add("Inventory contains a null row; candidate orders suppressed.");
+                    continue;
+                }
+                if (row.FeatureId <= 0)
+                    errors.Add("Invalid native feature ID; candidate orders suppressed.");
+                if (!featureIds.Add(row.FeatureId))
+                    errors.Add("Duplicate feature IDs; candidate orders suppressed.");
+                if (!string.IsNullOrEmpty(row.PersistentId) && !persistentIds.Add(row.PersistentId))
+                    errors.Add("Duplicate persistent identities; candidate orders suppressed.");
+                if (row.MinimumContext != null && !row.MinimumContext.Current)
+                    errors.Add("Inventory belongs to a stale Min context; rescan before enumerating.");
                 var item = new BendPlanningBend
                 {
                     Id = "B" + (i + 1) + "-F" + row.FeatureId,
@@ -40,17 +59,22 @@ namespace ADDIN.Commands
                     Mark = row.Kind ?? "",
                     CheckMinStatus = Unverified
                 };
+                // The diagnostic serializer must never emit NaN/Infinity (invalid
+                // JSON), nor turn an unknown API measurement into a zero value.
+                item.AngleDeg = Finite(item.AngleDeg, "angle", item);
+                item.RadiusMm = Finite(item.RadiusMm, "radius", item);
+                item.ThicknessMm = Finite(item.ThicknessMm, "thickness", item);
                 try
                 {
                     if (row.MinimumContext != null)
                         item.CheckMinStatus = row.MinimumContext.Evaluate(row).Status.ToString();
                 }
-                catch (Exception ex) { item.Warning = ex.Message; }
+                catch (Exception ex) { Warn(item, ex.Message); }
                 result.Bends.Add(item);
             }
-            if (result.Bends.Select(b => b.FeatureId).Distinct().Count() != result.Bends.Count)
+            if (errors.Count > 0)
             {
-                result.Reason = "Duplicate feature IDs; candidate orders suppressed.";
+                result.Reason = string.Join(" ", errors.OrderBy(e => e, StringComparer.Ordinal));
                 return result;
             }
             if (result.Bends.Count > 8)
@@ -68,6 +92,18 @@ namespace ADDIN.Commands
                 ? "All order permutations listed, but none checked."
                 : "Truncated at 24 orders; none checked.";
             return result;
+        }
+
+        private static double? Finite(double? value, string name, BendPlanningBend item)
+        {
+            if (!value.HasValue || !double.IsNaN(value.Value) && !double.IsInfinity(value.Value)) return value;
+            Warn(item, "Non-finite " + name + " reported as null.");
+            return null;
+        }
+
+        private static void Warn(BendPlanningBend item, string message)
+        {
+            item.Warning = string.IsNullOrEmpty(item.Warning) ? message : item.Warning + " " + message;
         }
 
         private static void Enumerate(string[] ids, bool[] used, List<string> current,
@@ -98,9 +134,9 @@ namespace ADDIN.Commands
             var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
             return serializer.Serialize(new
             {
-                Status, BendCount = Bends.Count, Bends,
+                Status, SourceRowCount, BendCount = Bends.Count, Bends,
                 CandidateOrderCount = CandidateOrders.Count,
-                Exhaustive, Reason, Scope, CandidateOrders
+                Exhaustive, Reason, DiagnosticError, Scope, CandidateOrders
             });
         }
     }
