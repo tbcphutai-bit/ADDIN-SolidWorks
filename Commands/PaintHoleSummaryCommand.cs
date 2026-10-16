@@ -391,9 +391,7 @@ namespace ADDIN.Commands
                 Feature representative = family.Roots.Count > 0 ? family.Roots[0] : family.Features[0];
                 string label = family.Label ?? "";
                 if (label.Length == 0 && SafeFeatureName(representative).Contains(PaintToken)) label = PaintToken;
-                string holeKey = family.DiameterMm.HasValue
-                    ? PhiToken + family.DiameterMm.Value.ToString("0.###", CultureInfo.InvariantCulture)
-                    : "?";
+                string holeKey = family.HoleKey ?? "?";
                 var record = new HoleRecord
                 {
                     HoleKey = holeKey,

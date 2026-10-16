@@ -13,7 +13,5 @@ namespace ADDIN.Commands
         public bool AddRadiusDimensions { get; set; } = true;
 
         public bool AddStepDimensions { get; set; } = true;
-
-        public double MaximumRadiusMm { get; set; } = 300;
     }
 }

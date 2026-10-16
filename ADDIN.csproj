@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="15.0">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -206,7 +206,30 @@
     <Compile Include="Commands\TaoDimKegaki.cs" />
     <Compile Include="Commands\AutoVCutSectionCommand.cs" />
     <Compile Include="Commands\AutoVCutSectionCommand.Assembly.cs" />
+    <Compile Include="Commands\AutoVCutSectionCommand.PartLayout.cs" />
+    <Compile Include="Commands\AutoVCutSectionCommand.PartMarks.cs" />
+    <Compile Include="Commands\PartSectionLayoutPlanner.cs" />
     <Compile Include="Commands\VCutPropertySetupCommand.cs" />
+    <Compile Include="Commands\BendPanelGeometry.cs" />
+    <Compile Include="Commands\BendMinimumFeatureGraph.cs" />
+    <Compile Include="Commands\BendMinimumContext.cs" />
+    <Compile Include="Commands\BendMinimumInspection.cs" />
+    <Compile Include="UI\BendMinimumSectionPreview.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Commands\BendMinimumSummary.cs" />
+    <Compile Include="Commands\BendCheckSession.cs" />
+    <Compile Include="UI\BendCheckForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\BendMinimumLiveMonitor.cs" />
+    <Compile Include="UI\BendMinimumDetailsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Commands\VCutPropertySetupCommand.Minimum.cs" />
+    <Compile Include="UI\VCutBendAssignmentControl.Minimum.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="Commands\BendTableCellReader.cs" />
     <Compile Include="Commands\VCutFeatureTagStore.cs" />
     <Compile Include="UI\VCutNoticeDialog.cs">
@@ -240,6 +263,38 @@
     <Compile Include="Commands\BendTableContentComparer.cs" />
     <Compile Include="Commands\BendTableDeepReader.cs" />
     <Compile Include="Commands\BendTableDatabase.cs" />
+    <Compile Include="Commands\BendToolExcelCatalog.cs" />
+    <Compile Include="Commands\BendToolExcelCatalog.Minimum.cs" />
+    <Compile Include="Commands\BendMinimumSection.cs" />
+    <Compile Include="Commands\BendMinimumScan.cs" />
+    <Compile Include="Commands\BendMinimumGeometryCache.cs" />
+    <Compile Include="Commands\BendMinimumManufacturing.cs" />
+    <Compile Include="UI\BendMinimumCheckForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\BendMinimumTaskPaneIntegration.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Commands\BendToolStorageSettings.cs" />
+    <Compile Include="Commands\BundledBendTools.cs" />
+    <Compile Include="Commands\BendTableStorageSettings.cs" />
+    <Compile Include="Commands\BendStandardProfile.cs" />
+    <Compile Include="Commands\BundledBendStandards.cs" />
+    <Compile Include="UI\AddinSettingsControl.Standards.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\BendStandardFilesForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\AddinSettingsControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\AddinSettingsControl.BendTools.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="BomTaskPaneControl.Settings.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="Commands\BendTableXlsxImporter.cs" />
     <Compile Include="Commands\KegakiFlatPatternReader.cs" />
     <Compile Include="Commands\CheckPartWorkingCopy.cs" />
@@ -262,6 +317,11 @@
       <DependentUpon>SamePartToleranceInputDialog.cs</DependentUpon>
     </Compile>
     <Compile Include="Commands\CheckAssemblyHole.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Results.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.MissingPattern.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.SkippedPattern.cs" />
+    <Compile Include="Commands\CheckHoleResultsForm.cs" />
+    <Compile Include="Commands\CheckHolePointCache.cs" />
     <Compile Include="Commands\RoundHolePreviewForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -365,9 +425,15 @@
     <Compile Include="Commands\BomDrawingReference.cs" />
     <Compile Include="Commands\DrawingCommandDisplayScope.cs" />
     <Compile Include="Commands\DxfBomDrawingSourceResolver.cs" />
-    <Compile Include="UI\DrawingBomCheckReviewForm.cs" />
-    <Compile Include="UI\DrawingBomCheckReviewIntegration.cs" />
-    <Compile Include="UI\DxfBomDrawingReviewForm.cs" />
+    <Compile Include="UI\DrawingBomCheckReviewForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\DrawingBomCheckReviewIntegration.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\DxfBomDrawingReviewForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Commands\DxfCheckExport.BomDrawing.cs" />
     <Compile Include="UI\StandaloneLauncherHandoff.cs">
       <SubType>UserControl</SubType>
@@ -379,6 +445,9 @@
     <Compile Include="Commands\DrawingDxfExport\DxfLaserMarkLayer.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfLayerFinalizer.CheckCopy.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfLayerFinalizer.cs" />
+    <Compile Include="Commands\DrawingDxfExport\DxfLayerFinalizer.VisibleLines.cs" />
+    <Compile Include="Commands\DrawingDxfExport\DxfOutPut.VisibleLines.cs" />
+    <Compile Include="Commands\DrawingDxfExport\DxfLayerFinalizer.OpeningLayout.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfLayerFinalizer.MarkContour.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfLayerFinalizer.MarkInjection.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfLayerFinalizer.MarkLayerOnly.cs" />
@@ -399,6 +468,8 @@
     <Compile Include="Commands\DrawingDxfExport\DxfOutPut.StepHoles.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfOutPut.Trace.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfOutPut.ViewGate.cs" />
+    <Compile Include="Commands\DrawingDxfExport\DxfOutPut.Update.cs" />
+    <Compile Include="Commands\DrawingDxfExport\DxfLayerFinalizer.CompleteGeometry.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfOutPut.ViewMarkExport.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfOutPut.ViewOrientation.cs" />
     <Compile Include="Commands\DrawingDxfExport\DxfPalette.cs" />
@@ -427,6 +498,12 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Data\BendTools.default.xlsx">
+      <LogicalName>ADDIN.BendTools.DefaultExcel.xlsx</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Data\BendTables.defaults.zip">
+      <LogicalName>ADDIN.BendTables.DefaultExcel.zip</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Data\BendTables.default.json">
       <LogicalName>ADDIN.BendTables.Default.json</LogicalName>
     </EmbeddedResource>

@@ -1,4 +1,4 @@
-﻿// Adapted from user-supplied DXF.zip; see SOURCE.md.
+// Adapted from user-supplied DXF.zip; see SOURCE.md.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -691,6 +691,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 string name = feature.Name ?? "";
                 if (visibleMarkFeatureNames.Contains(name) || !seen.Add(name)) continue;
                 if (!recognizer.TryResolve(feature, out LaserMarkFeatureRecognizer.Resolution mark)) continue;
+                if (mark.SourceKind == LaserMarkFeatureKind.Sketch2D) continue;
                 if (!string.Equals(mark.SourceName, name, StringComparison.OrdinalIgnoreCase)) continue;
                 if (IsFeatureSuppressedIn(feature, configuration)) continue;
                 result.Add((feature, mark));

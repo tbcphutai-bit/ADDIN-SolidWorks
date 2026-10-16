@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -87,6 +87,8 @@ namespace ADDIN.UI
         // Colour a child has to clear its corners with: the nearest opaque parent.
         public static Color BackdropOf(Control control)
         {
+            if (control != null && control.Parent is ModernCard card && card.HeaderStyle == ModernCardHeaderStyle.DarkNavy && control.Top < Px(control, CardHeader))
+                return Color.FromArgb(30, 41, 59);
             for (Control parent = control == null ? null : control.Parent; parent != null; parent = parent.Parent)
                 if (parent.BackColor.A == 255) return parent.BackColor;
             return Page;
@@ -117,13 +119,37 @@ namespace ADDIN.UI
         {
             Prepare(g);
             Rectangle frame = new Rectangle(bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1);
-            FillRound(g, frame, Px(owner, CardRadius), Surface, Border);
+            int rad = Px(owner, CardRadius);
+            FillRound(g, frame, rad, Surface, Border);
             if (string.IsNullOrEmpty(title)) return;
-            Rectangle text = new Rectangle(bounds.X + Px(owner, CardPadding), bounds.Y + Px(owner, 7),
-                Math.Max(1, bounds.Width - Px(owner, CardPadding) * 2), Px(owner, 22));
-            TextRenderer.DrawText(g, title, BodyStrong, text, Text,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
-                TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+
+            // Draw Dark Navy Header
+            int headerH = Px(owner, CardHeader);
+            using (GraphicsPath topPath = UIHelper.GetRoundPath(new Rectangle(bounds.X, bounds.Y, bounds.Width - 1, headerH * 2), rad))
+            {
+                g.SetClip(new Rectangle(bounds.X, bounds.Y, bounds.Width, headerH));
+                using (SolidBrush sb = new SolidBrush(Color.FromArgb(30, 41, 59))) // Slate-800
+                    g.FillPath(sb, topPath);
+                g.ResetClip();
+            }
+
+            // Cyan accent indicator
+            int pillX = bounds.X + Px(owner, 12);
+            int pillH = Px(owner, 14);
+            int pillY = bounds.Y + (headerH - pillH) / 2;
+            int pillW = Px(owner, 3);
+            using (SolidBrush pb = new SolidBrush(Color.FromArgb(56, 189, 248))) // Cyan-400
+                g.FillRectangle(pb, pillX, pillY, pillW, pillH);
+
+            int textX = pillX + pillW + Px(owner, 7);
+            int maxW = Math.Max(1, bounds.Right - Px(owner, 12) - textX);
+            using (Font titleFont = new Font("Segoe UI", 9.0f, FontStyle.Bold))
+            {
+                TextRenderer.DrawText(g, title, titleFont,
+                    new Rectangle(textX, bounds.Y, maxW, headerH),
+                    Color.White,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            }
         }
 
         // A GroupBox drawn as a card: same surface, border and title line as ModernCard.

@@ -219,8 +219,7 @@ namespace ADDIN.Commands
         private const double BendTableToleranceMm = 0.001;
         private const string XToolBendTableDirectory =
             @"C:\Program Files\XTool\XTool\SwTemplete\2024\BendTable";
-        private const string StandardBendTableDirectory =
-            @"C:\sw共有ライブラリ\テーブル\菊川ベンドテーブル_170905";
+        private string StandardBendTableDirectory => bendTableReader.StandardSourceDirectory;
 
         private readonly ISldWorks swApp;
         private readonly BendTableDeepReader bendTableReader;
@@ -667,7 +666,7 @@ namespace ADDIN.Commands
             return result;
         }
 
-        private static string ResolveActualBendTablePath(
+        private string ResolveActualBendTablePath(
             string requestedPath,
             string requestedName)
         {
@@ -684,13 +683,9 @@ namespace ADDIN.Commands
             return FindFileIgnoreCase(StandardBendTableDirectory, requestedName);
         }
 
-        private static string ResolveStandardBendTablePath(string requestedName)
+        private string ResolveStandardBendTablePath(string requestedName)
         {
-            string standardName = MapStandardBendTableName(requestedName);
-            string path = FindFileIgnoreCase(StandardBendTableDirectory, standardName);
-            if (!string.IsNullOrWhiteSpace(path))
-                return path;
-            return FindFileIgnoreCase(StandardBendTableDirectory, requestedName);
+            return bendTableReader.ResolveStandardPath(MapStandardBendTableName(requestedName));
         }
 
         private static string MapStandardBendTableName(string requestedName)
@@ -957,7 +952,7 @@ namespace ADDIN.Commands
                 + ", source=" + row.BendValueSource + ", " + note);
         }
 
-        private static string ResolveStandardBendTablePathForMaterialGroup(
+        private string ResolveStandardBendTablePathForMaterialGroup(
             string materialGroup)
         {
             string standardName = "";
@@ -970,7 +965,7 @@ namespace ADDIN.Commands
             else if (string.Equals(materialGroup, "CU", StringComparison.OrdinalIgnoreCase))
                 standardName = "BD_Kiku_RBs,Bs,Cu_2020.xlsx";
 
-            return FindFileIgnoreCase(StandardBendTableDirectory, standardName);
+            return string.IsNullOrWhiteSpace(standardName) ? null : bendTableReader.ResolveStandardPath(standardName);
         }
 
         private static void ApplyMaterialCheck(

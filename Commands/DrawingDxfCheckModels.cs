@@ -40,6 +40,14 @@ namespace ADDIN.Commands.DxfChecking
         public List<GeometryLoop2D> Inside = new List<GeometryLoop2D>();
         public List<DxfEdge> Unclosed = new List<DxfEdge>();
         public int OtherOuterCount;
+        public List<GeometryReviewPoint> Reviews = new List<GeometryReviewPoint>();
+    }
+
+    internal sealed class GeometryReviewPoint
+    {
+        public string Type, Description;
+        public DxfPoint Position;
+        public double Deviation;
     }
 
     internal sealed class GeometryMismatch
@@ -47,6 +55,7 @@ namespace ADDIN.Commands.DxfChecking
         public int Id;
         public string Type, Description;
         public bool CutQualityIssue;
+        public bool ReviewIssue;
         public DxfPoint DrawingPosition, DxfPosition;
         public bool HasDrawingPosition, HasDxfPosition;
         public double Deviation;
@@ -62,10 +71,19 @@ namespace ADDIN.Commands.DxfChecking
         public List<GeometryMismatch> Mismatches = new List<GeometryMismatch>();
         public DrawingComparisonSource Source;
         public DrawingNormalizationReport Normalization;
-        public bool GeometryPassed { get { return ScaleEvaluated && ScalePassed && AlignmentFound && OuterContourPassed && !Mismatches.Any(m => !m.CutQualityIssue) && FailedInsideContours == 0; } }
-        public bool CutQualityPassed { get { return !Mismatches.Any(m => m.CutQualityIssue); } }
-        public bool Passed { get { return GeometryPassed && CutQualityPassed; } }
-        public string Status { get { return Passed ? "PASS" : GeometryPassed ? "WARN" : "FAIL"; } }
+        public bool GeometryPassed { get { return ScaleEvaluated && ScalePassed && AlignmentFound && OuterContourPassed && !Mismatches.Any(m => !m.CutQualityIssue && !m.ReviewIssue) && FailedInsideContours == 0; } }
+        public bool CutQualityPassed { get { return !Mismatches.Any(m => m.CutQualityIssue || m.ReviewIssue); } }
+        public bool ReviewRequired { get { return Mismatches.Any(m => m.ReviewIssue); } }
+        public bool Passed { get { return GeometryPassed && CutQualityPassed && !ReviewRequired; } }
+        public string Status { get { return !GeometryPassed ? "FAIL" : ReviewRequired ? "CHECK" : CutQualityPassed ? "PASS" : "WARN"; } }
+        public void AddReview(GeometryReviewPoint review, bool drawing)
+        {
+            // Numerical joins are review evidence, separate from measured shape deviation.
+            Mismatches.Add(new GeometryMismatch { Id = Mismatches.Count + 1, Type = review.Type,
+                Description = (drawing ? "Drawing: " : "DXF: ") + review.Description, ReviewIssue = true,
+                HasDrawingPosition = drawing, DrawingPosition = drawing ? review.Position : new DxfPoint(),
+                HasDxfPosition = !drawing, DxfPosition = drawing ? new DxfPoint() : review.Position, Deviation = review.Deviation });
+        }
         public void AddQuality(string type, string description, DxfPoint? dxf)
         {
             Add(type, description, null, dxf);

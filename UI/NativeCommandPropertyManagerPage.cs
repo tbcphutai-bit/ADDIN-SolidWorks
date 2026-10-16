@@ -50,6 +50,7 @@ namespace ADDIN.UI
         protected virtual int SelectionMark(object item, int type) { return 0; }
         protected virtual int SelectionLimit(int mark) { return 1; }
         protected virtual bool UsesSelectionBoxes { get { return false; } }
+        protected virtual bool HandlesHostedKeyboard { get { return false; } }
         protected virtual void OnReleased(bool accepted) { }
         protected virtual IEnumerable<Pick> PrepareInitialSelections(List<Pick> picks) { return picks; }
         protected virtual void OnShown() { }
@@ -88,6 +89,8 @@ namespace ADDIN.UI
             int flags = (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_OkayButton |
                 (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_CancelButton |
                 (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_LockedPage;
+            if (HandlesHostedKeyboard)
+                flags |= (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_HandleKeystrokes;
             Page = App.CreatePropertyManagerPage(title, flags, this, ref status) as PropertyManagerPage2;
             if (Page == null || status != 0) { AfterClose(); throw new InvalidOperationException("Không tạo được " + title + " (" + status + ")."); }
             Initializing = true;
@@ -316,7 +319,7 @@ namespace ADDIN.UI
         public int OnActiveXControlCreated(int id, bool status) { return 0; }
         public void OnSliderPositionChanged(int id, double value) { }
         public void OnSliderTrackingCompleted(int id, double value) { }
-        public bool OnKeystroke(int wparam, int message, int lparam, int id) { return false; }
+        public virtual bool OnKeystroke(int wparam, int message, int lparam, int id) { return false; }
         public void OnPopupMenuItem(int id) { }
         public void OnPopupMenuItemUpdate(int id, ref int value) { }
         public void OnGainedFocus(int id) { }

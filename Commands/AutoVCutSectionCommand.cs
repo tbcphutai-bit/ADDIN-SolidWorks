@@ -270,14 +270,8 @@ namespace ADDIN.Commands
                 }
                 if (selectedCutLine != null)
                 {
-                    if (features.Count > 0 && props.Definitions.Count == 0)
-                    {
-                        Notify("Part có Bend Table 溝 nhưng chưa có Custom Property " +
-                            "V溝1 / V溝2 / C溝. Chưa tạo mặt cắt để tránh thiếu dấu.\n\n" +
-                            "Ví dụ: nhập V溝1=0.8 mm, chọn cạnh bào tương ứng trong " +
-                            "Set Bend line, rồi lưu Part. Loại ○ / ◎ / ● do bạn quyết định.");
-                        return;
-                    }
+                    // Ordinary sections do not need groove properties. Validate
+                    // setup only for groove bends actually crossed by this line.
                     CreateSectionFromSelectedLine(drawing, selectedView, selectedCutLine, features);
                     return;
                 }
@@ -622,17 +616,12 @@ namespace ADDIN.Commands
                     continue;
                 double angleDifference = UndirectedAngleDifference(cut.AngleDeg,
                     bend.ProjectedAxisDeg.Value + 90);
-                if (angleDifference > 2)
-                {
-                    Log("MANUAL SECTION V-CUT REJECT feature=" + bend.FeatureName +
-                        " reason=ANGLE delta=" + F(angleDifference) + "deg");
-                    continue;
-                }
                 if (bend.ProjectedBendSpans.Count == 0)
                 {
                     Log("MANUAL SECTION V-CUT REJECT feature=" + bend.FeatureName +
                         " reason=NO_PROJECTED_SPAN");
-                    ngBends.Add(bend.FeatureName + ": không đọc được chiều dài cạnh bẻ để kiểm tra đường cắt");
+                    if (angleDifference <= 2)
+                        ngBends.Add(bend.FeatureName + ": không đọc được chiều dài cạnh bẻ để kiểm tra đường cắt");
                     continue;
                 }
                 double along = 0;
@@ -645,6 +634,19 @@ namespace ADDIN.Commands
                     { distance = candidateDistance; along = candidateAlong; }
                 }
                 nearestBendDistance = Math.Min(nearestBendDistance, distance);
+                if (angleDifference > 2)
+                {
+                    Log("MANUAL SECTION V-CUT REJECT feature=" + bend.FeatureName +
+                        " reason=ANGLE delta=" + F(angleDifference) +
+                        "deg distance=" + Mm(distance) + "mm");
+                    // A nearby parallel bend must not block an ordinary cut.
+                    // A real oblique intersection needs review: silently omitting
+                    // its groove mark would produce an incomplete drawing.
+                    if (distance <= 1e-7)
+                        ngBends.Add(bend.FeatureName + ": đường cắt giao cạnh bào nhưng không vuông góc (lệch " +
+                            F(angleDifference) + "°). Hãy chọn đường cắt vuông góc với cạnh bào.");
+                    continue;
+                }
                 if (distance > cutHitTolerance)
                 {
                     Log("MANUAL SECTION V-CUT REJECT feature=" + bend.FeatureName +
@@ -688,17 +690,12 @@ namespace ADDIN.Commands
                     "\n\nKiểm tra thông tin cạnh nêu trên trong Set Bend line rồi thử lại.");
                 return;
             }
-            if (bends.Count > 0 && relevant.Count == 0)
+            if (relevant.Count == 0)
             {
                 string distanceText = nearestBendDistance == double.MaxValue ?
                     "không đo được" : Mm(nearestBendDistance) + " mm";
-                Log("MANUAL SECTION NO GROOVE HIT nearest=" + distanceText +
-                    " tolerance=" + Mm(cutHitTolerance) + "mm");
-                Notify("Đã nhận đường cắt, nhưng không tìm thấy giao với đoạn cạnh bào phù hợp. " +
-                    "Khoảng cách gần nhất: " + distanceText +
-                    "; giới hạn nhận dạng: " + Mm(cutHitTolerance) +
-                    " mm. Hãy kiểm tra đường cắt có giao và vuông góc với cạnh bào cần tạo mặt cắt.");
-                return;
+                Log("MANUAL SECTION NORMAL no crossed groove; nearest=" + distanceText +
+                    "; using shared scale, direction and layout without groove marks");
             }
             foreach (VCutBendInfo bend in relevant)
             {
@@ -775,35 +772,33 @@ namespace ADDIN.Commands
                 double materialThickness = relevant.Where(b => b.MaterialThicknessMm > 0 &&
                     !double.IsNaN(b.MaterialThicknessMm) && !double.IsInfinity(b.MaterialThicknessMm))
                     .Select(b => b.MaterialThicknessMm).DefaultIfEmpty(0).Min();
-                double targetWidth, targetHeight;
-                GetSectionLayoutTargets(drawingDoc, parent, verticalCut, out targetWidth, out targetHeight);
-                AutoScaleSectionView(drawing, drawingDoc, section, parent, verticalCut,
-                    targetWidth, targetHeight);
-                drawing.EditRebuild3();
-                bool omoteVerified = hasUra && EnsureOmoteDisplaySide(drawing,
-                    section, drSection, omoteVisible);
-                int blocks = 0;
-                var failedMarks = new List<string>();
-                foreach (VCutBendInfo bend in relevant)
+                if (materialThickness <= 0 && referencedPart != null)
                 {
-                    bend.ProjectedCenterX = null;
-                    bend.ProjectedCenterY = null;
-                    bend.ProjectedCenterZ = null;
-                    LogBendGeometry(bend, section);
-                    if (InsertVCutBlock(drawing, drawingDoc, section, bend)) blocks++;
-                    else failedMarks.Add(bend.FeatureName + " " + bend.MatchedDefinition.Mark);
+                    // Ordinary bends also have sheet thickness, independently
+                    // of groove marks. Report it without using it to size views.
+                    try
+                    {
+                        if (string.Equals(referencedPart.ConfigurationManager.ActiveConfiguration.Name,
+                            parent.ReferencedConfiguration, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var thicknesses = new HashSet<double>();
+                            var allowances = new List<BendAllowanceInfo>();
+                            var partBends = new List<Feature>();
+                            for (Feature root = referencedPart.FirstFeature() as Feature;
+                                root != null; root = root.GetNextFeature() as Feature)
+                                CollectFeature(root, allowances, partBends, thicknesses);
+                            if (thicknesses.Count == 1) materialThickness = thicknesses.First();
+                        }
+                    }
+                    catch (Exception ex) { Log("SECTION THICKNESS report unavailable: " + ex.Message); }
                 }
-                drawing.EditRebuild3();
-                // Break the view only after placing the mark blocks.  With the
-                // SOLIDWORKS "Break sketch blocks" option enabled, each mark
-                // follows its own end of the shortened section.
+                bool omoteVerified;
+                int blocks;
+                List<string> failedMarks;
                 string breakNotice;
-                string parentName = parent.GetName2();
-                section = AutoBreakSectionView(drawing, drawingDoc, section,
-                    verticalCut, relevant, verticalCut ? targetHeight : targetWidth, out breakNotice);
-                parent = FindSectionView(drawingDoc, parentName) ?? parent;
-                PlaceSectionView(drawing, drawingDoc, section, parent, verticalCut);
-                drawing.EditRebuild3();
+                section = SynchronizePartSectionLayout(drawing, drawingDoc, section, parent,
+                    verticalCut, relevant, hasUra, omoteVisible, out omoteVerified,
+                    out blocks, out failedMarks, out breakNotice);
                 double[] finalOutline = section.GetOutline() as double[];
                 Sheet finalSheet = drawingDoc.GetCurrentSheet() as Sheet;
                 if (finalOutline != null && finalSheet != null)
@@ -814,8 +809,9 @@ namespace ADDIN.Commands
                         finalOutline[2] > paperWidth || finalOutline[3] > paperHeight)
                         breakNotice += "\nMặt cắt còn vượt tờ: cần kiểm tra bố trí hoặc chọn khổ giấy lớn hơn.";
                 }
-                Notify("Đã tạo Section View " + label + ".\nBend V-CUT cùng hướng: " + relevant.Count +
-                    "\nĐã chèn dấu: " + blocks +
+                Notify("Đã tạo Section View " + label + "." +
+                    (relevant.Count == 0 ? "\nMặt cắt thường — không có cạnh bào đi qua đường cắt." :
+                        "\nCạnh bào đi qua đường cắt: " + relevant.Count + "\nĐã chèn dấu: " + blocks) +
                     "\nHướng OMOTE ra ngoài: " + (omoteVerified ? "OK" : "không xác định") +
                     "\nTỉ lệ mặt cắt: " + FormatSectionScale(section.ScaleDecimal) +
                     (materialThickness > 0 ? " — bề dày trên giấy: " +
@@ -1088,7 +1084,7 @@ namespace ADDIN.Commands
         private static SolidWorks.Interop.sldworks.View AutoBreakSectionView(
             ModelDoc2 drawing, DrawingDoc drawingDoc,
             SolidWorks.Interop.sldworks.View section, bool verticalCut,
-            List<VCutBendInfo> markedBends, double target, out string notice)
+            List<VCutBendInfo> markedBends, double target, out string notice, bool keepCommonScale = false)
         {
             notice = "";
             double[] outline = section.GetOutline() as double[];
@@ -1104,10 +1100,38 @@ namespace ADDIN.Commands
                 double? position = verticalCut ? bend.ProjectedCenterY : bend.ProjectedCenterX;
                 if (position.HasValue) protectedPoints.Add(position.Value);
             }
+            bool readableNormalProfile = true;
+            if (keepCommonScale || markedBends.Count == 0)
+            {
+                // With no groove marks, the profile itself must protect ordinary
+                // flanges/jogs. An empty mark list does not mean a straight middle.
+                var profile = GetDisplayedSegments(section);
+                readableNormalProfile = profile.Count > 0;
+                foreach (ProjectedSegmentInfo segment in profile)
+                {
+                    double transverse = verticalCut ? Math.Abs(segment.X2 - segment.X1)
+                        : Math.Abs(segment.Y2 - segment.Y1);
+                    if (segment.Length <= 1e-9 || transverse <= 0.00001 ||
+                        transverse / segment.Length <= 0.05) continue;
+                    double a = verticalCut ? segment.Y1 : segment.X1;
+                    double b = verticalCut ? segment.Y2 : segment.X2;
+                    double minimum = Math.Min(a, b), maximum = Math.Max(a, b);
+                    int samples = Math.Max(1, (int)Math.Ceiling((maximum - minimum) / 0.012));
+                    for (int i = 0; i <= samples; i++)
+                        protectedPoints.Add(minimum + (maximum - minimum) * i / samples);
+                }
+                Log("SECTION BREAK NORMAL profileSegments=" + profile.Count +
+                    " protectedPositions=" + protectedPoints.Count);
+            }
             double first, second;
-            if (!TryPlanSectionBreak(outline[axis], outline[axis + 2], target,
+            if (!readableNormalProfile || !TryPlanSectionBreak(outline[axis], outline[axis + 2], target,
                 protectedPoints, out first, out second))
             {
+                if (keepCommonScale)
+                {
+                    notice = "Không có đoạn ngắt an toàn; cần giảm tỉ lệ chung của nhóm mặt cắt.";
+                    return section;
+                }
                 // If a safe break is impossible, fit the entire geometry to its
                 // reserved area instead of using a material-thickness floor.
                 double oldScale = section.ScaleDecimal;
@@ -1144,11 +1168,16 @@ namespace ADDIN.Commands
                 if (!drawingDoc.ActivateView(viewName))
                     throw new InvalidOperationException("Không kích hoạt được Section View.");
                 section.BreakLineGap = 0.001;
-                object line = section.InsertBreak3(
-                    (int)(verticalCut ? swBreakLineOrientation_e.swBreakLineHorizontal :
-                        swBreakLineOrientation_e.swBreakLineVertical),
-                    relativeFirst, relativeSecond,
-                    (int)swBreakLineStyle_e.swBreakLine_Straight, 1, true);
+                int orientation = (int)(verticalCut ? swBreakLineOrientation_e.swBreakLineHorizontal :
+                    swBreakLineOrientation_e.swBreakLineVertical);
+                var oldLines = section.GetBreakLines() as Array;
+                var reusable = (oldLines == null ? Enumerable.Empty<BreakLine>() : oldLines.OfType<BreakLine>())
+                    .Where(candidateLine => candidateLine.Orientation == orientation)
+                    .OrderBy(candidateLine => candidateLine.GetPosition(0)).ToList();
+                object line = reusable.Count > 0
+                    ? (reusable[0].SetPosition(relativeFirst, relativeSecond) ? reusable[0] : null)
+                    : section.InsertBreak3(orientation, relativeFirst, relativeSecond,
+                        (int)swBreakLineStyle_e.swBreakLine_Straight, 1, true);
                 if (line == null)
                     throw new InvalidOperationException("InsertBreak3 trả về null.");
                 drawing.EditRebuild3();

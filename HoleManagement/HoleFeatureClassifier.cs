@@ -10,6 +10,61 @@ namespace ADDIN.HoleManagement
 
     internal static class HoleFeatureClassifier
     {
+        // Read pattern selections while the definition is accessible, then release the
+        // rollback before scanning geometry or renaming any feature.
+        public static void VisitPatternSeeds(Feature feature, ModelDoc2 model,
+            Action<object, object, object> visitor)
+        {
+            object definition = feature.GetDefinition();
+            bool accessed = false;
+            try
+            {
+                var linear = definition as LinearPatternFeatureData;
+                var curve = definition as CurveDrivenPatternFeatureData;
+                var circular = definition as CircularPatternFeatureData;
+                var fill = definition as FillPatternFeatureData;
+                var table = definition as TablePatternFeatureData;
+                if (linear != null) accessed = linear.AccessSelections(model, null);
+                else if (curve != null) accessed = curve.AccessSelections(model, null);
+                else if (circular != null) accessed = circular.AccessSelections(model, null);
+                else if (fill != null) accessed = fill.AccessSelections(model, null);
+                else if (table != null) accessed = table.AccessSelections(model, null);
+                if (!accessed)
+                    Debug.WriteLine("[HOLE FAMILY] Reading pattern selections without rollback: " + feature.Name);
+                if (linear != null) visitor(SafeRead(() => linear.PatternFeatureArray), SafeRead(() => linear.PatternFaceArray), SafeRead(() => linear.PatternBodyArray));
+                else if (curve != null) visitor(SafeRead(() => curve.PatternFeatureArray), SafeRead(() => curve.PatternFaceArray), SafeRead(() => curve.PatternBodyArray));
+                else if (circular != null) visitor(SafeRead(() => circular.PatternFeatureArray), SafeRead(() => circular.PatternFaceArray), SafeRead(() => circular.PatternBodyArray));
+                else if (fill != null) visitor(SafeRead(() => fill.PatternFeatureArray), SafeRead(() => fill.PatternFaceArray), SafeRead(() => fill.PatternBodyArray));
+                else if (table != null) visitor(SafeRead(() => table.PatternFeatureArray), SafeRead(() => table.PatternFaceArray), SafeRead(() => table.PatternBodyArray));
+            }
+            finally
+            {
+                if (accessed)
+                {
+                    var linear = definition as LinearPatternFeatureData;
+                    var curve = definition as CurveDrivenPatternFeatureData;
+                    var circular = definition as CircularPatternFeatureData;
+                    var fill = definition as FillPatternFeatureData;
+                    var table = definition as TablePatternFeatureData;
+                    if (linear != null) linear.ReleaseSelectionAccess();
+                    else if (curve != null) curve.ReleaseSelectionAccess();
+                    else if (circular != null) circular.ReleaseSelectionAccess();
+                    else if (fill != null) fill.ReleaseSelectionAccess();
+                    else if (table != null) table.ReleaseSelectionAccess();
+                }
+            }
+        }
+
+        private static object SafeRead(Func<object> read)
+        {
+            try { return read(); }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[HOLE FAMILY] Pattern selection unavailable: " + ex.Message);
+                return null;
+            }
+        }
+
         public static long Identity(Feature feature)
         {
             IntPtr pointer = Marshal.GetIUnknownForObject(feature);

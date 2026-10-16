@@ -107,8 +107,13 @@ internal static class DrawingDxfTests
         Case("all holes shifted cannot vote the outer origin away",()=>{
             var drawing=Drawing();var dxf=Move(drawing,500,300);
             for(int i=4;i<dxf.Count;i++) dxf[i]=C(dxf[i].Center.X+30,dxf[i].Center.Y,dxf[i].Radius);
-            var r=Check(drawing,dxf);Assert(r.OuterContourPassed && !r.GeometryPassed && r.FailedInsideContours==10,"must separate outer and holes");
-            Assert(Math.Abs(r.Translation.OffsetX+500)<1e-8 && Math.Abs(r.Translation.OffsetY+300)<1e-8 && Math.Abs(r.MaximumDeviation-30)<1e-6,"outer origin must stay fixed");});
+            var r=Check(drawing,dxf);Assert(r.OuterContourPassed && !r.GeometryPassed && r.Status=="FAIL","must separate outer and holes");
+            Assert(Math.Abs(r.Translation.OffsetX+500)<1e-8 && Math.Abs(r.Translation.OffsetY+300)<1e-8,"outer origin must stay fixed");
+            // A 30 mm displacement can exceed the pairing radius. In that case
+            // report ten missing plus ten extra holes rather than inventing pairs.
+            bool paired=r.FailedInsideContours==10 && Math.Abs(r.MaximumDeviation-30)<1e-6;
+            bool unpaired=r.FailedInsideContours==20 && r.Mismatches.Count(m=>m.Type=="Missing inside contour")==10 && r.Mismatches.Count(m=>m.Type=="Extra DXF contour")==10;
+            Assert(paired || unpaired,"all ten moved holes must remain failures");});
         Case("duplicate outer edge is a cut warning with geometry PASS",()=>{
             var dxf=Drawing();dxf.Add(L(0,0,1200,0));var r=Check(Drawing(),dxf);
             Assert(r.GeometryPassed && !r.CutQualityPassed && r.Status=="WARN" && !r.Passed,"warn is never a clean PASS");

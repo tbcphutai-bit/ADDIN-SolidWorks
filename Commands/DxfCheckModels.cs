@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -148,6 +148,8 @@ namespace ADDIN.Commands.DxfChecking
         public int YellowContourCount { get { return YellowShapes.Where(s => s.IsContour).Sum(s => s.Count); } }
         public int YellowLayerWithEntitiesCount { get { return YellowShapes.Where(s => s.YellowLayer && s.EntityCount > 0).Select(s => s.Layer).Distinct(StringComparer.OrdinalIgnoreCase).Count(); } }
         public bool HasYellowContent { get { return Error == null && Options.Has(DxfCheckCondition.YellowLayers) && YellowShapes.Any(s => s.EntityCount > 0); } }
+        public int SplineCount { get { return Edges.Where(e => e.OriginalType == "SPLINE").Select(e => e.Handle).Distinct().Count(); } }
+        public int PolylineCount { get { return Edges.Where(e => e.OriginalType == "POLYLINE" || e.OriginalType == "LWPOLYLINE").Select(e => e.Handle).Distinct().Count(); } }
         public int GeometryCount;
         public int DuplicateNameCount;
         public double Milliseconds;

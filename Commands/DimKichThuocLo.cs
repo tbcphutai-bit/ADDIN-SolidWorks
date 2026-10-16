@@ -10,6 +10,7 @@ namespace ADDIN.Commands
     public partial class DimKichThuocLo
     {
         private const string CenterMarkNamePrefix = "ADDIN_DIM_HOLE_CENTER_";
+        private const string SlotDimensionNamePrefix = "ADDIN_DIM_HOLE_SLOT_";
 
         private class LineInfo
         {
@@ -181,9 +182,23 @@ namespace ADDIN.Commands
                     if (CreateHoleDiameterDimension(model, view, hole, layout))
                         diameterCount++;
 
-                    if (layout.Contour != null &&
-                        CreateHolePositionDimension(model, view, hole, layout))
-                        positionCount++;
+                    foreach (bool horizontal in new[] { true, false })
+                    {
+                        LineInfo contour = FindPositionContour(hole, contours, bounds, horizontal);
+                        if (contour == null)
+                            continue;
+
+                        var positionLayout = new HoleLayout
+                        {
+                            Group = group,
+                            Contour = contour,
+                            Lane = layout.Lane,
+                            CalloutX = layout.CalloutX,
+                            CalloutY = layout.CalloutY
+                        };
+                        if (CreateHolePositionDimension(model, view, hole, positionLayout, horizontal))
+                            positionCount++;
+                    }
 
                     if ((!group.LinearPattern || !dimensionedLinearPatterns.Contains(group.PatternFeature)) &&
                         CreatePatternPitchDimension(model, view, layout, bounds, holeGroups))
@@ -396,6 +411,10 @@ namespace ADDIN.Commands
 
         private bool IsHoleRelatedDimension(Annotation annotation)
         {
+            // Slot position dimensions attach to their existing sketch center.
+            // Recognize them when replacing dimensions on the next run.
+            if ((annotation.GetName() ?? "").StartsWith(SlotDimensionNamePrefix, StringComparison.Ordinal))
+                return true;
             DisplayDimension displayDimension =
                 annotation.GetSpecificAnnotation() as DisplayDimension;
             if (displayDimension == null)
@@ -2273,11 +2292,61 @@ namespace ADDIN.Commands
             return best;
         }
 
+        private LineInfo FindPositionContour(HoleInfo hole, List<LineInfo> contours, ViewBounds bounds, bool horizontal)
+        {
+            if (hole == null || contours == null || bounds == null)
+                return null;
+
+            LineInfo best = null;
+            double bestProjection = double.MinValue;
+            double bestDistance = double.MaxValue;
+            double center = horizontal ? hole.CenterX : hole.CenterY;
+            double middle = horizontal ? (bounds.MinX + bounds.MaxX) / 2 : (bounds.MinY + bounds.MaxY) / 2;
+            double side = center <= middle ? -1 : 1;
+            foreach (LineInfo contour in contours)
+            {
+                if (!IsPositionContourAligned(contour, horizontal))
+                    continue;
+
+                double distance = DistancePointToSegment(hole.CenterX, hole.CenterY, contour.StartX, contour.StartY, contour.EndX, contour.EndY);
+                if (hole.IsSlot && distance < hole.Radius * 2.2)
+                    continue;
+
+                double projection = side * ((horizontal ? contour.MidX : contour.MidY) - center);
+                if (projection <= 1e-9)
+                    continue;
+
+                if (projection > bestProjection + 1e-7 ||
+                    (Math.Abs(projection - bestProjection) <= 1e-7 && distance < bestDistance))
+                {
+                    best = contour;
+                    bestProjection = projection;
+                    bestDistance = distance;
+                }
+            }
+
+            // A rotated outline may have no horizontal or vertical edge. Its
+            // nearest endpoint still provides both global X and Y coordinates.
+            return best ?? FindOutermostContour(hole, contours, bounds);
+        }
+
+        private bool IsPositionContourAligned(LineInfo contour, bool horizontal)
+        {
+            if (contour?.Edge == null)
+                return false;
+
+            double dx = Math.Abs(contour.EndX - contour.StartX);
+            double dy = Math.Abs(contour.EndY - contour.StartY);
+            double length = Math.Sqrt(dx * dx + dy * dy);
+            return length > 1e-9 && (horizontal ? dx : dy) <= length * 1e-6;
+        }
+
         private bool CreateHolePositionDimension(
             ModelDoc2 model,
             SolidWorks.Interop.sldworks.View view,
             HoleInfo hole,
-            HoleLayout layout)
+            HoleLayout layout,
+            bool horizontal)
         {
             LineInfo contour = layout?.Contour;
             if (hole?.Edge == null || contour?.Edge == null)
@@ -2288,57 +2357,45 @@ namespace ADDIN.Commands
             try
             {
                 model.ClearSelection2(true);
-                if (!view.SelectEntity(hole.Edge, false))
-                    return false;
-
-                if (!view.SelectEntity(contour.Edge, true))
+                bool holeSelected = hole.IsSlot
+                    ? SelectSlotCenter(model, view, hole, layout.Group?.SeedFeature)
+                    : view.SelectEntity(hole.Edge, false);
+                if (!holeSelected)
                     return false;
 
                 double closestX;
                 double closestY;
-                ClosestPointOnSegment(
-                    hole.CenterX,
-                    hole.CenterY,
-                    contour.StartX,
-                    contour.StartY,
-                    contour.EndX,
-                    contour.EndY,
-                    out closestX,
-                    out closestY);
-
-                double laneOffset = 0.004 + layout.Lane * 0.003;
-                double x;
-                double y;
-
-                object result;
-                double contourDx = Math.Abs(contour.EndX - contour.StartX);
-                double contourDy = Math.Abs(contour.EndY - contour.StartY);
-                if (contourDx >= contourDy * 2.0)
+                if (IsPositionContourAligned(contour, horizontal))
                 {
-                    double side = layout.CalloutX <= hole.CenterX ? 1.0 : -1.0;
-                    x = hole.CenterX + side * laneOffset;
-                    y = (hole.CenterY + closestY) / 2.0;
-                    result = model.AddVerticalDimension2(x, y, 0);
-                }
-                else if (contourDy >= contourDx * 2.0)
-                {
-                    double side = layout.CalloutY <= hole.CenterY ? 1.0 : -1.0;
-                    x = (hole.CenterX + closestX) / 2.0;
-                    y = hole.CenterY + side * laneOffset;
-                    result = model.AddHorizontalDimension2(x, y, 0);
+                    if (!view.SelectEntity(contour.Edge, true))
+                        return false;
+
+                    ClosestPointOnSegment(hole.CenterX, hole.CenterY, contour.StartX, contour.StartY, contour.EndX, contour.EndY, out closestX, out closestY);
                 }
                 else
                 {
-                    double sign =
-                        ((hole.CenterX - contour.MidX) * contour.NormalX +
-                        (hole.CenterY - contour.MidY) * contour.NormalY) >= 0
-                            ? 1.0
-                            : -1.0;
-                    x = (hole.CenterX + closestX) / 2.0 + contour.NormalX * sign * laneOffset;
-                    y = (hole.CenterY + closestY) / 2.0 + contour.NormalY * sign * laneOffset;
-                    result = model.AddDimension2(x, y, 0);
+                    bool start = Distance(hole.CenterX, hole.CenterY, contour.StartX, contour.StartY) <= Distance(hole.CenterX, hole.CenterY, contour.EndX, contour.EndY);
+                    var vertex = (start ? contour.Edge.GetStartVertex() : contour.Edge.GetEndVertex()) as Vertex;
+                    if (vertex == null || !view.SelectEntity(vertex, true))
+                        return false;
+
+                    closestX = start ? contour.StartX : contour.EndX;
+                    closestY = start ? contour.StartY : contour.EndY;
                 }
 
+                double laneOffset = .004 + layout.Lane * .003;
+                object result;
+                if (horizontal)
+                {
+                    double side = layout.CalloutY <= hole.CenterY ? 1 : -1;
+                    result = model.AddHorizontalDimension2((hole.CenterX + closestX) / 2, hole.CenterY + side * laneOffset, 0);
+                }
+                else
+                {
+                    double side = layout.CalloutX <= hole.CenterX ? 1 : -1;
+                    result = model.AddVerticalDimension2(hole.CenterX + side * laneOffset, (hole.CenterY + closestY) / 2, 0);
+                }
+                TagSlotDimension(result as DisplayDimension, hole.IsSlot);
                 return result != null;
             }
             finally
@@ -2560,6 +2617,85 @@ namespace ADDIN.Commands
             }
 
             return seedEdge != null && patternEdge != null;
+        }
+
+        private void TagSlotDimension(DisplayDimension dimension, bool slot)
+        {
+            if (!slot || dimension == null)
+                return;
+
+            var annotation = dimension.GetAnnotation() as Annotation;
+            annotation?.SetName(SlotDimensionNamePrefix + Guid.NewGuid().ToString("N"));
+        }
+
+        private bool SelectSlotCenter(ModelDoc2 model, SolidWorks.Interop.sldworks.View view, HoleInfo hole, Feature seedFeature)
+        {
+            // Use the existing center in the slot's own sketch. A side-edge
+            // midpoint is offset by half the slot width; an arc center is offset
+            // along its length. Neither is the center of the complete opening.
+            var roots = new List<Feature>();
+            if (seedFeature != null)
+                roots.Add(seedFeature);
+
+            foreach (object item in hole.Edge.GetTwoAdjacentFaces2() as object[] ?? new object[0])
+            {
+                var face = item as Face2;
+                var surface = face?.GetSurface() as Surface;
+                if (surface != null && surface.IsCylinder())
+                {
+                    var feature = face.GetFeature() as Feature;
+                    if (feature != null)
+                        roots.Add(feature);
+                }
+            }
+            var math = swApp.IGetMathUtility();
+            var transform = view.ModelToViewTransform;
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var data = ((SelectionMgr)model.SelectionManager).CreateSelectData();
+            data.View = view;
+            foreach (var root in roots)
+                if (SelectSlotSketchCenter(root, hole, math, transform, data, visited))
+                    return true;
+
+            Debug.WriteLine("[DIM HOLE SLOT] no associative center in the slot sketch; position DIM skipped.");
+            return false;
+        }
+
+        private bool SelectSlotSketchCenter(Feature feature, HoleInfo hole, MathUtility math, MathTransform viewTransform,
+            SelectData data, HashSet<string> visited)
+        {
+            if (feature == null || !visited.Add(feature.Name))
+                return false;
+
+            var sketch = feature.GetSpecificFeature2() as Sketch;
+            if (sketch != null)
+            {
+                var toModel = sketch.ModelToSketchTransform.Inverse() as MathTransform;
+                double tolerance = Math.Max(1e-7, hole.Radius * .025);
+                foreach (object item in sketch.GetSketchPoints2() as object[] ?? new object[0])
+                {
+                    var point = item as SketchPoint;
+                    if (point == null)
+                        continue;
+
+                    var modelPoint = TransformPoint(math, toModel, new[] { point.X, point.Y, point.Z });
+                    var sheetPoint = TransformPoint(math, viewTransform, modelPoint);
+                    if (IsPoint(sheetPoint) && Distance(sheetPoint[0], sheetPoint[1], hole.CenterX, hole.CenterY) <= tolerance &&
+                        point.Select4(false, data))
+                        return true;
+                }
+            }
+            for (var sub = feature.GetFirstSubFeature() as Feature; sub != null; sub = sub.GetNextSubFeature() as Feature)
+                if (SelectSlotSketchCenter(sub, hole, math, viewTransform, data, visited))
+                    return true;
+            foreach (object item in feature.GetParents() as object[] ?? new object[0])
+            {
+                var parent = item as Feature;
+                if (parent != null && parent.GetSpecificFeature2() is Sketch &&
+                    SelectSlotSketchCenter(parent, hole, math, viewTransform, data, visited))
+                    return true;
+            }
+            return false;
         }
 
         private void ClosestPointOnSegment(

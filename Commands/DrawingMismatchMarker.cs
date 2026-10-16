@@ -29,7 +29,7 @@ namespace ADDIN.Commands.DxfChecking
                 foreach (var mismatch in result.Mismatches.Where(m => m.HasDrawingPosition || (m.HasDxfPosition && result.AlignmentFound)).Take(200))
                 {
                     var p = mismatch.HasDrawingPosition ? mismatch.DrawingPosition : mismatch.DxfPosition;
-                    var note = drawing.InsertNote("[DXF " + command.ViewName + "] ERR-" + mismatch.Id.ToString("00")) as Note;
+                    var note = drawing.InsertNote("[DXF " + command.ViewName + "] " + (mismatch.ReviewIssue ? "CHECK-" : "ERR-") + mismatch.Id.ToString("00")) as Note;
                     if (note == null) throw new InvalidOperationException("Không tạo được note đánh dấu lỗi.");
                     notes.Add(note); var annotation = note.GetAnnotation() as Annotation;
                     if (annotation == null) throw new InvalidOperationException("Không lấy được annotation đánh dấu.");

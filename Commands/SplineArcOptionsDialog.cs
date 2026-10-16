@@ -16,12 +16,12 @@ namespace ADDIN.Commands
 
         private void btnCreate_Click(object sender, EventArgs e)
         {
-            int manualSegmentCount;
-            double toleranceMm;
+            int manualSegmentCount = 4;
+            double toleranceMm = 0.10;
 
-            if (!TryReadPositiveInteger(txtStep, out manualSegmentCount)
+            if (!chkAutomaticStep.Checked && (!TryReadPositiveInteger(txtStep, out manualSegmentCount)
                 || manualSegmentCount < 1
-                || manualSegmentCount > 200)
+                || manualSegmentCount > 200))
             {
                 MessageBox.Show(
                     this,
@@ -34,7 +34,7 @@ namespace ADDIN.Commands
                 return;
             }
 
-            if (!TryReadPositive(txtTolerance, out toleranceMm))
+            if (chkAutomaticStep.Checked && !TryReadPositive(txtTolerance, out toleranceMm))
             {
                 MessageBox.Show(
                     this,
@@ -52,7 +52,7 @@ namespace ADDIN.Commands
                 AutomaticStep = chkAutomaticStep.Checked,
                 ManualSegmentCount = manualSegmentCount,
                 MaximumDeviationMm = toleranceMm,
-                SplitWhenOverTolerance = chkAdaptive.Checked,
+                SplitWhenOverTolerance = chkAutomaticStep.Checked && chkAdaptive.Checked,
                 AddRadiusDimensions = chkRadiusDimensions.Checked,
                 AddStepDimensions = chkStepDimensions.Checked
             };
@@ -71,6 +71,10 @@ namespace ADDIN.Commands
             bool manualStep = !chkAutomaticStep.Checked;
             txtStep.Enabled = manualStep;
             lblStep.Enabled = manualStep;
+            txtTolerance.Enabled = !manualStep;
+            lblTolerance.Enabled = !manualStep;
+            lblToleranceUnit.Enabled = !manualStep;
+            chkAdaptive.Enabled = !manualStep;
         }
 
         private static bool TryReadPositive(TextBox textBox, out double value)

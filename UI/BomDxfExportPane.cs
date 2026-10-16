@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -13,10 +13,10 @@ namespace ADDIN.UI
     {
         private static readonly Color Ink = Color.FromArgb(24, 42, 66), Muted = Color.FromArgb(105, 122, 143);
         private readonly TextBox folder = new TextBox();
-        private readonly CheckBox bend = Toggle("Đường uốn", false), laser = Toggle("Vạch dấu"), sketches = Toggle("Sketch MARK");
+        private readonly CheckBox laser = Toggle("Vạch dấu"), sketches = Toggle("Sketch MARK");
         private readonly ComboBox checkMode = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, Margin = Padding.Empty };
         private readonly ModernButton start = Button("Xuất", true), stop = Button("Dừng", false);
-        private readonly ModernButton browse = Button("Chọn…", false), back = Button("BOM", false);
+        private readonly ModernButton browse = Button("Chọn…", false), back = new ModernButton { Text = "BOM", Icon = TaiIcon.Undo, Kind = ModernButtonKind.Standard, Dock = DockStyle.Fill, Margin = new Padding(0, 2, 4, 2), AutoSize = false };
         private readonly ModernButton report = Button("Báo cáo", false), output = Button("Thư mục", false);
         private readonly ModernButton openDxf = Button("Mở DXF", false);
         private readonly ModernButton review = Button("Preview / Sửa", false);
@@ -49,7 +49,7 @@ namespace ADDIN.UI
             var heading = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
             heading.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 34)); heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 68));
+            heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76));
             heading.Controls.Add(new DxfLogo { Margin = new Padding(0, 5, 0, 0) }, 0, 0);
             var titles = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1, Margin = Padding.Empty };
             titles.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); titles.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -66,7 +66,7 @@ namespace ADDIN.UI
                     if (dialog.ShowDialog(this) == DialogResult.OK) folder.Text = dialog.SelectedPath;
             };
             var options = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
-            options.Controls.Add(bend); options.Controls.Add(laser); options.Controls.Add(sketches); root.Controls.Add(options, 0, 3);
+            options.Controls.Add(laser); options.Controls.Add(sketches); root.Controls.Add(options, 0, 3);
             laser.CheckedChanged += (s, e) => sketches.Enabled = laser.Checked && !running;
             var tips = new ToolTip { ShowAlways = true };
             tips.SetToolTip(laser, "Đưa cạnh của feature tên MARK/-mark và miệng lỗ côn/bậc vào LASER_MARK màu vàng. Biên ngoài vẫn cắt ở CUT.");
@@ -114,7 +114,7 @@ namespace ADDIN.UI
             openDxf.Click += (s, e) => Open(selectedDxfPath);
             review.Click += (s, e) => ReviewRequested?.Invoke(SelectedOutputPath());
             results.CellDoubleClick += (s, e) => { if (!running && hasCheckResults && e.RowIndex >= 0) ReviewRequested?.Invoke(SelectedOutputPath()); };
-            detail.Text = "Vạch dấu: lấy cạnh feature có tên MARK và miệng lỗ côn/bậc. Sketch MARK: giữ nét MARK trên Drawing. Chọn dòng để xem lỗi.";
+            detail.Text = "Chỉ xuất đường thấy và MARK; bỏ nét khuất, nét đứt, tâm và đường uốn. Vạch dấu: lấy cạnh feature có tên MARK và miệng lỗ côn/bậc. Sketch MARK: giữ nét MARK trên Drawing. Chọn dòng để xem lỗi.";
             SetRunning(false); report.Enabled = false; output.Enabled = false;
         }
         private static CheckBox Toggle(string text, bool ticked = true) { return new CheckBox { Text = text, Checked = ticked, AutoSize = true, Margin = new Padding(0, 4, 10, 4) }; }
@@ -134,7 +134,7 @@ namespace ADDIN.UI
             string path = folder.Text.Trim();
             if (path.Length == 0 || !Path.IsPathRooted(path)) throw new ArgumentException("Chọn đường dẫn thư mục đầy đủ.");
             path = Path.GetFullPath(path); if (File.Exists(path)) throw new ArgumentException("Thư mục đang trỏ đến một file.");
-            return new BomDxfExportOptions { TargetFolder = path, IncludeBendLines = bend.Checked, IncludeLaserMarks = laser.Checked,
+            return new BomDxfExportOptions { TargetFolder = path, IncludeBendLines = false, IncludeLaserMarks = laser.Checked,
                 RecognizeFeatureMarks = laser.Checked, KeepDrawingMarkSketches = laser.Checked && sketches.Checked, CheckWhileExporting = checkMode.SelectedIndex == 0 };
         }
         internal void BeginBatch(int total)
@@ -193,7 +193,7 @@ namespace ADDIN.UI
         internal void ShowMessage(string message, bool failed) { status.Text = message; status.ForeColor = failed ? Color.FromArgb(207, 65, 78) : Muted; }
         internal void SetRunning(bool value)
         {
-            running = value; start.Enabled = back.Enabled = browse.Enabled = folder.Enabled = bend.Enabled = laser.Enabled = checkMode.Enabled = !value;
+            running = value; start.Enabled = back.Enabled = browse.Enabled = folder.Enabled = laser.Enabled = checkMode.Enabled = !value;
             sketches.Enabled = !value && laser.Checked; stop.Enabled = value;
             openDxf.Enabled = !value && File.Exists(selectedDxfPath);
             review.Enabled = !value && hasCheckResults;

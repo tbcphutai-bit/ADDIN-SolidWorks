@@ -25,7 +25,7 @@ namespace ADDIN
         private void NavigateDrawingCheckResult(DrawingCheckItemResult item, DrawingBomFieldResult field)
         {
             if (drawingBomCommandInProgress || item == null) return;
-            if (field != null && field.HasDrawingLocation)
+            if (field != null)
             {
                 drawingBomChecker?.NavigateToDrawingField(item.DrawingPath, field);
                 return;

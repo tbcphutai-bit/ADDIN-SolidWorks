@@ -12,12 +12,12 @@ namespace ADDIN.Commands
     {
         None, WrongBendTable, TableUnreadable, MissingValue, InvalidValue,
         MarkRequired, MarkNotAllowed, InvalidMark, RemainingNotBelowThickness,
-        KindValuesDiffer, VValuesEqual
+        KindValuesDiffer, VValuesEqual, ExternalMarkChanged
     }
 
     // Assigns a manufacturing groove kind to each Bend Feature. On save, the
     // confirmed groove value in its Bend Table updates the Part properties.
-    internal sealed class VCutPropertySetupCommand
+    internal sealed partial class VCutPropertySetupCommand
     {
         internal const double ToleranceMm = 0.0005;
         private static readonly string[] GroovePropertyNames = { "V溝1", "V溝2", "C溝" };
@@ -76,6 +76,7 @@ namespace ADDIN.Commands
             loadedConfiguration = config;
             loadedDefaultTable = defaultTable;
             loadedModelThicknessMm = modelThicknessMm;
+            LoadMinimum(rows, part, config);
             loadedRows = rows.Select(SnapshotRow).ToList();
             return true;
         }
@@ -414,7 +415,7 @@ namespace ADDIN.Commands
                 if (draftById.Count != freshRows.Count ||
                     freshRows.Any(row => !draftById.ContainsKey(row.FeatureId)))
                     throw new InvalidOperationException("Danh sách Bend Feature không còn đầy đủ.");
-                foreach (BendRow row in freshRows) row.Kind = draftById[row.FeatureId].Kind ?? "";
+                foreach (BendRow row in freshRows) { row.Kind = draftById[row.FeatureId].Kind ?? ""; row.DraftConflict = draftById[row.FeatureId].DraftConflict; }
                 currentRows = freshRows;
                 return true;
             }
@@ -509,7 +510,7 @@ namespace ADDIN.Commands
                 TableThicknessMm = row.TableThicknessMm, TableValueMm = row.TableValueMm,
                 TableError = row.TableError, WrongBendTable = row.WrongBendTable,
                 IsGrooveTable = row.IsGrooveTable, ValueMm = row.ValueMm,
-                OriginalKind = row.OriginalKind, Kind = row.Kind };
+                OriginalKind = row.OriginalKind, Kind = row.Kind, MinimumContext = row.MinimumContext, PersistentId = row.PersistentId, DraftConflict = row.DraftConflict };
         }
 
         private static List<string> Validate(IEnumerable<BendRow> rows,
@@ -556,6 +557,7 @@ namespace ADDIN.Commands
         private static VCutBendIssue GetLocalDraftIssue(BendRow row)
         {
             if (row == null) return VCutBendIssue.InvalidMark;
+            if (!string.IsNullOrEmpty(row.DraftConflict)) return VCutBendIssue.ExternalMarkChanged;
             string kind = row.Kind ?? "";
             if (VCutFeatureTagStore.Normalize(kind) != kind) return VCutBendIssue.InvalidMark;
             if (row.WrongBendTable) return VCutBendIssue.WrongBendTable;
@@ -587,6 +589,7 @@ namespace ADDIN.Commands
                 case VCutBendIssue.MarkRequired: return "NG — chưa gán loại bào (Bend Table 溝=" +
                     Format(row.ValueMm.Value) + " mm). Hãy chọn V溝1, V溝2 hoặc C溝 rồi lưu lại.";
                 case VCutBendIssue.MarkNotAllowed: return "NG — Bend Table thường không xác nhận 溝; hãy bỏ Mark cũ.";
+                case VCutBendIssue.ExternalMarkChanged: return "NG — " + row.DraftConflict;
                 case VCutBendIssue.InvalidMark: return "NG — loại bào không hợp lệ.";
                 case VCutBendIssue.RemainingNotBelowThickness: return "NG — bề dày còn lại " + Format(row.ValueMm.Value) +
                     " mm phải nhỏ hơn bề dày vật liệu " + Format(row.ModelThicknessMm.Value) + " mm.";
@@ -916,6 +919,9 @@ namespace ADDIN.Commands
 
         internal sealed class BendRow
         {
+            internal BendMinimumContext MinimumContext;
+            public string PersistentId = "";
+            public string DraftConflict;
             public Feature Feature;
             public int FeatureId;
             public string FeatureName = "";

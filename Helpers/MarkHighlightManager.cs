@@ -73,8 +73,8 @@ namespace ADDIN.Helpers
             dispatcher.BeginInvoke((Action)RefreshNow);
         }
 
-        // Selects the edges of every mark, so SOLIDWORKS shows them in its selection colour until the
-        // next click on the model. Returns the number of marks.
+        // Selects the edges of every mark (and segments of every 2D sketch mark), so SOLIDWORKS shows them
+        // in its selection colour until the next click on the model. Returns the number of marks.
         internal int ShowMarks()
         {
             if (detached) return 0;
@@ -91,10 +91,43 @@ namespace ADDIN.Helpers
                         string key = EdgeKey(edge);
                         if (key.Length > 0 && seen.Add(key)) edges.Add(new DispatchWrapper(edge));
                     }
+            int sketchMarks = CollectSketchMarks(model, edges);
             model.ClearSelection2(true);
             if (edges.Count > 0) model.Extension.MultiSelect2(edges.ToArray(), false, null);
             model.GraphicsRedraw2();
-            return marks.Count;
+            return marks.Count + sketchMarks;
+        }
+
+        private static int CollectSketchMarks(ModelDoc2 model, List<DispatchWrapper> targets)
+        {
+            int count = 0;
+            var recognizer = new LaserMarkFeatureRecognizer();
+            for (var feature = model.FirstFeature() as Feature; feature != null; feature = feature.GetNextFeature() as Feature)
+            {
+                LaserMarkFeatureRecognizer.Resolution mark;
+                if (!recognizer.TryResolve(feature, out mark)) continue;
+                if (mark.SourceKind != LaserMarkFeatureKind.Sketch2D) continue;
+                if (!string.Equals(mark.SourceName, feature.Name ?? "", StringComparison.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    if (feature.IsSuppressed()) continue;
+                    var sketch = feature.GetSpecificFeature2() as ISketch;
+                    int added = 0;
+                    if (sketch != null)
+                    {
+                        foreach (ISketchSegment segment in (sketch.GetSketchSegments() as object[] ?? new object[0]).OfType<ISketchSegment>())
+                        {
+                            if (segment.ConstructionGeometry) continue;
+                            targets.Add(new DispatchWrapper(segment));
+                            added++;
+                        }
+                    }
+                    if (added == 0) targets.Add(new DispatchWrapper(feature));
+                    count++;
+                }
+                catch (COMException) { }
+            }
+            return count;
         }
 
         private int OnActiveDocumentChanged() { RequestRefresh(); return 0; }
@@ -203,9 +236,24 @@ namespace ADDIN.Helpers
             return lines.ToArray();
         }
 
-        // What the feature draws itself: round holes by diameter, anything else as a slot.
+        // What the feature draws itself: round holes by diameter, anything else as a slot, or 2D sketch segments.
         private static string Shape(Feature feature, LaserMarkFeatureRecognizer.Resolution mark)
         {
+            if (mark.MarkedKind == LaserMarkFeatureKind.Sketch2D)
+            {
+                int segCount = 0;
+                try
+                {
+                    var directSketch = feature.GetSpecificFeature2() as ISketch;
+                    if (directSketch != null)
+                    {
+                        foreach (ISketchSegment seg in (directSketch.GetSketchSegments() as object[] ?? new object[0]).OfType<ISketchSegment>())
+                            if (!seg.ConstructionGeometry) segCount++;
+                    }
+                }
+                catch (COMException) { }
+                return segCount > 0 ? "sketch 2D (" + segCount + " nét)" : "sketch 2D";
+            }
             var holes = new SortedDictionary<double, int>();    // diameter in mm -> number of holes
             bool slot = false;
             try

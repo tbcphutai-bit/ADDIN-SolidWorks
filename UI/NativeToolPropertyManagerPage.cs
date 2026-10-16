@@ -15,15 +15,15 @@ namespace ADDIN.UI
     internal sealed class NativeToolValues
     {
         internal bool Automatic = true, Split = true, Radius = true, Step = true, Center = true;
-        internal double Count = 4, ToleranceMm = .1, MaximumRadiusMm = 300, OffsetMm = 10, LaneMm = 5, Scale = 1;
+        internal double Count = 4, ToleranceMm = .1, OffsetMm = 10, LaneMm = 5, Scale = 1;
         internal string Text = "", Property = "部品番号";
         internal NativeToolValues Copy() { return (NativeToolValues)MemberwiseClone(); }
         internal static bool Positive(double n) { return n > 0 && !double.IsNaN(n) && !double.IsInfinity(n); }
         internal bool Valid(NativeToolKind kind, out string message)
         {
             message = "Tham số chưa hợp lệ.";
-            if (kind == NativeToolKind.SplineArcs && (!Positive(ToleranceMm) || !Positive(MaximumRadiusMm) ||
-                (!Automatic && (!Positive(Count) || Count != Math.Floor(Count) || Count > 200)))) return false;
+            if (kind == NativeToolKind.SplineArcs && (Automatic ? !Positive(ToleranceMm) :
+                (!Positive(Count) || Count != Math.Floor(Count) || Count > 200))) return false;
             if ((kind == NativeToolKind.SectionDimensions || kind == NativeToolKind.KegakiDimensions || kind == NativeToolKind.HoleDimensions) && !Positive(OffsetMm)) return false;
             if (kind == NativeToolKind.HoleDimensions && !Positive(LaneMm)) return false;
             if (kind == NativeToolKind.ViewScale && !Automatic && !Positive(Scale)) return false;
@@ -34,7 +34,7 @@ namespace ADDIN.UI
         }
         internal SplineArcOptions ArcOptions()
         { return new SplineArcOptions { AutomaticStep = Automatic, ManualSegmentCount = (int)Count, MaximumDeviationMm = ToleranceMm,
-            MaximumRadiusMm = MaximumRadiusMm, SplitWhenOverTolerance = Split, AddRadiusDimensions = Radius, AddStepDimensions = Step }; }
+            SplitWhenOverTolerance = Automatic && Split, AddRadiusDimensions = Radius, AddStepDimensions = Step }; }
     }
     internal sealed class NativeToolPreview
     {
@@ -52,6 +52,7 @@ namespace ADDIN.UI
         private readonly string[] presets;
         private NativeToolValues values;
         private readonly Dictionary<int, PropertyManagerPageNumberbox> numbers = new Dictionary<int, PropertyManagerPageNumberbox>();
+        private readonly Dictionary<int, PropertyManagerPageLabel> numberLabels = new Dictionary<int, PropertyManagerPageLabel>();
         private readonly Dictionary<int, PropertyManagerPageCheckbox> checks = new Dictionary<int, PropertyManagerPageCheckbox>();
         private PropertyManagerPageTextbox textBox;
         private PropertyManagerPageCombobox propertyBox, presetBox;
@@ -238,7 +239,7 @@ namespace ADDIN.UI
         { var box = (PropertyManagerPageCheckbox)Control(group, id, swPropertyManagerPageControlType_e.swControlType_Checkbox, title); box.Checked = value; checks[id] = box; }
         private void Number(PropertyManagerPageGroup group, int id, string title, double value, bool length, double minimum, double maximum)
         {
-            Label(group, 1000 + id, title, 14);
+            numberLabels[id] = Label(group, 1000 + id, title, 14);
             var box = (PropertyManagerPageNumberbox)Control(group, id, swPropertyManagerPageControlType_e.swControlType_Numberbox, title);
             box.SetRange2((int)(length ? swNumberboxUnitType_e.swNumberBox_Length : swNumberboxUnitType_e.swNumberBox_UnitlessDouble),
                 minimum, maximum, true, length ? .001 : 1, length ? .01 : 10, length ? .0001 : .1);
@@ -263,7 +264,6 @@ namespace ADDIN.UI
                 Check(options, 21, "Tự tính số cung", values.Automatic);
                 Number(options, 22, "Số cung (khi tắt tự động)", values.Count, false, 1, 200);
                 Number(options, 23, "Sai số tối đa (mm)", values.ToleranceMm, true, .000000001, 1);
-                Number(options, 24, "Bán kính tối đa (mm)", values.MaximumRadiusMm, true, .000000001, 1000);
                 Check(options, 25, "Chia thêm cung khi vượt sai số", values.Split);
                 Check(options, 26, "Tạo DIM R", values.Radius); Check(options, 27, "Tạo DIM bước", values.Step);
             }
@@ -288,7 +288,7 @@ namespace ADDIN.UI
             get
             {
             string hint = "✓ chạy lệnh; ✕ hủy và khôi phục lựa chọn ban đầu.";
-            if (kind == NativeToolKind.SplineArcs) hint += "\nClick gần đầu spline để chọn hướng chạy.\nChọn sẵn cạnh spline rồi bấm lệnh thì chạy ngay với thông số mặc định, không mở bảng này.";
+            if (kind == NativeToolKind.SplineArcs) hint += "\nTự tính: theo sai số. Tắt tự tính: giữ đúng số cung đã nhập.\nClick gần đầu spline để chọn hướng chạy.\nChọn sẵn cạnh spline rồi bấm lệnh thì chạy ngay với thông số mặc định, không mở bảng này.";
             if (kind == NativeToolKind.RepairSpline) hint += "\nEdit 3D Sketch rồi chọn Arc hoặc spline thường.\nArc sẽ được giữ làm Construction; fit spline trong cùng sketch.";
             if (kind == NativeToolKind.RenameHole) hint += "\nToàn bộ Seed / Pattern trong họ lỗ sẽ đổi tên; xem danh sách trước khi ✓.";
             if (kind == NativeToolKind.HoleDimensions) hint += "\nChọn View: danh sách lỗ tự cập nhật. ✓ tạo DIM.\n7 / 5 mm chỉ chỉnh vị trí chữ DIM trên giấy.\nDIM lỗ cũ do lệnh tạo sẽ được thay thế trong View đã chọn.";
@@ -299,9 +299,22 @@ namespace ADDIN.UI
         }
         private void UpdateParameterAvailability()
         {
-            int id = kind == NativeToolKind.SplineArcs ? 22 : kind == NativeToolKind.ViewScale ? 33 : 0;
+            if (kind == NativeToolKind.SplineArcs)
+            {
+                SetNumberEnabled(22, !values.Automatic);
+                SetNumberEnabled(23, values.Automatic);
+                PropertyManagerPageCheckbox split;
+                if (checks.TryGetValue(25, out split))
+                    ((PropertyManagerPageControl)split).Enabled = values.Automatic;
+            }
+            else if (kind == NativeToolKind.ViewScale) SetNumberEnabled(33, !values.Automatic);
+        }
+        private void SetNumberEnabled(int id, bool enabled)
+        {
             PropertyManagerPageNumberbox box;
-            if (id != 0 && numbers.TryGetValue(id, out box)) ((PropertyManagerPageControl)box).Enabled = !values.Automatic;
+            if (numbers.TryGetValue(id, out box)) ((PropertyManagerPageControl)box).Enabled = enabled;
+            PropertyManagerPageLabel label;
+            if (numberLabels.TryGetValue(id, out label)) ((PropertyManagerPageControl)label).Enabled = enabled;
         }
         private object[] Picks()
         {
@@ -323,7 +336,6 @@ namespace ADDIN.UI
             switch (id) {
                 case 22: values.Count = value; break;
                 case 23: values.ToleranceMm = value * 1000; break;
-                case 24: values.MaximumRadiusMm = value * 1000; break;
                 case 28: values.OffsetMm = value * 1000; break;
                 case 29: values.LaneMm = value * 1000; break;
                 case 33: values.Scale = value; break;

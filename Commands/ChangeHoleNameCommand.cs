@@ -58,7 +58,11 @@ namespace ADDIN.Commands
                 {
                     HoleFamily family = resolver.Find(feature);
                     if (family == null)
+                    {
+                        if (resolver.PatternFamilyCount(feature) > 1)
+                            throw new InvalidOperationException("Pattern nay chua nhieu lo khac loai. Hay chon feature lo goc de dat ten rieng cho tung loai.");
                         throw new InvalidOperationException("Khong xac dinh duoc ho lo cho " + feature.Name);
+                    }
                     families.Add(family);
                 }
                 var occupied = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -71,9 +75,7 @@ namespace ADDIN.Commands
                 {
                     string id = string.IsNullOrWhiteSpace(family.FamilyId)
                         ? Guid.NewGuid().ToString("N") : family.FamilyId;
-                    string baseName = family.DiameterMm.HasValue
-                        ? "φ" + family.DiameterMm.Value.ToString("0.###", CultureInfo.InvariantCulture) + " " + label
-                        : label;
+                    string baseName = family.HoleKey == "?" ? label : family.HoleKey + " " + label;
                     foreach (Feature feature in family.Features)
                     {
                         HoleMetadataService.Write(model, feature, new HoleMetadata

@@ -146,9 +146,8 @@ namespace ADDIN.Commands
                     throw new InvalidOperationException(contextError);
                 }
 
-                // Even in automatic mode, keep 22 mm as a practical maximum
-                // span. The tolerance can split it further, but it cannot create
-                // one very long, almost-straight arc with an unusably large R.
+                // Fixed-count mode uses the requested number of equal-length
+                // ranges; automatic mode finds the count from the tolerance.
                 double manualStep =
                     context.TotalLength
                     / Math.Max(1, options.ManualSegmentCount);
@@ -156,6 +155,8 @@ namespace ADDIN.Commands
                     BuildInitialRanges(context, manualStep);
                 if (initialRanges.Count == 0)
                     throw new InvalidOperationException("Không chia được spline sketch theo bước nội suy.");
+                if (!options.AutomaticStep && initialRanges.Count != options.ManualSegmentCount)
+                    throw new InvalidOperationException("Không chia được spline thành đúng số cung đã nhập.");
 
                 List<ArcDefinition> arcDefinitions =
                     new List<ArcDefinition>();
@@ -170,14 +171,6 @@ namespace ADDIN.Commands
                     {
                         throw new InvalidOperationException(
                             "Khong fit duoc cung tron cho mot doan spline.");
-                    }
-
-                    if (!options.AutomaticStep
-                        && definition.MaximumDeviationMm
-                            > options.MaximumDeviationMm + 1e-9)
-                    {
-                        throw new InvalidOperationException(
-                            "So doan muon chia hien tai chua dat sai so cho phep. Hay tang so doan.");
                     }
 
                     arcDefinitions.Add(definition);

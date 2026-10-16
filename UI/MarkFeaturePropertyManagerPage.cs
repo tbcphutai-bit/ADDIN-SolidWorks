@@ -33,7 +33,13 @@ namespace ADDIN.UI
         protected override int SelectionLimit(int mark) { return mark == 1 ? int.MaxValue : 1; }
         protected override int SelectionMark(object item, int type)
         {
-            if (type != (int)swSelectType_e.swSelBODYFEATURES && type != (int)swSelectType_e.swSelFACES &&
+            if (type != (int)swSelectType_e.swSelBODYFEATURES &&
+                type != (int)swSelectType_e.swSelSKETCHES &&
+                type != (int)swSelectType_e.swSelEXTSKETCHSEGS &&
+                type != (int)swSelectType_e.swSelSKETCHSEGS &&
+                type != (int)swSelectType_e.swSelEXTSKETCHPOINTS &&
+                type != (int)swSelectType_e.swSelSKETCHPOINTS &&
+                type != (int)swSelectType_e.swSelFACES &&
                 type != (int)swSelectType_e.swSelEDGES) return 0;
             return command.CanResolve(item) ? 1 : 0;
         }
@@ -42,8 +48,15 @@ namespace ADDIN.UI
         {
             var pick = Group(10, "1. Chỗ cần khắc dấu");
 
-            var box = Selection(pick, 11, "Feature / mặt / cạnh của rãnh", 1,
-                swSelectType_e.swSelBODYFEATURES, swSelectType_e.swSelFACES, swSelectType_e.swSelEDGES);
+            var box = Selection(pick, 11, "Feature / mặt / cạnh / sketch 2D", 1,
+                swSelectType_e.swSelBODYFEATURES,
+                swSelectType_e.swSelSKETCHES,
+                swSelectType_e.swSelEXTSKETCHSEGS,
+                swSelectType_e.swSelSKETCHSEGS,
+                swSelectType_e.swSelEXTSKETCHPOINTS,
+                swSelectType_e.swSelSKETCHPOINTS,
+                swSelectType_e.swSelFACES,
+                swSelectType_e.swSelEDGES);
             box.SingleEntityOnly = false; box.Height = 70;
             var action = Group(20, "2. Thao tác");
             modeBox = Combo(action, 21, "Thao tác", new[] { "Đặt MARK", "Bỏ MARK" });
@@ -57,7 +70,7 @@ namespace ADDIN.UI
         {
             get
             {
-                return "Chọn feature trong cây, hoặc bấm vào mặt / cạnh của rãnh. ✓ đổi tên; ✕ hủy.\n" +
+                return "Chọn feature / sketch 2D trong cây, hoặc bấm vào mặt / cạnh của rãnh hay nét sketch 2D. ✓ đổi tên; ✕ hủy.\n" +
                     "Pattern của feature đã MARK tự theo feature gốc.\n" +
                     "Miệng lỗ vát (Chamfer) tự thành nét khắc, không cần đặt MARK.";
             }
@@ -87,7 +100,7 @@ namespace ADDIN.UI
 
         protected override bool Validate(out string message)
         {
-            if (Count(1) < 1) { message = "Chọn feature, hoặc mặt / cạnh của rãnh cần khắc dấu."; return false; }
+            if (Count(1) < 1) { message = "Chọn feature, sketch 2D, hoặc mặt / cạnh của rãnh cần khắc dấu."; return false; }
             if (previewError != null) { message = previewError; return false; }
             int changes = plan.Count(t => t.NewName != null);
             if (changes == 0) { message = set ? "Các feature đã chọn đều đã có MARK." : "Các feature đã chọn không có MARK."; return false; }

@@ -56,6 +56,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
             public int RemainingDefaultGeometryCount { get; set; }
             public int PartInfoTextCount { get; set; }
             public string PartInfoFontFile { get; set; }
+            public DxfOpeningLayoutResult OpeningLayout { get; set; }
             public int OverlapRemovedCount { get; set; }
             public int OverlapTrimmedCount { get; set; }
             public int OverlapPartialCount { get; set; }
@@ -94,6 +95,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 $"erased-mark-rims={ErasedMarkRimCount}, " +
                 $"remaining-layer-0={RemainingDefaultGeometryCount}, " +
                 $"PART_INFO_TEXT={PartInfoTextCount}, " +
+                $"opening-layout={OpeningLayout?.Changed == true}, " +
                 $"font='{PartInfoFontFile ?? "unresolved"}'.";
         }
 
@@ -438,6 +440,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 settings.Bend.Name,
                 "CENTER");
 
+            bool visiblePatternsChanged = semanticLayers && NormalizeVisibleLinePatterns(lines, settings);
             int partInfoTextCount;
             string partInfoFontFile;
             bool partInfoFontChanged = NormalizePartInfoFont(
@@ -446,7 +449,9 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 out partInfoTextCount,
                 out partInfoFontFile);
 
+            DxfOpeningLayoutResult openingLayout = ApplyOpeningLayout(lines, settings);
             Result result = Inspect(lines, settings);
+            result.OpeningLayout = openingLayout;
             result.ReassignedEntityCount = reassigned;
             result.PartInfoTextCount = partInfoTextCount;
             result.PartInfoFontFile = partInfoFontFile;
@@ -462,7 +467,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
             result.MarkRingSubstitutions.AddRange(markRingSubstitutions);
 
             if (reassigned > 0 || entityColorChanged || layerTableChanged ||
-                layerColorChanged || partInfoFontChanged ||
+                layerColorChanged || partInfoFontChanged || openingLayout.Changed || visiblePatternsChanged ||
                 discardedMarkers > 0)
             {
                 string tempPath = filePath + ".layers.tmp";

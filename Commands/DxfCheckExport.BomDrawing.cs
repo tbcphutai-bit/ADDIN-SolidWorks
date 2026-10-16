@@ -53,14 +53,15 @@ namespace ADDIN.Commands.DxfChecking
         internal static void WriteBomDrawingExcel(DxfBomBatchResult batch,double tolerance)
         {
             var summary=new List<object[]> { new object[] { "INo BOM","部品番号","KẾT QUẢ","COMPONENT","DRAWING","SHEET","VIEW","DXF","LỆCH MAX (mm)","NỘI DUNG","HÌNH HỌC","NÉT CẮT","DỊCH X (mm)","DỊCH Y (mm)","CONFIG","DRAWING SHA256","DXF SHA256","ADDIN BUILD" } };
-            var detail=new List<object[]> { new object[] { "INo BOM","部品番号","DRAWING","DXF","SHEET","VIEW","MÃ LỖI","LOẠI","LỆCH (mm)","MÔ TẢ" } };
+            var detail=new List<object[]> { new object[] { "INo BOM","部品番号","DRAWING","DXF","SHEET","VIEW","MÃ","LOẠI","LỆCH (mm)","MÔ TẢ","DRAWING X (mm)","DRAWING Y (mm)","DXF X (mm, dịch nếu căn được)","DXF Y (mm, dịch nếu căn được)" } };
             foreach(var item in batch.Items)
             {
                 summary.Add(new object[] {item.ItemNumber,item.PartNumber,item.Status,item.Component,item.DrawingPath,item.Sheet,item.View,item.DxfPath,item.Result==null?null:(object)item.Result.MaximumDeviation,item.Message,
-                    item.Result==null?"":item.Result.GeometryPassed?"PASS":"FAIL",item.Result==null?"":item.Result.CutQualityPassed?"PASS":"WARN",
+                    item.Result==null?"":item.Result.GeometryPassed?"PASS":"FAIL",item.Result==null?"":item.Result.ReviewRequired?"CHECK":item.Result.CutQualityPassed?"PASS":"WARN",
                     item.Result==null || !item.Result.AlignmentFound?null:(object)item.Result.Translation.OffsetX,item.Result==null || !item.Result.AlignmentFound?null:(object)item.Result.Translation.OffsetY,
                     item.Result?.Source?.Configuration,item.Result?.Source?.DrawingSha256,item.Result?.Source?.DxfSha256,item.Result?.Source?.AddinVersion});
-                if(item.Result!=null)foreach(var m in item.Result.Mismatches)detail.Add(new object[] {item.ItemNumber,item.PartNumber,item.DrawingPath,item.DxfPath,item.Sheet,item.View,m.Id,(m.CutQualityIssue?"NÉT CẮT: ":"HÌNH HỌC: ")+m.Type,m.Deviation,m.Description});
+                if(item.Result!=null)foreach(var m in item.Result.Mismatches)detail.Add(new object[] {item.ItemNumber,item.PartNumber,item.DrawingPath,item.DxfPath,item.Sheet,item.View,(m.ReviewIssue?"CHECK-":"ERR-")+m.Id.ToString("00"),(m.ReviewIssue?"CHECK: ":m.CutQualityIssue?"NÉT CẮT: ":"HÌNH HỌC: ")+m.Type,m.Deviation,m.Description,
+                    m.HasDrawingPosition?(object)m.DrawingPosition.X:null,m.HasDrawingPosition?(object)m.DrawingPosition.Y:null,m.HasDxfPosition?(object)m.DxfPosition.X:null,m.HasDxfPosition?(object)m.DxfPosition.Y:null});
                 else if(item.Status=="ERROR" || item.Status=="SKIP")detail.Add(new object[] {item.ItemNumber,item.PartNumber,item.DrawingPath,item.DxfPath,item.Sheet,item.View,"",item.Status,null,item.Message});
             }
             Atomic(batch.ReportPath,temp=>
@@ -79,7 +80,7 @@ namespace ADDIN.Commands.DxfChecking
                     Entry(zip,"xl/styles.xml",Styles());
                     string context=batch.Message+" Dung sai "+tolerance.ToString("0.000",System.Globalization.CultureInfo.InvariantCulture)+" mm; DXF so với SLDDRW. BOM: "+batch.BomPath;
                     Entry(zip,"xl/worksheets/sheet1.xml",Worksheet("CHECK DXF ↔ DRAWING THEO BOM",context,summary,new double[]{12,14,14,35,65,12,22,65,20,75,14,14,20,20,30,70,70,42},null,9,-1,null,new[]{8,12,13}));
-                    Entry(zip,"xl/worksheets/sheet2.xml",Worksheet("CHI TIẾT LỖI DXF / DRAWING",context,detail,new double[]{12,14,65,65,12,22,12,30,20,75},null,9,-1,null,new[]{8}));
+                    Entry(zip,"xl/worksheets/sheet2.xml",Worksheet("CHI TIẾT LỖI DXF / DRAWING",context,detail,new double[]{12,14,65,65,12,22,14,30,20,75,24,24,32,32},null,9,-1,null,new[]{8,10,11,12,13}));
                 }
             });
         }

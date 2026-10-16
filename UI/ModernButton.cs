@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
@@ -229,8 +229,8 @@ namespace ADDIN.UI
 
             if (!Enabled)
             {
-                look.Fill = TaiTheme.SurfaceDisabled; look.Border = TaiTheme.Divider;
-                look.Text = look.Detail = look.Icon = TaiTheme.TextDisabled;
+                look.Fill = Color.FromArgb(243, 244, 246); look.Border = Color.FromArgb(226, 232, 240);
+                look.Text = look.Detail = look.Icon = Color.FromArgb(148, 163, 184);
                 if (role == ModernButtonKind.Tile) look.Chip = Color.FromArgb(240, 242, 246);
                 else if (role == ModernButtonKind.Subtle) { look.Fill = backdrop; look.Border = Color.Empty; }
                 else if (role == ModernButtonKind.Primary || role == ModernButtonKind.Success)
@@ -261,10 +261,22 @@ namespace ADDIN.UI
                     look.Border = TaiTheme.WarningBorder; look.Text = look.Icon = TaiTheme.Warning;
                     break;
                 case ModernButtonKind.Subtle:
-                    bool alert = tone == ModernButtonTone.Danger && hovered;
-                    look.Fill = !hovered ? backdrop : alert ? TaiTheme.DangerSoft : down ? TaiTheme.Sunken : TaiTheme.SurfacePressed;
-                    look.Border = Color.Empty;
-                    look.Text = look.Icon = alert ? TaiTheme.Danger : hovered ? TaiTheme.Text : TaiTheme.TextMuted;
+                    bool inDarkHeader = Parent is ModernCard card && card.HeaderStyle == ModernCardHeaderStyle.DarkNavy && Top < TaiTheme.Px(this, TaiTheme.CardHeader);
+                    if (inDarkHeader)
+                    {
+                        bool alert = tone == ModernButtonTone.Danger;
+                        look.Fill = alert ? (hovered ? Color.FromArgb(185, 28, 28) : Color.FromArgb(127, 29, 29))
+                            : down ? Color.FromArgb(30, 41, 59) : hovered ? Color.FromArgb(71, 85, 105) : Color.FromArgb(51, 65, 85);
+                        look.Border = alert ? Color.FromArgb(239, 68, 68) : Color.FromArgb(71, 85, 105);
+                        look.Text = look.Icon = Color.White;
+                    }
+                    else
+                    {
+                        bool alert = tone == ModernButtonTone.Danger && hovered;
+                        look.Fill = !hovered ? backdrop : alert ? TaiTheme.DangerSoft : down ? TaiTheme.Sunken : TaiTheme.SurfacePressed;
+                        look.Border = Color.Empty;
+                        look.Text = look.Icon = alert ? TaiTheme.Danger : hovered ? TaiTheme.Text : TaiTheme.TextMuted;
+                    }
                     break;
                 case ModernButtonKind.Tile:
                     look.Text = TaiTheme.Text; look.Detail = TaiTheme.TextMuted; look.Icon = strong; look.Chip = soft;
@@ -300,14 +312,17 @@ namespace ADDIN.UI
         {
             Graphics g = pevent.Graphics;
             TaiTheme.Prepare(g);
-            Color backdrop = TaiTheme.BackdropOf(this);
+            bool inDarkHeader = Parent is ModernCard card && card.HeaderStyle == ModernCardHeaderStyle.DarkNavy && Top < TaiTheme.Px(this, TaiTheme.CardHeader);
+            Color backdrop = inDarkHeader ? Color.FromArgb(30, 41, 59) : TaiTheme.BackdropOf(this);
             g.Clear(backdrop);
             if (Width < 3 || Height < 3) return;
 
             ModernButtonKind role = ResolveKind();
             Look look = LookFor(role, backdrop);
             Rectangle frame = new Rectangle(0, 0, Width - 1, Height - 1);
-            int radius = TaiTheme.Px(this, role == ModernButtonKind.Tile ? 8 : TaiTheme.ButtonRadius);
+            int radius = inDarkHeader
+                ? Math.Min(Height / 2, TaiTheme.Px(this, 12))
+                : (BorderRadius > 0 && BorderRadius != 6 ? TaiTheme.Px(this, BorderRadius) : TaiTheme.Px(this, role == ModernButtonKind.Tile ? 8 : TaiTheme.ButtonRadius));
             TaiTheme.FillRound(g, frame, radius, look.Fill, look.Border);
             if (look.Lip.A > 0)
                 using (Pen lip = new Pen(look.Lip, 1F))

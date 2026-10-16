@@ -21,6 +21,21 @@ namespace ADDIN.Commands
         readonly List<DocumentDisplayState> documentStates = new List<DocumentDisplayState>();
         IntPtr documentArea;
         bool commandChanged, redrawSuppressed, visibilityRead, disposed;
+        bool keepRedrawDisabled;
+        SubclassCallback redrawCallback;
+        static readonly UIntPtr SubclassId = new UIntPtr(0x54414944);
+        delegate IntPtr SubclassCallback(IntPtr window, uint message, UIntPtr wParam,
+            IntPtr lParam, UIntPtr subclassId, UIntPtr referenceData);
+        delegate bool WindowCallback(IntPtr window, IntPtr parameter);
+        [StructLayout(LayoutKind.Sequential)]
+        struct WindowPosition { public IntPtr Window, InsertAfter; public int X, Y, Width, Height; public uint Flags; }
+        [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+        [DllImport("comctl32.dll")] static extern bool SetWindowSubclass(IntPtr window, SubclassCallback callback, UIntPtr id, UIntPtr referenceData);
+        [DllImport("comctl32.dll")] static extern bool RemoveWindowSubclass(IntPtr window, SubclassCallback callback, UIntPtr id);
+        [DllImport("comctl32.dll")] static extern IntPtr DefSubclassProc(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, WindowCallback callback, IntPtr parameter);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr GetProp(IntPtr window, string name);
 
         [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr window);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder name, int count);
@@ -46,27 +61,60 @@ namespace ADDIN.Commands
                 // Freeze only the MDI document area. The task pane's progress and
                 // Cancel control remain paintable and the main frame stays visible.
                 var frame = app.Frame() as IFrame;
-                var windows = frame?.ModelWindows as object[];
-                if (windows != null)
-                    foreach (object value in windows)
-                    {
-                        var window = value as IModelWindow;
-                        if (window == null) continue;
-                        IntPtr parent = GetParent(new IntPtr(window.HWndx64));
-                        var className = new StringBuilder(256);
-                        uint processId;
-                        GetWindowThreadProcessId(parent, out processId);
-                        GetClassName(parent, className, className.Capacity);
-                        string name = className.ToString();
-                        if (processId != app.GetProcessID() ||
-                            (!name.Equals("MDIClient", StringComparison.OrdinalIgnoreCase) && !name.Equals("swMdiClient", StringComparison.OrdinalIgnoreCase))) continue;
-                        IntPtr result;
-                        if (SendMessageTimeout(parent, WmSetRedraw, IntPtr.Zero, IntPtr.Zero, 2, 2000, out result) != IntPtr.Zero)
-                        { documentArea = parent; redrawSuppressed = true; }
-                        break;
-                    }
+                if (frame == null) throw new InvalidOperationException("Không lấy được khung SOLIDWORKS hiện tại.");
+                IntPtr frameHandle = new IntPtr(frame.GetHWndx64());
+                uint processId;
+                uint threadId = GetWindowThreadProcessId(frameHandle, out processId);
+                if (processId != (uint)app.GetProcessID() || processId != (uint)Process.GetCurrentProcess().Id || threadId != GetCurrentThreadId())
+                    throw new InvalidOperationException("Lệnh silent phải chạy trong luồng của add-in SOLIDWORKS hiện tại.");
+                EnumChildWindows(frameHandle, (window, parameter) => {
+                    var name = new StringBuilder(128);
+                    GetClassName(window, name, name.Capacity);
+                    if (!name.ToString().Equals("swMdiClient", StringComparison.OrdinalIgnoreCase) &&
+                        !name.ToString().Equals("MDIClient", StringComparison.OrdinalIgnoreCase)) return true;
+                    documentArea = window;
+                    return false;
+                }, IntPtr.Zero);
+                if (documentArea == IntPtr.Zero)
+                    throw new InvalidOperationException("Không tìm được vùng Drawing của phiên hiện tại.");
+                // A nested scope does not own the caller's redraw state.
+                if (GetProp(documentArea, "SysSetRedraw") != IntPtr.Zero ||
+                    (GetWindowLongPtr(documentArea, -16).ToInt64() & 0x10000000) == 0) return;
+                redrawCallback = GuardRedraw;
+                keepRedrawDisabled = true;
+                if (!SetWindowSubclass(documentArea, redrawCallback, SubclassId, UIntPtr.Zero))
+                    throw new InvalidOperationException("Không giữ được vùng Drawing silent trong luồng hiện tại.");
+                IntPtr result;
+                if (SendMessageTimeout(documentArea, WmSetRedraw, IntPtr.Zero, IntPtr.Zero, 2, 2000, out result) == IntPtr.Zero)
+                {
+                    keepRedrawDisabled = false;
+                    RemoveWindowSubclass(documentArea, redrawCallback, SubclassId);
+                    throw new InvalidOperationException("Không tạm dừng được hiển thị vùng Drawing.");
+                }
+                redrawSuppressed = true;
+                Trace.WriteLine("[DRAWING SILENT IN PROCESS] pid=" + processId + " mdi=" + documentArea.ToInt64());
             }
             catch { Dispose(); throw; }
+        }
+
+        IntPtr GuardRedraw(IntPtr window, uint message, UIntPtr wParam,
+            IntPtr lParam, UIntPtr subclassId, UIntPtr referenceData)
+        {
+            // SOLIDWORKS sends WM_SETREDRAW(TRUE) while opening/activating a
+            // document. Keep that same area guarded until all restoration ends.
+            if (keepRedrawDisabled && message == WmSetRedraw && wParam != UIntPtr.Zero) return IntPtr.Zero;
+            // ApplyDisplayState can show the MDI client directly, bypassing
+            // WM_SETREDRAW. Suppress that visibility change on this area only.
+            if (keepRedrawDisabled && message == 0x0046 && lParam != IntPtr.Zero)
+            {
+                var position = (WindowPosition)Marshal.PtrToStructure(lParam, typeof(WindowPosition));
+                if ((position.Flags & 0x0040) != 0)
+                {
+                    position.Flags = (position.Flags & ~0x0040u) | 0x0080u;
+                    Marshal.StructureToPtr(position, lParam, false);
+                }
+            }
+            return DefSubclassProc(window, message, wParam, lParam);
         }
 
         void CaptureExistingDisplays()
@@ -134,9 +182,12 @@ namespace ADDIN.Commands
             {
                 if (redrawSuppressed && IsWindow(documentArea))
                 {
+                    keepRedrawDisabled = false;
+                    RemoveWindowSubclass(documentArea, redrawCallback, SubclassId);
                     IntPtr result;
                     SendMessageTimeout(documentArea, WmSetRedraw, new IntPtr(1), IntPtr.Zero, 2, 2000, out result);
                     RedrawWindow(documentArea, IntPtr.Zero, IntPtr.Zero, 0x0001 | 0x0004 | 0x0080 | 0x0400);
+                    GC.KeepAlive(redrawCallback);
                 }
             }
         }

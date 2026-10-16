@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -241,6 +241,9 @@ namespace ADDIN.Commands
             NativeRepairDimensionTarget target, SwView view, DisplayDimension dd, Annotation annotation, string path,
             int number, int total, int display, int dangling)
         {
+            var nativeLinearRepair = TryRepairLinearWithNativeReattach(app, drawing, model, target, view, dd, annotation, display, dangling);
+            if (nativeLinearRepair != null) return nativeLinearRepair;
+
             object[] entities = annotation.GetAttachedEntities3() as object[];
             if (IsSingleEntityDimension(dd)) {
                 if (entities != null && entities.Length > 0 && entities[0] != null)
@@ -269,6 +272,149 @@ namespace ADDIN.Commands
                 info.FailureMode == RepairDimFailureMode.GeometryChangedNoCandidate || info.CandidateDecision == "NO_CANDIDATE_DIAGNOSTIC" || info.CandidateDecision == "GEOMETRY_UNVERIFIED")
                 return ExecuteSingleFullyLostTargetRepair(app, drawing, model, snapshot, number, total, display, dangling);
             return null;
+        }
+
+        private static SingleTargetRepairResult TryRepairLinearWithNativeReattach(ISldWorks app, DrawingDoc drawing, ModelDoc2 model,
+            NativeRepairDimensionTarget target, SwView view, DisplayDimension dd, Annotation annotation, int display, int dangling)
+        {
+            var info = ExtractDanglingInfo(target.SheetName, target.ViewName, dd, annotation);
+            bool linear = info.DimensionType == swDimensionType_e.swLinearDimension ||
+                info.DimensionType == swDimensionType_e.swHorLinearDimension ||
+                info.DimensionType == swDimensionType_e.swVertLinearDimension;
+            if (!linear) return null;
+
+            var geometry = GetRepairViewGeometry(app, view);
+            RepairDimCandidateFinder.AnalyzeCandidatesForDimension(app, info, geometry, view, dd);
+            CheckRepairReadBudget();
+
+            var points = new List<double[]>();
+            if (info.AnchorReferenceIndex < 0)
+            {
+                var pair = RepairDimCandidateFinder.FindFullyLostPairCandidate(app, info, geometry, view, dd);
+                if (pair == null || pair.BestPair == null ||
+                    (pair.Decision != "FULLY_LOST_HIGH_CONFIDENCE" && pair.Decision != "BROKEN_VIEW_PROVISIONAL_HIGH_CONFIDENCE"))
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_NO_UNIQUE_PAIR" };
+                points.Add(pair.BestPair.AttachPoint1);
+                points.Add(pair.BestPair.AttachPoint2);
+            }
+            else
+            {
+                if (info.CandidateDecision != "HIGH_CONFIDENCE" || info.Candidates == null || info.Candidates.Count == 0)
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_NO_UNIQUE_EDGE" };
+                var profile = RepairDimGeometry.BuildDisplayWitnessProfile(info.DisplayLineSegments, info.Position);
+                if (profile == null || !profile.IsValid)
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_NO_WITNESS_PROFILE" };
+
+                var candidate = info.Candidates[0];
+                var edge = geometry.RepairLineRecords.FirstOrDefault(x => x.RawRecordIndex == candidate.RawRecordIndex);
+                if (edge == null || edge.SheetStart == null || edge.SheetEnd == null)
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_EDGE_NOT_FOUND" };
+                var witness1 = RepairDimGeometry.ClosestPointOnSegment2D(profile.Witness1GeometryPoint[0], profile.Witness1GeometryPoint[1],
+                    edge.SheetStart[0], edge.SheetStart[1], edge.SheetEnd[0], edge.SheetEnd[1]);
+                var witness2 = RepairDimGeometry.ClosestPointOnSegment2D(profile.Witness2GeometryPoint[0], profile.Witness2GeometryPoint[1],
+                    edge.SheetStart[0], edge.SheetStart[1], edge.SheetEnd[0], edge.SheetEnd[1]);
+                if (Math.Abs(witness1.DistanceMm - witness2.DistanceMm) <= RepairDimGeometry.AbsoluteDistanceToleranceMm)
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_WITNESS_SIDE_AMBIGUOUS" };
+                var selectedPoint = witness1.DistanceMm < witness2.DistanceMm ? witness1.Point : witness2.Point;
+                if (selectedPoint == null || selectedPoint.Length < 2 || Math.Min(witness1.DistanceMm, witness2.DistanceMm) > 3.0)
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_WITNESS_TOO_FAR" };
+                points.Add(selectedPoint);
+            }
+
+            if (points.Count == 0 || points.Any(p => p == null || p.Length < 2 ||
+                double.IsNaN(p[0]) || double.IsNaN(p[1]) || double.IsInfinity(p[0]) || double.IsInfinity(p[1])))
+                return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_INVALID_POINT" };
+
+            Dimension dimension = dd.GetDimension2(0) as Dimension ?? dd.GetDimension() as Dimension;
+            string oldFullName = dimension == null ? "" : (dimension.FullName ?? "");
+            string oldAnnotationName = annotation.GetName() ?? "";
+            double? oldValue = info.SystemValue;
+            bool previousCommand = app.CommandInProgress;
+            bool attempted = false;
+            bool attached = false;
+            string failure = "NATIVE_REATTACH_NOT_CONFIRMED";
+            try
+            {
+                // Reattach is a native UI command. Temporarily release the batch command guard
+                // so SOLIDWORKS can enter the same command as the context-menu action.
+                app.CommandInProgress = false;
+                model.ClearSelection2(true);
+                if (!annotation.Select3(false, null) || !IsNativeDimensionSelected(model))
+                    return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_DIM_SELECTION_FAILED" };
+                attempted = app.RunCommand(3521, "");
+                if (!attempted) return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = "NATIVE_REATTACH_COMMAND_NOT_STARTED" };
+                LogDebug("NATIVE REATTACH START: " + target.DimensionName + ", points=" + points.Count);
+
+                var modelView = model.ActiveView as ModelView;
+                var mouse = modelView == null ? null : modelView.GetMouse() as IMouse;
+                if (mouse == null) failure = "NATIVE_REATTACH_MOUSE_UNAVAILABLE";
+                else
+                {
+                    foreach (var point in points)
+                    {
+                        CheckRepairReadBudget();
+                        bool down = mouse.MoveXYZ(point[0], point[1], point.Length > 2 ? point[2] : 0.0, 2);
+                        System.Threading.Thread.Sleep(15);
+                        bool up = mouse.MoveXYZ(point[0], point[1], point.Length > 2 ? point[2] : 0.0, 4);
+                        if (!down || !up) { failure = "NATIVE_REATTACH_CLICK_FAILED"; break; }
+                        PumpRepairMessages(120);
+                        if (!annotation.IsDangling()) { attached = true; break; }
+                    }
+                }
+
+                if (attached)
+                {
+                    model.ForceRebuild3(false);
+                    var verified = dd.GetAnnotation() as Annotation;
+                    var verifiedDim = dd.GetDimension2(0) as Dimension ?? dd.GetDimension() as Dimension;
+                    bool identityPreserved = verified != null && verifiedDim != null &&
+                        string.Equals(verified.GetName() ?? "", oldAnnotationName, StringComparison.Ordinal) &&
+                        (string.IsNullOrEmpty(oldFullName) || string.Equals(verifiedDim.FullName ?? "", oldFullName, StringComparison.Ordinal));
+                    bool valuePreserved = true;
+                    if (oldValue.HasValue && verifiedDim != null)
+                    {
+                        object values = verifiedDim.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
+                        double newValue = values is double[] array && array.Length > 0 ? array[0] : verifiedDim.GetSystemValue2("");
+                        double tolerance = Math.Max(0.00015, Math.Abs(oldValue.Value) * 0.001);
+                        valuePreserved = Math.Abs(newValue - oldValue.Value) <= tolerance;
+                    }
+                    attached = verified != null && !verified.IsDangling() && identityPreserved && valuePreserved;
+                    if (!attached) failure = "NATIVE_REATTACH_POSTCHECK_FAILED";
+                }
+            }
+            catch (RepairDimReadLimitException) { throw; }
+            catch (Exception ex) { failure = "NATIVE_REATTACH_ERROR: " + ex.Message; }
+            finally
+            {
+                if (attempted)
+                {
+                    try { app.RunCommand(3043, ""); } catch { }
+                    try { PumpRepairMessages(50); } catch { }
+                }
+                try { model.ClearSelection2(true); } finally { app.CommandInProgress = previousCommand; }
+            }
+
+            if (!attached) return new SingleTargetRepairResult { Status = SingleTargetStatus.ManualReview, Reason = failure };
+            int postDisplay, postDangling;
+            CountTotalDrawingDimensions(drawing, out postDisplay, out postDangling);
+            return new SingleTargetRepairResult { Status = SingleTargetStatus.Success, PostDisplayCount = postDisplay, PostDanglingCount = postDangling };
+        }
+
+        private static bool IsNativeDimensionSelected(ModelDoc2 model)
+        {
+            var selection = model.SelectionManager as SelectionMgr;
+            return selection != null && selection.GetSelectedObjectCount2(-1) == 1 &&
+                selection.GetSelectedObjectType3(1, -1) == (int)swSelectType_e.swSelDIMENSIONS;
+        }
+
+        private static void PumpRepairMessages(int milliseconds)
+        {
+            var timer = Stopwatch.StartNew();
+            while (timer.ElapsedMilliseconds < milliseconds)
+            {
+                System.Windows.Forms.Application.DoEvents();
+                System.Threading.Thread.Sleep(10);
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,6 +12,10 @@ namespace ADDIN.Commands
             new Dictionary<string, BendTableWorkbookData>(StringComparer.OrdinalIgnoreCase);
         private object excelApplication;
         private readonly BendTableDatabase standardDatabase = new BendTableDatabase();
+
+        internal string StandardSourceDirectory => standardDatabase.SourceDirectoryPath;
+        internal string ResolveStandardPath(string canonicalName) => standardDatabase.ResolveStandardPath(canonicalName);
+        internal double? GetGrooveRemainingThickness(string path) => standardDatabase.GetGrooveRemainingThickness(path);
 
         // Only the expected standard comes from the database. Actual table data
         // stays independent so identical filenames cannot hide a mismatch.

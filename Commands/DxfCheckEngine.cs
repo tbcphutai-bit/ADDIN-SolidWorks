@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -24,7 +24,7 @@ namespace ADDIN.Commands.DxfChecking
             folder = Path.GetFullPath(folder);
             batch.SourceFolder = folder;
             if (!Directory.Exists(folder)) { batch.InputMessage = "Không tìm thấy thư mục DXF. Hãy chọn lại thư mục."; return batch; }
-            List<string> files = Enumerate(folder, recursive).OrderBy(p => Path.GetFileNameWithoutExtension(p), new NaturalNameComparer()).ThenBy(p => p, StringComparer.OrdinalIgnoreCase).ThenBy(p => p, StringComparer.Ordinal).ToList();
+            List<string> files = Enumerate(folder, recursive).OrderBy(p => p, NaturalPathComparer).ThenBy(p => p, StringComparer.OrdinalIgnoreCase).ThenBy(p => p, StringComparer.Ordinal).ToList();
             Trace.WriteLine("[CHECK DXF] Folder=\"" + folder + "\"; Recursive=" + recursive + "; Files=" + files.Count);
             if (files.Count == 0) {
                 batch.InputMessage = "Không có DXF trong thư mục này. Chọn thư mục chứa file, hoặc bật Quét cả thư mục con rồi chọn lại.";
@@ -665,25 +665,44 @@ namespace ADDIN.Commands.DxfChecking
             return points;
         }
 
+        internal static readonly IComparer<string> NaturalPathComparer = new NaturalNameComparer();
+
+        internal static int CompareNaturalPath(string a, string b)
+        {
+            if (ReferenceEquals(a, b)) return 0;
+            if (a == null) return -1;
+            if (b == null) return 1;
+            int dir = CompareNatural(Path.GetDirectoryName(a) ?? "", Path.GetDirectoryName(b) ?? "");
+            if (dir != 0) return dir;
+            int stem = CompareNatural(Path.GetFileNameWithoutExtension(a) ?? "", Path.GetFileNameWithoutExtension(b) ?? "");
+            return stem != 0 ? stem : CompareNatural(a, b);
+        }
+
+        internal static int CompareNatural(string a, string b)
+        {
+            if (ReferenceEquals(a, b)) return 0;
+            if (a == null) return -1;
+            if (b == null) return 1;
+            int i = 0, j = 0;
+            while (i < a.Length && j < b.Length)
+            {
+                if (char.IsDigit(a[i]) && char.IsDigit(b[j]))
+                {
+                    int ai = i, bj = j;
+                    while (i < a.Length && char.IsDigit(a[i])) i++;
+                    while (j < b.Length && char.IsDigit(b[j])) j++;
+                    string x = a.Substring(ai, i - ai).TrimStart('0'), y = b.Substring(bj, j - bj).TrimStart('0');
+                    int c = x.Length.CompareTo(y.Length); if (c == 0) c = string.CompareOrdinal(x, y); if (c == 0) c = (i - ai).CompareTo(j - bj);
+                    if (c != 0) return c;
+                }
+                else { int c = char.ToUpperInvariant(a[i++]).CompareTo(char.ToUpperInvariant(b[j++])); if (c != 0) return c; }
+            }
+            return a.Length.CompareTo(b.Length);
+        }
+
         private sealed class NaturalNameComparer : IComparer<string>
         {
-            public int Compare(string a, string b)
-            {
-                int i = 0, j = 0;
-                while (i < a.Length && j < b.Length)
-                {
-                    if (char.IsDigit(a[i]) && char.IsDigit(b[j]))
-                    {
-                        int ai = i, bj = j;
-                        while (i < a.Length && char.IsDigit(a[i])) i++;
-                        while (j < b.Length && char.IsDigit(b[j])) j++;
-                        string x = a.Substring(ai, i - ai).TrimStart('0'), y = b.Substring(bj, j - bj).TrimStart('0');
-                        int c = x.Length.CompareTo(y.Length); if (c == 0) c = string.CompareOrdinal(x, y); if (c != 0) return c;
-                    }
-                    else { int c = char.ToUpperInvariant(a[i++]).CompareTo(char.ToUpperInvariant(b[j++])); if (c != 0) return c; }
-                }
-                return a.Length.CompareTo(b.Length);
-            }
+            public int Compare(string a, string b) { return CompareNaturalPath(a, b); }
         }
     }
 }

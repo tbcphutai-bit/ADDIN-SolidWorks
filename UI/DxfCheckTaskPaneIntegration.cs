@@ -1,14 +1,16 @@
-﻿using System;
+using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace ADDIN
 {
     public partial class BomTaskPaneControl
     {
-        private UI.ModernButton btnCheckDxf, btnCheckDxfMacro, btnStandaloneCurveMacro;
+        private UI.ModernButton btnCheckDxf, btnDxfSource, btnCheckDxfMacro, btnStandaloneCurveMacro;
         private UI.DxfCheckForm dxfCheckForm;
         private string loadedDxfBomPath;
+        private string selectedDxfSourceDirectory;
         private Commands.DxfChecking.DxfBomBatchResult lastDxfBomResult;
         private UI.DxfBomDrawingReviewForm dxfBomDrawingReviewForm;
 
@@ -17,19 +19,39 @@ namespace ADDIN
             if (drawingBomCommandInProgress) return;
             if (actions == null || actions.LoadedBomContext != Commands.BomCommandContext.Detail || string.IsNullOrWhiteSpace(loadedDxfBomPath))
             { lblStatus.Text = "Hãy Load BOM chi tiết rồi tick các dòng cần kiểm tra DXF."; return; }
+            if (!ChooseDxfSourceDirectory())
+            { lblStatus.Text = "Đã hủy chọn thư mục DXF; chưa chạy kiểm tra."; return; }
+            string sourceDirectory = selectedDxfSourceDirectory;
             Commands.DxfChecking.DxfBomBatchResult completedResult = null;
-            RunDrawingBomCommand(() =>
+            using (var progressView = new UI.DxfBomCheckProgressForm(sourceDirectory))
             {
-                try
+                progressView.PositionOnScreen(Screen.FromControl(this).WorkingArea);
+                RunDrawingBomCommand(() =>
                 {
-                    completedResult = new Commands.DxfChecking.CheckDxfBomBatch(swApp, dgvModelBom).RunSilent(
-                        dgvModelBom, loadedDxfBomPath, BeginProgress, UpdateProgress, FinishProgress, IsDrawingBomCancelRequested);
-                    lastDxfBomResult = completedResult;
-                    lblStatus.Text = completedResult.Message;
-                    bomCommandToolTip?.SetToolTip(lblStatus, completedResult.ReportPath ?? "");
-                }
-                catch (Exception ex) { lblStatus.Text = "DXF ↔ DRAWING: " + ex.Message; }
-            }, true, true);
+                    try
+                    {
+                        progressView.Show(this); progressView.Refresh();
+                        completedResult = new Commands.DxfChecking.CheckDxfBomBatch(swApp, dgvModelBom).RunSilent(
+                            dgvModelBom, loadedDxfBomPath,
+                            total => { progressView.Begin(total); BeginProgress(total); },
+                            (current, total) => { progressView.UpdateProgress(current, total); UpdateProgress(current, total); },
+                            FinishProgress, IsDrawingBomCancelRequested, null, sourceDirectory, null,
+                            item =>
+                            {
+                                progressView.SetCurrentFile(item);
+                                lblStatus.Text = string.IsNullOrWhiteSpace(item.DxfPath)
+                                    ? "Đang tìm DXF cho chi tiết " + item.PartNumber
+                                    : "Đang kiểm tra DXF: " + item.DxfPath;
+                                bomCommandToolTip?.SetToolTip(lblStatus, item.DxfPath ?? sourceDirectory);
+                                lblStatus.Refresh();
+                            });
+                        lastDxfBomResult = completedResult;
+                        lblStatus.Text = completedResult.Message;
+                        bomCommandToolTip?.SetToolTip(lblStatus, completedResult.ReportPath ?? "");
+                    }
+                    catch (Exception ex) { lblStatus.Text = "DXF ↔ DRAWING: " + ex.Message; }
+                }, true, true);
+            }
             // Show cached results after the current session's display/input state
             // has been restored. Opening this window performs no CAD/file checks.
             if (completedResult == null || completedResult.Items.Count == 0) return;
@@ -56,9 +78,19 @@ namespace ADDIN
             {
                 btnCheckDxf = CreateCheckDxfButton("btnCheckDxf");
                 btnCheckDxf.Text = "DXF ↔ DRAWING";
-                btnCheckDxf.Subtitle = "DXF ↔ Drawing theo BOM";
+                btnCheckDxf.Subtitle = "Chọn thư mục DXF";
                 btnCheckDxf.Enabled = false;
                 tabDrawingBom.Controls.Add(btnCheckDxf);
+            }
+            if (btnDxfSource == null)
+            {
+                btnDxfSource = CreateCheckDxfButton("btnDxfSource");
+                btnDxfSource.Click -= btnCheckDxf_Click;
+                btnDxfSource.Click += (s, e) => ChooseDxfSourceDirectory();
+                btnDxfSource.Text = "THƯ MỤC DXF";
+                btnDxfSource.Enabled = false;
+                btnDxfSource.Visible = false;
+                UpdateDxfSourceButton();
             }
             if (btnStandaloneCurveMacro == null)
             {
@@ -67,7 +99,7 @@ namespace ADDIN
                 btnStandaloneCurveMacro.Click += (s, e) => RunStandaloneCurveMacro();
                 btnStandaloneCurveMacro.Text = "CHECK ĐƯỜNG";
                 btnStandaloneCurveMacro.Subtitle = "Macro rời Drawing / DXF";
-                tabDrawingBom.Controls.Add(btnStandaloneCurveMacro);
+                btnStandaloneCurveMacro.Visible = false;
             }
             if (btnCheckDxfMacro == null)
             {
@@ -94,6 +126,39 @@ namespace ADDIN
             };
             button.Click += btnCheckDxf_Click;
             return button;
+        }
+
+        private bool ChooseDxfSourceDirectory()
+        {
+            string initial = Directory.Exists(selectedDxfSourceDirectory) ? selectedDxfSourceDirectory :
+                Path.GetDirectoryName(loadedDxfBomPath);
+            using (var dialog = new FolderBrowserDialog {
+                Description = "Chọn thư mục DXF cho lần kiểm tra này. Chỉ dùng file trong thư mục đã chọn và các thư mục con.",
+                SelectedPath = Directory.Exists(initial) ? initial : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                ShowNewFolderButton = false
+            })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath)) return false;
+                selectedDxfSourceDirectory = dialog.SelectedPath; UpdateDxfSourceButton();
+                return true;
+            }
+        }
+
+        private void UpdateDxfSourceButton()
+        {
+            if (btnDxfSource == null) return;
+            string path = selectedDxfSourceDirectory;
+            btnDxfSource.Subtitle = string.IsNullOrWhiteSpace(path) ? "Chọn khi bấm kiểm tra" : Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            string tip = string.IsNullOrWhiteSpace(path)
+                ? "Bấm DXF ↔ DRAWING để chọn thư mục DXF trước mỗi lần kiểm tra."
+                : "Thư mục DXF gần nhất: " + path + ". DXF ↔ DRAWING sẽ hỏi chọn thư mục trước mỗi lần chạy.";
+            bomCommandToolTip?.SetToolTip(btnDxfSource, tip);
+        }
+
+        private void ResetDxfSource()
+        {
+            selectedDxfSourceDirectory = null;
+            UpdateDxfSourceButton();
         }
 
         private void btnCheckDxf_Click(object sender, EventArgs e)

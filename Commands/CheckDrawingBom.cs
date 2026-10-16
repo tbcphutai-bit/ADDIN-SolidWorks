@@ -210,19 +210,11 @@ namespace ADDIN.Commands
             Action finishProgress,
             Func<bool> isCancelRequested, bool silent = false, string reportDirectory = null)
         {
-            if (silent)
-                using (var display = new DrawingCommandDisplayScope(swApp))
-                    return RunBatchCore(beginProgress, updateProgress, finishProgress, isCancelRequested, true, reportDirectory);
-            return RunBatchCore(beginProgress, updateProgress, finishProgress, isCancelRequested, false, reportDirectory);
-        }
-
-        private DrawingBatchCheckResult RunBatchCore(
-            Action<int> beginProgress,
-            Action<int, int> updateProgress,
-            Action finishProgress,
-            Func<bool> isCancelRequested, bool silent, string reportDirectory)
-        {
             DrawingBatchCheckResult result = new DrawingBatchCheckResult();
+            DrawingCommandDisplayScope displayScope = null;
+            string originalTitle = "";
+            bool progressStarted = false;
+            bool progressFinished = false;
 
             try
             {
@@ -265,13 +257,20 @@ namespace ADDIN.Commands
 
                 LogDebug($"Total selected BOM rows = {checkedRows.Count}");
 
-
                 ModelDoc2 originalDocument = swApp.ActiveDoc as ModelDoc2;
-                string originalTitle = originalDocument != null ? originalDocument.GetTitle() : "";
+                originalTitle = originalDocument != null ? originalDocument.GetTitle() : "";
 
                 List<string> searchDirectories = BuildSearchDirectories(originalDocument);
 
+                progressStarted = true;
                 beginProgress?.Invoke(checkedRows.Count);
+                if (isCancelRequested != null && isCancelRequested())
+                {
+                    result.Canceled = true;
+                    result.Message = "Đã hủy CHECK DRAWING.";
+                    return result;
+                }
+                if (silent) displayScope = new DrawingCommandDisplayScope(swApp);
 
                 for (int i = 0; i < checkedRows.Count; i++)
                 {
@@ -366,6 +365,7 @@ namespace ADDIN.Commands
                             try { swApp.CloseDoc(drawingDoc.GetTitle()); }
                             catch { }
                         }
+                        RestoreBatchActiveDocument(originalTitle);
                     }
                 }
 
@@ -374,11 +374,14 @@ namespace ADDIN.Commands
                     try
                     {
                         int activateErrors = 0;
-                        swApp.ActivateDoc3(originalTitle, false, 0, ref activateErrors);
+                        swApp.ActivateDoc3(originalTitle, false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activateErrors);
                     }
                     catch { }
                 }
 
+                displayScope?.Dispose();
+                displayScope = null;
+                progressFinished = true;
                 finishProgress?.Invoke();
 
                 result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " + result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning.";
@@ -404,7 +407,6 @@ namespace ADDIN.Commands
             }
             catch (Exception ex)
             {
-                finishProgress?.Invoke();
                 LogDebug($"[BATCH ERROR] {ex}");
                 result.Message = ex.Message;
                 if (!silent) MessageBox.Show(
@@ -414,12 +416,35 @@ namespace ADDIN.Commands
                     MessageBoxIcon.Error);
             }
 
+            finally
+            {
+                RestoreBatchActiveDocument(originalTitle);
+                displayScope?.Dispose();
+                if (progressStarted && !progressFinished)
+                {
+                    progressFinished = true;
+                    finishProgress?.Invoke();
+                }
+            }
             return result;
         }
 
         #endregion
 
         internal sealed class DrawingReferenceSnapshot : BomDrawingReference { }
+
+        private void RestoreBatchActiveDocument(string title)
+        {
+            if (string.IsNullOrWhiteSpace(title)) return;
+            try
+            {
+                ModelDoc2 current = swApp.ActiveDoc as ModelDoc2;
+                if (current != null && string.Equals(current.GetTitle(), title, StringComparison.OrdinalIgnoreCase)) return;
+                int errors = 0;
+                swApp.ActivateDoc3(title, false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref errors);
+            }
+            catch (Exception ex) { LogDebug("[RESTORE ACTIVE DRAWING] " + ex.Message); }
+        }
 
         #region Single Drawing Check (CheckOneDrawing - Complete 12-Field Verification)
 
@@ -477,10 +502,9 @@ namespace ADDIN.Commands
                 $"[SHEET RESOLVE] sheet=\"{sheetName}\" " +
                 $"filter={(string.IsNullOrWhiteSpace(sheetName) ? "ALL_VIEWS" : "CURRENT_SHEET")}");
 
-            // 1. Refresh Drawing trước khi đọc Note/Table.
-            // Batch mở Drawing bằng Silent + ReadOnly nên DisplayedText/Table có thể
-            // vẫn giữ giá trị cache cũ nếu chưa rebuild. ForceRebuild3 chỉ rebuild
-            // trong memory; command này không Save Drawing.
+            // Read the current displayed Drawing after activation. Forcing a
+            // full rebuild here also rebuilds referenced models and can fail on
+            // in-context parts with missing assembly references.
             RefreshDrawingBeforeCheck(
                 drawingModel,
                 drawing,
@@ -639,26 +663,40 @@ namespace ADDIN.Commands
         private void AddFlatPatternSideChecks(DrawingCheckItemResult itemResult,
             DrawingDoc drawing, string sheetName, List<NoteDiagnosticInfo> notes, SheetFrameBounds frameBounds)
         {
-            var markers = notes.Where(n => !n.IsHidden && NormalizeFlatSideMarker(n.DisplayedText) != "").ToList();
+            var markers = notes.Where(n => !n.IsHidden && NormalizeFlatSideMarker(n.DisplayedText) != ""
+                && (!n.HasPosition || IsNoteInsideFrame(n, frameBounds))).ToList();
             markers.AddRange(ScanFlatSideBlockMarkers(drawing, sheetName, frameBounds));
             if (markers.Count == 0) return;
+            if (frameBounds == null || !frameBounds.IsValid)
+            {
+                itemResult.Fields.Add(new DrawingBomFieldResult
+                {
+                    FieldName = "表/ウラ ↔ 展開",
+                    BomValue = "表 → mặt màu; ウラ → mặt hồng",
+                    Source = "DRAWING_FLAT_SIDE",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = "Không đọc được phạm vi bản vẽ để chọn view 展開."
+                });
+                return;
+            }
             var views = new List<SolidWorks.Interop.sldworks.View>();
-            var otherViewNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var excludedViewNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             SolidWorks.Interop.sldworks.View view = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
             while (view != null)
             {
-                if (IsViewOnSheet(view, sheetName))
+                if (IsViewOnSheet(view, sheetName) && view.Type != (int)swDrawingViewTypes_e.swDrawingSheet)
                 {
-                    if (UraOmoteChecker.IsFlatDrawingView(view)) views.Add(view);
-                    else if (view.Type != (int)swDrawingViewTypes_e.swDrawingSheet)
-                        otherViewNames.Add(view.Name ?? "");
+                    if (IsFlatViewInsideFrame(view, frameBounds) && UraOmoteChecker.IsFlatDrawingView(view))
+                        views.Add(view);
+                    else
+                        excludedViewNames.Add(view.Name ?? "");
                 }
                 view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
             }
             var field = new DrawingBomFieldResult
             {
                 FieldName = "表/ウラ ↔ 展開",
-                BomValue = "表 → mặt omote; ウラ → mặt hồng",
+                BomValue = "表 → mặt màu; ウラ → mặt hồng; cả hai mặt không hồng → Warning",
                 Source = "DRAWING_FLAT_SIDE",
                 Status = DrawingBomCheckStatus.OK
             };
@@ -670,8 +708,8 @@ namespace ADDIN.Commands
             {
                 string expected = NormalizeFlatSideMarker(marker.DisplayedText);
                 var candidates = views.Where(v => string.Equals(v.Name, marker.ViewName, StringComparison.OrdinalIgnoreCase)).ToList();
-                // Notes owned by a formed/section view do not describe a flat view.
-                if (candidates.Count == 0 && otherViewNames.Contains(marker.ViewName ?? "")) continue;
+                // Never reassign notes from a formed, hidden or off-sheet view.
+                if (candidates.Count == 0 && excludedViewNames.Contains(marker.ViewName ?? "")) continue;
                 if (candidates.Count == 0 && marker.HasPosition)
                 {
                     candidates = views.Where(v => IsFlatMarkerInsideOutline(marker.X, marker.Y, GetFlatViewOutline(v))).ToList();
@@ -696,7 +734,7 @@ namespace ADDIN.Commands
                     status = CompareFlatSideMarker(expected, side.PinkFacingViewer);
                     message = name + ": chữ " + expected + "; " + side.Message;
                     actual.Add(name + ": " + expected + " / " + (side.PinkFacingViewer.HasValue
-                        ? side.PinkFacingViewer.Value ? "mặt hồng" : "mặt omote" : "chưa đọc được mặt"));
+                        ? side.PinkFacingViewer.Value ? "mặt hồng (ウラ)" : "mặt màu (表)" : "chưa xác định mặt"));
                 }
                 if (!field.HasDrawingLocation || status == DrawingBomCheckStatus.NG)
                 {
@@ -704,6 +742,21 @@ namespace ADDIN.Commands
                     field.DrawingX = marker.X;
                     field.DrawingY = marker.Y;
                     field.DrawingViewName = candidates.Count == 1 ? candidates[0].Name : marker.ViewName;
+
+                    if (!field.HasDrawingLocation && candidates.Count == 1)
+                    {
+                        try
+                        {
+                            double[] outline = GetFlatViewOutline(candidates[0]);
+                            if (outline != null && outline.Length >= 4)
+                            {
+                                field.DrawingX = (outline[0] + outline[2]) / 2.0;
+                                field.DrawingY = (outline[1] + outline[3]) / 2.0;
+                                field.HasDrawingLocation = true;
+                            }
+                        }
+                        catch { }
+                    }
                 }
                 if (status == DrawingBomCheckStatus.NG || field.Status != DrawingBomCheckStatus.NG && status == DrawingBomCheckStatus.Warning)
                     field.Status = status;
@@ -773,6 +826,25 @@ namespace ADDIN.Commands
                                         }
                                     }
                                     catch { }
+                                    if (!info.HasPosition)
+                                    {
+                                        try
+                                        {
+                                            MathPoint instPt = instance.InstancePosition;
+                                            if (instPt != null && sketchToSheet != null)
+                                            {
+                                                instPt = instPt.MultiplyTransform(sketchToSheet) as MathPoint;
+                                                double[] instCoords = instPt?.ArrayData as double[];
+                                                if (instCoords != null && instCoords.Length >= 2)
+                                                {
+                                                    info.X = instCoords[0];
+                                                    info.Y = instCoords[1];
+                                                    info.HasPosition = true;
+                                                }
+                                            }
+                                        }
+                                        catch { }
+                                    }
                                     if (!info.HasPosition || IsNoteInsideFrame(info, frameBounds))
                                         TryAddUniqueNote(result, seen, info);
                                 }
@@ -805,6 +877,27 @@ namespace ADDIN.Commands
         {
             try { return view.GetOutline() as double[]; }
             catch { return null; }
+        }
+
+        private static bool IsFlatViewInsideFrame(SolidWorks.Interop.sldworks.View view, SheetFrameBounds frameBounds)
+        {
+            if (view == null || frameBounds == null || !frameBounds.IsValid) return false;
+            try
+            {
+                return view.GetVisible() && IsFlatViewOutlineInsideFrame(GetFlatViewOutline(view),
+                    frameBounds.MinX, frameBounds.MinY, frameBounds.MaxX, frameBounds.MaxY);
+            }
+            catch { return false; }
+        }
+
+        internal static bool IsFlatViewOutlineInsideFrame(double[] outline, double minX, double minY, double maxX, double maxY)
+        {
+            if (outline == null || outline.Length < 4 || maxX <= minX || maxY <= minY) return false;
+            for (int i = 0; i < 4; i++)
+                if (double.IsNaN(outline[i]) || double.IsInfinity(outline[i])) return false;
+            return outline[2] > outline[0] && outline[3] > outline[1]
+                && outline[0] >= minX - DrawingFrameEpsilon && outline[2] <= maxX + DrawingFrameEpsilon
+                && outline[1] >= minY - DrawingFrameEpsilon && outline[3] <= maxY + DrawingFrameEpsilon;
         }
 
         internal static DrawingBomCheckStatus CompareFlatSideMarker(string marker, bool? pinkFacingViewer)
@@ -852,6 +945,7 @@ namespace ADDIN.Commands
             // diagnostics are skipped completely.
             if (notes == null)
                 notes = new List<NoteDiagnosticInfo>();
+            notes = notes.Where(n => n != null && !n.IsHidden).ToList();
 
             if (tables == null)
                 tables = new List<TableDiagnosticInfo>();
@@ -1092,9 +1186,9 @@ namespace ADDIN.Commands
                     }
                 }
 
-                // 3. 品名 (X ≈ 0.062, Y ≈ 0.186)
-                if (raw.Contains("\"品名\"") || raw.Contains("'品名'") ||
-                    (note.Y >= 0.180 && note.Y <= 0.188 && note.X >= 0.050 && note.X <= 0.100 && (disp.Contains("ベンチ") || disp.Contains("外構") || disp.Contains("項目"))))
+                // A property link identifies the note; the value still comes
+                // only from the displayed Drawing text, including manual edits.
+                if (raw.Contains("\"品名\"") || raw.Contains("'品名'"))
                 {
                     if (string.IsNullOrWhiteSpace(data.ProductName))
                     {
@@ -1146,11 +1240,110 @@ namespace ADDIN.Commands
                 }
             }
 
+            // Printed labels identify manually edited values after their
+            // property links have been removed. An empty/ambiguous labeled cell
+            // must remain empty, even if another linked note/model has a value.
+            ApplyDisplayedTitleRow(data, notes, "品名");
+            ApplyDisplayedTitleRow(data, notes, "現場名");
+            ApplyDisplayedTitleRow(data, notes, "工事番号", "工事No.");
+            ApplyDisplayedTitleRow(data, notes, "材質");
+            ApplyDisplayedTitleRow(data, notes, "板厚");
+            ApplyDisplayedTitleRow(data, notes, "仕上げ", "仕上");
+            ApplyDisplayedTitleRow(data, notes, "手配番号", "No.");
+
             // Không fallback từ 3D để lấp Drawing Value còn thiếu.
             // Drawing Value phải thật sự đến từ Note/Table nằm trong khung bản vẽ.
             // Nếu không tìm thấy trong khung, field giữ trống để checker báo Warning/NG đúng bản chất.
 
             return data;
+        }
+
+        private static string NormalizeTitleLabel(string text)
+        {
+            return Regex.Replace(NormalizeText(text).Normalize(NormalizationForm.FormKC), @"[\s:：.．]", "")
+                .ToUpperInvariant();
+        }
+
+        private static bool IsPrintedTitleLabel(string text)
+        {
+            switch (NormalizeTitleLabel(text))
+            {
+                case "品名": case "現場名": case "工事番号": case "工事NO":
+                case "材質": case "板厚": case "仕上げ": case "仕上":
+                case "手配番号": case "NO": case "発行": case "図番": case "印部":
+                    return true;
+                default: return false;
+            }
+        }
+
+        private static void ApplyDisplayedTitleRow(DrawingDisplayedData data, List<NoteDiagnosticInfo> notes,
+            string fieldName, params string[] aliases)
+        {
+            var names = new HashSet<string>(new[] { fieldName }.Concat(aliases).Select(NormalizeTitleLabel));
+            var visible = notes.Where(n => n != null && !n.IsHidden && n.HasPosition).ToList();
+            var labels = visible.Where(n => names.Contains(NormalizeTitleLabel(n.DisplayedText))).ToList();
+            if (labels.Count == 0) return;
+            NoteDiagnosticInfo value = null;
+            NoteDiagnosticInfo anchor = labels.Count == 1 ? labels[0] : null;
+            var linked = visible.Where(n => (anchor == null ||
+                n.X > anchor.X && Math.Abs(n.Y - anchor.Y) <= 0.012) && Regex.Matches(n.RawText ?? "",
+                @"\$PRP(?:SHEET|MODEL|VIEW)?\s*:\s*""([^""]+)""", RegexOptions.IgnoreCase)
+                .Cast<Match>().Any(m => names.Contains(NormalizeTitleLabel(m.Groups[1].Value)))).ToList();
+            if (linked.Count == 1)
+            {
+                // Read the note's displayed text, never resolve the expression
+                // through a model property. Existing title layouts can have
+                // different text anchors or more than one material-row note.
+                if (!ContainsTablePropertyExpression(linked[0].DisplayedText)) value = linked[0];
+            }
+            else if (linked.Count == 0 && labels.Count == 1)
+            {
+                NoteDiagnosticInfo label = labels[0];
+                var sameView = visible.Where(n => string.Equals(n.ViewName, label.ViewName, StringComparison.OrdinalIgnoreCase)).ToList();
+                double rowBand = 0.0025;
+                foreach (NoteDiagnosticInfo other in sameView.Where(n => n != label && IsPrintedTitleLabel(n.DisplayedText)
+                    && Math.Abs(n.X - label.X) < 0.003 && Math.Abs(n.Y - label.Y) > 0.001))
+                    rowBand = Math.Min(rowBand, Math.Abs(other.Y - label.Y) * 0.45);
+                double right = sameView.Where(n => IsPrintedTitleLabel(n.DisplayedText)
+                    && n.X > label.X + 0.003 && Math.Abs(n.Y - label.Y) <= rowBand)
+                    .Select(n => n.X).DefaultIfEmpty(double.MaxValue).Min();
+                var candidates = sameView.Where(n => n.X > label.X + 0.003 && n.X < right - DrawingFrameEpsilon
+                    && Math.Abs(n.Y - label.Y) <= rowBand && !string.IsNullOrWhiteSpace(n.DisplayedText)
+                    && !IsPrintedTitleLabel(n.DisplayedText) && !ContainsTablePropertyExpression(n.DisplayedText)).ToList();
+                if (fieldName == "材質" && candidates.Count == 2)
+                {
+                    // This title format prints material then thickness in the
+                    // same labeled row. Preserve both displayed notes by column.
+                    value = candidates.OrderBy(n => n.X).First();
+                    NoteDiagnosticInfo thickness = candidates.OrderBy(n => n.X).Last();
+                    data.Thickness = (thickness.DisplayedText ?? "").Trim();
+                    SaveDrawingValueLocation(data, "板厚", thickness);
+                }
+                else if (candidates.Count == 1)
+                {
+                    if (fieldName == "材質" && Regex.IsMatch(candidates[0].DisplayedText,
+                        @"\d+(?:[.,]\d+)?\s*t\s*$", RegexOptions.IgnoreCase))
+                    {
+                        data.Thickness = candidates[0].DisplayedText.Trim();
+                        SaveDrawingValueLocation(data, "板厚", candidates[0]);
+                    }
+                    else value = candidates[0];
+                }
+            }
+            string displayed = value == null ? "" : (value.DisplayedText ?? "").Trim();
+            switch (fieldName)
+            {
+                case "品名": data.ProductName = displayed; break;
+                case "現場名": data.SiteName = displayed; break;
+                case "工事番号": data.JobNo = displayed; break;
+                case "材質": data.Material = displayed; break;
+                case "板厚": data.Thickness = displayed; break;
+                case "仕上げ": data.Finish = displayed; break;
+                case "手配番号": data.TehaiNo = displayed; break;
+            }
+            data.ValueLocations.Remove(fieldName);
+            if (value != null) SaveDrawingValueLocation(data, fieldName, value);
+            LogDebug($"[DRAWING TITLE ROW] field={fieldName} displayed=\"{displayed}\" labels={labels.Count} source={(value?.Source ?? "DRAWING_DISPLAY_UNAVAILABLE")}");
         }
 
         private sealed class PartGobanQuantityEntry
@@ -2067,8 +2260,12 @@ namespace ADDIN.Commands
             string nDraw = NormalizeText(drawVal).TrimEnd('-').Trim();
             string nBom = NormalizeText(bomVal).TrimEnd('-').Trim();
 
-            if (string.IsNullOrWhiteSpace(nDraw) && string.IsNullOrWhiteSpace(nBom))
-                return new DrawingBomFieldResult { FieldName = "材質", DrawingValue = "-", BomValue = "-", Status = DrawingBomCheckStatus.OK };
+            if (string.IsNullOrWhiteSpace(nDraw) || string.IsNullOrWhiteSpace(nBom))
+                return new DrawingBomFieldResult
+                {
+                    FieldName = "材質", DrawingValue = drawVal ?? "", BomValue = bomVal ?? "", Status = DrawingBomCheckStatus.Warning,
+                    Message = string.IsNullOrWhiteSpace(nDraw) ? "Không đọc được 材質 trên Drawing." : "Thiếu 材質 trong BOM / Model để đối chiếu."
+                };
 
             if (string.Equals(nDraw, nBom, StringComparison.OrdinalIgnoreCase))
                 return new DrawingBomFieldResult { FieldName = "材質", DrawingValue = drawVal, BomValue = bomVal, Status = DrawingBomCheckStatus.OK };
@@ -2085,9 +2282,13 @@ namespace ADDIN.Commands
 
         private static DrawingBomFieldResult CompareThicknessField(string drawVal, string bomVal)
         {
-            if (string.IsNullOrWhiteSpace(drawVal) && string.IsNullOrWhiteSpace(bomVal))
+            if (string.IsNullOrWhiteSpace(drawVal) || string.IsNullOrWhiteSpace(bomVal))
             {
-                return new DrawingBomFieldResult { FieldName = "板厚", DrawingValue = "-", BomValue = "-", Status = DrawingBomCheckStatus.OK };
+                return new DrawingBomFieldResult
+                {
+                    FieldName = "板厚", DrawingValue = drawVal ?? "", BomValue = bomVal ?? "", Status = DrawingBomCheckStatus.Warning,
+                    Message = string.IsNullOrWhiteSpace(drawVal) ? "Không đọc được 板厚 trên Drawing." : "Thiếu 板厚 trong BOM / Model để đối chiếu."
+                };
             }
 
             double dVal, bVal;
@@ -2419,7 +2620,14 @@ namespace ADDIN.Commands
 
             if (string.IsNullOrWhiteSpace(nDraw) || string.IsNullOrWhiteSpace(nBom))
             {
-                return new DrawingBomFieldResult { FieldName = fieldName, DrawingValue = drawVal, BomValue = bomVal, Status = DrawingBomCheckStatus.OK };
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName, DrawingValue = drawVal ?? "", BomValue = bomVal ?? "",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = string.IsNullOrWhiteSpace(nDraw)
+                        ? $"Không đọc được {fieldName} đang hiển thị trên Drawing."
+                        : $"Thiếu {fieldName} trong BOM / Model để đối chiếu."
+                };
             }
 
             if (string.Equals(nDraw, nBom, StringComparison.OrdinalIgnoreCase))
@@ -4385,6 +4593,26 @@ namespace ADDIN.Commands
                     field.DrawingY = location.Y;
                     field.DrawingViewName = location.ViewName;
                 }
+                else if (field.FieldName.Contains("合番") || field.Source?.Contains("合番") == true)
+                {
+                    if (drawingData.ValueLocations.TryGetValue("合番", out location))
+                    {
+                        field.HasDrawingLocation = true;
+                        field.DrawingX = location.X;
+                        field.DrawingY = location.Y;
+                        field.DrawingViewName = location.ViewName;
+                    }
+                }
+                else if (field.FieldName.Contains("部品番号") || field.Source?.Contains("部品番号") == true)
+                {
+                    if (drawingData.ValueLocations.TryGetValue("部品番号", out location))
+                    {
+                        field.HasDrawingLocation = true;
+                        field.DrawingX = location.X;
+                        field.DrawingY = location.Y;
+                        field.DrawingViewName = location.ViewName;
+                    }
+                }
             }
         }
 
@@ -5015,7 +5243,7 @@ namespace ADDIN.Commands
             {
                 try { model.Visible = true; } catch { }
                 int errors = 0;
-                ModelDoc2 activated = swApp.ActivateDoc3(model.GetTitle(), false, 0, ref errors) as ModelDoc2;
+                ModelDoc2 activated = swApp.ActivateDoc3(model.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref errors) as ModelDoc2;
                 LogDebug($"[DRAWING ACTIVATE] title={model.GetTitle()} success={activated != null} errors={errors}");
                 Sheet sheet = drawing.GetCurrentSheet() as Sheet;
                 string current = sheet != null ? (sheet.GetName() ?? "").Trim() : "";
@@ -5062,8 +5290,6 @@ namespace ADDIN.Commands
                     }
                 }
 
-                drawingModel.ForceRebuild3(false);
-
                 try
                 {
                     drawingModel.GraphicsRedraw2();
@@ -5074,7 +5300,7 @@ namespace ADDIN.Commands
 
                 LogDebug(
                     $"[DRAWING REFRESH] sheet=\"{sheetName}\" " +
-                    "ForceRebuild3=DONE");
+                    "DISPLAY_READ_READY");
             }
             catch (Exception ex)
             {
@@ -6325,182 +6551,579 @@ namespace ADDIN.Commands
 
                 drawingModel.ClearSelection2(true);
 
+                DrawingDoc drawDoc = drawingModel as DrawingDoc;
+                SolidWorks.Interop.sldworks.View targetView = null;
                 Annotation selectedAnnotation = null;
-
-                if (!string.IsNullOrWhiteSpace(field.Source) &&
-                    field.Source.StartsWith(
-                        "ASSEMBLY_TABLE",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    selectedAnnotation =
-                        FindNearestTableAnnotation(
-                            drawingModel as DrawingDoc,
-                            field.DrawingX,
-                            field.DrawingY);
-                }
-                else
-                {
-                    selectedAnnotation =
-                        FindNearestNoteAnnotation(
-                            drawingModel,
-                            field.DrawingX,
-                            field.DrawingY);
-                }
-
                 bool selected = false;
 
-                if (selectedAnnotation != null)
+                bool isFlatSideCheck = string.Equals(field.Source, "DRAWING_FLAT_SIDE", StringComparison.OrdinalIgnoreCase) ||
+                                       (field.FieldName != null && (field.FieldName.Contains("表/ウラ") || field.FieldName.Contains("展開")));
+
+                bool isGobanCheck = (field.FieldName != null && field.FieldName.Contains("合番")) ||
+                                    (field.Source != null && field.Source.Contains("合番"));
+
+                // =========================================================================
+                // CASE 1: KIỂM TRA 表/ウラ ↔ 展開 (VIEW 展開 & STAMP 表/ウラ)
+                // =========================================================================
+                if (isFlatSideCheck && drawDoc != null)
                 {
-                    try
+                    // 1a. Tìm View 展開 theo DrawingViewName (linh hoạt font nửa/toàn giác) hoặc theo IsFlatDrawingView
+                    SolidWorks.Interop.sldworks.View v = drawDoc.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                    while (v != null)
                     {
-                        selected =
-                            selectedAnnotation.Select3(
-                                false,
-                                null);
+                        if (v.Type != (int)swDrawingViewTypes_e.swDrawingSheet)
+                        {
+                            if (!string.IsNullOrWhiteSpace(field.DrawingViewName) && IsMatchingViewName(v.Name, field.DrawingViewName))
+                            {
+                                targetView = v;
+                                break;
+                            }
+                        }
+                        v = v.GetNextView() as SolidWorks.Interop.sldworks.View;
                     }
-                    catch
+
+                    if (targetView == null)
                     {
-                        selected = false;
+                        v = drawDoc.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                        while (v != null)
+                        {
+                            if (v.Type != (int)swDrawingViewTypes_e.swDrawingSheet && UraOmoteChecker.IsFlatDrawingView(v))
+                            {
+                                targetView = v;
+                                break;
+                            }
+                            v = v.GetNextView() as SolidWorks.Interop.sldworks.View;
+                        }
+                    }
+
+                    // 1b. Kích hoạt Sheet và View 展開
+                    if (targetView != null)
+                    {
+                        try
+                        {
+                            SolidWorks.Interop.sldworks.Sheet s = targetView.Sheet as SolidWorks.Interop.sldworks.Sheet;
+                            if (s != null) drawDoc.ActivateSheet(s.GetName());
+                        }
+                        catch { }
+                        try { drawDoc.ActivateView(targetView.GetName2()); } catch { }
+                    }
+
+                    // 1c. Tìm và chọn Note hoặc Sketch Block "表" / "ウラ"
+                    if (targetView != null)
+                    {
+                        // Quét notes trên view
+                        try
+                        {
+                            Note n = targetView.GetFirstNote() as Note;
+                            while (n != null)
+                            {
+                                string t = n.GetText() ?? "";
+                                if (NormalizeFlatSideMarker(t) != "" || t.Contains("ウラ") || t.Contains("ｳﾗ") || t.Contains("表"))
+                                {
+                                    selectedAnnotation = n.GetAnnotation() as Annotation;
+                                    if (selectedAnnotation != null)
+                                    {
+                                        try { selected = selectedAnnotation.Select3(false, null); } catch { }
+                                        break;
+                                    }
+                                }
+                                n = n.GetNext() as Note;
+                            }
+                        }
+                        catch { }
+
+                        // Quét block instances trên view
+                        if (!selected)
+                        {
+                            try
+                            {
+                                Sketch sk = targetView.GetSketch() as Sketch;
+                                Array blockInsts = sk?.GetSketchBlockInstances() as Array;
+                                if (blockInsts != null)
+                                {
+                                    foreach (object bObj in blockInsts)
+                                    {
+                                        SketchBlockInstance bi = bObj as SketchBlockInstance;
+                                        if (bi == null) continue;
+                                        Array bNotes = bi.Definition?.GetNotes() as Array;
+                                        if (bNotes != null)
+                                        {
+                                            foreach (object bnObj in bNotes)
+                                            {
+                                                Note bn = bnObj as Note;
+                                                string t = bn?.GetText() ?? "";
+                                                if (NormalizeFlatSideMarker(t) != "" || t.Contains("ウラ") || t.Contains("ｳﾗ") || t.Contains("表"))
+                                                {
+                                                    try { selected = drawingModel.Extension.SelectByID2(bi.Name, "SKETCHBLOCKINSTANCE", 0, 0, 0, false, 0, null, 0); } catch { }
+                                                    if (!selected)
+                                                    {
+                                                        try { (bi as dynamic).Select4(false, null); selected = true; } catch { }
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        if (selected) break;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+
+                    // Quét toàn bộ sheet nếu chưa chọn được
+                    if (!selected)
+                    {
+                        try
+                        {
+                            SolidWorks.Interop.sldworks.View scanV = drawDoc.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                            while (scanV != null && !selected)
+                            {
+                                Note n = scanV.GetFirstNote() as Note;
+                                while (n != null)
+                                {
+                                    string t = n.GetText() ?? "";
+                                    if (NormalizeFlatSideMarker(t) != "" || t.Contains("ウラ") || t.Contains("ｳﾗ") || t.Contains("表"))
+                                    {
+                                        selectedAnnotation = n.GetAnnotation() as Annotation;
+                                        if (selectedAnnotation != null)
+                                        {
+                                            try { selected = selectedAnnotation.Select3(false, null); } catch { }
+                                            break;
+                                        }
+                                    }
+                                    n = n.GetNext() as Note;
+                                }
+                                scanV = scanV.GetNextView() as SolidWorks.Interop.sldworks.View;
+                            }
+                        }
+                        catch { }
+                    }
+
+                    // 1d. Zoom bao trọn View 展開 với margin 15%
+                    if (targetView != null)
+                    {
+                        try
+                        {
+                            double[] outline = targetView.GetOutline() as double[];
+                            if (outline != null && outline.Length >= 4)
+                            {
+                                double spanX = outline[2] - outline[0];
+                                double spanY = outline[3] - outline[1];
+                                double marginX = Math.Max(spanX * 0.15, 0.035);
+                                double marginY = Math.Max(spanY * 0.15, 0.035);
+                                drawingModel.ViewZoomTo2(
+                                    outline[0] - marginX, outline[1] - marginY, 0,
+                                    outline[2] + marginX, outline[3] + marginY, 0);
+                            }
+                            else
+                            {
+                                drawingModel.ViewZoomtofit2();
+                            }
+                        }
+                        catch
+                        {
+                            try { drawingModel.ViewZoomtofit2(); } catch { }
+                        }
+
+                        LogDebug(
+                            $"[NAVIGATE NG] field=\"{field.FieldName}\" " +
+                            $"drawing=\"{Path.GetFileName(drawingPath)}\" " +
+                            $"view=\"{targetView.GetName2()}\" selected={selected} (ZoomedToFlatPatternView)");
+                        return;
                     }
                 }
 
-                // Sheet-format title-block notes (e.g. No. / 手配番号)
-                // may refuse selection while the Drawing is in normal sheet mode.
-                // Enter sheet-format mode only as a selection fallback, zoom,
-                // then immediately return to normal sheet mode.
-                bool enteredSheetFormat = false;
-
-                if (!selected &&
-                    (
-                        string.Equals(
-                            field.Source,
-                            "ASSEMBLY_TITLEBLOCK_NO",
-                            StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(
-                            field.Source,
-                            "ASSEMBLY_DRAWING_TYPE_LABEL",
-                            StringComparison.OrdinalIgnoreCase)
-                    ))
+                // =========================================================================
+                // CASE 2: KIỂM TRA BẢNG 合番 / 合番合計
+                // =========================================================================
+                if (isGobanCheck && drawDoc != null)
                 {
-                    DrawingDoc drawDoc =
-                        drawingModel as DrawingDoc;
+                    TableAnnotation gobanTable = null;
+                    SolidWorks.Interop.sldworks.View gobanView = null;
+                    try
+                    {
+                        SolidWorks.Interop.sldworks.View scanV = drawDoc.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                        while (scanV != null && gobanTable == null)
+                        {
+                            object[] tables = scanV.GetTableAnnotations() as object[];
+                            if (tables != null)
+                            {
+                                foreach (object tObj in tables)
+                                {
+                                    TableAnnotation ta = tObj as TableAnnotation;
+                                    if (ta == null) continue;
+                                    for (int r = 0; r < Math.Min(ta.RowCount, 6); r++)
+                                    {
+                                        for (int c = 0; c < ta.ColumnCount; c++)
+                                        {
+                                            string txt = ta.get_DisplayedText2(r, c, false) ?? "";
+                                            if (txt.Contains("合番"))
+                                            {
+                                                gobanTable = ta;
+                                                gobanView = scanV;
+                                                break;
+                                            }
+                                        }
+                                        if (gobanTable != null) break;
+                                    }
+                                    if (gobanTable != null) break;
+                                }
+                            }
+                            scanV = scanV.GetNextView() as SolidWorks.Interop.sldworks.View;
+                        }
+                    }
+                    catch { }
 
+                    if (gobanTable != null)
+                    {
+                        if (gobanView != null)
+                        {
+                            try
+                            {
+                                SolidWorks.Interop.sldworks.Sheet s = gobanView.Sheet as SolidWorks.Interop.sldworks.Sheet;
+                                if (s != null) drawDoc.ActivateSheet(s.GetName());
+                            }
+                            catch { }
+                            try { drawDoc.ActivateView(gobanView.GetName2()); } catch { }
+                        }
+
+                        Annotation tblAnn = gobanTable.GetAnnotation() as Annotation;
+                        if (tblAnn != null)
+                        {
+                            try { selected = tblAnn.Select3(false, null); } catch { }
+                        }
+
+                        double tblW = 0, tblH = 0;
+                        try
+                        {
+                            for (int c = 0; c < gobanTable.ColumnCount; c++) tblW += gobanTable.GetColumnWidth(c);
+                            for (int r = 0; r < gobanTable.RowCount; r++) tblH += gobanTable.GetRowHeight(r);
+                        }
+                        catch { }
+                        if (tblW <= 0) tblW = 0.080;
+                        if (tblH <= 0) tblH = 0.050;
+
+                        double[] tblPos = tblAnn?.GetPosition() as double[];
+                        if (tblPos != null && tblPos.Length >= 2)
+                        {
+                            double tX = tblPos[0];
+                            double tY = tblPos[1];
+                            double spanX = Math.Max(tblW * 0.75, 0.055);
+                            double spanY = Math.Max(tblH * 0.75, 0.045);
+                            try
+                            {
+                                drawingModel.ViewZoomTo2(
+                                    tX - spanX, tY - spanY, 0,
+                                    tX + spanX, tY + spanY, 0);
+                            }
+                            catch
+                            {
+                                if (selected) try { drawingModel.ViewZoomToSelection(); } catch { }
+                            }
+                        }
+                        else if (selected)
+                        {
+                            try { drawingModel.ViewZoomToSelection(); } catch { }
+                        }
+
+                        LogDebug(
+                            $"[NAVIGATE NG] field=\"{field.FieldName}\" " +
+                            $"drawing=\"{Path.GetFileName(drawingPath)}\" " +
+                            $"table=\"{tblAnn?.GetName()}\" selected={selected} (ZoomedToGobanTable)");
+                        return;
+                    }
+
+                    // Nếu không có bảng Goban, quét note "合番"
+                    try
+                    {
+                        SolidWorks.Interop.sldworks.View scanV2 = drawDoc.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                        while (scanV2 != null && !selected)
+                        {
+                            Note n = scanV2.GetFirstNote() as Note;
+                            while (n != null)
+                            {
+                                string t = n.GetText() ?? "";
+                                if (t.Contains("合番"))
+                                {
+                                    selectedAnnotation = n.GetAnnotation() as Annotation;
+                                    if (selectedAnnotation != null)
+                                    {
+                                        try { selected = selectedAnnotation.Select3(false, null); } catch { }
+                                        double[] pos = selectedAnnotation.GetPosition() as double[];
+                                        if (pos != null && pos.Length >= 2)
+                                        {
+                                            try
+                                            {
+                                                drawingModel.ViewZoomTo2(
+                                                    pos[0] - 0.050, pos[1] - 0.035, 0,
+                                                    pos[0] + 0.050, pos[1] + 0.035, 0);
+                                            }
+                                            catch
+                                            {
+                                                if (selected) try { drawingModel.ViewZoomToSelection(); } catch { }
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                                n = n.GetNext() as Note;
+                            }
+                            scanV2 = scanV2.GetNextView() as SolidWorks.Interop.sldworks.View;
+                        }
+                    }
+                    catch { }
+
+                    if (selected)
+                    {
+                        LogDebug(
+                            $"[NAVIGATE NG] field=\"{field.FieldName}\" " +
+                            $"drawing=\"{Path.GetFileName(drawingPath)}\" " +
+                            $"selected={selected} (ZoomedToGobanNote)");
+                        return;
+                    }
+                }
+
+                // =========================================================================
+                // CASE 3: CÁC TRƯỜNG KHUNG TÊN (部品番号, 板厚, 数量, 材質, W, L, ...)
+                // =========================================================================
+                double targetX = field.DrawingX;
+                double targetY = field.DrawingY;
+                bool hasTargetCoord = field.HasDrawingLocation && (Math.Abs(targetX) > 1e-5 || Math.Abs(targetY) > 1e-5);
+
+                // Fallback tìm note mang nhãn field trong khung tên nếu chưa có tọa độ trực tiếp
+                if (!hasTargetCoord && drawDoc != null)
+                {
+                    string labelNameToFind = null;
+                    if (field.FieldName != null)
+                    {
+                        if (field.FieldName.Contains("板厚")) labelNameToFind = "板厚";
+                        else if (field.FieldName.Contains("部品番号")) labelNameToFind = "部品番号";
+                        else if (field.FieldName.Contains("数量")) labelNameToFind = "数量";
+                        else if (field.FieldName.Contains("材質")) labelNameToFind = "材質";
+                        else if (field.FieldName.Contains("品名")) labelNameToFind = "品名";
+                        else if (field.FieldName.Contains("現場名")) labelNameToFind = "現場名";
+                        else if (field.FieldName.Contains("工事番号")) labelNameToFind = "工事番号";
+                        else if (field.FieldName.Contains("手配番号")) labelNameToFind = "手配番号";
+                        else if (field.FieldName.Contains("仕上げ")) labelNameToFind = "仕上げ";
+                    }
+
+                    if (labelNameToFind != null)
+                    {
+                        try
+                        {
+                            SolidWorks.Interop.sldworks.View v = drawDoc.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                            while (v != null && !hasTargetCoord)
+                            {
+                                Note n = v.GetFirstNote() as Note;
+                                while (n != null)
+                                {
+                                    string txt = (n.GetText() ?? "").Trim();
+                                    if (string.Equals(txt, labelNameToFind, StringComparison.OrdinalIgnoreCase) ||
+                                        txt.IndexOf(labelNameToFind, StringComparison.OrdinalIgnoreCase) >= 0)
+                                    {
+                                        Annotation ann = n.GetAnnotation() as Annotation;
+                                        if (ann != null)
+                                        {
+                                            double[] pos = ann.GetPosition() as double[];
+                                            if (pos != null && pos.Length >= 2)
+                                            {
+                                                targetX = pos[0];
+                                                targetY = pos[1];
+                                                hasTargetCoord = true;
+                                                selectedAnnotation = ann;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    n = n.GetNext() as Note;
+                                }
+                                v = v.GetNextView() as SolidWorks.Interop.sldworks.View;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                // Tìm Annotation chính xác theo tọa độ trong bán kính an toàn tối đa 40mm
+                if (selectedAnnotation == null && hasTargetCoord && drawDoc != null)
+                {
+                    Annotation nearestAnn = null;
+                    double nearestDist2 = 0.035 * 0.035; // Bán kính 35mm
+                    Annotation textMatchAnn = null;
+                    double textMatchDist2 = 0.040 * 0.040; // Bán kính 40mm nếu khớp giá trị
+                    string expectedVal = (field.DrawingValue ?? "").Trim();
+                    bool checkVal = !string.IsNullOrWhiteSpace(expectedVal) && expectedVal != "###" && expectedVal != "(Trống)" && expectedVal != "(Not Found)";
+
+                    try
+                    {
+                        SolidWorks.Interop.sldworks.View v = drawDoc.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                        while (v != null)
+                        {
+                            Note n = v.GetFirstNote() as Note;
+                            while (n != null)
+                            {
+                                Annotation ann = n.GetAnnotation() as Annotation;
+                                if (ann != null)
+                                {
+                                    double[] pos = ann.GetPosition() as double[];
+                                    if (pos != null && pos.Length >= 2)
+                                    {
+                                        double dx = pos[0] - targetX;
+                                        double dy = pos[1] - targetY;
+                                        double d2 = (dx * dx) + (dy * dy);
+                                        string nText = (n.GetText() ?? "").Trim();
+
+                                        if (checkVal && (string.Equals(nText, expectedVal, StringComparison.OrdinalIgnoreCase) ||
+                                                         (expectedVal.Length > 2 && nText.IndexOf(expectedVal, StringComparison.OrdinalIgnoreCase) >= 0)))
+                                        {
+                                            if (d2 < textMatchDist2)
+                                            {
+                                                textMatchDist2 = d2;
+                                                textMatchAnn = ann;
+                                            }
+                                        }
+
+                                        if (d2 < nearestDist2)
+                                        {
+                                            nearestDist2 = d2;
+                                            nearestAnn = ann;
+                                        }
+                                    }
+                                }
+                                n = n.GetNext() as Note;
+                            }
+                            v = v.GetNextView() as SolidWorks.Interop.sldworks.View;
+                        }
+                    }
+                    catch { }
+
+                    selectedAnnotation = textMatchAnn ?? nearestAnn;
+                }
+
+                // Chọn Annotation (Select3)
+                if (selectedAnnotation != null)
+                {
+                    try { selected = selectedAnnotation.Select3(false, null); }
+                    catch { selected = false; }
+                }
+
+                // Fallback Sheet-format title-block notes nếu chưa select
+                bool enteredSheetFormat = false;
+                if (!selected && hasTargetCoord &&
+                    (string.Equals(field.Source, "ASSEMBLY_TITLEBLOCK_NO", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(field.Source, "ASSEMBLY_DRAWING_TYPE_LABEL", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(field.Source, "MANUAL_OR_STATIC", StringComparison.OrdinalIgnoreCase)))
+                {
                     if (drawDoc != null)
                     {
                         try
                         {
                             drawDoc.EditTemplate();
                             enteredSheetFormat = true;
-
                             drawingModel.ClearSelection2(true);
-
-                            selectedAnnotation =
-                                FindNearestNoteAnnotationAllViews(
-                                    drawDoc,
-                                    drawingModel,
-                                    field.DrawingX,
-                                    field.DrawingY);
-
+                            selectedAnnotation = FindNearestNoteAnnotationAllViews(drawDoc, drawingModel, targetX, targetY);
                             if (selectedAnnotation != null)
                             {
-                                try
-                                {
-                                    selected =
-                                        selectedAnnotation.Select3(
-                                            false,
-                                            null);
-                                }
-                                catch
-                                {
-                                    selected = false;
-                                }
-                            }
-
-                            if (selected)
-                            {
-                                try
-                                {
-                                    drawingModel.ViewZoomToSelection();
-                                }
-                                catch
-                                {
-                                }
+                                try { selected = selectedAnnotation.Select3(false, null); } catch { selected = false; }
                             }
                         }
-                        catch
-                        {
-                            selected = false;
-                        }
+                        catch { selected = false; }
                         finally
                         {
                             if (enteredSheetFormat)
                             {
-                                try
-                                {
-                                    drawDoc.EditSheet();
-                                }
-                                catch
-                                {
-                                }
+                                try { drawDoc.EditSheet(); } catch { }
                             }
                         }
                     }
                 }
 
-                if (selected)
+                // Fallback chọn trực tiếp theo tọa độ targetX, targetY qua SelectByID2
+                if (!selected && hasTargetCoord)
                 {
                     try
                     {
-                        drawingModel.ViewZoomToSelection();
+                        selected = drawingModel.Extension.SelectByID2("", "NOTE", targetX, targetY, 0, false, 0, null, 0);
+                        if (!selected) selected = drawingModel.Extension.SelectByID2("", "ANNOTATIONTABLES", targetX, targetY, 0, false, 0, null, 0);
+                        if (!selected) selected = drawingModel.Extension.SelectByID2("", "SKETCHBLOCKINSTANCE", targetX, targetY, 0, false, 0, null, 0);
+                        if (!selected) selected = drawingModel.Extension.SelectByID2("", "", targetX, targetY, 0, false, 0, null, 0);
+                    }
+                    catch { selected = false; }
+                }
+
+                // Thực hiện Zoom và Lia (Pan) chính xác khung tên
+                if (hasTargetCoord)
+                {
+                    try
+                    {
+                        double halfW = 0.040; // 40mm
+                        double halfH = 0.025; // 25mm
+                        drawingModel.ViewZoomTo2(
+                            targetX - halfW, targetY - halfH, 0,
+                            targetX + halfW, targetY + halfH, 0);
                     }
                     catch
                     {
-                        try
-                        {
-                            drawingModel.ViewZoomtofit2();
-                        }
-                        catch
-                        {
-                        }
+                        if (selected) try { drawingModel.ViewZoomToSelection(); } catch { }
                     }
 
                     LogDebug(
                         $"[NAVIGATE NG] field=\"{field.FieldName}\" " +
-                        $"X={field.DrawingX:F6} Y={field.DrawingY:F6} " +
+                        $"targetX={targetX:F6} targetY={targetY:F6} " +
                         $"drawing=\"{Path.GetFileName(drawingPath)}\" " +
-                        $"source=\"{field.Source}\" selected=True");
+                        $"source=\"{field.Source}\" selected={selected} (ZoomedToCoord)");
+                }
+                else if (selected)
+                {
+                    try { drawingModel.ViewZoomToSelection(); }
+                    catch { try { drawingModel.ViewZoomtofit2(); } catch { } }
+
+                    LogDebug(
+                        $"[NAVIGATE NG] field=\"{field.FieldName}\" " +
+                        $"drawing=\"{Path.GetFileName(drawingPath)}\" " +
+                        $"source=\"{field.Source}\" selected=True (ZoomedToSelection)");
                 }
                 else
                 {
-                    try
-                    {
-                        drawingModel.ViewZoomtofit2();
-                    }
-                    catch
-                    {
-                    }
+                    try { drawingModel.ViewZoomtofit2(); } catch { }
 
                     LogDebug(
                         $"[NAVIGATE NG] field=\"{field.FieldName}\" " +
-                        $"X={field.DrawingX:F6} Y={field.DrawingY:F6} " +
                         $"drawing=\"{Path.GetFileName(drawingPath)}\" " +
-                        $"source=\"{field.Source}\" selected=False");
-
-                    ShowWarning(
-                        "Đã mở Drawing nhưng chưa chọn được đối tượng lỗi.\n" +
-                        $"Field: {field.FieldName}\n" +
-                        $"X={field.DrawingX:F6}, Y={field.DrawingY:F6}");
+                        $"source=\"{field.Source}\" selected=False (ZoomFit)");
                 }
             }
             catch (Exception ex)
             {
                 LogDebug(
                     $"[NAVIGATE NG ERROR] {ex.Message}");
-
-                ShowWarning(
-                    "Lỗi khi điều hướng tới vị trí NG:\n" +
-                    ex.Message);
             }
+        }
+
+        private static bool IsMatchingViewName(string name1, string name2)
+        {
+            if (string.IsNullOrWhiteSpace(name1) || string.IsNullOrWhiteSpace(name2))
+                return false;
+            if (string.Equals(name1.Trim(), name2.Trim(), StringComparison.OrdinalIgnoreCase))
+                return true;
+            try
+            {
+                string n1 = name1.Normalize(NormalizationForm.FormKC).Replace(" ", "");
+                string n2 = name2.Normalize(NormalizationForm.FormKC).Replace(" ", "");
+                if (string.Equals(n1, n2, StringComparison.OrdinalIgnoreCase))
+                    return true;
+                string d1 = Regex.Match(name1, @"\d+").Value;
+                string d2 = Regex.Match(name2, @"\d+").Value;
+                if (!string.IsNullOrEmpty(d1) && d1 == d2 &&
+                    (n1.Contains("ビュー") || n1.Contains("ﾋﾞｭｰ") || n1.Contains("view")) &&
+                    (n2.Contains("ビュー") || n2.Contains("ﾋﾞｭｰ") || n2.Contains("view")))
+                {
+                    return true;
+                }
+            }
+            catch { }
+            return false;
         }
 
         private static Annotation FindNearestNoteAnnotationAllViews(
@@ -6510,7 +7133,7 @@ namespace ADDIN.Commands
             double targetY)
         {
             Annotation best = null;
-            double bestDistance2 = double.MaxValue;
+            double bestDistance2 = 0.040 * 0.040; // Giới hạn bán kính tối đa 40mm để không bắt nhầm note ở xa
 
             if (drawing != null)
             {
@@ -6642,7 +7265,7 @@ namespace ADDIN.Commands
                 return null;
 
             Annotation best = null;
-            double bestDistance2 = double.MaxValue;
+            double bestDistance2 = 0.040 * 0.040; // Giới hạn bán kính tối đa 40mm
 
             try
             {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -11,7 +11,7 @@ namespace ADDIN.Commands.DxfChecking
     {
         public double[] LastBuffer { get; private set; }
         public DrawingNormalizationReport Normalization { get; private set; }
-        public List<DxfEdge> Extract(IView view)
+        public List<DxfEdge> Extract(IView view, ISldWorks app = null, ModelDoc2 drawing = null)
         {
             if (view == null || !view.IsFlatPatternView()) throw new InvalidOperationException("Hãy chọn một Flat Pattern Drawing View.");
             // These are projected Drawing entities, not Part/Flat-Pattern feature curves.
@@ -24,7 +24,15 @@ namespace ADDIN.Commands.DxfChecking
             // independent of ScaleDecimal (verified on SW 2024 at 1:2, 1:1 and 2:1).
             // Do not remove the display scale a second time. Only convert meters to mm here.
             DrawingNormalizationReport normalized;
-            var edges = DrawingViewCurveBuffer.Read(buffer, 1, out normalized);
+            // The comparison layer joins small gaps with explicit CHECK markers.
+            // Keep unmodified curve endpoints here so those locations are not lost.
+            var edges = DrawingViewCurveBuffer.Read(buffer, 1, out normalized, false);
+            foreach (var markEdge in ADDIN.Commands.DrawingDxfExporting.DxfOutPut.ExtractViewMarkSketchEdges(view, app, drawing))
+            {
+                if (!edges.Any(e => DrawingViewCurveBuffer.SameProjection(e, markEdge, 1e-3)))
+                    edges.Add(markEdge);
+            }
+            normalized.AcceptedEdges = edges.Count;
             Normalization = normalized;
             return edges;
         }
@@ -37,13 +45,16 @@ namespace ADDIN.Commands.DxfChecking
 
     internal static class DrawingViewCurveBuffer
     {
+        private const double ConnectedEndTolerance = 1e-4;
+        private const double CornerGapTolerance = 0.02;
+
         public static List<DxfEdge> Read(double[] buffer, double coordinateScale)
         {
             DrawingNormalizationReport report;
             return Read(buffer, coordinateScale, out report);
         }
 
-        public static List<DxfEdge> Read(double[] buffer, double coordinateScale, out DrawingNormalizationReport report)
+        public static List<DxfEdge> Read(double[] buffer, double coordinateScale, out DrawingNormalizationReport report, bool closeCornerGaps = true)
         {
             report = new DrawingNormalizationReport();
             if (!(coordinateScale > 0) || double.IsInfinity(coordinateScale)) throw new InvalidDataException("Tỉ lệ dữ liệu Drawing không hợp lệ.");
@@ -108,9 +119,86 @@ namespace ADDIN.Commands.DxfChecking
             var circles = result.Where(e => e.Type == "CIRCLE").ToList();
             report.CoveredArcs = result.RemoveAll(e => e.Type == "ARC" && circles.Any(c =>
                 c.Center.Distance(e.Center) < 1e-5 && Math.Abs(c.Radius - e.Radius) < 1e-5));
+            if (closeCornerGaps) CloseCornerGaps(result);
             report.AcceptedEdges = result.Count;
             if (result.Count == 0) throw new InvalidDataException("Không đọc được biên dạng Drawing View.");
             return result;
+        }
+
+        private sealed class EdgeEndpoint
+        {
+            public int EdgeIndex;
+            public bool IsStart;
+            public DxfPoint Point;
+        }
+
+        internal static void CloseCornerGaps(List<DxfEdge> edges)
+        {
+            if (edges == null || edges.Count < 2) return;
+            var ends = new List<EdgeEndpoint>();
+            for (int i = 0; i < edges.Count; i++)
+            {
+                DxfEdge e = edges[i];
+                if (e == null || e.Closed || e.Type == "CIRCLE" || e.Start.Distance(e.End) <= ConnectedEndTolerance) continue;
+                ends.Add(new EdgeEndpoint { EdgeIndex = i, IsStart = true, Point = e.Start });
+                ends.Add(new EdgeEndpoint { EdgeIndex = i, IsStart = false, Point = e.End });
+            }
+            if (ends.Count < 2) return;
+
+            var free = new HashSet<EdgeEndpoint>(ends.Where(end =>
+                !ends.Any(other => !ReferenceEquals(other, end) && other.Point.Distance(end.Point) <= ConnectedEndTolerance)));
+            if (free.Count < 2) return;
+
+            Func<EdgeEndpoint, EdgeEndpoint> nearest = end => free
+                .Where(other => other.EdgeIndex != end.EdgeIndex)
+                .Select(other => new { other, d = other.Point.Distance(end.Point) })
+                .Where(x => x.d <= CornerGapTolerance)
+                .OrderBy(x => x.d)
+                .Select(x => x.other)
+                .FirstOrDefault();
+
+            var done = new HashSet<EdgeEndpoint>();
+            foreach (EdgeEndpoint end in ends.Where(free.Contains))
+            {
+                if (done.Contains(end)) continue;
+                EdgeEndpoint partner = nearest(end);
+                if (partner == null || done.Contains(partner) || !ReferenceEquals(nearest(partner), end)) continue;
+
+                bool endLine = edges[end.EdgeIndex].Type == "LINE";
+                bool partnerLine = edges[partner.EdgeIndex].Type == "LINE";
+                DxfPoint target;
+                if (endLine && !partnerLine) target = partner.Point;
+                else if (partnerLine && !endLine) target = end.Point;
+                else target = (end.Point + partner.Point) * 0.5;
+
+                SnapEndpoint(edges, end.EdgeIndex, end.IsStart, target);
+                SnapEndpoint(edges, partner.EdgeIndex, partner.IsStart, target);
+                done.Add(end);
+                done.Add(partner);
+            }
+        }
+
+        private static void SnapEndpoint(List<DxfEdge> edges, int edgeIndex, bool isStart, DxfPoint target)
+        {
+            DxfEdge old = edges[edgeIndex];
+            DxfPoint s = isStart ? target : old.Start;
+            DxfPoint e = isStart ? old.End : target;
+            if (old.Type == "LINE" && s.Distance(e) > 1e-8)
+            {
+                DxfEdge updated = DxfGeometry.Line(s, e);
+                updated.Space = old.Space;
+                updated.Layer = old.Layer;
+                updated.Segment = old.Segment;
+                edges[edgeIndex] = updated;
+            }
+            else if (isStart)
+            {
+                old.Start = target;
+            }
+            else
+            {
+                old.End = target;
+            }
         }
 
         internal static bool SameProjection(DxfEdge a, DxfEdge b, double epsilon = 1e-5)

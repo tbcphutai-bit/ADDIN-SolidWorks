@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 using ADDIN.UI;
@@ -89,7 +89,7 @@ namespace ADDIN
             Command(btnMirrorPart, TaiIcon.Mirror, "Mirror part", "Đối xứng Part");
             Command(btnEdgeToEqualSpline, TaiIcon.Spline, "Auto spline", "Dựng spline từ cạnh");
             Command(btnRepair3DSpline, TaiIcon.SplineSmooth, "Repair 3D", "Mịn spline 3D");
-            Command(btnVCutPropertySetup, TaiIcon.VCut, "Set bend line", "曲げ線 & V-Cut");
+            Command(btnVCutPropertySetup, TaiIcon.VCut, "Set bend line", "Gán rãnh bào V-Cut");
             Command(btnCheckDxfMacro, TaiIcon.FileSearch, "Check DXF file", "Kiểm tra file DXF 2D");
 
             // The few large buttons carry their icon above the name.
@@ -219,7 +219,7 @@ namespace ADDIN
             TextBox[] values = { txtModelName, txtModelMaterial, txtModelThickness, txtModelGoban, txtModelQty, txtModelFinish };
             int cardTop = top + actionHeight + CommandPixels(8);
             int pad = CommandPixels(TaiTheme.CardPadding), labelWidth = CommandPixels(66), rowHeight = CommandPixels(40);
-            int y = cardTop + CommandPixels(TaiTheme.CardHeader);
+            int y = cardTop + CommandPixels(TaiTheme.CardHeader) + CommandPixels(6);
             for (int n = 0; n < labels.Length; n++)
             {
                 if (labels[n] == null || values[n] == null) continue;

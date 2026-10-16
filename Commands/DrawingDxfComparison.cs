@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -233,7 +233,7 @@ namespace ADDIN.Commands.DxfChecking
     {
         public static DxfCheckResult Check(IEnumerable<DxfEdge> reference, IEnumerable<DxfEdge> exported, DrawingDxfCheckOptions options)
         {
-            options.Validate(); var drawing = GeometryLoopBuilder.Build(reference);
+            options.Validate(); var drawing = ComparisonTopologyRepair.Build(reference, options.ToleranceMm);
             var distinctDxf = new List<DxfEdge>(); var duplicates = new List<DxfEdge>();
             foreach (var edge in exported)
             {
@@ -242,12 +242,16 @@ namespace ADDIN.Commands.DxfChecking
             }
             // Compare a separate geometry copy. The saved DXF and the preview keep
             // every entity; duplicated/open cuts are reported independently.
-            var dxf = GeometryLoopBuilder.Build(distinctDxf);
-            if (drawing.Outer == null || drawing.Unclosed.Count > 0 || drawing.OtherOuterCount > 0)
-                throw new InvalidDataException("Drawing View không có một biên ngoài kín hợp lệ hoặc có nét hở/nhánh. Kiểm tra View trước khi so DXF.");
+            var dxf = ComparisonTopologyRepair.Build(distinctDxf, options.ToleranceMm);
             var result = new DxfCheckResult { DrawingInsideContourCount = drawing.Inside.Count, DxfInsideContourCount = dxf.Inside.Count };
+            foreach (var review in drawing.Reviews) result.AddReview(review, true);
+            foreach (var review in dxf.Reviews) result.AddReview(review, false);
+            foreach (var edge in drawing.Unclosed) result.Add("Open Drawing geometry", "Drawing View có nét hở hoặc nhánh không thuộc biên kín.", edge.Start, null);
+            if (drawing.OtherOuterCount > 0) result.Add("Extra Drawing contour", "Drawing View có thêm biên ngoài rời: " + drawing.OtherOuterCount, drawing.Outer != null ? (DxfPoint?)drawing.Outer.Centroid : null, null);
             foreach (var edge in duplicates) result.AddQuality("Duplicate DXF geometry", "DXF có nét cắt lặp.", edge.Start);
             foreach (var edge in dxf.Unclosed) result.AddQuality("Open DXF geometry", "DXF có nét hở hoặc nhánh không thuộc biên kín.", edge.Start);
+            if (drawing.Outer == null)
+            { result.Add("Drawing contour", "Drawing View không có biên ngoài kín hợp lệ.", drawing.Edges.Count > 0 ? (DxfPoint?)drawing.Edges[0].Start : null, null); return result; }
             if (dxf.Outer == null)
             { result.Add("DXF contour", "DXF không có biên ngoài kín.", drawing.Outer.Centroid, null); return result; }
             ScaleChecker.Check(drawing.Outer, dxf.Outer, options.ToleranceMm, result);
@@ -256,11 +260,13 @@ namespace ADDIN.Commands.DxfChecking
             Translation2D translation;
             // Interior holes must not vote for the origin: moved holes can be the
             // majority of the edges while the outer outline is still correct.
-            result.AlignmentFound = TranslationFinder.Find(drawing.Outer.Entities, dxf.Outer.Entities, options.ToleranceMm, out translation);
+            // Numerical connectors must not cast votes for the X/Y origin.
+            result.AlignmentFound = TranslationFinder.Find(drawing.Outer.Entities.Where(e => !ComparisonTopologyRepair.IsJoin(e)).ToList(),
+                dxf.Outer.Entities.Where(e => !ComparisonTopologyRepair.IsJoin(e)).ToList(), options.ToleranceMm, out translation);
             result.Translation = translation;
             if (!result.AlignmentFound)
             { result.Add("Alignment", "Không đủ hình học tương ứng để xác định dịch X/Y. Không xoay, mirror hoặc fit DXF.", drawing.Outer.Centroid, null); return result; }
-            foreach (var issue in result.Mismatches.Where(m => m.CutQualityIssue && m.HasDxfPosition))
+            foreach (var issue in result.Mismatches.Where(m => (m.CutQualityIssue || m.ReviewIssue) && m.HasDxfPosition))
                 issue.DxfPosition = translation.Apply(issue.DxfPosition);
             if (dxf.OtherOuterCount > 0) result.Add("Extra outer contour", "DXF có thêm biên ngoài rời: " + dxf.OtherOuterCount, null, translation.Apply(dxf.Outer.Centroid));
             var outer = GeometryMatcher.Compare(drawing.Outer, dxf.Outer, translation, options.ToleranceMm);
@@ -290,7 +296,10 @@ namespace ADDIN.Commands.DxfChecking
                 int best = -1; double distance = double.PositiveInfinity;
                 for (int j = 0; j < dxf.Count; j++) if (!usedDxf.Contains(j))
                 {
-                    double score = drawing[i].Centroid.Distance(result.Translation.Apply(dxf[j].Centroid)) + Math.Abs(drawing[i].Bounds.Width - dxf[j].Bounds.Width) + Math.Abs(drawing[i].Bounds.Height - dxf[j].Bounds.Height);
+                    double centroidDistance = drawing[i].Centroid.Distance(result.Translation.Apply(dxf[j].Centroid));
+                    double maxPairDistance = Math.Max(drawing[i].Bounds.Size, dxf[j].Bounds.Size) + Math.Max(tolerance * 10, 5.0);
+                    if (centroidDistance > maxPairDistance) continue;
+                    double score = centroidDistance + Math.Abs(drawing[i].Bounds.Width - dxf[j].Bounds.Width) + Math.Abs(drawing[i].Bounds.Height - dxf[j].Bounds.Height);
                     if (score < distance) { distance = score; best = j; }
                 }
                 if (best < 0) result.Add("Missing inside contour", "Thiếu lỗ/rãnh bên trong Drawing C" + drawing[i].Id, drawing[i].Centroid, null);

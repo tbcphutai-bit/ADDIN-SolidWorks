@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -310,7 +310,7 @@ namespace ADDIN.UI
 
             // Grid column setups
             files.Columns.Add("File", "FILE DXF"); files.Columns.Add("Result", "KẾT QUẢ"); files.Columns.Add("Count", "LỖI");
-            files.Columns.Add("Yellow", "VÀNG");
+            files.Columns.Add("Yellow", "VÀNG"); files.Columns.Add("Spline", "SPLINE"); files.Columns.Add("Polyline", "POLYLINE");
             files.Columns[0].FillWeight = 100; files.Columns[0].MinimumWidth = 80;
             foreach (DataGridViewColumn column in files.Columns.Cast<DataGridViewColumn>().Skip(1)) {
                 column.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
@@ -318,10 +318,13 @@ namespace ADDIN.UI
                 column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 column.HeaderCell.Style.Padding = Padding.Empty;
             }
-            files.Columns[1].Width = 76; files.Columns[2].Width = 42;
-            files.Columns[3].Width = Math.Max(120, TextRenderer.MeasureText("Đối tượng vàng", badgeFont).Width + files.DefaultCellStyle.Padding.Horizontal + 6);
+            files.Columns[1].Width = 68; files.Columns[2].Width = 40;
+            files.Columns[3].Width = 96;
+            files.Columns[4].Width = 54; files.Columns[5].Width = 76;
             files.Columns[1].HeaderCell.ToolTipText = "OK/NG theo những điều kiện đã chọn trong từng file DXF. ERROR: không đọc được file.";
             files.Columns[3].HeaderCell.ToolTipText = "1, 2…: số layer vàng có đối tượng, không tính layer trống. Đối tượng vàng: đối tượng được gán màu vàng riêng trên layer màu khác. Không có: không có nội dung màu vàng, kể cả khi file có khai báo layer vàng trống. ?: lỗi đọc, chưa thống kê. Bấm ô để xem chi tiết và vị trí.";
+            files.Columns[4].HeaderCell.ToolTipText = "Số lượng đường SPLINE trong file DXF.";
+            files.Columns[5].HeaderCell.ToolTipText = "Số lượng đường POLYLINE / LWPOLYLINE trong file DXF.";
             issues.Columns.Add("Id", "DẤU"); issues.Columns.Add("Code", "LOẠI LỖI"); issues.Columns.Add("Text", "MÔ TẢ CHI TIẾT");
             issues.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.None; issues.Columns[0].Width = 56;
             issues.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.None; issues.Columns[1].Width = 118;
@@ -354,6 +357,19 @@ namespace ADDIN.UI
                 string value = Convert.ToString(e.Value); e.CellStyle.Font = badgeFont;
                 e.CellStyle.ForeColor = value == "OK" ? Green : value == "NG" ? Red : Color.FromArgb(165, 106, 21);
                 e.CellStyle.BackColor = value == "OK" ? Color.FromArgb(234, 248, 240) : value == "NG" ? Color.FromArgb(255, 239, 241) : Color.FromArgb(255, 247, 229);
+            };
+            files.SortCompare += (s, e) => {
+                if (e.Column.Index == 0) {
+                    e.SortResult = DxfCheckEngine.CompareNaturalPath(Convert.ToString(e.CellValue1), Convert.ToString(e.CellValue2));
+                    e.Handled = true;
+                }
+                else if (e.Column.Index >= 2) {
+                    int a, b;
+                    bool ha = int.TryParse(Convert.ToString(e.CellValue1), out a), hb = int.TryParse(Convert.ToString(e.CellValue2), out b);
+                    e.SortResult = ha && hb ? a.CompareTo(b) : ha ? 1 : hb ? -1 : DxfCheckEngine.CompareNatural(Convert.ToString(e.CellValue1), Convert.ToString(e.CellValue2));
+                    if (e.SortResult == 0) e.SortResult = DxfCheckEngine.CompareNaturalPath(Convert.ToString(files.Rows[e.RowIndex1].Cells[0].Value), Convert.ToString(files.Rows[e.RowIndex2].Cells[0].Value));
+                    e.Handled = true;
+                }
             };
             chooseButton.Click += async (s, e) => await ChooseAndRun();
             conditionsButton.Click += async (s, e) => { if (string.IsNullOrWhiteSpace(folderBox.Text)) await ChooseAndRun(); else await ChooseConditionsAndRun(folderBox.Text); };
@@ -401,7 +417,7 @@ namespace ADDIN.UI
         {
             try {
                 int filePaneMinimum = Math.Max(322, files.Columns.Cast<DataGridViewColumn>().Skip(1).Sum(c => c.Width) + files.Columns[0].MinimumWidth + 32);
-                if (outerSplit.Width > 500) outerSplit.SplitterDistance = Math.Max(filePaneMinimum, Math.Min(390, outerSplit.Width * 24 / 100));
+                if (outerSplit.Width > 500) outerSplit.SplitterDistance = Math.Max(filePaneMinimum, Math.Min(460, outerSplit.Width * 30 / 100));
                 if (innerSplit.Width > 500) innerSplit.SplitterDistance = Math.Max(320, innerSplit.Width - 390);
             }
             catch { }
@@ -589,7 +605,9 @@ namespace ADDIN.UI
         private void AddFileRow(DxfFileResult file)
         {
             string yellow = !file.Options.Has(DxfCheckCondition.YellowLayers) ? "TẮT" : file.Error != null ? "?" : !HasYellow(file) ? "Không có" : file.YellowLayerWithEntitiesCount > 0 ? file.YellowLayerWithEntitiesCount.ToString(CultureInfo.InvariantCulture) : "Đối tượng vàng";
-            int row = files.Rows.Add(file.RelativeName, file.Status, file.Issues.Count, yellow); files.Rows[row].Tag = file;
+            string spline = file.Error != null ? "?" : file.SplineCount.ToString(CultureInfo.InvariantCulture);
+            string polyline = file.Error != null ? "?" : file.PolylineCount.ToString(CultureInfo.InvariantCulture);
+            int row = files.Rows.Add(file.RelativeName, file.Status, file.Issues.Count, yellow, spline, polyline); files.Rows[row].Tag = file;
             files.Rows[row].Cells[0].ToolTipText = (file.DuplicateNameCount > 1 ? "Cảnh báo: " + file.DuplicateNameCount + " file cùng tên ở các thư mục khác nhau.\r\n" : "") + file.SourcePath;
             DataGridViewCell yellowCell = files.Rows[row].Cells["Yellow"];
             yellowCell.ToolTipText = YellowFileTooltip(file);
@@ -598,6 +616,8 @@ namespace ADDIN.UI
                 yellowCell.Style.BackColor = yellowCell.Style.SelectionBackColor = Color.FromArgb(255, 248, 221);
                 yellowCell.Style.Font = badgeFont;
             }
+            files.Rows[row].Cells["Spline"].ToolTipText = file.Error != null ? "Không đọc được file DXF." : file.SplineCount + " đường SPLINE";
+            files.Rows[row].Cells["Polyline"].ToolTipText = file.Error != null ? "Không đọc được file DXF." : file.PolylineCount + " đường POLYLINE / LWPOLYLINE";
             if (file.RecheckedAt.HasValue) files.Rows[row].Cells[0].ToolTipText += "\r\nKiểm tra lại lúc " + file.RecheckedAt.Value.ToString("HH:mm:ss") + " từ bản đã lưu: " + file.CheckedPath;
             if (file.SourceUpdatedAt.HasValue) files.Rows[row].Cells[0].ToolTipText += "\r\nĐã ghi đè DXF gốc lúc " + file.SourceUpdatedAt.Value.ToString("HH:mm:ss") + "\r\nBản sao lưu: " + file.SourceBackupPath;
         }
@@ -635,7 +655,7 @@ namespace ADDIN.UI
         private void PopulateFiles()
         {
             DxfFileResult before = SelectedFile(); selecting = true; files.Rows.Clear();
-            foreach (DxfFileResult file in completed) {
+            foreach (DxfFileResult file in completed.OrderBy(f => f.RelativeName, DxfCheckEngine.NaturalPathComparer)) {
                 if (!MatchesFileFilters(file)) continue;
                 AddFileRow(file);
             }
@@ -1061,9 +1081,14 @@ namespace ADDIN.UI
         private List<List<DxfPoint>> comparisonOverlay;
         private DxfBox comparisonBounds;
         private DxfPoint comparisonA, comparisonB;
+        private List<KeyValuePair<DxfPoint, string>> checkLocations = new List<KeyValuePair<DxfPoint, string>>();
+        internal string ComparisonMarkerLabel { get; set; } = "Khác";
+        internal bool ComparisonMarkerIsCheck { get; set; }
         private double zoom = 1; private PointF pan; private Point dragStart; private bool dragging;
         public DxfPreview() { Dock = DockStyle.Fill; BackColor = Color.White; DoubleBuffered = true; SetStyle(ControlStyles.ResizeRedraw, true); }
-        public void Set(DxfFileResult value, DxfIssue issue) { file = value; selected = issue; selectedShape = null; comparison = null; comparisonOverlay = null; zoom = 1; pan = PointF.Empty; Invalidate(); }
+        public void Set(DxfFileResult value, DxfIssue issue) { file = value; selected = issue; selectedShape = null; comparison = null; comparisonOverlay = null; checkLocations.Clear(); ComparisonMarkerLabel = "Khác"; ComparisonMarkerIsCheck = false; zoom = 1; pan = PointF.Empty; Invalidate(); }
+        internal void SetCheckLocations(IEnumerable<KeyValuePair<DxfPoint, string>> locations)
+        { checkLocations = locations.ToList(); Invalidate(); }
         public void SetYellow(DxfFileResult value, DxfShapeStatistic shape)
         { Set(value, null); if (value != null && shape != null && shape.Edges.Count > 0) selectedShape = shape; Invalidate(); }
         public void SetComparison(DxfFileResult value, DxfPartComparison match, bool focusDifference)
@@ -1085,7 +1110,7 @@ namespace ADDIN.UI
         protected override void OnMouseWheel(MouseEventArgs e)
         {
             base.OnMouseWheel(e); if (file == null) return;
-            double before = zoom; zoom = Math.Max(.15, Math.Min(250, zoom * (e.Delta > 0 ? 1.25 : .8))); double ratio = zoom / before;
+            double before = zoom; zoom = Math.Max(.002, Math.Min(250, zoom * (e.Delta > 0 ? 1.25 : .8))); double ratio = zoom / before;
             pan = new PointF((float)((pan.X - (e.X - Width / 2.0)) * ratio + e.X - Width / 2.0), (float)((pan.Y - (e.Y - Height / 2.0)) * ratio + e.Y - Height / 2.0)); Invalidate();
         }
         protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); Focus(); if (e.Button == MouseButtons.Left) { dragging = true; dragStart = e.Location; Capture = true; Cursor = Cursors.SizeAll; } }
@@ -1122,9 +1147,16 @@ namespace ADDIN.UI
                     }
                     if (!comparison.Exact) {
                         PointF a = map(comparisonA), b = map(comparisonB);
-                        e.Graphics.DrawLine(red, a, b); e.Graphics.DrawEllipse(red, a.X - 7, a.Y - 7, 14, 14);
-                        TextRenderer.DrawText(e.Graphics, "Khác", Font, new Point((int)a.X + 9, (int)a.Y - 18), Color.FromArgb(207, 65, 78));
+                        Pen marker = ComparisonMarkerIsCheck ? yellow : red;
+                        e.Graphics.DrawLine(marker, a, b); e.Graphics.DrawEllipse(marker, a.X - 7, a.Y - 7, 14, 14);
+                        TextRenderer.DrawText(e.Graphics, ComparisonMarkerLabel, Font, new Point((int)a.X + 9, (int)a.Y - 18), marker.Color);
                     }
+                }
+                foreach (var location in checkLocations) {
+                    PointF p = map(location.Key);
+                    e.Graphics.DrawEllipse(yellow, p.X - 5, p.Y - 5, 10, 10);
+                    if (comparison == null || comparison.Exact || !ComparisonMarkerIsCheck || location.Value != ComparisonMarkerLabel)
+                        TextRenderer.DrawText(e.Graphics, location.Value, Font, new Point((int)p.X + 8, (int)p.Y - 17), Color.FromArgb(166, 106, 21));
                 }
                 foreach (DxfIssue issue in file.Issues) {
                     if (comparison != null) continue;
@@ -1138,6 +1170,7 @@ namespace ADDIN.UI
             }
             string legend = comparison != null ? "Xanh: " + file.RelativeName + " · Cam: " + comparison.Other(file).RelativeName + " · Đỏ: một vị trí khác"
                 : selectedShape == null ? "Biên dạng gốc   ·   Dấu đỏ: vị trí NG" : "Vàng: " + selectedShape.Layer + " · " + selectedShape.ShapeName + " × " + selectedShape.Count + "   ·   Đỏ: vị trí NG";
+            if (checkLocations.Count > 0) legend += " · Vàng: vị trí CHECK";
             if (!ShowIssueLegend) legend = "Flat Pattern · mm · 1:1";
             TextRenderer.DrawText(e.Graphics, legend, Font, new Rectangle(8, Height - 22, Math.Max(1, Width - 16), 20), selectedShape == null ? Color.FromArgb(120, 135, 154) : Color.FromArgb(166, 106, 21), TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
         }

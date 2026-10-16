@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
@@ -152,7 +152,10 @@ namespace ADDIN.UI
         private static TaiIcon IconFor(string text)
         {
             if (string.Equals(text, "Drawing", StringComparison.OrdinalIgnoreCase)) return TaiIcon.Sheet;
-            return string.Equals(text, "Model", StringComparison.OrdinalIgnoreCase) ? TaiIcon.Cube : TaiIcon.None;
+            if (string.Equals(text, "Model", StringComparison.OrdinalIgnoreCase)) return TaiIcon.Cube;
+            if (string.Equals(text, "Settings", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(text, "Cài đặt", StringComparison.OrdinalIgnoreCase)) return TaiIcon.Wrench;
+            return TaiIcon.None;
         }
 
         protected override void OnPaint(PaintEventArgs e)

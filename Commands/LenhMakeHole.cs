@@ -5666,10 +5666,26 @@ namespace ADDIN.Commands
             try
             {
                 model.ClearSelection2(All: true);
-                bool flag = false;
-                int num = 0;
+                // A planar face must be preselected before opening Hole Wizard.
+                // With no face, SOLIDWORKS starts 3D positioning and disables slots.
+                bool planarFaceSelected = false;
+                if (IsPlanarFace(face))
+                {
+                    try
+                    {
+                        planarFaceSelected = SelectFace(face, append: false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[MAKE HOLE] Hole Wizard planar face selection failed: " + ex.Message);
+                    }
+                    if (!planarFaceSelected)
+                    {
+                        model.ClearSelection2(All: true);
+                    }
+                }
                 bool result = (holeWizardCommandStarted = model.Extension.RunCommand(39, "Hole Wizard"));
-                Debug.WriteLine("[MAKE HOLE] RunCommand HoleWizard 3D-friendly. started=" + result + ", face=" + flag + ", points=" + num);
+                Debug.WriteLine("[MAKE HOLE] RunCommand HoleWizard. started=" + result + ", planarFaceSelected=" + planarFaceSelected);
                 return result;
             }
             catch (Exception ex)

@@ -61,6 +61,51 @@ namespace ADDIN.UI
         public System.Windows.Visibility TableVisibility { get { return System.Windows.Visibility.Visible; } }
     }
 
+    // Display overlays identify the scanned loops without changing the selected
+    // source face, feature colors, geometry or the document's saved state.
+    internal sealed class NativeRepairHolePreview : IDisposable
+    {
+        private readonly List<Edge> edges = new List<Edge>();
+        private readonly Action redraw;
+        internal int EdgeCount { get { return edges.Count; } }
+        internal NativeRepairHolePreview(Action redraw) { this.redraw = redraw; }
+        internal void Show(LenhMakeHole.RepairHoleGroup group)
+        {
+            Clear(false);
+            if (group != null)
+            {
+                foreach (var candidate in group.Candidates)
+                {
+                    if (candidate == null) continue;
+                    foreach (var edge in candidate.Edges)
+                    {
+                        if (edge == null || edges.Any(previous => ReferenceEquals(previous, edge) || previous.Equals(edge))) continue;
+                        try { edge.Display(4, 1.0, 0.35, 0.0, true); edges.Add(edge); }
+                        catch (COMException) { } catch (InvalidComObjectException) { }
+                    }
+                }
+            }
+            Refresh();
+        }
+        internal void Clear(bool refresh = true)
+        {
+            bool hadEdges = edges.Count > 0;
+            foreach (var edge in edges)
+            {
+                try { edge.Display(4, 1.0, 0.35, 0.0, false); }
+                catch (COMException) { } catch (InvalidComObjectException) { }
+            }
+            edges.Clear();
+            if (refresh && hadEdges) Refresh();
+        }
+        private void Refresh()
+        {
+            try { redraw?.Invoke(); }
+            catch (COMException) { } catch (InvalidComObjectException) { }
+        }
+        public void Dispose() { Clear(); }
+    }
+
     // Keep the embedded table inside its native container. SW2024 sometimes
     // starts WindowFromHandle at 100 dialog units, regardless of page width.
     // Correct only this control's bounds; no COM calls from window messages.
@@ -83,6 +128,8 @@ namespace ADDIN.UI
 
         protected override void WndProc(ref System.Windows.Forms.Message message)
         {
+            if (message.Msg == 0x0087 && ContainsFocus)
+            { message.Result = new IntPtr(0x0085); return; }
             const int WindowPositionChanging = 0x0046;
             const uint NoSize = 0x0001;
             const uint NoMove = 0x0002;
@@ -124,6 +171,9 @@ namespace ADDIN.UI
         private int selectionRequest;
         private int faceSelectionCount = -1;
         private int previousPanelWidth, expandedPanelWidth;
+        private NativeRepairHolePreview holePreview;
+        private RepairHoleRowViewModel previewRow;
+        private int previewRequest;
 
         internal ObservableCollection<RepairHoleRowViewModel> Rows { get { return tableModel.Rows; } }
 
@@ -134,11 +184,21 @@ namespace ADDIN.UI
         { this.scan = scan; this.repair = repair; this.resetCache = resetCache; }
         protected override bool Supports(int type) { return type == (int)swDocumentTypes_e.swDocPART; }
         protected override bool UsesSelectionBoxes { get { return true; } }
+        protected override bool HandlesHostedKeyboard { get { return true; } }
+        public override bool OnKeystroke(int wparam, int message, int lparam, int id)
+        {
+            // Return true to stop SOLIDWORKS accelerators; Windows still sends
+            // the original message to the focused embedded WPF text editor.
+            return Interactive && tableView != null && tableView.IsKeyboardFocusWithin;
+        }
         protected override int SelectionMark(object item, int type)
         { return type == (int)swSelectType_e.swSelFACES && item is Face2 ? 1 : 0; }
         protected override void OnPreparingPage()
         {
             tableHost = new NativeRepairElementHost { Width = 280, Height = 400 };
+            holePreview = new NativeRepairHolePreview(() => {
+                if (Same(App.ActiveDoc, Model)) Model.GraphicsRedraw2();
+            });
             previousPanelWidth = Model.GetFeatureManagerWidth();
             int minimumWidth = (int)Math.Ceiling(360.0 * tableHost.DeviceDpi / 96.0);
             if (previousPanelWidth > 0 && previousPanelWidth < minimumWidth && Model.SetFeatureManagerWidth(minimumWidth) == 0)
@@ -154,6 +214,7 @@ namespace ADDIN.UI
             var targets = Group(10, "2. Kích thước Repair (mm)");
             tableView = new RepairHoleTaskPaneView();
             tableView.ConfigureForNativeCommand();
+            tableView.RowActivated += OnPreviewRow;
             tableView.DataContext = tableModel;
             tableHost.Child = tableView;
             tableWindow = (PropertyManagerPageWindowFromHandle)Control(targets, TableId,
@@ -185,6 +246,7 @@ namespace ADDIN.UI
         }
         private void PopulateRows()
         {
+            ++previewRequest; previewRow = null; holePreview?.Clear();
             syncing = true;
             try
             {
@@ -222,6 +284,19 @@ namespace ADDIN.UI
         {
             scannedFace = null; scanError = null; draft = new NativeRepairDraft(null);
             PopulateRows(); resetCache?.Invoke();
+        }
+        private void OnPreviewRow(RepairHoleRowViewModel row)
+        {
+            if (!Interactive || syncing || row == previewRow || scannedFace == null) return;
+            previewRow = row;
+            int request = ++previewRequest;
+            tableHost.BeginInvoke((Action)(() => {
+                if (!Interactive || request != previewRequest || !ContextMatches()) return;
+                if (row != null && !Rows.Contains(row)) return;
+                try { holePreview.Show(row == null ? null : row.Group); }
+                catch (COMException ex) { System.Diagnostics.Debug.WriteLine("[REPAIR HOLE PREVIEW] " + ex.Message); }
+                catch (InvalidComObjectException) { }
+            }));
         }
         // Reads the hole groups of the selected face into the table. An expected
         // failure goes to the page message, not to a dialog: the user may have
@@ -323,6 +398,9 @@ namespace ADDIN.UI
         }
         protected override void OnReleased(bool accepted)
         {
+            ++previewRequest; previewRow = null;
+            if (tableView != null) tableView.RowActivated -= OnPreviewRow;
+            holePreview?.Dispose(); holePreview = null;
             ++selectionRequest; selectionPending = false;
             foreach (var row in Rows) row.PropertyChanged -= OnRowChanged;
             Rows.Clear();

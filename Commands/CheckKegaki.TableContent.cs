@@ -101,7 +101,7 @@ namespace ADDIN.Commands
             return result;
         }
 
-        private static void ApplyContentComparison(BendTableContentAssessment target,
+        private void ApplyContentComparison(BendTableContentAssessment target,
             BendTableWorkbookData actual, BendTableWorkbookData standard, double thicknessMm)
         {
             BendTableContentComparison comparison = BendTableContentComparer.Compare(
@@ -119,12 +119,7 @@ namespace ADDIN.Commands
                 // Manufacturing residual is separate from the bend coefficient:
                 // the approved 2.5 residual table, for example, has C=2.3.
                 // Only the confirmed canonical standard can supply this label.
-                Match residual = Regex.Match(SafeFileName(target.StandardPath).Normalize(
-                    System.Text.NormalizationForm.FormKC), @"溝\s*(\d+(?:\.\d+)?)\s*残");
-                double value;
-                if (residual.Success && double.TryParse(residual.Groups[1].Value,
-                    NumberStyles.Float, CultureInfo.InvariantCulture, out value))
-                    target.RemainingThicknessMm = value;
+                target.RemainingThicknessMm = bendTableReader.GetGrooveRemainingThickness(target.StandardPath);
             }
             if (comparison.Status == "OK" && !string.Equals(SafeFileName(target.ActualPath),
                 SafeFileName(target.StandardPath), StringComparison.OrdinalIgnoreCase))

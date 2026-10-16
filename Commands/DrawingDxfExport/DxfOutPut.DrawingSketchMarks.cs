@@ -1,4 +1,4 @@
-﻿// Adapted from user-supplied DXF.zip; see SOURCE.md.
+// Adapted from user-supplied DXF.zip; see SOURCE.md.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -155,6 +155,232 @@ namespace ADDIN.Commands.DrawingDxfExporting
                     " trên layer MARK.");
             }
             return result;
+        }
+
+        /// <summary>
+        /// Reads 2D Sketch MARK features from the referenced Part (e.g. ｽｹｯﾁ1-mark) and
+        /// MARK-layer sketches drawn on the Drawing View / Sheet, projected into the
+        /// 1:1 View-local millimeter coordinate space of <see cref="IView.GetPolyLinesAndCurves"/>.
+        /// </summary>
+        internal static List<ADDIN.Commands.DxfChecking.DxfEdge> ExtractViewMarkSketchEdges(
+            IView flatView,
+            ISldWorks app = null,
+            ModelDoc2 drawingModel = null)
+        {
+            var result = new List<ADDIN.Commands.DxfChecking.DxfEdge>();
+            if (flatView == null) return result;
+
+            ISldWorks swApp = app ?? DxfExportContext.App;
+            MathUtility mathUtility = null;
+            MathTransform modelToView = null;
+            MathTransform viewToModel = null;
+            ISketch viewSketch = null;
+            MathTransform viewModelToSketch = null;
+            IView sheetView = null;
+            ISketch sheetSketch = null;
+            try
+            {
+                mathUtility = swApp?.GetMathUtility() as MathUtility;
+                modelToView = flatView.ModelToViewTransform;
+                viewToModel = modelToView?.Inverse() as MathTransform;
+                viewSketch = flatView.IGetSketch();
+                viewModelToSketch = viewSketch?.ModelToSketchTransform;
+                if (mathUtility == null || modelToView == null) return result;
+
+                double[] m = modelToView.ArrayData as double[];
+                Func<double[], ADDIN.Commands.DxfChecking.DxfPoint?> projectModelToViewMm = modelPoint =>
+                {
+                    if (modelPoint == null || modelPoint.Length < 3) return null;
+                    if (viewModelToSketch != null)
+                    {
+                        double[] vp = TransformModelPoint(
+                            modelPoint, null, modelToView, viewModelToSketch, mathUtility);
+                        if (IsUsableSketchPoint(vp))
+                            return new ADDIN.Commands.DxfChecking.DxfPoint(vp[0] * 1000.0, vp[1] * 1000.0);
+                    }
+                    double[] sp = ApplyTransform(modelPoint, modelToView, mathUtility);
+                    if (!IsUsableSketchPoint(sp) || m == null || m.Length < 13 || Math.Abs(m[12]) <= 1e-12)
+                        return null;
+                    return new ADDIN.Commands.DxfChecking.DxfPoint(
+                        (sp[0] - m[9]) / m[12] * 1000.0,
+                        (sp[1] - m[10]) / m[12] * 1000.0);
+                };
+
+                // 1. Part 2D Sketch features with MARK in their name (LaserMarkFeatureKind.Sketch2D).
+                ModelDoc2 part = flatView.ReferencedDocument as ModelDoc2;
+                if (part != null && part.GetType() == (int)swDocumentTypes_e.swDocPART)
+                {
+                    string configuration = "";
+                    try { configuration = flatView.ReferencedConfiguration ?? ""; } catch { }
+                    var recognizer = new LaserMarkFeatureRecognizer();
+                    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    for (Feature feature = part.FirstFeature() as Feature;
+                         feature != null;
+                         feature = feature.GetNextFeature() as Feature)
+                    {
+                        string name = "";
+                        try { name = feature.Name ?? ""; } catch { }
+                        if (string.IsNullOrEmpty(name) || !seen.Add(name)) continue;
+                        if (!recognizer.TryResolve(feature, out LaserMarkFeatureRecognizer.Resolution mark)) continue;
+                        if (mark.SourceKind != LaserMarkFeatureKind.Sketch2D) continue;
+                        if (!string.Equals(mark.SourceName, name, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (IsFeatureSuppressedIn(feature, configuration)) continue;
+
+                        ISketch partSketch = null;
+                        MathTransform partModelToSketch = null;
+                        MathTransform sketchToPartModel = null;
+                        try
+                        {
+                            partSketch = feature.GetSpecificFeature2() as ISketch;
+                            if (partSketch == null) continue;
+                            partModelToSketch = partSketch.ModelToSketchTransform;
+                            sketchToPartModel = partModelToSketch?.Inverse() as MathTransform;
+                            if (sketchToPartModel == null) continue;
+
+                            foreach (ISketchSegment segment in (partSketch.GetSketchSegments() as object[] ?? new object[0]).OfType<ISketchSegment>())
+                            {
+                                bool construction = false;
+                                try { construction = segment.ConstructionGeometry; } catch { }
+                                if (construction) continue;
+
+                                if (!TryReadMarkSketchSegment(
+                                        segment, partModelToSketch, null, mathUtility,
+                                        out string kind, out List<double[]> sketchPoints, out _))
+                                    continue;
+
+                                var pointsMm = new List<ADDIN.Commands.DxfChecking.DxfPoint>(sketchPoints.Count);
+                                foreach (double[] sp in sketchPoints)
+                                {
+                                    double[] mp = ApplyTransform(sp, sketchToPartModel, mathUtility);
+                                    ADDIN.Commands.DxfChecking.DxfPoint? vp = projectModelToViewMm(mp);
+                                    if (!vp.HasValue) { pointsMm = null; break; }
+                                    pointsMm.Add(vp.Value);
+                                }
+                                if (pointsMm != null && pointsMm.Count >= 2)
+                                    AppendMarkSketchEdges(kind, pointsMm, result);
+                            }
+                        }
+                        catch { }
+                        finally
+                        {
+                            SafeReleaseComObject(sketchToPartModel);
+                            SafeReleaseComObject(partModelToSketch);
+                        }
+                    }
+                }
+
+                // 2. User-drawn MARK-layer sketches on the Drawing View or Sheet inside the view outline.
+                if (viewToModel != null)
+                {
+                    var collection = new DrawingViewMarkSketchCollection();
+                    CollectMarkSketchSegments(
+                        collection, viewSketch, flatView, viewToModel, mathUtility, null);
+
+                    ModelDoc2 drawing = drawingModel ?? (swApp?.ActiveDoc as ModelDoc2);
+                    double[] outline = flatView.GetOutline() as double[];
+                    sheetView = (drawing as IDrawingDoc)?.GetFirstView() as IView;
+                    if (sheetView != null && outline != null && outline.Length >= 4)
+                    {
+                        sheetSketch = sheetView.IGetSketch();
+                        CollectMarkSketchSegments(
+                            collection, sheetSketch, null, viewToModel, mathUtility, outline);
+                    }
+
+                    foreach (DrawingViewMarkSketch sketchItem in collection.Items)
+                    {
+                        if (sketchItem.ModelPoints.Count < 2) continue;
+                        var pointsMm = new List<ADDIN.Commands.DxfChecking.DxfPoint>(sketchItem.ModelPoints.Count);
+                        foreach (double[] mp in sketchItem.ModelPoints)
+                        {
+                            ADDIN.Commands.DxfChecking.DxfPoint? vp = projectModelToViewMm(mp);
+                            if (!vp.HasValue) { pointsMm = null; break; }
+                            pointsMm.Add(vp.Value);
+                        }
+                        if (pointsMm != null && pointsMm.Count >= 2)
+                            AppendMarkSketchEdges(sketchItem.Kind, pointsMm, result);
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                SafeReleaseComObject(sheetSketch);
+                SafeReleaseComObject(sheetView);
+                SafeReleaseComObject(viewModelToSketch);
+                SafeReleaseComObject(viewSketch);
+                SafeReleaseComObject(viewToModel);
+                SafeReleaseComObject(modelToView);
+                SafeReleaseComObject(mathUtility);
+            }
+            return result;
+        }
+
+        private static void AppendMarkSketchEdges(
+            string kind,
+            List<ADDIN.Commands.DxfChecking.DxfPoint> points,
+            List<ADDIN.Commands.DxfChecking.DxfEdge> target)
+        {
+            var created = new List<ADDIN.Commands.DxfChecking.DxfEdge>();
+            switch (kind)
+            {
+                case "LINE":
+                    if (points.Count >= 2 && points[0].Distance(points[1]) > 1e-3)
+                        created.Add(ADDIN.Commands.DxfChecking.DxfGeometry.Line(points[0], points[1]));
+                    break;
+                case "CIRCLE":
+                    if (points.Count >= 2)
+                    {
+                        double radius = points[0].Distance(points[1]);
+                        if (radius > 1e-3)
+                            created.Add(ADDIN.Commands.DxfChecking.DxfGeometry.Circle(
+                                points[0], radius, 0, ADDIN.Commands.DxfChecking.DxfGeometry.Tau));
+                    }
+                    break;
+                case "ARC":
+                    if (points.Count >= 3)
+                    {
+                        var start = points[0];
+                        var end = points[1];
+                        var mid = points[2];
+                        double ax = start.X, ay = start.Y, bx = mid.X, by = mid.Y, cx = end.X, cy = end.Y;
+                        double det = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+                        if (Math.Abs(det) <= 1e-12)
+                        {
+                            if (start.Distance(end) > 1e-3)
+                                created.Add(ADDIN.Commands.DxfChecking.DxfGeometry.Line(start, end));
+                        }
+                        else
+                        {
+                            double a2 = ax * ax + ay * ay, b2 = bx * bx + by * by, c2 = cx * cx + cy * cy;
+                            double centerX = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / det;
+                            double centerY = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / det;
+                            var center = new ADDIN.Commands.DxfChecking.DxfPoint(centerX, centerY);
+                            double radius = start.Distance(center);
+                            double startAngle = Math.Atan2(ay - centerY, ax - centerX);
+                            double midAngle = NormalizePositiveAngle(Math.Atan2(by - centerY, bx - centerX) - startAngle);
+                            double endAngle = NormalizePositiveAngle(Math.Atan2(cy - centerY, cx - centerX) - startAngle);
+                            double sweep = midAngle <= endAngle ? endAngle : endAngle - 2 * Math.PI;
+                            if (radius > 1e-3 && Math.Abs(sweep) > 1e-6)
+                                created.Add(ADDIN.Commands.DxfChecking.DxfGeometry.Circle(center, radius, startAngle, sweep));
+                        }
+                    }
+                    break;
+                default:
+                    for (int i = 1; i < points.Count; i++)
+                    {
+                        if (points[i - 1].Distance(points[i]) > 1e-3)
+                            created.Add(ADDIN.Commands.DxfChecking.DxfGeometry.Line(points[i - 1], points[i]));
+                    }
+                    break;
+            }
+            foreach (var edge in created)
+            {
+                if (edge.Bounds.Size <= 1e-5) continue;
+                if (edge.Type == "LINE" && edge.Length <= 0.001) continue;
+                edge.Space = "Model";
+                edge.Layer = "DrawingView";
+                target.Add(edge);
+            }
         }
 
         /// <summary>

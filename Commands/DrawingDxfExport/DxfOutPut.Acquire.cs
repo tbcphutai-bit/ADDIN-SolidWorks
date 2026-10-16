@@ -437,10 +437,13 @@ namespace ADDIN.Commands.DrawingDxfExporting
                     if (item == null) continue;
                     (droppedRims.Contains(i) || droppedFar.Contains(i) ? plan.Erase : plan.Marks).Add(item);
                 }
+                int partSketchSegments = ProjectPartSketchMarks(
+                    view, recognizer, modelToView, mathUtility,
+                    plan.UserMarks, scan.VisibleMarkFeatureNames, scan.RecognizedDescriptions);
                 if (scan.RecognizedDescriptions.Count > 0)
                 {
                     DxfExportNotices.Info("LASER_MARK",
-                        "Nhận dạng " + scan.Marked.Count + " cạnh MARK → LASER_MARK: " +
+                        "Nhận dạng " + (scan.Marked.Count + partSketchSegments) + " cạnh/nét MARK → LASER_MARK: " +
                         string.Join("; ", scan.RecognizedDescriptions.Select(p => p.Key + " ×" + p.Value)) + "." +
                         (scan.RecoveredEdgeCount > 0 ? " (" + scan.RecoveredEdgeCount + " cạnh nhận lại bằng đối chiếu hình học.)" : ""));
                 }
@@ -669,6 +672,97 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 DxfTrace.Debug("Cannot read bend line: " + ex.Message);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Chiếu các nét của feature Sketch 2D có tên chứa MARK trong Part lên view → UserMarks (LASER_MARK).
+        /// </summary>
+        private static int ProjectPartSketchMarks(
+            IView view,
+            LaserMarkFeatureRecognizer recognizer,
+            MathTransform modelToView,
+            MathUtility mathUtility,
+            IList<DxfSemanticItem> targetMarks,
+            ICollection<string> visibleMarkFeatureNames,
+            IDictionary<string, int> recognizedDescriptions)
+        {
+            ModelDoc2 part = view?.ReferencedDocument as ModelDoc2;
+            if (part == null || part.GetType() != (int)swDocumentTypes_e.swDocPART) return 0;
+            string configuration = "";
+            try { configuration = view.ReferencedConfiguration ?? ""; } catch (COMException) { }
+
+            int totalAdded = 0;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (Feature feature = part.FirstFeature() as Feature; feature != null; feature = feature.GetNextFeature() as Feature)
+            {
+                string name = "";
+                try { name = feature.Name ?? ""; } catch (COMException) { }
+                if (string.IsNullOrEmpty(name) || !seen.Add(name)) continue;
+                if (!recognizer.TryResolve(feature, out LaserMarkFeatureRecognizer.Resolution mark)) continue;
+                if (mark.SourceKind != LaserMarkFeatureKind.Sketch2D) continue;
+                if (!string.Equals(mark.SourceName, name, StringComparison.OrdinalIgnoreCase)) continue;
+                if (IsFeatureSuppressedIn(feature, configuration)) continue;
+
+                ISketch sketch = null;
+                MathTransform modelToSketch = null;
+                MathTransform sketchToModel = null;
+                try
+                {
+                    sketch = feature.GetSpecificFeature2() as ISketch;
+                    if (sketch == null) continue;
+                    modelToSketch = sketch.ModelToSketchTransform;
+                    sketchToModel = modelToSketch?.Inverse() as MathTransform;
+                    if (sketchToModel == null) continue;
+
+                    int featureAdded = 0;
+                    foreach (ISketchSegment segment in (sketch.GetSketchSegments() as object[] ?? new object[0]).OfType<ISketchSegment>())
+                    {
+                        bool construction = false;
+                        try { construction = segment.ConstructionGeometry; } catch (COMException) { }
+                        if (construction) continue;
+
+                        if (!TryReadMarkSketchSegment(
+                                segment, modelToSketch, null, mathUtility,
+                                out string kind, out List<double[]> sketchPoints, out _))
+                            continue;
+
+                        var item = new DxfSemanticItem { Kind = kind, Source = name };
+                        foreach (double[] sp in sketchPoints)
+                        {
+                            double[] modelPoint = ApplyTransform(sp, sketchToModel, mathUtility);
+                            double[] viewPoint = ProjectPoint(modelPoint, null, modelToView, mathUtility);
+                            if (viewPoint == null) { item = null; break; }
+                            item.Points.Add(viewPoint);
+                        }
+                        if (item != null && item.Points.Count >= 2)
+                        {
+                            targetMarks?.Add(item);
+                            featureAdded++;
+                            totalAdded++;
+                        }
+                    }
+                    if (featureAdded > 0)
+                    {
+                        visibleMarkFeatureNames?.Add(mark.SourceName);
+                        visibleMarkFeatureNames?.Add(mark.MarkedName);
+                        if (recognizedDescriptions != null)
+                        {
+                            recognizedDescriptions[mark.Description] =
+                                (recognizedDescriptions.TryGetValue(mark.Description, out int n) ? n : 0) + featureAdded;
+                        }
+                    }
+                }
+                catch (COMException ex)
+                {
+                    DxfTrace.Debug("Cannot project Part 2D sketch MARK '" + name + "': " + ex.Message);
+                }
+                finally
+                {
+                    SafeReleaseComObject(sketchToModel);
+                    SafeReleaseComObject(modelToSketch);
+                }
+            }
+            return totalAdded;
         }
 
         [ThreadStatic] private static FastTransform _projection;

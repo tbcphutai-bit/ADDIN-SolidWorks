@@ -103,12 +103,14 @@ namespace ADDIN.Commands
                 chkSelectAll.Checked = true;
                 SetAllChecked(true);
                 SortGridByBuhinNoAscending();
-                AutoFitBomGrid();
             }
             finally
             {
-                gridBom.ResumeLayout(false);
+                gridBom.ResumeLayout(true);
             }
+
+            AutoFitBomGrid();
+            gridBom.Invalidate(true);
 
             string bomLabel = LoadedBomContext == BomCommandContext.Unit
                 ? "BOM UNIT"

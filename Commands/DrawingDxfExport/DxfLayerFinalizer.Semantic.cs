@@ -50,6 +50,13 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 throw new InvalidDataException("DXF group pairs are unbalanced.");
 
             double scale = plan.ViewScale > 0 ? plan.ViewScale : 1.0;
+            // Bend/center/construction lines are not exported unless identified as MARK.
+            plan.Bends.Clear();
+            var drawingItems = VisibleDrawingItems(plan);
+            var drawingIndex = new LaserSegmentIndex(ToSegments(drawingItems), SemanticOnEdgeTolerance);
+            var rawVisibility = new RawDrawingLineVisibility(lines);
+            var originalRecords = CollectEntityRecords(lines);
+            var planMarkIndex = new LaserSegmentIndex(ToSegments(plan.Marks), SemanticOnEdgeTolerance);
 
             // ---------------------------------------------------------- 2. cắt khung view
             // (trước kiểm chứng: hình của view cha không được tính vào tỉ lệ khớp;
@@ -76,13 +83,19 @@ namespace ADDIN.Commands.DrawingDxfExporting
             // ---------------------------------------------------------- 1. kiểm chứng
             // Mọi nét SolidWorks ghi phải nằm trên thứ XToolPro biết: cạnh nhìn thấy,
             // đường uốn, vòng xoá, cạnh MARK.
+            // Ignore decoration when checking placement; the independent complete
+            // geometry gate still requires every expected Drawing curve afterward.
+            var verificationEntities = entities.Where(e => e.IsText || e.Points.Count == 0 ||
+                (e.Points.All(p => planMarkIndex.IsNear(p, SemanticOnEdgeTolerance))) ||
+                (rawVisibility.IsVisibleContinuous(lines, originalRecords[e.RecordIndex]) &&
+                 (!plan.CropToView || e.Points.All(p => drawingIndex.IsNear(p, SemanticOnEdgeTolerance))))).ToList();
             List<LaserSegment> visible = ExpectedSegments(plan);
             var visibleIndex = new LaserSegmentIndex(visible, SemanticMatchTolerance);
-            double[] dxfBox = BoundsOf(entities.Where(e => IsCutCandidate(e, settings)).SelectMany(e => e.Points));
+            double[] dxfBox = BoundsOf(verificationEntities.Where(e => IsCutCandidate(e, settings)).SelectMany(e => e.Points));
             double offsetX = 0, offsetY = 0;
             if (dxfBox != null && planBox != null && plan.VisibleEdges.Count > 0)
             {
-                double ratio = MatchRatio(entities, visibleIndex, settings);
+                double ratio = MatchRatio(verificationEntities, visibleIndex, settings);
                 if (ratio < SemanticMinimumMatch && !plan.CropToView &&
                     Math.Abs((dxfBox[2] - dxfBox[0]) - (planBox[2] - planBox[0])) <= 0.1 &&
                     Math.Abs((dxfBox[3] - dxfBox[1]) - (planBox[3] - planBox[1])) <= 0.1)
@@ -93,7 +106,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
                     ShiftPlan(plan, offsetX, offsetY);
                     visible = ExpectedSegments(plan);
                     visibleIndex = new LaserSegmentIndex(visible, SemanticMatchTolerance);
-                    ratio = MatchRatio(entities, visibleIndex, settings);
+                    ratio = MatchRatio(verificationEntities, visibleIndex, settings);
                 }
                 result.MatchRatio = ratio;
                 result.OffsetXMm = offsetX;
@@ -138,7 +151,8 @@ namespace ADDIN.Commands.DrawingDxfExporting
             // Cạnh MODEL nhìn thấy (biên, lỗ…). Đường uốn là sketch, không phải cạnh model: nét nằm trên
             // đường uốn MÀ cũng nằm trên một cạnh model là CẠNH BIÊN trùng đường uốn (tấm cuốn/uốn ở đầu
             // tấm, chi tiết 13 của 4115) → giữ CUT, không thì biên ngoài bị hở.
-            var modelEdgeIndex = new LaserSegmentIndex(ToSegments(plan.VisibleEdges), SemanticOnEdgeTolerance);
+            drawingIndex = new LaserSegmentIndex(ToSegments(VisibleDrawingItems(plan)), SemanticOnEdgeTolerance);
+            var modelEdgeIndex = drawingIndex;
             var markHit = new bool[plan.Marks.Count];
             var markSamples = plan.Marks.Select(MarkSamplePoints).ToList();
             var markSampleHit = plan.Marks.Select(_ => new bool[MarkSampleCount]).ToList();
@@ -193,10 +207,17 @@ namespace ADDIN.Commands.DrawingDxfExporting
                     NoteHits(plan.Bends, bendHit, entity.Points);
                     continue;
                 }
-                if (!entity.IsText && !IsLayer(entity.Layer, settings.PartInfo.Name))
+                if (!IsLayer(entity.Layer, settings.PartInfo.Name) &&
+                    rawVisibility.IsVisibleContinuous(lines, originalRecords[entity.RecordIndex]) &&
+                    entity.Points.All(p => drawingIndex.IsNear(p, SemanticOnEdgeTolerance)))
                 {
                     relayer[entity.RecordIndex] = settings.Cut.Name;
                     result.CutEntities++;
+                }
+                else
+                {
+                    doomed.Add(entity.RecordIndex);
+                    result.NonVisibleEntitiesRemoved++;
                 }
             }
             result.MarksWithoutEntity = markHit.Count(hit => !hit);
@@ -222,7 +243,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 {
                     if (doomed.Contains(entity.RecordIndex)) continue;
                     bool strayText = entity.IsText && !IsLayer(entity.Layer, settings.PartInfo.Name);
-                    bool nonGeometry = !entity.IsText && !GeometryTypes.Contains(entity.Type);
+                    bool nonGeometry = !entity.IsText && (!GeometryTypes.Contains(entity.Type) || entity.Points.Count == 0);
                     if (!strayText && !nonGeometry) continue;
                     doomed.Add(entity.RecordIndex);
                     result.StrayTextRemoved++;
@@ -328,6 +349,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
             // DXF ra kích thước THẬT; SolidWorks ghi $DIMLFAC = 1/tỉ lệ sheet (vd 5 cho sheet 1:5) → đo
             // bằng AutoCAD ra gấp 5 lần (báo 06/10). Hệ số đo kích thước về 1, cả header lẫn mọi DIMSTYLE.
             NormalizeDimensionScale(lines);
+            NormalizeVisibleLinePatterns(lines, settings);
 
             string tempPath = filePath + ".semantic.tmp";
             try
@@ -370,7 +392,21 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 if (!entity.IsText && GeometryTypes.Contains(entity.Type))
                 {
                     if (TryTessellateEntity(lines, record, LaserChordTolerance, CandidateSampleSpacing, out List<List<DxfPoint2D>> polylines))
-                        foreach (List<DxfPoint2D> polyline in polylines) entity.Points.AddRange(polyline);
+                        foreach (List<DxfPoint2D> polyline in polylines)
+                        {
+                            for (int i = 0; i < polyline.Count; i++)
+                            {
+                                entity.Points.Add(polyline[i]);
+                                // Endpoints alone can both touch real edges while an
+                                // unrelated diagonal crosses the whole inside of a part.
+                                if (i + 1 < polyline.Count &&
+                                    (entity.Type == "LINE" || entity.Type == "POLYLINE" || entity.Type == "LWPOLYLINE"))
+                                    for (int n = 1; n < 16; n++)
+                                        entity.Points.Add(new DxfPoint2D {
+                                            X = polyline[i].X + (polyline[i+1].X-polyline[i].X)*n/16,
+                                            Y = polyline[i].Y + (polyline[i+1].Y-polyline[i].Y)*n/16 });
+                            }
+                        }
                 }
                 result.Add(entity);
             }

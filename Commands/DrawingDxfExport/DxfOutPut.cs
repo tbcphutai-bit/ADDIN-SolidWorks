@@ -1,4 +1,4 @@
-// Adapted from user-supplied DXF.zip; see SOURCE.md.
+﻿// Adapted from user-supplied DXF.zip; see SOURCE.md.
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using System;
@@ -137,73 +137,13 @@ namespace ADDIN.Commands.DrawingDxfExporting
         private static bool ExportDrawingView(DXFPropforExport properties, string saveRoot,
             int bendLine, int lazerMark, string extension, bool recognizeCutExtrudeAsLaserMark)
         {
-            // A Drawing that is not open in SOLIDWORKS is opened ONCE, as the disposable copy the
-            // export works on anyway: the view, the DXF identity and the MARK sketches are read from
-            // that copy before it is trimmed. Opening the source first and the copy after it cost
-            // about one extra Drawing load per row (measured 09/10/2026: 2.47 s -> 1.39 s per row).
-            // A Drawing the user has open keeps the old path, which carries unsaved changes.
-            // TAI_DXF_OPEN_SOURCE=1 forces the old path for comparison.
-            if (DxfExportContext.App.IGetOpenDocumentByName2(properties.DrwPath) == null &&
-                System.Environment.GetEnvironmentVariable("TAI_DXF_OPEN_SOURCE") != "1")
-            {
-                // The copy lives in %TEMP%, away from its Part: opened on its own it binds to the
-                // path stored in the Drawing (wherever the project was last saved), not to the Part
-                // of the BOM row. With that Part already in memory the copy binds to it. A Part
-                // loaded here is closed again by RestoreDocumentStateAfterExport.
-                PreloadPart(properties.PartPath);
-                DrawingCopy opened = OpenDrawingCopy(DxfExportContext.App, null, properties.DrwPath);
-                try {
-                    return ExportFromDrawing(opened.Model as ModelDoc2, opened, properties, saveRoot,
-                        bendLine, lazerMark, extension, recognizeCutExtrudeAsLaserMark);
-                }
-                finally { opened.Dispose(); }
-            }
-
-            using (DocumentLease lease = DocumentLease.Open(properties.DrwPath)) {
-                ModelDoc2 drawing = lease.Document;
-                if (drawing == null || drawing.GetType() != (int)swDocumentTypes_e.swDocDRAWING)
-                    throw new InvalidOperationException("Không mở được Drawing: " + properties.DrwPath);
-                string originalSheet = (drawing as IDrawingDoc)?.GetCurrentSheet() is ISheet sheet ? sheet.GetName() : "";
-                try {
-                    return ExportFromDrawing(drawing, null, properties, saveRoot,
-                        bendLine, lazerMark, extension, recognizeCutExtrudeAsLaserMark);
-                }
-                finally {
-                    if (!string.IsNullOrWhiteSpace(originalSheet)) (drawing as IDrawingDoc)?.ActivateSheet(originalSheet);
-                }
-            }
-        }
-
-        /// <summary>
-        /// A Part that is in memory with a flat-pattern configuration ALREADY rebuilt in this session gets
-        /// all its configurations rebuilt before its Drawing copy opens. Measured 11/10/2026 on 4119 with
-        /// the BOM assembly loaded: opening the Drawing of 4119-04-M3A-S03-2 makes SOLIDWORKS rebuild the
-        /// flat-pattern configuration of its twin 4119-04-M2A-S03-2 too, in another state (flat view
-        /// turned 3.5°, the hole re-drilled in the flat pattern no longer round); the twin's Drawing then
-        /// shows that state and its MARK hole is lost. A rebuild of the Part itself gives the saved state
-        /// back. A configuration still waiting for its rebuild is left alone: SOLIDWORKS builds it right
-        /// when the Drawing opens. TAI_DXF_NO_PART_REFRESH=1 switches this off (for comparison).
-        /// </summary>
-        private static void RebuildFlatConfigurationRebuiltElsewhere(ModelDoc2 part)
-        {
-            if (part == null || System.Environment.GetEnvironmentVariable("TAI_DXF_NO_PART_REFRESH") == "1") return;
-            try
-            {
-                string active = (part.GetActiveConfiguration() as Configuration)?.Name ?? "";
-                foreach (string name in part.GetConfigurationNames() as string[] ?? new string[0])
-                {
-                    if (string.Equals(name, active, StringComparison.OrdinalIgnoreCase) ||
-                        !name.EndsWith("SM-FLAT-PATTERN", StringComparison.OrdinalIgnoreCase)) continue;
-                    Configuration configuration = part.GetConfigurationByName(name) as Configuration;
-                    if (configuration == null || configuration.NeedsRebuild) continue;
-                    var clock = Stopwatch.StartNew();
-                    bool rebuilt = part.Extension.ForceRebuildAll();
-                    DxfTrace.Info("Part đang mở có cấu hình trải '" + name + "' đã được dựng lại trong phiên này: dựng lại mọi cấu hình của Part = " +
-                                  rebuilt + ", " + clock.ElapsedMilliseconds + " ms");
-                    return;
-                }
-            }
-            catch (Exception ex) { DxfTrace.Error("dựng lại cấu hình trải của Part trước khi mở bản sao bản vẽ", ex); }
+            // One path for closed and already-open Drawings. OpenDrawingCopy carries
+            // unsaved Drawing edits; the borrowed Part retains unsaved model edits.
+            PreloadPart(properties.PartPath);
+            ModelDoc2 source = DxfExportContext.App.IGetOpenDocumentByName2(properties.DrwPath) as ModelDoc2;
+            using (DrawingCopy copy = OpenDrawingCopy(DxfExportContext.App, source, properties.DrwPath))
+                return ExportFromDrawing(copy.Model as ModelDoc2, copy, properties, saveRoot,
+                    bendLine, lazerMark, extension, recognizeCutExtrudeAsLaserMark);
         }
 
         /// <summary>Loads the Part without a window when it is not in memory yet.</summary>
@@ -212,11 +152,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
             ISldWorks app = DxfExportContext.App;
             if (string.IsNullOrWhiteSpace(partPath) || !File.Exists(partPath)) return;
             ModelDoc2 loaded = app.IGetOpenDocumentByName2(partPath) as ModelDoc2;
-            if (loaded != null)
-            {
-                RebuildFlatConfigurationRebuiltElsewhere(loaded);
-                return;
-            }
+            if (loaded != null) return;
             int errors = 0, warnings = 0;
             var clock = Stopwatch.StartNew();
             app.DocumentVisible(false, (int)swDocumentTypes_e.swDocPART);
@@ -240,15 +176,22 @@ namespace ADDIN.Commands.DrawingDxfExporting
         {
             string viewName = FindFlatPatternViewName(drawing, properties);
             if (string.IsNullOrWhiteSpace(viewName)) return false;
-            if (!TryResolveExportIdentityFromDrawingView(drawing, viewName, properties, out string partPath)) return false;
-            DxfExportNotices.SetPartNumber(properties.PartNumber);
-            IView view = FindViewByName(drawing, viewName);
-            try {
-                if (view == null) throw new InvalidOperationException("Flat Pattern view không còn khả dụng.");
-                return ExportFlatPatternView(drawing, view, viewName, properties, saveRoot,
-                    bendLine, lazerMark, extension, recognizeCutExtrudeAsLaserMark, openedCopy);
+            IView updateView = FindViewByName(drawing, viewName);
+            IDisposable flatState = null;
+            try { flatState = UpdateFlatPatternDrawing(drawing, updateView, properties); }
+            finally { SafeReleaseComObject(updateView); }
+            using (flatState)
+            {
+                if (!TryResolveExportIdentityFromDrawingView(drawing, viewName, properties, out string partPath)) return false;
+                DxfExportNotices.SetPartNumber(properties.PartNumber);
+                IView view = FindViewByName(drawing, viewName);
+                try {
+                    if (view == null) throw new InvalidOperationException("Flat Pattern view không còn khả dụng.");
+                    return ExportFlatPatternView(drawing, view, viewName, properties, saveRoot,
+                        bendLine, lazerMark, extension, recognizeCutExtrudeAsLaserMark, openedCopy);
+                }
+                finally { SafeReleaseComObject(view); }
             }
-            finally { SafeReleaseComObject(view); }
         }
         private static bool TryResolveExportIdentityFromDrawingView(
             ModelDoc2 drawing,
@@ -498,6 +441,9 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 return false;
             }
 
+            // DXF policy: visible continuous Drawing edges and explicit MARK only.
+            if (string.Equals(extension, "dxf", StringComparison.OrdinalIgnoreCase)) bendLine = 0;
+
             string saveDirectory = BuildOrderOutputDirectory(
                 saveRoot,
                 properties);
@@ -564,17 +510,30 @@ namespace ADDIN.Commands.DrawingDxfExporting
                     properties.DrawingViewMarkSketches = userMarks;
                 }
 
+                // Immutable numeric reference BEFORE trimming or SaveAs can rebuild a shared model.
+                step("read model semantics");
+                DxfSemanticPlan plan = BuildSemanticPlan(
+                    drawingView, properties,
+                    lazerMark == 1, recognizeCutExtrudeAsLaserMark, bendLine == 1,
+                    userMarks, cropToView: true);
+                double[] referenceBuffer = drawingView.GetPolyLinesAndCurves(1) as double[];
+                if (referenceBuffer == null || referenceBuffer.Length == 0)
+                    throw new InvalidOperationException("Không đọc được hình học của view đã cập nhật.");
+                plan.ReferenceCurveBuffer = (double[])referenceBuffer.Clone();
+                plan.ContinuousReferenceCurveBuffer = ContinuousDrawingCurves(drawing, referenceBuffer);
+                if (System.Environment.GetEnvironmentVariable("XTOOLPRO_DXF_KEEP_RAW") == "1")
+                {
+                    double[] buffer = plan.ReferenceCurveBuffer;
+                    var snapshot = new { Drawing = properties.DrwPath, Part = properties.PartPath,
+                        Configuration = drawingView.ReferencedConfiguration, Sheet = sheetName, View = drawingViewName,
+                        Scale = drawingView.ScaleDecimal, Buffer = buffer };
+                    File.WriteAllText(Path.ChangeExtension(outputPath, ".view.json"),
+                        new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = 100000000 }.Serialize(snapshot));
+                }
                 step("open drawing copy");
-                // Already open when the source Drawing was not: everything above was read from it.
                 copy = openedCopy ?? OpenDrawingCopy(DxfExportContext.App, drawingModel, properties.DrwPath);
                 step("keep flat-pattern view on copy");
                 IView copyView = KeepOnlyView(copy.Model, sheetName, drawingViewName, false, properties);
-
-                step("read model semantics");
-                DxfSemanticPlan plan = BuildSemanticPlan(
-                    copyView, properties,
-                    lazerMark == 1, recognizeCutExtrudeAsLaserMark, bendLine == 1,
-                    userMarks, cropToView: true);   // mọi thứ ngoài khung view (khung tên còn sót…) bị bỏ
                 copyFrame = ViewFrame.Read(copyView);
                 // Keep graphics updating while the user monitors cleanup and DXF saving.
                 EnableRedraw(copy);
@@ -687,13 +646,27 @@ namespace ADDIN.Commands.DrawingDxfExporting
                         properties,
                         layerResult.ClosedMarkContourCount);
 
+                    step("verify complete DXF geometry");
+                    DxfCompleteGeometryVerdict geometry = DxfLayerFinalizer.VerifyCompleteGeometry(stagingPath, plan, layerSettings);
+                    DxfTrace.Info("[COMPLETE_GEOMETRY] " + geometry.Summary);
+                    if (System.Environment.GetEnvironmentVariable("XTOOLPRO_DXF_KEEP_RAW") == "1")
+                        File.WriteAllText(Path.ChangeExtension(outputPath, ".gate.json"),
+                            new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(geometry));
+                    if (!geometry.Passed)
+                    {
+                        string reviewDirectory = Path.Combine(saveDirectory, "CHECK_DXF_REVIEW");
+                        Directory.CreateDirectory(reviewDirectory);
+                        string reviewPath = Path.Combine(reviewDirectory, Path.GetFileName(outputPath));
+                        File.Copy(stagingPath, reviewPath, true);
+                        DxfExportNotices.SetOutputPath(reviewPath);
+                        throw new InvalidOperationException("DXF cần kiểm tra, chưa phát hành: " + geometry.Summary + "; " + reviewPath);
+                    }
                     step("view identity gate (log only)");
                     try
                     {
-                        ViewIdentityVerdict verdict = viewReference == null || viewReference.Paths.Count == 0
-                            ? null
-                            : EvaluateViewIdentity(viewReference.Paths, stagingPath, layerSettings, viewReference.ViewScale);
-                        LogViewIdentity(properties, viewReference, copyFrame, savedFrame, verdict);
+                        // The strict curve check above already verifies direction and scale.
+                        // Keep frame diagnostics; avoid the older fitted-scale scoring pass.
+                        LogViewIdentity(properties, viewReference, copyFrame, savedFrame, null);
                     }
                     catch (Exception ex)
                     {

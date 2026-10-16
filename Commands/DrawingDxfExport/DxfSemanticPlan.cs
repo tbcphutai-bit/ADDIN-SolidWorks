@@ -45,6 +45,12 @@ namespace ADDIN.Commands.DrawingDxfExporting
         /// <summary>Tỉ lệ view (DXF thô = model × tỉ lệ). Kết quả cuối chia cho tỉ lệ này.</summary>
         public double ViewScale { get; set; } = 1.0;
 
+        // Immutable analytical Drawing curves, in physical view-local coordinates.
+        public double[] ReferenceCurveBuffer { get; set; }
+
+        // Exact Drawing curves whose resolved line font has no gaps or dots.
+        public double[] ContinuousReferenceCurveBuffer { get; set; }
+
         /// <summary>Số cạnh model view cho thấy lúc đọc kế hoạch (-1: chưa đọc); so lại sau khi lưu DXF.</summary>
         public int ViewEdgeCount { get; set; } = -1;
 
@@ -79,6 +85,10 @@ namespace ADDIN.Commands.DrawingDxfExporting
                               string.Join(" ", item.Points.Select(p => p[0].ToString("R", ic) + "," + p[1].ToString("R", ic))));
                 }
             }
+            if (ReferenceCurveBuffer != null)
+                lines.Add("curvebuffer=" + string.Join(" ", ReferenceCurveBuffer.Select(v => v.ToString("R", ic))));
+            if (ContinuousReferenceCurveBuffer != null)
+                lines.Add("cutcurvebuffer=" + string.Join(" ", ContinuousReferenceCurveBuffer.Select(v => v.ToString("R", ic))));
             System.IO.File.WriteAllLines(path, lines, System.Text.Encoding.UTF8);
         }
 
@@ -88,6 +98,8 @@ namespace ADDIN.Commands.DrawingDxfExporting
             var plan = new DxfSemanticPlan();
             foreach (string line in System.IO.File.ReadAllLines(path, System.Text.Encoding.UTF8))
             {
+                if (line.StartsWith("cutcurvebuffer=")) { plan.ContinuousReferenceCurveBuffer = line.Substring(15).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(v => double.Parse(v, ic)).ToArray(); continue; }
+                if (line.StartsWith("curvebuffer=")) { plan.ReferenceCurveBuffer = line.Substring(12).Split(' ').Select(v => double.Parse(v, ic)).ToArray(); continue; }
                 if (line.StartsWith("scale=")) { plan.ViewScale = double.Parse(line.Substring(6), ic); continue; }
                 if (line.StartsWith("crop=")) { plan.CropToView = bool.Parse(line.Substring(5)); continue; }
                 if (line.StartsWith("text=")) { plan.RemoveStrayText = bool.Parse(line.Substring(5)); continue; }
@@ -132,6 +144,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
         public int FaceSplitEdges { get; set; }
         public int StrayTextRemoved { get; set; }
         public int CutEntities { get; set; }
+        public int NonVisibleEntitiesRemoved { get; set; }
 
         /// <summary>Cạnh MARK của model không tìm thấy nét DXF nào (chiếu ra ngoài / SW không vẽ).</summary>
         public int MarksWithoutEntity { get; set; }
@@ -165,7 +178,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
             (CoincidentEraseIgnored > 0 ? " erase-on-mark-ignored=" + CoincidentEraseIgnored : "") +
             (MarkOverEraseEntities > 0 ? " mark-over-erase=" + MarkOverEraseEntities : "") +
             " erased=" + ErasedEntities + " bend=" + BendEntitiesFound + "+" + BendEntitiesInjected + (BendOnBoundary > 0 ? " bend-on-boundary=" + BendOnBoundary : "") +
-            " userMark=" + UserMarkEntitiesInjected + " cropped=" + CroppedEntities + " face-split=" + FaceSplitEdges +
+            " removed-hidden-or-unmarked=" + NonVisibleEntitiesRemoved + " userMark=" + UserMarkEntitiesInjected + " cropped=" + CroppedEntities + " face-split=" + FaceSplitEdges +
             " ring-interior=" + RingInteriorRemoved + (MissingMarkDetail.Length > 0 ? " missing-detail=[" + MissingMarkDetail + "]" : "") + " text-removed=" + StrayTextRemoved;
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using System.Collections.Generic;
 
@@ -67,6 +67,7 @@ namespace ADDIN
         private CheckBalloon balloonChecker;
 
         private CheckDrawingBom drawingBomChecker;
+        private CheckAssemblyHole assemblyHoleChecker;
 
         private XepUnitDrawing xepUnitDrawing;
 
@@ -373,6 +374,7 @@ namespace ADDIN
 
             // Names, icons, colours and fonts of the whole pane: UI\BomTaskPaneTheme.cs.
             ApplyTaiTheme();
+            EnsureSettingsTab();
 
 
 
@@ -393,6 +395,8 @@ namespace ADDIN
         public void Init(ISldWorks app)
 
         {
+            assemblyHoleChecker?.CloseResults();
+            assemblyHoleChecker = null;
 
             swApp = app;
 
@@ -477,8 +481,11 @@ namespace ADDIN
         public void ShutdownFromSolidWorks()
 
         {
+            assemblyHoleChecker?.CloseResults();
+            assemblyHoleChecker = null;
 
             CloseDxfCheckWindow();
+            CloseBendMinimumWindow();
             CloseDrawingBomCheckReview();
 
             solidWorksClosing = true;
@@ -1128,6 +1135,7 @@ namespace ADDIN
             vCutBendAssignmentControl.CloseRequested += vCutBendAssignmentControl_CloseRequested;
 
             vCutBendAssignmentControl.BendSelected += vCutBendAssignmentControl_BendSelected;
+            vCutBendAssignmentControl.MinimumSelected += row => vCutPropertySetupCommand?.SelectMinimum(row);
 
             btnSplineToArcs.Click += btnSplineToArcs_Click;
 
@@ -1305,33 +1313,25 @@ namespace ADDIN
 
 
         private void btnCheckAssemblyHole_Click(object sender, EventArgs e)
-
         {
             if (!CanRunModelMacro(btnCheckAssemblyHole)) return;
-
             try
-
             {
-
-                CheckAssemblyHole holeCmd = new CheckAssemblyHole(swApp);
-
-                holeCmd.ResultTextChanged += ShowModelInspectionReport;
-                try { holeCmd.Run(); }
-                finally { holeCmd.ResultTextChanged -= ShowModelInspectionReport; }
-
+                if (assemblyHoleChecker == null)
+                {
+                    assemblyHoleChecker = new CheckAssemblyHole(swApp);
+                    assemblyHoleChecker.ResultTextChanged += ShowCheckHoleInspectionReport;
+                    assemblyHoleChecker.ResultsViewReady += ShowCheckHoleResultsView;
+                }
+                btnCheckAssemblyHole.Enabled = false;
+                try { assemblyHoleChecker.Run(); }
+                finally { if (!btnCheckAssemblyHole.IsDisposed) btnCheckAssemblyHole.Enabled = true; }
             }
-
             catch (Exception ex)
-
             {
-
-                MessageBox.Show("Lỗi khởi chạy CHECK ASSEMBLY HOLE:\n" + ex.Message, "CHECK ASSEMBLY HOLE", MessageBoxButtons.OK, MessageBoxIcon.Error);
-
+                ShowModelInspectionReport("Lỗi khởi chạy CHECK ASSEMBLY HOLE:\n" + ex.Message);
             }
-
         }
-
-
 
         private void btnRepair3DSpline_Click(object sender, EventArgs e)
 
@@ -1352,7 +1352,10 @@ namespace ADDIN
 
         {
             if (!CanRunModelMacro(btnVCutPropertySetup)) return;
-            ShowNativeVCutBendPage();
+            if (vCutBendAssignmentControl != null && vCutBendAssignmentControl.Visible &&
+                !vCutBendAssignmentControl.ConfirmDiscardChanges("mở lại Set bend line"))
+                return;
+            LoadVCutBendAssignments(null, true);
         }
 
 
@@ -1390,7 +1393,7 @@ namespace ADDIN
 
                 {
 
-                    UI.VCutNoticeDialog.Inform(this, "Không thể mở Set Bend line",
+                    UI.VCutNoticeDialog.Inform(this, "Không thể mở Set bend line",
 
                         message, MessageBoxIcon.Warning);
 
@@ -1408,7 +1411,11 @@ namespace ADDIN
 
                 vCutBendAssignmentControl.Visible = true;
 
+                SetModelMacroCommandsCollapsed(true);
+
                 vCutBendAssignmentControl.BringToFront();
+
+                vCutBendAssignmentControl.HighlightCurrentRow();
 
             }
 
@@ -1489,6 +1496,8 @@ namespace ADDIN
             vCutBendAssignmentControl.Visible = false;
 
             vCutPropertySetupCommand = null;
+
+            SetModelMacroCommandsCollapsed(false);
 
         }
 
@@ -1936,8 +1945,10 @@ namespace ADDIN
             {
 
                 actions?.LoadBom(IsDrawingBomCancelRequested);
+                string previousDxfBomPath = loadedDxfBomPath;
                 loadedDxfBomPath = actions != null && actions.LoadedBomContext != BomCommandContext.None && !IsDrawingBomCancelRequested()
                     ? (swApp.ActiveDoc as ModelDoc2)?.GetPathName() : null;
+                if (!string.Equals(previousDxfBomPath, loadedDxfBomPath, StringComparison.OrdinalIgnoreCase)) ResetDxfSource();
 
                 UpdateBomCommandButtonState();
 
@@ -1955,7 +1966,7 @@ namespace ADDIN
             if (bomDxfExportPane != null) bomDxfExportPane.Visible = false;
 
 
-            actions?.ClearBom(); loadedDxfBomPath = null; lastDxfBomResult = null;
+            actions?.ClearBom(); loadedDxfBomPath = null; lastDxfBomResult = null; ResetDxfSource();
 
             UpdateBomCommandButtonState();
 
@@ -1973,7 +1984,7 @@ namespace ADDIN
 
             {
 
-                btnCheckDfTk.Enabled = false; if (btnCheckDxf != null) btnCheckDxf.Enabled = false; if (btnStandaloneCurveMacro != null) btnStandaloneCurveMacro.Enabled = false; if (btnExportBomDxf != null) btnExportBomDxf.Enabled = false;
+                btnCheckDfTk.Enabled = false; if (btnCheckDxf != null) btnCheckDxf.Enabled = false; if (btnDxfSource != null) btnDxfSource.Enabled = false; if (btnStandaloneCurveMacro != null) btnStandaloneCurveMacro.Enabled = false; if (btnExportBomDxf != null) btnExportBomDxf.Enabled = false;
 
                 button2.Enabled = false;
 
@@ -2061,7 +2072,7 @@ namespace ADDIN
 
             btnCheckRound.Enabled = detailBomLoaded;
 
-            btnCheckSamePart.Enabled = detailBomLoaded; if (btnCheckDxf != null) btnCheckDxf.Enabled = detailBomLoaded; if (btnStandaloneCurveMacro != null) btnStandaloneCurveMacro.Enabled = swApp != null; if (btnExportBomDxf != null) btnExportBomDxf.Enabled = detailBomLoaded;
+            btnCheckSamePart.Enabled = detailBomLoaded; if (btnCheckDxf != null) btnCheckDxf.Enabled = detailBomLoaded; if (btnDxfSource != null) btnDxfSource.Enabled = detailBomLoaded; if (btnStandaloneCurveMacro != null) btnStandaloneCurveMacro.Enabled = swApp != null; if (btnExportBomDxf != null) btnExportBomDxf.Enabled = detailBomLoaded;
 
             btnCheckDrawingBom.Enabled = hasBomRows && !drawingBomCommandInProgress;
 
@@ -2242,7 +2253,8 @@ namespace ADDIN
 
 
 
-            SetBomCommandToolTip(btnCheckDxf, "DXF ↔ DRAWING: Load BOM chi tiết, tick các dòng rồi so DXF ↔ Drawing. Tự mở Drawing silent, tắt tô màu Flat Pattern và cập nhật View trước khi đọc; dung sai 0,20 mm; lưu báo cáo Excel.");
+            SetBomCommandToolTip(btnCheckDxf, "DXF ↔ DRAWING: Load BOM chi tiết, tick các dòng rồi bấm để chọn thư mục DXF. Chỉ dùng file trong thư mục đã chọn, hiện đầy đủ đường dẫn file đang kiểm tra. Tự mở Drawing silent, tắt tô màu Flat Pattern; dung sai 0,20 mm; lưu báo cáo Excel.");
+            SetBomCommandToolTip(btnDxfSource, "Thư mục DXF gần nhất. Bấm DXF ↔ DRAWING để chọn thư mục trước mỗi lần kiểm tra; chỉ dùng DXF trong thư mục đã chọn.");
 
             SetBomCommandToolTip(btnStandaloneCurveMacro, "Mở macro rời kiểm tra Drawing hoặc Drawing + DXF, chọn điều kiện SPLINE/POLYLINE và chuyển SPLINE nguồn sang ARC/LINE trong Part. Giữ các dòng BOM đã tick; không tự lưu Part.");
 
@@ -2468,7 +2480,7 @@ namespace ADDIN
 
                 btnCheckDrawingBom,
 
-                btnCheckDxf, btnStandaloneCurveMacro, btnExportBomDxf
+                btnCheckDxf, btnDxfSource, btnStandaloneCurveMacro, btnExportBomDxf
 
             };
 
@@ -6131,10 +6143,10 @@ namespace ADDIN
             int gap = 6;
 
             int fieldH = 36;
-            int row1Y = 34;
-            int row2Y = row1Y + fieldH + 4; // 66
+            int row1Y = 40;
+            int row2Y = row1Y + fieldH + 4; // 80
             int btnH = 32;
-            int row3Y = row2Y + fieldH + 6; // 104
+            int row3Y = row2Y + fieldH + 6; // 122
 
             int availableWidth = Math.Max(200, pageWidth - (margin * 2));
             bool singleRowButtons = availableWidth >= 305;
@@ -6207,7 +6219,7 @@ namespace ADDIN
 
             int groupTop = grpComponentSize.Bottom + 8;
 
-            int cardHeight = 156;
+            int cardHeight = 162;
 
             grpComponentBom.SetBounds(pageMargin, groupTop, pageWidth, cardHeight);
 
@@ -6241,11 +6253,11 @@ namespace ADDIN
 
 
 
-            int row1Y = 34;
+            int row1Y = 40;
 
-            int row2Y = 72;
+            int row2Y = 78;
 
-            int row3Y = 110;
+            int row3Y = 116;
 
             int inputH = 30;
 
@@ -6288,7 +6300,7 @@ namespace ADDIN
 
             int groupTop = grpComponentBom.Bottom + 8;
 
-            int minHeight = CommandPixels(246);
+            int minHeight = CommandPixels(252);
 
             groupBox3.SetBounds(pageMargin, groupTop, pageWidth, minHeight);
 
@@ -6321,7 +6333,7 @@ namespace ADDIN
 
             int innerLeft = CommandPixels(12);
 
-            int innerTop = CommandPixels(34);
+            int innerTop = CommandPixels(40);
 
             int innerGap = CommandPixels(8);
 
@@ -7246,7 +7258,7 @@ namespace ADDIN
         {
             if (ReferenceEquals(button, btnCheckAssemblyHole))
                 return documentType == (int)swDocumentTypes_e.swDocASSEMBLY;
-            if (ReferenceEquals(button, btnMirrorPart))
+            if (ReferenceEquals(button, btnMirrorPart) || ReferenceEquals(button, btnCheckBendMinimum))
                 return documentType == (int)swDocumentTypes_e.swDocPART ||
                        documentType == (int)swDocumentTypes_e.swDocASSEMBLY;
             if (ReferenceEquals(button, btnEdgeToEqualSpline) || ReferenceEquals(button, btnRepair3DSpline) ||
@@ -7279,6 +7291,7 @@ namespace ADDIN
             UpdateModelMacroButton(btnEdgeToEqualSpline, documentType, "Part");
             UpdateModelMacroButton(btnRepair3DSpline, documentType, "Part");
             UpdateModelMacroButton(btnVCutPropertySetup, documentType, "Part");
+            UpdateModelMacroButton(btnCheckBendMinimum, documentType, "Part hoặc Assembly");
             // CHECK DXF works on files in a folder, independent of the active SW document.
             if (btnCheckDxfMacro != null) btnCheckDxfMacro.Enabled = true;
         }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -58,6 +58,7 @@ namespace ADDIN.UI
             table.SaveRequested += OnSaveRequested;
             table.CloseRequested += OnCloseRequested;
             table.BendSelected += OnBendSelected;
+            table.MinimumSelected += OnMinimumSelected;
             var group = Group(1, "Bend setup / 曲げ・溝設定");
             tableWindow = (PropertyManagerPageWindowFromHandle)Control(group, 11,
                 swPropertyManagerPageControlType_e.swControlType_WindowFromHandle, "Bend table / 曲げ一覧",
@@ -97,6 +98,14 @@ namespace ADDIN.UI
                 if (Interactive) Handle(work);
             }));
         }
+        private void OnMinimumSelected(VCutPropertySetupCommand.BendRow row)
+        {
+            if (!Interactive || row == null) return;
+            int request = ++highlightRequest;
+            table.BeginInvoke((Action)(() => {
+                if (Interactive && request == highlightRequest) Handle(() => command.SelectMinimum(row));
+            }));
+        }
         private void OnBendSelected(VCutPropertySetupCommand.BendRow row)
         {
             if (!Interactive || row == null) return;
@@ -120,7 +129,8 @@ namespace ADDIN.UI
                     errors.Add("Bend " + (i + 1) + ": " +
                         VCutPropertySetupCommand.GetDraftIssueMessage(rows[i], issue));
             }
-            valid = errors.Count == 0;
+            valid = errors.Count == 0 && table.MinimumModelReady;
+            if (!table.MinimumModelReady) errors.Add("Chờ model cập nhật hoặc giải quyết Mark nháp chưa khớp.");
             validationMessage = valid
                 ? "Sẵn sàng. Save / ✓ ghi Mark và cập nhật Custom Property; Close / ✕ đóng bảng."
                 : errors[0] + " (" + errors.Count + " dòng cần kiểm tra).";
@@ -183,6 +193,7 @@ namespace ADDIN.UI
                 table.SaveRequested -= OnSaveRequested;
                 table.CloseRequested -= OnCloseRequested;
                 table.BendSelected -= OnBendSelected;
+                table.MinimumSelected -= OnMinimumSelected;
                 table.ReleaseNativeCommand();
                 table.Dispose();
             }
@@ -200,7 +211,7 @@ namespace ADDIN.UI
                 TableRevision = row.TableRevision,
                 TableThicknessMm = row.TableThicknessMm, TableValueMm = row.TableValueMm,
                 TableError = row.TableError, WrongBendTable = row.WrongBendTable, IsGrooveTable = row.IsGrooveTable,
-                ValueMm = row.ValueMm, OriginalKind = row.OriginalKind, Kind = row.Kind };
+                ValueMm = row.ValueMm, OriginalKind = row.OriginalKind, Kind = row.Kind, MinimumContext = row.MinimumContext, PersistentId = row.PersistentId, DraftConflict = row.DraftConflict };
         }
     }
 
@@ -238,7 +249,8 @@ namespace ADDIN.UI
             {
                 return "Create: select a straight sketch line in a 3D view.\n作成：3Dビュー内の直線を選択。\n" +
                     "Inspect: select one drawing view / 確認：ビューを選択。\n" +
-                    "Set bend marks before section / 先に溝の加工印を設定。\n✓ Run / 実行    ✕ Cancel / 取消";
+                    "Normal bends are supported / 通常曲げも対応。\n" +
+                    "Crossed grooves require marks / 切断する溝は加工印を設定。\n✓ Run / 実行    ✕ Cancel / 取消";
             }
         }
         public override bool OnSubmitSelection(int id, object item, int type, ref string text)

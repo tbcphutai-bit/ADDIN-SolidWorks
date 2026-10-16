@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -202,7 +202,7 @@ namespace ADDIN.Commands
                         continue;
                     }
                     if (Math.Abs(block.CoefficientMm - intendedCoefficientMm) > BendTableToleranceMm) continue;
-                    double? remaining = ReadCanonicalGrooveRemainingThickness(path);
+                    double? remaining = bendTableReader.GetGrooveRemainingThickness(path);
                     double deduction;
                     string detail;
                     if (!block.IsGroove || !remaining.HasValue

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -203,14 +203,19 @@ namespace ADDIN.UI
             {
                 grid.ResumeLayout(true);
                 state.Configuring = false;
+                grid.Invalidate();
             }
         }
 
         private static ColumnFitState ConfigureColumnFitEvents(DataGridView grid)
         {
-            grid.SizeChanged += RefitColumns;
+            grid.SizeChanged += (sender, args) =>
+            {
+                RefitColumns(sender, args);
+                (sender as DataGridView)?.Invalidate();
+            };
+            grid.Scroll += (sender, args) => (sender as DataGridView)?.Invalidate();
             grid.FontChanged += RefitColumns;
-            grid.Layout += (sender, args) => RefitColumns(sender, EventArgs.Empty);
             grid.ColumnAdded += (sender, args) => RefitColumns(sender, EventArgs.Empty);
             grid.ColumnRemoved += (sender, args) => RefitColumns(sender, EventArgs.Empty);
             grid.ColumnStateChanged += (sender, args) =>

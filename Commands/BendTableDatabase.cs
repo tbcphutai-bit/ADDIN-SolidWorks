@@ -21,40 +21,67 @@ namespace ADDIN.Commands
         private static readonly object StoreGate = new object();
         private readonly string root;
         private readonly string databasePath;
+        private readonly string cacheIdentity;
+        private readonly BendStandardProfile standards;
+        private readonly bool customStandards;
+        internal string SourceDirectoryPath => root;
         private readonly Dictionary<string, BendTableWorkbookData> session =
             new Dictionary<string, BendTableWorkbookData>(StringComparer.OrdinalIgnoreCase);
         private BendTableDatabaseDocument document;
         private bool needsSave;
-        private string[] grooveStandardPaths;
 
         internal IEnumerable<string> GetGrooveStandardPaths()
+        { return standards.GrooveFiles.Select(f => f.FilePath).ToArray(); }
+
+        internal double? GetGrooveRemainingThickness(string path)
+        { return standards.RemainingForPath(path); }
+
+        internal string ResolveStandardPath(string canonicalName)
         {
-            if (grooveStandardPaths != null) return grooveStandardPaths;
-            // The shipped catalog identifies approved standards. An arbitrary
-            // user table copied into the folder cannot become its own standard.
-            using (Stream stream = typeof(BendTableDatabase).Assembly
-                .GetManifestResourceStream("ADDIN.BendTables.Default.json"))
-            {
-                if (stream == null) throw new InvalidDataException("Khong tim thay danh muc bang chuan.");
-                BendTableDatabaseDocument catalog;
-                using (var reader = new StreamReader(stream, Encoding.UTF8))
-                    catalog = Deserialize(reader.ReadToEnd());
-                if (catalog == null) throw new InvalidDataException("Danh muc bang chuan khong hop le.");
-                grooveStandardPaths = catalog.Tables.Where(t => string.IsNullOrEmpty(Path.GetDirectoryName(t.RelativePath))
-                    && t.Data != null && t.Data.Blocks.Any(b => b.IsGroove))
-                    .Select(t => Path.Combine(root, t.RelativePath)).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToArray();
-            }
-            return grooveStandardPaths;
+            string path = standards.ResolveCanonicalName(canonicalName);
+            if (path != null || customStandards) return path;
+            return Path.Combine(root, Path.GetFileName(canonicalName));
         }
 
-        internal BendTableDatabase() : this(SourceDirectory, Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ADDIN", "BendTables", "database.json")) { }
+        internal BendTableDatabase() : this(new BendTableStorageSettings().LoadSelection()) { }
+
+        internal BendTableDatabase(BendTableStorageSelection selection)
+            : this(selection.EffectiveSourceDirectory,
+                selection.DatabasePath, selection.EffectiveStandardProfile)
+        {
+            if (!selection.UseCustomStandards) BundledBendStandards.EnsureExported(root);
+        }
 
         internal BendTableDatabase(string sourceDirectory, string storePath)
+            : this(sourceDirectory, storePath, null) { }
+
+        internal BendTableDatabase(string sourceDirectory, string storePath, BendStandardProfile profile)
         {
-            root = Path.GetFullPath(sourceDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            root = BendTableStorageSettings.NormalizeDirectory(sourceDirectory);
             databasePath = Path.GetFullPath(storePath);
+            customStandards = profile != null;
+            standards = profile == null ? BendStandardProfile.CreateDefault(root) : BendStandardProfile.Validate(profile, false);
+            cacheIdentity = profile == null ? root : root + "|profile=" + Hash(Encoding.UTF8.GetBytes(Serializer().Serialize(standards)));
+        }
+
+        internal int SynchronizeStandards()
+        {
+            var failures = new List<string>();
+            var files = standards.MaterialFiles.Select(f => new { f.FilePath, Groove = false })
+                .Concat(standards.GrooveFiles.Select(f => new { f.FilePath, Groove = true }))
+                .GroupBy(f => f.FilePath, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
+            foreach (var file in files)
+            {
+                BendTableWorkbookData data = Read(file.FilePath);
+                if (!data.IsValid) failures.Add(Path.GetFileName(file.FilePath) + ": " + data.Error);
+                else if (data.Blocks.Any(b => b.IsGroove != file.Groove))
+                    failures.Add(Path.GetFileName(file.FilePath) + ": Loai bang khong khop voi nhom da gan.");
+            }
+            if (failures.Count > 0)
+                throw new InvalidDataException("Chua dong bo du bo chuan (" + failures.Count + " file loi). "
+                    + string.Join("; ", failures));
+            if (files.Count == 0) throw new InvalidDataException("Chua chon file Excel chuan.");
+            return files.Count;
         }
 
         internal BendTableWorkbookData Read(string path)
@@ -66,10 +93,12 @@ namespace ADDIN.Commands
             if (session.TryGetValue(normalized, out cached)) return cached;
             try
             {
-                string prefix = root + Path.DirectorySeparatorChar;
-                if (!normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                string prefix = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                bool assigned = standards.MaterialFiles.Any(f => string.Equals(f.FilePath, normalized, StringComparison.OrdinalIgnoreCase))
+                    || standards.GrooveFiles.Any(f => string.Equals(f.FilePath, normalized, StringComparison.OrdinalIgnoreCase));
+                if (customStandards ? !assigned : !normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("Excel chuan nam ngoai thu muc Bend Table.");
-                string relative = normalized.Substring(prefix.Length);
+                string relative = normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? normalized.Substring(prefix.Length) : normalized;
                 byte[] bytes = ReadSource(normalized);
                 string hash = Hash(bytes);
                 lock (StoreGate)
@@ -129,11 +158,11 @@ namespace ADDIN.Commands
                 {
                     using (var reader = new StreamReader(stream, Encoding.UTF8))
                         document = Deserialize(reader.ReadToEnd());
-                    if (document != null && !string.Equals(document.SourceRoot, root, StringComparison.OrdinalIgnoreCase))
+                    if (document != null && !string.Equals(document.SourceRoot, cacheIdentity, StringComparison.OrdinalIgnoreCase))
                         document = null;
                 }
             }
-            if (document == null) document = NewDocument(root);
+            if (document == null) document = NewDocument(cacheIdentity);
             needsSave = true;
         }
 
@@ -145,7 +174,7 @@ namespace ADDIN.Commands
                 var info = new FileInfo(path);
                 if (info.Length > 16000000) return null;
                 BendTableDatabaseDocument data = Deserialize(File.ReadAllText(path, Encoding.UTF8));
-                return data != null && string.Equals(data.SourceRoot, root, StringComparison.OrdinalIgnoreCase) ? data : null;
+                return data != null && string.Equals(data.SourceRoot, cacheIdentity, StringComparison.OrdinalIgnoreCase) ? data : null;
             }
             catch (Exception ex)
             {

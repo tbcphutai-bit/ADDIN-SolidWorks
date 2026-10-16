@@ -141,16 +141,16 @@ namespace ADDIN.UI
         private void PresentResult(DxfCheckResult check, DrawingDxfCheckOptions options)
         {
             previewDxf = previewDrawing = null; preview.Set(null, null);
-            result = check; report.Text = FormatReport(check, options); resultStatus.Text = check.Status == "WARN" ? "WARN — NÉT CẮT" : check.Passed ? "PASS — KHỚP" : "FAIL — CẦN XEM"; resultStatus.ForeColor = check.Status == "WARN" ? Amber : check.Passed ? Green : Red;
+            result = check; report.Text = FormatReport(check, options); resultStatus.Text = check.Status == "CHECK" ? "CHECK — ĐÃ GHÉP BIÊN" : check.Status == "WARN" ? "WARN — NÉT CẮT" : check.Passed ? "PASS — KHỚP" : "FAIL — CẦN XEM"; resultStatus.ForeColor = check.Status == "WARN" || check.Status == "CHECK" ? Amber : check.Passed ? Green : Red;
             SetValue(scaleValue, check.ScaleEvaluated ? (check.ScalePassed ? "PASS · 1:1" : "FAIL · " + check.EstimatedScale.ToString("0.000", CultureInfo.InvariantCulture) + "×") : "CHƯA KIỂM", check.ScaleEvaluated, check.ScalePassed);
             SetValue(outerValue, check.AlignmentFound ? (check.OuterContourPassed ? "PASS" : "FAIL") : "CHƯA KIỂM", check.AlignmentFound, check.OuterContourPassed);
             SetValue(insideValue, check.AlignmentFound ? check.MatchedInsideContours + " / " + check.DrawingInsideContourCount + " khớp" : "CHƯA KIỂM", check.AlignmentFound, check.FailedInsideContours == 0);
             SetValue(deviationValue, check.AlignmentFound ? Number(check.MaximumDeviation) + " mm" : "CHƯA ĐO", check.AlignmentFound, check.MaximumDeviation <= options.ToleranceMm);
-            status.Text = (check.GeometryPassed ? (check.CutQualityPassed ? "DXF khớp Drawing View." : "Hình học khớp; DXF có nét cắt cần sửa.") : "Có " + check.Mismatches.Count + " mục cần đối chiếu.") + " Dung sai " + Number(options.ToleranceMm) + " mm · Bỏ qua " + command.IgnoredEntityCount + " đối tượng theo layer.";
+            status.Text = (check.GeometryPassed ? (check.ReviewRequired ? "Hình học khớp sau khi ghép biên nhỏ; xem các vị trí CHECK." : check.CutQualityPassed ? "DXF khớp Drawing View." : "Hình học khớp; DXF có nét cắt cần sửa.") : "Có " + check.Mismatches.Count + " mục cần đối chiếu.") + " Dung sai " + Number(options.ToleranceMm) + " mm · Bỏ qua " + command.IgnoredEntityCount + " đối tượng theo layer.";
             errors.Rows.Clear();
             foreach (var m in check.Mismatches)
             {
-                int index = errors.Rows.Add("ERR-" + m.Id.ToString("00"), MismatchName(m.Type), Number(m.Deviation), (m.CutQualityIssue ? "[NÉT CẮT] " : "[HÌNH HỌC] ") + m.Description,
+                int index = errors.Rows.Add((m.ReviewIssue ? "CHECK-" : "ERR-") + m.Id.ToString("00"), MismatchName(m.Type), Number(m.Deviation), (m.ReviewIssue ? "[CHECK] " : m.CutQualityIssue ? "[NÉT CẮT] " : "[HÌNH HỌC] ") + m.Description,
                     m.HasDrawingPosition ? Number(m.DrawingPosition.X) : "—", m.HasDrawingPosition ? Number(m.DrawingPosition.Y) : "—",
                     m.HasDxfPosition ? Number(m.DxfPosition.X) : "—", m.HasDxfPosition ? Number(m.DxfPosition.Y) : "—"); errors.Rows[index].Tag = m;
             }
@@ -195,6 +195,10 @@ namespace ADDIN.UI
             // DxfPreview renders this supplied identity transform; it never fits geometry.
             preview.SetComparison(previewDxf, new DxfPartComparison { First = previewDxf, Second = previewDrawing, SecondToFirst = DxfTransform.Identity,
                 Exact = !located, DifferenceA = dxfPoint, DifferenceB = drawingPoint, MaxBoundaryGap = located ? mismatch.Deviation : 0 }, zoomToError && located);
+            preview.ComparisonMarkerLabel = mismatch != null && mismatch.ReviewIssue ? "CHECK-" + mismatch.Id.ToString("00") : "Khác";
+            preview.ComparisonMarkerIsCheck = mismatch != null && mismatch.ReviewIssue;
+            preview.SetCheckLocations(result.Mismatches.Where(m => m.ReviewIssue && (m.HasDrawingPosition || m.HasDxfPosition))
+                .Select(m => new KeyValuePair<DxfPoint, string>(m.HasDrawingPosition ? m.DrawingPosition : m.DxfPosition, "CHECK-" + m.Id.ToString("00"))));
         }
         private string FormatReport(DxfCheckResult check, DrawingDxfCheckOptions options)
         {
@@ -211,7 +215,8 @@ namespace ADDIN.UI
             text.AppendLine("Inside contours — Drawing: " + check.DrawingInsideContourCount + "; DXF: " + check.DxfInsideContourCount + (check.AlignmentFound ? "; Matched: " + check.MatchedInsideContours + "; Failed: " + check.FailedInsideContours : "; NOT CHECKED"));
             text.AppendLine("Maximum measured deviation: " + (check.AlignmentFound ? Number(check.MaximumDeviation) + " mm" : "NOT MEASURED"));
             text.AppendLine("Geometry: " + (check.GeometryPassed ? "PASS" : "FAIL"));
-            text.AppendLine("Cut quality: " + (check.CutQualityPassed ? "PASS" : "WARN"));
+            text.AppendLine("Cut quality: " + (check.ReviewRequired ? "CHECK" : check.CutQualityPassed ? "PASS" : "WARN"));
+            text.AppendLine("Joined/near-overlap locations: " + (check.ReviewRequired ? "CHECK" : "NONE"));
             if (check.Source != null)
             {
                 text.AppendLine("Configuration: " + check.Source.Configuration);
@@ -222,7 +227,7 @@ namespace ADDIN.UI
             }
             foreach (var m in check.Mismatches)
             {
-                text.AppendLine(); text.AppendLine("ERR-" + m.Id.ToString("00") + " — " + m.Type); text.AppendLine(m.Description);
+                text.AppendLine(); text.AppendLine((m.ReviewIssue ? "CHECK-" : "ERR-") + m.Id.ToString("00") + " — " + m.Type); text.AppendLine(m.Description);
                 if (m.HasDrawingPosition) text.AppendLine("Drawing position: " + Number(m.DrawingPosition.X) + ", " + Number(m.DrawingPosition.Y));
                 if (m.HasDxfPosition) text.AppendLine("DXF position (translation applied): " + Number(m.DxfPosition.X) + ", " + Number(m.DxfPosition.Y)); text.AppendLine("Deviation: " + Number(m.Deviation) + " mm");
             }

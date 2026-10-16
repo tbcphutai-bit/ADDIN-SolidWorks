@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 using ADDIN.Commands;
@@ -13,8 +13,8 @@ namespace ADDIN
     {
         private const string StatusConnected = "Đã kết nối SOLIDWORKS", StatusWaiting = "Đang chờ kết nối SOLIDWORKS…";
         private bool drawingCommandLayoutInProgress, modelMacroLayoutInProgress;
-        private Button btnToggleCommands;
-        private bool bomCommandsCollapsed;
+        private ModernButton btnToggleSheetMetal, btnToggleAssemblyDrawing;
+        private bool bomSheetMetalCollapsed, bomAssemblyDrawingCollapsed;
         private ModernCard cardMacroCommands, cardInspectionMonitor;
         private ModernButton btnClearInspection;
         private RichTextBox modelInspectionReport;
@@ -47,18 +47,20 @@ namespace ADDIN
         // the card needs.
         private int LayoutTiles(Button[] tiles, int cardWidth, int tileHeight)
         {
-            int pad = CommandPixels(TaiTheme.CardPadding), gap = CommandPixels(6), top = CommandPixels(TaiTheme.CardHeader);
+            int pad = CommandPixels(TaiTheme.CardPadding), gap = CommandPixels(6), top = CommandPixels(TaiTheme.CardHeader) + CommandPixels(6);
             int inner = Math.Max(1, cardWidth - pad * 2);
-            int columns = inner >= CommandPixels(360) ? 2 : 1;
+            int columns = inner >= CommandPixels(200) ? 2 : 1;
             int width = (inner - gap * (columns - 1)) / columns;
+            var activeTiles = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Where(tiles, t => t != null));
             int index = 0;
-            foreach (Button tile in tiles)
+            for (int i = 0; i < activeTiles.Length; i++)
             {
-                if (tile == null) continue;
+                Button tile = activeTiles[i];
                 int column = index % columns, row = index / columns;
                 int left = pad + column * (width + gap);
-                SetCommandBounds(tile, left, top + row * (tileHeight + gap),
-                    column == columns - 1 ? pad + inner - left : width, tileHeight);
+                bool lastOdd = columns == 2 && column == 0 && i == activeTiles.Length - 1;
+                int tileW = lastOdd ? inner : (column == columns - 1 ? pad + inner - left : width);
+                SetCommandBounds(tile, left, top + row * (tileHeight + gap), tileW, tileHeight);
                 index++;
             }
             int rows = (index + columns - 1) / columns;
@@ -110,26 +112,86 @@ namespace ADDIN
                 lblBomCount = new Label { Name = "lblBomCount", AutoSize = false, TextAlign = ContentAlignment.MiddleRight };
                 tabDrawingBom.Controls.Add(lblBomCount);
             }
-            foreach (Button tile in new Button[] { btnCheckDfTk, btnCheckAll, btnCheckRound, btnCheckSamePart, btnCheckDxf, btnStandaloneCurveMacro, btnExportBomDxf })
+            if (btnStandaloneCurveMacro != null)
+            {
+                btnStandaloneCurveMacro.Visible = false;
+                cardSheetMetal?.Controls.Remove(btnStandaloneCurveMacro);
+                tabDrawingBom?.Controls.Remove(btnStandaloneCurveMacro);
+            }
+            if (btnDxfSource != null)
+            {
+                btnDxfSource.Visible = false;
+                cardSheetMetal?.Controls.Remove(btnDxfSource);
+                tabDrawingBom?.Controls.Remove(btnDxfSource);
+            }
+            foreach (Button tile in new Button[] { btnCheckDfTk, btnCheckAll, btnCheckRound, btnCheckSamePart, btnCheckDxf, btnExportBomDxf })
                 MoveControlToCard(tile, cardSheetMetal);
             foreach (Button tile in new Button[] { button2, btnOpenAssem, btnCheckBalloon, btnCheckDrawingBom })
                 MoveControlToCard(tile, cardAssemblyDrawing);
-            if (btnToggleCommands != null) return;
+            if (btnToggleSheetMetal != null && btnToggleAssemblyDrawing != null) return;
 
             cardSheetMetal.Text = "Kiểm tra chi tiết";
             cardAssemblyDrawing.Text = "Cụm lắp ráp & bản vẽ";
             WatchDisabledTiles(cardSheetMetal);
             WatchDisabledTiles(cardAssemblyDrawing);
 
-            btnToggleCommands = new ModernButton { Name = "btnToggleCommands", Kind = ModernButtonKind.Subtle, Icon = TaiIcon.ChevronUp, Text = "Thu gọn", TabStop = false };
-            btnToggleCommands.Click += (s, e) =>
+            if (btnToggleSheetMetal == null)
             {
-                bomCommandsCollapsed = !bomCommandsCollapsed;
-                btnToggleCommands.Text = bomCommandsCollapsed ? "Hiện lệnh" : "Thu gọn";
-                ((ModernButton)btnToggleCommands).Icon = bomCommandsCollapsed ? TaiIcon.ChevronDown : TaiIcon.ChevronUp;
-                LayoutDrawingBomCommands();
-            };
-            tabDrawingBom.Controls.Add(btnToggleCommands);
+                btnToggleSheetMetal = new ModernButton
+                {
+                    Name = "btnToggleSheetMetal",
+                    Kind = ModernButtonKind.Subtle,
+                    Icon = TaiIcon.ChevronUp,
+                    Text = "Thu gọn",
+                    TabStop = false
+                };
+                btnToggleSheetMetal.Click += (s, e) =>
+                {
+                    bomSheetMetalCollapsed = !bomSheetMetalCollapsed;
+                    LayoutDrawingBomCommands();
+                };
+                cardSheetMetal.Controls.Add(btnToggleSheetMetal);
+                cardSheetMetal.MouseDown += (s, e) =>
+                {
+                    if (e.Button == MouseButtons.Left && e.Y <= CommandPixels(TaiTheme.CardHeader))
+                    {
+                        if (cardSheetMetal.GetChildAtPoint(e.Location) == null)
+                        {
+                            bomSheetMetalCollapsed = !bomSheetMetalCollapsed;
+                            LayoutDrawingBomCommands();
+                        }
+                    }
+                };
+            }
+
+            if (btnToggleAssemblyDrawing == null)
+            {
+                btnToggleAssemblyDrawing = new ModernButton
+                {
+                    Name = "btnToggleAssemblyDrawing",
+                    Kind = ModernButtonKind.Subtle,
+                    Icon = TaiIcon.ChevronUp,
+                    Text = "Thu gọn",
+                    TabStop = false
+                };
+                btnToggleAssemblyDrawing.Click += (s, e) =>
+                {
+                    bomAssemblyDrawingCollapsed = !bomAssemblyDrawingCollapsed;
+                    LayoutDrawingBomCommands();
+                };
+                cardAssemblyDrawing.Controls.Add(btnToggleAssemblyDrawing);
+                cardAssemblyDrawing.MouseDown += (s, e) =>
+                {
+                    if (e.Button == MouseButtons.Left && e.Y <= CommandPixels(TaiTheme.CardHeader))
+                    {
+                        if (cardAssemblyDrawing.GetChildAtPoint(e.Location) == null)
+                        {
+                            bomAssemblyDrawingCollapsed = !bomAssemblyDrawingCollapsed;
+                            LayoutDrawingBomCommands();
+                        }
+                    }
+                };
+            }
 
             if (lblTitle != null) lblTitle.Visible = false;
             if (lblBomBadge != null) lblBomBadge.Visible = false;
@@ -160,21 +222,14 @@ namespace ADDIN
             tabDrawingBom.SuspendLayout();
             try
             {
-                Point previousScroll = tabDrawingBom.AutoScrollPosition;
-                int viewportWidth = tabDrawingBom.ClientSize.Width +
-                    (tabDrawingBom.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0);
-                int viewportHeight = tabDrawingBom.ClientSize.Height;
                 tabDrawingBom.AutoScroll = false;
                 tabDrawingBom.AutoScrollMinSize = Size.Empty;
                 tabDrawingBom.AutoScrollPosition = Point.Empty;
-                int requiredHeight = LayoutDrawingBomViewport(viewportWidth, viewportHeight);
-                bool scroll = requiredHeight > viewportHeight;
-                if (scroll) requiredHeight = LayoutDrawingBomViewport(
-                    Math.Max(1, viewportWidth - SystemInformation.VerticalScrollBarWidth), viewportHeight);
-                tabDrawingBom.AutoScroll = scroll;
-                tabDrawingBom.AutoScrollMinSize = scroll ? new Size(0, requiredHeight) : Size.Empty;
-                if (scroll) tabDrawingBom.AutoScrollPosition = new Point(0, Math.Max(0, -previousScroll.Y));
+                int viewportWidth = tabDrawingBom.ClientSize.Width;
+                int viewportHeight = tabDrawingBom.ClientSize.Height;
+                LayoutDrawingBomViewport(viewportWidth, viewportHeight);
                 actions?.AutoFitBomGrid();
+                dgvModelBom.Invalidate();
             }
             finally
             {
@@ -192,31 +247,46 @@ namespace ADDIN
             int width = Math.Max(1, viewportWidth - margin * 2);
             bool exporting = IsBomDxfExportPaneOpen;
 
-            // 1. Status line and the switch that folds the command cards away.
+            // 1. Status line (Full width now that toggles are on each card)
             if (string.IsNullOrWhiteSpace(lblStatus.Text) || lblStatus.Text == StatusConnected || lblStatus.Text == StatusWaiting ||
                 lblStatus.Text.StartsWith("●", StringComparison.Ordinal) || lblStatus.Text.StartsWith("○", StringComparison.Ordinal))
                 lblStatus.Text = swApp != null ? StatusConnected : StatusWaiting;
-            int row = CommandPixels(24), toggleWidth = exporting ? 0 : CommandPixels(92);
+            int row = CommandPixels(24);
             int top = CommandPixels(6);
-            btnToggleCommands.Visible = !exporting;
-            SetCommandBounds(btnToggleCommands, viewportWidth - margin - toggleWidth, top, toggleWidth, row);
-            SetCommandBounds(lblStatus, margin + CommandPixels(2), top, Math.Max(1, width - toggleWidth - CommandPixels(6)), row);
+            SetCommandBounds(lblStatus, margin + CommandPixels(2), top, Math.Max(1, width - CommandPixels(4)), row);
             int next = top + row + CommandPixels(6);
 
-            // 2. Command cards. Two-line tiles when the pane is tall enough to
-            //    leave the BOM grid its room, one-line tiles otherwise.
-            bool showCommands = !bomCommandsCollapsed && !exporting;
-            cardSheetMetal.Visible = cardAssemblyDrawing.Visible = showCommands;
-            if (showCommands)
+            // 2. Command cards. Two cards collapsible independently!
+            cardSheetMetal.Visible = cardAssemblyDrawing.Visible = !exporting;
+            if (!exporting)
             {
-                int tileHeight = CommandPixels(viewportHeight >= CommandPixels(700) ? 46 : 30);
-                int height = LayoutTiles(new Button[] { btnCheckDfTk, btnCheckAll, btnCheckRound, btnCheckSamePart,
-                    btnCheckDxf, btnStandaloneCurveMacro, btnExportBomDxf }, width, tileHeight);
-                SetCommandBounds(cardSheetMetal, margin, next, width, height);
-                next += height + gap;
-                height = LayoutTiles(new Button[] { button2, btnOpenAssem, btnCheckBalloon, btnCheckDrawingBom }, width, tileHeight);
-                SetCommandBounds(cardAssemblyDrawing, margin, next, width, height);
-                next += height + gap;
+                int tileHeight = CommandPixels(32);
+                int headerHeight = CommandPixels(TaiTheme.CardHeader);
+
+                // Card 1: Sheet metal (Kiểm tra chi tiết)
+                if (btnStandaloneCurveMacro != null) btnStandaloneCurveMacro.Visible = false;
+                if (btnDxfSource != null) btnDxfSource.Visible = false;
+                Button[] sheetMetalTiles = { btnCheckDfTk, btnCheckAll, btnCheckRound, btnCheckSamePart,
+                    btnCheckDxf, btnExportBomDxf };
+                foreach (Button tile in sheetMetalTiles)
+                    if (tile != null) tile.Visible = !bomSheetMetalCollapsed;
+                int height1 = bomSheetMetalCollapsed
+                    ? headerHeight + CommandPixels(2)
+                    : LayoutTiles(sheetMetalTiles, width, tileHeight);
+                SetCommandBounds(cardSheetMetal, margin, next, width, height1);
+                LayoutCardHeaderToggle(cardSheetMetal, btnToggleSheetMetal, bomSheetMetalCollapsed, width);
+                next += height1 + gap;
+
+                // Card 2: Assembly & Drawing (Cụm lắp ráp & bản vẽ)
+                Button[] assemblyTiles = { button2, btnOpenAssem, btnCheckBalloon, btnCheckDrawingBom };
+                foreach (Button tile in assemblyTiles)
+                    if (tile != null) tile.Visible = !bomAssemblyDrawingCollapsed;
+                int height2 = bomAssemblyDrawingCollapsed
+                    ? headerHeight + CommandPixels(2)
+                    : LayoutTiles(assemblyTiles, width, tileHeight);
+                SetCommandBounds(cardAssemblyDrawing, margin, next, width, height2);
+                LayoutCardHeaderToggle(cardAssemblyDrawing, btnToggleAssemblyDrawing, bomAssemblyDrawingCollapsed, width);
+                next += height2 + gap;
             }
 
             // 3. Select-all row, progress line, then the grid (or the DXF export pane).
@@ -231,19 +301,18 @@ namespace ADDIN
             if (progressCheck != null) SetCommandBounds(progressCheck, margin, progressTop, width, CommandPixels(3));
             int gridTop = exporting ? next : progressTop + CommandPixels(7);
 
-            // 4. Footer: load, clear, stop.
+            // 4. Footer: load, clear, stop. Pinned at the bottom of the viewport!
             Button[] footer = { btnLoadBom, btnClearBom, button1 };
             int footerHeight = CommandPixels(32), footerGap = CommandPixels(6);
             int footerWidth = Math.Max(1, (width - footerGap * 2) / 3);
-            int minimumContent = CommandPixels(exporting ? 600 : 120);
-            int requiredHeight = gridTop + minimumContent + gap + footerHeight + margin;
-            int footerTop = Math.Max(gridTop + minimumContent + gap, viewportHeight - margin - footerHeight);
+            int footerTop = Math.Max(gridTop + CommandPixels(40), viewportHeight - margin - footerHeight);
+            int gridHeight = Math.Max(CommandPixels(40), footerTop - gridTop - gap);
 
-            SetCommandBounds(dgvModelBom, margin, gridTop, width, footerTop - gridTop - gap);
+            SetCommandBounds(dgvModelBom, margin, gridTop, width, gridHeight);
             dgvModelBom.Visible = !exporting;
             if (exporting)
             {
-                SetCommandBounds(bomDxfExportPane, margin, gridTop, width, footerTop - gridTop - gap);
+                SetCommandBounds(bomDxfExportPane, margin, gridTop, width, gridHeight);
                 bomDxfExportPane.BringToFront();
             }
             for (int n = 0; n < footer.Length; n++)
@@ -251,7 +320,20 @@ namespace ADDIN
                 int left = margin + n * (footerWidth + footerGap);
                 SetCommandBounds(footer[n], left, footerTop, n == footer.Length - 1 ? margin + width - left : footerWidth, footerHeight);
             }
-            return requiredHeight;
+            return viewportHeight;
+        }
+
+        private void LayoutCardHeaderToggle(ModernCard card, ModernButton toggle, bool collapsed, int cardWidth)
+        {
+            if (card == null || toggle == null) return;
+            int pad = CommandPixels(TaiTheme.CardPadding);
+            bool narrow = cardWidth < CommandPixels(320);
+            int toggleWidth = CommandPixels(narrow ? 30 : 84);
+            toggle.Text = narrow ? string.Empty : (collapsed ? "Hiện lệnh" : "Thu gọn");
+            toggle.Icon = collapsed ? TaiIcon.ChevronDown : TaiIcon.ChevronUp;
+            toggle.Visible = true;
+            SetCommandBounds(toggle, cardWidth - pad - toggleWidth, CommandPixels(5), toggleWidth, CommandPixels(24));
+            toggle.BringToFront();
         }
 
         private void LayoutModelMacroCommands()
@@ -284,16 +366,41 @@ namespace ADDIN
         }
 
         private const string InspectionPlaceholder = "Chưa có kết quả.\r\nChạy một lệnh ở trên, báo cáo sẽ hiện tại đây.";
+        private ModernButton btnToggleMacroCommands;
+        private bool macroCommandsCollapsed;
+        private Control checkHoleResultsView;
+
+        internal void SetModelMacroCommandsCollapsed(bool collapsed)
+        {
+            macroCommandsCollapsed = collapsed;
+            if (btnToggleMacroCommands != null)
+            {
+                btnToggleMacroCommands.Text = macroCommandsCollapsed ? "Hiện lệnh" : "Thu gọn";
+                btnToggleMacroCommands.Icon = macroCommandsCollapsed ? TaiIcon.ChevronDown : TaiIcon.ChevronUp;
+            }
+            LayoutModelMacroCommands();
+        }
 
         private void EnsureModelMacroControls()
         {
+            EnsureBendMinimumButton();
             if (tabModelMacroPage == null || cardMacroCommands != null) return;
 
             cardMacroCommands = new ModernCard { Name = "cardMacroCommands", Text = "Lệnh macro" };
             tabModelMacroPage.Controls.Add(cardMacroCommands);
             foreach (Button tile in new Button[] { btnCheckAssemblyHole, btnMirrorPart, btnEdgeToEqualSpline,
-                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro })
+                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum })
                 MoveControlToCard(tile, cardMacroCommands);
+            btnToggleMacroCommands = new ModernButton
+            {
+                Name = "btnToggleMacroCommands",
+                Kind = ModernButtonKind.Subtle,
+                Icon = TaiIcon.ChevronUp,
+                Text = "Thu gọn",
+                TabStop = false
+            };
+            btnToggleMacroCommands.Click += (s, e) => SetModelMacroCommandsCollapsed(!macroCommandsCollapsed);
+            cardMacroCommands.Controls.Add(btnToggleMacroCommands);
             WatchDisabledTiles(cardMacroCommands);
 
             cardInspectionMonitor = new ModernCard { Name = "cardInspectionMonitor", Text = "Kết quả kiểm tra" };
@@ -315,7 +422,6 @@ namespace ADDIN
                 lblCheckAssemblyHoleResult.Text = InspectionPlaceholder;
                 lblCheckAssemblyHoleResult.TextAlign = ContentAlignment.MiddleCenter;
             }
-            // The vCut table covers this page while it is open.
             if (vCutBendAssignmentControl != null) vCutBendAssignmentControl.BringToFront();
         }
 
@@ -324,14 +430,45 @@ namespace ADDIN
             if (IsDisposed || Disposing) return;
             if (InvokeRequired) { BeginInvoke((Action)(() => ShowModelInspectionReport(text))); return; }
             EnsureModelMacroControls();
+            if (checkHoleResultsView != null && !checkHoleResultsView.IsDisposed) checkHoleResultsView.Visible = false;
+            if (vCutBendAssignmentControl != null && vCutBendAssignmentControl.Visible)
+            {
+                vCutBendAssignmentControl.Visible = false;
+                LayoutModelMacroCommands();
+            }
             modelInspectionReport.Text = text ?? string.Empty;
             modelInspectionReport.Bounds = lblCheckAssemblyHoleResult.Bounds;
             lblCheckAssemblyHoleResult.Visible = false; modelInspectionReport.Visible = true;
             modelInspectionReport.BringToFront();
         }
 
+        private void ShowCheckHoleResultsView(Control view)
+        {
+            if (IsDisposed || Disposing || view == null || view.IsDisposed) return;
+            if (InvokeRequired) { BeginInvoke((Action)(() => ShowCheckHoleResultsView(view))); return; }
+            EnsureModelMacroControls();
+            checkHoleResultsView = view;
+            cardInspectionMonitor.Controls.Add(view);
+            view.Bounds = lblCheckAssemblyHoleResult.Bounds;
+            lblCheckAssemblyHoleResult.Visible = false;
+            modelInspectionReport.Visible = false;
+            view.Show(); view.BringToFront();
+        }
+
+        private void ShowCheckHoleInspectionReport(string text)
+        {
+            if (IsDisposed || Disposing) return;
+            if (InvokeRequired) { BeginInvoke((Action)(() => ShowCheckHoleInspectionReport(text))); return; }
+            ShowModelInspectionReport(text);
+            if (checkHoleResultsView == null || checkHoleResultsView.IsDisposed) return;
+            modelInspectionReport.Visible = false;
+            checkHoleResultsView.Visible = true;
+            checkHoleResultsView.BringToFront();
+        }
+
         private void ClearModelInspectionReport()
         {
+            if (checkHoleResultsView != null && !checkHoleResultsView.IsDisposed) checkHoleResultsView.Visible = false;
             if (modelInspectionReport != null) { modelInspectionReport.Clear(); modelInspectionReport.Visible = false; }
             if (lblCheckAssemblyHoleResult != null) lblCheckAssemblyHoleResult.Visible = true;
         }
@@ -344,19 +481,42 @@ namespace ADDIN
             int margin = CommandPixels(8), gap = CommandPixels(8);
             int width = Math.Max(1, viewportWidth - margin * 2);
             int top = CommandPixels(8);
+            int pad = CommandPixels(TaiTheme.CardPadding), header = CommandPixels(TaiTheme.CardHeader);
+            bool vCutOpen = vCutBendAssignmentControl != null && vCutBendAssignmentControl.Visible;
 
-            int height = LayoutTiles(new Button[] { btnCheckAssemblyHole, btnMirrorPart, btnEdgeToEqualSpline,
-                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro }, width, CommandPixels(44));
+            Button[] macroTiles = { btnCheckAssemblyHole, btnMirrorPart, btnEdgeToEqualSpline,
+                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum };
+            foreach (Button tile in macroTiles)
+                if (tile != null) tile.Visible = !macroCommandsCollapsed;
+
+            int toggleWidth = CommandPixels(108);
+            SetCommandBounds(btnToggleMacroCommands, width - pad - toggleWidth, CommandPixels(5), toggleWidth, CommandPixels(24));
+
+            int height = macroCommandsCollapsed
+                ? header + CommandPixels(2)
+                : LayoutTiles(macroTiles, width, CommandPixels(44));
             SetCommandBounds(cardMacroCommands, margin, top, width, height);
 
             int monitorTop = top + height + gap;
-            int monitorHeight = Math.Max(CommandPixels(160), viewportHeight - monitorTop - margin);
-            SetCommandBounds(cardInspectionMonitor, margin, monitorTop, width, monitorHeight);
-            int pad = CommandPixels(TaiTheme.CardPadding), header = CommandPixels(TaiTheme.CardHeader), clearWidth = CommandPixels(58);
-            SetCommandBounds(btnClearInspection, width - pad - clearWidth + CommandPixels(4), CommandPixels(4), clearWidth, CommandPixels(24));
-            Rectangle body = new Rectangle(pad, header, Math.Max(1, width - pad * 2), Math.Max(1, monitorHeight - header - pad));
-            SetCommandBounds(lblCheckAssemblyHoleResult, body.X, body.Y, body.Width, body.Height);
-            SetCommandBounds(modelInspectionReport, body.X, body.Y, body.Width, body.Height);
+            int minWorkspaceHeight = CommandPixels(vCutOpen ? 280 : 160);
+            int monitorHeight = Math.Max(minWorkspaceHeight, viewportHeight - monitorTop - margin);
+
+            cardInspectionMonitor.Visible = !vCutOpen;
+            if (vCutOpen)
+            {
+                SetCommandBounds(vCutBendAssignmentControl, margin, monitorTop, width, monitorHeight);
+                vCutBendAssignmentControl.BringToFront();
+            }
+            else
+            {
+                SetCommandBounds(cardInspectionMonitor, margin, monitorTop, width, monitorHeight);
+                int clearWidth = CommandPixels(64);
+                SetCommandBounds(btnClearInspection, width - pad - clearWidth, CommandPixels(5), clearWidth, CommandPixels(24));
+                Rectangle body = new Rectangle(pad, header + CommandPixels(6), Math.Max(1, width - pad * 2), Math.Max(1, monitorHeight - header - pad - CommandPixels(6)));
+                SetCommandBounds(lblCheckAssemblyHoleResult, body.X, body.Y, body.Width, body.Height);
+                SetCommandBounds(modelInspectionReport, body.X, body.Y, body.Width, body.Height);
+                SetCommandBounds(checkHoleResultsView, body.X, body.Y, body.Width, body.Height);
+            }
             return monitorTop + monitorHeight + margin;
         }
     }

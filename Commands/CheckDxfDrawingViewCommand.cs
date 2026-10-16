@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -70,18 +70,18 @@ namespace ADDIN.Commands.DxfChecking
             var source = DrawingComparisonSource.Capture(Drawing, View, path, SheetName);
             DrawingViewPreparation.Prepare(Drawing, View, source);
             var extractor = new FlatDrawingViewGeometryExtractor();
-            var reference = extractor.Extract(View);
+            var reference = extractor.Extract(View, app, Drawing);
             DisplayScale = View.ScaleDecimal;
             var exported = new DxfGeometryReader().Read(path, options.IgnoredDxfLayers, out int ignored);
             IgnoredEntityCount = ignored;
+            // The result window draws the same geometry used by this comparison.
+            // Set before ContourMatcher.Check so preview remains inspectable on error.
+            PreviewDrawingEdges = reference.AsReadOnly();
+            PreviewDxfEdges = exported.AsReadOnly();
             var result = ContourMatcher.Check(reference, exported, options);
             source.VerifySavedFiles();
             result.Source = source; result.Normalization = extractor.Normalization;
             comparedBuffer = extractor.LastBuffer;
-            // The result window draws the same geometry used by this comparison.
-            // Preview alignment is restricted to the result's X/Y translation.
-            PreviewDrawingEdges = reference.AsReadOnly();
-            PreviewDxfEdges = exported.AsReadOnly();
             return result;
         }
 

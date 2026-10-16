@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -23,7 +23,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
         // The run's report and Check DXF output go to <ReportFolder>\CHECK_DXF_OUTPUT\<run>, so the DXF folder
         // holds DXF files only. Empty: inside TargetFolder, as before.
         public string ReportFolder;
-        public bool IncludeBendLines = true;
+        public bool IncludeBendLines = false;
         public bool IncludeLaserMarks = true;
         public bool RecognizeFeatureMarks = true;
         public bool KeepDrawingMarkSketches = true;
@@ -58,15 +58,17 @@ namespace ADDIN.Commands.DrawingDxfExporting
         {
             string text;
             switch (name) {
+                case "update drawing flat": text = "Cập nhật cấu hình trải và Drawing"; break;
+                case "verify complete DXF geometry": text = "Kiểm biên dạng / lỗ / MARK / tỉ lệ 1:1"; break;
                 case "read view identity": text = "Đọc hướng view Flat Pattern"; break;
                 case "open drawing copy": text = "Mở bản sao Drawing"; break;
                 case "keep flat-pattern view on copy": text = "Giữ riêng view Flat Pattern"; break;
-                case "read model semantics": text = "Đọc nét cắt / uốn / vạch dấu của view"; break;
+                case "read model semantics": text = "Đọc đường thấy / vạch dấu của view"; break;
                 case "disable model colors": text = "Tắt màu model trên bản sao"; break;
                 case "prepare copy for raw export": text = "Bỏ khung tên / kích thước / chú thích"; break;
                 case "save raw DXF": text = "Lưu hình học Drawing view sang DXF"; break;
                 case "close drawing copy": text = "Đóng bản sao Drawing"; break;
-                case "place semantic layers": text = "Đặt layer CUT / BEND / LASER_MARK"; break;
+                case "place semantic layers": text = "Giữ đường thấy CUT / LASER_MARK"; break;
                 case "finalize DXF layers": text = "Chuẩn hóa layer DXF"; break;
                 case "confirm exported Drawing View": text = "Đối chiếu hướng DXF với Drawing view"; break;
                 case "view identity gate (log only)": text = "Đối chiếu hướng DXF với Drawing view"; break;

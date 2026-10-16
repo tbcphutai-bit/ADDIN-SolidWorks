@@ -15,9 +15,10 @@ namespace ADDIN.Commands
     /// Kiem tra do dong tam cua cac lo thuoc nhieu component trong Assembly.
     /// Lenh chi tao mot 3D Sketch tren Assembly de danh dau NG, khong sua Part.
     /// </summary>
-    public sealed class CheckAssemblyHole
+    public sealed partial class CheckAssemblyHole
     {
         private const string MarkerFeaturePrefix = "CHECK-HOLE-NG";
+        private const string CheckHoleEngineVersion = "2026.10.16-missing-hole-4";
         private const double PositionToleranceM = 0.00010;       // 0.10 mm
         private const double AngleToleranceDeg = 0.20;
         private const double SearchPositionToleranceM = 0.0030; // 3.00 mm
@@ -131,6 +132,10 @@ namespace ADDIN.Commands
             public long RebuildGraphicsMs;
             public long FinalSummaryUiMs;
             public long DebugLoggingMs = 0;
+            public long ReportBuildMs;
+            public long StateCaptureMs;
+            public long EdgePointApiCalls;
+            public long EdgePointCacheHits;
 
             public long ComponentGetBodiesCalls;
             public long FaceEnumerationCalls;
@@ -157,6 +162,7 @@ namespace ADDIN.Commands
 
         public void Run()
         {
+            if (running || closeRequested) return;
             RunProfile profile = new RunProfile();
             activeProfile = profile;
             Stopwatch runWatch = Stopwatch.StartNew();
@@ -169,11 +175,6 @@ namespace ADDIN.Commands
                 validationWatch.Stop();
                 profile.ValidationMs = validationWatch.ElapsedMilliseconds;
                 PublishResultText("Hay mo Assembly can kiem tra truoc khi chay CHECK HOLE.");
-                MessageBox.Show(
-                    "Hay mo Assembly can kiem tra truoc khi chay CHECK HOLE.",
-                    "CHECK HOLE",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
                 runWatch.Stop();
                 WriteRunProfile(profile, runWatch.ElapsedMilliseconds);
                 activeProfile = null;
@@ -185,11 +186,6 @@ namespace ADDIN.Commands
                 validationWatch.Stop();
                 profile.ValidationMs = validationWatch.ElapsedMilliseconds;
                 PublishResultText("Hay thoat khoi Sketch dang edit truoc khi chay CHECK HOLE.");
-                MessageBox.Show(
-                    "Hay thoat khoi Sketch dang edit truoc khi chay CHECK HOLE.",
-                    "CHECK HOLE",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
                 runWatch.Stop();
                 WriteRunProfile(profile, runWatch.ElapsedMilliseconds);
                 activeProfile = null;
@@ -199,19 +195,33 @@ namespace ADDIN.Commands
             validationWatch.Stop();
             profile.ValidationMs = validationWatch.ElapsedMilliseconds;
 
+            running = true;
+            cancelRequested = false;
+            lastReport = null; reportModel = null; reportState = null;
+            markerRows.Clear(); reportComponents.Clear();
+            missingPatternBodies.Clear();
+            skippedPatternHoles.Clear();
             Cursor previousCursor = Cursor.Current;
             bool oldCommandInProgress = false;
+            bool hasOldCommandInProgress = false;
             try
             {
+                EnsureResultsForm();
+                EnableDiagnostics = resultsForm.DiagnosticEnabled;
+                AutoCreateMarkers = resultsForm.AutoMarkersEnabled;
+                resultsForm.BeginRun();
                 Cursor.Current = Cursors.WaitCursor;
                 try
                 {
                     oldCommandInProgress = swApp.CommandInProgress;
+                    hasOldCommandInProgress = true;
                     swApp.CommandInProgress = true;
                 }
                 catch { }
 
                 Debug.WriteLine("[CHECK HOLE ASSY] ===== RUN START =====");
+                Debug.WriteLine("[CHECK HOLE ASSY] ENGINE_VERSION=" + CheckHoleEngineVersion
+                    + ", missingHoleCheck=True, MVID=" + typeof(CheckAssemblyHole).Assembly.ManifestModule.ModuleVersionId);
                 Debug.WriteLine("[CHECK HOLE ASSY] assembly=" + SafeModelTitle(model)
                     + ", configuration=" + SafeConfigurationName(model));
                 Debug.WriteLine("[CHECK HOLE ASSY] tolerance position="
@@ -230,30 +240,25 @@ namespace ADDIN.Commands
                     profile.ResolveMs = resolveWatch.ElapsedMilliseconds;
                     Debug.WriteLine("[CHECK HOLE ASSY] RESOLVE aborted: " + resolveError);
                     PublishResultText(resolveError);
-                    MessageBox.Show(
-                        resolveError,
-                        "CHECK HOLE",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
                     return;
                 }
                 resolveWatch.Stop();
                 profile.ResolveMs = resolveWatch.ElapsedMilliseconds;
 
-                DeleteOldMarkers(model);
-
                 Stopwatch readWatch = Stopwatch.StartNew();
+                // Reading pattern selections temporarily rolls back/restores their
+                // part, which advances that part's update stamp. Finish this setup
+                // BEFORE capturing the state that protects the final geometry scan.
+                ReadSkippedPatternHoles(model, ToObjectArray(assembly.GetComponents(false)));
+                ThrowIfCanceled();
+                if (!model.Equals(swApp.ActiveDoc as ModelDoc2))
+                    throw new InvalidOperationException("Assembly đang hoạt động đã đổi trong lúc chuẩn bị. Hãy chạy lại.");
+                string inputState = CaptureModelState(model);
                 DeformedHoleDebugDetector deformedDebug;
                 List<HoleAxis> rawHoles = ReadAssemblyHoles(assembly, out deformedDebug);
                 readWatch.Stop();
                 profile.ComponentTraversalMs = readWatch.ElapsedMilliseconds;
-                if (IsCanceled())
-                {
-                    Debug.WriteLine("[CHECK HOLE ASSY] Canceled while reading components.");
-                    PublishResultText("Da huy CHECK HOLE.");
-                    MessageBox.Show("Da huy CHECK HOLE.", "CHECK HOLE");
-                    return;
-                }
+                ThrowIfCanceled();
 
                 Stopwatch mergeWatch = Stopwatch.StartNew();
                 List<HoleAxis> holes = MergeSameComponentCylinders(rawHoles);
@@ -267,10 +272,14 @@ namespace ADDIN.Commands
                 }
 
                 // Doi chieu DEBUG sau khi cylinder/SLOT da merge, truoc khi production injection.
-                Stopwatch validationDeformedWatch = Stopwatch.StartNew();
-                deformedDebug.DebugValidateRecoveredDeformedHoles(holes);
-                validationDeformedWatch.Stop();
-                profile.DeformedValidationMs = validationDeformedWatch.ElapsedMilliseconds;
+                if (EnableDiagnostics)
+                {
+                    Stopwatch validationDeformedWatch = Stopwatch.StartNew();
+                    deformedDebug.DebugValidateRecoveredDeformedHoles(holes);
+                    validationDeformedWatch.Stop();
+                    profile.DeformedValidationMs = validationDeformedWatch.ElapsedMilliseconds;
+                }
+                else Debug.WriteLine("[CHECK HOLE ASSY] DEFORMED_VALIDATE disabled");
 
                 // Production integration: chi them cac cap mouth hop le sau khi cylinder
                 // va SLOT da merge. Tat ca stack/pattern/marker phia sau van dung engine cu.
@@ -314,61 +323,38 @@ namespace ADDIN.Commands
                 patternWatch.Stop();
                 profile.PatternMs = patternWatch.ElapsedMilliseconds;
 
-                if (ngResults.Count > 0 || patternIssues.Count > 0)
-                    CreateNgMarkerSketch(model, ngResults, patternIssues);
-
-                Stopwatch graphicsWatch = Stopwatch.StartNew();
-                try
+                ThrowIfCanceled();
+                if (!model.Equals(swApp.ActiveDoc as ModelDoc2))
+                    throw new InvalidOperationException("Assembly đang hoạt động đã đổi trong lúc kiểm tra. Hãy chạy lại.");
+                if (!string.Equals(inputState, CaptureModelState(model), StringComparison.Ordinal))
+                    throw new InvalidOperationException("Model đã thay đổi trong lúc kiểm tra. Hãy chạy lại.");
+                Stopwatch reportWatch = Stopwatch.StartNew();
+                lastReport = BuildReport(model.GetTitle(), SafeConfigurationName(model), holes, results, patternIssues, 0);
+                reportWatch.Stop();
+                profile.ReportBuildMs = reportWatch.ElapsedMilliseconds;
+                // Keep previous markers until a complete replacement sketch is confirmed.
+                if (!AutoCreateMarkers || markerRows.Count == 0) DeleteOldMarkers(model);
+                reportModel = model;
+                reportState = CaptureModelState(model);
+                lastReport.EngineSeconds = runWatch.Elapsed.TotalSeconds;
+                Stopwatch publishWatch = Stopwatch.StartNew();
+                resultsForm.SetReport(lastReport);
+                PublishResultText(lastReport.Summary);
+                publishWatch.Stop();
+                profile.FinalSummaryUiMs = publishWatch.ElapsedMilliseconds;
+                if (AutoCreateMarkers && markerRows.Count > 0)
                 {
-                    profile.GraphicsRefreshCalls++;
-                    model.GraphicsRedraw2();
+                    try { CreateReportMarkers(null); }
+                    catch (Exception markerError)
+                    {
+                        Debug.WriteLine("[CHECK HOLE ASSY] AUTO MARKER ERROR: " + markerError);
+                        lastReport.MarkerStatus = markerError is OperationCanceledException
+                            ? "Đã hủy vẽ NG. Kết quả kiểm tra vẫn có trong bảng; hãy kiểm tra lại trước khi vẽ."
+                            : "Chưa vẽ được NG: " + markerError.Message;
+                        resultsForm.SetReport(lastReport);
+                        PublishResultText(lastReport.Summary);
+                    }
                 }
-                catch { }
-                graphicsWatch.Stop();
-                profile.RebuildGraphicsMs += graphicsWatch.ElapsedMilliseconds;
-                profile.MarkerGraphicsMs += graphicsWatch.ElapsedMilliseconds;
-
-                int okCount = results.Count - ngResults.Count;
-                string message = "Da kiem tra " + results.Count + " cum lo giua cac component."
-                    + System.Environment.NewLine + "OK: " + okCount
-                     + System.Environment.NewLine + "NG: " + ngResults.Count
-                    + System.Environment.NewLine + "NG vi tri/pitch hang lo: " + patternIssues.Count
-                    + System.Environment.NewLine + "Dung sai dong tam: "
-                    + FormatMm(PositionToleranceM) + " mm"
-                    + System.Environment.NewLine + "Dung sai lech goc: "
-                    + AngleToleranceDeg.ToString("0.###", CultureInfo.InvariantCulture) + " do";
-                if (ngResults.Count > 0 || patternIssues.Count > 0)
-                    message += System.Environment.NewLine + "Da tao 3D Sketch " + MarkerFeaturePrefix + " tren Assembly.";
-                else
-                    message += System.Environment.NewLine + "Khong co vi tri NG can danh dau.";
-
-                string detailText = message + System.Environment.NewLine + System.Environment.NewLine
-                    + "Ky hieu tren 3D Sketch:"
-                    + System.Environment.NewLine + "+ = tam tham chieu mong doi"
-                    + System.Environment.NewLine + "X = tam lo thuc te bi lech"
-                    + System.Environment.NewLine + "Duong do = huong va khoang lech"
-                    + System.Environment.NewLine + "Chi so sanh cac lop vat lieu ke nhau (khe ho toi da "
-                    + FormatMm(AdjacentFaceGapM) + " mm).";
-
-                List<string> issueDescriptions = BuildIssueDescriptions(ngResults, patternIssues, int.MaxValue);
-                if (issueDescriptions.Count > 0)
-                    detailText += System.Environment.NewLine + System.Environment.NewLine
-                        + "Chi tiet NG:"
-                        + System.Environment.NewLine
-                        + string.Join(System.Environment.NewLine, issueDescriptions);
-
-                Stopwatch finalSummaryWatch = Stopwatch.StartNew();
-                PublishResultText(detailText);
-
-                MessageBox.Show(
-                    message,
-                    "CHECK HOLE",
-                    MessageBoxButtons.OK,
-                    (ngResults.Count > 0 || patternIssues.Count > 0)
-                        ? MessageBoxIcon.Warning
-                        : MessageBoxIcon.Information);
-                finalSummaryWatch.Stop();
-                profile.FinalSummaryUiMs = finalSummaryWatch.ElapsedMilliseconds;
 
                 Debug.WriteLine("[CHECK HOLE ASSY] rawCylinder=" + rawHoles.Count
                     + ", logicalHole=" + holes.Count
@@ -378,29 +364,36 @@ namespace ADDIN.Commands
                     + ", elapsedMs=" + runWatch.ElapsedMilliseconds);
                 Debug.WriteLine("[CHECK HOLE ASSY] ===== RUN END =====");
             }
+            catch (OperationCanceledException)
+            {
+                lastReport = null; reportState = null;
+                PublishResultText("Đã hủy CHECK HOLE; kết quả chưa hoàn tất.");
+            }
             catch (Exception ex)
             {
+                lastReport = null; reportState = null;
                 Debug.WriteLine("[CHECK HOLE ASSY] ERROR: " + ex);
                 PublishResultText("CHECK HOLE bi loi:" + System.Environment.NewLine + ex.Message);
-                MessageBox.Show(
-                    "Loi khi CHECK HOLE:" + System.Environment.NewLine + ex.Message,
-                    "CHECK HOLE",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
             }
             finally
             {
                 runWatch.Stop();
                 Debug.WriteLine("[CHECK HOLE ASSY] FINALLY elapsedMs=" + runWatch.ElapsedMilliseconds);
                 WriteRunProfile(profile, runWatch.ElapsedMilliseconds);
-                try { swApp.CommandInProgress = oldCommandInProgress; } catch { }
+                if (hasOldCommandInProgress) { try { swApp.CommandInProgress = oldCommandInProgress; } catch { } }
                 Cursor.Current = previousCursor;
                 activeProfile = null;
+                running = false;
+                missingPatternBodies.Clear();
+                skippedPatternHoles.Clear();
+                FinishResultsUi();
             }
         }
 
         private void PublishResultText(string text)
         {
+            if (resultsForm != null && !resultsForm.IsDisposed)
+                resultsForm.SetBusy(running, text);
             try { ResultTextChanged?.Invoke(text ?? string.Empty); }
             catch (Exception ex)
             {
@@ -442,7 +435,9 @@ namespace ADDIN.Commands
                 + AddProfileValue(profile.MarkerCleanupMs)
                 + AddProfileValue(profile.RebuildGraphicsMs)
                 + AddProfileValue(profile.FinalSummaryUiMs)
-                + AddProfileValue(profile.DebugLoggingMs);
+                + AddProfileValue(profile.DebugLoggingMs)
+                + AddProfileValue(profile.ReportBuildMs)
+                + AddProfileValue(profile.StateCaptureMs);
             long unaccountedMs = Math.Max(0, totalMs - measuredMs);
             double unaccountedPercent = totalMs <= 0 ? 0.0 : unaccountedMs * 100.0 / totalMs;
 
@@ -457,7 +452,11 @@ namespace ADDIN.Commands
                 + ", deformedDetectMs=" + profile.DeformedDetectMs
                 + ", logicalMergeMs=" + profile.LogicalMergeMs
                 + ", slotMergeMs=" + profile.SlotMergeMs
-                + ", deformedInjectMs=" + profile.DeformedInjectMs);
+                + ", deformedInjectMs=" + profile.DeformedInjectMs
+                + ", deformedValidationMs=" + profile.DeformedValidationMs
+                + ", spatialIndexMs=" + profile.SpatialIndexMs
+                + ", reportBuildMs=" + profile.ReportBuildMs
+                + ", stateCaptureMs=" + profile.StateCaptureMs);
             Debug.WriteLine("normalStackMs=" + profile.NormalStackMs
                 + ", legacyRecoveryMs=" + profile.LegacyRecoveryMs
                 + ", relationshipAnchorMs=" + profile.RelationshipAnchorMs
@@ -499,7 +498,9 @@ namespace ADDIN.Commands
                 + ", sketchCreateCalls=" + profile.SketchCreateCalls
                 + ", featureCalls=" + profile.FeatureCalls
                 + ", rebuildCalls=" + profile.RebuildCalls
-                + ", graphicsRefreshCalls=" + profile.GraphicsRefreshCalls);
+                + ", graphicsRefreshCalls=" + profile.GraphicsRefreshCalls
+                + ", edgePointApiCalls=" + profile.EdgePointApiCalls
+                + ", edgePointCacheHits=" + profile.EdgePointCacheHits);
             Debug.WriteLine("[CHECK HOLE ASSY] PROFILE ACCOUNTING"
                 + " totalMs=" + totalMs
                 + ", measuredMs=" + measuredMs
@@ -588,8 +589,8 @@ namespace ADDIN.Commands
                 if ((componentIndex & 7) == 0)
                 {
                     Application.DoEvents();
-                    if (IsCanceled())
-                        break;
+                    PublishResultText("Đang đọc component " + (componentIndex + 1) + "/" + componentObjects.Length + "...");
+                    if (CheckCanceled()) break;
                 }
 
                 Component2 component = componentObjects[componentIndex] as Component2;
@@ -618,9 +619,11 @@ namespace ADDIN.Commands
                 }
 
                 string occurrence = SafeComponentName(component);
+                reportComponents[occurrence] = component;
                 string path = SafeComponentPath(component);
                 string referencedConfiguration = SafeReferencedConfiguration(component);
-                object[] bodies = GetComponentBodies(component);
+                int[] bodyInfo;
+                object[] bodies = GetComponentBodies(component, out bodyInfo);
                 int before = result.Count;
 
                 if (bodies.Length == 0 && VerboseHoleDebug)
@@ -643,6 +646,7 @@ namespace ADDIN.Commands
 
                     if (activeProfile != null) activeProfile.FaceEnumerationCalls++;
                     object[] faceObjects = ToObjectArray(body.GetFaces());
+                    missingPatternBodies[MissingBodyKey(occurrence, bodyName)] = new MissingPatternBody { Faces = faceObjects, Transform = transform };
                     List<HoleAxis> bodyCylinders = new List<HoleAxis>();
                     foreach (object faceObject in faceObjects)
                     {
@@ -665,7 +669,8 @@ namespace ADDIN.Commands
                         occurrence,
                         path,
                         referencedConfiguration,
-                        bodyCylinders);
+                        bodyCylinders,
+                        bodyInfo.Length == bodies.Length && bodyInfo[bodyIndex] == (int)swBodyInfo_e.swNormalBody_e);
                     deformedWatch.Stop();
                     if (activeProfile != null)
                         activeProfile.DeformedDetectMs += deformedWatch.ElapsedMilliseconds;
@@ -1086,7 +1091,7 @@ namespace ADDIN.Commands
                 if ((i & 31) == 0)
                 {
                     Application.DoEvents();
-                    if (IsCanceled())
+                    if (CheckCanceled())
                         break;
                 }
 
@@ -1318,7 +1323,7 @@ namespace ADDIN.Commands
                 if ((firstIndex & 31) == 0)
                 {
                     Application.DoEvents();
-                    if (IsCanceled())
+                    if (CheckCanceled())
                         break;
                 }
 
@@ -2550,6 +2555,9 @@ namespace ADDIN.Commands
             // dong tam. Nhanh nay chay sau logic co neo va khong thay doi logic cu.
             Stopwatch wholeRowEvaluationWatch = Stopwatch.StartNew();
             int wholeRowIssues = BuildShiftedWholeRowIssues(holes, issues, issueKeys);
+            int missingHoles = AppendMissingPatternIssues(holes, stackResults, issues, issueKeys, LocateMissingHoleSurface);
+            int skippedMissingHoles = AppendSkippedPatternIssues(holes, issues, issueKeys);
+            missingHoles += skippedMissingHoles;
             wholeRowEvaluationWatch.Stop();
             if (activeProfile != null)
                 activeProfile.PatternEvaluationMs += wholeRowEvaluationWatch.ElapsedMilliseconds;
@@ -2558,6 +2566,8 @@ namespace ADDIN.Commands
                 + ", validStacks=" + validStacks.Count
                 + ", comparedRows=" + comparedRows
                 + ", wholeRowIssues=" + wholeRowIssues
+                + ", missingHoles=" + missingHoles
+                + ", skippedMissingHoles=" + skippedMissingHoles
                 + ", issues=" + issues.Count);
             if (VerboseHoleDebug)
             {
@@ -2618,7 +2628,7 @@ namespace ADDIN.Commands
                     double overlapFraction = GetProjectedOverlapFraction(firstOrdered, secondOrdered, direction);
                     if (overlapFraction < WholeRowMinimumOverlapFraction)
                     {
-                        Debug.WriteLine("[CHECK HOLE ASSY] WHOLE ROW reject overlap: "
+                        if (VerboseHoleDebug) Debug.WriteLine("[CHECK HOLE ASSY] WHOLE ROW reject overlap: "
                             + first.ComponentOccurrence + " <-> " + second.ComponentOccurrence
                             + ", overlap=" + overlapFraction.ToString("0.###", CultureInfo.InvariantCulture));
                         continue;
@@ -2626,7 +2636,7 @@ namespace ADDIN.Commands
 
                     if (HasNearConcentricAnchor(firstOrdered, secondOrdered))
                     {
-                        Debug.WriteLine("[CHECK HOLE ASSY] WHOLE ROW skip; anchor exists: "
+                        if (VerboseHoleDebug) Debug.WriteLine("[CHECK HOLE ASSY] WHOLE ROW skip; anchor exists: "
                             + first.ComponentOccurrence + " <-> " + second.ComponentOccurrence);
                         continue;
                     }
@@ -2655,7 +2665,7 @@ namespace ADDIN.Commands
                     }
                     if (!compatible || maximumPitchDifference > PositionToleranceM)
                     {
-                        Debug.WriteLine("[CHECK HOLE ASSY] WHOLE ROW reject adjacency/size/pitch: "
+                        if (VerboseHoleDebug) Debug.WriteLine("[CHECK HOLE ASSY] WHOLE ROW reject adjacency/size/pitch: "
                             + first.ComponentOccurrence + " <-> " + second.ComponentOccurrence
                             + ", compatible=" + compatible
                             + ", pitchDelta=" + FormatMm(maximumPitchDifference) + "mm");
@@ -2677,7 +2687,7 @@ namespace ADDIN.Commands
                     }
                     if (maximumAcross > PatternRowToleranceM || minimumShift <= PositionToleranceM)
                     {
-                        Debug.WriteLine("[CHECK HOLE ASSY] WHOLE ROW reject row/shift: "
+                        if (VerboseHoleDebug) Debug.WriteLine("[CHECK HOLE ASSY] WHOLE ROW reject row/shift: "
                             + first.ComponentOccurrence + " <-> " + second.ComponentOccurrence
                             + ", across=" + FormatMm(maximumAcross) + "mm"
                             + ", minimumShift=" + FormatMm(minimumShift) + "mm");
@@ -3195,7 +3205,7 @@ namespace ADDIN.Commands
                     + " componentB=" + secondAnchor.ComponentOccurrence
                     + " gapSourceCount=" + assignment.GapSourceCount
                     + " gapTargetCount=" + assignment.GapTargetCount
-                    + " productionResult=NONE");
+                    + " productionResult=AWAITING_MATERIAL_CHECK");
             }
 
             foreach (PatternRowMatch match in assignment.AllMatches)
@@ -3519,7 +3529,7 @@ namespace ADDIN.Commands
             return Math.Acos(value) * 180.0 / Math.PI;
         }
 
-        private void CreateNgMarkerSketch(
+        private Feature CreateNgMarkerSketch(
             ModelDoc2 model,
             List<HoleStackResult> ngResults,
             List<PatternIssue> patternIssues)
@@ -3585,6 +3595,7 @@ namespace ADDIN.Commands
 
                 foreach (HoleStackResult result in ngResults)
                 {
+                    ThrowIfCanceled();
                     if (result == null || result.Stack == null || result.Reference == null)
                         continue;
                     Debug.WriteLine("[CHECK HOLE ASSY] MARK stack reference="
@@ -3599,7 +3610,8 @@ namespace ADDIN.Commands
                     {
                         foreach (FarMarkerRelation relation in result.Stack.FarMarkerRelations)
                         {
-                            if (relation == null || relation.SourceHole == null || relation.CounterpartHole == null)
+                            if (relation == null || relation.SourceHole == null || relation.CounterpartHole == null
+                                || !result.Outliers.Contains(relation.SourceHole))
                                 continue;
                             double[] expectedMouth;
                             double[] actualMouth;
@@ -3688,6 +3700,18 @@ namespace ADDIN.Commands
 
                 foreach (PatternIssue issue in patternIssues)
                 {
+                    ThrowIfCanceled();
+                    if (issue.IsMissingHole)
+                    {
+                        var cross = BuildMissingHoleMarkerLines(issue);
+                        if (cross.Count != 2) throw new InvalidOperationException("Không xác định được dấu X cho vị trí thiếu lỗ.");
+                        foreach (double[][] line in cross)
+                        {
+                            if (CreateDistinctColoredLine(manager, line[0], line[1], red, markerLines)) patternLines++;
+                            else duplicateLineSkipped++;
+                        }
+                        continue;
+                    }
                     // Cung mot lo co the bi bat boi ca check dong tam va check pitch.
                     // Chi ve mot bo marker de tranh dau +/X bi lap va che kin lo.
                     if (issue.ActualHole != null && holesAlreadyMarked.Contains(issue.ActualHole))
@@ -3760,10 +3784,15 @@ namespace ADDIN.Commands
                 {
                     try
                     {
-                        manager.Insert3DSketch(true);
+                        manager.Insert3DSketch(!UseDeferredMarkerRebuild);
                         if (activeProfile != null) activeProfile.SketchCreateCalls++;
+                        if (manager.ActiveSketch != null)
+                        {
+                            manager.Insert3DSketch(true);
+                            if (activeProfile != null) activeProfile.SketchCreateCalls++;
+                        }
                     }
-                    catch { }
+                    catch (Exception ex) { Debug.WriteLine("[CHECK HOLE ASSY] end sketch failed: " + ex); }
                 }
                 endSketchApiWatch.Stop();
                 if (activeProfile != null)
@@ -3795,10 +3824,12 @@ namespace ADDIN.Commands
                 if (activeProfile != null)
                     activeProfile.MarkerCloseSketchMs += closeSketchWatch.ElapsedMilliseconds;
 
+                if (GetActiveSketch(model) != null)
+                    throw new InvalidOperationException("Không thoát được sketch NG; hãy đóng Sketch và chạy lại.");
                 Stopwatch markerFeatureWatch = Stopwatch.StartNew();
                 // Feature cua 3D Sketch chi on dinh sau khi thoat che do edit.
                 Stopwatch postCloseLookupWatch = Stopwatch.StartNew();
-                markerFeature = GetSketchFeature(sketch);
+                markerFeature = FindNewSketchFeature(model, featureNamesBefore);
                 postCloseLookupWatch.Stop();
                 if (activeProfile != null)
                     activeProfile.MarkerPostCloseLookupMs += postCloseLookupWatch.ElapsedMilliseconds;
@@ -3815,9 +3846,7 @@ namespace ADDIN.Commands
                     Stopwatch renameWatch = Stopwatch.StartNew();
                     try
                     {
-                        markerFeature.Name = MarkerFeaturePrefix + "-"
-                            + (ngResults.Count + patternIssues.Count)
-                                .ToString("000", CultureInfo.InvariantCulture);
+                        markerFeature.Name = MarkerFeaturePrefix + "-TEMP-" + Guid.NewGuid().ToString("N");
                     }
                     catch { }
                     renameWatch.Stop();
@@ -3831,8 +3860,21 @@ namespace ADDIN.Commands
                 {
                     Debug.WriteLine("[CHECK HOLE ASSY] marker feature acquisition FAILED after closing 3D sketch.");
                 }
+                Stopwatch markerRebuildWatch = Stopwatch.StartNew();
+                if (model.Extension.NeedsRebuild2 != 0)
+                {
+                    if (activeProfile != null) activeProfile.RebuildCalls++;
+                    if (!model.EditRebuild3()) throw new InvalidOperationException("Rebuild sketch NG thất bại.");
+                }
+                markerRebuildWatch.Stop();
+                if (activeProfile != null) activeProfile.MarkerRebuildMs += markerRebuildWatch.ElapsedMilliseconds;
+                if (markerFeature == null) throw new InvalidOperationException("Không tìm được sketch NG mới.");
+                Sketch completedSketch = markerFeature.GetSpecificFeature2() as Sketch;
+                if (completedSketch == null || ToObjectArray(completedSketch.GetSketchSegments()).Length != markerLines.Count)
+                    throw new InvalidOperationException("Sketch NG chưa đủ các đường đánh dấu; giữ marker cũ và kiểm tra lại.");
                 Stopwatch colorWatch = Stopwatch.StartNew();
                 ApplyRedFeatureColor(markerFeature);
+                EnsureNgMarkerVisible(model, markerFeature);
                 colorWatch.Stop();
                 if (activeProfile != null)
                     activeProfile.MarkerColorMs += colorWatch.ElapsedMilliseconds;
@@ -3888,6 +3930,7 @@ namespace ADDIN.Commands
                         + ", totalMarkerMs=" + markerWatch.ElapsedMilliseconds);
                 }
             }
+            return markerFeature;
         }
 
         private HashSet<string> GetTopLevelFeatureNames(ModelDoc2 model)
@@ -3983,10 +4026,8 @@ namespace ADDIN.Commands
             SketchSegment segment = manager.CreateLine(
                 start[0], start[1], start[2],
                 end[0], end[1], end[2]);
-            if (segment != null)
-            {
-                try { segment.Color = color; } catch { }
-            }
+            if (segment == null) throw new InvalidOperationException("Không tạo được đường đánh dấu NG.");
+            try { segment.Color = color; } catch { }
         }
 
         private bool CreateDistinctColoredLine(
@@ -3996,6 +4037,8 @@ namespace ADDIN.Commands
             int color,
             HashSet<string> createdLines)
         {
+            if (manager == null || !IsPoint(start) || !IsPoint(end) || Distance(start, end) <= 1e-10)
+                return false;
             if (createdLines == null)
             {
                 CreateColoredLine(manager, start, end, color);
@@ -4014,10 +4057,8 @@ namespace ADDIN.Commands
                 return;
             if (activeProfile != null) activeProfile.SketchCreateCalls++;
             SketchPoint sketchPoint = manager.CreatePoint(point[0], point[1], point[2]);
-            if (sketchPoint != null)
-            {
-                try { sketchPoint.Color = color; } catch { }
-            }
+            if (sketchPoint == null) throw new InvalidOperationException("Không tạo được điểm đánh dấu NG.");
+            try { sketchPoint.Color = color; } catch { }
         }
 
         private bool CreateDistinctColoredPoint(
@@ -4026,6 +4067,8 @@ namespace ADDIN.Commands
             int color,
             HashSet<string> createdPoints)
         {
+            if (manager == null || !IsPoint(point))
+                return false;
             if (createdPoints == null)
             {
                 CreateColoredPoint(manager, point, color);
@@ -4116,7 +4159,7 @@ namespace ADDIN.Commands
             }
         }
 
-        private void DeleteOldMarkers(ModelDoc2 model)
+        private void DeleteOldMarkers(ModelDoc2 model, string keepFeatureName = null)
         {
             if (model == null)
                 return;
@@ -4128,7 +4171,8 @@ namespace ADDIN.Commands
             {
                 if (activeProfile != null) activeProfile.FeatureCalls++;
                 string name = SafeFeatureName(feature);
-                if (name.StartsWith(MarkerFeaturePrefix, StringComparison.OrdinalIgnoreCase))
+                if (name.StartsWith(MarkerFeaturePrefix, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(name, keepFeatureName, StringComparison.OrdinalIgnoreCase))
                     oldFeatures.Add(feature);
             }
             searchWatch.Stop();
@@ -4264,15 +4308,19 @@ namespace ADDIN.Commands
             return true;
         }
 
-        private object[] GetComponentBodies(Component2 component)
+        private object[] GetComponentBodies(Component2 component, out int[] bodyKinds)
         {
+            bodyKinds = new int[0];
             if (component == null)
                 return new object[0];
             try
             {
                 if (activeProfile != null) activeProfile.ComponentGetBodiesCalls++;
                 object bodyInfo;
-                return ToObjectArray(component.GetBodies3((int)swBodyType_e.swSolidBody, out bodyInfo));
+                object[] bodies = ToObjectArray(component.GetBodies3((int)swBodyType_e.swSolidBody, out bodyInfo));
+                Array info = bodyInfo as Array;
+                if (info != null) bodyKinds = info.Cast<object>().Select(Convert.ToInt32).ToArray();
+                return bodies;
             }
             catch
             {
@@ -4313,20 +4361,12 @@ namespace ADDIN.Commands
         {
             if (model == null)
                 return null;
-            try { return ((dynamic)model).GetActiveSketch2() as Sketch; }
+            try { return model.SketchManager.ActiveSketch as Sketch; }
             catch
             {
-                try { return ((dynamic)model.SketchManager).ActiveSketch as Sketch; }
+                try { return model.GetActiveSketch2() as Sketch; }
                 catch { return null; }
             }
-        }
-
-        private static Feature GetSketchFeature(Sketch sketch)
-        {
-            if (sketch == null)
-                return null;
-            try { return ((dynamic)sketch).GetFeature() as Feature; }
-            catch { return null; }
         }
 
         private static string SafeComponentName(Component2 component)
@@ -4820,15 +4860,16 @@ namespace ADDIN.Commands
                 string occurrence,
                 string path,
                 string configuration,
-                IList<HoleAxis> existingCylinders)
+                IList<HoleAxis> existingCylinders,
+                bool knownNormalBody)
             {
-                if (body == null || transform == null || owner == null || IsCanceled())
+                if (body == null || transform == null || owner == null || owner.CheckCanceled())
                     return;
 
                 occurrenceCount++;
                 string bodyName = ResolveBodyIdentity(body, bodyIndex);
-                string cacheKey = (path ?? "") + "|" + (configuration ?? "") + "|"
-                    + bodyIndex.ToString(CultureInfo.InvariantCulture) + "|" + bodyName;
+                string cacheKey = CheckHoleBodyCachePolicy.Key(path, configuration, bodyIndex, bodyName,
+                    occurrence, knownNormalBody && (path ?? "").IndexOf('^') < 0);
                 DeformedBodyCache cache;
                 bool cacheHit = bodyCache.TryGetValue(cacheKey, out cache);
                 Stopwatch bodyWatch = Stopwatch.StartNew();
@@ -5342,11 +5383,12 @@ namespace ADDIN.Commands
             {
                 Stopwatch watch = Stopwatch.StartNew();
                 DeformedBodyCache cache = new DeformedBodyCache { CacheKey = cacheKey };
+                CheckHolePointCache sampleCache = new CheckHolePointCache();
                 HashSet<string> signatures = new HashSet<string>(StringComparer.Ordinal);
                 int loopSerial = 0;
                 foreach (object faceObject in faceObjects ?? new object[0])
                 {
-                    if (IsCanceled())
+                    if (owner.CheckCanceled())
                         break;
                     Face2 face = faceObject as Face2;
                     if (face == null)
@@ -5372,6 +5414,7 @@ namespace ADDIN.Commands
                             loop,
                             occurrenceForDebug: occurrence,
                             loopId: loopSerial,
+                            sampleCache: sampleCache,
                             cheap: out cheap,
                             reason: out rejectReason))
                         {
@@ -5405,10 +5448,17 @@ namespace ADDIN.Commands
                     }
                 }
                 watch.Stop();
+                if (owner.activeProfile != null)
+                {
+                    owner.activeProfile.EdgePointApiCalls += sampleCache.ApiCalls;
+                    owner.activeProfile.EdgePointCacheHits += sampleCache.Hits;
+                }
                 Debug.WriteLine(Prefix + " CACHE_BUILD key=" + cacheKey
                     + ", faces=" + cache.FaceCount
                     + ", innerLoops=" + cache.InnerLoopCount
                     + ", candidates=" + cache.Candidates.Count
+                    + ", sampleApiCalls=" + sampleCache.ApiCalls
+                    + ", sampleCacheHits=" + sampleCache.Hits
                     + ", elapsedMs=" + watch.ElapsedMilliseconds);
                 return cache;
             }
@@ -5417,6 +5467,7 @@ namespace ADDIN.Commands
                 Loop2 loop,
                 string occurrenceForDebug,
                 int loopId,
+                CheckHolePointCache sampleCache,
                 out DeformedCheapLoop cheap,
                 out string reason)
             {
@@ -5474,8 +5525,8 @@ namespace ADDIN.Commands
                         u0 = u1;
                         u1 = swap;
                     }
-                    double[] start = EvaluateEdge(edge, u0);
-                    double[] end = EvaluateEdge(edge, u1);
+                    double[] start = EvaluateEdge(edge, u0, sampleCache);
+                    double[] end = EvaluateEdge(edge, u1, sampleCache);
                     if (!IsPoint(start) || !IsPoint(end))
                     {
                         reason = "EDGE_ENDPOINT_EVALUATION_FAILED";
@@ -5506,6 +5557,7 @@ namespace ADDIN.Commands
                     double fallbackLength;
                     if (!TrySampleEdgeForCheapPass(
                         edge,
+                        sampleCache,
                         u0,
                         u1,
                         edgeIsClosed ? 8 : 4,
@@ -5529,6 +5581,7 @@ namespace ADDIN.Commands
                     segments.Add(new DeformedEdgeSegment
                     {
                         Edge = edge,
+                        Samples = sampleCache,
                         UStart = u0,
                         UEnd = u1,
                         LengthM = length
@@ -5587,6 +5640,7 @@ namespace ADDIN.Commands
 
             private static bool TrySampleEdgeForCheapPass(
                 Edge edge,
+                CheckHolePointCache sampleCache,
                 double uStart,
                 double uEnd,
                 int intervalCount,
@@ -5601,7 +5655,7 @@ namespace ADDIN.Commands
                 {
                     double fraction = index / (double)intervalCount;
                     double parameter = uStart + (uEnd - uStart) * fraction;
-                    double[] point = EvaluateEdge(edge, parameter);
+                    double[] point = EvaluateEdge(edge, parameter, sampleCache);
                     if (!IsPoint(point))
                         return false;
                     points.Add(point);
@@ -5947,15 +6001,19 @@ namespace ADDIN.Commands
                     }
                     localFraction = Math.Max(0, Math.Min(1, localFraction));
                     double parameter = selected.UStart + (selected.UEnd - selected.UStart) * localFraction;
-                    double[] point = EvaluateEdge(selected.Edge, parameter);
+                    double[] point = EvaluateEdge(selected.Edge, parameter, selected.Samples);
                     if (IsPoint(point) && (result.Count == 0 || Distance(result[result.Count - 1], point) > 1e-10))
                         result.Add(point);
                 }
                 return result;
             }
 
-            private static double[] EvaluateEdge(Edge edge, double parameter)
+            private static readonly Func<object, double, double[]> ReadEdgePoint =
+                (edge, parameter) => EvaluateEdge((Edge)edge, parameter);
+
+            private static double[] EvaluateEdge(Edge edge, double parameter, CheckHolePointCache samples = null)
             {
+                if (samples != null) return samples.Evaluate(edge, parameter, ReadEdgePoint);
                 if (edge == null)
                     return null;
                 try
@@ -6165,6 +6223,7 @@ namespace ADDIN.Commands
         private sealed class DeformedEdgeSegment
         {
             public Edge Edge;
+            public CheckHolePointCache Samples;
             public double UStart;
             public double UEnd;
             public double LengthM;
@@ -6641,6 +6700,11 @@ namespace ADDIN.Commands
 
         private sealed class PatternIssue
         {
+            public bool IsMissingHole;
+            public string SkippedPatternName;
+            public int SkippedInstanceIndex;
+            public double[] DisplayNormal;
+            public double ExpectedPitchM;
             public string FirstComponent;
             public string SecondComponent;
             public string Kind;

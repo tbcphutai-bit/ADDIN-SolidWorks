@@ -15,6 +15,11 @@ namespace ADDIN.Commands.DxfChecking
     // types, background sessions or references to the Check Drawing command.
     internal sealed class DxfBomDrawingSourceResolver
     {
+        // Match only the label in its original text so stripping a mixed-width
+        // title does not normalize or otherwise change the actual filename.
+        static readonly Regex DxfFileNamePrefix = new Regex(
+            @"^\s*[DＤ]\s*[XＸ]\s*[FＦ]\s*(?:[フﾌ]\s*[ァｧ]\s*[イｲ]\s*[ルﾙ]\s*名|[FＦ]\s*[IＩ]\s*[LＬ]\s*[EＥ]\s*[NＮ]\s*[AＡ]\s*[MＭ]\s*[EＥ])\s*[:：=＝]?\s*",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         readonly DataGridView grid;
         internal DxfBomDrawingSourceResolver(ISldWorks application, DataGridView bomGrid) { grid = bomGrid; }
 
@@ -115,11 +120,11 @@ namespace ADDIN.Commands.DxfChecking
                     if (position != null && position.Length >= 2 && width > 0 && height > 0 && (position[0] < -.0002 || position[1] < -.0002 || position[0] > width + .0002 || position[1] > height + .0002)) continue;
                     for (int row = 0; row < table.RowCount; row++) for (int column = 0; column < table.ColumnCount; column++)
                     {
-                        string header = Normalize(table.get_DisplayedText2(row, column, false));
-                        if (header != "DXFファイル名" && header != "DXFﾌｧｲﾙ名" && header != "DXFFILENAME") continue;
+                        string header = table.get_DisplayedText2(row, column, false);
+                        if (!IsDxfFileNameLabel(header)) continue;
                         string value = column + 1 < table.ColumnCount ? table.get_DisplayedText2(row, column + 1, false) : "";
-                        if (string.IsNullOrWhiteSpace(value) && row + 1 < table.RowCount) value = table.get_DisplayedText2(row + 1, column, false);
-                        if (!string.IsNullOrWhiteSpace(value)) namedCells.Add(value.Trim());
+                        if ((string.IsNullOrWhiteSpace(value) || IsDxfFileNameLabel(value)) && row + 1 < table.RowCount) value = table.get_DisplayedText2(row + 1, column, false);
+                        if (!string.IsNullOrWhiteSpace(value) && !IsDxfFileNameLabel(value)) namedCells.Add(value.Trim());
                     }
                 }
             }
@@ -131,11 +136,11 @@ namespace ADDIN.Commands.DxfChecking
             var all = notes.ToList(); var explicitNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var note in all)
             {
-                string normalizedRaw = Normalize(note.Raw);
+                string normalizedRaw = Normalize(note.Raw ?? note.Text);
                 if (normalizedRaw.Contains("DXFファイル名") || normalizedRaw.Contains("DXFFILENAME"))
                 {
-                    string name = Regex.Replace(note.Text ?? "", @"^\s*DXF\s*(?:ファイル名|ﾌｧｲﾙ名|FILE\s*NAME)\s*[:：=]?\s*", "", RegexOptions.IgnoreCase).Trim();
-                    if (!string.IsNullOrWhiteSpace(name) && !Normalize(name).Equals("DXFファイル名", StringComparison.OrdinalIgnoreCase)) explicitNames.Add(name);
+                    string name = DxfFileNamePrefix.Replace(note.Text ?? "", "", 1).Trim();
+                    if (!string.IsNullOrWhiteSpace(name) && !IsDxfFileNameLabel(name)) explicitNames.Add(name);
                 }
             }
             if (explicitNames.Count > 1) throw new InvalidDataException("Drawing có nhiều tên DXF khác nhau; cần chọn đúng bản xuất.");
@@ -143,7 +148,7 @@ namespace ADDIN.Commands.DxfChecking
             // Preserve the existing title template's bottom-left 手配番号 / 部品番号
             // fragments. A random note containing .dxf is not accepted as a source.
             string job = "", part = "";
-            foreach (var note in all.Where(n => n.HasPosition && n.Y <= .020))
+            foreach (var note in all.Where(n => n.HasPosition && n.Y <= .020 && !IsDxfFileNameLabel(n.Text)))
             {
                 string text = (note.Text ?? "").Trim(), raw = note.Raw ?? "";
                 if ((raw.Contains("\"手配番号\"") || (note.X >= .030 && note.X <= .050 && !text.Contains("/"))) && string.IsNullOrWhiteSpace(job) && !string.IsNullOrWhiteSpace(text)) job = text;
@@ -161,7 +166,7 @@ namespace ADDIN.Commands.DxfChecking
                     var columns = all.Where(n => n.HasPosition && n.X > header.X && n.X < quantity.X && Math.Abs(n.Y - headerY) <= .010 && (Normalize(n.Text) == "W" || Normalize(n.Text) == "L")).ToList();
                     columns.Add(quantity); double next = columns.Min(n => n.X), middle = (header.X + next) / 2;
                     double minimumX = header.X - (middle - header.X);
-                    var value = all.Where(n => n != header && n != quantity && !columns.Contains(n) && n.HasPosition && headerY - n.Y >= .0005 && headerY - n.Y <= .025 && n.X >= minimumX && n.X <= middle).OrderBy(n => headerY - n.Y).FirstOrDefault();
+                    var value = all.Where(n => n != header && n != quantity && !columns.Contains(n) && !IsDxfFileNameLabel(n.Text) && n.HasPosition && headerY - n.Y >= .0005 && headerY - n.Y <= .025 && n.X >= minimumX && n.X <= middle).OrderBy(n => headerY - n.Y).FirstOrDefault();
                     if (value != null && !string.IsNullOrWhiteSpace(value.Text)) part = "/" + value.Text.Trim();
                 }
             }
@@ -169,6 +174,12 @@ namespace ADDIN.Commands.DxfChecking
             string compactJob = Regex.Replace(Normalize(job).Replace('／', '/'), @"(?<=\d)[-－−](?=\d)", "/");
             string compactPart = Regex.Replace(Normalize(part).Replace('／', '/'), @"(?<=\d)[-－−](?=\d)", "/");
             return compactPart.StartsWith("/", StringComparison.Ordinal) && compactJob.EndsWith(compactPart, StringComparison.OrdinalIgnoreCase) ? job.Trim() : (job + " " + part).Trim();
+        }
+        internal static bool IsDxfFileNameLabel(string text)
+        {
+            string value = (text ?? "").Trim();
+            Match label = DxfFileNamePrefix.Match(value);
+            return label.Success && label.Length == value.Length;
         }
         static string Normalize(string text) { return Regex.Replace((text ?? "").Normalize(NormalizationForm.FormKC), @"\s+", "").ToUpperInvariant(); }
     }

@@ -1,4 +1,4 @@
-﻿// Adapted from user-supplied DXF.zip; see SOURCE.md.
+// Adapted from user-supplied DXF.zip; see SOURCE.md.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,7 +14,8 @@ namespace ADDIN.Commands.DrawingDxfExporting
         CutExtrude,
         HoleWizard,
         OtherCut,
-        Pattern
+        Pattern,
+        Sketch2D
     }
 
     /// <summary>
@@ -24,6 +25,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
     /// no longer limited to Cut-Extrude:
     ///  - Cut-Extrude, Hole Wizard / Advanced Hole / Simple Hole and the other
     ///    material-removal cuts (Revolve/Sweep/Loft cut...) named with MARK;
+    ///  - 2D Sketch features (ProfileFeature) named with MARK;
     ///  - any feature pattern (Linear/Circular/Mirror/Sketch/Curve/Table/Fill...)
     ///    that is itself named with MARK, or whose seed feature is a MARK
     ///    feature. Pattern instance faces belong to the pattern feature, which
@@ -76,6 +78,7 @@ namespace ADDIN.Commands.DrawingDxfExporting
                 case LaserMarkFeatureKind.HoleWizard: return "Hole";
                 case LaserMarkFeatureKind.OtherCut: return "Cut";
                 case LaserMarkFeatureKind.Pattern: return "Pattern";
+                case LaserMarkFeatureKind.Sketch2D: return "Sketch 2D";
                 default: return "Feature";
             }
         }
@@ -157,6 +160,10 @@ namespace ADDIN.Commands.DrawingDxfExporting
             if (ContainsAny(compactType, compactLegacyType, "CUT") &&
                 !ContainsAny(compactType, compactLegacyType, "LIST"))
                 return LaserMarkFeatureKind.OtherCut;
+
+            // 2D Sketch (ProfileFeature).
+            if (IsAny(compactType, compactLegacyType, "PROFILEFEATURE", "SKETCH"))
+                return LaserMarkFeatureKind.Sketch2D;
 
             return LaserMarkFeatureKind.None;
         }

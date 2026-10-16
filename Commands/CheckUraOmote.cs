@@ -787,9 +787,9 @@ namespace ADDIN.Commands
                 }
                 string displayState = "";
                 try { displayState = view.DisplayState ?? ""; } catch { }
-                DisplayStateFaceMaterialSet appearances = ReadActiveDisplayStateFaceMaterials(model, displayState);
+                DisplayStateFaceMaterialSet appearances = ReadDrawingFaceMaterials(model, displayState);
                 result.DisplayState = appearances.DisplayStateName;
-                if (!string.IsNullOrWhiteSpace(displayState) && !appearances.ReadSucceeded)
+                if (!appearances.ReadSucceeded)
                 {
                     result.Message = "Không đọc được màu mặt trong display state mà view 展開 tham chiếu: " + displayState;
                     return result;
@@ -841,8 +841,12 @@ namespace ADDIN.Commands
                 result.BackPinkAreaMm2 = backPink * 1000000.0;
                 result.PinkFacingViewer = ClassifyFlatPinkSide(frontArea, backArea, frontPink, backPink);
                 result.Message = result.PinkFacingViewer.HasValue
-                    ? (result.PinkFacingViewer.Value ? "View đang nhìn mặt hồng (ウラ)." : "View đang nhìn mặt omote (表); mặt hồng ở phía sau.")
-                    : "Không xác định được một mặt hồng duy nhất: thiếu màu, màu ở cả hai phía hoặc view không nhìn thẳng mặt tấm.";
+                    ? (result.PinkFacingViewer.Value ? "Mặt đang nhìn của view 展開 có màu hồng (ウラ)." : "Mặt đang nhìn của view 展開 là mặt màu (表); mặt đối diện có màu hồng.")
+                    : frontArea <= 0 || backArea <= 0
+                        ? "View 展開 không nhìn thẳng hai mặt tấm."
+                        : frontPink <= 0 && backPink <= 0
+                            ? "Cả hai mặt không có màu hồng trong configuration '" + config + "', display state '" + result.DisplayState + "' của view 展開; chưa xác định được 表/ウラ."
+                            : "Diện tích màu hồng không đủ để xác định mặt tấm.";
                 Debug.WriteLine("[DRAWING FLAT SIDE] view=" + result.ViewName + " config=" + config
                     + " displayState=" + result.DisplayState + " pinkFacingViewer=" + NullableBoolText(result.PinkFacingViewer)
                     + " frontPinkMm2=" + result.FrontPinkAreaMm2 + " backPinkMm2=" + result.BackPinkAreaMm2);
@@ -865,7 +869,9 @@ namespace ADDIN.Commands
             const double fraction = 0.01;
             bool front = frontPink > frontArea * fraction;
             bool back = backPink > backArea * fraction;
-            if (front == back) return null;
+            // The visible face determines ウラ/表. With no pink face on
+            // either side, leave the result unknown so the report warns.
+            if (!front && !back) return null;
             return front;
         }
 
@@ -1022,6 +1028,123 @@ namespace ADDIN.Commands
 
                 return false;
             }
+        }
+
+        private sealed class DrawingFaceAppearance
+        {
+            public object Entity;
+            public double[] Material;
+            public int Priority;
+        }
+
+        // Render appearances are separate from legacy MaterialPropertyValues.
+        // Evaluate only the configuration/display state used by the Drawing,
+        // on the disposable CHECK copy. Never switch the user's source part.
+        private DisplayStateFaceMaterialSet ReadDrawingFaceMaterials(ModelDoc2 model, string requestedState)
+        {
+            var result = new DisplayStateFaceMaterialSet { Authoritative = true };
+            try
+            {
+                CheckPartWorkingCopy.RequireWorkingCopy(model);
+                Configuration configuration = model.ConfigurationManager.ActiveConfiguration;
+                Array states = configuration.GetDisplayStates() as Array;
+                if (states == null || states.Length == 0) return result;
+                string state = string.IsNullOrWhiteSpace(requestedState)
+                    ? Convert.ToString(states.GetValue(states.GetLowerBound(0))) : requestedState;
+                bool found = false;
+                foreach (object value in states)
+                    if (string.Equals(Convert.ToString(value), state, StringComparison.OrdinalIgnoreCase)) found = true;
+                if (!found || !configuration.ApplyDisplayState(state)) return result;
+                result.DisplayStateName = state;
+
+                var legacy = ReadActiveDisplayStateFaceMaterials(model, state);
+                object names = new[] { state };
+                int option = (int)swDisplayStateOpts_e.swSpecifyDisplayState;
+                int count = model.Extension.GetRenderMaterialsCount2(option, names);
+                Array materials = model.Extension.GetRenderMaterials2(option, names) as Array;
+                if (count < 0 || (count > 0 && (materials == null || materials.Length != count))) return result;
+                var appearances = new List<DrawingFaceAppearance>();
+                if (materials != null)
+                    foreach (object value in materials)
+                    {
+                        RenderMaterial appearance = value as RenderMaterial;
+                        if (appearance == null) return result;
+                        Array entities = appearance.GetEntities() as Array;
+                        if (appearance.GetEntitiesCount() > 0 && entities == null) return result;
+                        // A patterned appearance has no single face RGB value.
+                        // Keep it unknown instead of assuming its primary color.
+                        int color = appearance.PrimaryColor;
+                        double[] rgb = color >= 0 && appearance.SecondaryColor == color
+                            ? new[] { (color & 255) / 255.0, ((color >> 8) & 255) / 255.0, ((color >> 16) & 255) / 255.0 } : null;
+                        if (entities == null) continue;
+                        foreach (object entity in entities)
+                        {
+                            int priority = entity is Face2 ? 4 : entity is Feature ? 3 : entity is Body2 ? 2 : entity is ModelDoc2 ? 1 : 0;
+                            if (priority > 0) appearances.Add(new DrawingFaceAppearance { Entity = entity, Priority = priority, Material = rgb });
+                        }
+                    }
+
+                Array bodies = ((PartDoc)model).GetBodies2((int)swBodyType_e.swSolidBody, true) as Array;
+                if (bodies == null) return result;
+                foreach (Body2 body in bodies)
+                {
+                    Array faces = body.GetFaces() as Array;
+                    if (faces == null) return result;
+                    foreach (Face2 face in faces)
+                    {
+                        DrawingFaceAppearance effective = null;
+                        foreach (DrawingFaceAppearance appearance in appearances)
+                        {
+                            bool matches = appearance.Entity is Face2
+                                ? face.IsSame((Face2)appearance.Entity)
+                                : appearance.Entity is Feature
+                                    ? swApp.IsSame(face.GetFeature(), appearance.Entity) == (int)swObjectEquality.swObjectSame
+                                    : appearance.Entity is Body2
+                                        ? swApp.IsSame(body, appearance.Entity) == (int)swObjectEquality.swObjectSame
+                                        : swApp.IsSame(model, appearance.Entity) == (int)swObjectEquality.swObjectSame;
+                            if (!matches) continue;
+                            if (effective != null && effective.Priority == appearance.Priority &&
+                                !SameDrawingColor(effective.Material, appearance.Material)) return result;
+                            if (effective == null || appearance.Priority > effective.Priority) effective = appearance;
+                        }
+                        double[] material;
+                        if (effective != null && effective.Priority == 4)
+                            material = effective.Material;
+                        else if (!legacy.TryGet(face, out material) || !ValidDrawingColor(material))
+                        {
+                            // Legacy face colors still take precedence over a
+                            // feature/body/model appearance in the same state.
+                            material = face.GetMaterialPropertyValues2((int)swInConfigurationOpts_e.swThisConfiguration, null) as double[];
+                            if (!ValidDrawingColor(material)) material = effective?.Material;
+                        }
+                        if (effective != null && effective.Material == null && !ValidDrawingColor(material)) return result;
+                        if (!ValidDrawingColor(material)) continue;
+                        result.Faces.Add(face);
+                        result.Materials.Add(material);
+                    }
+                }
+                result.ReadSucceeded = true;
+                Debug.WriteLine("[URA OMOTE] Drawing appearances. config=" + configuration.Name + ", state=" + state
+                    + ", renderMaterials=" + count + ", coloredFaces=" + result.Faces.Count);
+            }
+            catch (Exception error)
+            {
+                Debug.WriteLine("[URA OMOTE] Drawing appearance ERROR: " + error);
+            }
+            return result;
+        }
+
+        private static bool ValidDrawingColor(double[] material)
+        {
+            return material != null && material.Length >= 3 &&
+                material[0] >= 0 && material[0] <= 1 && material[1] >= 0 && material[1] <= 1 && material[2] >= 0 && material[2] <= 1;
+        }
+
+        private static bool SameDrawingColor(double[] first, double[] second)
+        {
+            if (first == null || second == null) return first == second;
+            for (int i = 0; i < 3; i++) if (Math.Abs(first[i] - second[i]) > 1e-6) return false;
+            return true;
         }
 
         private DisplayStateFaceMaterialSet ReadActiveDisplayStateFaceMaterials(ModelDoc2 part, string requestedDisplayState = "")
