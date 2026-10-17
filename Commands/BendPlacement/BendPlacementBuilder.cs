@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Web.Script.Serialization;
 using ADDIN.Commands.BendTools;
+using ADDIN.Commands.BendCollision;
 
 namespace ADDIN.Commands.BendPlacement
 {
@@ -33,11 +34,20 @@ namespace ADDIN.Commands.BendPlacement
     internal static class BendPlacementBuilder
     {
         internal static PlacementDraft Build(PlacementModelCapture model,ToolProfileLibrarySnapshot library,Func<bool> ownerCurrent=null,PlacementSimulationRequest simulation=null)
+            => BuildCore(model,library,ownerCurrent,simulation,null);
+        // Separate production entry: there is no fallback from a missing
+        // external work-pose approval to a manual or inferred placement.
+        internal static PlacementDraft BuildWithProductionPlacements(PlacementModelCapture model,ToolProfileLibrarySnapshot library,
+            IEnumerable<CollisionWorkPoseEvidence> production,Func<bool> ownerCurrent=null)
+            => BuildCore(model,library,ownerCurrent,null,production);
+        private static PlacementDraft BuildCore(PlacementModelCapture model,ToolProfileLibrarySnapshot library,Func<bool> ownerCurrent,
+            PlacementSimulationRequest simulation,IEnumerable<CollisionWorkPoseEvidence> production)
         {
             if(model==null)throw new ArgumentNullException(nameof(model));
             var source=library?.PlacementSources??PlacementSourceSnapshot.Missing("PLACEMENT_SOURCE_NOT_CONFIGURED");
             Func<bool> current=()=>model.Lease.Current&&library?.Current==true&&source.Current&&(ownerCurrent==null||ownerCurrent());
             var sections=model.Sections;var candidates=new List<ToolCandidateDraft>();
+            var poses=(production??new CollisionWorkPoseEvidence[0]).ToArray();
             foreach(var sheet in sections)foreach(string id in CompanyToolIds.All)
             {
                 var r=new List<string>(source.Reasons);var found=source.Tools.Where(t=>string.Equals(t.Id,id,StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -53,6 +63,7 @@ namespace ADDIN.Commands.BendPlacement
                 r.Add("UNKNOWN_BEFORE_DURING_AFTER_STATES");
                 if(model.SimulationOnly)r.Add("SIMULATION_ONLY");
                 PlacementTransform2D transform=null,holderTransform=null;bool sim=simulation!=null&&string.Equals(simulation.ToolId,id,StringComparison.OrdinalIgnoreCase);
+                bool collisionPose=false;CollisionWorkPoseEvidence approvedPose=null;
                 if(sim&&assembly?.Punch!=null&&assembly.Holder!=null&&assembly.MappingIdentified)
                 {
                     r.Add("SIMULATION_ONLY");var tip=simulation.TipMm;var direction=simulation.WorkingDirection;
@@ -63,6 +74,8 @@ namespace ADDIN.Commands.BendPlacement
                     {
                         transform=PlacementTransform2D.Align(tip,direction,simulation.TargetContactMm,simulation.TargetApproach,simulation.Mirror);
                         holderTransform=transform;
+                        collisionPose=assembly.MasterDatums?.Status==DatumEvidenceStatus.VerifiedRecord && assembly.MasterDatums.TipPointMm.HasValue && assembly.MasterDatums.WorkingDirection.HasValue &&
+                            ToolPoint.Distance(tip,assembly.MasterDatums.TipPointMm.Value)<=1e-8 && ToolPoint.Distance(direction,assembly.MasterDatums.WorkingDirection.Value)<=1e-10;
                         if(assembly.SeatingEvidence.CoordinateRecordReady)
                         {
                             // A reviewed relative pose is separate from the
@@ -76,13 +89,18 @@ namespace ADDIN.Commands.BendPlacement
                 }
                 else
                 {
-                    r.Add("MISSING_WORK_CONTACT_AND_APPROACH_EVIDENCE");
+                    var matches=poses.Where(p=>p!=null&&p.ToolId==id&&p.FeatureId==sheet.FeatureId).ToArray();
+                    if(matches.Length==1&&matches[0].AppliesTo(model,library,sheet,assembly))
+                    { approvedPose=matches[0];transform=approvedPose.PunchToWork;holderTransform=approvedPose.HolderToWork;collisionPose=true; }
+                    else
+                    { r.Add(matches.Length>1?"DUPLICATE_PRODUCTION_COLLISION_POSE":"MISSING_WORK_CONTACT_AND_APPROACH_EVIDENCE"); if(matches.Length==1)r.AddRange(matches[0].Reasons); }
                     var dimensioned=library?.Tools.SingleOrDefault(t=>string.Equals(t.Id,id,StringComparison.OrdinalIgnoreCase));
                     if(dimensioned?.Datums?.SourceSha256!=null&&assembly?.MasterSha256!=null&&dimensioned.Datums.SourceSha256!=assembly.MasterSha256)
                         r.Add("UNVERIFIED_FRAME_REGISTRATION");
                 }
                 candidates.Add(new ToolCandidateDraft(id,sheet.FeatureId,assembly,sheet,new ToolGeometryPlacement2D(assembly?.Punch,transform,sheet.Frame?.FrameId),
-                    new ToolGeometryPlacement2D(assembly?.Holder,holderTransform,sheet.Frame?.FrameId),rules,r,sim||model.SimulationOnly||assembly?.SeatingEvidence.SimulationOnly==true||assembly?.HolderObstacles?.Review.SimulationOnly==true,current));
+                    new ToolGeometryPlacement2D(assembly?.Holder,holderTransform,sheet.Frame?.FrameId),rules,r,sim||model.SimulationOnly||assembly?.SeatingEvidence.SimulationOnly==true||assembly?.HolderObstacles?.Review.SimulationOnly==true,
+                    ()=>current()&&(approvedPose==null||approvedPose.Current),collisionPose,approvedPose));
             }
             return new PlacementDraft(model.SnapshotId,model.UpdateStamp,model.Configuration,sections,candidates,current);
         }
@@ -90,6 +108,8 @@ namespace ADDIN.Commands.BendPlacement
             draft.Status,draft.Current,BendCount=draft.Sections.Count,CandidateCount=draft.Candidates.Count,
             ReadyCount=draft.Candidates.Count(c=>c.ReadyForCollisionCheck),SimulationCount=draft.Candidates.Count(c=>c.SimulationOnly),
             GeometryCheckReadyCount=draft.Candidates.Count(c=>c.GeometryCheckReady),
+            CollisionPolicy=CollisionPolicy2D.Version,
+            CollisionCounts=new {Clear=draft.CollisionResults.Count(c=>c.CombinedResult==CollisionStatus.CLEAR),Collision=draft.CollisionResults.Count(c=>c.CombinedResult==CollisionStatus.COLLISION),Unknown=draft.CollisionResults.Count(c=>c.CombinedResult==CollisionStatus.UNKNOWN)},
             Tools=CompanyToolIds.All.Select(id=>new {Id=id,Count=draft.Candidates.Count(c=>c.ToolId==id),
                 Reasons=draft.Candidates.Where(c=>c.ToolId==id).SelectMany(c=>c.Reasons).Distinct().OrderBy(s=>s).ToArray()}) });
     }

@@ -228,6 +228,14 @@
     <Compile Include="Commands\BendPlacement\ToolPairSeatingEvidence.cs" />
     <Compile Include="Commands\BendPlacement\ToolHolderEvidenceReader.cs" />
     <Compile Include="Commands\BendPlacement\SheetEnvelopeReadiness.cs" />
+    <Compile Include="Commands\BendCollision\CollisionModels2D.cs" />
+    <Compile Include="Commands\BendCollision\CollisionInterval.cs" />
+    <Compile Include="Commands\BendCollision\CollisionGeometry2D.cs" />
+    <Compile Include="Commands\BendCollision\CollisionPointLocation2D.cs" />
+    <Compile Include="Commands\BendCollision\CollisionEngine2D.cs" />
+    <Compile Include="Commands\BendCollision\CollisionWorkPoseEvidence.cs" />
+    <Compile Include="Commands\BendCollision\CandidateCollisionResult.cs" />
+    <Compile Include="Commands\BendCollision\PlacementCollisionEvaluator.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolDxfReader.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileLibrary.cs" />

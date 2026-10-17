@@ -62,6 +62,15 @@ internal static partial class NativePlanningValidation
                 Check(Items(Get(placement,"Sections")).Length==initialBends&&Items(Get(placement,"Candidates")).Length==18*initialBends,"Every actual bend has all 18 candidates");
                 Check(Items(Get(placement,"Candidates")).All(c=>Get(c,"Status").ToString()=="CHUA_XAC_MINH"&&!(bool)Get(c,"ReadyForCollisionCheck")),"No automatic Check Max verdict");
                 Check(Get(placement,"WinnerToolId")==null&&Get(item,"PlacementDiagnosticError")==null,"No winner or placement error");
+                var collision=Items(Get(placement,"CollisionResults"));
+                Check(collision.Length==18*initialBends,"Collision engine retains all 18 actual tool rows per bend");
+                Check(collision.All(c=>Get(c,"PunchResult")!=null&&Get(c,"HolderResult")!=null&&Get(c,"CombinedResult").ToString()=="UNKNOWN"),
+                    "Unapproved real setups cannot become CLEAR or COLLISION");
+                Check(collision.All(c=>Items(Get(c,"States")).Length==4&&Get(c,"AllRequiredStatesResult").ToString()=="UNKNOWN"),
+                    "Observed final pose never replaces unknown process states");
+                Check(collision.All(c=>Items(Get(c,"Reasons")).Length>0&&Get(Get(c,"PunchResult"),"CertifiedClearanceLowerMm")==null&&Get(Get(c,"HolderResult"),"Witness")==null),
+                    "Actual UNKNOWN results include reasons without fictitious certificates");
+                report["collision"]=new {Bends=initialBends,Rows=collision.Length,Clear=0,Collision=0,Unknown=collision.Length};
                 int arcReads=(int)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementNativeCapture").GetProperty("ArcMetadataReadCount",All).GetValue(null,null);
                 Check(arcReads>0,"Analytic circle metadata appended during original STA capture");
                 report["placement"]=Json.DeserializeObject((string)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementBuilder").GetMethod("Diagnostic",All).Invoke(null,new[]{placement}));
@@ -112,7 +121,11 @@ internal static partial class NativePlanningValidation
                 Check(Json.Serialize(Snapshot(form,model,true))==min,"Min/planning unchanged by missing source");
                 Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",Path.Combine(output,"missing-manifest.json")); source(args[3]);
                 Until(()=> {Call(form,"Tick"); return Get(library(),"Error")!=null && Get(library(),"Error").ToString().Contains("manifest");},"Bad manifest reports separate library error");
-                Check(Get(item,"Error")==null && Json.Serialize(Snapshot(form,model,true))==min,"Bad manifest does not block Check Min");
+                var afterBadManifest=Snapshot(form,model,true);
+                report["afterBadManifest"]=afterBadManifest;
+                report["badManifestItemError"]=Get(item,"Error");
+                report["badManifestItemSame"]=ReferenceEquals(item,Items(Get(session,"Items")).Single());
+                Check(Get(item,"Error")==null && Json.Serialize(afterBadManifest)==min,"Bad manifest does not block Check Min");
                 Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",null); source(args[3]);
                 Until(()=> {Call(form,"Tick"); return count()==18;},"Library recovers after source restore");
                 var beforeEvidence=library(); string badEvidence=Path.Combine(output,"PRIVATE-malformed-datum.json");File.WriteAllText(badEvidence,"{broken");
@@ -142,6 +155,8 @@ internal static partial class NativePlanningValidation
                 model.ForceRebuild3(false); Call(form,"Tick");
                 Check(!(bool)Get(item,"Current") && Get(item,"ToolProfiles")==null,"Stale model no longer exposes a tool snapshot link");
                 Check(Get(item,"PlacementDraft")==null&&!(bool)Get(held,"Current"),"Rebuild invalidates held placement and hides stale draft");
+                Check(Items(Get(held,"CollisionResults")).All(c=>Get(Get(c,"PunchResult"),"Status").ToString()=="UNKNOWN"&&
+                    Items(Get(Get(c,"PunchResult"),"Reasons")).Cast<string>().Contains("STALE_COLLISION_INPUT")),"Held collision evidence invalidates with model rebuild");
                 Until(()=>Scanned(form) && !ReferenceEquals(item,Items(Get(session,"Items")).Single()),"Existing rebuild auto-rescan");
                 Check(Items(Get(Items(Get(session,"Items")).Single(),"Rows")).Length==initialBends,"Rebuild retains actual sample bend count");
                 var rebuilt=Items(Get(session,"Items")).Single();Check(Get(rebuilt,"PlacementDraft")!=null,"Placement regenerated after existing auto-rescan");
