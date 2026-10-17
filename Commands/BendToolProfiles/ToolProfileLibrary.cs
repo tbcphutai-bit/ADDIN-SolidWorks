@@ -14,6 +14,7 @@ namespace ADDIN.Commands.BendTools
         public int Version { get; set; } = 1;
         public string DirectoryPath { get; set; }
         public string ManifestPath { get; set; }
+        public string DatumEvidencePath { get; set; }
     }
     internal sealed class ToolProfileSourceSettings
     {
@@ -24,7 +25,8 @@ namespace ADDIN.Commands.BendTools
         {
             string directory=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY");
             if (!string.IsNullOrWhiteSpace(directory)) return new ToolProfileSourceConfiguration { DirectoryPath=directory,
-                ManifestPath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST") };
+                ManifestPath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST"),
+                DatumEvidencePath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE") };
             if (!File.Exists(path)) return new ToolProfileSourceConfiguration();
             if (new FileInfo(path).Length>65536) throw new InvalidDataException("DXF source settings exceed 64 KB.");
             var result=new JavaScriptSerializer().Deserialize<ToolProfileSourceConfiguration>(File.ReadAllText(path,Encoding.UTF8));
@@ -113,6 +115,14 @@ namespace ADDIN.Commands.BendTools
                         var definition=definitions.FirstOrDefault(t=>string.Equals(t.Id,id,StringComparison.OrdinalIgnoreCase));
                         tools.Add(ReadTool(id,definition,root,sources,cancellation));
                     }
+                    var evidence=ToolDatumEvidence.Load(config.DatumEvidencePath,cancellation,root:root);
+                    foreach (var tool in tools)
+                    {
+                        cancellation.ThrowIfCancellationRequested();
+                        tool.Datums=ToolDatumEvidence.Bind(tool,evidence,cancellation);
+                        tool.Validation.DatumEvidence=tool.Datums;
+                    }
+                    configSha=HashText(configSha+"\n"+ToolGeometryTolerance.Version+"\n"+evidence.Fingerprint);
                     var provenance=sources.Values.Select(d=>d.Source).OrderBy(s=>s.Path,StringComparer.OrdinalIgnoreCase).ToList();
                     string fingerprint=HashText(configSha+"\n"+string.Join("\n",provenance.Select(p=>p.Path+":"+p.Sha256+":"+p.Error)));
                     return Publish(new ToolProfileLibrarySnapshot { ConfigurationSha256=configSha,Fingerprint=fingerprint,Tools=tools.AsReadOnly(),Sources=provenance.AsReadOnly() });
@@ -128,9 +138,15 @@ namespace ADDIN.Commands.BendTools
         }
         internal static ToolProfileLibrarySnapshot Failure(string reason)
         {
-            return new ToolProfileLibrarySnapshot { Error=reason,Fingerprint=HashText("error:"+reason),Sources=Array.AsReadOnly(new ToolProfileProvenance[0]),
+            var snapshot=new ToolProfileLibrarySnapshot { Error=reason,Fingerprint=HashText("error:"+reason),Sources=Array.AsReadOnly(new ToolProfileProvenance[0]),
                 Tools=CompanyToolIds.All.Select(id=>new CompanyToolProfile { Id=id,Parts=Array.AsReadOnly(new ToolGeometryPart[0]),
                     Validation=new ToolProfileValidationResult { Reasons=Array.AsReadOnly(new[] {reason,"Tool-tip datum/frame and mounting geometry have not been verified."}) } }).ToList().AsReadOnly() };
+            foreach (var tool in snapshot.Tools)
+            {
+                tool.Datums=ToolDatumEvidence.Bind(tool,new ToolDatumEvidenceDocument());
+                tool.Validation.DatumEvidence=tool.Datums;
+            }
+            return snapshot;
         }
         private CompanyToolProfile ReadTool(string id, ToolProfileDefinition definition, string root, Dictionary<string,ToolDxfDocument> sources, CancellationToken cancellation)
         {
@@ -181,14 +197,21 @@ namespace ADDIN.Commands.BendTools
                     .Select(g=>new ToolGeometryPart { Role=g.Key,Source=p.Source,Entities=g.ToList().AsReadOnly() })).ToList();
             complete=complete && hasPunch;
             if (!hasPunch) reasons.Add("Company punch selection is missing.");
+            foreach (var part in parts.Where(p=>p.Role==ToolGeometryRole.CompanyPunchProfile || p.Role==ToolGeometryRole.HolderClampReference || p.Role==ToolGeometryRole.ManufacturerReference))
+                if (part.Source.Error==null) part.Region=ToolRegionValidator.Validate(part.Entities,cancellation:cancellation);
             var punch=parts.Where(p=>p.Role==ToolGeometryRole.CompanyPunchProfile).SelectMany(p=>p.Entities).ToList();
             bool supported=punch.Count>0 && punch.All(e=>e.UnsupportedReason==null && e.Curves.Count>0);
             bool closed=complete && ToolProfileTopology.Closed(punch);
             if (!closed) reasons.Add("Punch is open/incomplete; no closure or region was invented.");
             reasons.Add("Tool-tip origin and coordinate frame are unverified; source coordinates were not recentered.");
             reasons.Add("Holder/clamp fit is unverified; reference drawings are not verified mounting CAD.");
+            var punchParts=parts.Where(p=>p.Role==ToolGeometryRole.CompanyPunchProfile).ToArray();
+            var region=complete ? punchParts.Length==1 ? punchParts[0].Region : ToolRegionValidator.Validate(punch,cancellation:cancellation) : new ToolRegionValidation {
+                Status=ToolRegionStatus.NotEvaluated,DistanceToleranceMm=new ToolGeometryTolerance().DistanceMm,
+                Issues=Array.AsReadOnly(new[] {"IncompletePunchSelection"}) };
             return new CompanyToolProfile { Id=id,Parts=parts.AsReadOnly(),Validation=new ToolProfileValidationResult {
-                SourceFilesExist=files,PunchGeometryReadComplete=complete,PunchEntitiesSupported=supported,PunchClosed=closed,Reasons=reasons.Distinct().ToList().AsReadOnly() } };
+                SourceFilesExist=files,PunchGeometryReadComplete=complete,PunchEntitiesSupported=supported,PunchClosed=closed,Region=region,
+                Reasons=reasons.Distinct().ToList().AsReadOnly() } };
         }
         private ToolDxfDocument Load(string path, CancellationToken cancellation)
         {

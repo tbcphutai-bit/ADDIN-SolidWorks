@@ -1,8 +1,14 @@
-# Phase 2: analytic company DXF profiles
+# Company DXF profiles — Phase 2 / Phase 3A
 
 Production code is in `Commands/BendToolProfiles/`. It has no SOLIDWORKS, WinForms,
 or external package dependency. It supplies read-only geometry/provenance to the
 existing `BendCheckSession`; it does not evaluate manufacturing feasibility.
+
+Phase 3A adds independent analytic region validation and optional private datum
+evidence. Source closure and manufacturing status retain their Phase 2 meaning.
+See [geometry/evidence contract](../../Docs/BendCheck/Phase3A-GeometryContract.md)
+and [validation results](../../Docs/BendCheck/Validation-Phase3A.md). No UI change
+or Check Max feasibility algorithm is introduced.
 
 ## Source configuration without UI changes
 

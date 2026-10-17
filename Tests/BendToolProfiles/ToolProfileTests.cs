@@ -216,6 +216,7 @@ internal static partial class ToolProfileTests
         Test("cancellation is observed and not converted to fake missing data",()=> {
             using (var c=new CancellationTokenSource()) { c.Cancel(); bool cancelled=false; try { Provider(Folder()).Read(c.Token); } catch (OperationCanceledException) {cancelled=true;} Check(cancelled,"Cancellation propagated"); }
         });
+        RegionAndDatumTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a
         // computed directory and never any operation on a company source folder.

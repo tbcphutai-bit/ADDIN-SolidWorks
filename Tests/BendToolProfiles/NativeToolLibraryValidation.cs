@@ -24,7 +24,8 @@ internal static partial class NativePlanningValidation
     internal static int RunToolLibrary(string[] args)
     {
         ISldWorks app=null; bool owned=false; var report=new Dictionary<string,object>();
-        string oldDirectory=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY"), oldManifest=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST");
+        string oldDirectory=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY"), oldManifest=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST"),
+            oldEvidence=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE");
         try
         {
             product=Assembly.LoadFrom(Path.GetFullPath(args[0])); output=Path.GetFullPath(args[1]); Directory.CreateDirectory(output);
@@ -32,6 +33,7 @@ internal static partial class NativePlanningValidation
             File.Copy(original,copy,true); File.SetAttributes(copy,FileAttributes.Normal);
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY",Path.GetFullPath(args[3]));
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",null);
+            Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",null);
             var before=Process.GetProcessesByName("SLDWORKS").Select(p=>p.Id).ToArray();
             app=(ISldWorks)Activator.CreateInstance(Type.GetTypeFromProgID("SldWorks.Application.32")); int pid=app.GetProcessID();
             owned=!before.Contains(pid); Check(owned,"New owned API process required"); app.Visible=false; app.UserControl=false;
@@ -49,6 +51,8 @@ internal static partial class NativePlanningValidation
                 int initialBends=Items(Get(item,"Rows")).Length;
                 Check(ReferenceEquals(Get(item,"ToolProfiles"),initial),"Item uses session library snapshot");
                 Check(Items(Get(initial,"Tools")).All(t=>!(bool)Get(Get(t,"Validation"),"ClampVerified")),"No clamp verification inferred");
+                Check(Items(Get(initial,"Tools")).Count(t=>(bool)Get(Get(Get(t,"Validation"),"Region"),"IsValidRegion"))==17,"17 analytic regions, KIK remains open");
+                Check(Items(Get(initial,"Tools")).All(t=>Get(Get(t,"Datums"),"Status").ToString()=="Missing" && Get(Get(t,"Datums"),"TipPointMm")==null),"No guessed datum evidence");
                 report["initial"]=Snapshot(form,model,true);
                 string min=Json.Serialize(report["initial"]); string minText=Get(item,"MinimumText").ToString();
                 Action<string> source=directory=> {Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY",directory); Call(worker,"Refresh");};
@@ -64,6 +68,14 @@ internal static partial class NativePlanningValidation
                 Check(Get(item,"Error")==null && Json.Serialize(Snapshot(form,model,true))==min,"Bad manifest does not block Check Min");
                 Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",null); source(args[3]);
                 Until(()=> {Call(form,"Tick"); return count()==18;},"Library recovers after source restore");
+                var beforeEvidence=library(); string badEvidence=Path.Combine(output,"PRIVATE-malformed-datum.json");File.WriteAllText(badEvidence,"{broken");
+                Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",badEvidence);Call(worker,"Refresh");
+                Until(()=> {Call(form,"Tick");return Items(Get(library(),"Tools")).All(t=>Get(Get(t,"Datums"),"Status").ToString()=="Invalid");},"Malformed datum evidence is isolated");
+                Check(!(bool)Get(beforeEvidence,"Current") && count()==18,"Evidence edit invalidates snapshot but preserves all CAD profiles");
+                Check(ReferenceEquals(item,Items(Get(session,"Items")).Single()) && (int)Get(Get(item,"Context"),"GeometryReadCount")==1,"Evidence edit does not recapture COM geometry");
+                Check(Get(item,"Error")==null && Json.Serialize(Snapshot(form,model,true))==min,"Invalid datums do not change Check Min/planning");
+                Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",null);Call(worker,"Refresh");
+                Until(()=> {Call(form,"Tick");return Items(Get(library(),"Tools")).All(t=>Get(Get(t,"Datums"),"Status").ToString()=="Missing");},"Datum configuration recovers");
                 var listener=new FailingLibraryListener(); Debug.Listeners.Add(listener);
                 try
                 {
@@ -92,6 +104,7 @@ internal static partial class NativePlanningValidation
             if (owned && app!=null)
             { try {foreach(ModelDoc2 doc in app.GetDocuments() as object[]??new object[0]) if(doc.GetPathName().StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)) app.CloseDoc(doc.GetTitle());app.ExitApp();}catch(Exception ex){Console.WriteLine("Cleanup: "+ex.Message);} }
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY",oldDirectory); Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",oldManifest);
+            Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",oldEvidence);
         }
         Console.WriteLine("Library native checks: "+checks+"; passed: "+report.ContainsKey("passed")); return report.ContainsKey("passed")?0:1;
     }
