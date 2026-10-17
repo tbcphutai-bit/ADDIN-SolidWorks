@@ -38,11 +38,15 @@ namespace ADDIN.Commands.BendPlacement
             if(Thread.CurrentThread.GetApartmentState()!=ApartmentState.STA)throw new InvalidOperationException("Placement capture adapter requires STA.");
             var geometry=item.Context?.Geometry;var nativeBodies=geometry==null?new BendPanelBody[0]:geometry.Values.Select(g=>g.Body).Where(b=>b!=null).Distinct().ToArray();
             var bodies=new List<PlacementBodySnapshot>();var ids=new Dictionary<BendPanelBody,string>();
+            string key=PlacementSourceIo.Hash(item.Key+"\n"+item.Configuration+"\n"+item.Stamp);
+            // One optional read-only B-rep append, cached on the original Min
+            // context. No native object escapes into the managed DTO bundle.
+            var envelope=ADDIN.Commands.BendEnvelope.SheetNativeTopologyCapture.GetOrCapture(item,key,nativeBodies);
             for(int i=0;i<nativeBodies.Length;i++)
             {
                 var b=nativeBodies[i];string id="body:"+i;ids.Add(b,id);
                 bodies.Add(new PlacementBodySnapshot(id,b.Faces.Select(f=>new PlacementFaceSnapshot(f.Id,f.Kind,Direction(f.Normal),Point(f.Point),Direction(f.Axis),f.Edges)),
-                    b.Edges.Select(e=>new PlacementEdgeSnapshot(e.Id,e.Kind,Point(e.A),Point(e.B),e.Faces,e.PlacementArc))));
+                    b.Edges.Select(e=>new PlacementEdgeSnapshot(e.Id,e.Kind,Point(e.A),Point(e.B),e.Faces,e.PlacementArc)),envelope.Bodies[i]));
             }
             var bends=new List<PlacementBendSnapshot>();
             foreach(var row in item.Rows)
@@ -60,7 +64,9 @@ namespace ADDIN.Commands.BendPlacement
                 bends.Add(new PlacementBendSnapshot(row.FeatureId,bodyId,frame,row.ModelThicknessMm,min,max));
             }
             bool complete=item.Context!=null&&nativeBodies.Sum(b=>b.Faces.Count)==item.Context.FaceCount&&nativeBodies.Sum(b=>b.Edges.Count)==item.Context.EdgeCount;
-            string key=PlacementSourceIo.Hash(item.Key+"\n"+item.Configuration+"\n"+item.Stamp);
+            if(!item.Current||item.Context?.Current!=true||item.Model.GetUpdateStamp()!=item.Stamp||
+                item.Model.ConfigurationManager.ActiveConfiguration.Name!=item.Configuration)
+                throw new InvalidOperationException("Model changed during read-only native envelope append.");
             return new PlacementModelCapture(key,item.Stamp,item.Configuration,bodies,bends,complete);
         }
     }

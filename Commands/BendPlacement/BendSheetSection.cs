@@ -42,8 +42,11 @@ namespace ADDIN.Commands.BendPlacement
         public string Id { get; }
         public IReadOnlyList<PlacementFaceSnapshot> Faces { get; }
         public IReadOnlyList<PlacementEdgeSnapshot> Edges { get; }
+        public ADDIN.Commands.BendEnvelope.NativeEnvelopeBody EnvelopeTopology { get; }
         internal PlacementBodySnapshot(string id,IEnumerable<PlacementFaceSnapshot> faces,IEnumerable<PlacementEdgeSnapshot> edges)
-        {Id=id;Faces=PlacementLists.Copy(faces);Edges=PlacementLists.Copy(edges);}
+            : this(id,faces,edges,null) { }
+        internal PlacementBodySnapshot(string id,IEnumerable<PlacementFaceSnapshot> faces,IEnumerable<PlacementEdgeSnapshot> edges,ADDIN.Commands.BendEnvelope.NativeEnvelopeBody topology)
+        {Id=id;Faces=PlacementLists.Copy(faces);Edges=PlacementLists.Copy(edges);EnvelopeTopology=topology;}
     }
     internal sealed class PlacementBendSnapshot
     {
@@ -135,7 +138,7 @@ namespace ADDIN.Commands.BendPlacement
                 return new SheetSection2D(bend.FeatureId,bend.Frame,bend.ThicknessMm,SheetCoverage.Unsupported2DEnvelope,null,ToolRegionValidator.Validate(null),reasons);
             }
         }
-        private static ToolCurve Project(PlacementEdgeSnapshot edge,BendWorkFrame frame)
+        internal static ToolCurve Project(PlacementEdgeSnapshot edge,BendWorkFrame frame)
         {
             var a=frame.Project(edge.A);var b=frame.Project(edge.B);
             if(edge.Kind==1)return ToolCurve.Line(a,b,new ToolTransform());

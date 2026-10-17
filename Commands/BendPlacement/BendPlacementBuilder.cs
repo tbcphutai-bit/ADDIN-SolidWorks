@@ -40,8 +40,12 @@ namespace ADDIN.Commands.BendPlacement
         internal static PlacementDraft BuildWithProductionPlacements(PlacementModelCapture model,ToolProfileLibrarySnapshot library,
             IEnumerable<CollisionWorkPoseEvidence> production,Func<bool> ownerCurrent=null)
             => BuildCore(model,library,ownerCurrent,null,production);
+        // Managed preparation for the Phase 3D worker. It deliberately skips
+        // constructor-time kernel calls; the legacy synchronous path is kept.
+        internal static PlacementDraft PrepareForAsync(PlacementModelCapture model,ToolProfileLibrarySnapshot library)
+            => BuildCore(model,library,null,null,null,false);
         private static PlacementDraft BuildCore(PlacementModelCapture model,ToolProfileLibrarySnapshot library,Func<bool> ownerCurrent,
-            PlacementSimulationRequest simulation,IEnumerable<CollisionWorkPoseEvidence> production)
+            PlacementSimulationRequest simulation,IEnumerable<CollisionWorkPoseEvidence> production,bool evaluateLegacyCollision=true)
         {
             if(model==null)throw new ArgumentNullException(nameof(model));
             var source=library?.PlacementSources??PlacementSourceSnapshot.Missing("PLACEMENT_SOURCE_NOT_CONFIGURED");
@@ -100,7 +104,7 @@ namespace ADDIN.Commands.BendPlacement
                 }
                 candidates.Add(new ToolCandidateDraft(id,sheet.FeatureId,assembly,sheet,new ToolGeometryPlacement2D(assembly?.Punch,transform,sheet.Frame?.FrameId),
                     new ToolGeometryPlacement2D(assembly?.Holder,holderTransform,sheet.Frame?.FrameId),rules,r,sim||model.SimulationOnly||assembly?.SeatingEvidence.SimulationOnly==true||assembly?.HolderObstacles?.Review.SimulationOnly==true,
-                    ()=>current()&&(approvedPose==null||approvedPose.Current),collisionPose,approvedPose));
+                    ()=>current()&&(approvedPose==null||approvedPose.Current),collisionPose,approvedPose,evaluateLegacyCollision));
             }
             return new PlacementDraft(model.SnapshotId,model.UpdateStamp,model.Configuration,sections,candidates,current);
         }

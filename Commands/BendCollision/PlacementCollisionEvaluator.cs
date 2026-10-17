@@ -80,7 +80,7 @@ namespace ADDIN.Commands.BendCollision
             var query=new CollisionQuery2D(kind,workpiece,obstacle,state.Coverage.ToString(),current:current,missingEvidence:missing);
             return CollisionEngine2D.Evaluate(query);
         }
-        private static double PlacementUncertainty(IEnumerable<ToolCurve> curves,PlacementTransform2D t)
+        internal static double PlacementUncertainty(IEnumerable<ToolCurve> curves,PlacementTransform2D t)
         {
             var a=curves.ToArray();double magnitude=a.Max(c=>new[]{c.Start,c.End,c.Center}.Max(p=>Math.Max(Math.Abs(p.X),Math.Abs(p.Y)))+c.RadiusMm);
             return a.Max(c=>c.RadiusMm)*1e-9+64*2.2204460492503131e-16*(4*magnitude+Math.Abs(t.TxMm)+Math.Abs(t.TyMm)+1);

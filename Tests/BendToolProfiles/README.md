@@ -1,4 +1,4 @@
-# Company DXF profiles — Phase 2 through Phase 3C
+# Company DXF profiles — Phase 2 through Phase 3D
 
 Production code is in `Commands/BendToolProfiles/`. It has no SOLIDWORKS, WinForms,
 or external package dependency. It supplies read-only geometry/provenance to the
@@ -60,7 +60,41 @@ approvals or substitute company profiles.
 python Tests/BendToolProfiles/compare_collision_with_geos.py $PrivateOracleOutput
 ```
 
-Optional oracle dependencies are Shapely/GEOS (tested with Shapely 2.2.0) and
+Phase 3D adds `Commands/BendEnvelope/`: source-bound continuous axial partitions,
+an additional cached STA topology capture, finite signed Punch/Holder setup
+records and a managed bounded async worker. The new native proof accepts complete
+prismatic shells with axial steps/holes/pockets/tabs; unsupported native trims
+remain UNKNOWN. Controlled analytic solids also exercise linear LINE/ARC sweeps
+and a cross-axis cylindrical bore. Finite observed slices alone never prove
+CLEAR. See the [envelope contract](../../Docs/BendCheck/Phase3D-EnvelopeContract.md)
+and [local validation, failures and limits](../../Docs/BendCheck/Validation-Phase3D.md).
+
+The normal suite now runs 215 groups (7,964 assertions), including all 188 Phase
+3C groups. To run the new independent original-volume oracle:
+
+```powershell
+& $ToolProfilesTestExe --envelope-oracle $PrivateAxialOracleOutput
+python Tests/BendToolProfiles/compare_axial_solids.py $PrivateAxialOracleOutput
+```
+
+This oracle uses Python's standard library and controlled synthetic source solids,
+not company CAD. It checks true source overlap, 3D clearance lower bounds and
+witness occupancy independently of the native partition compiler. It does not
+grant production approval. Set `ADDIN_ENVELOPE_TEST_OUTPUT` to a private directory
+to retain the worker benchmark from normal tests. For the optimized Release suite,
+build with `/p:Configuration=Release /p:Platform=x64 /p:Optimize=true
+/p:DefineConstants=TRACE`. The test project retains DEBUG by default.
+
+The native harness adds coverage tiers, topology/read counters, worker separation
+and stale certificate checks. Optional `--require-uniform-sections` tests the
+existing three-bend uniform Part; `--capture-private` retains the full managed
+capture **outside Git**. Its optional seventh positional argument is the private
+placement configuration. Actual six-bend coverage remains 0/6 and all company
+tool results UNKNOWN pending both geometry support and external setup evidence.
+The existing UI/event handlers are unchanged; worker API availability is not a
+claim that the UI already uses it.
+
+Optional Phase 3C oracle dependencies are Shapely/GEOS (tested with Shapely 2.2.0) and
 NumPy in a private QA environment. The oracle independently subtracts each
 component's holes before union and uses a declared `1e-7 mm` arc sagitta
 allowance. It checks clearance lower bounds, conservative SPLINE bands and

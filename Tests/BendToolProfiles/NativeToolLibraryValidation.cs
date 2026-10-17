@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
 using Environment=System.Environment;
@@ -58,6 +60,7 @@ internal static partial class NativePlanningValidation
                 Check(Items(Get(initial,"Tools")).All(t=>Get(Get(t,"Datums"),"Status").ToString()=="Missing" && Get(Get(t,"Datums"),"TipPointMm")==null),"No guessed datum evidence");
                 report["initial"]=Snapshot(form,model,true);
                 string min=Json.Serialize(report["initial"]); string minText=Get(item,"MinimumText").ToString();
+                report["initialSerializedAtAssertion"]=min;
                 var placement=Get(item,"PlacementDraft");Check(placement!=null,"Read-only placement is captured by existing Check chan");
                 Check(Items(Get(placement,"Sections")).Length==initialBends&&Items(Get(placement,"Candidates")).Length==18*initialBends,"Every actual bend has all 18 candidates");
                 Check(Items(Get(placement,"Candidates")).All(c=>Get(c,"Status").ToString()=="CHUA_XAC_MINH"&&!(bool)Get(c,"ReadyForCollisionCheck")),"No automatic Check Max verdict");
@@ -73,6 +76,32 @@ internal static partial class NativePlanningValidation
                 report["collision"]=new {Bends=initialBends,Rows=collision.Length,Clear=0,Collision=0,Unknown=collision.Length};
                 int arcReads=(int)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementNativeCapture").GetProperty("ArcMetadataReadCount",All).GetValue(null,null);
                 Check(arcReads>0,"Analytic circle metadata appended during original STA capture");
+                var nativeEnvelopeType=product.GetType("ADDIN.Commands.BendEnvelope.SheetNativeTopologyCapture");
+                int bodyCaptures=(int)nativeEnvelopeType.GetProperty("BodyCaptureCount",All).GetValue(null,null);
+                Check(bodyCaptures>0,"One optional full topology append was read on STA");
+                var managedCapture=Get(item,"PlacementCapture");
+                product.GetType("ADDIN.Commands.BendPlacement.BendPlacementNativeCapture").GetMethod("Copy",All).Invoke(null,new[]{item});
+                Check((int)nativeEnvelopeType.GetProperty("BodyCaptureCount",All).GetValue(null,null)==bodyCaptures,"Same snapshot reuses cached native topology append");
+                var volumeRequest=New("Commands.BendEnvelope.CollisionBatchRequest",managedCapture,initial,null,null);
+                object volumeWorker=New("Commands.BendEnvelope.CollisionBatchWorker");object volumeResult;
+                try
+                {
+                    var task=(Task)Call(volumeWorker,"RunAsync",volumeRequest,null,CancellationToken.None,null);
+                    Until(()=>task.IsCompleted,"Managed 18-tool envelope batch completes");task.GetAwaiter().GetResult();
+                    volumeResult=task.GetType().GetProperty("Result").GetValue(task,null);
+                    var volumeRows=Items(Get(volumeResult,"Candidates"));var envelopes=Items(Get(volumeResult,"Envelopes"));
+                    Check(volumeRows.Length==18*initialBends&&volumeRows.All(r=>Get(r,"CombinedResult").ToString()=="UNKNOWN"),"Actual 3D tool extents remain unverified for all 18 slots");
+                    Check(envelopes.Length==initialBends,"Coverage result exists for every actual bend");
+                    Check((int)Get(volumeResult,"PreparationThreadId")!=Thread.CurrentThread.ManagedThreadId,"Managed geometry preparation runs off the STA caller");
+                    Check((int)nativeEnvelopeType.GetProperty("WrongThreadCount",All).GetValue(null,null)==0,"No native topology capture runs on a worker");
+                    report["envelope"]=new {Bends=initialBends,Rows=volumeRows.Length,BodyCaptures=bodyCaptures,
+                        CaptureElapsedMs=nativeEnvelopeType.GetProperty("TotalCaptureMilliseconds",All).GetValue(null,null),
+                        ElapsedMs=Get(volumeResult,"ElapsedMilliseconds"),CaptureHash=Items(Get(managedCapture,"Bodies")).Select(b=>Get(Get(b,"EnvelopeTopology"),"SourceSha256")).ToArray(),
+                        Tiers=envelopes.Select(e=>new {Feature=Get(Get(e,"Binding"),"FeatureId"),Tier=Get(Get(e,"Certificate"),"Tier").ToString(),
+                            Intervals=Items(Get(Get(e,"Certificate"),"Intervals")).Length,Reasons=Get(e,"Reasons")}).ToArray()};
+                    Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1,"Envelope batch reuses original Check Min capture");
+                }
+                finally {((IDisposable)volumeWorker).Dispose();}
                 report["placement"]=Json.DeserializeObject((string)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementBuilder").GetMethod("Diagnostic",All).Invoke(null,new[]{placement}));
                 report["sections"]=Items(Get(placement,"Sections")).Select(s=>new {Coverage=Get(s,"Coverage").ToString(),Reasons=Get(s,"Reasons"),BoundaryCount=Items(Get(s,"Boundary")).Length}).ToArray();
                 if(args.Skip(6).Contains("--capture-private"))
@@ -125,7 +154,9 @@ internal static partial class NativePlanningValidation
                 report["afterBadManifest"]=afterBadManifest;
                 report["badManifestItemError"]=Get(item,"Error");
                 report["badManifestItemSame"]=ReferenceEquals(item,Items(Get(session,"Items")).Single());
-                Check(Get(item,"Error")==null && Json.Serialize(afterBadManifest)==min,"Bad manifest does not block Check Min");
+                string manifestSerialized=Json.Serialize(afterBadManifest);
+                report["manifestSerializedAtAssertion"]=manifestSerialized;
+                Check(Get(item,"Error")==null && manifestSerialized==min,"Bad manifest does not block Check Min");
                 Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",null); source(args[3]);
                 Until(()=> {Call(form,"Tick"); return count()==18;},"Library recovers after source restore");
                 var beforeEvidence=library(); string badEvidence=Path.Combine(output,"PRIVATE-malformed-datum.json");File.WriteAllText(badEvidence,"{broken");
@@ -148,6 +179,7 @@ internal static partial class NativePlanningValidation
                 finally {Debug.Listeners.Remove(listener);}
                 source(args[3]); Until(()=> {Call(form,"Tick"); return count()==18;},"Final library restore");
                 Check((int)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementNativeCapture").GetProperty("ArcMetadataReadCount",All).GetValue(null,null)==arcReads,"Library/evidence edits do not call SOLIDWORKS arc capture again");
+                Check((int)nativeEnvelopeType.GetProperty("BodyCaptureCount",All).GetValue(null,null)==bodyCaptures,"Source-only changes add no native B-rep traversal");
                 Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1,"All source-only changes reuse original model capture");
                 Check(model.GetUpdateStamp()==stamp && model.GetSaveFlag()==dirty && model.ConfigurationManager.ActiveConfiguration.Name==config,"Library I/O preserves model stamp/config/dirty");
                 report["libraryDebug"]=Json.DeserializeObject((string)Call(library(),"ToDebugJson"));
@@ -155,6 +187,7 @@ internal static partial class NativePlanningValidation
                 model.ForceRebuild3(false); Call(form,"Tick");
                 Check(!(bool)Get(item,"Current") && Get(item,"ToolProfiles")==null,"Stale model no longer exposes a tool snapshot link");
                 Check(Get(item,"PlacementDraft")==null&&!(bool)Get(held,"Current"),"Rebuild invalidates held placement and hides stale draft");
+                Check(Items(Get(volumeResult,"Envelopes")).All(e=>!(bool)Get(Get(e,"Certificate"),"Current")),"Native rebuild invalidates held continuous-coverage certificates");
                 Check(Items(Get(held,"CollisionResults")).All(c=>Get(Get(c,"PunchResult"),"Status").ToString()=="UNKNOWN"&&
                     Items(Get(Get(c,"PunchResult"),"Reasons")).Cast<string>().Contains("STALE_COLLISION_INPUT")),"Held collision evidence invalidates with model rebuild");
                 Until(()=>Scanned(form) && !ReferenceEquals(item,Items(Get(session,"Items")).Single()),"Existing rebuild auto-rescan");
