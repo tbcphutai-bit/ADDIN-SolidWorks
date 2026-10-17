@@ -87,6 +87,7 @@ namespace ADDIN.Commands.BendTools
         public string Handle { get; internal set; }
         public int SourceRecord { get; internal set; }
         public string SourceLayer { get; internal set; }
+        public string SourceLineType { get; internal set; }
         public string Layer { get; internal set; }
         public string InstancePath { get; internal set; }
         public IReadOnlyList<string> Blocks { get; internal set; }
@@ -99,6 +100,7 @@ namespace ADDIN.Commands.BendTools
         public IReadOnlyList<ToolPoint> SourceVertices { get; internal set; }
         public IReadOnlyList<double> SourceBulges { get; internal set; }
         public IReadOnlyList<ToolCurve> Curves { get; internal set; }
+        public ToolSplineData Spline { get; internal set; }
     }
 
     internal static class ToolProfileTopology

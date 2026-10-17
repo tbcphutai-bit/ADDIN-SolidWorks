@@ -46,13 +46,13 @@ namespace ADDIN.Commands.BendPlacement
                 if(!current())r.Add("STALE_SOURCE");
                 if(sheet.Coverage==SheetCoverage.Unsupported2DEnvelope)r.Add("UNSUPPORTED_2D_ENVELOPE");
                 if(assembly?.MasterDatums?.Status!=DatumEvidenceStatus.VerifiedRecord)r.Add("MISSING_DATUM_EVIDENCE");
-                if(assembly?.Holder==null||assembly.Holder.ReferenceOnly)r.Add("UNVERIFIED_HOLDER");
-                if(assembly?.Holder!=null&&(!assembly.Holder.Supported||!assembly.Holder.Region.IsValidRegion))r.Add("UNSUPPORTED_HOLDER_GEOMETRY");
+                if(assembly?.Holder==null||assembly.ClampVerified!=true)r.Add("UNVERIFIED_HOLDER");
+                if(assembly?.Holder!=null&&assembly.HolderObstacles?.GeometrySupportedForCollision!=true)r.Add("UNSUPPORTED_HOLDER_GEOMETRY");
                 var rules=source.LimitRules.Where(rule=>rule.ToolIds.Contains(id,StringComparer.OrdinalIgnoreCase)).ToArray();
                 if(rules.Length==0||rules.Any(rule=>!rule.FamilyMappingVerified))r.Add("UNMAPPED_LIMIT_RULE");
                 r.Add("UNKNOWN_BEFORE_DURING_AFTER_STATES");
                 if(model.SimulationOnly)r.Add("SIMULATION_ONLY");
-                PlacementTransform2D transform=null;bool sim=simulation!=null&&string.Equals(simulation.ToolId,id,StringComparison.OrdinalIgnoreCase);
+                PlacementTransform2D transform=null,holderTransform=null;bool sim=simulation!=null&&string.Equals(simulation.ToolId,id,StringComparison.OrdinalIgnoreCase);
                 if(sim&&assembly?.Punch!=null&&assembly.Holder!=null&&assembly.MappingIdentified)
                 {
                     r.Add("SIMULATION_ONLY");var tip=simulation.TipMm;var direction=simulation.WorkingDirection;
@@ -60,7 +60,18 @@ namespace ADDIN.Commands.BendPlacement
                     if(!frame&&simulation.Registration!=null&&simulation.Registration.FromFrame==simulation.SourceFrameId&&simulation.Registration.ToFrame==assembly.Punch.FrameId)
                     {tip=simulation.Registration.Transform.Apply(tip);direction=simulation.Registration.Transform.Direction(direction);frame=true;}
                     if(frame&&assembly.Punch.FrameId==assembly.Holder.FrameId)
+                    {
                         transform=PlacementTransform2D.Align(tip,direction,simulation.TargetContactMm,simulation.TargetApproach,simulation.Mirror);
+                        holderTransform=transform;
+                        if(assembly.SeatingEvidence.CoordinateRecordReady)
+                        {
+                            // A reviewed relative pose is separate from the
+                            // paper-space placement of the Master instances.
+                            if(ToolPoint.Distance(tip,assembly.SeatingEvidence.TipPointMm.Value)<=1e-8&&ToolPoint.Distance(direction,assembly.SeatingEvidence.WorkingDirection.Value)<=1e-10)
+                                holderTransform=transform.Then(assembly.SeatingEvidence.HolderSourceToPunchSource);
+                            else{holderTransform=null;r.Add("SIMULATION_DATUM_DOES_NOT_MATCH_SEATING_RECORD");}
+                        }
+                    }
                     else r.Add("UNVERIFIED_FRAME_REGISTRATION");
                 }
                 else
@@ -71,13 +82,14 @@ namespace ADDIN.Commands.BendPlacement
                         r.Add("UNVERIFIED_FRAME_REGISTRATION");
                 }
                 candidates.Add(new ToolCandidateDraft(id,sheet.FeatureId,assembly,sheet,new ToolGeometryPlacement2D(assembly?.Punch,transform,sheet.Frame?.FrameId),
-                    new ToolGeometryPlacement2D(assembly?.Holder,transform,sheet.Frame?.FrameId),rules,r,sim||model.SimulationOnly,current));
+                    new ToolGeometryPlacement2D(assembly?.Holder,holderTransform,sheet.Frame?.FrameId),rules,r,sim||model.SimulationOnly||assembly?.SeatingEvidence.SimulationOnly==true||assembly?.HolderObstacles?.Review.SimulationOnly==true,current));
             }
             return new PlacementDraft(model.SnapshotId,model.UpdateStamp,model.Configuration,sections,candidates,current);
         }
         internal static string Diagnostic(PlacementDraft draft)=>new JavaScriptSerializer().Serialize(new {
             draft.Status,draft.Current,BendCount=draft.Sections.Count,CandidateCount=draft.Candidates.Count,
             ReadyCount=draft.Candidates.Count(c=>c.ReadyForCollisionCheck),SimulationCount=draft.Candidates.Count(c=>c.SimulationOnly),
+            GeometryCheckReadyCount=draft.Candidates.Count(c=>c.GeometryCheckReady),
             Tools=CompanyToolIds.All.Select(id=>new {Id=id,Count=draft.Candidates.Count(c=>c.ToolId==id),
                 Reasons=draft.Candidates.Where(c=>c.ToolId==id).SelectMany(c=>c.Reasons).Distinct().OrderBy(s=>s).ToArray()}) });
     }

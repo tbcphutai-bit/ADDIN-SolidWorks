@@ -10,6 +10,15 @@
     <Reference Include="System"/><Reference Include="System.Core"/><Reference Include="System.Web.Extensions"/>
     <Reference Include="System.IO.Compression"/><Reference Include="System.Xml"/><Reference Include="System.Xml.Linq"/>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileGeometry.cs"><Link>ToolProfileGeometry.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendToolProfiles\ToolNurbsGeometry.cs"><Link>ToolNurbsGeometry.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\ToolReviewEvidence.cs"><Link>ToolReviewEvidence.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\HolderObstacleGeometry.cs"><Link>HolderObstacleGeometry.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\HolderObstaclePlacement2D.cs"><Link>HolderObstaclePlacement2D.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\ToolPairSeatingEvidence.cs"><Link>ToolPairSeatingEvidence.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\ToolHolderEvidenceReader.cs"><Link>ToolHolderEvidenceReader.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\SheetEnvelopeReadiness.cs"><Link>SheetEnvelopeReadiness.cs</Link></Compile>
+    <Compile Include="HolderTests.cs"/>
+    <Compile Include="HolderCompanyIntegration.cs"/>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileModels.cs"><Link>ToolProfileModels.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolDxfReader.cs"><Link>ToolDxfReader.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileLibrary.cs"><Link>ToolProfileLibrary.cs</Link></Compile>

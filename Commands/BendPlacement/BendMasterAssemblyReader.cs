@@ -56,7 +56,7 @@ namespace ADDIN.Commands.BendPlacement
             internal IReadOnlyList<ToolAssemblyProfile> Tools;
             internal IReadOnlyList<string> Reasons;
         }
-        internal static Result Read(string source,string manifestPath,string datumPath,CancellationToken token)
+        internal static Result Read(string source,string manifestPath,string datumPath,CancellationToken token,string holderEvidencePath=null,string seatingEvidencePath=null,string authoritiesPath=null)
         {
             string sha=null,manifestSha=null;var reasons=new List<string>();var profiles=new List<ToolAssemblyProfile>();
             try
@@ -71,6 +71,9 @@ namespace ADDIN.Commands.BendPlacement
                 var doc=ToolDxfReader.Read(bytes,provenance,token);
                 if(doc.Source.Error!=null)throw new InvalidDataException("UNSUPPORTED_MASTER_SOURCE");
                 var labels=Labels(bytes);var evidence=ToolDatumEvidence.Load(datumPath,token);
+                var holderEvidence=new ToolHolderEvidenceReader(holderEvidencePath,seatingEvidencePath,authoritiesPath,token);
+                if(holderEvidence.HolderError!=null)reasons.Add(holderEvidence.HolderError);
+                if(holderEvidence.SeatingError!=null)reasons.Add(holderEvidence.SeatingError);
                 foreach(string id in CompanyToolIds.All)
                 {
                     token.ThrowIfCancellationRequested();var r=new List<string>();
@@ -89,12 +92,24 @@ namespace ADDIN.Commands.BendPlacement
                     var p=punch.Count==0?null:new GeometrySelection2D(sha,geometryHash,punch,false,token);
                     var h=holder.Count==0?null:new GeometrySelection2D(sha,null,holder,true,token);
                     var datums=ToolDatumEvidence.Bind(temp,evidence,token);
+                    var obstacle=holderEvidence.Material(id,p,h,manifestSha,token);
+                    var mappingReview=holderEvidence.Mapping(id,definition,p,h,manifestSha,token);
+                    var seating=holderEvidence.Seating(id,sha,manifestSha,p,h,obstacle,datums,token);
                     if(p!=null&&(!p.Region.IsValidRegion||!p.ObservedClosed||p.Region.MaximumJointGapMm>1e-10))r.Add("UNVERIFIED_PUNCH_REGION");
-                    if(h!=null&&!h.Supported)r.Add("UNSUPPORTED_HOLDER_GEOMETRY");
-                    else if(h!=null&&(!h.Region.IsValidRegion||!h.ObservedClosed||h.Region.MaximumJointGapMm>1e-10))r.Add("UNVERIFIED_HOLDER_REGION");
-                    r.Add("UNVERIFIED_HOLDER");r.Add("UNVERIFIED_PAIR_PLACEMENT");
+                    // The legacy drawing selection is deliberately analytic
+                    // only. Its unsupported-SPLINE/single-loop state must not
+                    // override a separately reviewed material-set backend.
+                    if(h!=null&&!obstacle.GeometrySupportedForCollision)
+                    {
+                        if(!h.Supported)r.Add("UNSUPPORTED_HOLDER_GEOMETRY");
+                        else if(!h.Region.IsValidRegion||!h.ObservedClosed||h.Region.MaximumJointGapMm>1e-10)r.Add("UNVERIFIED_HOLDER_REGION");
+                    }
+                    if(!seating.PhysicalInspectionAccepted||!mappingReview.RecordVerified)r.Add("UNVERIFIED_HOLDER");
+                    if(!seating.CoordinateRecordReady)r.Add("UNVERIFIED_PAIR_PLACEMENT");
                     if(datums.Status!=DatumEvidenceStatus.VerifiedRecord)r.Add("MISSING_DATUM_EVIDENCE");
-                    profiles.Add(new ToolAssemblyProfile(id,sha,manifestSha,p,h,datums,identified,r));
+                    r.AddRange(obstacle.Reasons);if(!mappingReview.RecordVerified)r.Add(mappingReview.Reason);
+                    r.AddRange(seating.Reasons);
+                    profiles.Add(new ToolAssemblyProfile(id,sha,manifestSha,p,h,datums,identified,r,obstacle,seating,mappingReview));
                 }
                 // A shared physical source entity cannot silently belong to two
                 // tool slots or both roles. Reused block definitions are fine
@@ -102,8 +117,8 @@ namespace ADDIN.Commands.BendPlacement
                 var assignments=profiles.SelectMany(p=>(p.Punch?.EntityKeys??new string[0]).Select(k=>new {p.Id,Key=k,Role="P"})
                     .Concat((p.Holder?.EntityKeys??new string[0]).Select(k=>new {p.Id,Key=k,Role="H"}))).ToArray();
                 var overlaps=new HashSet<string>(assignments.GroupBy(a=>a.Key).Where(g=>g.Count()>1).SelectMany(g=>g.Select(a=>a.Id)),StringComparer.OrdinalIgnoreCase);
-                profiles=profiles.Select(p=>overlaps.Contains(p.Id)?new ToolAssemblyProfile(p.Id,sha,manifestSha,p.Punch,p.Holder,p.MasterDatums,false,p.Reasons.Concat(new[]{"AMBIGUOUS_MASTER_ROLE"})):p).ToList();
-                return new Result {Tools=PlacementLists.Copy(profiles),Reasons=PlacementLists.Reasons(reasons),Fingerprint=PlacementSourceIo.Hash(sha+manifestSha+evidence.Fingerprint)};
+                profiles=profiles.Select(p=>overlaps.Contains(p.Id)?new ToolAssemblyProfile(p.Id,sha,manifestSha,p.Punch,p.Holder,p.MasterDatums,false,p.Reasons.Concat(new[]{"AMBIGUOUS_MASTER_ROLE"}),p.HolderObstacles,p.SeatingEvidence,p.MappingReview):p).ToList();
+                return new Result {Tools=PlacementLists.Copy(profiles),Reasons=PlacementLists.Reasons(reasons),Fingerprint=PlacementSourceIo.Hash(sha+manifestSha+evidence.Fingerprint+holderEvidence.Fingerprint)};
             }
             catch(OperationCanceledException){throw;}
             catch(Exception ex)

@@ -82,6 +82,25 @@ internal static partial class NativePlanningValidation
                     Check(Json.Serialize(Snapshot(form,model,true))==min,"Placement-source failure does not change Min or Planning");
                     Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",good);Call(worker,"Refresh");
                     Until(()=>{Call(form,"Tick");return Items(Get(Get(library(),"PlacementSources"),"Tools")).All(t=>Get(t,"Punch")!=null);},"Master/Excel source restores independently");
+                    // Exercise new optional review I/O through the real file
+                    // worker/session, without sending a COM object to it.
+                    var privateConfig=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(good));
+                    foreach(string key in privateConfig.Keys.Where(k=>k.EndsWith("Path",StringComparison.Ordinal)).ToArray())
+                    {
+                        string value=Convert.ToString(privateConfig[key]);
+                        if(!string.IsNullOrWhiteSpace(value))privateConfig[key]=Path.GetFullPath(Path.Combine(Path.GetDirectoryName(good),value));
+                    }
+                    string malformed=Path.Combine(output,"PRIVATE-malformed-holder-review.json"),reviewConfig=Path.Combine(output,"PRIVATE-holder-source-config.json");
+                    File.WriteAllText(malformed,"{broken");
+                    foreach(string key in new[]{"HolderEvidencePath","PairSeatingEvidencePath","ReviewAuthoritiesPath"})privateConfig[key]=malformed;
+                    File.WriteAllText(reviewConfig,Json.Serialize(privateConfig));
+                    var beforeHolderEdit=library();Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",reviewConfig);Call(worker,"Refresh");
+                    Until(()=>{Call(form,"Tick");return !ReferenceEquals(library(),beforeHolderEdit)&&Items(Get(Get(library(),"PlacementSources"),"Reasons")).Any(r=>r.ToString()=="INVALID_HOLDER_EVIDENCE_SOURCE");},"Malformed holder/seating review is isolated in native pipeline");
+                    Check(Items(Get(Get(library(),"PlacementSources"),"Tools")).Count(t=>Get(t,"Punch")!=null)==18,"Optional review error preserves actual 18 source punches");
+                    Check(Json.Serialize(Snapshot(form,model,true))==min&&ReferenceEquals(item,Items(Get(session,"Items")).Single()),"Holder review edit preserves Min/planning and capture object");
+                    Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1,"Holder review edit adds no COM geometry read");
+                    Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",good);Call(worker,"Refresh");
+                    Until(()=>{Call(form,"Tick");return !Items(Get(Get(library(),"PlacementSources"),"Reasons")).Any(r=>r.ToString()=="INVALID_HOLDER_EVIDENCE_SOURCE");},"Optional review source recovery");
                 }
                 Action<string> source=directory=> {Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY",directory); Call(worker,"Refresh");};
                 string missing=Path.Combine(output,"missing-company-source"); source(missing);

@@ -45,6 +45,18 @@ namespace ADDIN.Commands.BendTools
     {
         private const double Tau = 2 * Math.PI;
         private const double AngleRoundoff = 1e-12;
+        // Holder contour topology only. These helpers do not evaluate a Part
+        // against a tool or change the existing single-punch validator.
+        internal static bool BoundariesContact(IEnumerable<ToolCurve> first,IEnumerable<ToolCurve> second,double tolerance,CancellationToken token)
+        {
+            foreach(var a in first)foreach(var b in second)
+            {
+                token.ThrowIfCancellationRequested();if(!GetBounds(a,tolerance).Near(GetBounds(b,tolerance),tolerance))continue;
+                var contact=Intersections(a,b,tolerance);if(contact.Overlap||contact.Points.Count>0)return true;
+            }
+            return false;
+        }
+        internal static bool ContainsPoint(IEnumerable<ToolCurve> curves,ToolPoint point)=>Contains(curves.Select(c=>new Step {Edge=new Edge {Curve=c},Forward=true}).ToList(),point);
         private sealed class Edge
         {
             internal ToolCurve Curve;
