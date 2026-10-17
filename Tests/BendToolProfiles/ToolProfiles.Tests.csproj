@@ -13,7 +13,10 @@
     <Compile Include="..\..\Commands\BendToolProfiles\ToolDxfReader.cs"><Link>ToolDxfReader.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileLibrary.cs"><Link>ToolProfileLibrary.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileLibrarySession.cs"><Link>ToolProfileLibrarySession.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendToolProfiles\ToolRegionValidator.cs"><Link>ToolRegionValidator.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendToolProfiles\ToolDatumEvidence.cs"><Link>ToolDatumEvidence.cs</Link></Compile>
     <Compile Include="ToolProfileTests.cs"/><Compile Include="CompanyToolIntegration.cs"/>
+    <Compile Include="RegionAndDatumTests.cs"/>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

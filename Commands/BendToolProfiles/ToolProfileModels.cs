@@ -36,6 +36,7 @@ namespace ADDIN.Commands.BendTools
         public ToolGeometryRole Role { get; internal set; }
         public ToolProfileProvenance Source { get; internal set; }
         public IReadOnlyList<ToolDxfEntity> Entities { get; internal set; }
+        public ToolRegionValidation Region { get; internal set; } = ToolRegionValidator.Validate(null);
     }
 
     internal sealed class ToolProfileValidationResult
@@ -45,6 +46,11 @@ namespace ADDIN.Commands.BendTools
         public bool PunchGeometryReadComplete { get; internal set; }
         public bool PunchEntitiesSupported { get; internal set; }
         public bool PunchClosed { get; internal set; }
+        public ToolRegionValidation Region { get; internal set; } = ToolRegionValidator.Validate(null);
+        internal ToolDatumSet DatumEvidence;
+        public DatumEvidenceStatus DatumEvidenceStatus => DatumEvidence?.Status ?? ADDIN.Commands.BendTools.DatumEvidenceStatus.Missing;
+        // Legacy physical-verification flags are deliberately not promoted by
+        // a geometrically valid region or an externally attested datum record.
         public bool ToolTipOriginVerified => false;
         public bool CoordinateFrameVerified => false;
         public bool ClampVerified => false;
@@ -56,6 +62,7 @@ namespace ADDIN.Commands.BendTools
         public string Id { get; internal set; }
         public IReadOnlyList<ToolGeometryPart> Parts { get; internal set; }
         public ToolProfileValidationResult Validation { get; internal set; }
+        public ToolDatumSet Datums { get; internal set; }
     }
 
     internal sealed class ToolProfileLibrarySnapshot
@@ -68,15 +75,24 @@ namespace ADDIN.Commands.BendTools
         public IReadOnlyList<CompanyToolProfile> Tools { get; internal set; }
         public IReadOnlyList<ToolProfileProvenance> Sources { get; internal set; }
         public string Error { get; internal set; }
-        internal void Invalidate() { Interlocked.Exchange(ref current,0); }
+        internal void Invalidate()
+        {
+            Interlocked.Exchange(ref current,0);
+            if (Tools!=null) foreach (var tool in Tools) tool.Datums?.Invalidate();
+        }
 
         // A separate diagnostic summary: never serialize proprietary coordinates
         // into the Bend Planning report or use this data as a manufacturing PASS.
         internal string ToDebugJson() => new JavaScriptSerializer().Serialize(new {
             Status, Current, Fingerprint, ConfigurationSha256, Error, ToolCount=Tools.Count,
             DataCount=Tools.Count(t=>t.Validation.PunchGeometryReadComplete),
-            Tools=Tools.Select(t=>new { t.Id, t.Validation, Parts=t.Parts.Select(p=>new {
+            Tools=Tools.Select(t=>new { t.Id, Validation=new { t.Validation.Status, t.Validation.SourceFilesExist,
+                t.Validation.PunchGeometryReadComplete, t.Validation.PunchEntitiesSupported, t.Validation.PunchClosed,
+                GeometryValidationStatus=t.Validation.Region.Status.ToString(), t.Validation.Region.LoopCount, t.Validation.Region.Issues,
+                DatumEvidenceStatus=t.Validation.DatumEvidenceStatus.ToString(), t.Validation.ToolTipOriginVerified,
+                t.Validation.CoordinateFrameVerified, t.Validation.ClampVerified, t.Validation.Reasons }, Parts=t.Parts.Select(p=>new {
                 Role=p.Role.ToString(), p.Source.Sha256, p.Source.Error,
+                GeometryValidationStatus=p.Region.Status.ToString(), p.Region.LoopCount, p.Region.Issues,
                 EntityCount=p.Entities.Count, CurveCount=p.Entities.Sum(e=>e.Curves.Count),
                 ArcCount=p.Entities.Sum(e=>e.Curves.Count(c=>c.Kind=="ARC")) }) }) });
     }
