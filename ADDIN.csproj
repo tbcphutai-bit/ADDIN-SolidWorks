@@ -236,6 +236,14 @@
     <Compile Include="Commands\BendCollision\CollisionWorkPoseEvidence.cs" />
     <Compile Include="Commands\BendCollision\CandidateCollisionResult.cs" />
     <Compile Include="Commands\BendCollision\PlacementCollisionEvaluator.cs" />
+    <Compile Include="Commands\BendEnvelope\SheetEnvelopeModels.cs" />
+    <Compile Include="Commands\BendEnvelope\AnalyticAxialSolids.cs" />
+    <Compile Include="Commands\BendEnvelope\NativeEnvelopeTopology.cs" />
+    <Compile Include="Commands\BendEnvelope\PrismaticEnvelopeCompiler.cs" />
+    <Compile Include="Commands\BendEnvelope\SheetNativeTopologyCapture.cs" />
+    <Compile Include="Commands\BendEnvelope\AxialCollisionEngine.cs" />
+    <Compile Include="Commands\BendEnvelope\ToolAxialSetupEvidence.cs" />
+    <Compile Include="Commands\BendEnvelope\CollisionBatchWorker.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolDxfReader.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileLibrary.cs" />

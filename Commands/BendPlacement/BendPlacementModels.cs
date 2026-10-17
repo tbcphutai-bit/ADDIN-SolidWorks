@@ -182,7 +182,7 @@ namespace ADDIN.Commands.BendPlacement
             .Concat(DatumStatus==DatumEvidenceStatus.Stale?new[]{"STALE_DATUM_EVIDENCE"}:new string[0])
             .Concat(Assembly?.SeatingEvidence.Status==ToolReviewStatus.Stale||Assembly?.MappingReview.Status==ToolReviewStatus.Stale||Assembly?.HolderObstacles?.Current==false?new[]{"STALE_HOLDER_OR_SEATING_EVIDENCE"}:new string[0]));
         internal ToolCandidateDraft(string id,int feature,ToolAssemblyProfile assembly,SheetSection2D sheet,ToolGeometryPlacement2D punch,ToolGeometryPlacement2D holder,
-            IEnumerable<BendLimitRuleDraft> rules,IEnumerable<string> reasons,bool simulation,Func<bool> current,bool explicitCollisionPose=false,CollisionWorkPoseEvidence productionPose=null)
+            IEnumerable<BendLimitRuleDraft> rules,IEnumerable<string> reasons,bool simulation,Func<bool> current,bool explicitCollisionPose=false,CollisionWorkPoseEvidence productionPose=null,bool evaluateLegacyCollision=true)
         {
             ToolId=id;FeatureId=feature;Assembly=assembly;Sheet=sheet;PunchPlacement=punch;HolderPlacement=holder;LimitRules=PlacementLists.Copy(rules);
             HolderObstaclePlacement=new HolderObstaclePlacement2D(assembly?.HolderObstacles,holder.ToWorkFrame,sheet.Frame?.FrameId);
@@ -190,7 +190,7 @@ namespace ADDIN.Commands.BendPlacement
             HasExplicitCollisionPose=explicitCollisionPose;ProductionCollisionPose=productionPose;
             BendStates=PlacementLists.Copy(new[]{new BendStateDraft2D(BendStateCoverage.UnknownBefore),new BendStateDraft2D(BendStateCoverage.UnknownDuring),
                 new BendStateDraft2D(BendStateCoverage.UnknownAfter),new BendStateDraft2D(BendStateCoverage.FinalModelObserved,sheet)});
-            Collision=PlacementCollisionEvaluator.Evaluate(this);
+            if(evaluateLegacyCollision)Collision=PlacementCollisionEvaluator.Evaluate(this);
         }
     }
     internal sealed class PlacementDraft
@@ -206,6 +206,6 @@ namespace ADDIN.Commands.BendPlacement
         public IReadOnlyList<CandidateCollisionResult> CollisionResults { get; }
         public string WinnerToolId => null;
         internal PlacementDraft(string modelId,int stamp,string configuration,IEnumerable<SheetSection2D> sections,IEnumerable<ToolCandidateDraft> candidates,Func<bool> current)
-        {ModelSnapshotId=modelId;ModelUpdateStamp=stamp;Configuration=configuration;Sections=PlacementLists.Copy(sections);Candidates=PlacementLists.Copy(candidates);CollisionResults=PlacementLists.Copy(Candidates.Select(c=>c.Collision));this.current=current;}
+        {ModelSnapshotId=modelId;ModelUpdateStamp=stamp;Configuration=configuration;Sections=PlacementLists.Copy(sections);Candidates=PlacementLists.Copy(candidates);CollisionResults=PlacementLists.Copy(Candidates.Select(c=>c.Collision).Where(c=>c!=null));this.current=current;}
     }
 }
