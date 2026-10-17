@@ -14,6 +14,9 @@ namespace ADDIN.Commands.BendPlacement
         public string MasterDatumEvidencePath { get; set; }
         public string LimitWorkbookPath { get; set; }
         public string LimitManifestPath { get; set; }
+        public string HolderEvidencePath { get; set; }
+        public string PairSeatingEvidencePath { get; set; }
+        public string ReviewAuthoritiesPath { get; set; }
     }
     internal static class BendPlacementSources
     {
@@ -28,7 +31,8 @@ namespace ADDIN.Commands.BendPlacement
                 byte[] bytes=PlacementSourceIo.Read(configurationPath,65536,token);var c=PlacementSourceIo.Json<BendPlacementConfiguration>(bytes);
                 if(c==null||c.Version!=1)throw new InvalidDataException("Invalid placement source version.");
                 string root=Path.GetDirectoryName(Path.GetFullPath(configurationPath));
-                var master=BendMasterAssemblyReader.Read(PlacementSourceIo.Resolve(root,c.MasterPath),PlacementSourceIo.Resolve(root,c.MasterManifestPath),PlacementSourceIo.Resolve(root,c.MasterDatumEvidencePath),token);
+                var master=BendMasterAssemblyReader.Read(PlacementSourceIo.Resolve(root,c.MasterPath),PlacementSourceIo.Resolve(root,c.MasterManifestPath),PlacementSourceIo.Resolve(root,c.MasterDatumEvidencePath),token,
+                    PlacementSourceIo.Resolve(root,c.HolderEvidencePath),PlacementSourceIo.Resolve(root,c.PairSeatingEvidencePath),PlacementSourceIo.Resolve(root,c.ReviewAuthoritiesPath));
                 var limits=BendLimitWorkbookReader.Read(PlacementSourceIo.Resolve(root,c.LimitWorkbookPath),PlacementSourceIo.Resolve(root,c.LimitManifestPath),token);
                 return new PlacementSourceSnapshot(PlacementSourceIo.Hash(PlacementSourceIo.Hash(bytes)+master.Fingerprint+limits.Fingerprint),master.Tools,limits.Rules,master.Reasons.Concat(limits.Reasons));
             }

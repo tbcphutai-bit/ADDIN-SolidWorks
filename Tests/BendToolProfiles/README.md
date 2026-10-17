@@ -1,4 +1,4 @@
-# Company DXF profiles — Phase 2 / Phase 3A / Phase 3B
+# Company DXF profiles — Phase 2 / Phase 3A / Phase 3B / Phase 3B.1
 
 Production code is in `Commands/BendToolProfiles/`. It has no SOLIDWORKS, WinForms,
 or external package dependency. It supplies read-only geometry/provenance to the
@@ -16,6 +16,28 @@ mapping. The native adapter appends analytic arc metadata during the existing
 STA capture; workers still receive only managed file/geometry data. See the
 [placement contract](../../Docs/BendCheck/Phase3B-PlacementContract.md) and
 [Phase 3B validation](../../Docs/BendCheck/Validation-Phase3B.md).
+
+Phase 3B.1 adds a **separate** bounded SPLINE holder/material-set backend,
+explicit component/hole/union roles, exact reviewed mapping and signed external
+seating records. It does not change the legacy analytic DIM/punch flags, Min,
+UI or command flow. See the [holder/evidence contract](../../Docs/BendCheck/Phase3B1-HolderContract.md)
+and [18-tool validation](../../Docs/BendCheck/Validation-Phase3B1.md).
+
+Local-only Phase 3B.1 QA (outputs include private CAD and must stay outside Git):
+
+```powershell
+& $ToolProfilesTestExe --holder-company $PlacementConfig $CompanyDimDirectory $PrivateOutput
+python Tests/BendToolProfiles/compare_holder_splines.py `
+  "$PrivateOutput/PRIVATE-spline-qa.json" "$PrivateOutput/PRIVATE-spline-independent.json"
+```
+
+The independent script requires ezdxf only for QA. It evaluates original WCS
+controls/rational curves and nested INSERT transforms against each certified
+chord band. The local integration also emits **UNFILLED** material/mapping,
+seating and authority templates plus a machine operator checklist; it supplies
+no approval, measured pose, signature or key and does not configure the templates.
+Actual source tests assert 18 slots, 17 valid punches, no physical verification,
+120 converted selected SPLINE instances and four unresolved associations.
 
 Local-only Phase 3B modes (all output must be outside the checkout):
 
@@ -87,12 +109,18 @@ missing entries; an invalid manifest does not fall back to guessed selections.
 Roles: `CompanyPunchProfile`, `HolderClampReference`, `ManufacturerReference`,
 `Annotations`, `UnclassifiedReference`; `VerifiedHolderGeometry` is reserved.
 A request for that last role is retained as reference with an explanation.
-This phase has no mechanism to verify mounting, so `ClampVerified`,
-`ToolTipOriginVerified` and `CoordinateFrameVerified` remain false. Text and
+These legacy DIM-profile flags (`ClampVerified`, `ToolTipOriginVerified`,
+`CoordinateFrameVerified`) remain false. The distinct Phase 3B.1 Master-pair
+contract requires authorized external evidence and does not promote a raw role.
+Text and
 dimensions cannot be promoted to punch geometry by a selector. Overlapping
 selectors are downgraded to unclassified geometry and reported as incomplete.
 
 ## Geometry and freshness contract
+
+The geometry list below describes the legacy analytic DIM/punch reader. The
+separate Phase 3B.1 holder backend preserves those analytic entities and adds
+bounded SPLINE material geometry under the explicit contract linked above.
 
 - LINE, ARC, CIRCLE, LWPOLYLINE bulges, 2D POLYLINE/VERTEX/SEQEND, nested INSERT.
 - Exact analytic lines/circles; no tessellation, invented closure or tip shift.

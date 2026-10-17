@@ -33,14 +33,29 @@ namespace ADDIN.Commands.BendPlacement
         public bool ObservedClosed { get; }
         public ToolRegionValidation Region { get; }
         public bool ReferenceOnly { get; }
+        internal IReadOnlyList<ToolDxfEntity> SourceEntities { get; }
         public bool Supported => EntityKeys.Count>0&&UnsupportedTypes.Count==0&&Curves.Count>0;
         internal GeometrySelection2D(string sha,string geometrySha,IEnumerable<ToolDxfEntity> entities,bool reference,CancellationToken cancellation)
         {
-            var e=entities.ToArray();SourceSha256=sha;GeometrySha256=geometrySha;FrameId="MasterWcsMm:"+sha;ReferenceOnly=reference;
+            var e=entities.ToArray();SourceEntities=PlacementLists.Copy(e);SourceSha256=sha;
+            GeometrySha256=geometrySha??HolderDigest(sha,e,cancellation);
+            FrameId="MasterWcsMm:"+sha;ReferenceOnly=reference;
             EntityKeys=PlacementLists.Copy(e.Select(x=>x.InstancePath+"|"+x.SourceRecord+"|"+x.Handle));
             Curves=PlacementLists.Copy(e.SelectMany(x=>x.Curves));InstanceTransforms=PlacementLists.Copy(e.Select(x=>x.Transform));
             UnsupportedTypes=PlacementLists.Copy(e.Where(x=>x.UnsupportedReason!=null||x.Curves.Count==0).Select(x=>x.Type).Distinct());
             ObservedClosed=ToolProfileTopology.Closed(e);Region=ToolRegionValidator.Validate(e,cancellation:cancellation);
+        }
+        private static string HolderDigest(string sha,ToolDxfEntity[] entities,CancellationToken token)
+        {
+            var splineBindings=new List<string>();
+            foreach(var e in entities)
+            {
+                token.ThrowIfCancellationRequested();var s=e.Spline;
+                splineBindings.Add(ToolEvidenceCanonical.Hash(e.SourceLineType,s==null?null:ToolEvidenceCanonical.Hash(s.Degree.ToString(System.Globalization.CultureInfo.InvariantCulture),s.Flags.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ToolEvidenceCanonical.Hash(s.SourceControlPoints.Select(ToolEvidenceCanonical.Point).ToArray()),ToolEvidenceCanonical.Hash(s.ControlPointsMm.Select(ToolEvidenceCanonical.Point).ToArray()),
+                    ToolEvidenceCanonical.Hash(s.Knots.Select(ToolEvidenceCanonical.Number).ToArray()),ToolEvidenceCanonical.Hash(s.Weights.Select(ToolEvidenceCanonical.Number).ToArray()))));
+            }
+            return ToolEvidenceCanonical.Hash("HolderSelectionV1",sha,ToolDatumEvidence.GeometryHash(new CompanyToolProfile {Id="HolderSelection",Parts=new[]{new ToolGeometryPart {Source=new ToolProfileProvenance {Sha256=sha},Role=ToolGeometryRole.CompanyPunchProfile,Entities=entities}}},token),ToolEvidenceCanonical.Hash(splineBindings.ToArray()));
         }
     }
     internal sealed class ToolAssemblyProfile
@@ -53,11 +68,19 @@ namespace ADDIN.Commands.BendPlacement
         public ToolDatumSet MasterDatums { get; }
         public bool IdentityMatched { get; }
         public bool MappingIdentified => IdentityMatched&&Punch!=null&&Holder!=null;
-        public bool ClampVerified => false;
-        public bool PhysicalPairVerified => false;
+        public HolderObstacleSet HolderObstacles { get; }
+        public ToolPairSeatingEvidence SeatingEvidence { get; }
+        public ToolReviewValidation MappingReview { get; }
+        public bool GeometryCheckReady => MappingIdentified&&MappingReview.RecordVerified&&HolderObstacles?.GeometrySupportedForCollision==true&&
+            Punch.Supported&&Punch.ObservedClosed&&Punch.Region.IsValidRegion&&Punch.Region.MaximumJointGapMm<=1e-10&&SeatingEvidence.CoordinateRecordReady;
+        public bool ClampVerified => GeometryCheckReady&&SeatingEvidence.PhysicalInspectionAccepted&&MappingReview.Status==ToolReviewStatus.VerifiedExternalRecord;
+        public bool PhysicalPairVerified => ClampVerified;
         public IReadOnlyList<string> Reasons { get; }
-        internal ToolAssemblyProfile(string id,string sha,string manifest,GeometrySelection2D punch,GeometrySelection2D holder,ToolDatumSet datums,bool mapped,IEnumerable<string> reasons)
-        {Id=id;MasterSha256=sha;ManifestSha256=manifest;Punch=punch;Holder=holder;MasterDatums=datums;IdentityMatched=mapped;Reasons=PlacementLists.Reasons(reasons);}
+        internal ToolAssemblyProfile(string id,string sha,string manifest,GeometrySelection2D punch,GeometrySelection2D holder,ToolDatumSet datums,bool mapped,IEnumerable<string> reasons,
+            HolderObstacleSet obstacle=null,ToolPairSeatingEvidence seating=null,ToolReviewValidation mappingReview=null)
+        {Id=id;MasterSha256=sha;ManifestSha256=manifest;Punch=punch;Holder=holder;MasterDatums=datums;IdentityMatched=mapped;Reasons=PlacementLists.Reasons(reasons);
+            HolderObstacles=obstacle;SeatingEvidence=seating??ToolPairSeatingEvidence.Missing(datums);MappingReview=mappingReview??ToolReviewValidation.Missing("MAPPING_SELECTION_UNREVIEWED");}
+        internal void Invalidate(){MasterDatums?.Invalidate();HolderObstacles?.Invalidate();SeatingEvidence.Invalidate();MappingReview.Invalidate();}
     }
     internal enum BendLimitKind { MaxBendLength, DeepBendClearanceExample }
     internal sealed class BendLimitRuleDraft
@@ -89,7 +112,7 @@ namespace ADDIN.Commands.BendPlacement
         public IReadOnlyList<string> Reasons { get; }
         internal PlacementSourceSnapshot(string fingerprint,IEnumerable<ToolAssemblyProfile> tools,IEnumerable<BendLimitRuleDraft> rules,IEnumerable<string> reasons)
         {Fingerprint=fingerprint;Tools=PlacementLists.Copy(tools);LimitRules=PlacementLists.Copy(rules);Reasons=PlacementLists.Reasons(reasons);}
-        internal void Invalidate(){lease.Invalidate();foreach(var t in Tools)t.MasterDatums?.Invalidate();}
+        internal void Invalidate(){lease.Invalidate();foreach(var t in Tools)t.Invalidate();}
         internal static PlacementSourceSnapshot Missing(string reason) => new PlacementSourceSnapshot("Missing:"+reason,CompanyToolIds.All.Select(id=>
             new ToolAssemblyProfile(id,null,null,null,null,null,false,new[]{reason,"MISSING_MASTER_MAPPING","UNVERIFIED_HOLDER"})),null,new[]{reason});
     }
@@ -129,6 +152,11 @@ namespace ADDIN.Commands.BendPlacement
         public string Status => "CHUA_XAC_MINH";
         public bool Current => current();
         public bool ReadyForCollisionCheck => false; // physical/process evidence is not established in Phase 3B
+        // This is readiness to inspect a fully attested SIMULATION placement,
+        // not production PASS or permission to ignore approximation bands.
+        public bool GeometryCheckReady => Current&&SimulationOnly&&Assembly?.GeometryCheckReady==true&&Sheet.Coverage!=SheetCoverage.Unsupported2DEnvelope&&
+            PunchPlacement.ToWorkFrame!=null&&HolderPlacement.ToWorkFrame!=null&&HolderObstaclePlacement.HasConservativeGeometry;
+        public SheetEnvelopeReadiness EnvelopeReadiness => new SheetEnvelopeReadiness(Sheet);
         public PlacementReadiness Readiness { get; }
         public bool SimulationOnly { get; }
         public bool PlacementGeometryComplete => Current&&Assembly?.MappingIdentified==true&&Sheet.Coverage!=SheetCoverage.Unsupported2DEnvelope&&
@@ -139,17 +167,21 @@ namespace ADDIN.Commands.BendPlacement
         public DatumEvidenceStatus DatumStatus => Assembly?.MasterDatums?.Status??DatumEvidenceStatus.Missing;
         public ToolGeometryPlacement2D PunchPlacement { get; }
         public ToolGeometryPlacement2D HolderPlacement { get; }
+        public HolderObstaclePlacement2D HolderObstaclePlacement { get; }
         public SheetSection2D Sheet { get; }
         public IReadOnlyList<BendStateDraft2D> BendStates { get; }
         public IReadOnlyList<BendLimitRuleDraft> LimitRules { get; }
         private readonly IReadOnlyList<string> reasons;
         public IReadOnlyList<string> Reasons => PlacementLists.Reasons(reasons
+            .Concat(HolderObstaclePlacement.Reason==null?new string[0]:new[]{HolderObstaclePlacement.Reason})
             .Concat(Current?new string[0]:new[]{"STALE_SOURCE"})
-            .Concat(DatumStatus==DatumEvidenceStatus.Stale?new[]{"STALE_DATUM_EVIDENCE"}:new string[0]));
+            .Concat(DatumStatus==DatumEvidenceStatus.Stale?new[]{"STALE_DATUM_EVIDENCE"}:new string[0])
+            .Concat(Assembly?.SeatingEvidence.Status==ToolReviewStatus.Stale||Assembly?.MappingReview.Status==ToolReviewStatus.Stale||Assembly?.HolderObstacles?.Current==false?new[]{"STALE_HOLDER_OR_SEATING_EVIDENCE"}:new string[0]));
         internal ToolCandidateDraft(string id,int feature,ToolAssemblyProfile assembly,SheetSection2D sheet,ToolGeometryPlacement2D punch,ToolGeometryPlacement2D holder,
             IEnumerable<BendLimitRuleDraft> rules,IEnumerable<string> reasons,bool simulation,Func<bool> current)
         {
             ToolId=id;FeatureId=feature;Assembly=assembly;Sheet=sheet;PunchPlacement=punch;HolderPlacement=holder;LimitRules=PlacementLists.Copy(rules);
+            HolderObstaclePlacement=new HolderObstaclePlacement2D(assembly?.HolderObstacles,holder.ToWorkFrame,sheet.Frame?.FrameId);
             this.reasons=PlacementLists.Reasons(reasons);SimulationOnly=simulation;Readiness=simulation?PlacementReadiness.SimulationOnly:PlacementReadiness.PlacementDraft;this.current=current;
             BendStates=PlacementLists.Copy(new[]{new BendStateDraft2D(BendStateCoverage.UnknownBefore),new BendStateDraft2D(BendStateCoverage.UnknownDuring),
                 new BendStateDraft2D(BendStateCoverage.UnknownAfter),new BendStateDraft2D(BendStateCoverage.FinalModelObserved,sheet)});

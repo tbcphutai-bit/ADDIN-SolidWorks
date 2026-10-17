@@ -185,7 +185,7 @@ namespace ADDIN.Commands.BendTools
             string sourceLayer=record.Text(8,"0");
             bool annotation=new[] {"TEXT","MTEXT","DIMENSION","ATTRIB","ATTDEF","LEADER","MLEADER","VIEWPORT","POINT"}.Contains(record.Type);
             return new ToolDxfEntity { Type=record.Type,Handle=record.Text(5),SourceRecord=record.Index,SourceLayer=sourceLayer,
-                Layer=sourceLayer=="0" && inheritedLayer.Length>0 ? inheritedLayer : sourceLayer,
+                Layer=sourceLayer=="0" && inheritedLayer.Length>0 ? inheritedLayer : sourceLayer,SourceLineType=record.Text(6,"BYLAYER"),
                 InstancePath=path,Blocks=names.ToArray(),Transform=matrix,Annotation=annotation,
                 PaperSpace=record.Integer(67)==1 || !string.Equals(record.Text(410,"Model"),"Model",StringComparison.OrdinalIgnoreCase),
                 InsertHandles=path.Split('/').Where(p=>p.Contains(":")) .Select(p=>p.Split(':')[1]).ToArray(),
@@ -293,6 +293,38 @@ namespace ADDIN.Commands.BendTools
                 if (points.Count<2) throw new InvalidDataException("Polyline has fewer than two vertices.");
                 int count=entity.SourceClosed==true ? points.Count : points.Count-1;
                 for (int i=0;i<count;i++) curves.Add(ToolCurve.Bulge(points[i],points[(i+1)%points.Count],bulges[i],matrix,i));
+            }
+            else if(r.Type=="SPLINE")
+            {
+                if(r.Integer(73)>4096||r.Integer(72)>8192||r.Integer(74)>4096)throw new InvalidDataException("SPLINE metadata budget exceeded.");
+                // WCS control points: the normal is metadata, not an OCS
+                // transform. Keep analytic punch semantics unchanged. Only the
+                // separate, bounded holder backend consumes this new metadata.
+                var control=new List<ToolPoint>();var fit=new List<ToolPoint>();
+                List<Tag> current=null;var vertices=new List<List<Tag>>();
+                foreach(var tag in r.Tags)
+                {
+                    if(tag.Code==10||tag.Code==11){current=new List<Tag>();vertices.Add(current);}
+                    if(current!=null&&(tag.Code==10||tag.Code==20||tag.Code==30||tag.Code==11||tag.Code==21||tag.Code==31))current.Add(tag);
+                }
+                foreach(var tags in vertices)
+                {
+                    var point=new Record {Index=r.Index};point.Tags.AddRange(tags);
+                    if(point.Text(10,null)!=null){Zero(point,30);control.Add(point.Point());}else{Zero(point,31);fit.Add(point.Point(11));}
+                }
+                if(control.Count!=r.Integer(73)||fit.Count!=r.Integer(74))throw new InvalidDataException("SPLINE point count mismatch.");
+                var knots=r.Tags.Where(t=>t.Code==40).Select(t=>{double n;if(!double.TryParse(t.Value,NumberStyles.Float,CultureInfo.InvariantCulture,out n)||!ToolPoint.Finite(n))throw new InvalidDataException("Invalid SPLINE knot.");return n;}).ToArray();
+                var weights=r.Tags.Where(t=>t.Code==41).Select(t=>{double n;if(!double.TryParse(t.Value,NumberStyles.Float,CultureInfo.InvariantCulture,out n)||!ToolPoint.Finite(n))throw new InvalidDataException("Invalid SPLINE weight.");return n;}).ToArray();
+                if(knots.Length!=r.Integer(72))throw new InvalidDataException("SPLINE knot count mismatch.");
+                Zero(r,32,33,39);
+                // DXF SPLINE controls are WCS, unlike ARC/LWPOLYLINE OCS. A
+                // linear spline can have a zero/undefined normal. Actual Z=0
+                // controls/fit points above prove XY; never apply this normal
+                // as a transform or invent a projection of nonzero Z controls.
+                var normal=r.Text(210,null)==null&&r.Text(220,null)==null&&r.Text(230,null)==null?new double[0]:new[]{r.Number(210),r.Number(220),r.Number(230)};
+                entity.Spline=new ToolSplineData(r.Integer(71),r.Integer(70),control,knots,weights,fit,parent,normal);
+                entity.SourceClosed=entity.Spline.Closed||entity.Spline.Periodic;
+                entity.UnsupportedReason="SPLINE requires the separate bounded holder backend.";
             }
             else throw new InvalidDataException("Unsupported DXF entity: "+r.Type);
             entity.Transform=matrix; entity.SourceVertices=points.AsReadOnly(); entity.SourceBulges=bulges.AsReadOnly(); entity.Curves=curves.AsReadOnly();
