@@ -164,14 +164,16 @@ One earlier run of the inherited private Assembly harness stopped at its
 `Part initial pass` assertion after 1,522 assertions, **after the Assembly
 grouping/Min checks succeeded**. That attempt did not record the first Part's
 status, so its cause remains unproven; it is not silently counted as a pass.
-An instrumented repeat passed all 1,531 attempted assertions and recorded the
-first Part as Current / Done / Default / Đạt with its original test dimension.
+An instrumented repeat completed the functional scenarios (1,531 assertions
+attempted, with the one known layout warning) and recorded the first Part as
+Current / Done / Default / Đạt with its original test dimension.
 The private harness now also waits for `Scanned && all Items.Current` before
 asserting that initial verdict, rather than accepting Done alone. This is test
 precondition hardening, not a claimed production Min/UI repair. The intermittent
 earlier failure remains a disclosed validation limitation; the known layout
 stress warning remains separately reported. The final Current-gated run also
-passed all 1,531 attempted assertions, with the same one layout stress warning.
+completed the functional scenarios with 1,531 assertions attempted and the same
+one layout stress warning; neither run is claimed as a clean layout pass.
 
 ## Blockers classified for handoff
 
