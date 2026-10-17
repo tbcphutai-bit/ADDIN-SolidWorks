@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using ADDIN.Commands.BendTools;
+using ADDIN.Commands.BendCollision;
 
 namespace ADDIN.Commands.BendPlacement
 {
@@ -159,6 +160,9 @@ namespace ADDIN.Commands.BendPlacement
         public SheetEnvelopeReadiness EnvelopeReadiness => new SheetEnvelopeReadiness(Sheet);
         public PlacementReadiness Readiness { get; }
         public bool SimulationOnly { get; }
+        public bool HasExplicitCollisionPose { get; }
+        public CollisionWorkPoseEvidence ProductionCollisionPose { get; }
+        public CandidateCollisionResult Collision { get; }
         public bool PlacementGeometryComplete => Current&&Assembly?.MappingIdentified==true&&Sheet.Coverage!=SheetCoverage.Unsupported2DEnvelope&&
             PunchPlacement.ToWorkFrame!=null&&HolderPlacement.ToWorkFrame!=null&&Assembly.Punch.Supported&&Assembly.Holder.Supported&&
             Assembly.Punch.Region.IsValidRegion&&Assembly.Holder.Region.IsValidRegion&&Assembly.Punch.ObservedClosed&&Assembly.Holder.ObservedClosed&&
@@ -178,13 +182,15 @@ namespace ADDIN.Commands.BendPlacement
             .Concat(DatumStatus==DatumEvidenceStatus.Stale?new[]{"STALE_DATUM_EVIDENCE"}:new string[0])
             .Concat(Assembly?.SeatingEvidence.Status==ToolReviewStatus.Stale||Assembly?.MappingReview.Status==ToolReviewStatus.Stale||Assembly?.HolderObstacles?.Current==false?new[]{"STALE_HOLDER_OR_SEATING_EVIDENCE"}:new string[0]));
         internal ToolCandidateDraft(string id,int feature,ToolAssemblyProfile assembly,SheetSection2D sheet,ToolGeometryPlacement2D punch,ToolGeometryPlacement2D holder,
-            IEnumerable<BendLimitRuleDraft> rules,IEnumerable<string> reasons,bool simulation,Func<bool> current)
+            IEnumerable<BendLimitRuleDraft> rules,IEnumerable<string> reasons,bool simulation,Func<bool> current,bool explicitCollisionPose=false,CollisionWorkPoseEvidence productionPose=null)
         {
             ToolId=id;FeatureId=feature;Assembly=assembly;Sheet=sheet;PunchPlacement=punch;HolderPlacement=holder;LimitRules=PlacementLists.Copy(rules);
             HolderObstaclePlacement=new HolderObstaclePlacement2D(assembly?.HolderObstacles,holder.ToWorkFrame,sheet.Frame?.FrameId);
             this.reasons=PlacementLists.Reasons(reasons);SimulationOnly=simulation;Readiness=simulation?PlacementReadiness.SimulationOnly:PlacementReadiness.PlacementDraft;this.current=current;
+            HasExplicitCollisionPose=explicitCollisionPose;ProductionCollisionPose=productionPose;
             BendStates=PlacementLists.Copy(new[]{new BendStateDraft2D(BendStateCoverage.UnknownBefore),new BendStateDraft2D(BendStateCoverage.UnknownDuring),
                 new BendStateDraft2D(BendStateCoverage.UnknownAfter),new BendStateDraft2D(BendStateCoverage.FinalModelObserved,sheet)});
+            Collision=PlacementCollisionEvaluator.Evaluate(this);
         }
     }
     internal sealed class PlacementDraft
@@ -197,8 +203,9 @@ namespace ADDIN.Commands.BendPlacement
         public string Configuration { get; }
         public IReadOnlyList<SheetSection2D> Sections { get; }
         public IReadOnlyList<ToolCandidateDraft> Candidates { get; }
+        public IReadOnlyList<CandidateCollisionResult> CollisionResults { get; }
         public string WinnerToolId => null;
         internal PlacementDraft(string modelId,int stamp,string configuration,IEnumerable<SheetSection2D> sections,IEnumerable<ToolCandidateDraft> candidates,Func<bool> current)
-        {ModelSnapshotId=modelId;ModelUpdateStamp=stamp;Configuration=configuration;Sections=PlacementLists.Copy(sections);Candidates=PlacementLists.Copy(candidates);this.current=current;}
+        {ModelSnapshotId=modelId;ModelUpdateStamp=stamp;Configuration=configuration;Sections=PlacementLists.Copy(sections);Candidates=PlacementLists.Copy(candidates);CollisionResults=PlacementLists.Copy(Candidates.Select(c=>c.Collision));this.current=current;}
     }
 }

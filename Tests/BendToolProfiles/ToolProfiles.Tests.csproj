@@ -18,6 +18,17 @@
     <Compile Include="..\..\Commands\BendPlacement\ToolHolderEvidenceReader.cs"><Link>ToolHolderEvidenceReader.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendPlacement\SheetEnvelopeReadiness.cs"><Link>SheetEnvelopeReadiness.cs</Link></Compile>
     <Compile Include="HolderTests.cs"/>
+    <Compile Include="CollisionTests.cs"/>
+    <Compile Include="CollisionPlacementTests.cs"/>
+    <Compile Include="CollisionCompanyIntegration.cs"/>
+    <Compile Include="..\..\Commands\BendCollision\CollisionModels2D.cs"><Link>CollisionModels2D.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendCollision\CollisionInterval.cs"><Link>CollisionInterval.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendCollision\CollisionGeometry2D.cs"><Link>CollisionGeometry2D.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendCollision\CollisionPointLocation2D.cs"><Link>CollisionPointLocation2D.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendCollision\CollisionEngine2D.cs"><Link>CollisionEngine2D.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendCollision\CollisionWorkPoseEvidence.cs"><Link>CollisionWorkPoseEvidence.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendCollision\CandidateCollisionResult.cs"><Link>CandidateCollisionResult.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendCollision\PlacementCollisionEvaluator.cs"><Link>PlacementCollisionEvaluator.cs</Link></Compile>
     <Compile Include="HolderCompanyIntegration.cs"/>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileModels.cs"><Link>ToolProfileModels.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolDxfReader.cs"><Link>ToolDxfReader.cs</Link></Compile>

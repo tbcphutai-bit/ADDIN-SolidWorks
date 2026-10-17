@@ -1,4 +1,4 @@
-# Company DXF profiles — Phase 2 / Phase 3A / Phase 3B / Phase 3B.1
+# Company DXF profiles — Phase 2 through Phase 3C
 
 Production code is in `Commands/BendToolProfiles/`. It has no SOLIDWORKS, WinForms,
 or external package dependency. It supplies read-only geometry/provenance to the
@@ -38,6 +38,39 @@ seating and authority templates plus a machine operator checklist; it supplies
 no approval, measured pose, signature or key and does not configure the templates.
 Actual source tests assert 18 slots, 17 valid punches, no physical verification,
 120 converted selected SPLINE instances and four unresolved associations.
+
+Phase 3C adds the executable managed kernel in `Commands/BendCollision/` and
+adapters to the existing placement candidates. It computes conservative
+Workpiece/Punch and Workpiece/Holder geometry results, independent of the
+unchanged manufacturing verdict. No collision package or QA package is loaded
+by the add-in. See the [collision contract](../../Docs/BendCheck/Phase3C-CollisionContract.md)
+and [observed validation](../../Docs/BendCheck/Validation-Phase3C.md).
+
+The normal executable runs all pure C# tests, including real CLEAR/COLLISION/
+UNKNOWN fixtures, 54/108-row integration and an all-18 synthetic externally
+reviewed setup fixture with no selected tool. Those generated reviews and
+triangle/rectangle tools are explicitly software test data, never company
+approvals or substitute company profiles.
+
+```powershell
+& $ToolProfilesTestExe
+& $ToolProfilesTestExe --collision-company $PlacementConfig $CompanyDimDirectory $PrivateOutput
+# Independent oracle consumes only controlled synthetic geometry:
+& $ToolProfilesTestExe --collision-oracle $PrivateOracleOutput
+python Tests/BendToolProfiles/compare_collision_with_geos.py $PrivateOracleOutput
+```
+
+Optional oracle dependencies are Shapely/GEOS (tested with Shapely 2.2.0) and
+NumPy in a private QA environment. The oracle independently subtracts each
+component's holes before union and uses a declared `1e-7 mm` arc sagitta
+allowance. It checks clearance lower bounds, conservative SPLINE bands and
+robust interior witnesses. Tessellation is restricted to QA. Production LINE/
+ARC distances and predicates use outward interval enclosures. Actual company
+sources remain UNKNOWN until the separate source/setup evidence is provided.
+
+Native validation also asserts all 18 collision rows, explicit missing states,
+stale held results, unchanged Min and one model capture. Source-error snapshot
+comparisons retain private before/after diagnostics if a native assertion fails.
 
 Local-only Phase 3B modes (all output must be outside the checkout):
 

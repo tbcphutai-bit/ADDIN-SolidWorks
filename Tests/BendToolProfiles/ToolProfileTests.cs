@@ -59,6 +59,8 @@ internal static partial class ToolProfileTests
         if (args.Length>0 && args[0]=="--company") return CompanyIntegration(args);
         if (args.Length>0 && args[0]=="--placement-company") return PlacementCompanyIntegration(args);
         if (args.Length>0 && args[0]=="--holder-company") return HolderCompanyIntegration(args);
+        if (args.Length>0 && args[0]=="--collision-company") return CollisionCompanyIntegration(args);
+        if (args.Length>0 && args[0]=="--collision-oracle") return CollisionOracleFixtures(args);
         if (args.Length>0 && args[0]=="--workbook-objects") return WorkbookObjectInventory(args);
         temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ToolProfileTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
         Test("LINE retains coordinates and INSBASE; no tip recentering",()=> {
@@ -211,7 +213,16 @@ internal static partial class ToolProfileTests
                 {
                     var watch=Stopwatch.StartNew(); session.Refresh(); session.Poll(); Check(watch.ElapsedMilliseconds<200,"Caller not blocked on I/O");
                     release.Set(); var listener=new BadListener(); Debug.Listeners.Add(listener);
-                    try { Wait(()=> {session.Poll(); return session.Snapshot.Error==null;}); Check(listener.Count==1 && session.DiagnosticError.Contains("injected"),"Diagnostic fault observed separately"); Check(First(session.Snapshot).Validation.PunchGeometryReadComplete,"Valid data survives diagnostic listener"); }
+                    try
+                    {
+                        Wait(()=> {session.Poll(); return session.Snapshot.Error==null;});
+#if DEBUG
+                        Check(listener.Count==1 && session.DiagnosticError.Contains("injected"),"Diagnostic fault observed separately");
+#else
+                        Check(listener.Count==0 && string.IsNullOrEmpty(session.DiagnosticError),"Release compiler omits Debug diagnostic callback");
+#endif
+                        Check(First(session.Snapshot).Validation.PunchGeometryReadComplete,"Valid data survives diagnostic listener");
+                    }
                     finally { Debug.Listeners.Remove(listener); }
                 }
             }
@@ -222,6 +233,8 @@ internal static partial class ToolProfileTests
         RegionAndDatumTests();
         PlacementTests();
         HolderTests();
+        CollisionTests();
+        CollisionPlacementTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a
         // computed directory and never any operation on a company source folder.

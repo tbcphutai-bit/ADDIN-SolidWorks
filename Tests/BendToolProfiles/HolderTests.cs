@@ -46,24 +46,26 @@ internal static partial class ToolProfileTests
         internal ReviewFixture Reviews;internal ToolAssemblyProfile Assembly;internal MasterFixture Master;internal ToolPairSeatingRecord Record;internal HolderMaterialDefinition Material;
         public void Dispose()=>Reviews.Dispose();
     }
-    private static SeatingFixture Seating(bool simulation=true,bool physical=false)
+    private static SeatingFixture Seating(bool simulation=true,bool physical=false,int toolIndex=0)
     {
-        var f=new SeatingFixture {Reviews=Reviews(simulation,physical),Master=Master(1)};var original=Read(f.Master).Tools[0];
+        var f=new SeatingFixture {Reviews=Reviews(simulation,physical),Master=Master(toolIndex+1)};var original=Read(f.Master).Tools[toolIndex];
+        double offset=toolIndex*100;var selection=f.Master.Mapping.Tools[toolIndex];
         var tool=new CompanyToolProfile {Id=original.Id,Parts=new[]{new ToolGeometryPart {Role=ToolGeometryRole.CompanyPunchProfile,Source=new ToolProfileProvenance {Sha256=original.MasterSha256},Entities=original.Punch.SourceEntities}},
             Validation=new ToolProfileValidationResult {PunchGeometryReadComplete=true}};
-        var datumRecord=DatumRecord(tool);ApproveAll(datumRecord);var datums=Bound(tool,datumRecord);
+        var datumRecord=DatumRecord(tool);datumRecord.TipPointMm.X+=offset;datumRecord.MountDatumMm.X+=offset;datumRecord.LocalCoordinateFrame.OriginMm.X+=offset;
+        ApproveAll(datumRecord);var datums=Bound(tool,datumRecord);
         f.Material=new HolderMaterialDefinition {ToolId=original.Id,BindingSha256=HolderObstacleSet.Binding(original.Id,original.Punch,original.Holder,original.ManifestSha256),
             Contours=new List<HolderContourDefinition>{new HolderContourDefinition {Id="SOLID",MaterialKind="Solid",EntityKeys=original.Holder.EntityKeys.ToArray()}},Excluded=new List<HolderExcludedEntity>()};
         f.Material.Review=f.Reviews.Sign("HolderMaterialRule",HolderObstacleSet.Payload(f.Material),simulation);
         var material=HolderObstacleSet.Read(original.Id,original.Punch,original.Holder,original.ManifestSha256,f.Material,f.Reviews.Verifier,f.Reviews.Root,CancellationToken.None);
-        var map=new ToolHolderMappingRecord {ToolId=original.Id,BindingSha256=f.Material.BindingSha256,ExpectedLabel=f.Master.Mapping.Tools[0].ExpectedLabel,LabelHandle="L0",PunchRootInsert="I0",PunchBlock=f.Master.Mapping.Tools[0].PunchBlock,
-            HolderRootInsert="I0",HolderBlock=f.Master.Mapping.Tools[0].HolderBlock,HolderEntityKeys=original.Holder.EntityKeys.ToArray()};
+        var map=new ToolHolderMappingRecord {ToolId=original.Id,BindingSha256=f.Material.BindingSha256,ExpectedLabel=selection.ExpectedLabel,LabelHandle="L"+toolIndex,PunchRootInsert="I"+toolIndex,PunchBlock=selection.PunchBlock,
+            HolderRootInsert="I"+toolIndex,HolderBlock=selection.HolderBlock,HolderEntityKeys=original.Holder.EntityKeys.ToArray()};
         map.Review=f.Reviews.Sign("ToolHolderMapping",map.Payload(),simulation);
         var mapReview=f.Reviews.Verifier.Verify("ToolHolderMapping",map.Payload(),map.Review,f.Reviews.Root,CancellationToken.None);
         f.Record=new ToolPairSeatingRecord {ToolId=original.Id,MasterSourceSha256=original.MasterSha256,MasterManifestSha256=original.ManifestSha256,PunchGeometrySha256=original.Punch.GeometrySha256,
             HolderSelectionSha256=original.Holder.GeometrySha256,HolderMaterialDefinitionSha256=material.DefinitionSha256,PunchSourceFrameId=original.Punch.FrameId,HolderSourceFrameId=original.Holder.FrameId,
-            HolderSourceToPunchSource=new PairTransformRecord {A=1,B=0,C=0,D=1,TxMm=2,TyMm=0},TipPointMm=new PairPointRecord {X=1,Y=2},PunchMountDatumMm=new PairPointRecord {X=6,Y=12},HolderMountDatumMm=new PairPointRecord {X=4,Y=12},
-            WorkingDirection=new PairPointRecord {X=0,Y=-1},ApproachDirection=new PairPointRecord {X=0,Y=-1},ContactReferenceMm=new PairPointRecord {X=1,Y=2},ContactReferenceFrameId=original.Punch.FrameId,
+            HolderSourceToPunchSource=new PairTransformRecord {A=1,B=0,C=0,D=1,TxMm=2,TyMm=0},TipPointMm=new PairPointRecord {X=1+offset,Y=2},PunchMountDatumMm=new PairPointRecord {X=6+offset,Y=12},HolderMountDatumMm=new PairPointRecord {X=4+offset,Y=12},
+            WorkingDirection=new PairPointRecord {X=0,Y=-1},ApproachDirection=new PairPointRecord {X=0,Y=-1},ContactReferenceMm=new PairPointRecord {X=1+offset,Y=2},ContactReferenceFrameId=original.Punch.FrameId,
             DatumLocalFrameSha256=ToolPairSeatingEvidence.LocalFrameHash(datums),PhysicalInspectionConfirmed=physical};
         f.Record.Review=f.Reviews.Sign("ToolPairSeating",ToolPairSeatingEvidence.Payload(f.Record),simulation);
         var seating=ToolPairSeatingEvidence.Read(original.Id,original.MasterSha256,original.ManifestSha256,original.Punch,original.Holder,material,datums,f.Record,f.Reviews.Verifier,f.Reviews.Root,CancellationToken.None);
