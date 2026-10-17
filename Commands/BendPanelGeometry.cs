@@ -21,6 +21,7 @@ namespace ADDIN.Commands
     {
         internal int Id, Kind;
         internal BendVector A,B;
+        internal BendPlacement.PlacementArc3D PlacementArc;
         internal readonly List<int> Faces=new List<int>();
     }
     internal sealed class BendPanelBody
@@ -66,6 +67,7 @@ namespace ADDIN.Commands
                     var edge=nativeEdges[i];var curve=edge.GetCurve() as Curve;var p=edge.GetCurveParams3() as CurveParamData;
                     if(curve==null||p==null)throw new InvalidOperationException("Không đọc được cạnh topology của body.");
                     var value=new BendPanelEdge{Id=i,Kind=curve.IsLine()?1:curve.IsCircle()?2:0,A=BendVector.From((double[])p.StartPoint),B=BendVector.From((double[])p.EndPoint)};
+                    if(value.Kind==2)value.PlacementArc=BendPlacement.BendPlacementNativeCapture.TryReadArc(edge,curve,p);
                     foreach(var face in edge.GetTwoAdjacentFaces2() as object[]??new object[0]) {
                         int index;if(face!=null&&faceIds.TryGetValue(Key(face),out index))value.Faces.Add(index);
                     }

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using ADDIN.Commands.BendTools;
+using ADDIN.Commands.BendPlacement;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -20,6 +21,24 @@ namespace ADDIN.Commands
         internal ModelDoc2 Model;
         private BendCheckPlanningDraft planningDraft;
         private ToolProfileLibrarySnapshot toolProfiles;
+        internal PlacementModelCapture PlacementCapture;
+        private PlacementDraft placementDraft;
+        private ToolProfileLibrarySnapshot placementLibrary;
+        internal string PlacementDiagnosticError;
+        internal PlacementDraft PlacementDraft => Current&&Context?.Current!=false&&placementDraft?.Current==true?placementDraft:null;
+        internal void UpdatePlacement(ToolProfileLibrarySnapshot library)
+        {
+            if(PlacementCapture==null||!Current||Context?.Current==false)return;
+            if(ReferenceEquals(library,placementLibrary)&&placementDraft?.Current==true)return;
+            try
+            {
+                var context=Context;
+                placementDraft=BendPlacementBuilder.Build(PlacementCapture,library,()=>Current&&context?.Current==true);
+                placementLibrary=library;PlacementDiagnosticError=null;
+                Debug.WriteLine("[BEND PLACEMENT DRAFT] "+BendPlacementBuilder.Diagnostic(placementDraft));
+            }
+            catch(Exception ex){PlacementDiagnosticError="PLACEMENT_DIAGNOSTIC_ERROR:"+ex.GetType().Name;}
+        }
         internal ToolProfileLibrarySnapshot ToolProfiles
         {
             get { return Current && Context?.Current != false && toolProfiles?.Current == true ? toolProfiles : null; }
@@ -44,8 +63,8 @@ namespace ADDIN.Commands
             return (path ?? "").ToUpperInvariant() + "\n" + (configuration ?? "").ToUpperInvariant() +
                 (modified || string.IsNullOrEmpty(path) ? "\n@" + instance : "");
         }
-        internal void Invalidate() { Current = false; PlanningDraft = null; toolProfiles = null; Context?.Invalidate(); }
-        public void Dispose() { Current = false; planningDraft = null; toolProfiles = null; Copy?.Dispose(); Copy = null; Model = null; }
+        internal void Invalidate() { Current = false; PlanningDraft = null; toolProfiles = null; Context?.Invalidate(); PlacementCapture?.Lease.Invalidate(); placementDraft=null; }
+        public void Dispose() { Current = false; planningDraft = null; toolProfiles = null; PlacementCapture?.Lease.Invalidate();placementDraft=null;PlacementCapture=null;placementLibrary=null; Copy?.Dispose(); Copy = null; Model = null; }
     }
 
     // All SolidWorks calls in this class run on the task pane's STA. File
@@ -218,7 +237,18 @@ namespace ADDIN.Commands
                 CapturePlanningDraft(item);
             }
             catch (Exception ex) { item.Error = ex.Message; item.Context?.Invalidate(); }
-            finally { item.Done = true; item.ToolProfiles = toolLibrary.Snapshot; }
+            finally
+            {
+                item.Done = true; item.ToolProfiles = toolLibrary.Snapshot;
+                // Copies only the managed capture already read for Min. The
+                // optional placement adapter cannot set the item's Min Error.
+                try
+                {
+                    if(item.Error==null&&item.Current&&item.Context?.Current==true)
+                    {item.PlacementCapture=BendPlacementNativeCapture.Copy(item);item.UpdatePlacement(toolLibrary.Snapshot);}
+                }
+                catch(Exception ex){item.PlacementDiagnosticError="PLACEMENT_CAPTURE_ERROR:"+ex.GetType().Name;}
+            }
         }
         private static void CapturePlanningDraft(BendCheckItem item)
         {
@@ -252,7 +282,7 @@ namespace ADDIN.Commands
                 bool current = item.Model.GetActiveSketch2() == null && item.Model.Extension.NeedsRebuild2 == 0 &&
                     item.Model.GetUpdateStamp() == item.Stamp && ConfigurationOf(item.Model) == item.Configuration;
                 if (item.Copy != null) item.Copy.ValidateSource();
-                if (!current) item.Invalidate(); return current;
+                if (!current) item.Invalidate(); else item.UpdatePlacement(toolLibrary.Snapshot); return current;
             }
             catch { item.Invalidate(); return false; }
         }

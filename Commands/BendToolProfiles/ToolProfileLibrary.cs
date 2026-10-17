@@ -15,6 +15,7 @@ namespace ADDIN.Commands.BendTools
         public string DirectoryPath { get; set; }
         public string ManifestPath { get; set; }
         public string DatumEvidencePath { get; set; }
+        public string PlacementConfigurationPath { get; set; }
     }
     internal sealed class ToolProfileSourceSettings
     {
@@ -26,11 +27,14 @@ namespace ADDIN.Commands.BendTools
             string directory=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY");
             if (!string.IsNullOrWhiteSpace(directory)) return new ToolProfileSourceConfiguration { DirectoryPath=directory,
                 ManifestPath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST"),
-                DatumEvidencePath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE") };
-            if (!File.Exists(path)) return new ToolProfileSourceConfiguration();
+                DatumEvidencePath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE"),
+                PlacementConfigurationPath=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG") };
+            if (!File.Exists(path)) return new ToolProfileSourceConfiguration {PlacementConfigurationPath=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG")};
             if (new FileInfo(path).Length>65536) throw new InvalidDataException("DXF source settings exceed 64 KB.");
             var result=new JavaScriptSerializer().Deserialize<ToolProfileSourceConfiguration>(File.ReadAllText(path,Encoding.UTF8));
             if (result==null || result.Version!=1) throw new InvalidDataException("Unsupported DXF source settings version.");
+            string placement=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG");
+            if(!string.IsNullOrWhiteSpace(placement))result.PlacementConfigurationPath=placement;
             return result;
         }
     }
@@ -122,10 +126,11 @@ namespace ADDIN.Commands.BendTools
                         tool.Datums=ToolDatumEvidence.Bind(tool,evidence,cancellation);
                         tool.Validation.DatumEvidence=tool.Datums;
                     }
-                    configSha=HashText(configSha+"\n"+ToolGeometryTolerance.Version+"\n"+evidence.Fingerprint);
+                    var placement=BendPlacement.BendPlacementSources.Read(config.PlacementConfigurationPath,cancellation,root);
+                    configSha=HashText(configSha+"\n"+ToolGeometryTolerance.Version+"\n"+evidence.Fingerprint+"\n"+placement.Fingerprint);
                     var provenance=sources.Values.Select(d=>d.Source).OrderBy(s=>s.Path,StringComparer.OrdinalIgnoreCase).ToList();
                     string fingerprint=HashText(configSha+"\n"+string.Join("\n",provenance.Select(p=>p.Path+":"+p.Sha256+":"+p.Error)));
-                    return Publish(new ToolProfileLibrarySnapshot { ConfigurationSha256=configSha,Fingerprint=fingerprint,Tools=tools.AsReadOnly(),Sources=provenance.AsReadOnly() });
+                    return Publish(new ToolProfileLibrarySnapshot { ConfigurationSha256=configSha,Fingerprint=fingerprint,Tools=tools.AsReadOnly(),Sources=provenance.AsReadOnly(),PlacementSources=placement });
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex) { return Publish(Failure(ex.Message)); }
