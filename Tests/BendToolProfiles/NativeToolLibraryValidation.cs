@@ -25,15 +25,18 @@ internal static partial class NativePlanningValidation
     {
         ISldWorks app=null; bool owned=false; var report=new Dictionary<string,object>();
         string oldDirectory=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY"), oldManifest=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST"),
-            oldEvidence=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE");
+            oldEvidence=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE"),oldPlacement=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG");
         try
         {
             product=Assembly.LoadFrom(Path.GetFullPath(args[0])); output=Path.GetFullPath(args[1]); Directory.CreateDirectory(output);
+            bool debugDiagnostics=product.GetCustomAttribute<DebuggableAttribute>()?.IsJITTrackingEnabled==true;
+            report["debugDiagnosticInjection"]=debugDiagnostics?"Enabled":"Debug.WriteLine omitted by Release compiler";
             string original=Path.GetFullPath(args[2]), hash=Sha(original), copy=Path.Combine(output,"PRIVATE-library-test.SLDPRT");
             File.Copy(original,copy,true); File.SetAttributes(copy,FileAttributes.Normal);
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY",Path.GetFullPath(args[3]));
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",null);
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",null);
+            Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",args.Length>5?Path.GetFullPath(args[5]):null);
             var before=Process.GetProcessesByName("SLDWORKS").Select(p=>p.Id).ToArray();
             app=(ISldWorks)Activator.CreateInstance(Type.GetTypeFromProgID("SldWorks.Application.32")); int pid=app.GetProcessID();
             owned=!before.Contains(pid); Check(owned,"New owned API process required"); app.Visible=false; app.UserControl=false;
@@ -55,6 +58,31 @@ internal static partial class NativePlanningValidation
                 Check(Items(Get(initial,"Tools")).All(t=>Get(Get(t,"Datums"),"Status").ToString()=="Missing" && Get(Get(t,"Datums"),"TipPointMm")==null),"No guessed datum evidence");
                 report["initial"]=Snapshot(form,model,true);
                 string min=Json.Serialize(report["initial"]); string minText=Get(item,"MinimumText").ToString();
+                var placement=Get(item,"PlacementDraft");Check(placement!=null,"Read-only placement is captured by existing Check chan");
+                Check(Items(Get(placement,"Sections")).Length==initialBends&&Items(Get(placement,"Candidates")).Length==18*initialBends,"Every actual bend has all 18 candidates");
+                Check(Items(Get(placement,"Candidates")).All(c=>Get(c,"Status").ToString()=="CHUA_XAC_MINH"&&!(bool)Get(c,"ReadyForCollisionCheck")),"No automatic Check Max verdict");
+                Check(Get(placement,"WinnerToolId")==null&&Get(item,"PlacementDiagnosticError")==null,"No winner or placement error");
+                int arcReads=(int)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementNativeCapture").GetProperty("ArcMetadataReadCount",All).GetValue(null,null);
+                Check(arcReads>0,"Analytic circle metadata appended during original STA capture");
+                report["placement"]=Json.DeserializeObject((string)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementBuilder").GetMethod("Diagnostic",All).Invoke(null,new[]{placement}));
+                report["sections"]=Items(Get(placement,"Sections")).Select(s=>new {Coverage=Get(s,"Coverage").ToString(),Reasons=Get(s,"Reasons"),BoundaryCount=Items(Get(s,"Boundary")).Length}).ToArray();
+                if(args.Skip(6).Contains("--capture-private"))
+                    File.WriteAllText(Path.Combine(output,"PRIVATE-managed-capture.json"),Json.Serialize(Get(item,"PlacementCapture")));
+                if(args.Skip(6).Contains("--require-uniform-sections"))
+                    Check(Items(Get(placement,"Sections")).All(s=>Get(s,"Coverage").ToString()=="CompleteUniformExtrusion"&&Items(Get(s,"Boundary")).Length>0),
+                        "Actual uniform Part retains the full closed material section for every bend");
+                if(args.Length>5)
+                {
+                    Check(Items(Get(Get(initial,"PlacementSources"),"Tools")).Count(t=>Get(t,"Punch")!=null)==18,"Actual Master mappings reach production pipeline");
+                    string good=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG");
+                    Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",Path.Combine(output,"missing-placement-config.json"));Call(worker,"Refresh");
+                    Until(()=>{Call(form,"Tick");return !ReferenceEquals(library(),initial)&&Get(item,"PlacementDraft")!=null;},"Placement config change creates safe unknown draft");
+                    Check(!(bool)Get(placement,"Current")&&!(bool)Get(Get(initial,"PlacementSources"),"Current"),"Held placement/source invalidate on configuration edit");
+                    Check(Items(Get(Get(item,"PlacementDraft"),"Candidates")).Length==18*initialBends,"Missing configuration retains 18 slots per actual bend");
+                    Check(Json.Serialize(Snapshot(form,model,true))==min,"Placement-source failure does not change Min or Planning");
+                    Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",good);Call(worker,"Refresh");
+                    Until(()=>{Call(form,"Tick");return Items(Get(Get(library(),"PlacementSources"),"Tools")).All(t=>Get(t,"Punch")!=null);},"Master/Excel source restores independently");
+                }
                 Action<string> source=directory=> {Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY",directory); Call(worker,"Refresh");};
                 string missing=Path.Combine(output,"missing-company-source"); source(missing);
                 Until(()=> {Call(form,"Tick"); return count()==0 && !ReferenceEquals(library(),initial);},"Missing directory yields explicit unverified snapshot");
@@ -81,17 +109,27 @@ internal static partial class NativePlanningValidation
                 {
                     source(missing);
                     Until(()=> {Call(form,"Tick"); return count()==0;},"Diagnostic failure injection update");
-                    Check(listener.Failures==1 && Convert.ToString(Get(session,"ToolLibraryDiagnosticError")).Contains("Injected"),"Library diagnostic failure isolated");
+                    Check(debugDiagnostics?listener.Failures==1&&Convert.ToString(Get(session,"ToolLibraryDiagnosticError")).Contains("Injected"):listener.Failures==0,
+                        "Diagnostic failure isolated in Debug; diagnostic call omitted in Release");
                     Check(Get(item,"Error")==null && Get(item,"MinimumText").ToString()==minText,"Diagnostic listener cannot change Min");
                 }
                 finally {Debug.Listeners.Remove(listener);}
                 source(args[3]); Until(()=> {Call(form,"Tick"); return count()==18;},"Final library restore");
+                Check((int)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementNativeCapture").GetProperty("ArcMetadataReadCount",All).GetValue(null,null)==arcReads,"Library/evidence edits do not call SOLIDWORKS arc capture again");
+                Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1,"All source-only changes reuse original model capture");
                 Check(model.GetUpdateStamp()==stamp && model.GetSaveFlag()==dirty && model.ConfigurationManager.ActiveConfiguration.Name==config,"Library I/O preserves model stamp/config/dirty");
                 report["libraryDebug"]=Json.DeserializeObject((string)Call(library(),"ToDebugJson"));
+                var held=Get(item,"PlacementDraft");
                 model.ForceRebuild3(false); Call(form,"Tick");
                 Check(!(bool)Get(item,"Current") && Get(item,"ToolProfiles")==null,"Stale model no longer exposes a tool snapshot link");
+                Check(Get(item,"PlacementDraft")==null&&!(bool)Get(held,"Current"),"Rebuild invalidates held placement and hides stale draft");
                 Until(()=>Scanned(form) && !ReferenceEquals(item,Items(Get(session,"Items")).Single()),"Existing rebuild auto-rescan");
                 Check(Items(Get(Items(Get(session,"Items")).Single(),"Rows")).Length==initialBends,"Rebuild retains actual sample bend count");
+                var rebuilt=Items(Get(session,"Items")).Single();Check(Get(rebuilt,"PlacementDraft")!=null,"Placement regenerated after existing auto-rescan");
+                Check(model.AddConfiguration3("PHASE3B_TEST_ONLY","private regression copy","",0)!=null,"Create private-copy configuration for stale test");
+                model.ShowConfiguration2("PHASE3B_TEST_ONLY");
+                Check(model.ConfigurationManager.ActiveConfiguration.Name=="PHASE3B_TEST_ONLY","Switch private-copy configuration");Call(form,"Tick");
+                Check(Get(rebuilt,"PlacementDraft")==null,"Changed model configuration hides old placement");
                 form.Close();
             }
             Check(Sha(original)==hash,"Original Part unchanged"); report["originalUnchanged"]=true; report["passed"]=true;
@@ -105,6 +143,7 @@ internal static partial class NativePlanningValidation
             { try {foreach(ModelDoc2 doc in app.GetDocuments() as object[]??new object[0]) if(doc.GetPathName().StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)) app.CloseDoc(doc.GetTitle());app.ExitApp();}catch(Exception ex){Console.WriteLine("Cleanup: "+ex.Message);} }
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY",oldDirectory); Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",oldManifest);
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",oldEvidence);
+            Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",oldPlacement);
         }
         Console.WriteLine("Library native checks: "+checks+"; passed: "+report.ContainsKey("passed")); return report.ContainsKey("passed")?0:1;
     }

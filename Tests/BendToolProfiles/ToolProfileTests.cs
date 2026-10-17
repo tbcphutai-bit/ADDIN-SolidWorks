@@ -57,6 +57,8 @@ internal static partial class ToolProfileTests
     private static int Main(string[] args)
     {
         if (args.Length>0 && args[0]=="--company") return CompanyIntegration(args);
+        if (args.Length>0 && args[0]=="--placement-company") return PlacementCompanyIntegration(args);
+        if (args.Length>0 && args[0]=="--workbook-objects") return WorkbookObjectInventory(args);
         temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ToolProfileTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
         Test("LINE retains coordinates and INSBASE; no tip recentering",()=> {
             var doc=Parse(Dxf(Line(20,-5,30,-5),header:Tags(9,"$INSBASE",10,7,20,8,30,9)));
@@ -217,6 +219,7 @@ internal static partial class ToolProfileTests
             using (var c=new CancellationTokenSource()) { c.Cancel(); bool cancelled=false; try { Provider(Folder()).Read(c.Token); } catch (OperationCanceledException) {cancelled=true;} Check(cancelled,"Cancellation propagated"); }
         });
         RegionAndDatumTests();
+        PlacementTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a
         // computed directory and never any operation on a company source folder.

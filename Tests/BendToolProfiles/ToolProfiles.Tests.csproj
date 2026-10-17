@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System"/><Reference Include="System.Core"/><Reference Include="System.Web.Extensions"/>
+    <Reference Include="System.IO.Compression"/><Reference Include="System.Xml"/><Reference Include="System.Xml.Linq"/>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileGeometry.cs"><Link>ToolProfileGeometry.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileModels.cs"><Link>ToolProfileModels.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolDxfReader.cs"><Link>ToolDxfReader.cs</Link></Compile>
@@ -17,6 +18,15 @@
     <Compile Include="..\..\Commands\BendToolProfiles\ToolDatumEvidence.cs"><Link>ToolDatumEvidence.cs</Link></Compile>
     <Compile Include="ToolProfileTests.cs"/><Compile Include="CompanyToolIntegration.cs"/>
     <Compile Include="RegionAndDatumTests.cs"/>
+    <Compile Include="PlacementTests.cs"/>
+    <Compile Include="PlacementCompanyIntegration.cs"/>
+    <Compile Include="..\..\Commands\BendPlacement\BendPlacementMath.cs"><Link>BendPlacementMath.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\BendPlacementModels.cs"><Link>BendPlacementModels.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\BendMasterAssemblyReader.cs"><Link>BendMasterAssemblyReader.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\BendLimitWorkbookReader.cs"><Link>BendLimitWorkbookReader.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\BendPlacementSources.cs"><Link>BendPlacementSources.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\BendSheetSection.cs"><Link>BendSheetSection.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\BendPlacementBuilder.cs"><Link>BendPlacementBuilder.cs</Link></Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

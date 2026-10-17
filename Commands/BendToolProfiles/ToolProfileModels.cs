@@ -75,10 +75,12 @@ namespace ADDIN.Commands.BendTools
         public IReadOnlyList<CompanyToolProfile> Tools { get; internal set; }
         public IReadOnlyList<ToolProfileProvenance> Sources { get; internal set; }
         public string Error { get; internal set; }
+        public BendPlacement.PlacementSourceSnapshot PlacementSources { get; internal set; } = BendPlacement.PlacementSourceSnapshot.Missing("PLACEMENT_SOURCE_NOT_CONFIGURED");
         internal void Invalidate()
         {
             Interlocked.Exchange(ref current,0);
             if (Tools!=null) foreach (var tool in Tools) tool.Datums?.Invalidate();
+            PlacementSources?.Invalidate();
         }
 
         // A separate diagnostic summary: never serialize proprietary coordinates

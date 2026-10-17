@@ -1,4 +1,4 @@
-# Company DXF profiles — Phase 2 / Phase 3A
+# Company DXF profiles — Phase 2 / Phase 3A / Phase 3B
 
 Production code is in `Commands/BendToolProfiles/`. It has no SOLIDWORKS, WinForms,
 or external package dependency. It supplies read-only geometry/provenance to the
@@ -9,6 +9,27 @@ evidence. Source closure and manufacturing status retain their Phase 2 meaning.
 See [geometry/evidence contract](../../Docs/BendCheck/Phase3A-GeometryContract.md)
 and [validation results](../../Docs/BendCheck/Validation-Phase3A.md). No UI change
 or Check Max feasibility algorithm is introduced.
+
+Phase 3B adds `Commands/BendPlacement/`: private Master punch/holder selections,
+rigid placement math, whole sheet coverage and independent workbook reference
+mapping. The native adapter appends analytic arc metadata during the existing
+STA capture; workers still receive only managed file/geometry data. See the
+[placement contract](../../Docs/BendCheck/Phase3B-PlacementContract.md) and
+[Phase 3B validation](../../Docs/BendCheck/Validation-Phase3B.md).
+
+Local-only Phase 3B modes (all output must be outside the checkout):
+
+```powershell
+& $ToolProfilesTestExe --workbook-objects $Workbook $PrivateObjectInventory
+& $ToolProfilesTestExe --placement-company $PlacementConfig $CompanyDimDirectory $PrivateOutput
+& $NativeToolLibraryTestExe $ProductDll $PrivateOutput $OriginalPart $CompanyDimDirectory $MinExcel $PlacementConfig
+```
+
+The company integration uses actual supplied tools; its sheet is an explicitly
+synthetic harness fixture. Native validation uses a private copy of the real
+Part. Debug diagnostic injection is asserted in Debug; Release omits
+Debug.WriteLine and asserts it does not run. Production source code never edits
+the Part. Native stale/configuration tests edit only the harness's private copy.
 
 ## Source configuration without UI changes
 
