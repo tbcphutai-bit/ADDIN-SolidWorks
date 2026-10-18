@@ -69,6 +69,17 @@ namespace ADDIN.Tools.BendToolAudit
             }
             Write(output, "PRIVATE-operator-checklist.md", b.ToString());
         }
+        internal static void ModelContext(string output, AuditModelContext context)
+        {
+            Write(output, "PRIVATE-model-context.json", Json(new { Scope = "SavedGeometryContextOnly_NoPhysicalApproval",
+                NativeSourceContract = context?.Model?.Bodies.Any(b => b.EnvelopeTopology != null) == true ? OfflineModelReader.NativeSourceContract : null,
+                Diagnostic = context?.Diagnostic ?? (context == null ? "MODEL_CONTEXT_NOT_SUPPLIED" : null),
+                CaptureReview = context?.CaptureReview?.Status.ToString(), SnapshotId = context?.Model?.SnapshotId,
+                Configuration = context?.Model?.Configuration, UpdateStamp = context?.Model?.UpdateStamp,
+                NativeSources = context?.Model?.Bodies.Select(b => new { b.Id, SourceSha256 = b.EnvelopeTopology?.SourceSha256, CircleCount = b.EnvelopeTopology?.Circles.Count }).ToArray(),
+                Envelopes = context?.Envelopes?.Select(e => new { e.Binding.FeatureId, Tier = e.Certificate.Tier.ToString(), e.Certificate.Method,
+                    ContinuousCoverageProven = e.Certificate.ContinuousCoverageProven, e.GeometrySha256, Intervals = e.Certificate.Intervals.Count, e.Reasons }).ToArray() }));
+        }
         internal static void Templates(string output, ToolProfileLibrarySnapshot library, IReadOnlyList<AuditSourceFact> facts, MasterAssemblyManifest manifest)
         {
             var intake = new AuditIntake();

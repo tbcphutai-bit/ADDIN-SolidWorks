@@ -1,5 +1,8 @@
 # Issue #17 — xác minh công cụ, Windows 2026-10-18
 
+Kết quả bên dưới là baseline PR #18 trước tích hợp Phase 3D.1. Kết quả hiện tại
+và lineage được ghi trong [Issue #20](Issue20-SnapshotCompatibility.md).
+
 Baseline source Phase 3D / PR #15: `283a7a77a3280dda6cc36b82412608cf518cb58b`.
 Branch độc lập `feature/check-chan-issue17-data-audit`.
 Tài liệu này chỉ báo cáo kiểm thử công cụ bằng dữ liệu tổng hợp. Kết quả thực tế

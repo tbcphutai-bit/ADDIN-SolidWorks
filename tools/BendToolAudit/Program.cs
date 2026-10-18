@@ -151,6 +151,7 @@ namespace ADDIN.Tools.BendToolAudit
                 catch (Exception ex) when (ex is IOException || ex is ArgumentException || ex is InvalidOperationException) { }
                 Directory.CreateDirectory(output);
                 AuditExport.Report(output, rows, Get("--code-revision"), ledger.Fingerprint);
+                AuditExport.ModelContext(output, context);
                 AuditExport.Templates(output, library, facts, manifest);
                 // Console exposes only counts/codes; detailed diagnostics and
                 // source/selection bindings remain in the private report.

@@ -3,7 +3,8 @@
 Giải quyết phần công cụ và bàn giao của [Issue #17](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/issues/17).
 Baseline Phase 3D: `283a7a77a3280dda6cc36b82412608cf518cb58b` (PR #15).
 Branch riêng: `feature/check-chan-issue17-data-audit`; Draft PR base là
-`feature/check-chan-phase3d-sheet-envelope`. Không thay source runtime, UI,
+`feature/check-chan-phase3d1-native-coverage` sau khi tích hợp PR #19 theo
+[Issue #20](Issue20-SnapshotCompatibility.md). Không thay source runtime, UI,
 Check Min, collision solver hoặc branch Phase 3D.1.
 
 `tools/BendToolAudit/BendToolAudit.csproj` tạo CLI .NET Framework 4.8 độc lập,
@@ -54,6 +55,7 @@ provider refresh cũng được kiểm tra trước khi xuất. Báo cáo là qu
 | File local | Công dụng |
 | --- | --- |
 | `PRIVATE-audit.json` | Đủ 18 dòng, source path/SHA và claimed revision, exact selection keys, per-field diagnostics, Excel references và evidence observations. |
+| `PRIVATE-model-context.json` | Native V2 integrity và coverage từ snapshot Phase 3D.1; diagnostic rõ khi thiếu/sai metadata. |
 | `18-tool-status.csv` | Bảng 18 dòng để lọc/sắp xếp; UNKNOWN giữ nguyên, không đổi NULL thành PASS. |
 | `PRIVATE-operator-checklist.md` | Phiếu kiểm định riêng cho từng dao, đầy đủ các mục còn thiếu và chỗ điền artifact/đo/reviewer. |
 | `PRIVATE-four-mappings.json` | Theo dõi riêng AMD-STD-004/008/117/452, kể cả sau khi giải quyết mapping. |
@@ -172,3 +174,6 @@ liệu/trạng thái công ty vào test. Baseline JSON có `Version: 1`, `Tools`
 object theo thứ tự `CompanyToolIds.All`, mỗi object chứa ToolId cùng các field
 trạng thái kỳ vọng; `SeparateMappingFollowups` là danh sách cần theo dõi riêng.
 Giữ baseline ngoài checkout. Xem [xác minh công cụ](Validation-Issue17.md).
+
+Snapshot Phase 3D.1 phải có đầy đủ circle axis/sense và hash NativeAnalyticShellV2;
+CLI chạy x64. Xem [contract, migration và regression mới](Issue20-SnapshotCompatibility.md).
