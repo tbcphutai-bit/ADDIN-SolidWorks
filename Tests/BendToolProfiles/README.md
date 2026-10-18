@@ -281,6 +281,35 @@ compares supported curves against original files using `ezdxf` (QA dependency
 only; tested with 1.4.5), including arc radius and arc midpoint after OCS/INSERT.
 The two aggregate evidence files must be present for that comparison.
 
+## Phase 4A process motion
+
+The normal managed suite also runs `ProcessTests`/`ProcessAdditionalTests`.
+`--process-tests` runs just those twenty groups. Controlled fixtures define
+actual panel motion and joint enclosures; no company profile is replaced by a
+synthetic fixture in production. The complete interval solver reuses the axial
+and analytic kernels and retains independent Punch/Holder results.
+
+```powershell
+& $Tests --process-tests
+& $Tests --process-oracle $PrivateProcessOutput
+& $Python Tests/BendToolProfiles/compare_process_motion.py "$PrivateProcessOutput/process-oracle.json"
+& $Tests --process-company $PrivatePlacementConfig $CompanyDimDirectory $PrivateOutput
+```
+
+The process oracle uses a closed-form rotating-bar/disk minimum, independently
+checks witnesses including finite axial occupancy, and includes collisions
+missed by start/midpoint/end sampling. It imports no production kernel.
+`--process-company` reads the actual 18-tool library and explicitly keeps
+54/108 synthetic-workpiece tool rows UNKNOWN without reviewed process inputs;
+real Part/Assembly captures are checked separately by the native harness.
+
+The new native regression also runs the managed process API against existing
+captures: ten missing pair/phase results per actual tool, no new COM reads,
+no final-shape inference. No WinForms/handler change invokes this API from UI.
+Full test counts, commands, performance, remaining production blockers and
+the inherited layout warning are in
+[`Validation-Phase4A.md`](../../Docs/BendCheck/Validation-Phase4A.md).
+
 ## Native regression
 
 Build product Debug/x64 into a private directory with the existing pre/post-build
