@@ -63,6 +63,13 @@ internal static partial class ToolProfileTests
         if (args.Length>0 && args[0]=="--collision-oracle") return CollisionOracleFixtures(args);
         if (args.Length>0 && args[0]=="--envelope-oracle") return EnvelopeOracleIntegration(args);
         if (args.Length>0 && args[0]=="--native-family-oracle") return NativeFamilyOracle(args);
+        if (args.Length>0 && args[0]=="--process-oracle") return ProcessOracle(args);
+        if (args.Length>0 && args[0]=="--process-company") return ProcessCompanyIntegration(args);
+        if (args.Length>0 && args[0]=="--process-tests")
+        {
+            temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ProcessTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
+            ProcessTests(); Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions"); return failed==0?0:1;
+        }
         if (args.Length>0 && args[0]=="--workbook-objects") return WorkbookObjectInventory(args);
         temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ToolProfileTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
         Test("LINE retains coordinates and INSBASE; no tip recentering",()=> {
@@ -238,6 +245,7 @@ internal static partial class ToolProfileTests
         CollisionTests();
         CollisionPlacementTests();
         EnvelopeTests();
+        ProcessTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a
         // computed directory and never any operation on a company source folder.

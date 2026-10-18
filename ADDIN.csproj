@@ -245,6 +245,11 @@
     <Compile Include="Commands\BendEnvelope\AxialCollisionEngine.cs" />
     <Compile Include="Commands\BendEnvelope\ToolAxialSetupEvidence.cs" />
     <Compile Include="Commands\BendEnvelope\CollisionBatchWorker.cs" />
+    <Compile Include="Commands\BendProcess\ProcessMotionGeometry.cs" />
+    <Compile Include="Commands\BendProcess\BendProcessModels.cs" />
+    <Compile Include="Commands\BendProcess\PlanarFormingContact.cs" />
+    <Compile Include="Commands\BendProcess\ProcessCollisionEngine.cs" />
+    <Compile Include="Commands\BendProcess\ProcessBatchWorker.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolDxfReader.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileLibrary.cs" />

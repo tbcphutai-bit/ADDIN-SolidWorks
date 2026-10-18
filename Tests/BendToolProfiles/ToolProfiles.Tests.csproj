@@ -44,6 +44,14 @@
     <Compile Include="..\..\Commands\BendEnvelope\AxialCollisionEngine.cs"><Link>AxialCollisionEngine.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendEnvelope\ToolAxialSetupEvidence.cs"><Link>ToolAxialSetupEvidence.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendEnvelope\CollisionBatchWorker.cs"><Link>CollisionBatchWorker.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendProcess\ProcessMotionGeometry.cs"><Link>ProcessMotionGeometry.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendProcess\BendProcessModels.cs"><Link>BendProcessModels.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendProcess\PlanarFormingContact.cs"><Link>PlanarFormingContact.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendProcess\ProcessCollisionEngine.cs"><Link>ProcessCollisionEngine.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendProcess\ProcessBatchWorker.cs"><Link>ProcessBatchWorker.cs</Link></Compile>
+    <Compile Include="ProcessTests.cs"/>
+    <Compile Include="ProcessAdditionalTests.cs"/>
+    <Compile Include="ProcessCompanyIntegration.cs"/>
     <Compile Include="HolderCompanyIntegration.cs"/>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolProfileModels.cs"><Link>ToolProfileModels.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendToolProfiles\ToolDxfReader.cs"><Link>ToolDxfReader.cs</Link></Compile>

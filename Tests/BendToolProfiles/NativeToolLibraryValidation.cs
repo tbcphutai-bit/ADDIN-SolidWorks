@@ -101,6 +101,25 @@ internal static partial class NativePlanningValidation
                         Tiers=envelopes.Select(e=>new {Feature=Get(Get(e,"Binding"),"FeatureId"),Tier=Get(Get(e,"Certificate"),"Tier").ToString(),
                             Intervals=Items(Get(Get(e,"Certificate"),"Intervals")).Length,Reasons=Get(e,"Reasons")}).ToArray()};
                     Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1,"Envelope batch reuses original Check Min capture");
+                    var processRequest=New("Commands.BendProcess.ProcessBatchRequest",managedCapture,initial,null,
+                        Typed("Commands.BendEnvelope.SheetEnvelopeCapture",envelopes));
+                    using(var processWorker=(IDisposable)New("Commands.BendProcess.ProcessBatchWorker"))
+                    {
+                        var processTask=(Task)Call(processWorker,"RunAsync",processRequest,null,CancellationToken.None,null);
+                        Until(()=>processTask.IsCompleted,"Managed 18-tool process batch completes");processTask.GetAwaiter().GetResult();
+                        var processResult=processTask.GetType().GetProperty("Result").GetValue(processTask,null);
+                        var processRows=Items(Get(processResult,"Candidates"));
+                        Check(processRows.Length==18*initialBends&&processRows.All(r=>Get(r,"ProcessResult").ToString()=="UNKNOWN"),"Final native CAD cannot supply missing forming states");
+                        Check(processRows.All(r=>Items(Get(r,"PairSegments")).Length==10&&Items(Get(r,"UnknownPhases")).Length==5),"Every real tool retains both pairs and five unresolved process phases");
+                        Check((int)Get(processResult,"KernelQueries")==0,"No unverified real motion is silently sent to the numeric kernel");
+                        Check((int)Get(processResult,"WorkerThreadId")!=Thread.CurrentThread.ManagedThreadId,"Process batch uses only managed worker data");
+                        Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1&&
+                            (int)nativeEnvelopeType.GetProperty("BodyCaptureCount",All).GetValue(null,null)==bodyCaptures&&
+                            (int)nativeEnvelopeType.GetProperty("WrongThreadCount",All).GetValue(null,null)==0,"Process batch adds zero native reads/worker COM calls");
+                        report["process"]=new {Rows=processRows.Length,Unknown=processRows.Length,
+                            PairPhaseResults=processRows.Sum(r=>Items(Get(r,"PairSegments")).Length),
+                            WorkerMs=Get(processResult,"WorkerMilliseconds"),KernelQueries=Get(processResult,"KernelQueries")};
+                    }
                     if(args.Skip(6).Contains("--native-family-reference"))
                         report["nativeFamilyReference"]=NativeFamilyReference(model,managedCapture,envelopes);
                 }
