@@ -57,12 +57,17 @@ namespace ADDIN.Commands.BendEnvelope
                     return new NativeEnvelopeBody(id, false, 0, 0, null, null, "INCOMPLETE_NATIVE_BREP_CAPTURE");
                 var faceIds = faces.Select((f, i) => new { key = Key(f), i }).ToDictionary(v => v.key, v => v.i);
                 var edgeIds = edges.Select((e, i) => new { key = Key(e), i }).ToDictionary(v => v.key, v => v.i);
-                var edgeData = new List<PlacementEdgeSnapshot>(); var faceData = new List<NativeEnvelopeFace>();
+                var edgeData = new List<PlacementEdgeSnapshot>(); var faceData = new List<NativeEnvelopeFace>();var circles=new List<NativeCircleDefinition>();
                 for (int i = 0; i < edges.Length; i++)
                 {
                     var edge = (Edge)edges[i]; var curve = edge.GetCurve() as Curve; var p = edge.GetCurveParams3() as CurveParamData;
                     if (curve == null || p == null) throw new InvalidOperationException("MISSING_NATIVE_CURVE");
                     int kind = curve.IsLine() ? 1 : curve.IsCircle() ? 2 : 0;
+                    if(kind==2)
+                    {
+                        var circle=(double[])curve.CircleParams;
+                        circles.Add(new NativeCircleDefinition(i,V(circle,3).Unit,p.Sense));
+                    }
                     var endpoints=NativeEnvelopeEdgePolicy.EdgeEndpoints(V((double[])p.StartPoint,metres:true),V((double[])p.EndPoint,metres:true),p.Sense);
                     var adjacent = (edge.GetTwoAdjacentFaces2() as object[] ?? new object[0]).Where(f => f != null).Select(f => faceIds[Key(f)]).ToArray();
                     edgeData.Add(new PlacementEdgeSnapshot(i, kind, endpoints.Item1, endpoints.Item2, adjacent,
@@ -85,7 +90,7 @@ namespace ADDIN.Commands.BendEnvelope
                     }
                     faceData.Add(new NativeEnvelopeFace(i, kind, normal, point, axis, radius, face.FaceInSurfaceSense(), loops));
                 }
-                return new NativeEnvelopeBody(id, native.GetType() == 0, native.GetFaceCount(), native.GetEdgeCount(), edgeData, faceData);
+                return new NativeEnvelopeBody(id, native.GetType() == 0, native.GetFaceCount(), native.GetEdgeCount(), edgeData, faceData,circles:circles);
             }
             catch (Exception ex)
             { return new NativeEnvelopeBody(id, false, 0, 0, null, null, "NATIVE_TOPOLOGY_CAPTURE_FAILED:" + ex.GetType().Name); }
