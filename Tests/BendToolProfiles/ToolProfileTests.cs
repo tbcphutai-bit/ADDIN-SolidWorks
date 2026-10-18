@@ -237,6 +237,7 @@ internal static partial class ToolProfileTests
         CollisionTests();
         CollisionPlacementTests();
         EnvelopeTests();
+        AuditTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a
         // computed directory and never any operation on a company source folder.
