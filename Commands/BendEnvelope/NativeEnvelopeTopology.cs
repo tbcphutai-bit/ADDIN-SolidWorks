@@ -28,6 +28,14 @@ namespace ADDIN.Commands.BendEnvelope
         internal NativeFaceLoop(bool outer, bool singular, IEnumerable<NativeLoopEdge> edges)
         { IsOuter = outer; Singular = singular; Edges = PlacementLists.Copy(edges); }
     }
+    internal sealed class NativeCircleDefinition
+    {
+        public int EdgeId { get; }
+        public PlacementVector3 Axis { get; }
+        public bool CurveAndEdgeSameSense { get; }
+        internal NativeCircleDefinition(int edge,PlacementVector3 axis,bool sameSense)
+        { EdgeId=edge;Axis=axis;CurveAndEdgeSameSense=sameSense; }
+    }
     internal sealed class NativeEnvelopeFace
     {
         public int Id { get; }
@@ -53,14 +61,17 @@ namespace ADDIN.Commands.BendEnvelope
         public int NativeEdgeCount { get; }
         public IReadOnlyList<PlacementEdgeSnapshot> Edges { get; }
         public IReadOnlyList<NativeEnvelopeFace> Faces { get; }
+        public IReadOnlyList<NativeCircleDefinition> Circles { get; }
         public string Error { get; }
         public string SourceSha256 { get; }
         internal NativeEnvelopeBody(string body, bool solid, int faceCount, int edgeCount, IEnumerable<PlacementEdgeSnapshot> edges,
-            IEnumerable<NativeEnvelopeFace> faces, string error = null)
+            IEnumerable<NativeEnvelopeFace> faces, string error = null,IEnumerable<NativeCircleDefinition> circles=null)
         {
             BodyId = body; SolidBody = solid; NativeFaceCount = faceCount; NativeEdgeCount = edgeCount;
-            Edges = PlacementLists.Copy(edges); Faces = PlacementLists.Copy(faces); Error = error;
-            SourceSha256 = ToolEvidenceCanonical.Hash("NativeAnalyticShellV1", body, solid.ToString(), error,
+            Edges = PlacementLists.Copy(edges); Faces = PlacementLists.Copy(faces); Error = error;Circles=PlacementLists.Copy(circles);
+            SourceSha256 = ToolEvidenceCanonical.Hash("NativeAnalyticShellV2", body, solid.ToString(), error,
+                ToolEvidenceCanonical.Hash(Circles.Select(c=>ToolEvidenceCanonical.Hash(c.EdgeId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    EnvelopeBinding.Vector(c.Axis),c.CurveAndEdgeSameSense.ToString())).ToArray()),
                 faceCount.ToString(System.Globalization.CultureInfo.InvariantCulture), edgeCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ToolEvidenceCanonical.Hash(Edges.Select(e => ToolEvidenceCanonical.Hash(e.Id.ToString(), e.Kind.ToString(),
                     EnvelopeBinding.Vector(e.A), EnvelopeBinding.Vector(e.B), e.Arc == null ? null : ToolEvidenceCanonical.Hash(

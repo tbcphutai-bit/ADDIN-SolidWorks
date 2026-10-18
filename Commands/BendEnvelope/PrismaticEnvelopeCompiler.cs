@@ -123,11 +123,15 @@ namespace ADDIN.Commands.BendEnvelope
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is InvalidDataException || ex is ArgumentException || ex is InvalidOperationException)
             {
+                if(body?.EnvelopeTopology!=null && (ex.Message=="UNSUPPORTED_NONPRISMATIC_TRIM"||ex.Message=="UNSUPPORTED_CROSS_AXIS_NATIVE_CYLINDER"||ex.Message=="UNSUPPORTED_PERIODIC_CAP_ORIENTATION"))
+                    return OrthogonalNativeEnvelopeCompiler.Read(binding,body.EnvelopeTopology,token);
                 return new SheetEnvelopeCapture(binding, null, EnvelopeCoverageTier.UnknownCoverage, "NativeProofUnavailable", model.SimulationOnly,
-                    SourceToleranceMm, new[] { "AXIAL_COVERAGE_UNKNOWN", ex is InvalidDataException ? ex.Message : "INVALID_NATIVE_ENVELOPE_INPUT" });
+                    SourceToleranceMm, new[] { "AXIAL_COVERAGE_UNKNOWN", ex is InvalidDataException ? ex.Message : "INVALID_NATIVE_ENVELOPE_INPUT" }
+                    .Concat(body?.EnvelopeTopology?.Faces.Where(f=>f.Kind!=1&&f.Kind!=2).Select(f=>"UNSUPPORTED_NATIVE_SURFACE_FACE:"+f.Id)??new string[0])
+                    .Concat(body?.EnvelopeTopology?.Edges.Where(e=>e.Kind!=1&&e.Kind!=2).Select(e=>"UNSUPPORTED_NATIVE_TRIM_EDGE:"+e.Id)??new string[0]));
             }
         }
-        private static void ValidateShell(NativeEnvelopeBody shell, CancellationToken token)
+        internal static void ValidateShell(NativeEnvelopeBody shell, CancellationToken token)
         {
             if (!shell.SolidBody || shell.NativeEdgeCount != shell.Edges.Count || shell.NativeFaceCount != shell.Faces.Count ||
                 shell.Faces.Count == 0 || shell.Faces.Count > 12000 || shell.Edges.Count > 24000 || shell.Edges.Select(e => e.Id).Distinct().Count() != shell.Edges.Count)
@@ -197,7 +201,7 @@ namespace ADDIN.Commands.BendEnvelope
             return loop.Sum(e=>e.Kind=="LINE"?(e.Start.X-origin.X)*(e.End.Y-origin.Y)-(e.Start.Y-origin.Y)*(e.End.X-origin.X):
                 (e.Center.X-origin.X)*(e.End.Y-e.Start.Y)-(e.Center.Y-origin.Y)*(e.End.X-e.Start.X)+e.RadiusMm*e.RadiusMm*e.SweepRadians);
         }
-        private static CollisionMaterial2D OrientedMaterial(List<ToolCurve> source, EnvelopeBinding binding)
+        internal static CollisionMaterial2D OrientedMaterial(List<ToolCurve> source, EnvelopeBinding binding)
         {
             var remaining = new List<ToolCurve>(source); var contours = new List<Tuple<CollisionContour2D, double>>();
             while (remaining.Count > 0)

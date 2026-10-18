@@ -62,6 +62,7 @@ internal static partial class ToolProfileTests
         if (args.Length>0 && args[0]=="--collision-company") return CollisionCompanyIntegration(args);
         if (args.Length>0 && args[0]=="--collision-oracle") return CollisionOracleFixtures(args);
         if (args.Length>0 && args[0]=="--envelope-oracle") return EnvelopeOracleIntegration(args);
+        if (args.Length>0 && args[0]=="--native-family-oracle") return NativeFamilyOracle(args);
         if (args.Length>0 && args[0]=="--workbook-objects") return WorkbookObjectInventory(args);
         temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ToolProfileTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
         Test("LINE retains coordinates and INSBASE; no tip recentering",()=> {

@@ -23,6 +23,9 @@
     <Compile Include="CollisionCompanyIntegration.cs"/>
     <Compile Include="EnvelopeTests.cs"/>
     <Compile Include="NativeEnvelopeTests.cs"/>
+    <Compile Include="NativeSnapshotJson.cs"/>
+    <Compile Include="NativeCylinderTests.cs"/>
+    <Compile Include="NativeFamilyOracle.cs"/>
     <Compile Include="EnvelopeWorkerTests.cs"/>
     <Compile Include="EnvelopeOracleIntegration.cs"/>
     <Compile Include="..\..\Commands\BendCollision\CollisionModels2D.cs"><Link>CollisionModels2D.cs</Link></Compile>
@@ -37,6 +40,7 @@
     <Compile Include="..\..\Commands\BendEnvelope\AnalyticAxialSolids.cs"><Link>AnalyticAxialSolids.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendEnvelope\NativeEnvelopeTopology.cs"><Link>NativeEnvelopeTopology.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendEnvelope\PrismaticEnvelopeCompiler.cs"><Link>PrismaticEnvelopeCompiler.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendEnvelope\OrthogonalNativeEnvelopeCompiler.cs"><Link>OrthogonalNativeEnvelopeCompiler.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendEnvelope\AxialCollisionEngine.cs"><Link>AxialCollisionEngine.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendEnvelope\ToolAxialSetupEvidence.cs"><Link>ToolAxialSetupEvidence.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendEnvelope\CollisionBatchWorker.cs"><Link>CollisionBatchWorker.cs</Link></Compile>
