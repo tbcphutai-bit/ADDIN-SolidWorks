@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><AssemblyName>BendToolAudit</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion><LangVersion>7.3</LangVersion>
+    <OutputPath>bin\</OutputPath><StartupObject>ADDIN.Tools.BendToolAudit.Program</StartupObject>
+    <PlatformTarget>x64</PlatformTarget><Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System"/><Reference Include="System.Core"/><Reference Include="System.Web.Extensions"/>
+    <Reference Include="System.IO.Compression"/><Reference Include="System.Xml"/><Reference Include="System.Xml.Linq"/>
+    <Reference Include="System.Runtime.Serialization"/>
+    <Compile Include="..\..\Commands\BendToolProfiles\*.cs" />
+    <Compile Include="..\..\Commands\BendPlacement\*.cs" Exclude="..\..\Commands\BendPlacement\BendPlacementNativeCapture.cs" />
+    <Compile Include="..\..\Commands\BendCollision\*.cs" />
+    <Compile Include="..\..\Commands\BendEnvelope\*.cs" Exclude="..\..\Commands\BendEnvelope\SheetNativeTopologyCapture.cs" />
+    <Compile Include="AuditContracts.cs"/><Compile Include="ToolDataAudit.cs"/>
+    <Compile Include="OfflineModelReader.cs"/><Compile Include="AuditExport.cs"/><Compile Include="Program.cs"/>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

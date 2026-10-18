@@ -59,3 +59,8 @@ _codex_backup/
 backups/
 scratch_*
 /CreateMirrorPartPackage.cs
+
+# Company audit packets/reports must remain outside every checkout.
+PRIVATE-*
+*-UNFILLED.json
+.audit-private/

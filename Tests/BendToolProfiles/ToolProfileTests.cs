@@ -56,6 +56,8 @@ internal static partial class ToolProfileTests
     }
     private static int Main(string[] args)
     {
+        if (args.Length>0 && (args[0]=="--audit-snapshot-tests"||args[0]=="--audit-snapshot-roundtrip")) return AuditSnapshotFocused(args);
+        if (args.Length>0 && args[0]=="--audit-snapshot-private") return AuditSnapshotPrivate(args);
         if (args.Length>0 && args[0]=="--company") return CompanyIntegration(args);
         if (args.Length>0 && args[0]=="--placement-company") return PlacementCompanyIntegration(args);
         if (args.Length>0 && args[0]=="--holder-company") return HolderCompanyIntegration(args);
@@ -238,6 +240,8 @@ internal static partial class ToolProfileTests
         CollisionTests();
         CollisionPlacementTests();
         EnvelopeTests();
+        AuditTests();
+        AuditSnapshotTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a
         // computed directory and never any operation on a company source folder.
