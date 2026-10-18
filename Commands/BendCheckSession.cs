@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using ADDIN.Commands.BendTools;
 using ADDIN.Commands.BendPlacement;
+using ADDIN.Commands.BendAssembly;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -13,10 +14,12 @@ namespace ADDIN.Commands
     internal sealed class BendCheckItem : IDisposable
     {
         internal string Key, Name, Path, Configuration, Error, Material;
+        internal string AssemblyBatchReason;
         internal double? ThicknessMm;
         internal int Quantity, Stamp;
         internal bool Done, Current = true, AssemblyBodyModified;
         internal readonly List<Component2> Instances = new List<Component2>();
+        internal readonly List<AssemblyOccurrence> AssemblyOccurrences = new List<AssemblyOccurrence>();
         internal List<VCutPropertySetupCommand.BendRow> Rows = new List<VCutPropertySetupCommand.BendRow>();
         internal ModelDoc2 Model;
         private BendCheckPlanningDraft planningDraft;
@@ -69,7 +72,7 @@ namespace ADDIN.Commands
 
     // All SolidWorks calls in this class run on the task pane's STA. File
     // providers run on workers. Geometry is captured once per file/config.
-    internal sealed class BendCheckSession : IDisposable
+    internal sealed partial class BendCheckSession : IDisposable
     {
         private readonly ISldWorks app;
         internal readonly ModelDoc2 Host;
@@ -122,11 +125,12 @@ namespace ADDIN.Commands
             for (int i = 1; i <= manager.GetSelectedObjectCount2(-1); i++)
             {
                 var component = manager.GetSelectedObjectsComponent4(i, -1) as Component2;
-                if (component != null) selected.Add(component.Name2);
+                if (component != null) selected.Add(ComponentIdentity(component));
             }
         }
         internal void BuildInventory(bool selectedOnly)
         {
+            ResetAssemblyInventory();
             foreach (var item in Items) item.Dispose(); Items.Clear(); SuppressedCount = 0;
             if (!IsHostActive) throw new InvalidOperationException("Quay lại đúng model và configuration đã mở Check chấn.");
             if (IsEditing) throw new InvalidOperationException("Thoát sketch và rebuild trước khi kiểm tra.");
@@ -139,10 +143,9 @@ namespace ADDIN.Commands
             else
             {
                 var assembly = (AssemblyDoc)Host;
-                assembly.ResolveAllLightWeightComponents(false);
                 var all = (assembly.GetComponents(false) as object[] ?? new object[0]).OfType<Component2>().ToList();
                 // Preserve the captured scope across Refresh and face highlighting.
-                var roots = selectedOnly ? all.Where(c => selected.Contains(c.Name2)).ToList() :
+                var roots = selectedOnly ? all.Where(c => selected.Contains(ComponentIdentity(c))).ToList() :
                     (assembly.GetComponents(true) as object[] ?? new object[0]).OfType<Component2>().ToList();
                 if (selectedOnly && roots.Count == 0) throw new InvalidOperationException("Component đã chọn không còn trong configuration này. Chọn lại phạm vi.");
                 var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -150,46 +153,14 @@ namespace ADDIN.Commands
             }
             Items.Sort((a, b) => { int n = StringComparer.CurrentCultureIgnoreCase.Compare(a.Name, b.Name); return n != 0 ? n : StringComparer.Ordinal.Compare(a.Configuration, b.Configuration); });
             hostStamp = Host.GetUpdateStamp();
+            assemblyInventorySelectedOnly = selectedOnly;
             // Read company files once for the session, on a managed I/O worker.
             // It neither receives COM objects nor blocks the existing Min scan.
             toolLibrary.Refresh();
         }
         private void Visit(Component2 component, HashSet<string> visited)
         {
-            string name = component.Name2;
-            if (!visited.Add(name)) return;
-            if (component.IsSuppressed()) { SuppressedCount++; return; }
-            var children = component.GetChildren() as object[];
-            var model = component.GetModelDoc2() as ModelDoc2;
-            string path = component.GetPathName();
-            bool assembly = model != null ? model.GetType() == (int)swDocumentTypes_e.swDocASSEMBLY :
-                string.Equals(System.IO.Path.GetExtension(path), ".SLDASM", StringComparison.OrdinalIgnoreCase);
-            if (assembly || children != null && children.Length > 0)
-            { if (children != null) foreach (var child in children.OfType<Component2>()) Visit(child, visited); return; }
-            string config = component.ReferencedConfiguration;
-            bool modified = false; string error = null;
-            if (model == null) error = "Chưa tải được component.";
-            else
-            {
-                try
-                {
-                    object info; component.GetBodies3((int)swBodyType_e.swSolidBody, out info);
-                    var values = info as Array;
-                    if (values == null) error = "Chưa đọc được body trong Assembly.";
-                    else modified = values.Cast<object>().Any(v => Convert.ToInt32(v) == (int)swBodyInfo_e.swUserBody_e);
-                }
-                catch (Exception ex) { error = "Chưa đối chiếu body Assembly: " + ex.Message; }
-            }
-            string key = BendCheckItem.GroupKey(path, config, name, modified || error != null);
-            var item = Items.FirstOrDefault(i => i.Key == key);
-            if (item == null)
-            {
-                string title = string.IsNullOrEmpty(path) ? name : System.IO.Path.GetFileNameWithoutExtension(path);
-                item = new BendCheckItem { Key = key, Path = path, Name = title, Configuration = config,
-                    Model = model, AssemblyBodyModified = modified, Error = modified ? "Body có sửa trong Assembly; cần kiểm tra hình học instance." : error };
-                Items.Add(item);
-            }
-            item.Instances.Add(component); item.Quantity++;
+            VisitAssemblyInventory(component, visited, false);
         }
         internal void Capture(BendCheckItem item, BendToolCatalogReadResult source)
         {
@@ -267,6 +238,7 @@ namespace ADDIN.Commands
         }
         internal bool CheckHostStamp()
         {
+            PollAssemblyBackend();
             // Reuse the existing polling point without changing UI/event code.
             // A failed DXF read has its own snapshot; it never sets item.Error.
             try { toolLibrary.Poll(); foreach (var item in Items) if (item.Current) item.ToolProfiles = toolLibrary.Snapshot; }
@@ -286,13 +258,13 @@ namespace ADDIN.Commands
             }
             catch { item.Invalidate(); return false; }
         }
-        internal void Invalidate() { foreach (var item in Items) item.Invalidate(); }
+        internal void Invalidate() { InvalidateAssemblyBackend(); foreach (var item in Items) item.Invalidate(); }
         internal void SelectRepresentative(BendCheckItem item)
         {
             if (!IsAssembly || !IsHostActive || item == null) return;
             try { Host.ClearSelection2(true); item.Instances.FirstOrDefault()?.Select4(false, null, false); Host.GraphicsRedraw2(); } catch { }
         }
-        public void Dispose() { if (disposed) return; disposed = true; toolLibrary.Dispose(); foreach (var item in Items) item.Dispose(); }
+        public void Dispose() { if (disposed) return; DisposeAssemblyBackend(); disposed = true; toolLibrary.Dispose(); foreach (var item in Items) item.Dispose(); }
     }
 
     internal sealed partial class VCutPropertySetupCommand

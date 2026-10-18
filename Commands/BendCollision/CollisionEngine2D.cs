@@ -10,6 +10,14 @@ namespace ADDIN.Commands.BendCollision
     {
         internal static CollisionResult2D Evaluate(CollisionQuery2D query, CancellationToken cancellation=default(CancellationToken))
         {
+            var observer=CollisionTimingScope.Observer;
+            if(observer==null)return EvaluateCore(query,cancellation);
+            var timer=System.Diagnostics.Stopwatch.StartNew();
+            try{return EvaluateCore(query,cancellation);}
+            finally{try{observer(timer.Elapsed.TotalMilliseconds);}catch{ /* Timing cannot change geometry. */ }}
+        }
+        private static CollisionResult2D EvaluateCore(CollisionQuery2D query, CancellationToken cancellation)
+        {
             if(query==null) throw new ArgumentNullException(nameof(query));
             var work=new CollisionWork(query,cancellation);double guard=0;
             try

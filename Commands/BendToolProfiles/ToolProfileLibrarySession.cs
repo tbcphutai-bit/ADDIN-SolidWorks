@@ -24,6 +24,16 @@ namespace ADDIN.Commands.BendTools
             if (disposed || pending!=null) return;
             pending=Task.Run(()=>provider.Read(cancellation.Token),cancellation.Token);
         }
+        // Explicit end-of-batch freshness barrier, managed I/O only. A changed
+        // source invalidates the old provider snapshot even before the next UI
+        // poll accepts the replacement. Never publish old cached CLEAR while a
+        // newly requested source validation is still pending.
+        internal Task<ToolProfileLibrarySnapshot> VerifyForPublicationAsync()
+        {
+            if(disposed)throw new ObjectDisposedException(nameof(ToolProfileLibrarySession));
+            var token=cancellation.Token;
+            return Task.Run(()=>provider.Read(token),token);
+        }
         internal void Poll()
         {
             if (disposed) return;
