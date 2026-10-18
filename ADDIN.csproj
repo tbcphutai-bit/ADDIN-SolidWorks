@@ -240,6 +240,7 @@
     <Compile Include="Commands\BendEnvelope\AnalyticAxialSolids.cs" />
     <Compile Include="Commands\BendEnvelope\NativeEnvelopeTopology.cs" />
     <Compile Include="Commands\BendEnvelope\PrismaticEnvelopeCompiler.cs" />
+    <Compile Include="Commands\BendEnvelope\OrthogonalNativeEnvelopeCompiler.cs" />
     <Compile Include="Commands\BendEnvelope\SheetNativeTopologyCapture.cs" />
     <Compile Include="Commands\BendEnvelope\AxialCollisionEngine.cs" />
     <Compile Include="Commands\BendEnvelope\ToolAxialSetupEvidence.cs" />

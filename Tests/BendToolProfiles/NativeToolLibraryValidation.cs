@@ -59,8 +59,9 @@ internal static partial class NativePlanningValidation
                 Check(Items(Get(initial,"Tools")).Count(t=>(bool)Get(Get(Get(t,"Validation"),"Region"),"IsValidRegion"))==17,"17 analytic regions, KIK remains open");
                 Check(Items(Get(initial,"Tools")).All(t=>Get(Get(t,"Datums"),"Status").ToString()=="Missing" && Get(Get(t,"Datums"),"TipPointMm")==null),"No guessed datum evidence");
                 report["initial"]=Snapshot(form,model,true);
-                string min=Json.Serialize(report["initial"]); string minText=Get(item,"MinimumText").ToString();
-                report["initialSerializedAtAssertion"]=min;
+                string min=NativeSnapshotJson.Canonical(report["initial"]); string minText=Get(item,"MinimumText").ToString();
+                report["initialSerializedAtAssertion"]=Json.Serialize(report["initial"]);
+                report["initialCanonicalAtAssertion"]=min;
                 var placement=Get(item,"PlacementDraft");Check(placement!=null,"Read-only placement is captured by existing Check chan");
                 Check(Items(Get(placement,"Sections")).Length==initialBends&&Items(Get(placement,"Candidates")).Length==18*initialBends,"Every actual bend has all 18 candidates");
                 Check(Items(Get(placement,"Candidates")).All(c=>Get(c,"Status").ToString()=="CHUA_XAC_MINH"&&!(bool)Get(c,"ReadyForCollisionCheck")),"No automatic Check Max verdict");
@@ -100,6 +101,8 @@ internal static partial class NativePlanningValidation
                         Tiers=envelopes.Select(e=>new {Feature=Get(Get(e,"Binding"),"FeatureId"),Tier=Get(Get(e,"Certificate"),"Tier").ToString(),
                             Intervals=Items(Get(Get(e,"Certificate"),"Intervals")).Length,Reasons=Get(e,"Reasons")}).ToArray()};
                     Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1,"Envelope batch reuses original Check Min capture");
+                    if(args.Skip(6).Contains("--native-family-reference"))
+                        report["nativeFamilyReference"]=NativeFamilyReference(model,managedCapture,envelopes);
                 }
                 finally {((IDisposable)volumeWorker).Dispose();}
                 report["placement"]=Json.DeserializeObject((string)product.GetType("ADDIN.Commands.BendPlacement.BendPlacementBuilder").GetMethod("Diagnostic",All).Invoke(null,new[]{placement}));
@@ -117,7 +120,7 @@ internal static partial class NativePlanningValidation
                     Until(()=>{Call(form,"Tick");return !ReferenceEquals(library(),initial)&&Get(item,"PlacementDraft")!=null;},"Placement config change creates safe unknown draft");
                     Check(!(bool)Get(placement,"Current")&&!(bool)Get(Get(initial,"PlacementSources"),"Current"),"Held placement/source invalidate on configuration edit");
                     Check(Items(Get(Get(item,"PlacementDraft"),"Candidates")).Length==18*initialBends,"Missing configuration retains 18 slots per actual bend");
-                    Check(Json.Serialize(Snapshot(form,model,true))==min,"Placement-source failure does not change Min or Planning");
+                    Check(NativeSnapshotJson.Canonical(Snapshot(form,model,true))==min,"Placement-source failure does not change Min or Planning");
                     Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",good);Call(worker,"Refresh");
                     Until(()=>{Call(form,"Tick");return Items(Get(Get(library(),"PlacementSources"),"Tools")).All(t=>Get(t,"Punch")!=null);},"Master/Excel source restores independently");
                     // Exercise new optional review I/O through the real file
@@ -135,7 +138,7 @@ internal static partial class NativePlanningValidation
                     var beforeHolderEdit=library();Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",reviewConfig);Call(worker,"Refresh");
                     Until(()=>{Call(form,"Tick");return !ReferenceEquals(library(),beforeHolderEdit)&&Items(Get(Get(library(),"PlacementSources"),"Reasons")).Any(r=>r.ToString()=="INVALID_HOLDER_EVIDENCE_SOURCE");},"Malformed holder/seating review is isolated in native pipeline");
                     Check(Items(Get(Get(library(),"PlacementSources"),"Tools")).Count(t=>Get(t,"Punch")!=null)==18,"Optional review error preserves actual 18 source punches");
-                    Check(Json.Serialize(Snapshot(form,model,true))==min&&ReferenceEquals(item,Items(Get(session,"Items")).Single()),"Holder review edit preserves Min/planning and capture object");
+                    Check(NativeSnapshotJson.Canonical(Snapshot(form,model,true))==min&&ReferenceEquals(item,Items(Get(session,"Items")).Single()),"Holder review edit preserves Min/planning and capture object");
                     Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1,"Holder review edit adds no COM geometry read");
                     Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",good);Call(worker,"Refresh");
                     Until(()=>{Call(form,"Tick");return !Items(Get(Get(library(),"PlacementSources"),"Reasons")).Any(r=>r.ToString()=="INVALID_HOLDER_EVIDENCE_SOURCE");},"Optional review source recovery");
@@ -147,7 +150,7 @@ internal static partial class NativePlanningValidation
                 Check(Get(item,"Error")==null && (bool)Get(item,"Current") && Get(item,"MinimumText").ToString()==minText,"Missing DXFs do not damage Min");
                 Check(ReferenceEquals(item,Items(Get(session,"Items")).Single()),"No second COM capture on source update");
                 Check((int)Get(Get(item,"Context"),"GeometryReadCount")==1,"One model geometry capture");
-                Check(Json.Serialize(Snapshot(form,model,true))==min,"Min/planning unchanged by missing source");
+                Check(NativeSnapshotJson.Canonical(Snapshot(form,model,true))==min,"Min/planning unchanged by missing source");
                 Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",Path.Combine(output,"missing-manifest.json")); source(args[3]);
                 Until(()=> {Call(form,"Tick"); return Get(library(),"Error")!=null && Get(library(),"Error").ToString().Contains("manifest");},"Bad manifest reports separate library error");
                 var afterBadManifest=Snapshot(form,model,true);
@@ -156,7 +159,8 @@ internal static partial class NativePlanningValidation
                 report["badManifestItemSame"]=ReferenceEquals(item,Items(Get(session,"Items")).Single());
                 string manifestSerialized=Json.Serialize(afterBadManifest);
                 report["manifestSerializedAtAssertion"]=manifestSerialized;
-                Check(Get(item,"Error")==null && manifestSerialized==min,"Bad manifest does not block Check Min");
+                report["manifestCanonicalAtAssertion"]=NativeSnapshotJson.Canonical(afterBadManifest);
+                Check(Get(item,"Error")==null && NativeSnapshotJson.Canonical(afterBadManifest)==min,"Bad manifest does not block Check Min");
                 Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",null); source(args[3]);
                 Until(()=> {Call(form,"Tick"); return count()==18;},"Library recovers after source restore");
                 var beforeEvidence=library(); string badEvidence=Path.Combine(output,"PRIVATE-malformed-datum.json");File.WriteAllText(badEvidence,"{broken");
@@ -164,7 +168,7 @@ internal static partial class NativePlanningValidation
                 Until(()=> {Call(form,"Tick");return Items(Get(library(),"Tools")).All(t=>Get(Get(t,"Datums"),"Status").ToString()=="Invalid");},"Malformed datum evidence is isolated");
                 Check(!(bool)Get(beforeEvidence,"Current") && count()==18,"Evidence edit invalidates snapshot but preserves all CAD profiles");
                 Check(ReferenceEquals(item,Items(Get(session,"Items")).Single()) && (int)Get(Get(item,"Context"),"GeometryReadCount")==1,"Evidence edit does not recapture COM geometry");
-                Check(Get(item,"Error")==null && Json.Serialize(Snapshot(form,model,true))==min,"Invalid datums do not change Check Min/planning");
+                Check(Get(item,"Error")==null && NativeSnapshotJson.Canonical(Snapshot(form,model,true))==min,"Invalid datums do not change Check Min/planning");
                 Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",null);Call(worker,"Refresh");
                 Until(()=> {Call(form,"Tick");return Items(Get(library(),"Tools")).All(t=>Get(Get(t,"Datums"),"Status").ToString()=="Missing");},"Datum configuration recovers");
                 var listener=new FailingLibraryListener(); Debug.Listeners.Add(listener);

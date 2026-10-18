@@ -1,4 +1,4 @@
-# Company DXF profiles — Phase 2 through Phase 3D
+# Company DXF profiles — Phase 2 through Phase 3D.1
 
 Production code is in `Commands/BendToolProfiles/`. It has no SOLIDWORKS, WinForms,
 or external package dependency. It supplies read-only geometry/provenance to the
@@ -69,7 +69,7 @@ and a cross-axis cylindrical bore. Finite observed slices alone never prove
 CLEAR. See the [envelope contract](../../Docs/BendCheck/Phase3D-EnvelopeContract.md)
 and [local validation, failures and limits](../../Docs/BendCheck/Validation-Phase3D.md).
 
-The normal suite now runs 215 groups (7,964 assertions), including all 188 Phase
+The Phase 3D baseline suite runs 215 groups (7,964 assertions), including all 188 Phase
 3C groups. To run the new independent original-volume oracle:
 
 ```powershell
@@ -89,10 +89,37 @@ The native harness adds coverage tiers, topology/read counters, worker separatio
 and stale certificate checks. Optional `--require-uniform-sections` tests the
 existing three-bend uniform Part; `--capture-private` retains the full managed
 capture **outside Git**. Its optional seventh positional argument is the private
-placement configuration. Actual six-bend coverage remains 0/6 and all company
+placement configuration. At the Phase 3D baseline, six-bend coverage is 0/6 and all company
 tool results UNKNOWN pending both geometry support and external setup evidence.
 The existing UI/event handlers are unchanged; worker API availability is not a
 claim that the UI already uses it.
+
+Phase 3D.1 adds a direct native plane/cylinder section-family compiler, including
+transverse bends and full-circle hole trims with certified interval boundary
+bounds. The real six-bend fixture improves **0/6 → 6/6**; uniform coverage remains
+3/3. Production tool readiness stays UNKNOWN. The current suite runs **222 groups,
+8,130 assertions**, retaining all Phase 3D groups. See the
+[native geometry contract](../../Docs/BendCheck/Phase3D1-NativeCoverage.md) and
+[before/after table, exact commands and failures](../../Docs/BendCheck/Validation-Phase3D1.md).
+
+```powershell
+& $ToolProfilesTestExe --native-family-oracle $PrivateNativeOracleOutput
+python Tests/BendToolProfiles/compare_native_families.py $PrivateNativeOracleOutput
+```
+
+This additional 480-case reference uses Python's standard library and independent
+source volumes. For original native Part comparison, build the native harness and
+configure `ADDIN_NATIVE_REFERENCE_PYTHON`, `ADDIN_NATIVE_REFERENCE_SCRIPT` and an
+isolated OCP/VTK `PYTHONPATH`, then pass `--native-family-reference`. It exports a
+**private STEP copy**, awaits `compare_native_step.py` and checks material/voids,
+interval enclosures and collision witnesses with an independent B-rep kernel.
+The source Part/stamp and unit/frame guards are asserted. Raw STEP/JSON outputs
+contain company geometry and must remain outside Git. The reference is QA only;
+the add-in has no OpenCascade dependency and uses no sampled production proof.
+
+The native harness now compares snapshots by canonical JSON object keys. Array
+order and all values are still exact. This fixes the reproduced property-order
+false failure at the bad-manifest assertion without changing Check Min/Planning.
 
 Optional Phase 3C oracle dependencies are Shapely/GEOS (tested with Shapely 2.2.0) and
 NumPy in a private QA environment. The oracle independently subtracts each

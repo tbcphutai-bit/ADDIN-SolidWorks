@@ -142,6 +142,7 @@ internal static partial class ToolProfileTests
             }
         });
         NativeEnvelopeTests();
+        NativeCylinderTests();
         EnvelopeWorkerTests();
     }
 }
