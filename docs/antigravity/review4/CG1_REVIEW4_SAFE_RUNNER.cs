@@ -49,6 +49,27 @@ namespace ADDIN.Tests
             public string Error;
         }
 
+        private static string s_baselineDir;
+        private static string s_candidateDir;
+
+        // The assemblies are loaded from isolated byte arrays so the two ADDIN
+        // binaries can coexist. Search their dependency folders deterministically.
+        private static Assembly ResolveDependency(object sender, ResolveEventArgs e)
+        {
+            string name = new AssemblyName(e.Name).Name + ".dll";
+            foreach (string folder in new[] {
+                s_candidateDir,
+                s_baselineDir,
+                @"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS"
+            })
+            {
+                if (string.IsNullOrEmpty(folder)) continue;
+                string candidate = Path.Combine(folder, name);
+                if (File.Exists(candidate)) return Assembly.LoadFrom(candidate);
+            }
+            return null;
+        }
+
         [STAThread]
         public static int Main(string[] args)
         {
@@ -72,6 +93,10 @@ namespace ADDIN.Tests
                 var models = new[] { Path.GetFullPath(args[3]), Path.GetFullPath(args[4]) };
 
                 ValidateSandboxInputs(baselineDll, candidateDll, sandboxRoot, models);
+
+                s_baselineDir = Path.GetDirectoryName(baselineDll);
+                s_candidateDir = Path.GetDirectoryName(candidateDll);
+                AppDomain.CurrentDomain.AssemblyResolve += ResolveDependency;
 
                 // FAIL CLOSED: do not attach to an existing user session or close
                 // any document that was open prior to this run.
