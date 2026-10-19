@@ -12,6 +12,9 @@
 5. [05_VALIDATION_CRITERIA.md](05_VALIDATION_CRITERIA.md) — tiêu chí đạt/không đạt.
 6. [06_UNRESOLVED_CASES.md](06_UNRESOLVED_CASES.md) — quyết định còn mở; không tự suy đoán.
 7. [07_VS_COPILOT_HANDOFF.md](07_VS_COPILOT_HANDOFF.md) — trao đổi trực tiếp bằng GitHub Copilot Chat trong Visual Studio.
+8. [08_COPILOT_IMPLEMENTATION_RUNBOOK.md](08_COPILOT_IMPLEMENTATION_RUNBOOK.md) — lệnh build, test, sửa code từng bước.
+9. [09_COPILOT_DEBUG_PROTOCOL.md](09_COPILOT_DEBUG_PROTOCOL.md) — cơ chế debug tự động, trường hợp cần can thiệp của người dùng.
+10. [10_SOLIDWORKS_READONLY_ADAPTER_PLAN.md](10_SOLIDWORKS_READONLY_ADAPTER_PLAN.md) — kế hoạch tích hợp read-only cho Phase 2.
 
 ## Nguồn làm việc (chưa đưa CAD/PDF gốc vào repository)
 - Bộ SOLIDWORKS/STEP: `1618a`, `3615a` (T1/T2), `2216a`, mẫu `2216-02-lc-W18.STEP`, hình ảnh Assembly `2216-02-lc-W22`.
@@ -34,3 +37,6 @@
 - Dữ liệu vào/ra, biến đổi hệ tọa độ và lý do dừng được định nghĩa.
 - Có ma trận kiểm thử tái hiện được để so sánh CAD trước/sau.
 - Có danh sách unresolved cần chủ thiết kế xác nhận.
+
+## Executable research reference (isolated)
+`tools/AutoFrameJointResearch/AutoFrameJointResearch.csproj` là ứng dụng Console .NET Framework 4.8 với thuật toán hình học cơ bản và self-tests C# 7.3. Chưa kết nối SOLIDWORKS; chưa tự đọc STEP; không tạo Feature; mọi dung sai trong tests là fixture chứ không phải tiêu chuẩn sản xuất. Copilot phải build và chạy tests tại Visual Studio trước khi gọi code này là được xác minh.
