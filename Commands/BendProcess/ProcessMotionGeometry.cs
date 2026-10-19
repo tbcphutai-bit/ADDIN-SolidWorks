@@ -114,6 +114,14 @@ namespace ADDIN.Commands.BendProcess
             CollisionMaterial2D material, AxialInterval domain, ProcessMotionLaw motion, ProcessGeometryFidelity fidelity = ProcessGeometryFidelity.ExactGeometricSurrogate) =>
             new ProcessSheetPart(id, AnalyticSheetEnvelope.Controlled(model, bend, new AxialPrismaticSweep(domain, material)), motion,
                 ProcessGeometryRole.InProcessPanels, fidelity, material, domain);
+        internal static ProcessSheetPart RegisteredPrism(string id,SheetEnvelopeCapture source,ProcessMotionLaw motion,ProcessGeometryRole role,
+            ProcessGeometryFidelity fidelity,CollisionMaterial2D exact,AxialInterval domain)
+        {
+            if(source.Certificate.Method!="ExplicitReviewedProcessPrismV1"||exact?.Valid!=true||exact.FrameId!=source.Binding.FrameId||domain==null)
+                throw new InvalidDataException("INVALID_IMPORTED_PRISM_DEFINITION");
+            return new ProcessSheetPart(id,source,motion,role,fidelity,source.Certificate.SolidToleranceMm==0?exact:null,
+                source.Certificate.SolidToleranceMm==0?domain:null);
+        }
         internal SheetEnvelopeCapture At(double u) => Envelope(u, u);
         internal SheetEnvelopeCapture Sweep(double lo, double hi) => Envelope(lo, hi);
         private SheetEnvelopeCapture Envelope(double lo, double hi)
@@ -166,23 +174,39 @@ namespace ADDIN.Commands.BendProcess
     internal sealed class ProcessToolPose
     {
         private readonly Lazy<string> sourceCanonical;
+        private readonly Lazy<string> assemblyCanonical;
         public AxialToolOccupancy Source { get; }
         public ProcessMotionLaw Motion { get; }
         public string SetupSourceSha256 { get; }
         internal ToolAxialSetupEvidence SetupEvidence { get; private set; }
         internal ProcessToolPose(AxialToolOccupancy source, ProcessMotionLaw motion, string setupSourceSha256)
-        { Source = source; Motion = motion; SetupSourceSha256 = setupSourceSha256;sourceCanonical=new Lazy<string>(BuildSourceCanonical); }
+            : this(source,motion,setupSourceSha256,null) { }
+        private ProcessToolPose(AxialToolOccupancy source,ProcessMotionLaw motion,string setupSourceSha256,string hardware)
+        { Source = source; Motion = motion; SetupSourceSha256 = setupSourceSha256;sourceCanonical=new Lazy<string>(BuildSourceCanonical);
+            assemblyCanonical=new Lazy<string>(()=>hardware==null?SourceCanonical:ToolEvidenceCanonical.Hash("WholePartToolHardwareAndPlacedVolumeV1",hardware,
+                Source?.Material==null?null:AxialSolidPrimitive.MaterialHash(Source.Material),Source==null?null:ToolEvidenceCanonical.Hash(Source.Segments.Select(s=>
+                    ToolEvidenceCanonical.Hash(ToolEvidenceCanonical.Number(s.StartMm),ToolEvidenceCanonical.Number(s.EndMm))).ToArray()),
+                Source==null?null:ToolEvidenceCanonical.Number(Source.AxialUncertaintyMm))); }
         internal static ProcessToolPose FromEvidence(ToolAxialSetupEvidence evidence, SheetEnvelopeCapture observed,
             ToolProfileLibrarySnapshot library, ProcessMotionLaw motion)
         {
             if (evidence == null || !evidence.AppliesTo(observed, library)) throw new ArgumentException("Mismatched process tool setup source");
-            return new ProcessToolPose(evidence.Occupancy, motion, evidence.PayloadSha256) { SetupEvidence = evidence };
+            return new ProcessToolPose(evidence.Occupancy, motion, evidence.PayloadSha256,evidence.HardwareSourceSha256) { SetupEvidence = evidence };
+        }
+        internal static ProcessToolPose ImportedSimulation(AxialToolOccupancy source,ProcessMotionLaw motion,string payload,string geometryIdentity)
+        {
+            if(source?.SimulationOnly!=true||!ToolDatumEvidence.IsSha256(geometryIdentity))throw new InvalidDataException("IMPORTED_SIMULATION_TOOL_IDENTITY_REQUIRED");
+            return new ProcessToolPose(source,motion,payload,geometryIdentity);
         }
         public bool Current => Source?.Current == true;
         public bool Valid => Source?.Verified == true && Motion?.Valid == true && ToolDatumEvidence.IsSha256(SetupSourceSha256);
         // Geometry/laws are immutable DTOs; only their Current leases are live.
         // Cache identity bytes, never an approval/freshness decision.
         internal string SourceCanonical => sourceCanonical.Value;
+        // Per-bend signed setup payloads necessarily have different FeatureId
+        // bindings. Hardware equality compares the independently bound physical
+        // source AND complete placed volume instead; it never shares a proof.
+        internal string AssemblyCanonical => assemblyCanonical.Value;
         private string BuildSourceCanonical() => ToolEvidenceCanonical.Hash("ProcessToolSourceV1", SetupSourceSha256,
             Source?.Material == null ? null : AxialSolidPrimitive.MaterialHash(Source.Material), Source?.Provenance,
             Source == null ? null : ToolEvidenceCanonical.Hash(Source.Segments.Select(s => ToolEvidenceCanonical.Hash(

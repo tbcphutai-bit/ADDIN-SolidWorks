@@ -153,8 +153,10 @@ internal static partial class NativeAssemblyBatchValidation
             bool deferred=false;
             // This observer reads managed fields only. It never calls COM or
             // controls from the worker, except the thread-safe BeginInvoke.
-            // index advances before the atomic native Capture; Done becomes
-            // true afterward. Post Close while that real capture is executing.
+            // Observe the explicit atomic-capture flag. The source index now
+            // advances after its asynchronous provider read, so index-1/Done
+            // no longer proves whether native Capture is active. No owner,
+            // item or COM object is inspected on this observer thread.
             var posted=Task.Run(()=> {
                 var clock=Stopwatch.StartNew();
                 while(clock.ElapsedMilliseconds<30000)
@@ -162,9 +164,8 @@ internal static partial class NativeAssemblyBatchValidation
                     var wrapper=Get(controller,"operation");
                     if(wrapper!=null&&(bool)Get(controller,"pumping"))
                     {
-                        var native=Get(wrapper,"operation");int index=(int)Get(native,"index");
-                        var items=Items(Get(Get(native,"owner"),"Items"));
-                        if(index>0&&index<=items.Length&&Get(native,"work")==null&&!(bool)Get(items[index-1],"Done"))
+                        var native=Get(wrapper,"operation");
+                        if((bool)Get(native,"NativeCaptureActive"))
                         {
                             form.BeginInvoke(new Action(()=>{form.Close();deferred=!form.IsDisposed;}));return true;
                         }
@@ -285,7 +286,23 @@ internal static partial class NativeAssemblyBatchValidation
             string edgeSheet=Path.Combine(output,"EDGE-SEED.SLDPRT"),edgeTwin=Path.Combine(output,"EDGE-TWIN.SLDPRT");
             File.Copy(args[5],edgeSheet,false);File.Copy(args[5],edgeTwin,false);
             File.SetAttributes(edgeSheet,FileAttributes.Normal);File.SetAttributes(edgeTwin,FileAttributes.Normal);
-            Open(app,edgeSheet);Open(app,edgeTwin);Activate(app,root);
+            // As in the 120/25 fixture, ordinary mixed-source probes require
+            // context-independent definitions. The caller's seed can contain
+            // live external sketch references. Break those on these disposable
+            // copies only; retaining them would correctly make every ordinary
+            // occurrence ineligible before mixed-instance isolation is tested.
+            var prepared=new List<object>();
+            foreach(string fixturePath in new[]{edgeSheet,edgeTwin})
+            {
+                Check(Path.GetFullPath(fixturePath).StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase),"External-reference preparation is confined to owned fixture copies");
+                var fixture=Open(app,fixturePath);int before=fixture.Extension.ListExternalFileReferencesCount();
+                object models,components,features,types,status,entities,featCom,configOptions,configNames;
+                fixture.Extension.ListExternalFileReferences2(out models,out components,out features,out types,out status,out entities,out featCom,out configOptions,out configNames);
+                if(before>0)fixture.Extension.BreakAllExternalFileReferences2(true);
+                fixture.ForceRebuild3(false);Save(fixture);
+                prepared.Add(new{File=Path.GetFileName(fixturePath),ExternalBefore=before,StatusBefore=status});
+            }
+            report["PrivateEdgeSourcePreparation"]=prepared;Activate(app,root);
             EdgeFixtures(app,root,args[3],output,disposable,report,source,edgeSheet,edgeTwin);
             }
             Check(Sha(args[2])==seedHash,"Original seed bytes unchanged");
@@ -294,6 +311,6 @@ internal static partial class NativeAssemblyBatchValidation
             File.WriteAllText(Path.Combine(output,"PRIVATE-native-ui-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;
         }
         catch(Exception ex){report["Result"]="FAIL";report["Assertions"]=assertions;report["Error"]=ex.ToString();File.WriteAllText(Path.Combine(output,"PRIVATE-native-ui-result.json"),Json.Serialize(report));Console.WriteLine(ex);return 1;}
-        finally{foreach(var d in disposable)d.Dispose();if(app!=null){try{app.CloseAllDocuments(true);app.ExitApp();}catch{}}}
+        finally{foreach(var d in disposable)d.Dispose();if(app!=null){try{NativeTestProcess.RestoreCommandScope(app);app.CloseAllDocuments(true);app.ExitApp();}catch{}}}
     }
 }

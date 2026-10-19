@@ -129,7 +129,10 @@ namespace ADDIN.Commands.BendProcess
             {
                 review = verifier?.Verify("BendProcessPlan", PayloadSha256, proof, evidenceRoot, token);
                 if (review?.RecordVerified != true) reasons.Add("UNVERIFIED_PROCESS_SOURCE_AND_CONSTRAINTS");
-                if (library?.PlacementSources?.Tools.SingleOrDefault(t => t.Id == toolId)?.PhysicalPairVerified != true)
+                // An explicitly signed software-simulation process may run
+                // without a physical inspection. Its SimulationOnly flag is
+                // sticky below; this never approves external production data.
+                if (review?.SimulationOnly != true && library?.PlacementSources?.Tools.SingleOrDefault(t => t.Id == toolId)?.PhysicalPairVerified != true)
                     reasons.Add("UNVERIFIED_PHYSICAL_PUNCH_HOLDER_PAIR");
                 if (Segments.SelectMany(s => new[] { s.Punch, s.Holder }).Any(t => t?.Source != null && !t.Source.SimulationOnly &&
                     (t.SetupEvidence == null || t.SetupEvidence.ToolId != toolId || t.SetupEvidence.FeatureId != binding.FeatureId)))

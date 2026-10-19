@@ -60,13 +60,14 @@ namespace ADDIN.Commands.BendPlanning
         public bool DeclaredAlternativesComplete { get; }
         public bool SimulationOnly { get; }
         public IReadOnlyList<string> Reasons { get; }
+        public IReadOnlyList<string> InputReasons { get; }
         internal void Invalidate() => lease.Invalidate();
         internal string SharedInvalidReason => !lease.Current ? "STALE_SEQUENCE_SOURCE" : !Model.Lease.Current ? "STALE_SEQUENCE_MODEL" : review?.Status == ToolReviewStatus.Stale ? "STALE_SEQUENCE_REVIEW" : null;
         internal string InvalidReason => SharedInvalidReason ?? (Transitions.Any(t => t.Plan.InvalidatedReason != null) ? "STALE_SEQUENCE_PROCESS_OR_SETUP" : null);
 
         private PartSequenceSpace(PlacementModelCapture model, string source, string revision, string initial,
             IEnumerable<SequenceSheetState> states, IEnumerable<SequenceTransition> transitions, bool complete,
-            bool controlled, ToolReviewVerifier verifier, ToolReviewProof proof, string root, CancellationToken token)
+            bool controlled, ToolReviewVerifier verifier, ToolReviewProof proof, string root, CancellationToken token, IEnumerable<string> inputReasons = null)
         {
             Model = model ?? throw new ArgumentNullException(nameof(model)); SourceSha256 = source; Revision = revision; InitialStateId = initial;
             States = PlacementLists.Copy(states); Transitions = PlacementLists.Copy(transitions); DeclaredAlternativesComplete = complete;
@@ -74,7 +75,8 @@ namespace ADDIN.Commands.BendPlanning
                 throw new ArgumentException("Invalid or oversized sequence evidence graph");
             var byState = States.ToLookup(s => s.Id, StringComparer.Ordinal);
             Func<string, SequenceSheetState> state = id => id == null || byState[id].Count() != 1 ? null : byState[id].First();
-            var reasons = new List<string>();
+            InputReasons = PlacementLists.Reasons(inputReasons ?? new string[0]);
+            var reasons = new List<string>(InputReasons);
             if (!ToolDatumEvidence.IsSha256(source) || string.IsNullOrWhiteSpace(revision)) reasons.Add("MISSING_SEQUENCE_SOURCE_REVISION");
             if (States.Count == 0 || States.Select(s => s.Id).Distinct().Count() != States.Count ||
                 Transitions.Select(t => t.Id).Distinct().Count() != Transitions.Count) reasons.Add("AMBIGUOUS_SEQUENCE_STATE_IDENTITY");
@@ -94,13 +96,7 @@ namespace ADDIN.Commands.BendPlanning
                 else if (a.GeometryPoseSha256 != Boundary(t.Plan, false) || b.GeometryPoseSha256 != Boundary(t.Plan, true))
                     reasons.Add("UNBOUND_SEQUENCE_STATE_GEOMETRY_OR_FRAME");
             }
-            NativeGeometrySha256 = ToolEvidenceCanonical.Hash("SequenceTargetNativeGeometryV1", model.CompleteBodyCoverage.ToString(),
-                ToolEvidenceCanonical.Hash(model.Bodies.Select(b => ToolEvidenceCanonical.Hash(b.Id, b.EnvelopeTopology?.SourceSha256,
-                    ToolEvidenceCanonical.Hash(b.Edges.Select(e => ToolEvidenceCanonical.Hash(e.Id.ToString(), e.Kind.ToString(), EnvelopeBinding.Vector(e.A),
-                        EnvelopeBinding.Vector(e.B), e.Arc == null ? null : ToolEvidenceCanonical.Hash(EnvelopeBinding.Vector(e.Arc.CenterMm),
-                            EnvelopeBinding.Vector(e.Arc.MidMm), ToolEvidenceCanonical.Number(e.Arc.RadiusMm), e.Arc.FullCircle.ToString()))).ToArray()),
-                    ToolEvidenceCanonical.Hash(b.Faces.Select(f => ToolEvidenceCanonical.Hash(f.Id.ToString(), f.Kind.ToString(), EnvelopeBinding.Vector(f.Normal),
-                        EnvelopeBinding.Vector(f.PointMm), EnvelopeBinding.Vector(f.Axis), string.Join(",", f.Edges))).ToArray()))).ToArray()));
+            NativeGeometrySha256 = TargetGeometryHash(model);
             PayloadSha256 = ToolEvidenceCanonical.Hash("PartSequenceSpaceV1", model.SnapshotId, model.Configuration, NativeGeometrySha256,
                 model.UpdateStamp.ToString(System.Globalization.CultureInfo.InvariantCulture), source, revision, initial, complete.ToString(),
                 ToolEvidenceCanonical.Hash(model.Bends.Select(b => ToolEvidenceCanonical.Hash(b.FeatureId.ToString(), b.PersistentId)).ToArray()),
@@ -114,6 +110,15 @@ namespace ADDIN.Commands.BendPlanning
             SimulationOnly = controlled || model.SimulationOnly || review?.SimulationOnly == true || Transitions.Any(t => t.Plan.SimulationOnly);
             Reasons = PlacementLists.Reasons(reasons);
         }
+        internal static string TargetGeometryHash(PlacementModelCapture model) => ToolEvidenceCanonical.Hash("SequenceTargetNativeGeometryV1", model.CompleteBodyCoverage.ToString(),
+                ToolEvidenceCanonical.Hash(model.Bodies.Select(b => ToolEvidenceCanonical.Hash(b.Id, b.EnvelopeTopology?.SourceSha256,
+                    ToolEvidenceCanonical.Hash(b.Edges.Select(e => ToolEvidenceCanonical.Hash(e.Id.ToString(), e.Kind.ToString(), EnvelopeBinding.Vector(e.A),
+                        EnvelopeBinding.Vector(e.B), e.Arc == null ? null : ToolEvidenceCanonical.Hash(EnvelopeBinding.Vector(e.Arc.CenterMm),
+                            EnvelopeBinding.Vector(e.Arc.MidMm), ToolEvidenceCanonical.Number(e.Arc.RadiusMm), e.Arc.FullCircle.ToString()))).ToArray()),
+                    ToolEvidenceCanonical.Hash(b.Faces.Select(f => ToolEvidenceCanonical.Hash(f.Id.ToString(), f.Kind.ToString(), EnvelopeBinding.Vector(f.Normal),
+                            EnvelopeBinding.Vector(f.PointMm), EnvelopeBinding.Vector(f.Axis), string.Join(",", f.Edges))).ToArray()))).ToArray()));
+        internal static PartSequenceSpace Missing(PlacementModelCapture model, params string[] reasons) =>
+            new PartSequenceSpace(model, null, null, null, null, null, false, false, null, null, null, CancellationToken.None, reasons);
         internal static PartSequenceSpace Controlled(PlacementModelCapture model, string source, string revision, string initial,
             IEnumerable<SequenceSheetState> states, IEnumerable<SequenceTransition> transitions, bool complete = true) =>
             new PartSequenceSpace(model, source, revision, initial, states, transitions, complete, true, null, null, null, CancellationToken.None);

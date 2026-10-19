@@ -14,6 +14,8 @@ using Environment=System.Environment;
 internal static class NativeTestProcess
 {
     private static Process ownedServer;
+    private static bool commandScope, originalCommandState;
+    private static readonly object dumpLogGate=new object();
     [StructLayout(LayoutKind.Sequential)] private struct NativeMessage
     { public IntPtr Window; public uint Message; public UIntPtr WParam; public IntPtr LParam; public uint Time; public int X,Y; public uint Private; }
     [DllImport("user32.dll")] private static extern bool PeekMessage(out NativeMessage message,IntPtr window,uint first,uint last,uint remove);
@@ -43,11 +45,39 @@ internal static class NativeTestProcess
         process.BeginOutputReadLine();process.BeginErrorReadLine();
         DateTime start=process.StartTime.ToUniversalTime();Directory.CreateDirectory(output);
         File.WriteAllText(Path.Combine(output,"ownership.json"),new JavaScriptSerializer().Serialize(new {Owned=true,Pid=process.Id,StartUtc=start.ToString("o")}));
+        string collector=Environment.GetEnvironmentVariable("ADDIN_NATIVE_PROCDUMP");
+        if(!string.IsNullOrWhiteSpace(collector))
+        {
+            if(!File.Exists(collector)||!Path.IsPathRooted(collector))throw new FileNotFoundException("Explicit native dump collector missing");
+            string dumpRoot=Path.Combine(output,"PRIVATE-dumps");Directory.CreateDirectory(dumpRoot);
+            var monitor=Process.Start(new ProcessStartInfo(collector,"-accepteula -ma -e 1 -f C0000374,C0000005 -g -t -n 2 "+process.Id+" \""+dumpRoot+"\"")
+                {UseShellExecute=false,WindowStyle=ProcessWindowStyle.Hidden,RedirectStandardOutput=true,RedirectStandardError=true,
+                    StandardOutputEncoding=System.Text.Encoding.Unicode,StandardErrorEncoding=System.Text.Encoding.Unicode});
+            DataReceivedEventHandler log=(s,e)=>{if(e.Data!=null)lock(dumpLogGate)File.AppendAllText(Path.Combine(output,"PRIVATE-procdump.log"),e.Data+"\r\n");};
+            monitor.OutputDataReceived+=log;monitor.ErrorDataReceived+=log;monitor.BeginOutputReadLine();monitor.BeginErrorReadLine();
+        }
         var clock=Stopwatch.StartNew();
         while(clock.ElapsedMilliseconds<60000&&!process.HasExited)
         {
             var app=Find(process.Id);
-            if(app!=null&&app.GetProcessID()==process.Id&&process.StartTime.ToUniversalTime()==start)return app;
+            if(app!=null&&app.GetProcessID()==process.Id&&process.StartTime.ToUniversalTime()==start&&
+                (Environment.GetEnvironmentVariable("ADDIN_NATIVE_SKIP_STARTUP_READY")=="1"||app.StartupProcessCompleted))
+            {
+                File.WriteAllText(Path.Combine(output,"startup-readiness.json"),new JavaScriptSerializer().Serialize(new{
+                    Ready=app.StartupProcessCompleted,ElapsedMilliseconds=clock.Elapsed.TotalMilliseconds,
+                    ExplicitNegativeControl=Environment.GetEnvironmentVariable("ADDIN_NATIVE_SKIP_STARTUP_READY")=="1"}));
+                if(Environment.GetEnvironmentVariable("ADDIN_NATIVE_COMMAND_SCOPE")=="1")
+                {originalCommandState=app.CommandInProgress;app.CommandInProgress=true;commandScope=true;}
+                string excluded=Environment.GetEnvironmentVariable("ADDIN_NATIVE_EXCLUDE_ADDIN");
+                if(!string.IsNullOrWhiteSpace(excluded))
+                {
+                    if(!Path.IsPathRooted(excluded)||!File.Exists(excluded))throw new FileNotFoundException("Explicit owned-session add-in path required");
+                    bool unloaded=app.UnloadAddIn(excluded)==0;
+                    File.WriteAllText(Path.Combine(output,"PRIVATE-addin-isolation.json"),new JavaScriptSerializer().Serialize(new {Pid=process.Id,Path=excluded,Unloaded=unloaded}));
+                    if(!unloaded)throw new InvalidOperationException("Owned-session add-in isolation was not applied");
+                }
+                return app;
+            }
             PumpMessages();Thread.Sleep(50);
         }
         throw new InvalidOperationException("Owned SOLIDWORKS PID did not register; no fallback to another session");
@@ -63,6 +93,8 @@ internal static class NativeTestProcess
         {PumpMessages();Thread.Sleep(20);}
         return ownedServer.HasExited?(int?)ownedServer.ExitCode:null;
     }
+    internal static void RestoreCommandScope(ISldWorks app)
+    {if(commandScope){commandScope=false;app.CommandInProgress=originalCommandState;}}
     private static ISldWorks Find(int pid)
     {
         IBindCtx context=null;IRunningObjectTable table=null;IEnumMoniker enumeration=null;

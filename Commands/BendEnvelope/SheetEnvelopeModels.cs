@@ -32,6 +32,8 @@ namespace ADDIN.Commands.BendEnvelope
 
     internal sealed class EnvelopeBinding
     {
+        private readonly Func<bool> registrationCurrent;
+        private readonly string registrationPayload;
         internal PlacementModelCapture Model { get; }
         public string ModelSnapshotId => Model.SnapshotId;
         public int UpdateStamp => Model.UpdateStamp;
@@ -41,17 +43,30 @@ namespace ADDIN.Commands.BendEnvelope
         public BendWorkFrame WorkFrame { get; }
         public string FrameId => WorkFrame.FrameId;
         public string SourceSha256 { get; }
-        public bool Current => Model.Lease.Current;
+        public bool Current => Model.Lease.Current && (registrationCurrent == null || registrationCurrent());
         internal EnvelopeBinding(PlacementModelCapture model, PlacementBendSnapshot bend, string sourceHash)
+            : this(model, bend, sourceHash, null, null, null) { }
+        private EnvelopeBinding(PlacementModelCapture model, PlacementBendSnapshot bend, string sourceHash,
+            BendWorkFrame registered, string registrationPayload, Func<bool> registrationCurrent)
         {
             if (model == null || bend?.Frame == null || !ToolDatumEvidence.IsSha256(sourceHash) ||
                 !model.Bends.Contains(bend)) throw new InvalidDataException("INVALID_ENVELOPE_SOURCE_BINDING");
-            Model = model; FeatureId = bend.FeatureId; BodyId = bend.BodyId; WorkFrame = bend.Frame; SourceSha256 = sourceHash;
+            Model = model; FeatureId = bend.FeatureId; BodyId = bend.BodyId; WorkFrame = registered ?? bend.Frame; SourceSha256 = sourceHash;
+            this.registrationCurrent = registrationCurrent; this.registrationPayload = registrationPayload;
         }
-        internal string Canonical => ToolEvidenceCanonical.Hash("SheetEnvelopeBindingV1", ModelSnapshotId,
+        internal static EnvelopeBinding Registered(PlacementModelCapture model, PlacementBendSnapshot bend, string source,
+            BendWorkFrame frame, ToolReviewValidation review, Func<bool> current)
+        {
+            if (frame == null || review?.RecordVerified != true || current == null) throw new InvalidDataException("UNVERIFIED_PROCESS_FRAME_REGISTRATION");
+            return new EnvelopeBinding(model, bend, source, frame, review.PayloadSha256,
+                () => current() && review.RecordVerified);
+        }
+        private string NativeCanonical => ToolEvidenceCanonical.Hash("SheetEnvelopeBindingV1", ModelSnapshotId,
             UpdateStamp.ToString(System.Globalization.CultureInfo.InvariantCulture), Configuration, BodyId,
             FeatureId.ToString(System.Globalization.CultureInfo.InvariantCulture), FrameId, SourceSha256,
             Vector(WorkFrame.OriginMm), Vector(WorkFrame.X), Vector(WorkFrame.Y), Vector(WorkFrame.BendAxis));
+        internal string Canonical => registrationPayload == null ? NativeCanonical :
+            ToolEvidenceCanonical.Hash("ReviewedRegisteredEnvelopeBindingV1", NativeCanonical, registrationPayload);
         internal static string Vector(PlacementVector3 p) => ToolEvidenceCanonical.Hash(ToolEvidenceCanonical.Number(p.X),
             ToolEvidenceCanonical.Number(p.Y), ToolEvidenceCanonical.Number(p.Z));
     }

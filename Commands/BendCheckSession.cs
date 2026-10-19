@@ -218,7 +218,7 @@ namespace ADDIN.Commands
                     if(item.Error==null&&item.Current&&item.Context?.Current==true)
                     {item.PlacementCapture=BendPlacementNativeCapture.Copy(item);item.UpdatePlacement(toolLibrary.Snapshot);}
                 }
-                catch(Exception ex){item.PlacementDiagnosticError="PLACEMENT_CAPTURE_ERROR:"+ex.GetType().Name;}
+                catch(Exception ex){BendNativeCaptureDiagnostics.Failure(ex,"Placement.OptionalCapture");item.PlacementDiagnosticError="PLACEMENT_CAPTURE_ERROR:"+ex.GetType().Name;}
             }
         }
         private static void CapturePlanningDraft(BendCheckItem item)

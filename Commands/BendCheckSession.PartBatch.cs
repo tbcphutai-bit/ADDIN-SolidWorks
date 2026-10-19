@@ -68,6 +68,10 @@ namespace ADDIN.Commands
             private Task<Dictionary<string, string>> files;
             private Dictionary<string, string> revisions;
             private Task<ToolProfileLibrarySnapshot> tools;
+            private Task processVerification;
+            private Task<AssemblyProgramData> program;
+            private PlacementModelCapture model;
+            private bool reused;
             private Task<AssemblyBatchSnapshot> work;
             private bool captured, publication;
             private double captureMs;
@@ -87,6 +91,7 @@ namespace ADDIN.Commands
                 try
                 {
                     owner.toolLibrary.Poll();
+                    owner.processPrograms.Poll();
                     if (token.IsCancellationRequested || !owner.IsHostActive || owner.IsEditing ||
                         owner.Host.GetUpdateStamp() != owner.hostStamp || captured && !owner.CheckItem(owner.Items[0])) lease.Invalidate();
                     if (!completion.Task.IsCompleted && clock.ElapsedMilliseconds >= 300000) { lease.Invalidate(); throw new TimeoutException("PART_NATIVE_TIME_BUDGET_EXCEEDED"); }
@@ -109,23 +114,32 @@ namespace ADDIN.Commands
                     if (owner.ToolLibrary.Error == "DXF source read pending.") return;
                     if (!captured)
                     {
-                        bool existing = owner.Items[0].Done && owner.Items[0].PlacementCapture != null;
+                        reused = owner.Items[0].Done && owner.Items[0].PlacementCapture != null;
                         var capture = Stopwatch.StartNew(); owner.Capture(owner.Items[0], minimum); owner.Items[0].Context?.SetSource(minimum);
                         captureMs = capture.Elapsed.TotalMilliseconds; captured = true;
-                        var item = owner.Items[0]; var model = item.PlacementCapture;
+                        var item = owner.Items[0]; model = item.PlacementCapture;
                         // A 0-bend/non-sheet Part has no inferred bending data.
                         if (model == null && item.Rows.Count == 0) model = new PlacementModelCapture(item.Key, item.Stamp,
                             item.Configuration, new PlacementBodySnapshot[0], new PlacementBendSnapshot[0], false);
+                        program = model == null ? Task.FromResult(new AssemblyProgramData()) : ReadProcessProgramAsync(owner.processPrograms, item.Key, item.Path, model, owner.ToolLibrary, token);
+                        return;
+                    }
+                    if (work == null)
+                    {
+                        if (!program.IsCompleted) return;
+                        var data=program.GetAwaiter().GetResult(); var item=owner.Items[0];
                         var occurrence = new AssemblyOccurrence("PART:" + item.Key, null, item.Name, item.Path, item.Configuration,
                             new double[] { 1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0 }, AssemblyOccurrenceKind.SheetMetal, true);
-                        var source = new AssemblySourceInput(item.Key, model, new[] { occurrence }, reason: item.Error, metadata: ReadMinimumMetadata(item));
+                        var source = new AssemblySourceInput(item.Key, model, new[] { occurrence }, data.Envelopes, data.Setups, data.Plans, data.Use,
+                            item.Error, data.ConditionsRevision, data.Sequence, ReadMinimumMetadata(item));
                         var request = new AssemblyBatchRequest(item.Key, item.Configuration, AssemblyCheckScope.EntireAssembly, lease, owner.ToolLibrary,
-                            new[] { source }, new[] { occurrence }, 0, captureMs, model == null || existing ? 0 : 1, existing ? 1 : 0);
+                            new[] { source }, new[] { occurrence }, 0, captureMs, model == null || reused ? 0 : 1, reused ? 1 : 0);
                         work = owner.assemblyCoordinator.RunAsync(request, token: token, progress: progress); return;
                     }
                     if (!work.IsCompleted) return;
-                    if (!publication) { publication = true; files = AssemblyNativeBatchOperation.ReadFiles(paths); tools = owner.toolLibrary.VerifyForPublicationAsync(); return; }
-                    if (!files.IsCompleted || !tools.IsCompleted) return;
+                    if (!publication) { publication = true; files = AssemblyNativeBatchOperation.ReadFiles(paths); tools = owner.toolLibrary.VerifyForPublicationAsync(); processVerification=owner.processPrograms.VerifyForPublicationAsync(); return; }
+                    if (!files.IsCompleted || !tools.IsCompleted || !processVerification.IsCompleted) return;
+                    processVerification.GetAwaiter().GetResult();
                     CheckFiles(files.GetAwaiter().GetResult()); files = null;
                     if (!ReferenceEquals(tools.GetAwaiter().GetResult(), owner.ToolLibrary) || !owner.ToolLibrary.Current) lease.Invalidate();
                     completion.TrySetResult(work.GetAwaiter().GetResult());

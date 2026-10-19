@@ -74,6 +74,11 @@ internal static partial class ToolProfileTests
             temporary=Path.Combine(Path.GetTempPath(),"ADDIN-SequenceTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
             SequencePlannerTests(); Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions"); return failed==0?0:1;
         }
+        if (args.Length>0 && args[0]=="--import-tests")
+        {
+            temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ProcessImportTests-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(temporary);
+            ProcessPackageTests();Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions");return failed==0?0:1;
+        }
         if (args.Length>0 && args[0]=="--process-tests")
         {
             temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ProcessTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
@@ -256,6 +261,7 @@ internal static partial class ToolProfileTests
         EnvelopeTests();
         ProcessTests();
         SequencePlannerTests();
+        ProcessPackageTests();
         AssemblyBatchTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a

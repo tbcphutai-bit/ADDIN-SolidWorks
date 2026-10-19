@@ -139,6 +139,10 @@ internal static partial class NativeAssemblyBatchValidation
             .Any(o=>string.Equals(Convert.ToString(Get(o,"DisplayPath")),normalProbe.Name2,StringComparison.Ordinal))).ToArray();
         Check(mixed.Length==1,"Normal probe resolves to one shared Min file/config group");
         var members=Items(Get(mixed[0],"AssemblyOccurrences"));
+        Console.WriteLine("MIXED_GROUP_OBSERVED "+Json.Serialize(new {BatchReason=Get(mixed[0],"AssemblyBatchReason"),
+            Members=members.Select(o=>new {Kind=Get(o,"Kind").ToString(),Reason=Get(o,"Reason"),
+                Modified=Get(o,"Modified"),Mirrored=Get(o,"Mirrored"),Virtual=Get(o,"Virtual"),
+                Configuration=Get(o,"Configuration"),DisplayPath=Get(o,"DisplayPath")})}));
         Check(members.Any(o=>Get(o,"Kind").ToString()=="SheetMetal"&&Get(o,"Reason")==null)&&
             members.Count(o=>Convert.ToString(Get(o,"Reason"))=="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM")>=2&&
             Get(mixed[0],"AssemblyBatchReason")==null,

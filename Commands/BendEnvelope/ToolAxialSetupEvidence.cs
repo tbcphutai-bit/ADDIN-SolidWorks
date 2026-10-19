@@ -48,11 +48,12 @@ namespace ADDIN.Commands.BendEnvelope
         public ToolReviewValidation Review { get; }
         public AxialToolOccupancy Occupancy { get; }
         public string PayloadSha256 { get; }
+        public string HardwareSourceSha256 { get; }
         internal bool AppliesTo(SheetEnvelopeCapture sheet, ToolProfileLibrarySnapshot source) =>
             ReferenceEquals(envelope, sheet) && ReferenceEquals(library, source) && FeatureId == sheet.Binding.FeatureId;
         private ToolAxialSetupEvidence(string id, int feature, CollisionPairKind pair, string payload, ToolReviewValidation review,
-            SheetEnvelopeCapture envelope, ToolProfileLibrarySnapshot library, AxialToolOccupancy occupancy)
-        { ToolId = id; FeatureId = feature; Pair = pair; PayloadSha256 = payload; Review = review; this.envelope = envelope; this.library = library; Occupancy = occupancy; }
+            SheetEnvelopeCapture envelope, ToolProfileLibrarySnapshot library, AxialToolOccupancy occupancy, string hardware)
+        { ToolId = id; FeatureId = feature; Pair = pair; PayloadSha256 = payload; Review = review; this.envelope = envelope; this.library = library; Occupancy = occupancy; HardwareSourceSha256=hardware; }
         private static ToolPoint Point(PairPointRecord p) => p == null || !p.X.HasValue || !p.Y.HasValue ?
             throw new InvalidDataException("MISSING_AXIAL_SETUP_CONTACT_OR_APPROACH") : new ToolPoint(p.X.Value, p.Y.Value);
         internal static string Payload(ToolAxialSetupRecord r)
@@ -144,7 +145,9 @@ namespace ADDIN.Commands.BendEnvelope
                 sourceAssembly?.SeatingEvidence.Status != ToolReviewStatus.Stale &&
                 (pair == CollisionPairKind.WorkpiecePunch || sourceAssembly?.MappingReview.Status != ToolReviewStatus.Stale && sourceAssembly?.HolderObstacles?.Current != false);
             var occupancy = new AxialToolOccupancy(material, intervals, error, payload ?? "UNVERIFIED_AXIAL_SETUP", review.SimulationOnly || envelope.SimulationOnly, current, reasons);
-            return new ToolAxialSetupEvidence(record.ToolId, record.FeatureId, pair, payload, review, envelope, library, occupancy);
+            string hardware=reasons.Count==0?ToolEvidenceCanonical.Hash("ToolHardwareSourceV1",record.ToolId,record.Pair,record.MasterSourceSha256,
+                record.ProfileGeometrySha256,record.SeatingPayloadSha256,record.FrameId,record.AxialSectionContract):null;
+            return new ToolAxialSetupEvidence(record.ToolId, record.FeatureId, pair, payload, review, envelope, library, occupancy,hardware);
         }
     }
 }
