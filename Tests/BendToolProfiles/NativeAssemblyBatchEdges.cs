@@ -38,15 +38,17 @@ internal static partial class NativeAssemblyBatchValidation
     }
     private static object Inventory(ISldWorks app,ModelDoc2 root,List<IDisposable> disposable)
     {Activate(app,root);root.ClearSelection2(true);root.ForceRebuild3(false);var session=Session(app,root);disposable.Add((IDisposable)session);Call(session,"BuildInventory",false);return session;}
-    private static void EdgeFixtures(ISldWorks app,ModelDoc2 main,string assemblyTemplate,string output,List<IDisposable> disposable,Dictionary<string,object> report,object minimumSource=null)
+    private static void EdgeFixtures(ISldWorks app,ModelDoc2 main,string assemblyTemplate,string output,List<IDisposable> disposable,Dictionary<string,object> report,
+        object minimumSource=null,string sheetFixture=null,string twinFixture=null)
     {
         string directory=Path.Combine(output,"edge-fixtures-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(directory);
         string partTemplate=System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_PART_TEMPLATE")??Path.Combine(Path.GetDirectoryName(assemblyTemplate),"部品.PRTDOT");
         var cube=Block(app,partTemplate,Path.Combine(directory,"BLOCK.SLDPRT"),1);var multi=Block(app,partTemplate,Path.Combine(directory,"MULTI.SLDPRT"),2);
         var edgeRoot=app.NewDocument(assemblyTemplate,0,0,0) as ModelDoc2;Check(edgeRoot!=null,"Create native edge Assembly");var a=(AssemblyDoc)edgeRoot;
         var nonSheet=a.AddComponent5(cube.GetPathName(),0,"",true,"Default",.3,0,0);var multiBody=a.AddComponent5(multi.GetPathName(),0,"",true,"Default",.4,0,0);
-        string sheetPath=Path.Combine(output,"GENERATED-02.SLDPRT");
-        var first=a.AddComponent5(sheetPath,0,"",true,"Default",0,0,0);var second=a.AddComponent5(Path.Combine(output,"GENERATED-03.SLDPRT"),0,"",true,"Default",.2,0,0);
+        string sheetPath=sheetFixture??Path.Combine(output,"GENERATED-02.SLDPRT");
+        var first=a.AddComponent5(sheetPath,0,"",true,"Default",0,0,0);var second=a.AddComponent5(twinFixture??Path.Combine(output,"GENERATED-03.SLDPRT"),0,"",true,"Default",.2,0,0);
+        Check(first!=null&&second!=null,"Load both actual sheet-metal seeds for native edge fixtures");
         // MakeVirtual operates on the source definition, so give this case its
         // own source instead of unintentionally converting both mirror inputs.
         string virtualPath=Path.Combine(directory,"VIRTUAL-INPUT.SLDPRT");File.Copy(sheetPath,virtualPath,false);Open(app,virtualPath);Activate(app,edgeRoot);
@@ -159,6 +161,8 @@ internal static partial class NativeAssemblyBatchValidation
                 ExactReason="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM"};
             ExerciseMixedOccurrenceScopes(app,edgeRoot,assemblyTemplate,directory,sheetPath,normalProbe,normalSibling,first,
                 reflected[0],minimumSource,disposable,report);
+            if(System.Environment.GetEnvironmentVariable("ADDIN_ASSEMBLY_UI_TEST")=="1")
+                ExerciseNativeUi(app,edgeRoot,minimumSource,directory,normalProbe,report,"mixed");
         }
         report["NativeEdgeFixtures"]=new {NonSheetMetal=1,Multibody=1,Virtual=1,OppositeHandMirrorFeature=mirrorFeature!=null,Mirrored=mirrored.Length,ReflectedTransforms=reflected.Count,AssemblyCut=cutOccurrences.Length};
         Activate(app,main);

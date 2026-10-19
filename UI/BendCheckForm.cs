@@ -16,6 +16,7 @@ namespace ADDIN.UI
     internal sealed class BendCheckForm : Form
     {
         private readonly BendCheckSession session;
+        private BendAssemblyBatchForm batchForm;
         private readonly DataGridView parts;
         private readonly ComboBox scope;
         private readonly TextBox search;
@@ -56,9 +57,17 @@ namespace ADDIN.UI
             title.Controls.Add(new Label { Text = "KIỂM TRA KÍCH THƯỚC CHẤN", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TaiTheme.Accent }, 0, 0);
             if (session.IsAssembly)
             {
-                var btnBatchUI = new ModernButton { Text = "Batch UI (Phase 4A)", Dock = DockStyle.Fill, Kind = ModernButtonKind.Subtle, Tone = ModernButtonTone.Accent, Margin = new Padding(4, 4, 4, 4) };
+                var btnBatchUI = new ModernButton { Text = "Assembly Batch", Dock = DockStyle.Fill, Kind = ModernButtonKind.Subtle, Tone = ModernButtonTone.Accent, Margin = new Padding(4, 4, 4, 4) };
                 btnBatchUI.Click += (s, e) => {
-                    var batchForm = new BendAssemblyBatchForm(model.GetTitle(), model.ConfigurationManager?.ActiveConfiguration?.Name);
+                    if (batchForm != null && !batchForm.IsDisposed) { batchForm.Activate(); return; }
+                    if (capturing) return;
+                    batchForm = new BendAssemblyBatchForm(model.GetTitle(), model.ConfigurationManager?.ActiveConfiguration?.Name);
+                    new BendAssemblyBatchController(batchForm, new BendAssemblyBatchLiveBackend(app, model));
+                    // Both windows use the same SOLIDWORKS STA. Pause the Min
+                    // timer while Batch owns native capture; resume its normal
+                    // freshness checks after the child closes.
+                    timer.Stop();
+                    batchForm.FormClosed += (sender, args) => { batchForm = null; if (!disposed) timer.Start(); };
                     batchForm.Show(this);
                 };
                 title.Controls.Add(btnBatchUI, 1, 0);

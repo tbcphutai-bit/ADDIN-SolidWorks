@@ -21,6 +21,10 @@ namespace ADDIN.UI
         // The BOM grid in the TaiTheme look: quiet header, hairline row
         // separators, accent selection and themed check boxes.
         public static void ApplyModernStyle(DataGridView grid)
+        { ApplyModernStyle(grid, true); }
+
+        // Non-BOM forms retain their own Designer column schema and widths.
+        public static void ApplyModernStyle(DataGridView grid, bool fitBomColumns)
         {
             if (grid == null) return;
             EnableDoubleBuffer(grid);
@@ -74,7 +78,7 @@ namespace ADDIN.UI
             grid.CellPainting -= PaintBomHeader;
             grid.CellPainting += PaintBomHeader;
 
-            ConfigureColumns(grid);
+            if (fitBomColumns) ConfigureColumns(grid);
         }
 
         private const int HeaderHeight = 40;

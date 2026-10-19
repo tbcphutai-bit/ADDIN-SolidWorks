@@ -18,8 +18,10 @@ namespace ADDIN.UI
         public int Quantity { get; set; }
         public int BendCount { get; set; }
         public CollisionStatus Status { get; set; }
-        public string StatusDisplay => Status == CollisionStatus.COLLISION ? "COLLISION*" :
+        public CollisionStatus ProcessStatus { get; set; } = CollisionStatus.UNKNOWN;
+        public string StatusDisplay => Status == CollisionStatus.COLLISION ? "Có dao COLLISION*" :
                                        Status == CollisionStatus.CLEAR ? "CLEAR*" : "UNKNOWN";
+        public string ManufacturingStatus => "CHƯA XÁC MINH";
         public string Reason { get; set; }
         public string SourceKey { get; set; }
         public bool IsExpanded { get; set; }
@@ -57,15 +59,27 @@ namespace ADDIN.UI
     {
         public int BendIndex { get; set; }
         public string BendName { get; set; }
-        public double AngleDeg { get; set; }
-        public double RadiusMm { get; set; }
+        public double? AngleDeg { get; set; }
+        public double? RadiusMm { get; set; }
+        public string AngleDisplay => AngleDeg.HasValue ? $"{AngleDeg:0.#}°" : "Chưa có dữ liệu";
+        public string RadiusDisplay => RadiusMm.HasValue ? $"R{RadiusMm:0.##} mm" : "Chưa có dữ liệu";
         public int FeatureId { get; set; }
         public CollisionStatus Status { get; set; }
         public string StatusDisplay => Status == CollisionStatus.COLLISION ? "COLLISION*" :
                                        Status == CollisionStatus.CLEAR ? "CLEAR*" : "UNKNOWN";
         public List<BatchToolCandidateViewModel> ToolCandidates { get; set; } = new List<BatchToolCandidateViewModel>();
 
-        public override string ToString() => $"{BendName} ({AngleDeg:0.#}° R{RadiusMm:0.##}) - {StatusDisplay}";
+        public override string ToString() => $"{BendName} (Góc: {AngleDisplay}; bán kính: {RadiusDisplay}) - {StatusDisplay}";
+    }
+
+    internal sealed class BatchMotionSegmentViewModel
+    {
+        public BendProcessPhase Phase { get; set; }
+        public CollisionPairKind Pair { get; set; }
+        public string SegmentId { get; set; }
+        public CollisionStatus Status { get; set; }
+        public string Reason { get; set; }
+        public override string ToString() => $"{Phase} / {SegmentId} / {Pair}: {Status} — {Reason}";
     }
 
     /// <summary>
@@ -74,17 +88,37 @@ namespace ADDIN.UI
     internal sealed class BatchToolCandidateViewModel
     {
         public string ToolId { get; set; }
+        public int FeatureId { get; set; }
         public CollisionStatus PunchStatus { get; set; }
         public string PunchStatusDisplay => PunchStatus == CollisionStatus.COLLISION ? "COLLISION" :
                                             PunchStatus == CollisionStatus.CLEAR ? "CLEAR" : "UNKNOWN";
 
         public CollisionStatus HolderStatus { get; set; }
         public string HolderStatusDisplay => HolderStatus == CollisionStatus.COLLISION ? "COLLISION" :
-                                             HolderStatus == CollisionStatus.CLEAR ? "CLEAR" : "Chưa xác minh";
+                                             HolderStatus == CollisionStatus.CLEAR ? "CLEAR" : "UNKNOWN";
 
         public CollisionStatus MotionPreBend { get; set; }
         public CollisionStatus MotionDuringBend { get; set; }
         public CollisionStatus MotionPostBend { get; set; }
+        public CollisionStatus ProcessStatus { get; set; } = CollisionStatus.UNKNOWN;
+        public List<BatchMotionSegmentViewModel> MotionSegments { get; set; } = new List<BatchMotionSegmentViewModel>();
+        public CollisionStatus PhaseStatus(BendProcessPhase phase)
+        {
+            var rows = MotionSegments.Where(s => s.Phase == phase).ToArray();
+            if (rows.Any(s => s.Status == CollisionStatus.COLLISION)) return CollisionStatus.COLLISION;
+            var punch = rows.Where(s => s.Pair == CollisionPairKind.WorkpiecePunch).ToArray();
+            var holder = rows.Where(s => s.Pair == CollisionPairKind.WorkpieceHolder).ToArray();
+            bool complete = punch.Length > 0 && punch.Select(s => s.SegmentId).Distinct().Count() == punch.Length &&
+                holder.Length == punch.Length && holder.Select(s => s.SegmentId).Distinct().Count() == holder.Length &&
+                punch.All(s => !string.IsNullOrWhiteSpace(s.SegmentId)) &&
+                punch.Select(s => s.SegmentId).OrderBy(s => s, StringComparer.Ordinal).SequenceEqual(
+                    holder.Select(s => s.SegmentId).OrderBy(s => s, StringComparer.Ordinal));
+            return complete && rows.All(s => s.Status == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
+        }
+        public string MotionDisplay => string.Join("; ", Enum.GetValues(typeof(BendProcessPhase)).Cast<BendProcessPhase>()
+            .Select(p => p + ": " + PhaseStatus(p))) + " | Quá trình: " + ProcessStatus;
+        public string MotionDetail => MotionSegments.Count == 0 ? "Chưa có dữ liệu quá trình." :
+            string.Join(Environment.NewLine, MotionSegments.Select(s => s.ToString()));
 
         public CollisionStatus GeometricStatus { get; set; }
         public string GeometricStatusDisplay => GeometricStatus == CollisionStatus.COLLISION ? "COLLISION*" :
@@ -114,6 +148,10 @@ namespace ADDIN.UI
         public int SkippedComponents { get; set; }
         public int ProgressPercent { get; set; }
         public double ElapsedSeconds { get; set; }
+        public double NativeCaptureSeconds { get; set; }
+        public double WorkerSeconds { get; set; }
+        public bool StageTimingsAvailable { get; set; }
+        public bool CompletionConfirmed { get; set; }
         public int ActiveWorkers { get; set; }
         public long GeometryCacheHits { get; set; }
         public long StaticCertificateHits { get; set; }
@@ -132,7 +170,7 @@ namespace ADDIN.UI
             SkippedComponents = 0,
             ProgressPercent = 0,
             ElapsedSeconds = 0,
-            ActiveWorkers = 1
+            ActiveWorkers = 0
         };
     }
 
@@ -141,16 +179,22 @@ namespace ADDIN.UI
     /// </summary>
     internal static class BatchViewModelConverter
     {
-        public static BatchSummaryViewModel FromSnapshot(AssemblyBatchSnapshot snapshot)
+        public static BatchSummaryViewModel FromSnapshot(AssemblyBatchSnapshot snapshot, double elapsedSeconds = 0)
         {
             if (snapshot == null) return BatchSummaryViewModel.CreateEmpty();
 
-            int clearCount = snapshot.Parts.Count(p => p.GeometricStatus == CollisionStatus.CLEAR);
-            int collCount = snapshot.Parts.Count(p => p.GeometricStatus == CollisionStatus.COLLISION);
-            int unkCount = snapshot.Parts.Count(p => p.GeometricStatus == CollisionStatus.UNKNOWN);
+            var parts = PartsFromSnapshot(snapshot);
+            int clearCount = parts.Count(p => p.Status == CollisionStatus.CLEAR);
+            int collCount = parts.Count(p => p.Status == CollisionStatus.COLLISION);
+            int unkCount = snapshot.Parts.Count - clearCount - collCount;
             int checkedParts = clearCount + collCount + unkCount;
-            int totalParts = Math.Max(1, snapshot.Parts.Count);
-            int progress = (int)Math.Round((double)checkedParts / totalParts * 100.0);
+            var reasons = snapshot.Parts.SelectMany(p => p.StaticCandidates.SelectMany(c => c.Reasons)
+                .Concat(p.ProcessCandidates.SelectMany(c => c.PairSegments.SelectMany(s => s.Reasons))))
+                .Concat(snapshot.Parts.Select(p => p.Reason));
+            bool interrupted = reasons.Any(r => r != null && (r.Contains("BUDGET") || r.Contains("CANCELLED") ||
+                r.Contains("STALE") || r.Contains("SUPERSEDED"))) || snapshot.Parts.Any(p => !p.Current);
+            bool complete = snapshot.Complete && !interrupted && parts.All(p => p.Bends.Count == p.BendCount);
+            int progress = complete ? 100 : snapshot.Current && checkedParts > 0 ? 99 : 0;
 
             var diag = new List<string>();
             if (snapshot.LightweightOccurrences > 0)
@@ -161,6 +205,8 @@ namespace ADDIN.UI
                 diag.Add($"Có {snapshot.UnresolvedBranches} nhánh subassembly chưa xác minh được danh sách chi tiết con.");
             if (!string.IsNullOrWhiteSpace(snapshot.InvalidReason))
                 diag.Add($"Trạng thái kiểm tra: {snapshot.InvalidReason}");
+            if (!complete) diag.Add("Tác vụ chưa hoàn tất hợp lệ; không xác nhận 100%.");
+            diag.Add("Hình học và quá trình là kết quả theo từng ứng viên. Một dao COLLISION không kết luận toàn Part không thể chấn. Sản xuất: CHƯA XÁC MINH.");
 
             return new BatchSummaryViewModel
             {
@@ -172,8 +218,12 @@ namespace ADDIN.UI
                 CollisionParts = collCount,
                 SkippedComponents = snapshot.SuppressedOccurrences + snapshot.LightweightOccurrences + snapshot.UnsupportedOccurrences,
                 ProgressPercent = progress,
-                ElapsedSeconds = Math.Round(snapshot.WorkerMilliseconds / 1000.0, 1),
-                ActiveWorkers = snapshot.PeakWorkers > 0 ? snapshot.PeakWorkers : 2,
+                ElapsedSeconds = elapsedSeconds,
+                NativeCaptureSeconds = snapshot.CaptureMilliseconds / 1000.0,
+                WorkerSeconds = snapshot.WorkerMilliseconds / 1000.0,
+                StageTimingsAvailable = true,
+                CompletionConfirmed = complete,
+                ActiveWorkers = snapshot.PeakWorkers,
                 GeometryCacheHits = snapshot.GeometryHits,
                 StaticCertificateHits = snapshot.StaticHits,
                 ProcessCertificateHits = snapshot.ProcessHits,
@@ -185,7 +235,7 @@ namespace ADDIN.UI
         public static List<BatchPartViewModel> PartsFromSnapshot(AssemblyBatchSnapshot snapshot)
         {
             var result = new List<BatchPartViewModel>();
-            if (snapshot?.Parts == null) return result;
+            if (snapshot?.Parts == null || !snapshot.Current) return result;
 
             foreach (var part in snapshot.Parts)
             {
@@ -201,8 +251,9 @@ namespace ADDIN.UI
                     Configuration = config,
                     Quantity = part.Quantity,
                     BendCount = part.BendCount,
-                    Status = part.GeometricStatus,
-                    Reason = part.Reason ?? (part.GeometricStatus == CollisionStatus.CLEAR ? "Tất cả nếp CLEAR hình học" : "Chưa đủ bằng chứng mapping và vị trí gá Holder."),
+                    Status = CollisionStatus.UNKNOWN,
+                    Reason = !part.Current ? "SOURCE_INVALIDATED — cần chạy lại." : part.Reason ??
+                        "Kết quả theo ứng viên; chưa xác minh sản xuất hoặc chọn dao cho toàn Part.",
                     SourceKey = part.SourceKey,
                     RawPartResult = part
                 };
@@ -233,52 +284,88 @@ namespace ADDIN.UI
                     });
                 }
 
-                // Populate bends and 18 tools
-                for (int b = 1; b <= Math.Max(1, part.BendCount); b++)
+                // The backend currently exports IDs through candidates, but no
+                // native angle/radius DTO. Never invent IDs or dimensions.
+                var featureIds = part.BendCount == 0 ? new int[0] : part.StaticCandidates.Select(c => c.FeatureId)
+                    .Concat(part.ProcessCandidates.Select(c => c.FeatureId)).Distinct().OrderBy(id => id).ToArray();
+                if (featureIds.Length != part.BendCount)
+                    partVm.Reason += " Chưa có dữ liệu đầy đủ về FeatureId của các nếp chấn.";
+                foreach (int featureId in featureIds)
                 {
-                    int bendIdx = b;
                     var bendVm = new BatchBendViewModel
                     {
-                        BendIndex = bendIdx,
-                        BendName = $"Bend {bendIdx:D2}",
-                        AngleDeg = 90.0,
-                        RadiusMm = 1.0,
-                        FeatureId = bendIdx,
-                        Status = part.GeometricStatus
+                        BendIndex = partVm.Bends.Count + 1,
+                        BendName = $"FeatureId {featureId}",
+                        FeatureId = featureId,
+                        Status = CollisionStatus.UNKNOWN
                     };
 
                     foreach (string toolId in CompanyToolIds.All)
                     {
-                        var staticCand = part.StaticCandidates?.FirstOrDefault(c => c.ToolId == toolId && c.FeatureId == bendIdx);
-                        var procCand = part.ProcessCandidates?.FirstOrDefault(c => c.ToolId == toolId && c.FeatureId == bendIdx);
+                        var statics = part.StaticCandidates.Where(c => c.ToolId == toolId && c.FeatureId == featureId).ToArray();
+                        var processes = part.ProcessCandidates.Where(c => c.ToolId == toolId && c.FeatureId == featureId).ToArray();
+                        var staticCand = part.Current && statics.Length == 1 ? statics[0] : null;
+                        var procCand = part.Current && processes.Length == 1 ? processes[0] : null;
 
                         CollisionStatus punch = staticCand != null ? staticCand.PunchResult.Status : CollisionStatus.UNKNOWN;
                         CollisionStatus holder = staticCand != null ? staticCand.HolderResult.Status : CollisionStatus.UNKNOWN;
-                        CollisionStatus geom = procCand != null ? procCand.ProcessResult :
-                                              staticCand != null ? staticCand.CombinedResult : CollisionStatus.UNKNOWN;
+                        CollisionStatus geom = staticCand != null ? staticCand.CombinedResult : CollisionStatus.UNKNOWN;
 
-                        bendVm.ToolCandidates.Add(new BatchToolCandidateViewModel
+                        var toolVm = new BatchToolCandidateViewModel
                         {
                             ToolId = toolId,
+                            FeatureId = featureId,
                             PunchStatus = punch,
                             HolderStatus = holder,
-                            MotionPreBend = procCand != null ? procCand.PunchResult : CollisionStatus.UNKNOWN,
-                            MotionDuringBend = procCand != null ? procCand.ProcessResult : CollisionStatus.UNKNOWN,
-                            MotionPostBend = procCand != null ? procCand.HolderResult : CollisionStatus.UNKNOWN,
                             GeometricStatus = geom,
+                            PunchClearanceMm = staticCand?.PunchResult?.CertifiedClearanceLowerMm,
+                            HolderClearanceMm = staticCand?.HolderResult?.CertifiedClearanceLowerMm,
                             PunchReason = staticCand?.PunchResult?.Reasons?.FirstOrDefault() ?? "chưa đủ bằng chứng mapping",
                             HolderReason = staticCand?.HolderResult?.Reasons?.FirstOrDefault() ?? "vị trí gá Holder chưa xác minh",
-                            CombinedReason = part.Reason ?? "chưa đủ bằng chứng mapping và vị trí gá Holder."
-                        });
+                            CombinedReason = !part.Current ? "SOURCE_INVALIDATED" : statics.Length > 1 || processes.Length > 1 ?
+                                "AMBIGUOUS_CANDIDATE_BINDING" : string.Join("; ",
+                                (staticCand?.Reasons ?? new[] { "MISSING_STATIC_CANDIDATE" })
+                                .Concat(procCand?.PairSegments.SelectMany(s => s.Reasons) ?? new[] { "MISSING_PROCESS_CANDIDATE" })
+                                .Concat(part.Reason == null ? new string[0] : new[] { part.Reason }).Distinct()),
+                            MotionSegments = procCand?.PairSegments.Select(s => new BatchMotionSegmentViewModel
+                            {
+                                Phase = s.Phase, Pair = s.Pair, SegmentId = s.SegmentId,
+                                Status = s.Status, Reason = string.Join("; ", s.Reasons)
+                            }).ToList() ?? new List<BatchMotionSegmentViewModel>()
+                        };
+                        toolVm.MotionPreBend = toolVm.PhaseStatus(BendProcessPhase.PreBend);
+                        toolVm.MotionDuringBend = toolVm.PhaseStatus(BendProcessPhase.DuringBend);
+                        toolVm.MotionPostBend = toolVm.PhaseStatus(BendProcessPhase.RetractUnload);
+                        var phases = Enum.GetValues(typeof(BendProcessPhase)).Cast<BendProcessPhase>().Select(toolVm.PhaseStatus).ToArray();
+                        toolVm.ProcessStatus = phases.Contains(CollisionStatus.COLLISION) ? CollisionStatus.COLLISION :
+                            phases.All(s => s == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
+                        bendVm.ToolCandidates.Add(toolVm);
                     }
+
+                    bendVm.Status = bendVm.ToolCandidates.Any(t => t.GeometricStatus == CollisionStatus.COLLISION || t.ProcessStatus == CollisionStatus.COLLISION) ?
+                        CollisionStatus.COLLISION : bendVm.ToolCandidates.All(t => t.GeometricStatus == CollisionStatus.CLEAR && t.ProcessStatus == CollisionStatus.CLEAR) ?
+                        CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
 
                     partVm.Bends.Add(bendVm);
                 }
+
+                partVm.Status = Aggregate(partVm.Bends.SelectMany(b => b.ToolCandidates).Select(t => t.GeometricStatus),
+                    partVm.Bends.Count == part.BendCount && part.BendCount > 0);
+                partVm.ProcessStatus = Aggregate(partVm.Bends.SelectMany(b => b.ToolCandidates).Select(t => t.ProcessStatus),
+                    partVm.Bends.Count == part.BendCount && part.BendCount > 0);
+                partVm.Reason += " Quá trình: " + partVm.ProcessStatus + "; sản xuất: CHƯA XÁC MINH.";
 
                 result.Add(partVm);
             }
 
             return result;
+        }
+
+        private static CollisionStatus Aggregate(IEnumerable<CollisionStatus> values, bool inventoryComplete)
+        {
+            var statuses = values.ToArray();
+            return statuses.Contains(CollisionStatus.COLLISION) ? CollisionStatus.COLLISION :
+                inventoryComplete && statuses.Length > 0 && statuses.All(s => s == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
         }
 
         /// <summary>
