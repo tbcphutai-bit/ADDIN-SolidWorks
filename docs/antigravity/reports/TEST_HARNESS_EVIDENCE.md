@@ -2,9 +2,10 @@
 
 > Source files:
 > - [`docs/antigravity/reports/TEST_HARNESS.cs`](TEST_HARNESS.cs) (Offline algorithmic, tolerance & WinForms state harness)
-> - [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs) / [`docs/antigravity/review4/CG1_REVIEW4_SAFE_RUNNER.cs`](../review4/CG1_REVIEW4_SAFE_RUNNER.cs) (Review #4 Fail-closed isolated sandbox regression runner: Baseline `main` vs `CG1`)
+> - [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs) / [`docs/antigravity/review4/CG1_REVIEW4_SAFE_RUNNER.cs`](../review4/CG1_REVIEW4_SAFE_RUNNER.cs) (Review #4/5 Fail-closed isolated sandbox regression runner: Baseline `main` vs `CG1`)
+> - [`docs/antigravity/reports/TEST_UI_INTERACTION.cs`](TEST_UI_INTERACTION.cs) (Review #5/6 Fail-closed WinForms UI modal, CSV, and safety audit test)
 >
-> Execution Date: 2026-10-19 07:23:38 UTC
+> Execution Date: 2026-10-19 09:20:00 UTC
 > Target Binary (CG1): `C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll`
 > Target Binary SHA256: `D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E`
 > Target MVID: `456f9ade-ac27-4395-854f-857ad2521fd0`
@@ -41,6 +42,13 @@ $large   = "$sandbox\ProductionCopy\1618-01-BH.SLDASM"
 
 & "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" $mainDll $cg1Dll $sandbox $zero $large
 Remove-Item "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" -Force
+```
+
+### D. Hardened UI Interaction and Safety Audit Test
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\Roslyn\csc.exe" /r:"System.Windows.Forms.dll" /r:"System.Drawing.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\TEST_UI_INTERACTION.exe" "docs\antigravity\reports\TEST_UI_INTERACTION.cs"
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" $cg1Dll $sandbox "$sandbox\SimpleFixtures\Fixture_OK.SLDASM"
+Remove-Item "docs\antigravity\reports\TEST_UI_INTERACTION.exe" -Force
 ```
 
 ---
@@ -130,13 +138,13 @@ In Review #5, all internal references were resolved within the sandbox copy (`D:
 
 ---
 
-## 5. Review #5 Live CAD Regression Results
+## 5. Live CAD Regression & UI Verification Results
 
 ### A. Full Production 916-Hole Assembly & Zero-Hole Baseline Comparison
 ```powershell
 & "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" $mainDll $cg1Dll $sandbox `
-    "$sandbox\ZeroHole\run07_Missing_Ura_BOM.SLDASM" `
-    "$sandbox\ProductionCopy\1618-01-BH.SLDASM"
+     "$sandbox\ZeroHole\run07_Missing_Ura_BOM.SLDASM" `
+     "$sandbox\ProductionCopy\1618-01-BH.SLDASM"
 ```
 
 **Verbatim Console Output:**
@@ -153,7 +161,7 @@ run07_Missing_Ura_BOM.SLDASM: PASS
 SUMMARY: PASS=2 FAIL=0 SKIP=0 EXIT=0
 ```
 
-### B. Self-Contained Test Fixtures (OK, NG Offset, Unmatched, Multi-Layer ABC)
+### B. Self-Contained Test Fixtures (Review #6: NG Fixture Proven with NG=12)
 ```powershell
 & "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" $mainDll $cg1Dll $sandbox `
     "$sandbox\ZeroHole\run07_Missing_Ura_BOM.SLDASM" `
@@ -174,8 +182,8 @@ run07_Missing_Ura_BOM.SLDASM: PASS
 Fixture_OK.SLDASM main: holes=57 groups=24 unmatched=33 stacks=12 NG=0
 Fixture_OK.SLDASM CG1 : holes=57 groups=24 unmatched=33 stacks=12 NG=0
 Fixture_OK.SLDASM: PASS
-Fixture_NG_Offset.SLDASM main: holes=57 groups=24 unmatched=33 stacks=12 NG=0
-Fixture_NG_Offset.SLDASM CG1 : holes=57 groups=24 unmatched=33 stacks=12 NG=0
+Fixture_NG_Offset.SLDASM main: holes=57 groups=24 unmatched=33 stacks=12 NG=12
+Fixture_NG_Offset.SLDASM CG1 : holes=57 groups=24 unmatched=33 stacks=12 NG=12
 Fixture_NG_Offset.SLDASM: PASS
 Fixture_Unmatched.SLDASM main: holes=32 groups=0 unmatched=32 stacks=0 NG=0
 Fixture_Unmatched.SLDASM CG1 : holes=32 groups=0 unmatched=32 stacks=0 NG=0
@@ -186,16 +194,15 @@ Fixture_MultiLayer_ABC.SLDASM: PASS
 SUMMARY: PASS=5 FAIL=0 SKIP=0 EXIT=0
 ```
 
-### C. Live WinForms UI & "Nhóm liên kết" Modal Dialog Verification
+### C. Hardened WinForms UI & Safety Audit Execution (`TEST_UI_INTERACTION.cs`)
 ```powershell
-& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /r:"System.Windows.Forms.dll" /r:"System.Drawing.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\TEST_UI_INTERACTION.exe" "docs\antigravity\reports\TEST_UI_INTERACTION.cs"
 & "docs\antigravity\reports\TEST_UI_INTERACTION.exe" $cg1Dll $sandbox "$sandbox\SimpleFixtures\Fixture_OK.SLDASM"
 ```
 
 **Verbatim Console Output:**
 ```text
 =========================================================
-CG1 UI INTERACTION & MODAL VERIFICATION TEST
+CG1 UI INTERACTION & SAFETY AUDIT TEST
 =========================================================
 SolidWorks Revision: 32.5.0
 Candidate DLL: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
@@ -218,50 +225,75 @@ Fixture: D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_OK.SLDASM
     Found Button: 'Nhóm liên kết' (Enabled=True)
     Found Button: 'Hủy' (Enabled=False)
     Found Button: 'Theo dõi 3D' (Enabled=True)
+    Found Button: '← Lỗi trước' (Enabled=False)
+    Found Button: 'Lỗi tiếp →' (Enabled=False)
     Found Button: 'Chi tiết' (Enabled=True)
+    Found Button: 'Hủy' (Enabled=False)
     -> Button 'Nhóm liên kết' presence: PASS
     -> Button 'Nhóm liên kết' enabled: PASS
 
-[3] Testing 'Nhóm liên kết' Modal Dialog Opening & Content:
+[3] Testing 'Nhóm liên kết' Modal Dialog via PerformClick():
     -> Modal Title: 'CHECK HOLE - Nhóm liên kết (chẩn đoán)' (PASS)
     -> Header Description Text:
         Nhóm lỗ đã ghép: 12 | NG chưa rõ Master: 0 | Lỗ chưa ghép: 33
         Hai đầu trục chỉ là ứng viên hình học, KHÔNG phải vật chủ được xác nhận.
         CG1 chưa kiểm tra quan hệ đối với Part không có lỗ.
-    -> Header Disclaimers: PASS
-    -> DataGridView RowCount: 12 (expected: 12) (PASS)
-    -> DataGridView Columns: Id, Status, Components, HoleCount, EndCandidates, MasterDecision, MatchSource, MaxOffsetMm, MaxAngleDeg, Note
+    -> Header Counts & Mandatory Disclaimer: PASS
+    -> DataGridView ReadOnly & RowCount (12): PASS
     -> All 10 Diagnostic Columns Present: PASS
+    -> Modal Evaluation Level: MODAL_PROGRAMMATIC_PASS
 
-[4] Testing CSV Report Export:
+[4] Testing CSV Report Export & Verification:
     -> CSV created: D:\CG1-ISOLATED-TEST-COPIES\Test_Export_Report.csv
     -> CSV line count: 46
     -> Header: Assembly,Configuration,Status,Type,Reference component,Actual component,Offset (mm),Angle (deg),Reason
-    -> CSV Export: PASS
+    -> CSV Export Row-by-Row Content Matches Report: PASS
+    -> CSV Writer Level: CSV_WRITER_PASS
 
-[5] Verifying Assembly Non-Mutation State:
-    -> doc.GetSaveFlag() = False
-    -> In-memory Non-Mutation: PASS (Clean)
+[5] Verifying Post-Execution Assembly Safety & Invariance:
+    -> Feature Tree Invariance: PASS
+    -> Memory Non-Mutation (doc.GetSaveFlag() == false): PASS
+    -> Disk File SHA256 Invariance: PASS
 
 =========================================================
-ALL UI INTERACTION AND DIAGNOSTIC TESTS PASSED (EXIT 0)
+ALL UI SAFETY AND INTERACTION CHECKS PASSED (EXIT 0)
+Status Levels: MODAL_PROGRAMMATIC_PASS | CSV_WRITER_PASS | UI_USER_CLICK_NOT_TESTED
 =========================================================
 ```
 
-### D. Negative Test: Stale Marker Feature Detection (`Fixture_OldMarker.SLDASM`)
+### D. Hardened UI Test Negative Gates (Review #6)
+
+#### D.1 Sandbox Path Enforcement Self-Test
 ```powershell
-& "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" $mainDll $cg1Dll $sandbox "$sandbox\SimpleFixtures\Fixture_OldMarker.SLDASM"
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" --self-test
+# Output:
+PASS: sandbox path enforcement self-test
+# Exit Code: 0
 ```
 
-**Verbatim Console Output:**
-```text
-SOLIDWORKS revision: 32.5.0
-BASELINE SHA256: 297D66CDF1EF56382C1165B8F84AF7B394090B2B8D2DC25A2F4D71067836118D
-CANDIDATE SHA256: D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E
-Fixture_OldMarker.SLDASM: FAIL | System.InvalidOperationException: Isolated run rejected: Existing CHECK-HOLE-NG feature detected. Run only on a disposable fixture without markers.
-   at ADDIN.Tests.Cg1Review4SafeRunner.EnsureNoOldMarkers(ModelDoc2 doc)
-   at ADDIN.Tests.Cg1Review4SafeRunner.RunOneIsolated(ISldWorks app, Type checkerType, String root, String modelPath, Boolean expectCg1)
-SUMMARY: PASS=0 FAIL=1 SKIP=0 EXIT=1
+#### D.2 Rejection of Path Outside Sandbox Root
+```powershell
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" $cg1Dll $sandbox "C:\outside\model.sldasm"
+# Output:
+FAIL CLOSED: Path outside isolated fixture root: C:\outside\model.sldasm
+# Exit Code: 1
+```
+
+#### D.3 Rejection of Stale Markers on Opened Model (`Fixture_OldMarker.SLDASM`)
+```powershell
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" $cg1Dll $sandbox "$sandbox\SimpleFixtures\Fixture_OldMarker.SLDASM"
+# Output:
+=========================================================
+CG1 UI INTERACTION & SAFETY AUDIT TEST
+=========================================================
+SolidWorks Revision: 32.5.0
+Candidate DLL: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
+Fixture: D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_OldMarker.SLDASM
+    -> Disk File SHA256 Invariance: PASS
+
+FAIL CLOSED: System.InvalidOperationException: Isolated run rejected: Existing CHECK-HOLE-NG feature detected (CHECK-HOLE-NG-STALE-MARKER). Run only on a disposable fixture without markers.
+   at ADDIN.Tests.TestUiInteraction.RunEntry(String[] args)
+# Exit Code: 1
 ```
 
 ---
@@ -294,16 +326,18 @@ SUMMARY: PASS=0 FAIL=1 SKIP=0 EXIT=1
 | | R4-SandboxRoot | Test models outside sandbox $\to$ refuses execution, fails closed | `PASS` |
 | | R4-ExtRefs | External component dependencies in assembly $\to$ refuses execution, fails closed | `PASS` |
 | | R4-SmokeZero | Isolated zero-hole model `run07_Missing_Ura_BOM.SLDASM` evaluated on baseline and CG1 candidate $\to$ 100% match, exit code 0 | `PASS` |
-| **Review #5 Live Fixtures** | R5-Prod916 | Production 916-hole assembly `1618-01-BH.SLDASM` with resolved references: 916 holes, 696 grouped, 220 unmatched, 348 stacks, 0 NG $\to$ 100% match, exit code 0 | `PASS` |
+| **Review #5/6 Live Fixtures** | R5-Prod916 | Production 916-hole assembly `1618-01-BH.SLDASM` with resolved references: 916 holes, 696 grouped, 220 unmatched, 348 stacks, 0 NG $\to$ 100% match, exit code 0 | `PASS` |
 | | R5-SubA10 | Subassembly `1618-02-bh-A10.SLDASM`: 90 holes, 64 grouped, 26 unmatched, 32 stacks, 0 NG $\to$ 100% match, exit code 0 | `PASS` |
 | | R5-FixOK | Self-contained clean joint `Fixture_OK.SLDASM`: 57 holes, 24 grouped, 33 unmatched, 12 stacks $\to$ 100% match, exit code 0 | `PASS` |
-| | R5-FixNGOFF | Offset joint `Fixture_NG_Offset.SLDASM`: 57 holes, 24 grouped, 33 unmatched, 12 stacks $\to$ 100% match, exit code 0 | `PASS` |
+| | R6-FixNGOFF | Offset joint `Fixture_NG_Offset.SLDASM` with mates suppressed & $+0.30\text{ mm}$ translation in X ($> 0.10\text{ mm}$ tol): 57 holes, 24 grouped, 33 unmatched, 12 stacks, **12 NG** on both baseline and CG1 candidate $\to$ 100% match, exit code 0 | `PASS` |
 | | R5-FixUNM | Unmatched holes `Fixture_Unmatched.SLDASM`: 32 holes, 0 grouped, 32 unmatched, 0 stacks $\to$ 100% match, exit code 0 | `PASS` |
 | | R5-FixML | Multi-layer joint `Fixture_MultiLayer_ABC.SLDASM`: 82 holes, 48 grouped, 34 unmatched, 24 stacks $\to$ 100% match, exit code 0 | `PASS` |
-| **Review #5 UI & Modal** | R5-UIPresence | Button "Nhóm liên kết" visible & enabled | `PASS` |
-| | R5-UIModal | Modal `"CHECK HOLE - Nhóm liên kết (chẩn đoán)"` opens and closes cleanly | `PASS` |
-| | R5-UIDisclaimer | Header contains required non-authoritative disclaimer | `PASS` |
-| | R5-UIGrid | DataGridView contains all 10 diagnostic columns with matching row count | `PASS` |
-| | R5-UICSV | CSV report exported successfully via `CheckHoleCsv.Write` | `PASS` |
-| | R5-UINonMutate | In-memory assembly state clean (`GetSaveFlag() == false`) throughout UI inspection | `PASS` |
-| **Review #5 Negative Test** | R5-NegMarker | Model with stale `CHECK-HOLE-NG*` feature rejected by `EnsureNoOldMarkers` (exit 1) | `PASS` |
+| **Review #6 UI Hardening** | R6-UISelfTest | `--self-test` verifies path containment logic | `PASS` |
+| | R6-UIOutside | Rejection of path outside sandbox root (exit 1) | `PASS` |
+| | R6-UIMarker | Rejection of stale `CHECK-HOLE-NG*` features before running (exit 1) | `PASS` |
+| | R6-UIModal | Toolbar button click event dispatch $\to$ Modal `"CHECK HOLE - Nhóm liên kết (chẩn đoán)"` opens and closes cleanly (`MODAL_PROGRAMMATIC_PASS`) | `PASS` |
+| | R6-UIDisclaimer | Header contains required non-authoritative disclaimer and accurate counts | `PASS` |
+| | R6-UIGrid | Strict assertions: `grid != null && grid.ReadOnly`, row count == 12, all 10 diagnostic columns present | `PASS` |
+| | R6-UICSV | CSV report written and row-by-row verified against `report.Rows` (`CSV_WRITER_PASS`) | `PASS` |
+| | R6-UINonMutate | In-memory assembly clean (`GetSaveFlag() == false`), feature tree signature invariant, disk file SHA256 invariant | `PASS` |
+| | R6-UIUserClick | End-user manual mouse clicking on physical desktop UI | `UI_USER_CLICK_NOT_TESTED` |
