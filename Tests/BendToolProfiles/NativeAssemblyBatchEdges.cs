@@ -90,6 +90,8 @@ internal static partial class NativeAssemblyBatchValidation
         }
         var normalProbe=a.AddComponent5(sheetPath,0,"",true,"Default",.85,0,0);
         Check(normalProbe!=null,"Add an ordinary same-source instance next to native reflected instances");
+        var normalSibling=a.AddComponent5(sheetPath,0,"",true,"Default",.95,0,0);
+        Check(normalSibling!=null,"Add second normal same-source sibling");
         inventory=Inventory(app,edgeRoot,disposable);
         Check(Items(Get(inventory,"InventoryOccurrences")).Count(o=>Convert.ToString(Get(o,"Reason"))=="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM")>=2,"Native reflections cannot inherit rigid-source certification");
         // Cut exactly one Assembly instance, with propagation to source disabled.
@@ -155,6 +157,8 @@ internal static partial class NativeAssemblyBatchValidation
                 "Native reflected instances are individually UNKNOWN, never inherited source certificates");
             report["MixedOccurrenceIsolation"]=new {Normal=ordinary.Length,Blocked=reflectedParts.Length,
                 ExactReason="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM"};
+            ExerciseMixedOccurrenceScopes(app,edgeRoot,assemblyTemplate,directory,sheetPath,normalProbe,normalSibling,first,
+                reflected[0],minimumSource,disposable,report);
         }
         report["NativeEdgeFixtures"]=new {NonSheetMetal=1,Multibody=1,Virtual=1,OppositeHandMirrorFeature=mirrorFeature!=null,Mirrored=mirrored.Length,ReflectedTransforms=reflected.Count,AssemblyCut=cutOccurrences.Length};
         Activate(app,main);

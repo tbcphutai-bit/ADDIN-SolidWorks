@@ -11,6 +11,8 @@
     <Reference Include="SolidWorks.Interop.swconst"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.swconst.dll</HintPath></Reference>
     <Compile Include="NativeAssemblyBatchValidation.cs"/>
     <Compile Include="NativeAssemblyBatchEdges.cs"/>
+    <Compile Include="NativeAssemblyMixedTests.cs"/>
+    <Compile Include="NativeTestProcess.cs"/>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

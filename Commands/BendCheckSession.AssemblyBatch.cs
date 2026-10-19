@@ -150,7 +150,13 @@ namespace ADDIN.Commands
             {
                 this.owner=owner; this.minimum=minimum; this.scope=scope; this.options=options; this.lease=lease; this.inventoryMs=inventoryMs;
                 this.token=token; this.progress=progress; this.programs=programs;
-                paths=owner.Items.Select(i=>i.Path).Concat(new[]{owner.Host.GetPathName(),minimum?.Snapshot?.SourcePath})
+                // Only captured, eligible geometry is a file proof dependency.
+                // A virtual/unsupported definition can materialize a temporary
+                // side file while SOLIDWORKS changes activation. It already has
+                // an independent UNKNOWN result and must not invalidate normal
+                // siblings. Assembly stamp/pose and required source guards stay.
+                paths=owner.Items.Where(i=>i.AssemblyOccurrences.Any(o=>AssemblyOccurrenceEligibility.Reason(o)==null))
+                    .Select(i=>i.Path).Concat(new[]{owner.Host.GetPathName(),minimum?.Snapshot?.SourcePath})
                     .Where(p=>!string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 files=ReadFiles(paths); nextFiles=DateTime.UtcNow.AddSeconds(2);
             }

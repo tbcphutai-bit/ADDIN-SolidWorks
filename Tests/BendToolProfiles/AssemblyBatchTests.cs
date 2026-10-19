@@ -321,6 +321,34 @@ internal static partial class ToolProfileTests
                 }
             }
         });
+        Test("assembly: direct coordinator admission enforces occurrence eligibility without a native partition",()=> {
+            using(var f=Seating())
+            {
+                var q=WorkerRequest(f,1,P(1,2));var plans=AssemblyPlans(q.Model);var normal=Occurrence(0,0);
+                var virtualPart=Occurrence(0,1,virtualPart:true);
+                var uncertified=Occurrence(0,2,share:false);
+                var declared=new AssemblyOccurrence("DECLARED_UNVERIFIED",normal.ParentId,normal.DisplayPath,normal.SourceIdentity,
+                    normal.Configuration,normal.Transform,AssemblyOccurrenceKind.SheetMetal,true,reason:"EXPLICIT_CONTEXT_UNVERIFIED");
+                foreach(var bad in new[]{virtualPart,uncertified,declared})
+                {
+                    var input=LocalSource("DIRECT",q.Model,new[]{bad,normal},q.Envelopes,q.Setups,plans);
+                    using(var coordinator=new AssemblyBatchCoordinator())
+                    {
+                        var result=coordinator.RunAsync(AssemblyRequest(new[]{input},q.Library),new AssemblyBatchOptions(2)).Result;
+                        var healthy=result.Parts.Single(p=>p.Occurrences.Any(o=>o.Id==normal.Id));
+                        var blocked=result.Parts.Single(p=>p.Occurrences.Any(o=>o.Id==bad.Id));
+                        Check(healthy.Quantity==1&&blocked.Quantity==1&&blocked.Reason==AssemblyOccurrenceEligibility.Reason(bad),
+                            "Direct managed caller cannot share an ineligible occurrence's result with its normal sibling");
+                        Check(result.KernelQueries>0&&healthy.StaticCandidates.Any(c=>c.CombinedResult==CollisionStatus.COLLISION),
+                            "Normal sibling actually executes the inherited numeric kernel");
+                        Check(blocked.StaticCandidates.Count==18&&blocked.ProcessCandidates.Count==18&&
+                            blocked.StaticCandidates.All(c=>c.CombinedResult==CollisionStatus.UNKNOWN)&&
+                            blocked.ProcessCandidates.All(c=>c.ProcessResult==CollisionStatus.UNKNOWN),
+                            "Every rejected direct occurrence retains 18 UNKNOWN slots without transferred evidence");
+                    }
+                }
+            }
+        });
         Test("assembly: invalid policy and listener failure cannot fake success",()=> {
             var source=LocalSource("S",CollisionModel(Rect("BODY",0,0,1,1)),new[]{Occurrence(0,0)});
             using(var c=new AssemblyBatchCoordinator())

@@ -23,7 +23,8 @@ internal static partial class ToolProfileTests
         ProcessCollision=r.Parts.Sum(p=>p.ProcessCandidates.Count(c=>c.ProcessResult==CollisionStatus.COLLISION))};
     private static int AssemblyBenchmark(string[] args)
     {
-        if(args.Length!=2)return 2;Directory.CreateDirectory(args[1]);temporary=Path.Combine(args[1],"controlled-proof-fixtures");Directory.CreateDirectory(temporary);
+        if(args.Length<2||args.Length>3||args.Length==3&&!new[]{"Numeric18x3","Numeric18x6","Numeric120x25"}.Contains(args[2]))return 2;
+        Directory.CreateDirectory(args[1]);temporary=Path.Combine(args[1],"controlled-proof-fixtures");Directory.CreateDirectory(temporary);
         var fixtures=new List<SeatingFixture>();var performance=new List<object>();
         try
         {
@@ -31,7 +32,7 @@ internal static partial class ToolProfileTests
             var library=new ToolProfileLibrarySnapshot {Tools=CompanyToolIds.All.Select(id=>new CompanyToolProfile {Id=id,Parts=new ToolGeometryPart[0],Validation=new ToolProfileValidationResult()}).ToArray(),
                 PlacementSources=new PlacementSourceSnapshot("CONTROLLED_ALL_18_ASSEMBLY_BENCHMARK",fixtures.Select(f=>f.Assembly),null,new string[0])};
             foreach(var fixture in new[]{new {Name="Numeric18x3",Sources=1,Bends=3,Instances=1},new{Name="Numeric18x6",Sources=1,Bends=6,Instances=1},
-                new{Name="Numeric120x25",Sources=25,Bends=1,Instances=120}})
+                new{Name="Numeric120x25",Sources=25,Bends=1,Instances=120}}.Where(f=>args.Length==2||f.Name==args[2]))
             {
                 var sources=new List<AssemblySourceInput>();
                 for(int n=0;n<fixture.Sources;n++)
@@ -51,7 +52,12 @@ internal static partial class ToolProfileTests
                     calls+=sr.KernelQueries+pr.KernelQueries;reference.Add(new AssemblyPartResult(s.SourceKey,new[]{o},null,sr.Candidates,pr.Candidates,s.Model.Bends.Count,true,()=>null));
                 }
                 double baselineMs=clock.Elapsed.TotalMilliseconds;string expected=ResultFingerprint(reference);
-                Check(reference.All(p=>p.StaticCandidates.All(c=>c.CombinedResult!=CollisionStatus.UNKNOWN)&&p.ProcessCandidates.All(c=>c.ProcessResult!=CollisionStatus.UNKNOWN)),"Controlled benchmark must do complete real numeric work");
+                var unknownReasons=reference.SelectMany(p=>p.StaticCandidates.SelectMany(c=>c.PunchResult.Reasons.Concat(c.HolderResult.Reasons))
+                    .Concat(p.ProcessCandidates.SelectMany(c=>c.PairSegments.Where(q=>q.Status==CollisionStatus.UNKNOWN).SelectMany(q=>q.Reasons))))
+                    .GroupBy(r=>r).ToDictionary(g=>g.Key,g=>g.Count());
+                bool complete=reference.All(p=>p.StaticCandidates.All(c=>c.CombinedResult!=CollisionStatus.UNKNOWN)&&p.ProcessCandidates.All(c=>c.ProcessResult!=CollisionStatus.UNKNOWN));
+                if(!complete)performance.Add(new {Name=fixture.Name+"-incomplete-reference",WallMilliseconds=baselineMs,KernelQueries=calls,Reasons=unknownReasons});
+                Check(complete,"Controlled benchmark must do complete real numeric work");
                 performance.Add(new {Name=fixture.Name+"-independent-sequential",WallMilliseconds=baselineMs,KernelQueries=calls,Instances=fixture.Instances,UniqueGeometry=fixture.Sources,MaximumWorkers=1});
                 using(var c=new AssemblyBatchCoordinator())
                 {
@@ -66,7 +72,8 @@ internal static partial class ToolProfileTests
                 }
                 Console.WriteLine("ASSEMBLY_NUMERIC_BENCHMARK "+fixture.Name+" baselineMs="+baselineMs+" queries="+calls);
             }
-            File.WriteAllText(Path.Combine(args[1],"assembly-numeric-performance.json"),Json.Serialize(new {Result="PASS",Assertions=assertions,SimulationOnly=true,Performance=performance}));return 0;
+            File.WriteAllText(Path.Combine(args[1],"assembly-numeric-performance.json"),Json.Serialize(new {Result="PASS",Assertions=assertions,SimulationOnly=true,
+                Is64BitProcess=System.Environment.Is64BitProcess,ProcessorCount=System.Environment.ProcessorCount,Performance=performance}));return 0;
         }
         catch(Exception ex){File.WriteAllText(Path.Combine(args[1],"assembly-numeric-performance.json"),Json.Serialize(new {Result="FAIL",Error=ex.ToString(),Performance=performance}));Console.WriteLine(ex);return 1;}
         finally{foreach(var f in fixtures)f.Dispose();}

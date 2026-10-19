@@ -149,7 +149,7 @@ namespace ADDIN.Commands.BendAssembly
             return new AssemblyProgramUse(source, payload, false, v, v.RecordVerified);
         }
         internal bool CanShare(AssemblySourceInput source, string programDigest) => source.Reason==null && Current && PartLocal && SourceKey == source.SourceKey &&
-            PayloadSha256 == Payload(source.SourceKey, programDigest) && source.Occurrences.All(o => o.Kind == AssemblyOccurrenceKind.SheetMetal && o.GeometryShareable && o.RigidInstanceTransform && !o.Mirrored && !o.Modified && !o.Flexible && !o.Virtual);
+            PayloadSha256 == Payload(source.SourceKey, programDigest) && source.Occurrences.All(o => AssemblyOccurrenceEligibility.Reason(o) == null);
     }
     internal sealed class AssemblyBatchRequest
     {

@@ -1,5 +1,9 @@
 # Phase 4A.1 validation — 2026-10-18/19
 
+This file preserves the original `73a4566` validation history. The Windows
+follow-up to ChatGPT's `5f1e468` mixed-occurrence fix, additional defects and
+current observed results are in [Mixed Isolation validation](Validation-Phase4A1-MixedIsolation.md).
+
 Issue [#23](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/issues/23).
 Baseline PR #22, `6717848b734a032b6317155556ab6183c8d54042`.
 Branch `feature/check-chan-phase4a1-assembly-batch`; Draft target

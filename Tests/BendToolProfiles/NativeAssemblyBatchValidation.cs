@@ -48,6 +48,17 @@ internal static partial class NativeAssemblyBatchValidation
         {Call(op,"Pump",1);turns++;Application.DoEvents();Thread.Sleep(1);}
         Check(task.IsCompleted,"Native batch timeout: "+Get(op,"Diagnostic"));task.GetAwaiter().GetResult();var result=Get(op,"Result");
         wall=clock.Elapsed.TotalMilliseconds;sta=(double)Get(op,"MaximumStaCaptureMilliseconds");
+        if(!(bool)Get(result,"Current"))
+        {
+            var changes=new List<object>();var observed=Get(op,"revisions") as IDictionary;
+            if(observed!=null)foreach(DictionaryEntry entry in observed)
+            {
+                string path=(string)entry.Key;bool exists=File.Exists(path);
+                bool same=exists&&string.Equals(Sha(path).Replace("-",""),Convert.ToString(entry.Value),StringComparison.OrdinalIgnoreCase);
+                if(!same)changes.Add(new {Name=Path.GetFileName(path),Exists=exists,Changed=true});
+            }
+            Console.WriteLine("NATIVE_FRESHNESS_DIAGNOSTIC "+Json.Serialize(changes));
+        }
         Check((bool)Get(result,"Current"),"Native batch stale: "+Get(result,"InvalidReason")+" / "+Get(op,"Diagnostic"));
         Check(turns>0,"STA capture progresses via message-loop slices");return result;
     }
@@ -82,8 +93,8 @@ internal static partial class NativeAssemblyBatchValidation
         try
         {
             product=Assembly.LoadFrom(args[0]);string output=Path.GetFullPath(args[1]);Directory.CreateDirectory(output);
-            string seedHash=Sha(args[2]);int[] old=Process.GetProcessesByName("SLDWORKS").Select(p=>p.Id).ToArray();
-            app=(ISldWorks)Activator.CreateInstance(Type.GetTypeFromProgID("SldWorks.Application.32"));owned=!old.Contains(app.GetProcessID());Check(owned,"Must own new API process");app.Visible=false;app.UserControl=false;
+            string seedHash=Sha(args[2]);
+            app=NativeTestProcess.StartOwned(output);owned=true;Check(owned,"Own explicit native test process");app.Visible=false;app.UserControl=false;
             File.WriteAllText(Path.Combine(output,"ownership.json"),Json.Serialize(new {Owned=owned,Pid=app.GetProcessID(),StartUtc=Process.GetProcessById(app.GetProcessID()).StartTime.ToUniversalTime().ToString("o")}));
             string rootPath=Path.Combine(output,"GENERATED-120.SLDASM");
             if(!File.Exists(rootPath))
@@ -131,7 +142,7 @@ internal static partial class NativeAssemblyBatchValidation
             var leaves=(assembly.GetComponents(false) as object[]??new object[0]).OfType<Component2>().Where(c=>string.Equals(Path.GetExtension(c.GetPathName()),".SLDPRT",StringComparison.OrdinalIgnoreCase)).ToArray();
             Check(leaves.Length==120,"Actual native fixture has 120 leaf occurrences");
             if(System.Environment.GetEnvironmentVariable("ADDIN_ASSEMBLY_EDGE_ONLY")=="1")
-            {EdgeFixtures(app,root,args[4],output,disposable,report);report["Result"]="EDGE_ONLY_PASS";report["Assertions"]=assertions;File.WriteAllText(Path.Combine(output,"assembly-edge-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;}
+            {EdgeFixtures(app,root,args[4],output,disposable,report,Source(args[5],output));report["Result"]="EDGE_ONLY_PASS";report["Assertions"]=assertions;File.WriteAllText(Path.Combine(output,"assembly-edge-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;}
             var files=Directory.GetFiles(output,"*.SLDPRT").Concat(Directory.GetFiles(output,"*.SLDASM")).ToDictionary(p=>p,Sha);
             var beforeDocs=(app.GetDocuments() as object[]).OfType<ModelDoc2>().Where(d=>files.ContainsKey(d.GetPathName())).ToDictionary(d=>d.GetPathName(),d=>Json.Serialize(State(d)));
             var source=Source(args[5],output);root.ClearSelection2(true);var session=Session(app,root);disposable.Add((IDisposable)session);
@@ -209,6 +220,10 @@ internal static partial class NativeAssemblyBatchValidation
             var lw=Session(app,root);disposable.Add((IDisposable)lw);Call(lw,"BuildInventory",true);
             var lwRows=Items(Get(lw,"InventoryOccurrences"));Check(lwRows.Length==1&&Get(lwRows[0],"Kind").ToString()=="Lightweight","Actual lightweight metadata without GetModelDoc fallback");
             Check(edge.GetSuppression2()==light&&(int)Get(lw,"SelectiveResolveCount")==0,"Read-only LW scan preserves state");
+            var lwBatch=Run(lw,source,true,Options(2),out wall,out sta);
+            Check((int)Get(lwBatch,"Captures")==0&&Items(Get(lwBatch,"Parts")).Length==1&&
+                Get(Items(Get(lwBatch,"Parts"))[0],"GeometricStatus").ToString()=="UNKNOWN"&&edge.GetSuppression2()==light,
+                "Actual selected lightweight batch stays UNKNOWN without capture or automatic resolution");
             int restore=edge.SetSuppression2(oldState);report["LightweightProbe"]=new {SetReturn=set,Observed=light,RestoreReturn=restore,Restored=edge.GetSuppression2()==oldState,
                 StampBefore=stamp,StampAfter=root.GetUpdateStamp(),DirtyBefore=dirty,DirtyAfter=root.GetSaveFlag(),BackendResolveCount=0};
             edge.SetSuppression2(0);root.ClearSelection2(true);edge.Select4(false,null,false);var suppressed=Session(app,root);disposable.Add((IDisposable)suppressed);Call(suppressed,"BuildInventory",true);

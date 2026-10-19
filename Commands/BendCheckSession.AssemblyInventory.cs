@@ -39,6 +39,19 @@ namespace ADDIN.Commands
         private static double[] ComponentTransform(Component2 component)
         {return (component.GetTotalTransform(false)?.ArrayData as double[])??new double[0];}
         private static bool Rigid(double[] t) => AssemblyOccurrence.RigidTransform(t);
+        private static bool HasFlexibleAncestor(Component2 component)
+        {
+            // Selected roots may be descendants, so recursion alone cannot
+            // establish their inherited assembly context.
+            var parent=component.GetParent() as Component2;int depth=0;
+            while(parent!=null)
+            {
+                if(++depth>128)throw new InvalidOperationException("Unbounded assembly ancestry");
+                if(parent.Solving==(int)swComponentSolvingOption_e.swComponentFlexibleSolving)return true;
+                parent=parent.GetParent() as Component2;
+            }
+            return false;
+        }
         private static bool HasLiveExternalGeometry(ModelDoc2 model)
         {
             int count=model.Extension.ListExternalFileReferencesCount();if(count==0)return false;
@@ -57,7 +70,7 @@ namespace ADDIN.Commands
             string name=component.Name2,path=component.GetPathName(),config=component.ReferencedConfiguration;
             var parent=component.GetParent() as Component2;string parentId=parent==null?null:ComponentIdentity(parent);
             double[] transform=ComponentTransform(component);int suppression=component.GetSuppression2();
-            bool mirrored=component.IsMirrored(),virtualPart=component.IsVirtual,flexible=flexibleParent||component.Solving==(int)swComponentSolvingOption_e.swComponentFlexibleSolving;
+            bool mirrored=component.IsMirrored(),virtualPart=component.IsVirtual,flexible=flexibleParent||component.Solving==(int)swComponentSolvingOption_e.swComponentFlexibleSolving||HasFlexibleAncestor(component);
             string source=ToolEvidenceCanonical.Hash("AssemblySourcePathConfigV1",string.IsNullOrWhiteSpace(path)?id:path.ToUpperInvariant(),config);
             bool subassembly=string.Equals(Path.GetExtension(path),".SLDASM",StringComparison.OrdinalIgnoreCase);
             Func<AssemblyOccurrenceKind,bool,bool,string,AssemblyOccurrence> record=(entryKind,share,entryModified,why)=>new AssemblyOccurrence(id,parentId,name,source,config,transform,entryKind,share,mirrored,entryModified,virtualPart,flexible,why,subassembly);
@@ -137,6 +150,6 @@ namespace ADDIN.Commands
         }
         private string AssemblyComponentState(Component2 component) => ToolEvidenceCanonical.Hash(ComponentIdentity(component),component.GetSuppression2().ToString(),component.ReferencedConfiguration,
             ToolEvidenceCanonical.Hash(ComponentTransform(component).Select(ToolEvidenceCanonical.Number).ToArray()),
-            component.IsMirrored().ToString(),component.IsVirtual.ToString(),component.Solving.ToString());
+            component.IsMirrored().ToString(),component.IsVirtual.ToString(),component.Solving.ToString(),HasFlexibleAncestor(component).ToString());
     }
 }

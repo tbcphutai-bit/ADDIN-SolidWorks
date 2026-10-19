@@ -65,6 +65,12 @@ maximum interaction latency or move any COM access onto a worker.
   Additional Max/process restrictions live in `AssemblyBatchReason`, not in
   the Min error field. A source can therefore remain measurable by Check Min
   while Batch explicitly returns UNKNOWN for its unproven instance context.
+- A mixed Min group is partitioned into eligible occurrences and independent
+  blocked occurrences. The coordinator enforces this partition even for direct
+  managed callers. Both recursive and directly selected descendants inspect
+  native ancestor solving state; selecting a child cannot discard flexible
+  ancestry. Known bend inventories retain 18 static/process slots on blocked
+  occurrences, with no setup certificates transferred from normal siblings.
 - The unconditional bulk lightweight resolve was removed. Lightweight and
   unresolved subassembly branches are explicit UNKNOWN diagnostics. The
   backend performs **zero** automatic resolves; it cannot certify exact editor,
@@ -146,6 +152,12 @@ cannot be rebound to an old open Part: that session requires source reload/new
 session. Canceled/native-time-budget operations do not wait for unrelated file
 reads before producing a non-current result. A single COM call cannot be
 preempted; cancellation is cooperative at safe capture boundaries.
+
+Native file-proof dependencies comprise eligible captured source files, the
+host Assembly and the minimum workbook. An unsupported virtual occurrence's
+temporary side file cannot invalidate unrelated normal occurrences; that
+occurrence still returns UNKNOWN. Host/occurrence stamps, configuration, pose,
+ancestor solving state and required-source/tool/review guards remain checked.
 
 `AssemblyBatchSnapshot` retains component occurrences and source/configuration
 counts separately from analysis jobs, capture hits/reads, compiler/precheck,

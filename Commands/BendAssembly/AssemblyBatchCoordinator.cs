@@ -155,7 +155,11 @@ namespace ADDIN.Commands.BendAssembly
                 var reason=invalid();if(reason!=null)throw new CollisionAbort(reason);};
             if(!options.Valid)state.Stop("INVALID_ASSEMBLY_BATCH_POLICY");
             var jobs=new List<Tuple<AssemblySourceInput,AssemblyOccurrence[]>>();
-            foreach(var source in request.Sources)
+            // Native capture already partitions Min groups, but the managed API
+            // is callable independently. Enforce the same admission boundary
+            // here so a caller cannot bypass it with a mixed/unverified source.
+            foreach(var source in request.Sources.SelectMany(s=>AssemblyOccurrenceEligibility.Partition(s.SourceKey,s.Model,
+                s.Occurrences,s.Envelopes,s.Setups,s.Plans,s.ProgramUse,s.Reason,s.ConditionsRevision)))
             {
                 bool share=options.Deduplicate&&source.ProgramUse.CanShare(source,AssemblyCacheKeys.Program(source));
                 if(share)jobs.Add(Tuple.Create(source,source.Occurrences.ToArray()));
