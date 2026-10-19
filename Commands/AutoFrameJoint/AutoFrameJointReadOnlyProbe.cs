@@ -28,6 +28,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        // Retained as a convenience for callers without a native PMP.
+        // The PMP should instead call AnalyzePair with explicit marked A/B.
         public static string AnalyzeSelected(ISldWorks app)
         {
             try
@@ -42,14 +44,40 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 SelectionMgr mgr = assembly.SelectionManager as SelectionMgr;
                 if (mgr == null || mgr.GetSelectedObjectCount2(-1) != 2)
-                    return "NEEDS_SELECTION: Select EXACTLY two Part component occurrences in the Assembly.";
+                    return "NEEDS_SELECTION: Select exactly two Component occurrences.";
 
                 Component2 a = ResolveComponent(mgr, 1);
                 Component2 b = ResolveComponent(mgr, 2);
+                return AnalyzePair(app, a, b);
+            }
+            catch (Exception ex)
+            {
+                return "ERROR (no cut applied): " + ex.GetType().Name + ": " + ex.Message;
+            }
+        }
+
+        /// <summary>
+        /// Explicitly selected component occurrences. A/B order comes from
+        /// the PropertyManager selection marks, NOT global selection indices.
+        /// Read only: no Part/Assembly mutation or Feature Cut.
+        /// </summary>
+        public static string AnalyzePair(ISldWorks app, Component2 a, Component2 b)
+        {
+            try
+            {
+                if (app == null)
+                    return "UNAVAILABLE: ISldWorks reference is null.";
+
+                ModelDoc2 assembly = app.ActiveDoc as ModelDoc2;
+                if (assembly == null ||
+                    assembly.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
+                    return "UNSUPPORTED: Open an Assembly document first.";
+
                 if (a == null || b == null)
-                    return "NEEDS_SELECTION: Select components or faces belonging to two Parts.";
-                if (String.Equals(a.Name2, b.Name2, StringComparison.OrdinalIgnoreCase))
-                    return "NEEDS_SELECTION: The same component occurrence was selected twice.";
+                    return "NEEDS_SELECTION: Select Frame A and Frame B.";
+
+                if (app.IsSame(a, b) == (int)swObjectEquality.swObjectSame)
+                    return "NEEDS_SELECTION: Frame A and B must be distinct component occurrences.";
 
                 MathUtility math = app.GetMathUtility() as MathUtility;
                 if (math == null)
