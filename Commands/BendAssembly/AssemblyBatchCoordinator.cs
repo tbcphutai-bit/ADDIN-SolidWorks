@@ -8,6 +8,7 @@ using ADDIN.Commands.BendCollision;
 using ADDIN.Commands.BendEnvelope;
 using ADDIN.Commands.BendPlacement;
 using ADDIN.Commands.BendProcess;
+using ADDIN.Commands.BendPlanning;
 using ADDIN.Commands.BendTools;
 
 namespace ADDIN.Commands.BendAssembly
@@ -38,8 +39,14 @@ namespace ADDIN.Commands.BendAssembly
         public int Candidates { get; }
         public int WorkerThreadId { get; }
         public AssemblyPartResult ProvisionalPart { get; }
+        public string PlanningToolId { get; }
+        public int PlanningNodes { get; }
+        public int PlanningQueries { get; }
         internal AssemblyBatchProgress(int done,int total,int bends,int candidates,AssemblyPartResult part)
-        {CompletedParts=done;TotalParts=total;CompletedBends=bends;Candidates=candidates;ProvisionalPart=part;WorkerThreadId=Thread.CurrentThread.ManagedThreadId;}
+            : this(done,total,bends,candidates,part,null) { }
+        internal AssemblyBatchProgress(int done,int total,int bends,int candidates,AssemblyPartResult part,SequencePlanningProgress planning)
+        {CompletedParts=done;TotalParts=total;CompletedBends=bends;Candidates=candidates;ProvisionalPart=part;WorkerThreadId=Thread.CurrentThread.ManagedThreadId;
+            PlanningToolId=planning?.ToolId;PlanningNodes=planning?.VisitedNodes??0;PlanningQueries=planning?.KernelQueries??0;}
     }
     internal sealed class AssemblyBatchSnapshot
     {
@@ -76,6 +83,9 @@ namespace ADDIN.Commands.BendAssembly
         public double EnvelopeMilliseconds { get; }
         public double StaticMilliseconds { get; }
         public double ProcessMilliseconds { get; }
+        public double PlanningMilliseconds => Parts.Sum(p => p.Planning?.ElapsedMilliseconds ?? 0);
+        public int PlanningCacheHits => Parts.Sum(p => p.Planning?.CacheHits ?? 0);
+        public int PlanningCacheMisses => Parts.Sum(p => p.Planning?.CacheMisses ?? 0);
         public double NumericKernelMilliseconds { get; }
         public double PrecheckMilliseconds { get; }
         public int FastPrecheckOnlyJobs { get; }
@@ -122,12 +132,16 @@ namespace ADDIN.Commands.BendAssembly
     }
     internal sealed class AssemblyBatchCoordinator : IDisposable
     {
+        private sealed class PlannerProgress : IProgress<SequencePlanningProgress>
+        { private readonly Action<SequencePlanningProgress> report; internal PlannerProgress(Action<SequencePlanningProgress> report){this.report=report;}
+            public void Report(SequencePlanningProgress value)=>report(value); }
         private readonly AssemblyManagedCache<AssemblyGeometryBundle> geometry;
         private readonly AssemblyManagedCache<AssemblyStaticCertificate> statics;
         private readonly AssemblyManagedCache<AssemblyProcessCertificate> processes;
         private readonly AssemblyManagedCache<ToolProfileLibrarySnapshot> catalogs;
         private readonly object gate=new object();
         private readonly SemaphoreSlim workerSlots=new SemaphoreSlim(4,4);
+        private readonly PartSequencePlanner planner = new PartSequencePlanner();
         private int totalActiveWorkers;
         private CancellationTokenSource active;
         private CollisionBatchRunState activeState;
@@ -186,7 +200,7 @@ namespace ADDIN.Commands.BendAssembly
             // is callable independently. Enforce the same admission boundary
             // here so a caller cannot bypass it with a mixed/unverified source.
             foreach(var source in request.Sources.SelectMany(s=>AssemblyOccurrenceEligibility.Partition(s.SourceKey,s.Model,
-                s.Occurrences,s.Envelopes,s.Setups,s.Plans,s.ProgramUse,s.Reason,s.ConditionsRevision)))
+                s.Occurrences,s.Envelopes,s.Setups,s.Plans,s.ProgramUse,s.Reason,s.ConditionsRevision,s.Sequence,s.BendMetadata)))
             {
                 bool share=options.Deduplicate&&source.ProgramUse.CanShare(source,AssemblyCacheKeys.Program(source));
                 if(share)jobs.Add(Tuple.Create(source,source.Occurrences.ToArray()));
@@ -258,8 +272,14 @@ namespace ADDIN.Commands.BendAssembly
                                 restoredStatic=PlacementLists.Copy(restoredStatic.Select(r=>new VolumeCandidateCollisionResult(r.ToolId,r.FeatureId,r.PunchResult,r.HolderResult,true)));
                                 restoredProcess=PlacementLists.Copy(restoredProcess.Select(r=>new ProcessCandidateResult(r.ToolId,r.FeatureId,r.PairSegments,true)));
                             }
+                            PartPlanningResult planning;
+                            using(new CollisionTimingScope(ms=>{lock(progressGate)kernelMs+=ms;}))
+                                planning = planner.Run(ToolEvidenceCanonical.Hash(source.SourceKey, condition, source.ConditionsRevision),
+                                    source.Model, request.Library, source.Sequence, token: token, externalInvalid: readGuard.Check,
+                                    sharedInvalid: invalid, externalConsume: consume, progress: progress==null?null:new PlannerProgress(p=>{
+                                        lock(progressGate) progress.Report(new AssemblyBatchProgress(done,jobs.Count,bends,candidates,null,p)); }));
                             output[index]=new AssemblyPartResult(source.SourceKey,occurrences,null,restoredStatic,restoredProcess,source.Model.Bends.Count,
-                                source.Model.SimulationOnly||source.ProgramUse.SimulationOnly,readGuard.Check);
+                                source.Model.SimulationOnly||source.ProgramUse.SimulationOnly,readGuard.Check,planning,source.BendMetadata);
                         }
                     }
                     catch(OperationCanceledException){state.Stop("CANCELLED");output[index]=Unknown(source,occurrences,"CANCELLED",readGuard.Check);}
@@ -277,7 +297,7 @@ namespace ADDIN.Commands.BendAssembly
             Volatile.Write(ref executing,0);timer.Stop();
             long[] finish={geometry.Hits,geometry.Misses,statics.Hits,statics.Misses,processes.Hits,processes.Misses,catalogs.Hits,catalogs.Misses};
             return new AssemblyBatchSnapshot(request,state,output,timer.Elapsed.TotalMilliseconds,envelopeMs,staticMs,processMs,kernelMs,calls,peak,
-                finish.Zip(start,(a,b)=>a-b).ToArray(),geometry.Bytes+statics.Bytes+processes.Bytes+catalogs.Bytes,memory,diagnostic,fullInvalid,precheckMs,fastJobs,
+                finish.Zip(start,(a,b)=>a-b).ToArray(),geometry.Bytes+statics.Bytes+processes.Bytes+catalogs.Bytes+planner.CacheBytes,memory,diagnostic,fullInvalid,precheckMs,fastJobs,
                 processAudits,processSharedChecks,processAuditMs,readGuard);
         }
         private static AssemblyPartResult Unknown(AssemblySourceInput source,AssemblyOccurrence[] occurrences,string reason,Func<string> invalid)
@@ -290,12 +310,12 @@ namespace ADDIN.Commands.BendAssembly
                 processes.Add(new ProcessCandidateResult(id,bend.FeatureId,Enum.GetValues(typeof(BendProcessPhase)).Cast<BendProcessPhase>().SelectMany(phase=>
                     Enum.GetValues(typeof(CollisionPairKind)).Cast<CollisionPairKind>().Select(p=>new ProcessPairResult(p,"UNKNOWN:"+phase,phase,CollisionStatus.UNKNOWN,new[]{reason},invalid,null,0,0,0,0,0))),source.Model.SimulationOnly));
             }
-            return new AssemblyPartResult(source.SourceKey,occurrences,reason,statics,processes,source.Model?.Bends.Count??0,source.Model?.SimulationOnly==true||source.ProgramUse.SimulationOnly,invalid);
+            return new AssemblyPartResult(source.SourceKey,occurrences,reason,statics,processes,source.Model?.Bends.Count??0,source.Model?.SimulationOnly==true||source.ProgramUse.SimulationOnly,invalid,null,source.BendMetadata);
         }
         internal void Cancel()
         {lock(gate){activeState?.Stop("CANCELLED");published?.State.Stop("CANCELLED");active?.Cancel();statics.Clear();processes.Clear();}}
         public void Dispose()
         {lock(gate){if(disposed)return;disposed=true;generation++;activeState?.Stop("ASSEMBLY_COORDINATOR_DISPOSED");published?.State.Stop("ASSEMBLY_COORDINATOR_DISPOSED");active?.Cancel();
-            geometry.Clear();statics.Clear();processes.Clear();catalogs.Clear();}}
+            geometry.Clear();statics.Clear();processes.Clear();catalogs.Clear();planner.Dispose();}}
     }
 }

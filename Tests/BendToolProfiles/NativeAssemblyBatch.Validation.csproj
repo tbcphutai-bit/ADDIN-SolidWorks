@@ -13,6 +13,7 @@
     <Compile Include="NativeAssemblyBatchEdges.cs"/>
     <Compile Include="NativeAssemblyMixedTests.cs"/>
     <Compile Include="NativeAssemblyBatchUiValidation.cs"/>
+    <Compile Include="NativeUnifiedPartValidation.cs"/>
     <Compile Include="NativeAssemblyLargeUiValidation.cs"/>
     <Compile Include="NativeTestProcess.cs"/>
   </ItemGroup>

@@ -92,6 +92,9 @@ namespace ADDIN.Commands.BendEnvelope
         public IReadOnlyList<AxialSlice2D> ObservedSlices { get; }
         public IReadOnlyList<string> Reasons { get; }
         public string GeometrySha256 { get; }
+        // Same analytic solids in a registered frame, without a bend-specific
+        // capture ID. Used only for exact process endpoint continuity.
+        internal string ShapeSha256 { get; }
         public bool SimulationOnly { get; }
         public bool Current => Binding.Current;
         public AxialInterval Domain { get; }
@@ -109,6 +112,8 @@ namespace ADDIN.Commands.BendEnvelope
                 tier = EnvelopeCoverageTier.UnknownCoverage;
             Certificate = new EnvelopeCoverageCertificate(binding, tier, method, intervals, tolerance);
             GeometrySha256 = ToolEvidenceCanonical.Hash("SheetEnvelopeV1", binding.Canonical, tier.ToString(), method,
+                ToolEvidenceCanonical.Number(tolerance), ToolEvidenceCanonical.Hash(primitives.Select(p => p.Canonical).ToArray()));
+            ShapeSha256 = ToolEvidenceCanonical.Hash("SheetEnvelopeShapeV1", binding.FrameId, tier.ToString(), method,
                 ToolEvidenceCanonical.Number(tolerance), ToolEvidenceCanonical.Hash(primitives.Select(p => p.Canonical).ToArray()));
             ObservedSlices = PlacementLists.Copy(observations ?? (tier == EnvelopeCoverageTier.UnknownCoverage ? new AxialSlice2D[0] :
                 intervals.Select(i => Slice(i.MidMm)).ToArray()));

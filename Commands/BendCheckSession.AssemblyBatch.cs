@@ -10,6 +10,7 @@ using ADDIN.Commands.BendAssembly;
 using ADDIN.Commands.BendEnvelope;
 using ADDIN.Commands.BendPlacement;
 using ADDIN.Commands.BendProcess;
+using ADDIN.Commands.BendPlanning;
 using ADDIN.Commands.BendTools;
 
 namespace ADDIN.Commands
@@ -23,9 +24,12 @@ namespace ADDIN.Commands
         internal IEnumerable<BendProcessPlan> Plans { get; }
         internal AssemblyProgramUse Use { get; }
         internal string ConditionsRevision { get; }
+        internal PartSequenceSpace Sequence { get; }
+        internal AssemblyProgramData(IEnumerable<SheetEnvelopeCapture> envelopes, IEnumerable<ToolAxialSetupEvidence> setups,
+            IEnumerable<BendProcessPlan> plans, AssemblyProgramUse use, string revision) : this(envelopes, setups, plans, use, revision, null) { }
         internal AssemblyProgramData(IEnumerable<SheetEnvelopeCapture> envelopes=null, IEnumerable<ToolAxialSetupEvidence> setups=null,
-            IEnumerable<BendProcessPlan> plans=null, AssemblyProgramUse use=null, string revision=null)
-        { Envelopes=PlacementLists.Copy(envelopes); Setups=PlacementLists.Copy(setups); Plans=PlacementLists.Copy(plans); Use=use; ConditionsRevision=revision; }
+            IEnumerable<BendProcessPlan> plans=null, AssemblyProgramUse use=null, string revision=null, PartSequenceSpace sequence=null)
+        { Envelopes=PlacementLists.Copy(envelopes); Setups=PlacementLists.Copy(setups); Plans=PlacementLists.Copy(plans); Use=use; ConditionsRevision=revision; Sequence=sequence; }
     }
 
     internal sealed partial class BendCheckSession
@@ -57,16 +61,20 @@ namespace ADDIN.Commands
             IProgress<AssemblyBatchProgress> progress = null, Func<string,PlacementModelCapture,AssemblyProgramData> program = null)
         {
             RequireAssemblySta();
+            BendNativeCaptureDiagnostics.Stage("Assembly.Begin.entry");
             if (!IsAssembly) throw new InvalidOperationException("Assembly batch requires an Assembly document");
             if (!IsHostActive || IsAssemblyBackendEditing) throw new InvalidOperationException("Assembly must be active, rebuilt and outside component/sketch edit mode");
             PollAssemblyBackendCore(true);
+            BendNativeCaptureDiagnostics.Stage("Assembly.Begin.polled");
             bool selectedOnly = scope == AssemblyCheckScope.SelectedComponents;
             if (selectedOnly && !HasSelection) throw new InvalidOperationException("No selected components in the captured scope");
             var timer = Stopwatch.StartNew();
             bool reuse = assemblyInventorySelectedOnly == selectedOnly && CapturedAssemblyInputsCurrent();
             if (!reuse) BuildInventory(selectedOnly);
+            BendNativeCaptureDiagnostics.Stage("Assembly.Begin.inventory-complete");
             InvalidateAssemblyBackend();
             assemblySceneLease = new PlacementLease(); assemblyPoseState = AssemblyOccurrenceState();
+            BendNativeCaptureDiagnostics.Stage("Assembly.Begin.pose-audit-complete");
             assemblyOperation = new AssemblyNativeBatchOperation(this, minimumSource, scope, options ?? new AssemblyBatchOptions(),
                 assemblySceneLease, timer.Elapsed.TotalMilliseconds, token, progress, program);
             return assemblyOperation;
@@ -112,7 +120,7 @@ namespace ADDIN.Commands
             catch { InvalidateAssemblyBackend(); }
         }
         private void InvalidateAssemblyBackend()
-        { assemblySceneLease?.Invalidate(); assemblyOperation?.Invalidate(); }
+        { assemblySceneLease?.Invalidate(); assemblyOperation?.Invalidate(); partOperation?.Invalidate(); }
         private void DisposeAssemblyBackend()
         { InvalidateAssemblyBackend(); assemblyCoordinator.Dispose(); nativeInventoryReferences.Clear(); }
 
@@ -213,7 +221,7 @@ namespace ADDIN.Commands
                             // Min preserves its file/config grouping; Batch separates
                             // healthy occurrences and individual unsupported instances.
                             sources.AddRange(AssemblyOccurrenceEligibility.Partition(key,model,item.AssemblyOccurrences,
-                                data?.Envelopes,data?.Setups,data?.Plans,data?.Use,sourceReason,data?.ConditionsRevision));
+                                data?.Envelopes,data?.Setups,data?.Plans,data?.Use,sourceReason,data?.ConditionsRevision,data?.Sequence,ReadMinimumMetadata(item)));
                             captured++;
                         }
                         if (index<owner.Items.Count) return;
@@ -232,7 +240,7 @@ namespace ADDIN.Commands
                     {lease.Invalidate();Diagnostic="TOOL_SOURCES_CHANGED_BEFORE_PUBLICATION";}
                     owner.PollAssemblyBackendCore(true); Result=work.GetAwaiter().GetResult(); completion.TrySetResult(Result);
                 }
-                catch(Exception ex) { lease.Invalidate(); Diagnostic="ASSEMBLY_NATIVE_CAPTURE_FAILED:"+ex.GetType().Name; completion.TrySetException(ex); }
+                catch(Exception ex) { BendNativeCaptureDiagnostics.Failure(ex,"Assembly.NativePump"); lease.Invalidate(); Diagnostic="ASSEMBLY_NATIVE_CAPTURE_FAILED:"+ex.GetType().Name; completion.TrySetException(ex); }
             }
             internal void Invalidate() { lease.Invalidate(); }
             internal void Cancel() { lease.Invalidate();owner.assemblyCoordinator.Cancel();Diagnostic="CANCELLED"; }
@@ -251,7 +259,7 @@ namespace ADDIN.Commands
                 if (revisions.Any(p=>!current.ContainsKey(p.Key)||current[p.Key]!=p.Value))
                 { lease.Invalidate(); Diagnostic="SOURCE_FILE_CHANGED_DURING_OR_AFTER_BATCH"; }
             }
-            private static Task<Dictionary<string,string>> ReadFiles(string[] paths)
+            internal static Task<Dictionary<string,string>> ReadFiles(string[] paths)
             {
                 // This closure owns strings only, never owner/operation/COM.
                 var task=Task.Run(()=> {

@@ -6,6 +6,7 @@ using ADDIN.Commands.BendCollision;
 using ADDIN.Commands.BendEnvelope;
 using ADDIN.Commands.BendPlacement;
 using ADDIN.Commands.BendProcess;
+using ADDIN.Commands.BendPlanning;
 using ADDIN.Commands.BendTools;
 
 namespace ADDIN.Commands.BendAssembly
@@ -80,7 +81,7 @@ namespace ADDIN.Commands.BendAssembly
         internal static IReadOnlyList<AssemblySourceInput> Partition(string sourceKey, PlacementModelCapture model,
             IEnumerable<AssemblyOccurrence> occurrences, IEnumerable<SheetEnvelopeCapture> envelopes,
             IEnumerable<ToolAxialSetupEvidence> setups, IEnumerable<BendProcessPlan> plans, AssemblyProgramUse programUse,
-            string sourceReason, string conditionsRevision)
+            string sourceReason, string conditionsRevision, PartSequenceSpace sequence = null, IEnumerable<AssemblyBendMetadata> metadata = null)
         {
             var all = occurrences.ToArray();
             if (all.Length == 0) throw new InvalidOperationException("EMPTY_ASSEMBLY_SOURCE_GROUP");
@@ -88,7 +89,7 @@ namespace ADDIN.Commands.BendAssembly
             var output = new List<AssemblySourceInput>();
             if (eligible.Length > 0)
                 output.Add(new AssemblySourceInput(sourceKey, model, eligible, envelopes, setups, plans, programUse,
-                    sourceReason, conditionsRevision));
+                    sourceReason, conditionsRevision, sequence, metadata));
             foreach (var occurrence in all)
             {
                 string reason = Reason(occurrence);
@@ -110,16 +111,26 @@ namespace ADDIN.Commands.BendAssembly
         public IReadOnlyList<SheetEnvelopeCapture> Envelopes { get; }
         public IReadOnlyList<ToolAxialSetupEvidence> Setups { get; }
         public IReadOnlyList<BendProcessPlan> Plans { get; }
+        public PartSequenceSpace Sequence { get; }
+        public IReadOnlyList<AssemblyBendMetadata> BendMetadata { get; }
         public AssemblyProgramUse ProgramUse { get; }
         public string Reason { get; }
         public string ConditionsRevision { get; }
-        public bool Current => Model?.Lease.Current != false && Setups.All(s => s.Occupancy.Current) && Plans.All(p => p.InvalidatedReason == null) && ProgramUse.Current;
+        internal AssemblySourceInput(string sourceKey, PlacementModelCapture model, IEnumerable<AssemblyOccurrence> occurrences,
+            IEnumerable<SheetEnvelopeCapture> envelopes, IEnumerable<ToolAxialSetupEvidence> setups, IEnumerable<BendProcessPlan> plans,
+            AssemblyProgramUse use, string reason, string conditionsRevision)
+            : this(sourceKey, model, occurrences, envelopes, setups, plans, use, reason, conditionsRevision, null) { }
+        internal AssemblySourceInput(string sourceKey, PlacementModelCapture model, IEnumerable<AssemblyOccurrence> occurrences,
+            IEnumerable<SheetEnvelopeCapture> envelopes, IEnumerable<ToolAxialSetupEvidence> setups, IEnumerable<BendProcessPlan> plans,
+            AssemblyProgramUse use, string reason, string conditionsRevision, PartSequenceSpace sequence)
+            : this(sourceKey, model, occurrences, envelopes, setups, plans, use, reason, conditionsRevision, sequence, null) { }
+        public bool Current => Model?.Lease.Current != false && Setups.All(s => s.Occupancy.Current) && Plans.All(p => p.InvalidatedReason == null) && Sequence?.InvalidReason == null && ProgramUse.Current;
         internal AssemblySourceInput(string sourceKey, PlacementModelCapture model, IEnumerable<AssemblyOccurrence> occurrences,
             IEnumerable<SheetEnvelopeCapture> envelopes = null, IEnumerable<ToolAxialSetupEvidence> setups = null, IEnumerable<BendProcessPlan> plans = null,
-            AssemblyProgramUse use = null, string reason = null, string conditionsRevision = "")
+            AssemblyProgramUse use = null, string reason = null, string conditionsRevision = "", PartSequenceSpace sequence = null, IEnumerable<AssemblyBendMetadata> metadata = null)
         {
             SourceKey = sourceKey; Model = model; Occurrences = PlacementLists.Copy(occurrences); Envelopes = PlacementLists.Copy(envelopes);
-            Setups = PlacementLists.Copy(setups); Plans = PlacementLists.Copy(plans);
+            Setups = PlacementLists.Copy(setups); Plans = PlacementLists.Copy(plans); Sequence = sequence; BendMetadata = PlacementLists.Copy(metadata);
             Reason = reason ?? (Model!=null&&Occurrences.Any(o=>!string.Equals(o.Configuration,Model.Configuration,StringComparison.OrdinalIgnoreCase))?
                 "MISMATCHED_REFERENCED_CONFIGURATION":Occurrences.Select(o=>o.SourceIdentity).Distinct(StringComparer.Ordinal).Count()>1?"MIXED_SOURCE_IDENTITIES":null);
             ProgramUse = use ?? AssemblyProgramUse.PerOccurrence(); ConditionsRevision = conditionsRevision;
@@ -176,6 +187,8 @@ namespace ADDIN.Commands.BendAssembly
     {
         private readonly Func<string> invalid;
         public string SourceKey { get; }
+        public string OccurrenceSetKey => ToolEvidenceCanonical.Hash(SourceKey,
+            ToolEvidenceCanonical.Hash(Occurrences.Select(o => o.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray()));
         public IReadOnlyList<AssemblyOccurrence> Occurrences { get; }
         public int Quantity => Occurrences.Count;
         public string Reason { get; }
@@ -184,6 +197,8 @@ namespace ADDIN.Commands.BendAssembly
         public int BendCount { get; }
         public bool SimulationOnly { get; }
         public bool Current => invalid() == null;
+        public PartPlanningResult Planning { get; }
+        public IReadOnlyList<AssemblyBendMetadata> BendMetadata { get; }
         public string ManufacturingStatus => "CHUA_XAC_MINH";
         public string WinnerToolId => null;
         public CollisionStatus GeometricStatus => !Current ? CollisionStatus.UNKNOWN :
@@ -191,7 +206,13 @@ namespace ADDIN.Commands.BendAssembly
             ProcessCandidates.Count > 0 && ProcessCandidates.All(r => r.ProcessResult == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
         internal AssemblyPartResult(string source, IEnumerable<AssemblyOccurrence> occurrences, string reason, IEnumerable<VolumeCandidateCollisionResult> statics,
             IEnumerable<ProcessCandidateResult> processes, int bends, bool simulation, Func<string> invalid)
+            : this(source, occurrences, reason, statics, processes, bends, simulation, invalid, null) { }
+        internal AssemblyPartResult(string source, IEnumerable<AssemblyOccurrence> occurrences, string reason, IEnumerable<VolumeCandidateCollisionResult> statics,
+            IEnumerable<ProcessCandidateResult> processes, int bends, bool simulation, Func<string> invalid, PartPlanningResult planning)
+            : this(source, occurrences, reason, statics, processes, bends, simulation, invalid, planning, null) { }
+        internal AssemblyPartResult(string source, IEnumerable<AssemblyOccurrence> occurrences, string reason, IEnumerable<VolumeCandidateCollisionResult> statics,
+            IEnumerable<ProcessCandidateResult> processes, int bends, bool simulation, Func<string> invalid, PartPlanningResult planning = null, IEnumerable<AssemblyBendMetadata> metadata = null)
         { SourceKey = source; Occurrences = PlacementLists.Copy(occurrences); Reason = reason; StaticCandidates = PlacementLists.Copy(statics);
-            ProcessCandidates = PlacementLists.Copy(processes); BendCount = bends; SimulationOnly = simulation; this.invalid = invalid; }
+            ProcessCandidates = PlacementLists.Copy(processes); BendCount = bends; SimulationOnly = simulation; this.invalid = invalid; Planning = planning; BendMetadata = PlacementLists.Copy(metadata); }
     }
 }

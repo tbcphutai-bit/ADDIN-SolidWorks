@@ -67,6 +67,16 @@ namespace ADDIN.UI
         private bool isRunning;
         private bool isMockupMode;
         private bool bindingParts, bindingTools;
+        private readonly BendSequencePlanningControl sequenceView = new BendSequencePlanningControl();
+        private string preservePart, preserveTool;
+        private int? preserveFeature;
+        private readonly DataGridView phaseEvidence = new DataGridView();
+        private readonly Label pageLabel = new Label { AutoSize = true, Padding = new Padding(4, 5, 4, 0) };
+        private int partPage;
+        private const int PartsPerPage = 250;
+        private readonly DataGridView minimumEvidence = new DataGridView();
+        private readonly TextBox minimumDescription = new TextBox();
+        private Font bendActiveFont, bendNormalFont;
         internal BendAssemblyBatchTimings LastBindingTimings { get; private set; }
         internal bool IsPreview => isMockupMode;
         internal bool IsRunning => isRunning;
@@ -80,6 +90,9 @@ namespace ADDIN.UI
         {
             InitializeComponent();
             ApplyCustomStyling();
+            bendActiveFont = new Font(Font, FontStyle.Bold); bendNormalFont = new Font(Font, FontStyle.Regular);
+            Disposed += (s, e) => { bendActiveFont?.Dispose(); bendNormalFont?.Dispose(); };
+            AddPlanningNavigation();
             WireInternalEvents();
             toolTips.SetToolTip(lblHeaderSub, lblHeaderSub.Text);
             ClearLive("Chưa chạy. Chọn phạm vi rồi bấm Run Batch Check.");
@@ -97,6 +110,54 @@ namespace ADDIN.UI
         }
 
         #endregion
+
+        private void AddPlanningNavigation()
+        {
+            // Keep Antigravity's controls/layout intact within the existing
+            // window; add functional navigation around those controls.
+            var tabs = new TabControl { Name = "checkChanDetailTabs", Dock = DockStyle.Fill };
+            var bends = new TabPage("Nếp & 18 dao"); var plan = new TabPage("Dao & thứ tự"); var diagnostic = new TabPage("Chẩn đoán");
+            var minimum = new TabPage("Check Min");
+            minimumEvidence.Name = "batchMinimumEvidence"; minimumEvidence.Dock = DockStyle.Fill; minimumEvidence.ReadOnly = true;
+            minimumEvidence.AllowUserToAddRows = false; minimumEvidence.RowHeadersVisible = false; minimumEvidence.MultiSelect = false;
+            minimumEvidence.SelectionMode = DataGridViewSelectionMode.FullRowSelect; minimumEvidence.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            foreach (string heading in new[] { "FeatureId", "Kết quả Min", "Phía", "Dạng / mốc", "Phủ bì mm", "Min mm" })
+            { int i = minimumEvidence.Columns.Add("min" + minimumEvidence.Columns.Count, heading); minimumEvidence.Columns[i].MinimumWidth = 85; }
+            minimumDescription.Name = "batchMinimumDescription"; minimumDescription.Dock = DockStyle.Bottom; minimumDescription.Height = 95;
+            minimumDescription.Multiline = true; minimumDescription.ReadOnly = true; minimumDescription.ScrollBars = ScrollBars.Vertical;
+            minimum.Controls.Add(minimumEvidence); minimum.Controls.Add(minimumDescription);
+            minimumEvidence.CellClick += (s, e) => {
+                if (e.RowIndex < 0 || selectedPart?.RawPartResult?.Current != true || isMockupMode) return;
+                var metadata = minimumEvidence.Rows[e.RowIndex].Tag as AssemblyBendMetadata;
+                if (metadata != null) { minimumDescription.Text = metadata.MinimumDetails; BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SelectionKey, metadata.FeatureId)); }
+            };
+            splitMain.Panel2.Controls.Remove(splitDetails); bends.Controls.Add(splitDetails);
+            splitDetails.Panel2.Controls.Remove(pnlDiagnosticsCard); diagnostic.Controls.Add(pnlDiagnosticsCard);
+            pnlToolCallout.Dock = DockStyle.Top; pnlToolCallout.Height = 145;
+            colToolId.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; colToolId.MinimumWidth = 165;
+            colPunch.HeaderText = "Punch"; colHolder.HeaderText = "Holder"; colMotion.HeaderText = "Process"; colGeomStatus.HeaderText = "Static";
+            phaseEvidence.Name = "candidatePhaseEvidence"; phaseEvidence.Dock = DockStyle.Fill; phaseEvidence.ReadOnly = true;
+            phaseEvidence.AllowUserToAddRows = false; phaseEvidence.RowHeadersVisible = false; phaseEvidence.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            foreach (string heading in new[] { "Phase / cặp", "Kết quả", "Witness / lý do" })
+            { int column = phaseEvidence.Columns.Add("p" + phaseEvidence.Columns.Count, heading); phaseEvidence.Columns[column].MinimumWidth = 90; }
+            phaseEvidence.CellToolTipTextNeeded += (s, e) => { if (e.RowIndex >= 0 && e.ColumnIndex >= 0) e.ToolTipText = Convert.ToString(phaseEvidence[e.ColumnIndex, e.RowIndex].Value); };
+            splitDetails.Panel2.Controls.Add(phaseEvidence); phaseEvidence.BringToFront();
+            plan.Controls.Add(sequenceView); tabs.TabPages.AddRange(new[] { bends, plan, diagnostic, minimum }); splitMain.Panel2.Controls.Add(tabs);
+            sequenceView.FeatureSelected += (s, feature) => { if (!isMockupMode && selectedPart?.RawPartResult?.Current == true) BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SelectionKey, feature)); };
+            var pager = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false };
+            var previous = new Button { Name = "partsPagePrevious", Text = "‹", Width = 30 }; var next = new Button { Name = "partsPageNext", Text = "›", Width = 30 };
+            previous.Click += (s, e) => { if (partPage > 0) { partPage--; PopulatePartsGrid(); } };
+            next.Click += (s, e) => { if ((partPage + 1) * PartsPerPage < displayedParts.Count) { partPage++; PopulatePartsGrid(); } };
+            pager.Controls.AddRange(new Control[] { previous, pageLabel, next }); pnlPartsHeader.Controls.Add(pager);
+            pnlPartsHeader.Controls.Remove(btnToggleOccurrences); btnToggleOccurrences.Anchor = AnchorStyles.None;
+            btnToggleOccurrences.AutoSize = true; btnToggleOccurrences.Text = "Component"; pager.Controls.Add(btnToggleOccurrences);
+        }
+        internal void RecordDiagnostic(string message) => txtDiagnostics.AppendText("\r\n" + message);
+        internal void SetPartMode()
+        {
+            btnScopeEntire.Text = "Part hiện tại"; btnScopeSelected.Visible = false;
+            lblHeaderTitle.Text = "CHECK CHẤN · PART"; LayoutControlBar();
+        }
 
         #region DPI & Responsive Scaling
 
@@ -456,6 +517,7 @@ namespace ADDIN.UI
 
         internal void ClearLive(string message)
         {
+            if (selectedPart != null) { preservePart = selectedPart.SelectionKey; preserveFeature = selectedBend?.FeatureId; preserveTool = selectedTool?.ToolId; }
             LastBindingTimings = null;
             isMockupMode = false;
             badgeConcept.Text = "LIVE";
@@ -465,6 +527,7 @@ namespace ADDIN.UI
             currentSummary = BatchSummaryViewModel.CreateEmpty();
             currentSummary.Diagnostics.Add(message);
             allParts.Clear();
+            sequenceView.SetResult(null, false);
             ClearDetailSection();
             RenderSummary();
             ApplyPartFilters();
@@ -508,11 +571,13 @@ namespace ADDIN.UI
 
             currentSummary = projection.Summary;
             allParts = projection.Parts;
+            if (allParts.Count > 0 && allParts.All(p => p.RawPartResult?.SimulationOnly == true)) badgeConcept.Text = "SIMULATION";
             LastBindingTimings = new BendAssemblyBatchTimings
             {
                 NativeCaptureMilliseconds = snapshot.CaptureMilliseconds,
                 WorkerMilliseconds = snapshot.WorkerMilliseconds,
                 NumericSolverMilliseconds = snapshot.NumericKernelMilliseconds,
+                PlanningMilliseconds = snapshot.PlanningMilliseconds,
                 SnapshotValidationMilliseconds = projection.SnapshotValidationMilliseconds,
                 SnapshotCopyMilliseconds = projection.SnapshotCopyMilliseconds,
                 ViewModelMilliseconds = projection.ConversionMilliseconds
@@ -535,6 +600,7 @@ namespace ADDIN.UI
             currentSummary.ElapsedSeconds = runMilliseconds / 1000.0;
             var t = LastBindingTimings;
             txtDiagnostics.AppendText($"\r\n\r\nSnapshot validation: {t.SnapshotValidationMilliseconds:0.00} ms | Đọc kết quả: {t.SnapshotCopyMilliseconds:0.00} ms | ViewModel: {t.ViewModelMilliseconds:0.00} ms | Grid: {t.GridRenderingMilliseconds:0.00} ms | Run → hiển thị: {t.RunToVisibleMilliseconds:0.00} ms");
+            txtDiagnostics.AppendText($"\r\nPlanning (tổng worker): {t.PlanningMilliseconds:0.00} ms");
         }
 
         /// <summary>
@@ -559,6 +625,7 @@ namespace ADDIN.UI
             currentSummary.CompletionConfirmed = false;
 
             lblProgressTitle.Text = $"Đã xử lý {done} / {total} lượt ({progress.CompletedBends} nếp, {progress.Candidates} ứng viên); chờ backend xác nhận · {elapsedSeconds:0.0}s";
+            if (progress.PlanningToolId != null) lblProgressTitle.Text = $"Planning · {progress.PlanningToolId} · {progress.PlanningNodes} nodes · {progress.PlanningQueries} queries · {done}/{total} Part · {elapsedSeconds:0.0}s";
             lblProgressPercent.Text = $"{percent}%";
             pnlProgressBar.Invalidate();
         }
@@ -636,6 +703,7 @@ namespace ADDIN.UI
             search = (search ?? string.Empty).Trim().ToLowerInvariant();
 
             int filterIndex = cboStatusFilter.SelectedIndex;
+            partPage = 0;
 
             displayedParts = allParts.Where(p =>
             {
@@ -656,6 +724,9 @@ namespace ADDIN.UI
                 return true;
             }).ToList();
 
+            int previousIndex = displayedParts.FindIndex(p => p.SelectionKey == preservePart);
+            if (previousIndex >= 0) partPage = previousIndex / PartsPerPage;
+
             PopulatePartsGrid();
         }
 
@@ -665,7 +736,9 @@ namespace ADDIN.UI
             try
             {
             dgvParts.Rows.Clear();
-            foreach (var part in displayedParts)
+            partPage = Math.Min(partPage, Math.Max(0, (displayedParts.Count - 1) / PartsPerPage));
+            pageLabel.Text = (partPage + 1) + "/" + Math.Max(1, (int)Math.Ceiling(displayedParts.Count / (double)PartsPerPage));
+            foreach (var part in displayedParts.Skip(partPage * PartsPerPage).Take(PartsPerPage))
             {
                 int rowIndex = dgvParts.Rows.Add(
                     part.PartName,
@@ -682,8 +755,16 @@ namespace ADDIN.UI
 
             if (dgvParts.Rows.Count > 0)
             {
-                dgvParts.Rows[0].Selected = true;
-                selectedPart = dgvParts.Rows[0].Tag as BatchPartViewModel;
+                if (displayedParts.Count == 1 && splitMain.Height > 400)
+                {
+                    splitMain.Panel1MinSize = 110;
+                    splitMain.SplitterDistance = Math.Min(splitMain.SplitterDistance, Math.Max(110,
+                        pnlPartsHeader.Height + dgvParts.ColumnHeadersHeight + dgvParts.Rows[0].Height + 16));
+                }
+                var row = dgvParts.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => (r.Tag as BatchPartViewModel)?.SelectionKey == preservePart) ??
+                    dgvParts.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => (r.Tag as BatchPartViewModel)?.Status != CollisionStatus.CLEAR) ?? dgvParts.Rows[0];
+                dgvParts.CurrentCell = row.Cells[0]; row.Selected = true;
+                selectedPart = row.Tag as BatchPartViewModel;
                 RenderPartDetail(selectedPart);
             }
             else
@@ -707,15 +788,18 @@ namespace ADDIN.UI
 
         private void RenderPartDetail(BatchPartViewModel part)
         {
+            sequenceView.SetResult(part?.RawPartResult?.Planning, isMockupMode, part?.RawPartResult?.Reason ?? part?.Reason);
+            RenderMinimum(part);
             if (part == null || part.Bends == null || part.Bends.Count == 0)
             {
                 ClearDetailSection();
+                selectedPart = part; RenderMinimum(part);
                 return;
             }
 
             // Create bend selector pills
             pnlBendPills.SuspendLayout();
-            pnlBendPills.Controls.Clear();
+            ClearBendPills();
 
             BatchBendViewModel firstBend = null;
             foreach (var bend in part.Bends)
@@ -743,13 +827,36 @@ namespace ADDIN.UI
             }
             pnlBendPills.ResumeLayout(true);
 
-            SelectBend(firstBend);
+            SelectBend(part.Bends.FirstOrDefault(b => b.FeatureId == preserveFeature) ?? firstBend);
+        }
+
+        private void RenderMinimum(BatchPartViewModel part)
+        {
+            minimumEvidence.Rows.Clear(); minimumDescription.Text = "Chưa có kết quả Check Min của capture hiện tại.";
+            if (isMockupMode || part?.RawPartResult?.Current != true) return;
+            foreach (var bend in part.RawPartResult.BendMetadata)
+            {
+                string status = bend.MinimumStatus == "MeetsMinimum" ? "Đạt Min" : bend.MinimumStatus == "BelowMinimum" ? "NG Min" :
+                    bend.MinimumStatus == "GroovedAccepted" ? "Cạnh bào" : "Cần xác minh";
+                int sides = Math.Max(1, bend.Sides.Count);
+                for (int side = 0; side < sides; side++)
+                {
+                    var datum = bend.Sides.Count > side ? bend.Sides[side] : null;
+                    int row = minimumEvidence.Rows.Add(bend.FeatureId, status, side + 1, datum == null ? "—" : datum.Shape + "/" + datum.Dimension,
+                        datum?.ActualMm.ToString("0.###"), datum?.MinimumMm?.ToString("0.###") ?? "—");
+                    minimumEvidence.Rows[row].Tag = bend;
+                    foreach (DataGridViewCell cell in minimumEvidence.Rows[row].Cells) cell.ToolTipText = bend.Name + "\n" + bend.MinimumSummary;
+                }
+            }
+            minimumDescription.Text = "Kết quả từ Check Min hiện có · kích thước phủ bì · L→A, Z→B, C(U)→C. Chọn dòng để xem lý do và sáng nếp trên CAD.\r\n" +
+                string.Join("\r\n", part.RawPartResult.BendMetadata.Select(b => b.FeatureId + ": " + b.MinimumSummary));
         }
 
         private void SelectBend(BatchBendViewModel bend)
         {
             if (bend == null || selectedPart == null) return;
             selectedBend = bend;
+            preserveFeature = bend.FeatureId; preservePart = selectedPart.SelectionKey;
 
             lblDetailBendTitle.Text = $"{selectedPart.PartName} / {bend.BendName} · Góc: {bend.AngleDisplay} · R: {bend.RadiusDisplay}";
             toolTips.SetToolTip(lblDetailBendTitle, $"{selectedPart.PartName} / {bend.BendName} (FeatureId {bend.FeatureId})\nGóc chấn: {bend.AngleDisplay}\nBán kính: {bend.RadiusDisplay}\nTrạng thái: {bend.StatusDisplay}");
@@ -762,11 +869,11 @@ namespace ADDIN.UI
                 {
                     bool active = ReferenceEquals(mb.Tag, bend);
                     mb.Selected = active;
-                    mb.Font = new Font(mb.Font, active ? FontStyle.Bold : FontStyle.Regular);
+                    mb.Font = active ? bendActiveFont : bendNormalFont;
                 }
             }
 
-            if (!isMockupMode) BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SourceKey, bend.FeatureId));
+            if (!isMockupMode) BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SelectionKey, bend.FeatureId));
             PopulateToolsGrid(bend);
         }
 
@@ -805,7 +912,7 @@ namespace ADDIN.UI
                 for (int i = 0; i < dgvTools.Rows.Count; i++)
                 {
                     var cand = dgvTools.Rows[i].Tag as BatchToolCandidateViewModel;
-                    if (cand != null && cand.ToolId == "AMD-STD-004")
+                    if (cand != null && cand.ToolId == (preserveTool ?? "AMD-STD-004"))
                     {
                         defaultIndex = i;
                         break;
@@ -826,11 +933,17 @@ namespace ADDIN.UI
             if (tool == null) return;
 
             selectedTool = tool;
+            preserveTool = tool.ToolId;
             RenderToolCallout(tool);
         }
 
         private void RenderToolCallout(BatchToolCandidateViewModel tool)
         {
+            phaseEvidence.Rows.Clear();
+            foreach (var segment in tool.MotionSegments)
+                phaseEvidence.Rows.Add(segment.Phase + " / " + (segment.Pair == CollisionPairKind.WorkpiecePunch ? "Punch" : "Holder"), segment.Status,
+                    segment.Witness == null ? segment.Reason : "u=" + segment.Witness.Parameter.ToString("0.######") + " · " + segment.Witness.PartId +
+                    " · margin>" + segment.Witness.Geometry.CrossSectionInteriorMarginLowerMm.ToString("0.######") + " mm");
             lblCalloutTitle.Text = $"Chi tiết dao — {tool.ToolId}";
             lblCalloutPunch.Text = $"Punch – {tool.ToolId} : {tool.PunchStatusDisplay}";
             lblCalloutHolder.Text = $"Upper Holder : {tool.HolderStatusDisplay}";
@@ -846,6 +959,8 @@ namespace ADDIN.UI
             toolTips.SetToolTip(lblCalloutTitle, $"Ứng viên: {tool.ToolId} (FeatureId {tool.FeatureId})");
             toolTips.SetToolTip(lblCalloutPunch, $"Punch ({tool.ToolId}): {tool.PunchStatusDisplay}");
             toolTips.SetToolTip(lblCalloutHolder, $"Upper Holder: {tool.HolderStatusDisplay}");
+            toolTips.SetToolTip(lblCalloutPunch, $"Punch: {tool.PunchStatusDisplay} · clearance ≥ {tool.PunchClearanceMm} mm\n{tool.PunchReason}\nWitness: {tool.PunchWitness?.PointMm}");
+            toolTips.SetToolTip(lblCalloutHolder, $"Holder: {tool.HolderStatusDisplay} · clearance ≥ {tool.HolderClearanceMm} mm\n{tool.HolderReason}\nWitness: {tool.HolderWitness?.PointMm}");
             toolTips.SetToolTip(lblCalloutReason, $"Lý do / Bằng chứng:\n{tool.CombinedReason}");
         }
 
@@ -854,8 +969,10 @@ namespace ADDIN.UI
             selectedPart = null; selectedBend = null; selectedTool = null;
             lblDetailBendTitle.Text = "Chi tiết nếp chấn — Chưa chọn Part";
             toolTips.SetToolTip(lblDetailBendTitle, "Chọn một chi tiết bên trên để xem các nếp chấn.");
-            pnlBendPills.Controls.Clear();
+            ClearBendPills();
             dgvTools.Rows.Clear();
+            phaseEvidence.Rows.Clear();
+            minimumEvidence.Rows.Clear(); minimumDescription.Clear();
             lblCalloutTitle.Text = "Chi tiết dao đang chọn";
             lblCalloutPunch.Text = "Punch : —";
             lblCalloutHolder.Text = "Upper Holder : —";
@@ -863,6 +980,11 @@ namespace ADDIN.UI
             toolTips.SetToolTip(lblCalloutPunch, null);
             toolTips.SetToolTip(lblCalloutHolder, null);
             toolTips.SetToolTip(lblCalloutReason, null);
+        }
+        private void ClearBendPills()
+        {
+            foreach (Control control in pnlBendPills.Controls.Cast<Control>().ToArray()) control.Dispose();
+            pnlBendPills.Controls.Clear();
         }
 
         private void DgvParts_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)

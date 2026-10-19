@@ -25,6 +25,8 @@ namespace ADDIN.UI
         void CaptureSelection();
         void Invalidate();
     }
+    internal interface IBendBatchLocator
+    { bool Locate(AssemblyBatchSnapshot snapshot, string source, int feature); }
 
     internal sealed class BendAssemblyBatchController : IDisposable
     {
@@ -55,6 +57,7 @@ namespace ADDIN.UI
             form.RefreshRequested += RefreshRequested;
             form.PreviewRequested += PreviewRequested;
             form.ScopeChanged += ScopeChanged;
+            form.BendLocateRequested += LocateRequested;
             form.FormClosing += FormClosing;
             form.Disposed += FormDisposed;
             timer = new System.Windows.Forms.Timer { Interval = 50 };
@@ -64,6 +67,13 @@ namespace ADDIN.UI
         private void RequireSta()
         {
             if (Thread.CurrentThread.ManagedThreadId != staThread) throw new InvalidOperationException("Batch native calls must stay on the owning STA");
+        }
+        private void LocateRequested(object sender, Tuple<string, int> target)
+        {
+            RequireSta();
+            if (running || displayed?.Current != true || form.IsPreview) return;
+            try { (backend as IBendBatchLocator)?.Locate(displayed, target.Item1, target.Item2); }
+            catch (Exception ex) { form.RecordDiagnostic("CAD highlight: " + ex.GetType().Name + " — " + ex.Message); }
         }
         private async void RunRequested(object sender, AssemblyCheckScope scope) { await RunAsync(scope); }
         private async void RefreshRequested(object sender, EventArgs args)
@@ -273,6 +283,7 @@ namespace ADDIN.UI
             form.RefreshRequested -= RefreshRequested;
             form.PreviewRequested -= PreviewRequested;
             form.ScopeChanged -= ScopeChanged;
+            form.BendLocateRequested -= LocateRequested;
             form.FormClosing -= FormClosing;
             form.Disposed -= FormDisposed;
             if (!pumping) { DisposeBackend(); if (!running) dispatcher.Dispose(); }

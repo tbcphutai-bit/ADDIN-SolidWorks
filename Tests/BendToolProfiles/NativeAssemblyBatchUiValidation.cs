@@ -35,7 +35,9 @@ internal static partial class NativeAssemblyBatchValidation
             Check(bends.Select(b=>(int)Get(b,"FeatureId")).SequenceEqual(count==0?new int[0]:ids),"UI IDs match actual native backend FeatureIds");
             foreach(var bend in bends)
             {
-                Check(Get(bend,"AngleDeg")==null&&Get(bend,"RadiusMm")==null,"No native dimensions invented");
+                var metadata=Items(Get(raw,"BendMetadata")).SingleOrDefault(m=>(int)Get(m,"FeatureId")== (int)Get(bend,"FeatureId"));
+                Check(Equals(Get(bend,"AngleDeg"),metadata==null?null:Get(metadata,"AngleDeg"))&&
+                    Equals(Get(bend,"RadiusMm"),metadata==null?null:Get(metadata,"RadiusMm")),"UI dimensions match actual captured native metadata, never guessed");
                 var tools=Items(Get(bend,"ToolCandidates"));Check(tools.Length==18,"18 live tool slots per native bend");
                 Check(tools.All(t=>Get(t,"GeometricStatus").ToString()=="UNKNOWN"&&Get(t,"ProcessStatus").ToString()=="UNKNOWN"),
                     "No setup/process evidence means UNKNOWN, never CLEAR");
@@ -185,7 +187,7 @@ internal static partial class NativeAssemblyBatchValidation
         Activate(app,root);root.ClearSelection2(true);
         using(var owner=(Form)Activator.CreateInstance(product.GetType("ADDIN.UI.BendCheckForm",true),All,null,new object[]{app,root,null},null))
         {
-            owner.Show();var launch=UiControls(owner).OfType<Button>().Single(b=>b.Text=="Assembly Batch");launch.PerformClick();
+            owner.Show();var launch=UiControls(owner).OfType<Button>().Single(b=>b.Text=="Check chấn");launch.PerformClick();
             var form=(Form)Get(owner,"batchForm");var controller=Get(owner,"batchController");
             Check(form!=null&&controller!=null,"Assembly -> Check Chan -> Assembly Batch launches the live controller");
             UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));
@@ -195,7 +197,10 @@ internal static partial class NativeAssemblyBatchValidation
             report["LauncherWorkflow"]="PASS";
         }
     }
+    private static string generatedSeedDimension;
     private static ModelDoc2 UiSheet(ISldWorks app,string template,string path,int bends)
+        => UiSheet(app,template,path,bends,false);
+    private static ModelDoc2 UiSheet(ISldWorks app,string template,string path,int bends,bool dimensioned)
     {
         var doc=(ModelDoc2)app.NewDocument(template,0,0,0);Check(doc!=null,"Create private sheet fixture");
         Check(Plane(doc).Select2(false,0),"Select native sheet plane");doc.SketchManager.InsertSketch(true);
@@ -204,7 +209,17 @@ internal static partial class NativeAssemblyBatchValidation
         if(bends!=0&&bends!=3&&bends!=6)throw new ArgumentOutOfRangeException(nameof(bends));
         var xy=bends==0?new double[]{0,0,.05,0}:bends==3?new double[]{0,0,.05,0,.05,.03,.08,.03,.08,.06}:
             new double[]{0,0,.05,0,.05,.03,.08,.03,.08,.06,.11,.06,.11,.09,.14,.09};
-        for(int i=0;i+3<xy.Length;i+=2)doc.SketchManager.CreateLine(xy[i],xy[i+1],0,xy[i+2],xy[i+3],0);
+        SketchSegment firstLine=null;
+        for(int i=0;i+3<xy.Length;i+=2)
+        {var line=doc.SketchManager.CreateLine(xy[i],xy[i+1],0,xy[i+2],xy[i+3],0) as SketchSegment;if(firstLine==null)firstLine=line;}
+        if(dimensioned)
+        {
+            doc.ClearSelection2(true);Check(firstLine!=null&&firstLine.Select4(false,null),"Select fresh seed sketch segment");
+            var display=doc.AddDimension2(.025,-.01,0) as DisplayDimension;
+            Check(display!=null,"Explicit driving length on controlled seed only");
+            generatedSeedDimension=string.Join("@",((Dimension)display.GetDimension2(0)).FullName.Split('@').Take(2));
+            doc.ClearSelection2(true);
+        }
         doc.SketchManager.InsertSketch(true);Feature profile=null;
         for(var f=(Feature)doc.FirstFeature();f!=null;f=(Feature)f.GetNextFeature())if(f.GetTypeName2()=="ProfileFeature")profile=f;
         Check(profile!=null&&profile.Select2(false,0),"Select generated profile");

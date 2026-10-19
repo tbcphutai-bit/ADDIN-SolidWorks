@@ -12,6 +12,7 @@
     <Compile Include="..\..\UI\BendAssemblyBatchController.cs" />
     <Compile Include="..\..\UI\BendAssemblyBatchTimings.cs" />
     <Compile Include="..\..\UI\BendAssemblyBatchForm.cs" />
+    <Compile Include="..\..\UI\BendSequencePlanningControl.cs" />
     <Compile Include="..\..\UI\BendAssemblyBatchForm.Designer.cs" />
     <Compile Include="..\..\UI\TaiTheme.cs" /><Compile Include="..\..\UI\ModernButton.cs" />
     <Compile Include="..\..\UI\TaiIcons.cs" />

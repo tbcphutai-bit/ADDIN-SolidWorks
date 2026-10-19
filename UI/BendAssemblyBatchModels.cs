@@ -5,6 +5,7 @@ using System.Diagnostics;
 using ADDIN.Commands.BendAssembly;
 using ADDIN.Commands.BendCollision;
 using ADDIN.Commands.BendProcess;
+using ADDIN.Commands.BendEnvelope;
 using ADDIN.Commands.BendTools;
 
 namespace ADDIN.UI
@@ -25,6 +26,7 @@ namespace ADDIN.UI
         public string ManufacturingStatus => "CHƯA XÁC MINH";
         public string Reason { get; set; }
         public string SourceKey { get; set; }
+        public string SelectionKey => RawPartResult?.OccurrenceSetKey ?? SourceKey;
         public bool IsExpanded { get; set; }
         public List<BatchOccurrenceViewModel> Occurrences { get; set; } = new List<BatchOccurrenceViewModel>();
         public List<BatchBendViewModel> Bends { get; set; } = new List<BatchBendViewModel>();
@@ -81,6 +83,7 @@ namespace ADDIN.UI
         public CollisionStatus Status { get; set; }
         public string Reason { get; set; }
         public override string ToString() => $"{Phase} / {SegmentId} / {Pair}: {Status} — {Reason}";
+        public ProcessCollisionWitness Witness { get; set; }
     }
 
     /// <summary>
@@ -116,8 +119,7 @@ namespace ADDIN.UI
                     holder.Select(s => s.SegmentId).OrderBy(s => s, StringComparer.Ordinal));
             return complete && rows.All(s => s.Status == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
         }
-        public string MotionDisplay => string.Join("; ", Enum.GetValues(typeof(BendProcessPhase)).Cast<BendProcessPhase>()
-            .Select(p => p + ": " + PhaseStatus(p))) + " | Quá trình: " + ProcessStatus;
+        public string MotionDisplay => ProcessStatus.ToString();
         public string MotionDetail => MotionSegments.Count == 0 ? "Chưa có dữ liệu quá trình." :
             string.Join(Environment.NewLine, MotionSegments.Select(s => s.ToString()));
 
@@ -131,6 +133,8 @@ namespace ADDIN.UI
         public string PunchReason { get; set; }
         public string HolderReason { get; set; }
         public string CombinedReason { get; set; }
+        public AxialCollisionWitness PunchWitness { get; set; }
+        public AxialCollisionWitness HolderWitness { get; set; }
 
         public override string ToString() => $"{ToolId} - Punch: {PunchStatusDisplay}, Holder: {HolderStatusDisplay}, Geom: {GeometricStatusDisplay}";
     }
@@ -321,11 +325,14 @@ namespace ADDIN.UI
                 var processByFeature = part.ProcessCandidates.ToLookup(c => c.FeatureId);
                 foreach (int featureId in featureIds)
                 {
+                    var metadata = part.Source.BendMetadata.Where(b => b.FeatureId == featureId).ToArray();
+                    var native = metadata.Length == 1 ? metadata[0] : null;
                     var bendVm = new BatchBendViewModel
                     {
                         BendIndex = partVm.Bends.Count + 1,
-                        BendName = $"FeatureId {featureId}",
+                        BendName = native == null ? $"FeatureId {featureId}" : $"{native.Name} [{featureId}]",
                         FeatureId = featureId,
+                        AngleDeg = native?.AngleDeg, RadiusMm = native?.RadiusMm,
                         Status = CollisionStatus.UNKNOWN
                     };
 
@@ -351,6 +358,7 @@ namespace ADDIN.UI
                             GeometricStatus = geom,
                             PunchClearanceMm = staticCand?.PunchResult?.CertifiedClearanceLowerMm,
                             HolderClearanceMm = staticCand?.HolderResult?.CertifiedClearanceLowerMm,
+                            PunchWitness = staticCand?.PunchResult?.Witness, HolderWitness = staticCand?.HolderResult?.Witness,
                             PunchReason = staticCand?.PunchResult?.Reasons?.FirstOrDefault() ?? "chưa đủ bằng chứng mapping",
                             HolderReason = staticCand?.HolderResult?.Reasons?.FirstOrDefault() ?? "vị trí gá Holder chưa xác minh",
                             CombinedReason = !part.Current ? "SOURCE_INVALIDATED" : statics.Length > 1 || processes.Length > 1 ?
@@ -361,7 +369,7 @@ namespace ADDIN.UI
                             MotionSegments = procCand?.PairSegments.Select(s => new BatchMotionSegmentViewModel
                             {
                                 Phase = s.Phase, Pair = s.Pair, SegmentId = s.SegmentId,
-                                Status = s.Status, Reason = string.Join("; ", s.Reasons)
+                                Status = s.Status, Reason = string.Join("; ", s.Reasons), Witness = s.Witness
                             }).ToList() ?? new List<BatchMotionSegmentViewModel>()
                         };
                         toolVm.MotionPreBend = toolVm.PhaseStatus(BendProcessPhase.PreBend);

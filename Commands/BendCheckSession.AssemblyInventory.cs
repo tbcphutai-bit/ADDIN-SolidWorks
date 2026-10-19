@@ -65,6 +65,7 @@ namespace ADDIN.Commands
         }
         private void VisitAssemblyInventory(Component2 component,HashSet<string> visited,bool flexibleParent)
         {
+            BendNativeCaptureDiagnostics.Stage("Assembly.Inventory.visit." + visited.Count);
             RequireAssemblySta();string id=ComponentIdentity(component);if(!visited.Add(id))return;
             nativeInventoryReferences.Add(component);
             string name=component.Name2,path=component.GetPathName(),config=component.ReferencedConfiguration;
@@ -121,6 +122,7 @@ namespace ADDIN.Commands
                 }
                 catch(Exception ex){error="ASSEMBLY_BODY_PROOF_FAILED:"+ex.GetType().Name;kind=AssemblyOccurrenceKind.Unsupported;minimumError="Chưa đối chiếu body Assembly: "+ex.Message;}
             }
+            BendNativeCaptureDiagnostics.Stage("Assembly.Inventory.proof-complete." + visited.Count);
             var occurrence=record(kind,shareable,modified,error);InventoryOccurrences.Add(occurrence);
             AddAssemblyItem(component,model,path,config,id,occurrence,modified,error,minimumError);
         }

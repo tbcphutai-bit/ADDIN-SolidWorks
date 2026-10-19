@@ -12,6 +12,7 @@ using ADDIN.Commands.BendAssembly;
 using ADDIN.Commands.BendCollision;
 using ADDIN.Commands.BendEnvelope;
 using ADDIN.Commands.BendProcess;
+using ADDIN.Commands.BendPlanning;
 using ADDIN.Commands.BendTools;
 using ADDIN.UI;
 
@@ -273,16 +274,102 @@ internal static class BendAssemblyUiTests
     {
         Directory.CreateDirectory(output);
         foreach (float factor in new[] { 1f,1.25f,1.5f })
+        foreach (var size in new[] { new Size(1024,680), new Size(1264,821), new Size(1920,1080) })
         using (var form = new BendAssemblyBatchForm())
         {
-            form.Show(); form.Scale(new SizeF(factor,factor)); Application.DoEvents();
+            form.Show(); form.ClientSize=size; form.Scale(new SizeF(factor,factor)); Application.DoEvents();
             form.BindSnapshot(Snapshot(Part(3,new[] { Geometry(7),Geometry(42),Geometry(314) })), 1);
             Application.DoEvents();
             using (var bitmap = new Bitmap(form.Width,form.Height))
-            { form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size)); bitmap.Save(Path.Combine(output,"form-scale-"+(int)(factor*100)+".png")); }
+            { form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size)); bitmap.Save(Path.Combine(output,"form-"+size.Width+"-scale-"+(int)(factor*100)+".png")); }
             Console.WriteLine("LAYOUT_SCALE " + factor + " deviceDpi=" + form.DeviceDpi + " client=" + form.ClientSize);
             Check(Control(form,"btnRunBatch").Visible && Control(form,"dgvParts").Width>0 && Control(form,"dgvTools").Height>0,"Usable scaled controls");
+            var tabs=(TabControl)Control(form,"checkChanDetailTabs");
+            for(int tab=0;tab<tabs.TabPages.Count;tab++)
+            {
+                tabs.SelectedIndex=tab; Application.DoEvents();
+                Check(tabs.SelectedTab.ClientSize.Width>500 && tabs.SelectedTab.ClientSize.Height>100,"Each functional tab has usable scrollable viewport");
+            }
             form.Close();
+        }
+    }
+    private static void UnifiedNavigationTests()
+    {
+        Test("unified: real numeric planner -> 18 tools -> sequence -> native timeline -> independent phase witnesses", () => {
+            var fixture = ToolProfileTests.SequenceUiFixture();
+            var raw = new AssemblyPartResult("S", new[] { Occ() }, null, new[] { Geometry(7), Geometry(42) }, null, 2, true, () => null, fixture.Item1);
+            using (var form = new BendAssemblyBatchForm())
+            {
+                form.Show(); form.BindSnapshot(Snapshot(raw));
+                var tabs = (TabControl)Control(form, "checkChanDetailTabs"); tabs.SelectedIndex = 1; Application.DoEvents();
+                var tools = (DataGridView)Control(form, "sequenceTools"); var options = (DataGridView)Control(form, "sequenceOptions");
+                var timeline = (DataGridView)Control(form, "sequenceTimeline"); var phases = (DataGridView)Control(form, "sequencePhases");
+                Check(tools.Rows.Count == 18 && options.Rows.Count == 2, "Actual planner results bound lazily for one tool");
+                Check(options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "COLLISION") &&
+                    options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "CLEAR"), "Different orders and actual numeric statuses visible");
+                var clear = options.Rows.Cast<DataGridViewRow>().First(r => Convert.ToString(r.Cells[1].Value) == "CLEAR");
+                options.CurrentCell = clear.Cells[0];
+                Check(timeline.Rows.Count == 2 && Convert.ToInt32(timeline.Rows[0].Cells[1].Value) == 42 && phases.Rows.Count == 10, "Native timeline + five Punch/Holder phase pairs");
+                tabs.SelectedIndex = 0;
+                var pills = Control(form, "pnlBendPills").Controls.OfType<Button>().ToArray(); pills.Last().PerformClick();
+                var nativeTools = (DataGridView)Control(form, "dgvTools"); nativeTools.CurrentCell = nativeTools.Rows[5].Cells[0];
+                string tool = Convert.ToString(nativeTools.Rows[5].Cells[0].Value); form.BindSnapshot(Snapshot(raw));
+                Check(Control(form, "lblDetailBendTitle").Text.Contains("42") && Control(form, "lblCalloutTitle").Text.Contains(tool), "Part/Bend/Tool selection survives current identity refresh");
+                fixture.Item2.Lease.Invalidate(); form.ClearLive("STALE"); tabs.SelectedIndex = 1;
+                Check(options.Rows.Count == 0 && phases.Rows.Count == 0 && !tools.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[3].Value) == "Có chứng minh*"), "Stale proof withdrawn");
+                form.Close();
+            }
+        });
+        Test("unified: bounded large-Part grid and zero-bend Part mode", () => {
+            using (var form = new BendAssemblyBatchForm())
+            {
+                form.Show(); form.SetPartMode();
+                Check(Control(form, "btnScopeEntire").Text == "Part hiện tại" && !Control(form, "btnScopeSelected").Visible, "Single Part uses same window");
+                var parts = Enumerable.Range(0, 2000).Select(i => new BatchPartViewModel { SourceKey = "SOURCE" + i, PartName = "SAMPLE " + i,
+                    Configuration = "Default", Quantity = 1, Reason = "Missing data", Status = CollisionStatus.UNKNOWN }).ToList();
+                typeof(BendAssemblyBatchForm).GetField("allParts",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).SetValue(form,parts);
+                typeof(BendAssemblyBatchForm).GetMethod("ApplyPartFilters",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(form,null);
+                Check(RowCount(form) == 250, "2000 Parts do not populate 2000 display rows"); Click(form, "partsPageNext");
+                Check(Convert.ToString(((DataGridView)Control(form, "dgvParts")).Rows[0].Cells[0].Value) == "SAMPLE 250", "Paging retains stable Part records");
+                ((TextBox)Control(form,"txtSearch")).Text = "SAMPLE 1999";
+                Check(RowCount(form) == 1 && ((DataGridView)Control(form,"dgvTools")).Rows.Count == 0, "Search spans full dataset; zero bends invent nothing");
+                form.Close();
+            }
+        });
+        Test("unified: Check Min projection keeps native evaluator status and dimensions separate from Max", () => {
+            var metadata = new[] { new AssemblyBendMetadata(42, "PERSISTENT", "Native bend", 90, .1, "BelowMinimum", "B 10 < 17.1", "Existing evaluator result",
+                new[] { new AssemblyBendMinimumSide("Z", "B", 10, 17.1), new AssemblyBendMinimumSide("L", "A", 20, 12.5) }) };
+            var raw = new AssemblyPartResult("S",new[]{Occ()},null,new[]{Geometry(42)},null,1,true,()=>null,null,metadata);
+            using(var form = new BendAssemblyBatchForm())
+            {
+                form.Show(); form.BindSnapshot(Snapshot(raw));
+                var grid = (DataGridView)Control(form,"batchMinimumEvidence");
+                Check(grid.Rows.Count==2 && Convert.ToString(grid.Rows[0].Cells[1].Value)=="NG Min" && Convert.ToDouble(grid.Rows[0].Cells[4].Value)==10,
+                    "Exact Min result/outer dimension projected without recalculation");
+                Check(((DataGridView)Control(form,"dgvTools")).Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[4].Value).Contains("UNKNOWN")),
+                    "Min NG cannot invent a Max manufacturing verdict");
+                var unsupported = new AssemblyPartResult("S",new[]{Occ()},"MISSING_NATIVE_MAX_CAPTURE",null,null,0,false,()=>null,null,metadata);
+                form.BindSnapshot(Snapshot(unsupported));Check(grid.Rows.Count==2,"Optional Max capture failure does not hide existing Check Min dimensions");
+                form.ClearLive("STALE"); Check(grid.Rows.Count==0,"Withdraw stale Min display alongside managed Max display"); form.Close();
+            }
+        });
+    }
+    private static void RenderPlanner(string output)
+    {
+        Directory.CreateDirectory(output);var fixture=ToolProfileTests.SequenceUiFixture(6);var planner=fixture.Item1;
+        var raw=new AssemblyPartResult("S",new[]{Occ()},null,fixture.Item2.Bends.Select(b=>Geometry(b.FeatureId)),null,6,true,()=>null,planner);
+        using(var form=new BendAssemblyBatchForm("CONTROLLED SIMULATION","Synthetic"))
+        {
+            form.Show();var watch=Stopwatch.StartNew();form.BindSnapshot(Snapshot(raw));
+            var tabs=(TabControl)Control(form,"checkChanDetailTabs");tabs.SelectedIndex=1;Application.DoEvents();form.Update();
+            double visible=watch.Elapsed.TotalMilliseconds;var options=(DataGridView)Control(form,"sequenceOptions");
+            var clear=options.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Convert.ToString(r.Cells[1].Value)=="CLEAR");
+            if(clear!=null)options.CurrentCell=clear.Cells[0];
+            using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"simulation-sequence.png"));}
+            File.WriteAllText(Path.Combine(output,"planner-ui-timing.json"),new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new{
+                SimulationOnly=true,Bends=6,Tools=planner.Tools.Count,PlannerMilliseconds=planner.ElapsedMilliseconds,RenderToVisibleMilliseconds=visible,
+                NativeCaptureMilliseconds=0,KernelQueries=planner.KernelQueries,DeviceDpi=form.DeviceDpi}));
+            Console.WriteLine("PLANNER_UI 18x6 numeric; planner ms="+planner.ElapsedMilliseconds+" render ms="+visible);form.Close();
         }
     }
     [STAThread]
@@ -292,8 +379,8 @@ internal static class BendAssemblyUiTests
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             if(args.Length==2&&args[0]=="--benchmark-ui")return ToolProfileTests.UiReadBenchmark(args[1]);
-            ConverterTests(); FormTests();
-            if(args.Length==2 && args[0]=="--render") Render(args[1]);
+            ConverterTests(); FormTests(); UnifiedNavigationTests();
+            if(args.Length==2 && args[0]=="--render") { Render(args[1]); RenderPlanner(args[1]); }
             Console.WriteLine("RESULT " + groups + " groups; " + assertions + " assertions; 0 failures"); return 0;
         }
         catch(Exception ex) { Console.WriteLine("FAIL " + ex); return 1; }

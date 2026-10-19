@@ -221,6 +221,8 @@
     <Compile Include="Commands\BendCheckSession.cs" />
     <Compile Include="Commands\BendCheckSession.AssemblyInventory.cs" />
     <Compile Include="Commands\BendCheckSession.AssemblyBatch.cs" />
+    <Compile Include="Commands\BendCheckSession.PartBatch.cs" />
+    <Compile Include="Commands\BendNativeCaptureDiagnostics.cs" />
     <Compile Include="Commands\BendAssembly\*.cs" />
     <Compile Include="Commands\BendCollision\CollisionTimingScope.cs" />
     <Compile Include="Commands\BendCheckPlanningDraft.cs" />
@@ -255,6 +257,10 @@
     <Compile Include="Commands\BendProcess\ProcessCollisionEngine.cs" />
     <Compile Include="Commands\BendProcess\ProcessPerformance.cs" />
     <Compile Include="Commands\BendProcess\ProcessBatchWorker.cs" />
+    <Compile Include="Commands\BendPlanning\SequenceEvidence.cs" />
+    <Compile Include="Commands\BendAssembly\AssemblyBendMetadata.cs" />
+    <Compile Include="Commands\BendPlanning\SequencePlanningModels.cs" />
+    <Compile Include="Commands\BendPlanning\PartSequencePlanner.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolDxfReader.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileLibrary.cs" />
@@ -279,6 +285,7 @@
     <Compile Include="UI\BendAssemblyBatchForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="UI\BendSequencePlanningControl.cs" />
     <Compile Include="UI\BendAssemblyBatchForm.Designer.cs">
       <DependentUpon>BendAssemblyBatchForm.cs</DependentUpon>
     </Compile>

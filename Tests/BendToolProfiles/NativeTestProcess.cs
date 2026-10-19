@@ -13,6 +13,7 @@ using Environment=System.Environment;
 // instance. Start our own executable and bind ONLY its exact ROT PID instead.
 internal static class NativeTestProcess
 {
+    private static Process ownedServer;
     [StructLayout(LayoutKind.Sequential)] private struct NativeMessage
     { public IntPtr Window; public uint Message; public UIntPtr WParam; public IntPtr LParam; public uint Time; public int X,Y; public uint Private; }
     [DllImport("user32.dll")] private static extern bool PeekMessage(out NativeMessage message,IntPtr window,uint first,uint last,uint remove);
@@ -35,6 +36,7 @@ internal static class NativeTestProcess
         if(!File.Exists(executable))throw new FileNotFoundException("Set ADDIN_NATIVE_SOLIDWORKS_EXE to the installed executable");
         var process=Process.Start(new ProcessStartInfo(executable){UseShellExecute=false,WindowStyle=ProcessWindowStyle.Hidden,
             RedirectStandardOutput=true,RedirectStandardError=true});
+        ownedServer=process;
         // Drain owned server diagnostics without inheriting the harness pipes.
         // A lingering server must not make a finished test look still running.
         process.OutputDataReceived+=(s,e)=>{};process.ErrorDataReceived+=(s,e)=>{};
@@ -49,6 +51,17 @@ internal static class NativeTestProcess
             PumpMessages();Thread.Sleep(50);
         }
         throw new InvalidOperationException("Owned SOLIDWORKS PID did not register; no fallback to another session");
+    }
+    // Keep the original Process handle: never inspect/close an unrelated PID
+    // that Windows might reuse. A successful assertion run is not evidence of
+    // a clean server shutdown (native heap corruption may occur in ExitApp).
+    internal static int? WaitForOwnedExit(int milliseconds)
+    {
+        if(ownedServer==null)return null;
+        var clock=Stopwatch.StartNew();
+        while(!ownedServer.HasExited&&clock.ElapsedMilliseconds<milliseconds)
+        {PumpMessages();Thread.Sleep(20);}
+        return ownedServer.HasExited?(int?)ownedServer.ExitCode:null;
     }
     private static ISldWorks Find(int pid)
     {
