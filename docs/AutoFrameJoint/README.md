@@ -43,3 +43,9 @@
 
 ## Prototype C# đọc Assembly (Phase 2A, chưa cắt)
 Xem [13_READONLY_PROBE_INSTRUCTIONS.md](13_READONLY_PROBE_INSTRUCTIONS.md). Mã nguồn `Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs` đã được đưa vào `ADDIN.csproj`, nhưng chưa có button/TaskPane để gọi; cần xác minh Build và SOLIDWORKS COM tại máy người dùng. Không tạo Feature hoặc sửa Part.
+
+## Antigravity UI/UX (preview-first)
+- [14_ANTIGRAVITY_UIUX_PLAN.md](14_ANTIGRAVITY_UIUX_PLAN.md) — 3 màn hình cụ thể và yêu cầu đẹp/dễ dùng theo TaiTheme.
+- [15_COPILOT_AUDIT_ANTIGRAVITY_HANDOFF.md](15_COPILOT_AUDIT_ANTIGRAVITY_HANDOFF.md) — xác minh code Copilot local, bảo vệ file và giao việc Anti.
+- [16_ANTIGRAVITY_UI_CODE_CONTRACT.md](16_ANTIGRAVITY_UI_CODE_CONTRACT.md) — DTO/control/event mẫu WinForms C# 7.3 sau khi UI được duyệt.
+Không thay đổi WinForms thật trước khi người dùng duyệt Preview từng tab.
