@@ -262,6 +262,7 @@
     <Compile Include="Commands\BendPlanning\SequencePlanningModels.cs" />
     <Compile Include="Commands\BendPlanning\PartSequencePlanner.cs" />
     <Compile Include="Commands\BendPlanning\ProcessPackageRecords.cs" />
+    <Compile Include="Commands\BendPlanning\CadReferenceSimulation.cs" />
     <Compile Include="Commands\BendPlanning\ProcessPackageImporter.cs" />
     <Compile Include="Commands\BendPlanning\ProcessProgramProvider.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
@@ -273,6 +274,7 @@
     <Compile Include="Commands\BendPlacement\BendPlacementMath.cs" />
     <Compile Include="Commands\BendPlacement\BendPlacementModels.cs" />
     <Compile Include="Commands\BendPlacement\BendMasterAssemblyReader.cs" />
+    <Compile Include="Commands\BendPlacement\CompanyCadPairs.cs" />
     <Compile Include="Commands\BendPlacement\BendLimitWorkbookReader.cs" />
     <Compile Include="Commands\BendPlacement\BendPlacementSources.cs" />
     <Compile Include="Commands\BendPlacement\BendSheetSection.cs" />

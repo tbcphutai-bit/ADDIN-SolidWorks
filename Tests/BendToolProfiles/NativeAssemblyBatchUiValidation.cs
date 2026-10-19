@@ -24,6 +24,7 @@ internal static partial class NativeAssemblyBatchValidation
     private static object[] UiParts(Form form) => ((DataGridView)UiControl(form,"dgvParts")).Rows.Cast<DataGridViewRow>().Select(r=>r.Tag).ToArray();
     private static void UiCheckBindings(Form form,object snapshot)
     {
+        CheckCompanyCadPairs(snapshot);
         var actual=UiParts(form);var expected=Items(Get(snapshot,"Parts"));
         Check(actual.Length==expected.Length,"UI has exactly the current backend analysis rows");
         foreach(var part in actual)
@@ -39,6 +40,9 @@ internal static partial class NativeAssemblyBatchValidation
                 Check(Equals(Get(bend,"AngleDeg"),metadata==null?null:Get(metadata,"AngleDeg"))&&
                     Equals(Get(bend,"RadiusMm"),metadata==null?null:Get(metadata,"RadiusMm")),"UI dimensions match actual captured native metadata, never guessed");
                 var tools=Items(Get(bend,"ToolCandidates"));Check(tools.Length==18,"18 live tool slots per native bend");
+                if(System.Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")=="1")
+                    Check(tools.All(t=>Get(t,"CadAssembly")!=null&&Equals(Get(Get(t,"CadAssembly"),"Id"),Get(t,"ToolId"))&&
+                        (bool)Get(Get(Get(t,"CadAssembly"),"CadPair"),"Matched")),"Live native candidates retain their fixed CAD pair and ToolId");
                 Check(tools.All(t=>Get(t,"GeometricStatus").ToString()=="UNKNOWN"&&Get(t,"ProcessStatus").ToString()=="UNKNOWN"),
                     "No setup/process evidence means UNKNOWN, never CLEAR");
             }
@@ -59,6 +63,15 @@ internal static partial class NativeAssemblyBatchValidation
             if(pills.Length==0)Check(((DataGridView)UiControl(form,"dgvTools")).Rows.Count==0,"Zero-bend visible Part has no fictional tools");
         }
         Check(UiControl(form,"lblDisclaimer").Text.Contains("CHƯA XÁC MINH"),"Live manufacturing disclaimer");
+    }
+    private static void CheckCompanyCadPairs(object snapshot)
+    {
+        if(System.Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")!="1")return;
+        var pairs=Items(Get(snapshot,"ToolPairs"));
+        Check(pairs.Length==18&&pairs.All(p=>(bool)Get(p,"MappingIdentified")&&(bool)Get(Get(p,"CadPair"),"Matched")),"Native backend uses all 18 company CAD pairs");
+        Check(pairs.All(p=>!(bool)Get(p,"ClampVerified")&&Get(Get(p,"SeatingEvidence"),"TipPointMm")==null),"Native CAD reference does not certify datum/seating");
+        Check(pairs.Select(p=>Get(Get(p,"CadPair"),"PunchInsert")).Distinct().Count()==18&&pairs.Select(p=>Get(Get(p,"CadPair"),"HolderInsert")).Distinct().Count()==18,
+            "Native source has 18 unique Punch and 18 unique Holder instances");
     }
     private static void ExerciseNativeUi(ISldWorks app,ModelDoc2 root,object source,string output,Component2 selected,
         Dictionary<string,object> report,string label)

@@ -7,6 +7,7 @@ using ADDIN.Commands.BendCollision;
 using ADDIN.Commands.BendProcess;
 using ADDIN.Commands.BendEnvelope;
 using ADDIN.Commands.BendTools;
+using ADDIN.Commands.BendPlacement;
 
 namespace ADDIN.UI
 {
@@ -91,6 +92,7 @@ namespace ADDIN.UI
     /// </summary>
     internal sealed class BatchToolCandidateViewModel
     {
+        public ToolAssemblyProfile CadAssembly { get; set; }
         public string ToolId { get; set; }
         public int FeatureId { get; set; }
         public CollisionStatus PunchStatus { get; set; }
@@ -351,6 +353,7 @@ namespace ADDIN.UI
 
                         var toolVm = new BatchToolCandidateViewModel
                         {
+                            CadAssembly = read.ToolPairs.SingleOrDefault(p=>p.Id==toolId),
                             ToolId = toolId,
                             FeatureId = featureId,
                             PunchStatus = punch,

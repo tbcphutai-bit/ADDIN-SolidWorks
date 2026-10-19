@@ -72,15 +72,17 @@ namespace ADDIN.Commands.BendPlacement
         public HolderObstacleSet HolderObstacles { get; }
         public ToolPairSeatingEvidence SeatingEvidence { get; }
         public ToolReviewValidation MappingReview { get; }
+        public CadPairBinding CadPair { get; }
+        public ToolProfileProvenance Source { get; }
         public bool GeometryCheckReady => MappingIdentified&&MappingReview.RecordVerified&&HolderObstacles?.GeometrySupportedForCollision==true&&
             Punch.Supported&&Punch.ObservedClosed&&Punch.Region.IsValidRegion&&Punch.Region.MaximumJointGapMm<=1e-10&&SeatingEvidence.CoordinateRecordReady;
         public bool ClampVerified => GeometryCheckReady&&SeatingEvidence.PhysicalInspectionAccepted&&MappingReview.Status==ToolReviewStatus.VerifiedExternalRecord;
         public bool PhysicalPairVerified => ClampVerified;
         public IReadOnlyList<string> Reasons { get; }
         internal ToolAssemblyProfile(string id,string sha,string manifest,GeometrySelection2D punch,GeometrySelection2D holder,ToolDatumSet datums,bool mapped,IEnumerable<string> reasons,
-            HolderObstacleSet obstacle=null,ToolPairSeatingEvidence seating=null,ToolReviewValidation mappingReview=null)
+            HolderObstacleSet obstacle=null,ToolPairSeatingEvidence seating=null,ToolReviewValidation mappingReview=null,CadPairBinding cadPair=null,ToolProfileProvenance source=null)
         {Id=id;MasterSha256=sha;ManifestSha256=manifest;Punch=punch;Holder=holder;MasterDatums=datums;IdentityMatched=mapped;Reasons=PlacementLists.Reasons(reasons);
-            HolderObstacles=obstacle;SeatingEvidence=seating??ToolPairSeatingEvidence.Missing(datums);MappingReview=mappingReview??ToolReviewValidation.Missing("MAPPING_SELECTION_UNREVIEWED");}
+            HolderObstacles=obstacle;SeatingEvidence=seating??ToolPairSeatingEvidence.Missing(datums);MappingReview=mappingReview??ToolReviewValidation.Missing("MAPPING_SELECTION_UNREVIEWED");CadPair=cadPair;Source=source;}
         internal void Invalidate(){MasterDatums?.Invalidate();HolderObstacles?.Invalidate();SeatingEvidence.Invalidate();MappingReview.Invalidate();}
     }
     internal enum BendLimitKind { MaxBendLength, DeepBendClearanceExample }

@@ -12,6 +12,17 @@ namespace ADDIN.Commands.BendTools
     {
         internal ToolProfileProvenance Source;
         internal readonly List<ToolDxfEntity> Entities=new List<ToolDxfEntity>();
+        internal readonly List<ToolDxfRootInsert> RootInserts=new List<ToolDxfRootInsert>();
+    }
+
+    // Source presentation identity only. The transform is the DXF transform,
+    // including units and block base; it is never a machine/seating datum.
+    internal sealed class ToolDxfRootInsert
+    {
+        internal string Handle, Block, Layer;
+        internal int Rows, Columns;
+        internal ToolTransform Transform;
+        internal ToolPoint PresentationAnchorMm;
     }
 
     // A deliberately bounded analytic reader, independent of the DXF-check
@@ -96,7 +107,7 @@ namespace ADDIN.Commands.BendTools
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is InvalidDataException || ex is ArgumentException || ex is DecoderFallbackException || ex is OverflowException)
-            { source.Error=ex.Message; doc.Entities.Clear(); }
+            { source.Error=ex.Message; doc.Entities.Clear(); doc.RootInserts.Clear(); }
             return doc;
         }
 
@@ -227,6 +238,8 @@ namespace ADDIN.Commands.BendTools
                                     .Then(new ToolTransform(1,0,0,1,col*record.Number(44),row*record.Number(45)))
                                     .Then(new ToolTransform(sx,0,0,sy))
                                     .Then(new ToolTransform(1,0,0,1,-basePoint.X,-basePoint.Y));
+                                if(names.Count==0)doc.RootInserts.Add(new ToolDxfRootInsert {Handle=record.Text(5),Block=name,Layer=entity.Layer,
+                                    Rows=rows,Columns=columns,Transform=matrix.Then(local),PresentationAnchorMm=matrix.Apply(ocs.Apply(insertion))});
                                 Expand(block.Entities,blocks,matrix.Then(local),entity.Layer,childNames,
                                     path+"/"+record.Index+":"+record.Text(5)+":"+name+"["+col+","+row+"]",visiting,doc,cancellation);
                             }

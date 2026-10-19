@@ -940,13 +940,20 @@ namespace ADDIN.UI
         private void RenderToolCallout(BatchToolCandidateViewModel tool)
         {
             phaseEvidence.Rows.Clear();
+            var cad=tool.CadAssembly?.CadPair;
+            if(cad!=null)
+            {
+                phaseEvidence.Rows.Add("CAD / Punch",cad.Status,cad.PunchBlock+" · INSERT "+cad.PunchInsert+" · "+string.Join(", ",cad.PunchLayers));
+                phaseEvidence.Rows.Add("CAD / Holder",cad.Status,cad.HolderBlock+" · INSERT "+cad.HolderInsert+" · "+string.Join(", ",cad.HolderLayers));
+                phaseEvidence.Rows.Add("CAD / Gá", "UNKNOWN", "Tọa độ trình bày; datum, seating và chiều dài làm việc cần bằng chứng riêng.");
+            }
             foreach (var segment in tool.MotionSegments)
                 phaseEvidence.Rows.Add(segment.Phase + " / " + (segment.Pair == CollisionPairKind.WorkpiecePunch ? "Punch" : "Holder"), segment.Status,
                     segment.Witness == null ? segment.Reason : "u=" + segment.Witness.Parameter.ToString("0.######") + " · " + segment.Witness.PartId +
                     " · margin>" + segment.Witness.Geometry.CrossSectionInteriorMarginLowerMm.ToString("0.######") + " mm");
             lblCalloutTitle.Text = $"Chi tiết dao — {tool.ToolId}";
             lblCalloutPunch.Text = $"Punch – {tool.ToolId} : {tool.PunchStatusDisplay}";
-            lblCalloutHolder.Text = $"Upper Holder : {tool.HolderStatusDisplay}";
+            lblCalloutHolder.Text = $"Upper Holder : {tool.HolderStatusDisplay}"+(cad?.Matched==true?" · CAD reference":"");
             lblCalloutReason.Text = $"Lý do: {tool.CombinedReason}";
 
             // Color coding
@@ -957,6 +964,7 @@ namespace ADDIN.UI
                                         tool.HolderStatus == CollisionStatus.CLEAR ? TaiTheme.Success : Color.FromArgb(51, 65, 85);
 
             toolTips.SetToolTip(lblCalloutTitle, $"Ứng viên: {tool.ToolId} (FeatureId {tool.FeatureId})");
+            if(cad!=null)toolTips.SetToolTip(lblCalloutTitle, $"{tool.ToolId} · ô {cad.SlotId} · {cad.Status}\nDXF SHA256: {cad.SourceSha256}\n{cad.CoordinateSystem}\n{cad.EvidenceReference}");
             toolTips.SetToolTip(lblCalloutPunch, $"Punch ({tool.ToolId}): {tool.PunchStatusDisplay}");
             toolTips.SetToolTip(lblCalloutHolder, $"Upper Holder: {tool.HolderStatusDisplay}");
             toolTips.SetToolTip(lblCalloutPunch, $"Punch: {tool.PunchStatusDisplay} · clearance ≥ {tool.PunchClearanceMm} mm\n{tool.PunchReason}\nWitness: {tool.PunchWitness?.PointMm}");

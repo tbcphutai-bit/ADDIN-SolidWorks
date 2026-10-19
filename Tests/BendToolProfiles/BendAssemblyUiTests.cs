@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -41,13 +42,13 @@ internal static class BendAssemblyUiTests
     private static AssemblyPartResult Part(int count, IEnumerable<VolumeCandidateCollisionResult> statics = null,
         IEnumerable<ProcessCandidateResult> processes = null, Func<string> invalid = null) =>
         new AssemblyPartResult("S", new[] { Occ() }, null, statics, processes, count, true, invalid ?? (() => null));
-    private static AssemblyBatchSnapshot Snapshot(AssemblyPartResult part, Func<string> invalid = null, bool incomplete = false)
+    private static AssemblyBatchSnapshot Snapshot(AssemblyPartResult part, Func<string> invalid = null, bool incomplete = false,ToolProfileLibrarySnapshot library=null)
     {
         var occs = new List<AssemblyOccurrence> { Occ() };
         if (incomplete) occs.Add(new AssemblyOccurrence("ROOT/LW", "ROOT", "LW", "LW", "Default", null,
             AssemblyOccurrenceKind.Lightweight, false, assemblyBranch: true));
         var request = new AssemblyBatchRequest("FIXTURE", "Default", AssemblyCheckScope.EntireAssembly, new ADDIN.Commands.BendPlacement.PlacementLease(),
-            new ToolProfileLibrarySnapshot { Tools = new CompanyToolProfile[0] },
+            library??new ToolProfileLibrarySnapshot { Tools = new CompanyToolProfile[0] },
             new[] { new AssemblySourceInput("S", null, new[] { Occ() }) }, occs, captureMs: 200);
         return new AssemblyBatchSnapshot(request, new CollisionBatchRunState(), new[] { part }, 300, 0, 0, 0, 0, 0, 2,
             new long[8], 0, 0, null, invalid ?? (() => null), 0, 0);
@@ -57,6 +58,16 @@ internal static class BendAssemblyUiTests
             .Single().Bends.Single().ToolCandidates[0];
     private static void ConverterTests()
     {
+        Test("18 fixed CAD pair identities reach every UI bend without promotion",()=>{
+            var library=ToolProfileTests.CadPairUiLibrary();var snapshot=Snapshot(Part(3,new[]{Geometry(7),Geometry(42),Geometry(314)}),library:library);
+            var part=BatchViewModelConverter.PartsFromSnapshot(snapshot).Single();
+            foreach(var bend in part.Bends){Check(bend.ToolCandidates.Count==18,"18 fixed pair candidates");
+                Check(bend.ToolCandidates.All(t=>t.CadAssembly?.CadPair?.Matched==true&&t.CadAssembly.Id==t.ToolId&&!t.CadAssembly.ClampVerified),"Source identities stay with their ToolId");}
+            using(var form=new BendAssemblyBatchForm()){form.Show();form.BindSnapshot(snapshot);Application.DoEvents();
+                Check(Control(form,"lblCalloutHolder").Text.Contains("CAD reference"),"Reference status visible");
+                var evidence=(DataGridView)typeof(BendAssemblyBatchForm).GetField("phaseEvidence",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(form);
+                Check(evidence.Rows.Cast<DataGridViewRow>().Any(r=>Convert.ToString(r.Cells[0].Value)=="CAD / Holder"),"Exact Holder identity visible in existing evidence area");form.Close();}
+        });
         Test("native nonconsecutive FeatureIds and 18 independent slots; no angle/radius inference", () =>
         {
             var vm = BatchViewModelConverter.PartsFromSnapshot(Snapshot(Part(3, new[] { Geometry(7), Geometry(42), Geometry(314) }))).Single();

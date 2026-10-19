@@ -230,6 +230,7 @@ internal static partial class NativeAssemblyBatchValidation
             if(System.Environment.GetEnvironmentVariable("ADDIN_ASSEMBLY_INVENTORY_ONLY")=="1")
             {Call(session,"BuildInventory",false);Console.WriteLine("INVENTORY_ONLY "+Json.Serialize(Items(Get(session,"InventoryOccurrences")).GroupBy(o=>Get(o,"Kind")+":"+Get(o,"Reason")).Select(g=>new {Reason=g.Key,Count=g.Count()})));return 0;}
             double wall,sta;var cold=Run(session,source,false,Options(4),out wall,out sta);var metrics=new List<object>{Metrics("cold-all",cold,wall,sta)};report["Performance"]=metrics;
+            CheckCompanyCadPairs(cold);
             var items=Items(Get(session,"Items"));Check(items.Length==25,"Inventory groups 120 members into 25 source/config captures");
             report["CaptureInventory"]=items.Select(i=>new {File=Path.GetFileName(Convert.ToString(Get(i,"Path"))),
                 Configuration=Get(i,"Configuration"),Done=Get(i,"Done"),Error=Get(i,"Error"),Reason=Get(i,"AssemblyBatchReason"),
