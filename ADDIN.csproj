@@ -317,6 +317,7 @@
       <DependentUpon>SamePartToleranceInputDialog.cs</DependentUpon>
     </Compile>
     <Compile Include="Commands\CheckAssemblyHole.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.ConnectionGroups.cs" />
     <Compile Include="Commands\CheckAssemblyHole.Results.cs" />
     <Compile Include="Commands\CheckAssemblyHole.MissingPattern.cs" />
     <Compile Include="Commands\CheckAssemblyHole.SkippedPattern.cs" />
