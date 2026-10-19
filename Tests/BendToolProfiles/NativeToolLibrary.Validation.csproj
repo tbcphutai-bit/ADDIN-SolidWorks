@@ -15,6 +15,7 @@
     <Reference Include="SolidWorks.Interop.swconst"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.swconst.dll</HintPath></Reference>
     <Compile Include="..\BendPlanning\NativePlanningValidation.cs"><Link>NativePlanningValidation.cs</Link></Compile>
     <Compile Include="NativeToolLibraryValidation.cs"/>
+    <Compile Include="NativeTestProcess.cs"/>
     <Compile Include="NativeSnapshotJson.cs"/>
     <Compile Include="NativeFamilyReference.cs"/>
   </ItemGroup>

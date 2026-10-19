@@ -65,6 +65,8 @@ internal static partial class ToolProfileTests
         if (args.Length>0 && args[0]=="--native-family-oracle") return NativeFamilyOracle(args);
         if (args.Length>0 && args[0]=="--process-oracle") return ProcessOracle(args);
         if (args.Length>0 && args[0]=="--process-company") return ProcessCompanyIntegration(args);
+        if (args.Length>0 && args[0]=="--assembly-tests") return AssemblyOnly(args);
+        if (args.Length>0 && args[0]=="--assembly-benchmark") return AssemblyBenchmark(args);
         if (args.Length>0 && args[0]=="--process-tests")
         {
             temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ProcessTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
@@ -246,6 +248,7 @@ internal static partial class ToolProfileTests
         CollisionPlacementTests();
         EnvelopeTests();
         ProcessTests();
+        AssemblyBatchTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a
         // computed directory and never any operation on a company source folder.

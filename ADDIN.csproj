@@ -219,6 +219,10 @@
     </Compile>
     <Compile Include="Commands\BendMinimumSummary.cs" />
     <Compile Include="Commands\BendCheckSession.cs" />
+    <Compile Include="Commands\BendCheckSession.AssemblyInventory.cs" />
+    <Compile Include="Commands\BendCheckSession.AssemblyBatch.cs" />
+    <Compile Include="Commands\BendAssembly\*.cs" />
+    <Compile Include="Commands\BendCollision\CollisionTimingScope.cs" />
     <Compile Include="Commands\BendCheckPlanningDraft.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileGeometry.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolNurbsGeometry.cs" />

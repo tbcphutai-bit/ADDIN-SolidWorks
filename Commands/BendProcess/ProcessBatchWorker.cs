@@ -19,10 +19,16 @@ namespace ADDIN.Commands.BendProcess
         // data; it is NEVER converted into Before/During/After states.
         public IReadOnlyList<SheetEnvelopeCapture> ObservedFinalGeometry { get; }
         public IReadOnlyList<BendProcessPlan> Plans { get; }
+        private readonly Dictionary<string, IReadOnlyList<BendProcessPlan>> planIndex;
+        private static readonly IReadOnlyList<BendProcessPlan> NoPlans=PlacementLists.Copy<BendProcessPlan>(null);
         internal ProcessBatchRequest(PlacementModelCapture model, ToolProfileLibrarySnapshot library,
             IEnumerable<BendProcessPlan> plans = null, IEnumerable<SheetEnvelopeCapture> observedFinalGeometry = null)
         { Model = model ?? throw new ArgumentNullException(nameof(model)); Library = library ?? throw new ArgumentNullException(nameof(library));
-            Plans = PlacementLists.Copy(plans); ObservedFinalGeometry = PlacementLists.Copy(observedFinalGeometry); }
+            Plans = PlacementLists.Copy(plans); ObservedFinalGeometry = PlacementLists.Copy(observedFinalGeometry);
+            planIndex = Plans.GroupBy(p => PlanKey(p.ToolId, p.Binding.FeatureId)).ToDictionary(g => g.Key, g => PlacementLists.Copy(g), StringComparer.Ordinal); }
+        private static string PlanKey(string tool, int feature) => tool + "\n" + feature.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        internal IReadOnlyList<BendProcessPlan> FindPlans(string tool, int feature)
+        { IReadOnlyList<BendProcessPlan> values; return planIndex.TryGetValue(PlanKey(tool, feature), out values) ? values : NoPlans; }
         internal string InvalidReason => !Model.Lease.Current ? "STALE_MODEL_OR_CONFIGURATION" : !Library.Current || Library.PlacementSources?.Current == false ?
             "STALE_TOOL_LIBRARY" : ObservedFinalGeometry.Any(e => !ReferenceEquals(e.Binding.Model, Model) || !e.Current) ?
             "STALE_OR_MISMATCHED_OBSERVED_GEOMETRY" : Plans.Any(p => p.InvalidatedReason != null) ? "STALE_PROCESS_OR_SETUP" : null;
@@ -61,8 +67,12 @@ namespace ADDIN.Commands.BendProcess
         public int Milliseconds { get; }
         public int KernelQueries { get; }
         public ProcessCollisionPolicy PairPolicy { get; }
+        internal Func<string> ExternalInvalid { get; private set; }
+        internal Action ExternalConsume { get; private set; }
         internal ProcessBatchOptions(int workers = 2, int milliseconds = 30000, int kernelQueries = 100000, ProcessCollisionPolicy pairPolicy = null)
         { Workers = workers; Milliseconds = milliseconds; KernelQueries = kernelQueries; PairPolicy = pairPolicy ?? new ProcessCollisionPolicy(); }
+        internal ProcessBatchOptions WithAssemblyGuard(Func<string> invalid, Action consume) => new ProcessBatchOptions(Workers,
+            Milliseconds, KernelQueries, PairPolicy) { ExternalInvalid = invalid, ExternalConsume = consume };
         internal bool Valid => Workers >= 1 && Workers <= 4 && Milliseconds > 0 && Milliseconds <= 120000 && KernelQueries > 0 && KernelQueries <= 1000000 && PairPolicy.Valid;
     }
     internal sealed class ProcessBatchSnapshot
@@ -122,12 +132,14 @@ namespace ADDIN.Commands.BendProcess
             var clock = Stopwatch.StartNew(); int calls = 0, next = -1, done = 0, executing = 1, running = 0, maximum = 0;
             int thread = Thread.CurrentThread.ManagedThreadId; string diagnostic = null; var progressGate = new object();
             Func<string> invalid = () => {
+                string external = options.ExternalInvalid?.Invoke(); if (external != null) runState.Stop(external);
                 if (request.InvalidReason != null) runState.Stop(request.InvalidReason);
                 if (token.IsCancellationRequested) runState.Stop("CANCELLED");
                 if (Volatile.Read(ref executing) != 0 && clock.ElapsedMilliseconds >= options.Milliseconds) runState.Stop("PROCESS_JOB_TIME_BUDGET_EXCEEDED");
                 return runState.Reason;
             };
             Action consume = () => {
+                options.ExternalConsume?.Invoke();
                 if (Interlocked.Increment(ref calls) > options.KernelQueries) runState.Stop("PROCESS_JOB_QUERY_BUDGET_EXCEEDED");
                 var reason = invalid(); if (reason != null) throw new CollisionAbort(reason);
             };
@@ -145,9 +157,9 @@ namespace ADDIN.Commands.BendProcess
                         new ProcessPairResult(pair, "MISSING:" + phase, phase, CollisionStatus.UNKNOWN, reasons, invalid, null, 0, 0, 0, 0, 0);
                     try
                     {
-                        var plans = request.Plans.Where(p => p.ToolId == job.Tool && p.Binding.FeatureId == job.Bend.FeatureId).ToArray();
-                        var plan = plans.Length == 1 ? plans[0] : null;
-                        string missing = plans.Length > 1 ? "DUPLICATE_PROCESS_PLAN" : plan == null ? "UNKNOWN_PROCESS_GEOMETRY" :
+                        var plans = request.FindPlans(job.Tool, job.Bend.FeatureId);
+                        var plan = plans.Count == 1 ? plans[0] : null;
+                        string missing = plans.Count > 1 ? "DUPLICATE_PROCESS_PLAN" : plan == null ? "UNKNOWN_PROCESS_GEOMETRY" :
                             !ReferenceEquals(plan.Binding.Model, request.Model) ? "MISMATCHED_PROCESS_MODEL" : invalid();
                         if (missing == null)
                         {
