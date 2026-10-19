@@ -7256,7 +7256,8 @@ namespace ADDIN
 
         private bool IsModelMacroSupported(Control button, int documentType)
         {
-            if (ReferenceEquals(button, btnCheckAssemblyHole))
+            if (ReferenceEquals(button, btnCheckAssemblyHole) ||
+                ReferenceEquals(button, btnAutoFrameJoint))
                 return documentType == (int)swDocumentTypes_e.swDocASSEMBLY;
             if (ReferenceEquals(button, btnMirrorPart) || ReferenceEquals(button, btnCheckBendMinimum))
                 return documentType == (int)swDocumentTypes_e.swDocPART ||
@@ -7292,6 +7293,7 @@ namespace ADDIN
             UpdateModelMacroButton(btnRepair3DSpline, documentType, "Part");
             UpdateModelMacroButton(btnVCutPropertySetup, documentType, "Part");
             UpdateModelMacroButton(btnCheckBendMinimum, documentType, "Part hoặc Assembly");
+            UpdateModelMacroButton(btnAutoFrameJoint, documentType, "Assembly");
             // CHECK DXF works on files in a folder, independent of the active SW document.
             if (btnCheckDxfMacro != null) btnCheckDxfMacro.Enabled = true;
         }

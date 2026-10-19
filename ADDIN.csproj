@@ -121,6 +121,7 @@
     </Compile>
     <Compile Include="Commands\AutoFrameJoint\AutoFrameJointReadOnlyProbe.cs" />
     <Compile Include="UI\AutoFrameJoint\AutoFrameJointSelectionPage.cs" />
+    <Compile Include="UI\AutoFrameJointTaskPaneLauncher.cs" />
     <Compile Include="Commands\AutoFrameJoint\AutoFrameJointCommandEntry.cs" />
     <Compile Include="Commands\NativeToolBridges.cs" />
     <Compile Include="Commands\RepairDanglingDimensions.Native.cs" />
