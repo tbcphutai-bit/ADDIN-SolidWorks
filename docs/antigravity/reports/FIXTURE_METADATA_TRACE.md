@@ -76,3 +76,33 @@ MVID Candidate: 456f9ade-ac27-4395-854f-857ad2521fd0 (CG1)
 | 13–45 | N/A | `1618-04-bh-A10-fr1-2` or `1-1` | N/A | N/A | **Chưa ghép** | **Chưa ghép** | N/A (33 unmatched holes) |
 
 **Conclusion:** 100% equivalence between `main` baseline and `CG1` candidate. Real NG detection (`NgStacks = 12 >= 1`) verified.
+
+---
+
+## 4. Hardened Generator Safeguards & Execution Contract (Review #8)
+
+In response to Review #8 BLOCKER A, [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs) has been hardened with the following strict fail-closed safety contracts:
+
+1. **Sandbox Root & Consent Token Validation:**
+   - Requires physical existence of `CG1_SANDBOX_OK.txt` in `sandboxRoot`.
+   - Strictly enforces that `fixtureDir` resides within `sandboxRoot`.
+   - Refuses execution if `fixtureDir` or `sandboxRoot` overlaps with the git repository or active project workspace (`Directory.GetCurrentDirectory()`).
+2. **Pre-Execution Component Reference Containment:**
+   - Opens base assembly (`1618-02-bh-A10.SLDASM`) read-only and iterates all components via `VerifyReferencesUnderSandbox`.
+   - Ensures zero components reference paths outside `sandboxRoot` and all dependencies exist on disk.
+3. **Overwrite Protection:**
+   - `allowOverwrite` parameter defaults to `false`.
+   - Refuses to overwrite existing fixtures unless explicitly invoked with `--force-overwrite`.
+4. **Complete Resource Lifecycle Management (`try/finally`):**
+   - Every opened `ModelDoc2` document is wrapped in a strict `try/finally` block ensuring `app.CloseDoc(doc.GetTitle())` is called under all success and exception paths.
+5. **Rigorous API Return Value Checks:**
+   - `OpenDoc6`: Verified `doc != null` and `swErrors == 0`.
+   - `GetComponents`: Verified non-null and non-empty.
+   - `SetSuppression2`: Verified return code is `swSuppressionChangeOk`.
+   - `SaveAs`: Verified boolean return is `true`, `swErrors == 0`, and file exists on disk with length $> 0$.
+6. **Geometric Transformation & Readback Assertions:**
+   - Exactly 19 sub-mates in feature `合致` (`MateGroup`) verified suppressed (`suppressedMateCount == 19`).
+   - Component `fr1` lateral offset readback verified after `EditRebuild3()`: $\Delta X = 0.000300\text{ m} \pm 10^{-6}\text{ m}$ ($+0.3000\text{ mm}$).
+   - Stale marker feature `CHECK-HOLE-NG-STALE-MARKER` verified on `Fixture_OldMarker.SLDASM`.
+7. **Standalone CLI Self-Test:**
+   - `FIXTURE_GENERATOR.exe --self-test` executes automated unit testing of sandbox consent, path containment, and negative rejection without requiring a running SOLIDWORKS instance.

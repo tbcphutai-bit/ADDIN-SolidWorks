@@ -345,6 +345,10 @@ FAIL CLOSED: System.InvalidOperationException: Isolated run rejected: Existing C
 | | R7-BtnDispatch | Strict button click event dispatch via `Button.OnClick` reflection without fallback | `BUTTON_EVENT_DISPATCH_PASS` |
 | | R7-RFC4180CSV | RFC-4180 CSV parser verifying all 9 columns against `report.Rows` (Assembly, Config, Status, Kind, Ref, Act, Offset, Angle, Reason) | `CSV_ALL_9_COLUMNS_AND_CONTENT_PASS` |
 | | R7-FixGenTrace | Standalone fixture generator (`FIXTURE_GENERATOR.cs`) and metadata trace (`FIXTURE_METADATA_TRACE.md`) | `PASS` |
+| **Review #8 Hardening** | R8-FixGenSelfTest | Hardened `FIXTURE_GENERATOR.exe --self-test` verifies sandbox consent, root containment, and fail-closed gates | `PASS` |
+| | R8-FixGenNegative | Rejection of missing consent token, outside sandbox root, and working project tree | `PASS` |
+| | R8-RFC4180Stream | True RFC-4180 stream parser supporting multiline quoted fields, escaped quotes, and commas | `PASS` |
+| | R8-ExactCellMatch | Exact raw cell matching without `Trim()`, preserving whitespace, formula prefixes, and literals | `CSV_ALL_9_COLUMNS_RFC4180_PASS` |
 
 ---
 
@@ -430,5 +434,111 @@ Fixture: D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_OK.SLDASM
 =========================================================
 ALL UI SAFETY AND INTERACTION CHECKS PASSED (EXIT 0)
 Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_ALL_9_COLUMNS_AND_CONTENT_PASS | UI_USER_CLICK_NOT_TESTED
+=========================================================
+```
+
+---
+
+## 8. Review #8 Execution Logs & Verbatim Output
+
+### A. FIXTURE_GENERATOR Safety Gates & Self-Test
+```powershell
+& "docs\antigravity\reports\FIXTURE_GENERATOR.exe" --self-test
+# Output:
+PASS: FIXTURE_GENERATOR sandbox consent and safety gates self-test
+# Exit Code: 0
+```
+
+### B. FIXTURE_GENERATOR Negative Security Gates
+```powershell
+# 1. Missing sandbox consent token (CG1_SANDBOX_OK.txt)
+& "docs\antigravity\reports\FIXTURE_GENERATOR.exe" "C:\outside" "C:\outside\dir"
+# Output:
+FAIL CLOSED: System.InvalidOperationException: Sandbox consent token missing: C:\outside\CG1_SANDBOX_OK.txt. Refusing execution outside verified isolated sandbox.
+   at ADDIN.Tests.FixtureGenerator.RequireSandboxConsent(String sandboxRoot, String fixtureDir)
+   at ADDIN.Tests.FixtureGenerator.RunGenerate(String sandboxRoot, String fixtureDir, Boolean allowOverwrite)
+   at ADDIN.Tests.FixtureGenerator.Main(String[] args)
+# Exit Code: 1
+
+# 2. fixtureDir outside sandbox root
+& "docs\antigravity\reports\FIXTURE_GENERATOR.exe" "D:\CG1-ISOLATED-TEST-COPIES" "C:\outside"
+# Output:
+FAIL CLOSED: System.InvalidOperationException: fixtureDir (C:\outside) is outside sandboxRoot (D:\CG1-ISOLATED-TEST-COPIES). Refusing execution.
+   at ADDIN.Tests.FixtureGenerator.RequireSandboxConsent(String sandboxRoot, String fixtureDir)
+   at ADDIN.Tests.FixtureGenerator.RunGenerate(String sandboxRoot, String fixtureDir, Boolean allowOverwrite)
+   at ADDIN.Tests.FixtureGenerator.Main(String[] args)
+# Exit Code: 1
+
+# 3. fixtureDir inside git repository or working project tree
+& "docs\antigravity\reports\FIXTURE_GENERATOR.exe" "D:\CG1-ISOLATED-TEST-COPIES" "c:\Tao moi\ADDIN"
+# Output:
+FAIL CLOSED: System.InvalidOperationException: fixtureDir (c:\Tao moi\ADDIN) is outside sandboxRoot (D:\CG1-ISOLATED-TEST-COPIES). Refusing execution.
+   at ADDIN.Tests.FixtureGenerator.RequireSandboxConsent(String sandboxRoot, String fixtureDir)
+   at ADDIN.Tests.FixtureGenerator.RunGenerate(String sandboxRoot, String fixtureDir, Boolean allowOverwrite)
+   at ADDIN.Tests.FixtureGenerator.Main(String[] args)
+# Exit Code: 1
+```
+
+### C. Multiline RFC-4180 & Exact Cell Escaping Self-Test
+```powershell
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" --self-test
+# Output:
+PASS: sandbox path enforcement and full RFC-4180 multiline CSV parsing self-test
+# Exit Code: 0
+```
+
+### D. Live In-CAD UI & Multiline RFC-4180 9-Column Execution (`Fixture_OK.SLDASM`)
+```powershell
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" $cg1Dll $sandbox "$sandbox\SimpleFixtures\Fixture_OK.SLDASM"
+```
+
+**Verbatim Console Output:**
+```text
+=========================================================
+CG1 UI INTERACTION & SAFETY AUDIT TEST
+=========================================================
+SolidWorks Revision: 32.5.0
+Candidate DLL: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
+Fixture: D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_OK.SLDASM
+
+[1] CheckAssemblyHole Output Metrics:
+    Logical Holes: 57
+    Stack Count  : 12
+    Groups Count : 12
+    Unmatched    : 33
+    NG No Master : 0
+    Coverage Rows: 12
+
+[2] Verifying CheckHoleResultsForm Toolbar Controls:
+    -> Button 'Nhóm liên kết' presence: PASS
+    -> Button 'Nhóm liên kết' enabled: PASS
+
+[3] Testing 'Nhóm liên kết' Button Event Dispatch & Modal Dialog:
+    -> Button Click Event Dispatch: PASS (BUTTON_EVENT_DISPATCH_PASS)
+    -> Modal Title: 'CHECK HOLE - Nhóm liên kết (chẩn đoán)' (PASS)
+    -> Header Description Text:
+        Nhóm lỗ đã ghép: 12 | NG chưa rõ Master: 0 | Lỗ chưa ghép: 33
+        Hai đầu trục chỉ là ứng viên hình học, KHÔNG phải vật chủ được xác nhận.
+        CG1 chưa kiểm tra quan hệ đối với Part không có lỗ.
+    -> Header Counts & Mandatory Disclaimer: PASS
+    -> DataGridView ReadOnly & RowCount (12): PASS
+    -> All 10 Diagnostic Columns Present: PASS
+    -> Modal Evaluation Level: MODAL_PROGRAMMATIC_PASS
+
+[4] Testing CSV Report Export & Strict 9-Column Verification:
+    -> CSV created: D:\CG1-ISOLATED-TEST-COPIES\Test_Export_Report.csv
+    -> CSV record count (including header): 46
+    -> Header: Assembly,Configuration,Status,Type,Reference component,Actual component,Offset (mm),Angle (deg),Reason
+    -> CSV All 9 Columns Verified Against Report.Rows (RFC-4180 Multiline Parser & Exact Cell Escaping): PASS
+    -> CSV Verification Level: CSV_ALL_9_COLUMNS_RFC4180_PASS
+
+[5] Verifying Post-Execution Assembly Safety & Invariance:
+    -> Feature Tree Invariance: PASS
+    -> Memory Non-Mutation (doc.GetSaveFlag() == false): PASS
+    -> Disk File SHA256 Invariance: PASS
+
+=========================================================
+ALL UI SAFETY AND INTERACTION CHECKS PASSED (EXIT 0)
+Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_ALL_9_COLUMNS_RFC4180_PASS | UI_USER_CLICK_NOT_TESTED
 =========================================================
 ```

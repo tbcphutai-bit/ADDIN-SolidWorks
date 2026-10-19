@@ -314,24 +314,30 @@ namespace ADDIN.Tests
                     if (!File.Exists(testCsvPath) || new FileInfo(testCsvPath).Length == 0)
                         throw new InvalidOperationException("CSV export failed or produced empty file.");
 
-                    string[] csvLines = File.ReadAllLines(testCsvPath, Encoding.UTF8);
+                    string fullCsvText = File.ReadAllText(testCsvPath, Encoding.UTF8);
+                    List<List<string>> records = ParseCsvRecords(fullCsvText);
                     Console.WriteLine("    -> CSV created: " + testCsvPath);
-                    Console.WriteLine("    -> CSV line count: " + csvLines.Length);
-                    Console.WriteLine("    -> Header: " + csvLines[0]);
+                    Console.WriteLine("    -> CSV record count (including header): " + records.Count);
+                    if (records.Count == 0)
+                        throw new InvalidOperationException("CSV is empty.");
+
+                    List<string> header = records[0];
+                    string actualHeaderStr = string.Join(",", header);
+                    Console.WriteLine("    -> Header: " + actualHeaderStr);
 
                     const string expectedHeader = "Assembly,Configuration,Status,Type,Reference component,Actual component,Offset (mm),Angle (deg),Reason";
-                    if (!string.Equals(csvLines[0].Trim(), expectedHeader, StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(actualHeaderStr, expectedHeader, StringComparison.OrdinalIgnoreCase))
                     {
-                        throw new InvalidOperationException("CSV header does not match expected schema.\nExpected: " + expectedHeader + "\nActual: " + csvLines[0]);
+                        throw new InvalidOperationException("CSV header does not match expected schema.\nExpected: " + expectedHeader + "\nActual: " + actualHeaderStr);
                     }
 
                     FieldInfo fRows = tReport.GetField("Rows", BindingFlags.Public | BindingFlags.Instance);
                     IList reportRows = fRows != null ? fRows.GetValue(report) as IList : null;
                     if (reportRows == null) throw new InvalidOperationException("Rows missing from report.");
 
-                    if (csvLines.Length - 1 != reportRows.Count)
+                    if (records.Count - 1 != reportRows.Count)
                     {
-                        throw new InvalidOperationException("CSV data row count (" + (csvLines.Length - 1) + ") does not match report rows (" + reportRows.Count + ").");
+                        throw new InvalidOperationException("CSV data record count (" + (records.Count - 1) + ") does not match report rows (" + reportRows.Count + ").");
                     }
 
                     string expectedTitle = (string)tReport.GetField("AssemblyTitle").GetValue(report) ?? "";
@@ -349,45 +355,44 @@ namespace ADDIN.Tests
                         double? expAngle = (double?)tRow.GetProperty("AngleDeg").GetValue(row, null);
                         string expReason = (string)tRow.GetProperty("Reason").GetValue(row, null) ?? "";
 
-                        string csvLine = csvLines[i + 1];
-                        List<string> fields = ParseCsvLine(csvLine);
+                        List<string> fields = records[i + 1];
                         if (fields.Count != 9)
                         {
-                            throw new InvalidOperationException("CSV line " + (i + 1) + " parsed into " + fields.Count + " fields instead of 9: " + csvLine);
+                            throw new InvalidOperationException("CSV record " + (i + 1) + " has " + fields.Count + " fields instead of 9.");
                         }
 
-                        // Verify Col 0: AssemblyTitle
-                        string actTitle = UnescapeCell(fields[0]);
-                        if (!string.Equals(actTitle, expectedTitle, StringComparison.Ordinal))
-                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 0 (Assembly) mismatch: exp='" + expectedTitle + "', act='" + actTitle + "'");
+                        // Verify Col 0: AssemblyTitle - exact ExpectedRawCell match, no Trim()!
+                        string expCell0 = ExpectedRawCell(expectedTitle);
+                        if (!string.Equals(fields[0], expCell0, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 0 (Assembly) mismatch: exp='" + expCell0 + "', act='" + fields[0] + "'");
 
                         // Verify Col 1: Configuration
-                        string actConfig = UnescapeCell(fields[1]);
-                        if (!string.Equals(actConfig, expectedConfig, StringComparison.Ordinal))
-                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 1 (Config) mismatch: exp='" + expectedConfig + "', act='" + actConfig + "'");
+                        string expCell1 = ExpectedRawCell(expectedConfig);
+                        if (!string.Equals(fields[1], expCell1, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 1 (Config) mismatch: exp='" + expCell1 + "', act='" + fields[1] + "'");
 
                         // Verify Col 2: Status
-                        string actStatus = UnescapeCell(fields[2]);
-                        if (!string.Equals(actStatus, expStatus, StringComparison.Ordinal))
-                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 2 (Status) mismatch: exp='" + expStatus + "', act='" + actStatus + "'");
+                        string expCell2 = ExpectedRawCell(expStatus);
+                        if (!string.Equals(fields[2], expCell2, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 2 (Status) mismatch: exp='" + expCell2 + "', act='" + fields[2] + "'");
 
                         // Verify Col 3: Type / Kind
-                        string actKind = UnescapeCell(fields[3]);
-                        if (!string.Equals(actKind, expKind, StringComparison.Ordinal))
-                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 3 (Type) mismatch: exp='" + expKind + "', act='" + actKind + "'");
+                        string expCell3 = ExpectedRawCell(expKind);
+                        if (!string.Equals(fields[3], expCell3, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 3 (Type) mismatch: exp='" + expCell3 + "', act='" + fields[3] + "'");
 
                         // Verify Col 4: Reference component
-                        string actRef = UnescapeCell(fields[4]);
-                        if (!string.Equals(actRef, expRef, StringComparison.Ordinal))
-                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 4 (ReferenceComponent) mismatch: exp='" + expRef + "', act='" + actRef + "'");
+                        string expCell4 = ExpectedRawCell(expRef);
+                        if (!string.Equals(fields[4], expCell4, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 4 (ReferenceComponent) mismatch: exp='" + expCell4 + "', act='" + fields[4] + "'");
 
                         // Verify Col 5: Actual component
-                        string actAct = UnescapeCell(fields[5]);
-                        if (!string.Equals(actAct, expAct, StringComparison.Ordinal))
-                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 5 (ActualComponent) mismatch: exp='" + expAct + "', act='" + actAct + "'");
+                        string expCell5 = ExpectedRawCell(expAct);
+                        if (!string.Equals(fields[5], expCell5, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 5 (ActualComponent) mismatch: exp='" + expCell5 + "', act='" + fields[5] + "'");
 
                         // Verify Col 6: Offset (mm)
-                        string actOffsetStr = fields[6].Trim();
+                        string actOffsetStr = fields[6];
                         if (expOffset.HasValue)
                         {
                             if (string.IsNullOrEmpty(actOffsetStr) ||
@@ -404,7 +409,7 @@ namespace ADDIN.Tests
                         }
 
                         // Verify Col 7: Angle (deg)
-                        string actAngleStr = fields[7].Trim();
+                        string actAngleStr = fields[7];
                         if (expAngle.HasValue)
                         {
                             if (string.IsNullOrEmpty(actAngleStr) ||
@@ -421,13 +426,13 @@ namespace ADDIN.Tests
                         }
 
                         // Verify Col 8: Reason
-                        string actReason = UnescapeCell(fields[8]);
-                        if (!string.Equals(actReason, expReason, StringComparison.Ordinal))
-                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 8 (Reason) mismatch: exp='" + expReason + "', act='" + actReason + "'");
+                        string expCell8 = ExpectedRawCell(expReason);
+                        if (!string.Equals(fields[8], expCell8, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 8 (Reason) mismatch: exp='" + expCell8 + "', act='" + fields[8] + "'");
                     }
 
-                    Console.WriteLine("    -> CSV All 9 Columns Verified Against Report.Rows: PASS");
-                    Console.WriteLine("    -> CSV Verification Level: CSV_ALL_9_COLUMNS_AND_CONTENT_PASS");
+                    Console.WriteLine("    -> CSV All 9 Columns Verified Against Report.Rows (RFC-4180 Multiline Parser & Exact Cell Escaping): PASS");
+                    Console.WriteLine("    -> CSV Verification Level: CSV_ALL_9_COLUMNS_RFC4180_PASS");
 
                     // [5] Post-Execution Invariance Checks
                     Console.WriteLine("\n[5] Verifying Post-Execution Assembly Safety & Invariance:");
@@ -468,7 +473,7 @@ namespace ADDIN.Tests
 
                 Console.WriteLine("\n=========================================================");
                 Console.WriteLine("ALL UI SAFETY AND INTERACTION CHECKS PASSED (EXIT 0)");
-                Console.WriteLine("Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_ALL_9_COLUMNS_AND_CONTENT_PASS | UI_USER_CLICK_NOT_TESTED");
+                Console.WriteLine("Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_ALL_9_COLUMNS_RFC4180_PASS | UI_USER_CLICK_NOT_TESTED");
                 Console.WriteLine("=========================================================");
                 return 0;
             }
@@ -570,51 +575,89 @@ namespace ADDIN.Tests
             return list;
         }
 
-        // Robust RFC-4180 CSV parser respecting quotes and escaped quotes (Review #7 BLOCKER B)
-        internal static List<string> ParseCsvLine(string line)
+        // True RFC-4180 CSV stream parser supporting multiline quoted fields, escaped quotes, and commas
+        internal static List<List<string>> ParseCsvRecords(string csvText)
         {
-            var fields = new List<string>();
-            if (line == null) return fields;
+            var records = new List<List<string>>();
+            if (string.IsNullOrEmpty(csvText)) return records;
 
-            var sb = new StringBuilder();
+            var currentRecord = new List<string>();
+            var currentField = new StringBuilder();
             bool inQuotes = false;
-            for (int i = 0; i < line.Length; i++)
+
+            for (int i = 0; i < csvText.Length; i++)
             {
-                char c = line[i];
-                if (c == '"')
+                char c = csvText[i];
+                if (inQuotes)
                 {
-                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    if (c == '"')
                     {
-                        sb.Append('"');
-                        i++; // skip escaped quote
+                        if (i + 1 < csvText.Length && csvText[i + 1] == '"')
+                        {
+                            currentField.Append('"');
+                            i++; // skip escaped quote
+                        }
+                        else
+                        {
+                            inQuotes = false;
+                        }
                     }
                     else
                     {
-                        inQuotes = !inQuotes;
+                        currentField.Append(c);
                     }
-                }
-                else if (c == ',' && !inQuotes)
-                {
-                    fields.Add(sb.ToString());
-                    sb.Clear();
                 }
                 else
                 {
-                    sb.Append(c);
+                    if (c == '"')
+                    {
+                        inQuotes = true;
+                    }
+                    else if (c == ',')
+                    {
+                        currentRecord.Add(currentField.ToString());
+                        currentField.Clear();
+                    }
+                    else if (c == '\r')
+                    {
+                        if (i + 1 < csvText.Length && csvText[i + 1] == '\n')
+                            i++;
+                        currentRecord.Add(currentField.ToString());
+                        currentField.Clear();
+                        records.Add(currentRecord);
+                        currentRecord = new List<string>();
+                    }
+                    else if (c == '\n')
+                    {
+                        currentRecord.Add(currentField.ToString());
+                        currentField.Clear();
+                        records.Add(currentRecord);
+                        currentRecord = new List<string>();
+                    }
+                    else
+                    {
+                        currentField.Append(c);
+                    }
                 }
             }
-            fields.Add(sb.ToString());
-            return fields;
+
+            if (currentField.Length > 0 || currentRecord.Count > 0)
+            {
+                currentRecord.Add(currentField.ToString());
+                records.Add(currentRecord);
+            }
+
+            return records;
         }
 
-        private static string UnescapeCell(string raw)
+        // Mirrors production CheckHoleCsv.Cell serialization logic without Trim(),
+        // preserving significant leading/trailing whitespace and formula prefixes.
+        internal static string ExpectedRawCell(string value)
         {
-            if (raw == null) return "";
-            string val = raw.Trim();
-            // CheckHoleCsv.Cell prefixes with "'" if text starts with '=+-@'
-            if (val.Length > 1 && val.StartsWith("'") && "=+-@".IndexOf(val[1]) >= 0)
-                val = val.Substring(1);
-            return val;
+            value = value ?? "";
+            string start = value.TrimStart();
+            if (start.Length > 0 && "=+-@".IndexOf(start[0]) >= 0) value = "'" + value;
+            return value;
         }
 
         private static int SelfTestSandboxAndCsvLogic()
@@ -633,28 +676,72 @@ namespace ADDIN.Tests
             }
             catch { /* expected */ }
 
-            // Test CSV parser with quotes, commas inside fields, and escaped quotes
+            // 1. Test CSV parser with quotes, commas inside fields, and escaped quotes
             string sampleLine = "\"Assy, 1\",\"Default\",\"OK\",\"Type\",\"Comp, A\",\"Comp, B\",0.3000,0.2000,\"Reason with, comma and \"\"escaped quotes\"\"\"";
-            List<string> fields = ParseCsvLine(sampleLine);
-            if (fields.Count != 9)
+            List<List<string>> records = ParseCsvRecords(sampleLine);
+            if (records.Count != 1 || records[0].Count != 9)
             {
-                Console.Error.WriteLine("FAIL: ParseCsvLine field count: " + fields.Count);
+                Console.Error.WriteLine("FAIL: ParseCsvRecords field count: " + (records.Count > 0 ? records[0].Count : 0));
                 ok = false;
             }
             else
             {
+                List<string> fields = records[0];
                 if (fields[0] != "Assy, 1" ||
                     fields[4] != "Comp, A" ||
                     fields[6] != "0.3000" ||
                     fields[8] != "Reason with, comma and \"escaped quotes\"")
                 {
-                    Console.Error.WriteLine("FAIL: ParseCsvLine content mismatch: " + string.Join(" | ", fields));
+                    Console.Error.WriteLine("FAIL: ParseCsvRecords content mismatch: " + string.Join(" | ", fields));
+                    ok = false;
+                }
+            }
+
+            // 2. Test whitespace preservation (Review #8 MINOR B)
+            string spaceVal = "   Component With Spaces   ";
+            string spaceExpected = ExpectedRawCell(spaceVal);
+            if (spaceExpected != spaceVal)
+            {
+                Console.Error.WriteLine("FAIL: ExpectedRawCell trimmed whitespace: '" + spaceExpected + "'");
+                ok = false;
+            }
+
+            // 3. Test formula prefix escaping (Review #8 MINOR B)
+            string formulaVal = "=SUM(1,2)";
+            string formulaExpected = ExpectedRawCell(formulaVal);
+            if (formulaExpected != "'=SUM(1,2)")
+            {
+                Console.Error.WriteLine("FAIL: ExpectedRawCell failed formula escaping: '" + formulaExpected + "'");
+                ok = false;
+            }
+
+            string literalQuoteVal = "'=Literal";
+            string literalQuoteExpected = ExpectedRawCell(literalQuoteVal);
+            if (literalQuoteExpected != "'=Literal")
+            {
+                Console.Error.WriteLine("FAIL: ExpectedRawCell altered literal quote: '" + literalQuoteExpected + "'");
+                ok = false;
+            }
+
+            // 4. Test multiline RFC-4180 record parsing (Review #8 MINOR B)
+            string multilineCsv = "\"Record 1 Col 1\",\"Line 1\r\nLine 2\"\r\n\"Record 2 Col 1\",\"Single Line\"";
+            List<List<string>> multiRecords = ParseCsvRecords(multilineCsv);
+            if (multiRecords.Count != 2 || multiRecords[0].Count != 2 || multiRecords[1].Count != 2)
+            {
+                Console.Error.WriteLine("FAIL: ParseCsvRecords multiline count mismatch: " + multiRecords.Count);
+                ok = false;
+            }
+            else
+            {
+                if (multiRecords[0][1] != "Line 1\r\nLine 2" || multiRecords[1][1] != "Single Line")
+                {
+                    Console.Error.WriteLine("FAIL: ParseCsvRecords multiline content mismatch: '" + multiRecords[0][1] + "'");
                     ok = false;
                 }
             }
 
             Console.WriteLine(ok
-                ? "PASS: sandbox path enforcement and CSV RFC-4180 parsing self-test"
+                ? "PASS: sandbox path enforcement and full RFC-4180 multiline CSV parsing self-test"
                 : "FAIL: sandbox or CSV self-test");
             return ok ? 0 : 1;
         }
