@@ -16,6 +16,8 @@ Files changed:
 
 Open these files and review the diff against `main` **before** making further changes.
 
+**BẮT BUỘC:** Trước khi báo hoàn thành, Antigravity phải xác nhận **CODE ĐẦY ĐỦ (CODE COMPLETENESS GATE)** theo Mục 9. Build thành công một mình KHÔNG đủ điều kiện PASS. Trường hợp không thể xác minh phải ghi `NOT_VERIFIED`, không được tự xác nhận hoàn tất.
+
 ## 1. Required behavior
 
 CG1 is a non-invasive diagnostic pass:
@@ -409,3 +411,74 @@ Trong ItemGroup chứa `Commands\\CheckAssemblyHole.cs`, có thêm dòng:
 6. Commit phần sửa lỗi hợp lệ trên branch CG1 và báo SHA để ChatGPT review.
 
 **Ranh giới CG1:** Đây là lớp chẩn đoán các nhóm lỗ đã ghép, không tự xác định toàn bộ Part phải có lỗ; CG2 mới xét quan hệ Part kể cả khi thiếu lỗ.
+
+## 9. BẮT BUỘC XÁC NHẬN CODE ĐẦY ĐỦ — CODE COMPLETENESS GATE
+
+**Không được kết luận CG1 hoàn thành chỉ vì đã commit, giao diện hiển thị hoặc biên dịch thành công.** Phải kiểm tra **tính đầy đủ của mã nguồn, tích hợp, đường chạy, và bằng chứng thực nghiệm**.
+
+### 9.1. Xác minh đủ file và đủ nội dung
+
+Đối chiếu từng file C# thực tế trên branch với code và các điểm chèn ở Mục 8; không chèn trùng nếu nội dung đã tồn tại:
+
+- [ ] `Commands/CheckAssemblyHole.ConnectionGroups.cs`: đầy đủ các class `CheckHoleConnectionGroupRow`, `CheckHoleConnectionCoverage`, phương thức `BuildConnectionCoverage(List<HoleAxis>, List<HoleStackResult>)`; không bị cắt đầu/cuối, không mất ngoặc hoặc thiếu `using`.
+- [ ] `Commands/CheckAssemblyHole.cs`: lời gọi `BuildConnectionCoverage(holes, results)` xuất hiện đúng 1 lần, sau `BuildReport(...)`, gán vào `lastReport.ConnectionCoverage`; không sửa nhánh trả về NG hay dòng tạo marker.
+- [ ] `Commands/CheckHoleResultsForm.cs`: có field báo cáo `ConnectionCoverage`, cập nhật `Summary`, nút `connectionGroups`, đăng ký sự kiện qua `AddButton`, cập nhật trạng thái trong `UpdateActions` và phương thức `ShowConnectionGroups()` đầy đủ; không bỏ sót thành phần nào.
+- [ ] `ADDIN.csproj`: có chính xác **một** mục `<Compile Include="Commands\\CheckAssemblyHole.ConnectionGroups.cs" />`; file tồn tại đúng đường dẫn và được compile trong Debug/Release x64.
+- [ ] `git diff origin/main...HEAD` không chứa thay đổi ngoài phạm vi CG1; không có file bị xóa, class bị thay thế, đoạn mã `TODO` / `FIXME` / `throw new NotImplementedException` / code giả / comment thay thế implementation trong các phần CG1 cần chạy.
+- [ ] Không copy nguyên cả code Markdown dán đè lên file đang có; **source C# trên branch là mã chạy thực tế**, Markdown là bản đối chiếu.
+
+### 9.2. Xác minh đủ luồng chạy, không chỉ nhìn thấy hàm
+
+- [ ] `Run()` thật sự gọi phần chẩn đoán sau `BuildReport`; kết quả được lưu trong `lastReport` và truyền tới `resultsForm.SetReport(lastReport)`.
+- [ ] Nút **Nhóm liên kết** hiển thị đúng trong màn hình chi tiết, bật/tắt hợp lý khi đang chạy, sau hủy, sau chạy lại, và khi không có báo cáo.
+- [ ] Nhấp nút mở bảng dữ liệu có nhóm thật, thông tin hiện đúng; đóng dialog không ảnh hưởng CHECK HOLE và không tạo Sketch/Feature.
+- [ ] Dữ liệu chẩn đoán không tồn tại sai sau hủy, rerun, đóng form, đổi Assembly hoặc model thay đổi; xử lý bất thường được ghi rõ.
+- [ ] Logic CG1 không sửa `HoleStack`, `HoleAxis`, phép đánh giá `EvaluateStack`, các dung sai, báo cáo NG hiện có, phép ghép recovery/pattern hay việc tạo marker.
+- [ ] Nếu code bị lỗi runtime hoặc bị null ở tình huống biên, Anti phải sửa an toàn trong phạm vi CG1, không che lỗi bằng `catch { }` hoặc âm thầm báo PASS.
+
+### 9.3. Kiểm tra có thể tái lập
+
+1. Chạy `git diff --check` và ghi rõ kết quả; kiểm tra có thể thấy source trong project/solution.
+2. Build **Debug|x64** và **Release|x64** sử dụng SOLIDWORKS Interop và .NET Framework 4.8 thực tế. Ghi trạng thái `PASS`, `FAIL` hoặc `BLOCKED_ENVIRONMENT`, cùng thông báo lỗi chính xác; không tuyên bố PASS khi thiếu môi trường.
+3. Chạy T01–T10 trong Mục 4. Ghi rõ `PASS / FAIL / NOT_TESTED` **cho từng test**; cung cấp bản ghi kết quả, Assembly mẫu và hình/log khi có.
+4. Đối chiếu baseline trước/sau: logical holes, stack, NG, pattern NG, missing holes, unmatched, marker count, CSV, và vị trí/ý nghĩa của những dòng report. Sai lệch không giải thích được là **FAIL**.
+5. Kiểm tra CG1 **không suy diễn Master** từ vị trí Part ngoài cùng và **không tạo NG thiếu lỗ mới**.
+
+### 9.4. Báo cáo xác nhận bắt buộc
+
+Antigravity phải gửi bảng trạng thái cho từng mục dưới đây (không được chỉ ghi “code hoàn chỉnh”):
+
+| Hạng mục xác nhận | Trạng thái bắt buộc | Bằng chứng |
+|---|---|---|
+| 4 file đã có code đúng và đủ | PASS / FAIL | file path và diff |
+| Tất cả class, method, field, event/call site hoạt động liên thông | PASS / FAIL / NOT_VERIFIED | vị trí source + hành vi |
+| Không thiếu method, không stub, không duplicate | PASS / FAIL | kết quả kiểm tra source |
+| Build Debug x64 | PASS / FAIL / BLOCKED_ENVIRONMENT | log |
+| Build Release x64 | PASS / FAIL / BLOCKED_ENVIRONMENT | log |
+| UI runtime và data-binding | PASS / FAIL / NOT_TESTED | ảnh/log |
+| T01–T10 | PASS / FAIL / NOT_TESTED từng case | bảng kiểm thử |
+| Không thay đổi OK/NG/marker hiện tại | PASS / FAIL / NOT_VERIFIED | so sánh baseline |
+| Không còn lỗi/blocker chưa được báo cáo | PASS / FAIL | danh sách rủi ro |
+| Commit và trạng thái branch | SHA + tên branch | Git log |
+
+**Định nghĩa hoàn tất:** chỉ ghi `CODE_COMPLETE=YES` sau khi file code đầy đủ, không có phần bị thiếu/trùng/stub, luồng tích hợp đã đối chiếu, build cả hai cấu hình PASS và các test bắt buộc đã có bằng chứng PASS. Nếu test chưa đủ hoặc thiếu môi trường, ghi `CODE_COMPLETE=NOT_VERIFIED` và liệt kê chính xác phần nào chưa xác nhận. Nếu có lỗi xác định, ghi `CODE_COMPLETE=NO`. Không merge `main` khi chưa được người dùng duyệt.
+
+### 9.5. Mẫu lời xác nhận Antigravity phải trả về
+
+```text
+CG1 CODE COMPLETENESS VERIFICATION
+Branch:
+Commit SHA:
+File audit (4 files): PASS / FAIL
+Missing methods/fields/events: NONE / LIST
+Duplicate integrations/stubs: NONE / LIST
+Production OK/NG rules unchanged: PASS / FAIL / NOT_VERIFIED
+Debug|x64: PASS / FAIL / BLOCKED_ENVIRONMENT
+Release|x64: PASS / FAIL / BLOCKED_ENVIRONMENT
+UI & call-chain: PASS / FAIL / NOT_TESTED
+T01..T10: [each test status + evidence]
+Baseline regression: PASS / FAIL / NOT_VERIFIED
+Outstanding limitations/blockers:
+CODE_COMPLETE: YES / NO / NOT_VERIFIED
+Ready for ChatGPT review: YES / NO
+```
