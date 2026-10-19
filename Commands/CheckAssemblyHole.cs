@@ -331,6 +331,29 @@ namespace ADDIN.Commands
                 Stopwatch reportWatch = Stopwatch.StartNew();
                 lastReport = BuildReport(model.GetTitle(), SafeConfigurationName(model), holes, results, patternIssues, 0);
                 lastReport.ConnectionCoverage = BuildConnectionCoverage(holes, results);
+                // CG2: broad-phase component screening only. Never changes production NG.
+                // AABB overlap is not proof of solid contact or a missing hole.
+                try
+                {
+                    lastReport.PartRelations = BuildCg2PartRelations(assembly, holes);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception cg2Error)
+                {
+                    Debug.WriteLine("[CHECK HOLE CG2] diagnostics unavailable: " + cg2Error);
+                    lastReport.PartRelations = new CheckHoleCg2Report
+                    {
+                        IsPartial = true,
+                        CoverageStatus = "ERROR_UNVERIFIED"
+                    };
+                    lastReport.PartRelations.Warnings.Add(cg2Error.GetType().Name);
+                }
+                ThrowIfCanceled();
+                if (!string.Equals(inputState, CaptureModelState(model), StringComparison.Ordinal))
+                    throw new InvalidOperationException("Model đã thay đổi trong khi CG2 quét; hãy chạy lại.");
                 reportWatch.Stop();
                 profile.ReportBuildMs = reportWatch.ElapsedMilliseconds;
                 // Keep previous markers until a complete replacement sketch is confirmed.
