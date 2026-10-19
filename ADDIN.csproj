@@ -253,6 +253,7 @@
     <Compile Include="Commands\BendProcess\BendProcessModels.cs" />
     <Compile Include="Commands\BendProcess\PlanarFormingContact.cs" />
     <Compile Include="Commands\BendProcess\ProcessCollisionEngine.cs" />
+    <Compile Include="Commands\BendProcess\ProcessPerformance.cs" />
     <Compile Include="Commands\BendProcess\ProcessBatchWorker.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolDxfReader.cs" />
@@ -273,6 +274,7 @@
     </Compile>
     <Compile Include="UI\BendAssemblyBatchModels.cs" />
     <Compile Include="UI\BendAssemblyBatchController.cs" />
+    <Compile Include="UI\BendAssemblyBatchTimings.cs" />
     <Compile Include="UI\BendAssemblyBatchLiveBackend.cs" />
     <Compile Include="UI\BendAssemblyBatchForm.cs">
       <SubType>Form</SubType>

@@ -1,0 +1,33 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+using SolidWorks.Interop.sldworks;
+
+internal static partial class NativeAssemblyBatchValidation
+{
+    private static void ExerciseLargeNativeUi(ISldWorks app,ModelDoc2 root,Dictionary<string,object> report,string output)
+    {
+        Activate(app,root);root.ClearSelection2(true);
+        using(var owner=(Form)Activator.CreateInstance(product.GetType("ADDIN.UI.BendCheckForm",true),All,null,new object[]{app,root,null},null))
+        {
+            owner.Show();UiControls(owner).OfType<Button>().Single(b=>b.Text=="Assembly Batch").PerformClick();
+            var form=(Form)Get(owner,"batchForm");var controller=Get(owner,"batchController");
+            foreach(string stage in new[]{"cold","warm"})
+            {
+                UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));
+                var result=Get(controller,"displayed");
+                Check(result!=null&&(bool)Get(result,"Current")&&(int)Get(result,"LeafOccurrences")==120&&
+                    (int)Get(result,"UniqueSourceConfigurations")==25,"Actual 120/25 Live Form completes: "+UiControl(form,"lblProgressTitle").Text);
+                UiCheckBindings(form,result);report["Ui120-"+stage]=UiTimings(controller);
+                if(stage=="warm")Check((int)Get(result,"Captures")==0&&(int)Get(result,"CaptureHits")==25,"Live UI warm hits actual 25 native captures");
+                using(var bitmap=new Bitmap(form.Width,form.Height))
+                {form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"PRIVATE-live-120-"+stage+".png"));}
+                Console.WriteLine("LIVE_UI_120 "+stage+" "+Json.Serialize(report["Ui120-"+stage]));
+            }
+            form.Close();owner.Close();
+        }
+    }
+}

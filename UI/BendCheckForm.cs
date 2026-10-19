@@ -17,6 +17,7 @@ namespace ADDIN.UI
     {
         private readonly BendCheckSession session;
         private BendAssemblyBatchForm batchForm;
+        private BendAssemblyBatchController batchController;
         private readonly DataGridView parts;
         private readonly ComboBox scope;
         private readonly TextBox search;
@@ -62,12 +63,12 @@ namespace ADDIN.UI
                     if (batchForm != null && !batchForm.IsDisposed) { batchForm.Activate(); return; }
                     if (capturing) return;
                     batchForm = new BendAssemblyBatchForm(model.GetTitle(), model.ConfigurationManager?.ActiveConfiguration?.Name);
-                    new BendAssemblyBatchController(batchForm, new BendAssemblyBatchLiveBackend(app, model));
+                    batchController = new BendAssemblyBatchController(batchForm, new BendAssemblyBatchLiveBackend(app, model));
                     // Both windows use the same SOLIDWORKS STA. Pause the Min
                     // timer while Batch owns native capture; resume its normal
                     // freshness checks after the child closes.
                     timer.Stop();
-                    batchForm.FormClosed += (sender, args) => { batchForm = null; if (!disposed) timer.Start(); };
+                    batchForm.FormClosed += (sender, args) => { batchForm = null; batchController = null; if (!disposed) timer.Start(); };
                     batchForm.Show(this);
                 };
                 title.Controls.Add(btnBatchUI, 1, 0);

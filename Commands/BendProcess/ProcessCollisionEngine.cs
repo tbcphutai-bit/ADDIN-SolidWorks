@@ -11,7 +11,7 @@ namespace ADDIN.Commands.BendProcess
 {
     internal sealed class ProcessCollisionPolicy
     {
-        public const string Version = "CertifiedAffineBendZMotionBandsMmV1";
+        public const string Version = "CertifiedAffineBendZMotionBandsMmV2";
         public int MaximumIntervals { get; }
         public int MaximumDepth { get; }
         public int MaximumMilliseconds { get; }
@@ -65,16 +65,21 @@ namespace ADDIN.Commands.BendProcess
     internal static class ProcessCollisionEngine
     {
         private sealed class Cell
-        { internal double Lo, Hi; internal int Depth; internal Cell(double lo, double hi, int depth) { Lo = lo; Hi = hi; Depth = depth; } }
+        { internal double Lo, Hi; internal int Depth; internal uint Separated;
+            internal Cell(double lo, double hi, int depth, uint separated=0) { Lo = lo; Hi = hi; Depth = depth; Separated=separated; } }
         internal static ProcessPairResult Evaluate(BendProcessPlan plan, BendMotionSegment segment, CollisionPairKind pair,
-            ProcessCollisionPolicy policy = null, CancellationToken token = default(CancellationToken), Func<string> externalInvalid = null, Action consume = null)
+            ProcessCollisionPolicy policy = null, CancellationToken token = default(CancellationToken), Func<string> externalInvalid = null, Action consume = null,
+            Action<ProcessPerformanceSample> performance = null)
         {
             if (segment == null) throw new ArgumentNullException(nameof(segment));
+            using(var profile=new ProcessPerformanceScope(performance,plan?.ToolId,plan?.Binding.FeatureId??-1,segment.Phase,pair))
+            {
             policy = policy ?? new ProcessCollisionPolicy(); var watch = Stopwatch.StartNew();
             int intervals = 0, refinements = 0, calls = 0, contacts = 0;
             // The time clock is used only while executing. Held results expire
             // by source/job leases, not by elapsed time after completion.
             Func<string> invalid = () => {
+                using(ProcessPerformanceScope.Measure("Freshness.Engine"))
                 try { return externalInvalid?.Invoke() ?? plan?.InvalidatedReason; } catch { return "PROCESS_FRESHNESS_GUARD_FAILED"; }
             };
             Func<CollisionStatus, IEnumerable<string>, ProcessCollisionWitness, ProcessPairResult> result = (status, reasons, hit) =>
@@ -104,16 +109,21 @@ namespace ADDIN.Commands.BendProcess
                     step();
                     int remaining = Math.Max(1, policy.MaximumMilliseconds - (int)watch.ElapsedMilliseconds);
                     var ap = new AxialCollisionPolicy(policy.Axial.CrossSection, policy.Axial.MaximumCells, Math.Min(remaining, policy.Axial.MaximumMilliseconds));
-                    var r = AxialCollisionEngine.Evaluate(new AxialCollisionQuery(sheet, obstacle, pair, ap, invalid, () => { step(); consume?.Invoke(); calls++; }), token);
+                    AxialPairResult r;
+                    using(ProcessPerformanceScope.Measure("Axial.Query"))
+                        r = AxialCollisionEngine.Evaluate(new AxialCollisionQuery(sheet, obstacle, pair, ap, invalid, () => { step(); consume?.Invoke(); calls++; }), token);
                     step(); return r;
                 };
                 var observed = new HashSet<double>();
                 var constantActual = new Dictionary<string, AxialPairResult>();
                 var constantSweep = new Dictionary<string, AxialPairResult>();
-                Func<double, ProcessCollisionWitness> witnessAt = u => {
+                Func<double,uint, ProcessCollisionWitness> witnessAt = (u,proven) => {
                     if (!observed.Add(u)) return null;
-                    foreach (var p in segment.Parts.Where(p => p.Fidelity == ProcessGeometryFidelity.ExactGeometricSurrogate && p.Motion.AxialErrorMm == 0))
+                    for(int partIndex=0;partIndex<segment.Parts.Count;partIndex++)
                     {
+                        var p=segment.Parts[partIndex];
+                        if((proven&(1u<<partIndex))!=0) {ProcessPerformanceScope.Count("Motion.ParentSeparationReuses");continue;}
+                        if(p.Fidelity!=ProcessGeometryFidelity.ExactGeometricSurrogate||p.Motion.AxialErrorMm!=0)continue;
                         AxialPairResult r;
                         bool fixedPair = Constant(p.Motion) && Constant(tool.Motion);
                         if (!fixedPair || !constantActual.TryGetValue(p.Id, out r))
@@ -124,30 +134,48 @@ namespace ADDIN.Commands.BendProcess
                     return null;
                 };
                 foreach (double u in new[] { 0.0, 1.0 })
-                { var hit = witnessAt(u); if (hit != null) return result(CollisionStatus.COLLISION, new[] { "WITNESSED_UNWANTED_PROCESS_INTERFERENCE" }, hit); }
+                { var hit = witnessAt(u,0); if (hit != null) return result(CollisionStatus.COLLISION, new[] { "WITNESSED_UNWANTED_PROCESS_INTERFERENCE" }, hit); }
                 var queue = new Queue<Cell>(); queue.Enqueue(new Cell(0, 1, 0)); var unknown = new List<string>();
                 while (queue.Count > 0)
                 {
                     step();
                     if (++intervals > policy.MaximumIntervals) return result(CollisionStatus.UNKNOWN, new[] { "PROCESS_INTERVAL_BUDGET_EXCEEDED" }, null);
+                    ProcessPerformanceScope.Count("Motion.Intervals");
                     var cell = queue.Dequeue(); double mid = cell.Lo / 2 + cell.Hi / 2;
-                    var hit = witnessAt(mid);
+                    var hit = witnessAt(mid,cell.Separated);
                     if (hit != null) return result(CollisionStatus.COLLISION, new[] { "WITNESSED_UNWANTED_PROCESS_INTERFERENCE" }, hit);
                     bool separated = true; bool contact = false; bool variableUnresolved = false; var cellReasons = new List<string>();
-                    foreach (var p in segment.Parts)
+                    uint proven=cell.Separated;
+                    for(int partIndex=0;partIndex<segment.Parts.Count;partIndex++)
                     {
+                        var p=segment.Parts[partIndex];uint bit=1u<<partIndex;
+                        // A parent certificate covers its WHOLE time interval,
+                        // hence every descendant. No sampled-state or bounding-
+                        // box decision can set this bit. It is local to this
+                        // evaluation and never survives a stale/canceled lease.
+                        if((proven&bit)!=0){ProcessPerformanceScope.Count("Motion.ParentSeparationReuses");continue;}
                         if (segment.Contacts.Any(c => c.Proves(p, tool, segment.Phase, pair))) { contact = true; continue; }
                         AxialPairResult enclosure;
                         bool fixedPair = Constant(p.Motion) && Constant(tool.Motion);
-                        if (!fixedPair || !constantSweep.TryGetValue(p.Id, out enclosure))
+                        AxialPairResult fixedActual;
+                        if(fixedPair&&constantActual.TryGetValue(p.Id,out fixedActual)&&fixedActual.Status==CollisionStatus.CLEAR)
+                        {
+                            // Both supplied poses are constant: an actual-state
+                            // certified separation proves that same occupancy
+                            // at every u. Keep all source/numerical error bands.
+                            enclosure=fixedActual;ProcessPerformanceScope.Count("Motion.FixedSeparationReuses");
+                        }
+                        else if (!fixedPair || !constantSweep.TryGetValue(p.Id, out enclosure))
                         { enclosure = query(p.Sweep(cell.Lo, cell.Hi), tool.Sweep(cell.Lo, cell.Hi)); if (fixedPair) constantSweep[p.Id] = enclosure; }
                         if (enclosure.Status != CollisionStatus.CLEAR)
                         { separated = false; variableUnresolved |= !fixedPair; cellReasons.AddRange(enclosure.Reasons); }
+                        else proven|=bit;
                     }
                     if (separated) { if (contact) contacts++; continue; }
                     if (!variableUnresolved || cell.Depth >= policy.MaximumDepth)
                     { unknown.AddRange(cellReasons); unknown.Add("UNCOVERED_PROCESS_INTERVAL_OR_UNRESOLVED_CONTACT"); continue; }
-                    refinements++; queue.Enqueue(new Cell(cell.Lo, mid, cell.Depth + 1)); queue.Enqueue(new Cell(mid, cell.Hi, cell.Depth + 1));
+                    refinements++; queue.Enqueue(new Cell(cell.Lo, mid, cell.Depth + 1,proven)); queue.Enqueue(new Cell(mid, cell.Hi, cell.Depth + 1,proven));
+                    ProcessPerformanceScope.Count("Motion.Refinements");
                 }
                 step();
                 return unknown.Count > 0 ? result(CollisionStatus.UNKNOWN, unknown, null) : result(CollisionStatus.CLEAR,
@@ -157,6 +185,7 @@ namespace ADDIN.Commands.BendProcess
             catch (CollisionAbort ex) { return result(CollisionStatus.UNKNOWN, new[] { ex.Message }, null); }
             catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException || ex is System.IO.InvalidDataException || ex is ArithmeticException)
             { return result(CollisionStatus.UNKNOWN, new[] { "PROCESS_GEOMETRY_OR_NUMERICAL_FAILURE" }, null); }
+            }
         }
         private static bool Constant(ProcessMotionLaw m) => m.StartAngle == m.EndAngle && m.StartAxialMm == m.EndAxialMm &&
             m.StartTranslationMm.X == m.EndTranslationMm.X && m.StartTranslationMm.Y == m.EndTranslationMm.Y;

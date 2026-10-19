@@ -10,6 +10,7 @@
     <Reference Include="System.Drawing" /><Reference Include="System.Windows.Forms" />
     <Compile Include="..\..\UI\BendAssemblyBatchModels.cs" />
     <Compile Include="..\..\UI\BendAssemblyBatchController.cs" />
+    <Compile Include="..\..\UI\BendAssemblyBatchTimings.cs" />
     <Compile Include="..\..\UI\BendAssemblyBatchForm.cs" />
     <Compile Include="..\..\UI\BendAssemblyBatchForm.Designer.cs" />
     <Compile Include="..\..\UI\TaiTheme.cs" /><Compile Include="..\..\UI\ModernButton.cs" />
@@ -17,5 +18,6 @@
     <Compile Include="..\..\UI\ModernCard.cs" />
     <Compile Include="..\..\UI\UIHelper.cs" /><Compile Include="..\..\UI\GridStyler.cs" />
     <Compile Include="BendAssemblyUiTests.cs" />
+    <Compile Include="AssemblyUiBenchmark.cs" />
   </ItemGroup>
 </Project>

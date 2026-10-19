@@ -70,6 +70,7 @@ internal static partial class ToolProfileTests
         (p.Witness==null?"-":ToolEvidenceCanonical.Point(p.Witness.PointMm)+":"+ToolEvidenceCanonical.Number(p.Witness.AxialMm));
     private static void AssemblyBatchTests()
     {
+        AssemblyReadTests();
         Test("assembly cache: bounded LRU, stale guards and exceptions cannot strand flights",()=> {
             var cache=new AssemblyManagedCache<string>(2,8);bool hit;int made=0;bool fresh=true;
             Func<string,string> get=k=>cache.Get(k,()=>{made++;return k;},_=>fresh,_=>4,CancellationToken.None,out hit);
