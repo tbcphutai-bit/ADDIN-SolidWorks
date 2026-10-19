@@ -90,13 +90,37 @@ internal static partial class NativeAssemblyBatchValidation
         // template, min workbook. Source files are only copied/read, never saved.
         if(args.Length!=6) {Console.WriteLine("dll output seed dimension assembly-template min-xlsx");return 2;}
         ISldWorks app=null;bool owned=false;var disposable=new List<IDisposable>();var report=new Dictionary<string,object>();
+        var fixtureSources=new Dictionary<string,string>();
         try
         {
             product=Assembly.LoadFrom(args[0]);string output=Path.GetFullPath(args[1]);Directory.CreateDirectory(output);
+            if(System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_CAPTURE_DIAGNOSTICS")=="1")
+            {
+                int staThread=Thread.CurrentThread.ManagedThreadId;
+                AppDomain.CurrentDomain.FirstChanceException+=(sender,eventArgs)=> {
+                    if(Thread.CurrentThread.ManagedThreadId==staThread&&eventArgs.Exception is KeyNotFoundException)
+                        File.AppendAllText(Path.Combine(output,"PRIVATE-capture-exceptions.txt"),eventArgs.Exception+System.Environment.NewLine);
+                };
+            }
             string seedHash=Sha(args[2]);
             app=NativeTestProcess.StartOwned(output);owned=true;Check(owned,"Own explicit native test process");app.Visible=false;app.UserControl=false;
             File.WriteAllText(Path.Combine(output,"ownership.json"),Json.Serialize(new {Owned=owned,Pid=app.GetProcessID(),StartUtc=Process.GetProcessById(app.GetProcessID()).StartTime.ToUniversalTime().ToString("o")}));
             string rootPath=Path.Combine(output,"GENERATED-120.SLDASM");
+            string existing=System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_FIXTURE_SOURCE");
+            if(!string.IsNullOrWhiteSpace(existing))
+            {
+                existing=Path.GetFullPath(existing);
+                Check(!string.Equals(existing,output,StringComparison.OrdinalIgnoreCase)&&!File.Exists(rootPath),"Clone fixture into a new private output only");
+                var parts=Directory.GetFiles(existing,"GENERATED-*.SLDPRT");
+                var assemblies=new[]{"SUB-0.SLDASM","SUB-1.SLDASM","GENERATED-120.SLDASM"}.Select(n=>Path.Combine(existing,n)).ToArray();
+                Check(parts.Length==23&&assemblies.All(File.Exists),"Reuse requires the complete real 120/25 fixture");
+                foreach(var path in parts.Concat(assemblies)){fixtureSources.Add(path,Sha(path));File.Copy(path,Path.Combine(output,Path.GetFileName(path)),false);}
+                // Closed-document replacement writes only the copied Assembly.
+                // Native path assertions below reject an unresolved old link.
+                foreach(var assemblyPath in assemblies)foreach(var sourceReference in parts.Concat(assemblies.Take(2)))
+                    app.ReplaceReferencedDocument(Path.Combine(output,Path.GetFileName(assemblyPath)),sourceReference,Path.Combine(output,Path.GetFileName(sourceReference)));
+                report["ReusedBaselineFixture"]=true;
+            }
             if(!File.Exists(rootPath))
             {
             var keys=new List<Tuple<string,string>>();var docs=new List<ModelDoc2>();
@@ -130,6 +154,9 @@ internal static partial class NativeAssemblyBatchValidation
             // The fixture explicitly starts resolved. Backend never requests bulk
             // resolution; any required setup belongs to fixture creation only.
             assembly.ResolveAllLightWeightComponents(false);
+            Check((assembly.GetComponents(false) as object[]??new object[0]).OfType<Component2>().All(c=>
+                Path.GetFullPath(c.GetPathName()).StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)),
+                "All fixture references are inside the current private output before any fixture saves");
             foreach(var fixturePart in (app.GetDocuments() as object[]).OfType<ModelDoc2>().Where(d=>d.GetType()==1 && d.GetPathName().StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)))
             {
                 if(fixturePart.Extension.ListExternalFileReferencesCount()>0)fixturePart.Extension.BreakAllExternalFileReferences2(true);
@@ -155,6 +182,10 @@ internal static partial class NativeAssemblyBatchValidation
             {Call(session,"BuildInventory",false);Console.WriteLine("INVENTORY_ONLY "+Json.Serialize(Items(Get(session,"InventoryOccurrences")).GroupBy(o=>Get(o,"Kind")+":"+Get(o,"Reason")).Select(g=>new {Reason=g.Key,Count=g.Count()})));return 0;}
             double wall,sta;var cold=Run(session,source,false,Options(4),out wall,out sta);var metrics=new List<object>{Metrics("cold-all",cold,wall,sta)};report["Performance"]=metrics;
             var items=Items(Get(session,"Items"));Check(items.Length==25,"Inventory groups 120 members into 25 source/config captures");
+            report["CaptureInventory"]=items.Select(i=>new {File=Path.GetFileName(Convert.ToString(Get(i,"Path"))),
+                Configuration=Get(i,"Configuration"),Done=Get(i,"Done"),Error=Get(i,"Error"),Reason=Get(i,"AssemblyBatchReason"),
+                Reads=Get(i,"Context")==null?(object)null:Get(Get(i,"Context"),"GeometryReadCount")}).ToArray();
+            report["BatchPartReasons"]=Get(cold,"ReasonCounts");
             Check((int)Get(cold,"Captures")==25&&items.All(i=>(int)Get(Get(i,"Context"),"GeometryReadCount")==1),"Exactly one real Min geometry read per unique source");
             Check(items.All(i=>Get(i,"Error")==null),"Every eligible native Part captured successfully");
             Check((int)Get(cold,"KernelQueries")==0,"Unverified company process is UNKNOWN, not numeric benchmark");
@@ -230,6 +261,8 @@ internal static partial class NativeAssemblyBatchValidation
             Check((int)Get(suppressed,"SuppressedCount")==1,"Suppressed selected component accounted without body traversal");
             edge.SetSuppression2(oldState);
             EdgeFixtures(app,root,args[4],output,disposable,report,source);
+            Check(fixtureSources.All(p=>Sha(p.Key)==p.Value),"Baseline fixture source bytes unchanged");
+            report["BaselineFixtureSourceUnchanged"]=true;
             report["Assertions"]=assertions;report["Result"]="PASS";report["CompanyNumericBenchmark"]=false;
             File.WriteAllText(Path.Combine(output,"assembly-batch-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;
         }

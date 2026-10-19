@@ -51,8 +51,10 @@
     <Compile Include="..\..\Commands\BendProcess\BendProcessModels.cs"><Link>BendProcessModels.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendProcess\PlanarFormingContact.cs"><Link>PlanarFormingContact.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendProcess\ProcessCollisionEngine.cs"><Link>ProcessCollisionEngine.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendProcess\ProcessPerformance.cs"><Link>ProcessPerformance.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendProcess\ProcessBatchWorker.cs"><Link>ProcessBatchWorker.cs</Link></Compile>
     <Compile Include="ProcessTests.cs"/>
+    <Compile Include="ProcessPerformanceTests.cs"/>
     <Compile Include="AssemblyBatchTests.cs"/>
     <Compile Include="AssemblyBatchBenchmark.cs"/>
     <Compile Include="ProcessAdditionalTests.cs"/>

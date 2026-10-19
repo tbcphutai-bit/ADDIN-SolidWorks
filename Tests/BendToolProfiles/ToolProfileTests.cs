@@ -67,6 +67,7 @@ internal static partial class ToolProfileTests
         if (args.Length>0 && args[0]=="--process-company") return ProcessCompanyIntegration(args);
         if (args.Length>0 && args[0]=="--assembly-tests") return AssemblyOnly(args);
         if (args.Length>0 && args[0]=="--assembly-benchmark") return AssemblyBenchmark(args);
+        if (args.Length>0 && args[0]=="--process-reference") return ProcessReference(args);
         if (args.Length>0 && args[0]=="--process-tests")
         {
             temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ProcessTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);

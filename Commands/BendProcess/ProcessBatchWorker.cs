@@ -29,9 +29,11 @@ namespace ADDIN.Commands.BendProcess
         private static string PlanKey(string tool, int feature) => tool + "\n" + feature.ToString(System.Globalization.CultureInfo.InvariantCulture);
         internal IReadOnlyList<BendProcessPlan> FindPlans(string tool, int feature)
         { IReadOnlyList<BendProcessPlan> values; return planIndex.TryGetValue(PlanKey(tool, feature), out values) ? values : NoPlans; }
-        internal string InvalidReason => !Model.Lease.Current ? "STALE_MODEL_OR_CONFIGURATION" : !Library.Current || Library.PlacementSources?.Current == false ?
+        internal string SharedInvalidReason => !Model.Lease.Current ? "STALE_MODEL_OR_CONFIGURATION" : !Library.Current || Library.PlacementSources?.Current == false ?
             "STALE_TOOL_LIBRARY" : ObservedFinalGeometry.Any(e => !ReferenceEquals(e.Binding.Model, Model) || !e.Current) ?
-            "STALE_OR_MISMATCHED_OBSERVED_GEOMETRY" : Plans.Any(p => p.InvalidatedReason != null) ? "STALE_PROCESS_OR_SETUP" : null;
+            "STALE_OR_MISMATCHED_OBSERVED_GEOMETRY" : null;
+        internal string InvalidReason { get { using(ProcessPerformanceScope.Measure("Freshness.FullRequest"))
+            return SharedInvalidReason ?? (Plans.Any(p => p.InvalidatedReason != null) ? "STALE_PROCESS_OR_SETUP" : null); } }
     }
     internal sealed class ProcessCandidateResult
     {
@@ -69,10 +71,13 @@ namespace ADDIN.Commands.BendProcess
         public ProcessCollisionPolicy PairPolicy { get; }
         internal Func<string> ExternalInvalid { get; private set; }
         internal Action ExternalConsume { get; private set; }
+        internal Action<ProcessPerformanceSample> Performance { get; private set; }
         internal ProcessBatchOptions(int workers = 2, int milliseconds = 30000, int kernelQueries = 100000, ProcessCollisionPolicy pairPolicy = null)
         { Workers = workers; Milliseconds = milliseconds; KernelQueries = kernelQueries; PairPolicy = pairPolicy ?? new ProcessCollisionPolicy(); }
         internal ProcessBatchOptions WithAssemblyGuard(Func<string> invalid, Action consume) => new ProcessBatchOptions(Workers,
-            Milliseconds, KernelQueries, PairPolicy) { ExternalInvalid = invalid, ExternalConsume = consume };
+            Milliseconds, KernelQueries, PairPolicy) { ExternalInvalid = invalid, ExternalConsume = consume, Performance = Performance };
+        internal ProcessBatchOptions WithPerformance(Action<ProcessPerformanceSample> sink) => new ProcessBatchOptions(Workers,
+            Milliseconds, KernelQueries, PairPolicy) { ExternalInvalid=ExternalInvalid, ExternalConsume=ExternalConsume, Performance=sink };
         internal bool Valid => Workers >= 1 && Workers <= 4 && Milliseconds > 0 && Milliseconds <= 120000 && KernelQueries > 0 && KernelQueries <= 1000000 && PairPolicy.Valid;
     }
     internal sealed class ProcessBatchSnapshot
@@ -87,10 +92,14 @@ namespace ADDIN.Commands.BendProcess
         public int WorkerThreadId { get; }
         public int MaximumConcurrency { get; }
         public string ProgressDiagnostic { get; }
+        public int FullAudits { get; }
+        public int SharedGuardChecks { get; }
+        public double FreshnessAuditMilliseconds { get; }
         internal ProcessBatchSnapshot(ProcessBatchRequest request, CollisionBatchRunState state, IEnumerable<ProcessCandidateResult> rows,
-            double ms, int calls, int thread, int concurrency, string diagnostic)
+            double ms, int calls, int thread, int concurrency, string diagnostic,int fullAudits=0,int sharedChecks=0,double auditMs=0)
         { this.request = request; RunState = state; Candidates = PlacementLists.Copy(rows); WorkerMilliseconds = ms;
-            KernelQueries = calls; WorkerThreadId = thread; MaximumConcurrency = concurrency; ProgressDiagnostic = diagnostic; }
+            KernelQueries = calls; WorkerThreadId = thread; MaximumConcurrency = concurrency; ProgressDiagnostic = diagnostic;
+            FullAudits=fullAudits;SharedGuardChecks=sharedChecks;FreshnessAuditMilliseconds=auditMs; }
     }
     internal sealed class ProcessBatchWorker : IDisposable
     {
@@ -130,13 +139,25 @@ namespace ADDIN.Commands.BendProcess
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
             var clock = Stopwatch.StartNew(); int calls = 0, next = -1, done = 0, executing = 1, running = 0, maximum = 0;
+            int fullAudits=0,sharedChecks=0;long auditTicks=0;
             int thread = Thread.CurrentThread.ManagedThreadId; string diagnostic = null; var progressGate = new object();
             Func<string> invalid = () => {
+                Interlocked.Increment(ref sharedChecks);
                 string external = options.ExternalInvalid?.Invoke(); if (external != null) runState.Stop(external);
-                if (request.InvalidReason != null) runState.Stop(request.InvalidReason);
+                // Per-query guards validate shared leases here and the active
+                // plan in ProcessCollisionEngine. Other plans cannot publish
+                // partial proof: full audits run at candidate boundaries and
+                // publication, and held snapshots still use InvalidReason.
+                string shared=request.SharedInvalidReason;if(shared!=null)runState.Stop(shared);
                 if (token.IsCancellationRequested) runState.Stop("CANCELLED");
                 if (Volatile.Read(ref executing) != 0 && clock.ElapsedMilliseconds >= options.Milliseconds) runState.Stop("PROCESS_JOB_TIME_BUDGET_EXCEEDED");
                 return runState.Reason;
+            };
+            Func<string> fullInvalid = () => {
+                long start=Stopwatch.GetTimestamp();Interlocked.Increment(ref fullAudits);
+                string reason=request.InvalidReason;if(reason!=null)runState.Stop(reason);
+                Interlocked.Add(ref auditTicks,Stopwatch.GetTimestamp()-start);
+                return invalid();
             };
             Action consume = () => {
                 options.ExternalConsume?.Invoke();
@@ -160,12 +181,12 @@ namespace ADDIN.Commands.BendProcess
                         var plans = request.FindPlans(job.Tool, job.Bend.FeatureId);
                         var plan = plans.Count == 1 ? plans[0] : null;
                         string missing = plans.Count > 1 ? "DUPLICATE_PROCESS_PLAN" : plan == null ? "UNKNOWN_PROCESS_GEOMETRY" :
-                            !ReferenceEquals(plan.Binding.Model, request.Model) ? "MISMATCHED_PROCESS_MODEL" : invalid();
+                            !ReferenceEquals(plan.Binding.Model, request.Model) ? "MISMATCHED_PROCESS_MODEL" : fullInvalid();
                         if (missing == null)
                         {
                             simulation |= plan.SimulationOnly;
                             foreach (var segment in plan.Segments) foreach (CollisionPairKind pair in Enum.GetValues(typeof(CollisionPairKind)))
-                                results.Add(ProcessCollisionEngine.Evaluate(plan, segment, pair, options.PairPolicy, token, invalid, consume));
+                                results.Add(ProcessCollisionEngine.Evaluate(plan, segment, pair, options.PairPolicy, token, invalid, consume, options.Performance));
                         }
                         foreach (BendProcessPhase phase in Enum.GetValues(typeof(BendProcessPhase)))
                             foreach (CollisionPairKind pair in Enum.GetValues(typeof(CollisionPairKind)))
@@ -179,6 +200,7 @@ namespace ADDIN.Commands.BendProcess
                             results.Add(unknown(pair, phase, new[] { runState.Reason }));
                     }
                     finally { Interlocked.Decrement(ref running); }
+                    fullInvalid();
                     output[index] = new ProcessCandidateResult(job.Tool, job.Bend.FeatureId, results, simulation);
                     lock (progressGate)
                     {
@@ -192,11 +214,12 @@ namespace ADDIN.Commands.BendProcess
             {
                 if (options.Workers == 1 || !options.Valid) work();
                 else Task.WaitAll(Enumerable.Range(0, options.Workers).Select(i => Task.Run(work)).ToArray());
-                invalid();
+                fullInvalid();
             }
             Volatile.Write(ref executing, 0); clock.Stop();
             var ordered = request.Model.Bends.SelectMany(b => CompanyToolIds.All.Select(id => output.Single(r => r.FeatureId == b.FeatureId && r.ToolId == id)));
-            return new ProcessBatchSnapshot(request, runState, ordered, clock.Elapsed.TotalMilliseconds, calls, thread, maximum, diagnostic);
+            return new ProcessBatchSnapshot(request, runState, ordered, clock.Elapsed.TotalMilliseconds, calls, thread, maximum, diagnostic,
+                fullAudits,sharedChecks,auditTicks*1000.0/Stopwatch.Frequency);
         }
         public void Dispose()
         {
