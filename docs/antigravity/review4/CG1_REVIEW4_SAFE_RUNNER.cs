@@ -60,7 +60,8 @@ namespace ADDIN.Tests
             foreach (string folder in new[] {
                 s_candidateDir,
                 s_baselineDir,
-                @"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS"
+                @"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS",
+                @"C:\Tao moi"
             })
             {
                 if (string.IsNullOrEmpty(folder)) continue;
@@ -73,6 +74,8 @@ namespace ADDIN.Tests
         [STAThread]
         public static int Main(string[] args)
         {
+            AppDomain.CurrentDomain.AssemblyResolve += ResolveDependency;
+
             if (args.Length == 1 && args[0] == "--self-test")
                 return SelfTestExitPolicy();
 
@@ -83,6 +86,12 @@ namespace ADDIN.Tests
                 return 2;
             }
 
+            return RunRunner(args);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static int RunRunner(string[] args)
+        {
             ISldWorks app = null;
             bool ownsNewSession = false;
             try
@@ -96,7 +105,6 @@ namespace ADDIN.Tests
 
                 s_baselineDir = Path.GetDirectoryName(baselineDll);
                 s_candidateDir = Path.GetDirectoryName(candidateDll);
-                AppDomain.CurrentDomain.AssemblyResolve += ResolveDependency;
 
                 // FAIL CLOSED: do not attach to an existing user session or close
                 // any document that was open prior to this run.

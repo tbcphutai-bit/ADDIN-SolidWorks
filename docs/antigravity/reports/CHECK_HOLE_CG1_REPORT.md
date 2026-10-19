@@ -1,6 +1,6 @@
 # CHECK HOLE CG1 — ANTIGRAVITY IMPLEMENTATION & VERIFICATION REPORT
 
-> REPORT STATUS: **VERIFIED_BUILD_AND_CAD_REGRESSION_PENDING_FIXTURES**
+> REPORT STATUS: **VERIFIED_BUILD_AND_SAFE_RUNNER_PENDING_FIXTURES**
 >
 > This report documents the verification, full rebuild, independent tolerance testing, live SOLIDWORKS CAD regression against `main` baseline, and review resolution for CG1 (Automatic Connection Group Diagnostics) executed by Antigravity on branch `feat/check-hole-connection-groups-cg1`.
 > ChatGPT reviews the final published report and branch diff; only the user can authorize merging into `main`.
@@ -9,23 +9,25 @@
 
 ## 0. Review Responses & Resolution
 
-### 0.1 Resolution of ChatGPT Review #3 (2026-10-19)
+### 0.1 Resolution of ChatGPT Review #4 (2026-10-19)
 
-| # | Review #3 Item | Status | Resolution & Evidence |
+| # | Review #4 Requirement | Status | Resolution & Evidence |
 |---|---|---|---|
-| **1** | **Sửa `LIVE_CAD_RUNNER.cs`** | **RESOLVED** | Rewrote runner to eliminate any silent PASS: <br>- Validates file existence (`File.Exists`), model opening (`OpenDoc6`), and all report fields. Missing file records `SKIP`; error records `FAIL`. <br>- Any assertion failure or exception returns `exit code 1`; only returns `0` when all assertions pass. <br>- Comprehensive assertions for zero-hole assembly (`run07`): asserts `LogicalHoles == 0`, `StackCount == 0`, `CG1 Groups == 0`, `CoverageStatus == "KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO"`. |
-| **2** | **Bảo vệ SOLIDWORKS và Assembly gốc** | **RESOLVED** | Safety mechanisms verified: <br>- Session preservation: Runner detects pre-existing `SLDWORKS` process. If already running, connects via ROT/ProgID and **never** calls `ExitApp()`. If launched by runner, safely exits on completion. <br>- Model protection: Opens files strictly with `swOpenDocOptions_ReadOnly \| swOpenDocOptions_Silent`. <br>- Marker suppression: Sets `checker.AutoCreateMarkers = false` before `Run()`; never creates or alters sketch markers. <br>- Integrity verification: Cryptographic SHA256 of the `.SLDASM` file is computed immediately before opening and after closing. Verified 100% identical (`3DFBB2CC...` for run07, `45F500B4...` for 1618-01-BH). |
-| **3** | **Kiểm thử hồi quy thực tế (Baseline `main` vs `CG1`)** | **RESOLVED** | Independent baseline binary built from `main` (`549a03c`) at `C:\Tao moi\ADDIN_MAIN_BASELINE\bin\x64\Release\ADDIN.dll`. Runner loads both baseline DLL and CG1 candidate DLL, executing them sequentially on the exact same models under identical conditions: <br>- Zero-hole model: 100% match across all metrics. <br>- Production 916-hole model (`1618-01-BH.SLDASM`): 100% match on all 7 production metrics (`Logical=916`, `Grouped=696`, `Unmatched=220`, `Stacks=348`, `NG=0`, `PatNG=0`, `Miss=0`). <br>- CG1 invariants confirmed: `Groups=348` matches `Stacks=348`, `UnmatchedHoles=220` matches `Unmatched=220`. |
-| **4** | **Kiểm tra lại bằng chứng build & Warning** | **RESOLVED** | Warning breakdown clarified: Total `16` warnings reported by MSBuild (CG1 code: `0` warnings; Preexisting: `16` warnings consisting of `8` unique preexisting warnings emitted twice due to MSBuild's 2-pass WPF compilation: `_wpftmp.csproj` + `.csproj`). Full rebuild logs for Release and Debug recorded in [`BUILD_EVIDENCE.md`](BUILD_EVIDENCE.md). |
-| **5** | **Cập nhật báo cáo trên GitHub** | **RESOLVED** | Updated `BUILD_EVIDENCE.md`, `TEST_HARNESS_EVIDENCE.md`, `LIVE_CAD_RUNNER.cs`, and this report. Committed and pushed to `origin feat/check-hole-connection-groups-cg1`. |
-| **6** | **Xác nhận code đầy đủ & Gate** | **CONFIRMED** | Maintained `CODE_COMPLETE=NOT_VERIFIED` because standalone CAD test fixtures for T01–T10 remain pending user provision. No claims of PASS without full fixture evidence. |
+| **1** | **Triển khai `CG1_REVIEW4_SAFE_RUNNER.cs`** | **RESOLVED** | Adopted `docs/antigravity/review4/CG1_REVIEW4_SAFE_RUNNER.cs` as the reference fail-closed runner and integrated it into [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs). Fixed the JIT `AssemblyResolve` timing issue so interop dependencies resolve before method JIT compilation. |
+| **2** | **Xác thực `--self-test`** | **PASS** | Executed `LIVE_CAD_RUNNER.exe --self-test` $\to$ returned `0` (PASS: exit policy handles PASS / FAIL / SKIP / empty cases). |
+| **3** | **Từ chối phiên SOLIDWORKS đang mở** | **PASS (Fail-closed)** | Verified: when a `SLDWORKS` process is active, runner immediately aborts with `InvalidOperationException: An existing SOLIDWORKS session is running. Close it yourself before running this isolated test. No CAD was touched.` and returns exit code 1. |
+| **4** | **Yêu cầu sandbox cô lập & chấp thuận thủ công** | **PASS (Fail-closed)** | Verified: missing `CG1_SANDBOX_OK.txt` or paths outside sandbox root aborts with `InvalidOperationException` and returns exit code 1. |
+| **5** | **Bảo vệ chống sửa đổi mô hình gốc** | **PASS (Fail-closed)** | Runner enforces: opening strictly read-only and silent, verifying document is clean (`GetSaveFlag() == false`), ensuring no pre-existing `CHECK-HOLE-NG*` features, checking feature tree signature invariance, and comparing file SHA256 before vs after execution. |
+| **6** | **Từ chối liên kết linh kiện ngoài sandbox** | **PASS (Fail-closed)** | `VerifyReferencesUnderSandbox` iterates all components. <br>- `run07_Missing_Ura_BOM.SLDASM` (0-hole smoke) is 100% self-contained $\to$ **PASS** on both baseline `main` and `CG1` candidate with identical 0-hole metrics and exit code 0. <br>- `1618-01-BH.SLDASM` references external missing path `C:\SGN09\2026\8月\1618\1618-04-bh-A2-蓋1.SLDPRT` $\to$ Runner strictly blocks execution (`BLOCKED_ISOLATION`). In accordance with Review #4 directives, the isolation check was NOT bypassed or weakened. Status recorded as `NOT_TESTED` / `BLOCKED_ISOLATION`. |
+| **7** | **Trạng thái nghiệm thu** | **CONFIRMED** | Maintained `CODE_COMPLETE=NOT_VERIFIED` and `READY_FOR_MERGE=NO`. |
 
 ---
 
-### 0.2 Prior Reviews Resolution Summary (Reviews #1 & #2)
+### 0.2 Prior Reviews Resolution Summary (Reviews #1, #2 & #3)
 
 - **Review #1:** Corrected commit SHAs; aligned Git history; opened Draft PR #27; established testing guidelines.
 - **Review #2:** Full Rebuild logs with compiler invocation; independent tolerance unit tests (`E10–E12`) verifying real `EvaluateStack` calls for 0.09 mm ($\le 0.10$ mm $\to$ OK), 0.11 mm ($> 0.10$ mm $\to$ NG), and 0.35° ($> 0.20^\circ \to$ NG); offline WinForms state verification (`UI01–UI05`).
+- **Review #3:** Dual-assembly in-CAD regression runner; pre-existing session preservation; strict non-zero exit codes; compiler warning breakdown (16 total: 0 in CG1, 16 preexisting).
 
 ---
 
@@ -94,45 +96,38 @@ Detailed verbatim logs in [`docs/antigravity/reports/BUILD_EVIDENCE.md`](BUILD_E
 
 ---
 
-## E. Real SOLIDWORKS Tests & In-CAD Regression Benchmarks
+## E. Review #4 Acceptance Matrix & In-CAD Verification
 
-Evaluated live via [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs) comparing baseline `main` DLL against `CG1` target DLL:
-
-| Model | Status | Baseline Production Metrics (Logical / Grouped / Unmatched / Stacks / NG / Pat / Miss) | CG1 Candidate Production Metrics (Logical / Grouped / Unmatched / Stacks / NG / Pat / Miss) | CG1 Diagnostic Invariants (Groups / Status / NgNoMaster / Unmatched) | File SHA256 Match | Verdict |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `run07_Missing_Ura_BOM.SLDASM` (Boundary: 0 holes) | **PASS** | `0 / 0 / 0 / 0 / 0 / 0 / 0` | `0 / 0 / 0 / 0 / 0 / 0 / 0` | `Groups=0`, `CoverageStatus="KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO"`, `NgNoMaster=0`, `Unmatched=0` | YES (`3DFBB2CC...`) | **PASS** |
-| `1618-01-BH.SLDASM` (Production: 916 holes) | **PASS** | `916 / 696 / 220 / 348 / 0 / 0 / 0` | `916 / 696 / 220 / 348 / 0 / 0 / 0` | `Groups=348`, `CoverageStatus="CHUA_DAY_DU: CO_LO_CHUA_GHEP"`, `NgNoMaster=0`, `Unmatched=220` | YES (`45F500B4...`) | **PASS** |
-
-### Individual Scenarios T01–T10 Status
-| ID | Test scenario | Result | Basis of Verification |
+| Requirement | Description | Status | Evidence / Verification |
 |---|---|---|---|
-| T01 | Two coaxial round holes | NOT_TESTED | Standalone CAD fixture pending. Synthetic harness `E03` verified display mapping. |
-| T02 | 0.09 mm offset | **PASS (Engine)** | Real production `EvaluateStack` evaluated 0.09 mm offset $\le 0.10\text{ mm}$ tolerance: `IsNg=false`, piped to CG1 `Status="OK"` (`E10`). Standalone CAD fixture: `NOT_TESTED`. |
-| T03 | 0.11 mm offset | **PASS (Engine)** | Real production `EvaluateStack` evaluated 0.11 mm offset $> 0.10\text{ mm}$ tolerance: `IsNg=true`, piped to CG1 `Status="NG"`, `CHUA_XAC_DINH_MASTER` (`E11`). Standalone CAD fixture: `NOT_TESTED`. |
-| T04 | Angle outside 0.20-degree tolerance | **PASS (Engine)** | Real production `EvaluateStack` evaluated 0.35° angle $> 0.20^\circ$ tolerance: `IsNg=true`, piped to CG1 `Status="NG"` (`E12`). Standalone CAD fixture: `NOT_TESTED`. |
-| T05 | A–B–C layered stack | NOT_TESTED | Standalone CAD fixture pending. Synthetic harness `E07` verified endpoints mapped to A and C. |
-| T06 | Independent B–D connection | NOT_TESTED | Standalone CAD fixture pending. Synthetic harness `E08` verified 2 distinct groups without global Part master. |
-| T07 | Unmatched hole | NOT_TESTED | Standalone CAD fixture pending. Synthetic harness `E09` verified unmatched count and coverage status. |
-| T08 | Missing hole / skipped pattern | NOT_TESTED | Standalone CAD fixture pending. Production pattern/missing algorithms untouched. |
-| T09 | SLOT, curved, or recovered deformed hole | NOT_TESTED | Standalone CAD fixture pending. Production recovery/slot classification untouched. |
-| T10 | Large Assembly, rerun, cancel and model changes | **PASS (Benchmark)** | 916-hole live benchmark completed with 100% metric equivalence to `main`. State machine validated. |
+| **Compile safe runner** | C# 7.3 / .NET 4.8 standalone compilation | **PASS** | Compiled with Roslyn `csc.exe` with 0 errors. |
+| **Self-test exit semantics** | `LIVE_CAD_RUNNER.exe --self-test` | **PASS** | Returned exit code 0 (`PASS: exit policy handles PASS / FAIL / SKIP / empty cases`). |
+| **Existing SW session refusal** | Refuse to attach or touch user session | **PASS** | Detected pre-existing `SLDWORKS` process $\to$ aborts with exit code 1. |
+| **Missing consent refusal** | Missing `CG1_SANDBOX_OK.txt` | **PASS** | Aborts with `InvalidOperationException` and exit code 1. |
+| **Path outside sandbox refusal** | Model path outside root | **PASS** | Aborts with `InvalidOperationException` and exit code 1. |
+| **External component refusal** | Component reference outside root | **PASS** | Aborts with `InvalidOperationException` and exit code 1. |
+| **Real baseline vs candidate** | Compare two distinct binaries | **PASS** | Verified distinct MVIDs: Baseline `8008c4c2...`, Candidate `456f9ade...`. |
+| **Model safety verification** | Not dirty, features invariant, hash match | **PASS** | Verified `GetSaveFlag() == false`, feature tree signature identical, file SHA256 unchanged. |
+| **Zero-hole isolated fixture** | `run07_Missing_Ura_BOM.SLDASM` | **PASS** | 100% match on both baseline `main` and `CG1` candidate (`holes=0 groups=0 unmatched=0 stacks=0 NG=0`). |
+| **Production large assembly** | `1618-01-BH.SLDASM` | **BLOCKED_ISOLATION** | Refused by `VerifyReferencesUnderSandbox` due to external non-existent path `C:\SGN09\...` for components `A2-蓋1` and `A3-蓋1`. Recorded as `NOT_TESTED` / `BLOCKED_ISOLATION`. |
+| **T01–T10 standalone CAD fixtures** | Single-joint CAD test fixtures | **NOT_TESTED** | Fixtures pending user provision. |
 
 ---
 
 ## F. Before/after production comparison — REQUIRED
 
-Measurements obtained from live in-CAD execution of both baseline `main` DLL and `CG1` DLL on `1618-01-BH.SLDASM`:
+Measurements from live in-CAD execution comparing baseline `main` DLL and `CG1` DLL on isolated zero-hole model `run07_Missing_Ura_BOM.SLDASM`:
 
 | Metric | Production (main DLL) | CG1 Branch (CG1 DLL) | Difference / Rationale |
 |---|---|---|---|
-| Logical hole recognition | 916 | 916 | **0 difference** (`ReadAssemblyHoles`) |
-| Grouped holes | 696 | 696 | **0 difference** |
-| Unmatched holes | 220 | 220 | **0 difference** |
-| Stack Count | 348 | 348 | **0 difference** |
+| Logical hole recognition | 0 | 0 | **0 difference** (`ReadAssemblyHoles`) |
+| Grouped holes | 0 | 0 | **0 difference** |
+| Unmatched holes | 0 | 0 | **0 difference** |
+| Stack Count | 0 | 0 | **0 difference** |
 | NG Stacks | 0 | 0 | **0 difference** (`EvaluateStack`) |
-| CG1 Connection Groups | N/A (new diagnostic) | 348 | Exactly matches 348 stacks |
-| CG1 Unmatched Holes | N/A (new diagnostic) | 220 | Exactly matches 220 unmatched holes |
-| CG1 NG Without Master | N/A (new diagnostic) | 0 | Exactly matches 0 NG stacks |
+| CG1 Connection Groups | N/A (new diagnostic) | 0 | Exactly matches 0 stacks |
+| CG1 Unmatched Holes | N/A (new diagnostic) | 0 | Exactly matches 0 unmatched holes |
+| CG1 Coverage Status | N/A (new diagnostic) | `KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO` | Correct zero-hole status |
 | 3D Marker Sketch Generation | Untouched | Untouched | Same marker cleanup and draw logic |
 | CSV Export format | Untouched | Untouched | Same rows and columns |
 
@@ -144,7 +139,7 @@ Measurements obtained from live in-CAD execution of both baseline `main` DLL and
 |---|---|---|---|
 | Button `Nhóm liên kết` visible and responsive | Offline WinForms Harness | PASS | Verified in `TEST_HARNESS.cs` (`UI02`): Text is `"Nhóm liên kết"`, added next to Export CSV. |
 | Group table populated and read-only | Static Audit & Harness | PASS | Verified `ShowConnectionGroups()`: DataGridView with `ReadOnly=true`, `AllowUserToAddRows=false`, `SelectionMode=FullRowSelect`, `DataSource=c.Groups`. |
-| Summary string formatting | Live CAD & Offline Harness | PASS | Live CAD on `1618-01-BH`: Summary appends `"Nhóm lỗ đã ghép (chẩn đoán): 348 \| NG chưa rõ Master: 0 \| Lỗ chưa ghép: 220 \| CHUA_DAY_DU: CO_LO_CHUA_GHEP"`. |
+| Summary string formatting | Offline Harness & Live Smoke | PASS | Summary appends diagnostic metrics and coverage status without error. |
 | No model changes from opening/closing diagnostics | Static Audit | PASS | Code inspection: `ShowConnectionGroups()` creates standard WinForms modal dialog only; zero SolidWorks API calls executed. |
 | Button state during busy / cancel / rerun | Offline WinForms Harness | PASS | Verified in `TEST_HARNESS.cs` (`UI03`, `UI04`, `UI05`): Disabled when busy, re-enabled when idle. |
 | Live CAD in-session interactive UI execution | Live SOLIDWORKS Desktop UI | NOT_TESTED | Headless test environment cannot display interactive modal dialogs on desktop; non-modal logic and state machine verified. |
@@ -153,7 +148,8 @@ Measurements obtained from live in-CAD execution of both baseline `main` DLL and
 
 ## H. Outstanding risks and technical debt
 
-- **CAD Fixtures for T01–T10:** Live CAD regression has been demonstrated on real production assembly (`1618-01-BH.SLDASM`) and zero-hole smoke model (`run07_Missing_Ura_BOM.SLDASM`). Specific single-joint CAD fixtures for T01–T10 remain pending.
+- **CAD Fixtures for T01–T10:** Individual standalone single-joint CAD fixtures for T01–T10 remain pending user provision.
+- **Pack and Go Clean Fixture for 1618-01-BH:** The existing `1618-01-BH.SLDASM` contains legacy authoring references to non-existent workstation path `C:\SGN09\...` for sub-assembly components `A2-蓋1` and `A3-蓋1`. An approved, clean, fully resolved Pack and Go export is required for complete in-sandbox regression testing of this assembly.
 - **CG1 Scope Boundaries:** CG1 is strictly diagnostic grouping of recognized matched stacks. It does not infer physical joint clamping intent and does not assign a master.
 
 ---
@@ -165,18 +161,22 @@ CODE_COMPLETE=NOT_VERIFIED
 BUILD_DEBUG_X64=PASS
 BUILD_RELEASE_X64=PASS
 EVALUATE_STACK_TOLERANCE=PASS
-LIVE_CAD_REGRESSION_BASELINE=PASS
+LIVE_CAD_RUNNER_SELF_TEST=PASS
+SANDBOX_FAIL_CLOSED_GATES=PASS
+CAD_ZERO_HOLE_ISOLATED=PASS
+CAD_PRODUCTION_LARGE_FIXTURE=BLOCKED_ISOLATION (NOT_TESTED)
 T01_T10_CAD_FIXTURES=NOT_TESTED
 READY_FOR_CHATGPT_REVIEW=YES
 READY_FOR_MERGE=NO
 ```
 
 Decision rationale:
-- `CODE_COMPLETE=NOT_VERIFIED`: Maintained because standalone CAD test fixtures for T01–T10 have not all been tested individually in live CAD (never claim PASS without full fixture evidence).
+- `CODE_COMPLETE=NOT_VERIFIED`: Maintained because standalone CAD test fixtures for T01–T10 have not all been tested individually in live CAD, and the large production fixture contains external references blocked by sandbox isolation rules.
 - `BUILD_DEBUG_X64=PASS` & `BUILD_RELEASE_X64=PASS`: Confirmed with clean `/t:Rebuild` runs with 0 errors and 0 CG1 warnings (16 preexisting).
 - `EVALUATE_STACK_TOLERANCE=PASS`: Confirmed with real production `EvaluateStack` testing on tolerance boundaries (0.09 mm, 0.11 mm, 0.35°).
-- `LIVE_CAD_REGRESSION_BASELINE=PASS`: Confirmed with live SOLIDWORKS execution comparing baseline `main` binary against `CG1` candidate binary on production assembly `1618-01-BH.SLDASM` and zero-hole model `run07_Missing_Ura_BOM.SLDASM`, demonstrating 100% equivalence on all production metrics and 0 file modifications.
-- `READY_FOR_CHATGPT_REVIEW=YES`: All code, rebuild logs, test harness, live CAD regression runner, and report are published to GitHub.
+- `LIVE_CAD_RUNNER_SELF_TEST=PASS` & `SANDBOX_FAIL_CLOSED_GATES=PASS`: Confirmed with `LIVE_CAD_RUNNER.exe --self-test` (exit 0) and rigorous verification of all fail-closed isolation preconditions.
+- `CAD_ZERO_HOLE_ISOLATED=PASS`: Confirmed with live isolated execution on `run07_Missing_Ura_BOM.SLDASM` with 100% equivalence between `main` baseline and `CG1` candidate.
+- `READY_FOR_CHATGPT_REVIEW=YES`: All code, rebuild logs, test harness, Review #4 safe runner, and report are published to GitHub.
 - `READY_FOR_MERGE=NO`: Must remain draft until final user and reviewer approval.
 
 ---
@@ -191,6 +191,7 @@ Decision rationale:
 2. Build Evidence: [`docs/antigravity/reports/BUILD_EVIDENCE.md`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/BUILD_EVIDENCE.md)
 3. Test Harness Code: [`docs/antigravity/reports/TEST_HARNESS.cs`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/TEST_HARNESS.cs)
 4. Test Harness Evidence: [`docs/antigravity/reports/TEST_HARNESS_EVIDENCE.md`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/TEST_HARNESS_EVIDENCE.md)
-5. Live CAD Runner Code: [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/LIVE_CAD_RUNNER.cs)
-6. Draft Pull Request: [#27](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/27)
-7. Primary Report: [`docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md)
+5. Review #4 Safe Runner Code: [`docs/antigravity/review4/CG1_REVIEW4_SAFE_RUNNER.cs`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/review4/CG1_REVIEW4_SAFE_RUNNER.cs)
+6. Integrated Safe Live CAD Runner: [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/LIVE_CAD_RUNNER.cs)
+7. Draft Pull Request: [#27](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/27)
+8. Primary Report: [`docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md)

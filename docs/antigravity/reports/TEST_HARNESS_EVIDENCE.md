@@ -2,9 +2,9 @@
 
 > Source files:
 > - [`docs/antigravity/reports/TEST_HARNESS.cs`](TEST_HARNESS.cs) (Offline algorithmic, tolerance & WinForms state harness)
-> - [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs) (Live SOLIDWORKS dual-assembly regression runner: Baseline `main` vs `CG1`)
+> - [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs) / [`docs/antigravity/review4/CG1_REVIEW4_SAFE_RUNNER.cs`](../review4/CG1_REVIEW4_SAFE_RUNNER.cs) (Review #4 Fail-closed isolated sandbox regression runner: Baseline `main` vs `CG1`)
 >
-> Execution Date: 2026-10-19 06:45:22 UTC
+> Execution Date: 2026-10-19 07:23:38 UTC
 > Target Binary (CG1): `C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll`
 > Target Binary SHA256: `D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E`
 > Target MVID: `456f9ade-ac27-4395-854f-857ad2521fd0`
@@ -23,10 +23,23 @@
 Remove-Item "docs\antigravity\reports\TEST_HARNESS.exe" -Force
 ```
 
-### B. Live SOLIDWORKS In-CAD Dual-Assembly Regression Benchmark
+### B. Safe Runner Self-Test (--self-test)
 ```powershell
-& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\Roslyn\csc.exe" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\LIVE_CAD_RUNNER.exe" "docs\antigravity\reports\LIVE_CAD_RUNNER.cs"
-& "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" "C:\Tao moi\ADDIN_MAIN_BASELINE\bin\x64\Release\ADDIN.dll" "C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll"
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\Roslyn\csc.exe" /target:exe /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\LIVE_CAD_RUNNER.exe" "docs\antigravity\reports\LIVE_CAD_RUNNER.cs"
+& "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" --self-test
+```
+
+### C. Safe Runner Isolated Fixture Regression Execution
+```powershell
+# Precondition: Ensure ALL SOLIDWORKS processes are closed before executing.
+# Precondition: Fixtures must be isolated inside a sandbox with CG1_SANDBOX_OK.txt.
+$mainDll = "C:\Tao moi\ADDIN_MAIN_BASELINE\bin\x64\Release\ADDIN.dll"
+$cg1Dll  = "C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll"
+$sandbox = "D:\CG1-ISOLATED-TEST-COPIES"
+$zero    = "$sandbox\ZeroHole\run07_Missing_Ura_BOM.SLDASM"
+$large   = "$sandbox\ProductionCopy\1618-01-BH.SLDASM"
+
+& "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" $mainDll $cg1Dll $sandbox $zero $large
 Remove-Item "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" -Force
 ```
 
@@ -73,58 +86,63 @@ RESULT: ALL 17 AUTOMATED TESTS PASSED (0 FAILURES)
 
 ---
 
-## 3. Verbatim Console Output (Live SOLIDWORKS In-CAD Regression Runner — 2/2 PASS, Exit Code 0)
+## 3. Verbatim Console Output (Safe Runner --self-test — PASS, Exit Code 0)
 
 ```text
-===============================================================================
-ANTIGRAVITY CHECK HOLE CG1 — LIVE SOLIDWORKS REGRESSION & BENCHMARK RUNNER
-Timestamp (UTC): 2026-10-19 06:39:27 UTC
-===============================================================================
-[SETUP] Baseline DLL:  C:\Tao moi\ADDIN_MAIN_BASELINE\bin\x64\Release\ADDIN.dll
-[SETUP] CG1 Target DLL: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
-[SETUP] Baseline MVID: 8008c4c2-2258-456a-8cf5-5b6fed1d742b | SHA256: 297D66CDF1EF56382C1165B8F84AF7B394090B2B8D2DC25A2F4D71067836118D
-[SETUP] CG1      MVID: 456f9ade-ac27-4395-854f-857ad2521fd0 | SHA256: D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E
-[SAFETY] Pre-existing SOLIDWORKS session detected. Attaching to ROT/ProgID without closing user session.
-[SOLIDWORKS] Connected version: 32.5.0
+Microsoft (R) Visual C# Compiler version 5.10.0-1.26380.3
+Copyright (C) Microsoft Corporation. All rights reserved.
 
--------------------------------------------------------------------------------
-Evaluating: run07_Missing_Ura_BOM.SLDASM
-Path:       C:\Users\SGN26\Documents\addin\work\missing_ura_test_20261004\cases\run07\run07_Missing_Ura_BOM.SLDASM
--> Running Baseline (main branch code)...
-   [Baseline] Logical=0, Grouped=0, Unmatched=0, Stacks=0, NG=0, PatNG=0, Miss=0
--> Running CG1 Candidate (feat/check-hole-connection-groups-cg1)...
-   [CG1 Target] Logical=0, Grouped=0, Unmatched=0, Stacks=0, NG=0, PatNG=0, Miss=0
-   [CG1 Diag]   Groups=0, CoverageStatus=KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO, NgWithoutMaster=0, UnmatchedHoles=0
-STATUS: [PASS] 100% equivalence between baseline and CG1. All invariants satisfied.
-[SAFETY VERIFIED] Original file SHA256 identical before and after test (3DFBB2CC...)
-
--------------------------------------------------------------------------------
-Evaluating: 1618-01-BH.SLDASM
-Path:       C:\Users\SGN26\Documents\addin\work\same_part_1618_20261010\all-models\1618-01-BH.SLDASM
--> Running Baseline (main branch code)...
-   [Baseline] Logical=916, Grouped=696, Unmatched=220, Stacks=348, NG=0, PatNG=0, Miss=0
--> Running CG1 Candidate (feat/check-hole-connection-groups-cg1)...
-   [CG1 Target] Logical=916, Grouped=696, Unmatched=220, Stacks=348, NG=0, PatNG=0, Miss=0
-   [CG1 Diag]   Groups=348, CoverageStatus=CHUA_DAY_DU: CO_LO_CHUA_GHEP, NgWithoutMaster=0, UnmatchedHoles=220
-STATUS: [PASS] 100% equivalence between baseline and CG1. All invariants satisfied.
-[SAFETY VERIFIED] Original file SHA256 identical before and after test (45F500B4...)
-
-===============================================================================
-REGRESSION AND BENCHMARK RESULTS TABLE
-===============================================================================
-| Model | Status | Logical | Grouped | Unmatched | Stacks | NG Stacks | Pattern/Miss | CG1 Groups | Coverage Status | SHA Match |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| run07_Missing_Ura_BOM.SLDASM | **PASS** | 0 | 0 | 0 | 0 | 0 | 0/0 | 0 | KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO | YES |
-| 1618-01-BH.SLDASM | **PASS** | 916 | 696 | 220 | 348 | 0 | 0/0 | 348 | CHUA_DAY_DU: CO_LO_CHUA_GHEP | YES |
-
-SUMMARY: Total=2 | PASS=2 | FAIL=0 | SKIP=0
-TEST OUTCOME: SUCCEEDED (Exit Code 0)
-[SAFETY] Preserving user's pre-existing SOLIDWORKS session intact.
+PASS: exit policy handles PASS / FAIL / SKIP / empty cases
 ```
 
 ---
 
-## 4. Test Coverage Breakdown
+## 4. Verbatim Evidence of Fail-Closed Precondition Gates
+
+### Gate 1: Existing User SOLIDWORKS Session (Must Refuse, Never Attach/Close)
+```text
+FAIL CLOSED: System.InvalidOperationException: An existing SOLIDWORKS session is running. Close it yourself before running this isolated test. No CAD was touched.
+   at ADDIN.Tests.Cg1Review4SafeRunner.RunRunner(String[] args)
+Exit Code: 1
+```
+
+### Gate 2: Missing Sandbox Consent File `CG1_SANDBOX_OK.txt` (Must Refuse)
+```text
+FAIL CLOSED: System.InvalidOperationException: Isolated fixture root missing, or explicit CG1_SANDBOX_OK.txt acknowledgement missing.
+   at ADDIN.Tests.Cg1Review4SafeRunner.ValidateSandboxInputs(String baselineDll, String candidateDll, String root, String[] models)
+   at ADDIN.Tests.Cg1Review4SafeRunner.RunRunner(String[] args)
+Exit Code: 1
+```
+
+### Gate 3: Test Model Outside Sandbox Root (Must Refuse)
+```text
+FAIL CLOSED: System.InvalidOperationException: Path outside isolated fixture root: C:\other\f1.sldasm
+   at ADDIN.Tests.Cg1Review4SafeRunner.RequireSandboxPath(String root, String path)
+   at ADDIN.Tests.Cg1Review4SafeRunner.ValidateSandboxInputs(String baselineDll, String candidateDll, String root, String[] models)
+   at ADDIN.Tests.Cg1Review4SafeRunner.RunRunner(String[] args)
+Exit Code: 1
+```
+
+### Gate 4: Assembly Containing External Component Dependencies (Must Refuse, Protect Originals)
+Execution log when testing `1618-01-BH.SLDASM` (which contains unresolved authoring references to `C:\SGN09\...`):
+```text
+SOLIDWORKS revision: 32.5.0
+BASELINE SHA256: 297D66CDF1EF56382C1165B8F84AF7B394090B2B8D2DC25A2F4D71067836118D
+CANDIDATE SHA256: D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E
+run07_Missing_Ura_BOM.SLDASM main: holes=0 groups=0 unmatched=0 stacks=0 NG=0
+run07_Missing_Ura_BOM.SLDASM CG1 : holes=0 groups=0 unmatched=0 stacks=0 NG=0
+run07_Missing_Ura_BOM.SLDASM: PASS
+1618-01-BH.SLDASM: FAIL | System.InvalidOperationException: Isolated run rejected: Path outside isolated fixture root: C:\SGN09\2026\8月\1618\1618-04-bh-A2-蓋1.SLDPRT ---> System.InvalidOperationException: Path outside isolated fixture root: C:\SGN09\2026\8月\1618\1618-04-bh-A2-蓋1.SLDPRT
+   at ADDIN.Tests.Cg1Review4SafeRunner.RequireSandboxPath(String root, String path)
+   at ADDIN.Tests.Cg1Review4SafeRunner.VerifyReferencesUnderSandbox(ModelDoc2 model, String root)
+   at ADDIN.Tests.Cg1Review4SafeRunner.RunOneIsolated(ISldWorks app, Type checkerType, String root, String modelPath, Boolean expectCg1)
+SUMMARY: PASS=1 FAIL=1 SKIP=0 EXIT=1
+```
+*Note: In accordance with Review #4 directives, the isolation check was strictly preserved and NOT bypassed. `1618-01-BH.SLDASM` is recorded as `BLOCKED_ISOLATION` / `NOT_TESTED`.*
+
+---
+
+## 5. Test Coverage Breakdown
 
 | Category | Test ID | Description & Assertion | Verdict |
 |---|---|---|---|
@@ -145,6 +163,12 @@ TEST OUTCOME: SUCCEEDED (Exit Code 0)
 | | UI03 | Button enabled after valid report with `ConnectionCoverage` is set | `PASS` |
 | | UI04 | Button disabled during busy state | `PASS` |
 | | UI05 | Button re-enabled when busy completes | `PASS` |
-| **Live CAD Dual Regression** | CAD-Smoke | Zero-hole model `run07_Missing_Ura_BOM.SLDASM` evaluated on both baseline `main` and `CG1` candidate. Exact 0 across all metrics, coverage status verified, 0 errors. | `PASS` |
-| | CAD-Prod | Production 916-hole assembly `1618-01-BH.SLDASM` evaluated on both baseline `main` and `CG1` candidate. Exact match: 916 logical holes, 696 grouped, 220 unmatched, 348 stacks, 0 NG stacks. CG1: 348 connection groups, status `CHUA_DAY_DU: CO_LO_CHUA_GHEP`. Pre/post SHA256 verified identical. | `PASS` |
-| | CAD-T01–T10 | Synthetic fixtures matching T01–T10 exact geometric specifications | `NOT_TESTED` (fixtures pending user provision) |
+| **Review #4 Safe Runner** | R4-Compile | Standalone C# 7.3 compilation of `CG1_REVIEW4_SAFE_RUNNER.cs` | `PASS` |
+| | R4-SelfTest | `--self-test` exit-code semantics validation | `PASS` |
+| | R4-ExistingSW | Pre-existing SOLIDWORKS session detected $\to$ refuses execution, fails closed | `PASS` |
+| | R4-Consent | Missing `CG1_SANDBOX_OK.txt` $\to$ refuses execution, fails closed | `PASS` |
+| | R4-SandboxRoot | Test models outside sandbox $\to$ refuses execution, fails closed | `PASS` |
+| | R4-ExtRefs | External component dependencies in assembly $\to$ refuses execution, fails closed | `PASS` |
+| | R4-SmokeZero | Fully isolated zero-hole model `run07_Missing_Ura_BOM.SLDASM` evaluated on fresh baseline and fresh CG1 instances $\to$ 100% match, exit code 0 | `PASS` |
+| | R4-ProdLarge | Production 916-hole assembly `1618-01-BH.SLDASM` | `BLOCKED_ISOLATION` (`NOT_TESTED`) |
+| | R4-T01–T10 | Standalone isolated single-joint fixtures for T01–T10 | `NOT_TESTED` (fixtures pending user provision) |
