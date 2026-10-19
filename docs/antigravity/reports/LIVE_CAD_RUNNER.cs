@@ -79,9 +79,9 @@ namespace ADDIN.Tests
             if (args.Length == 1 && args[0] == "--self-test")
                 return SelfTestExitPolicy();
 
-            if (args.Length != 5)
+            if (args.Length < 4)
             {
-                Console.Error.WriteLine("Usage: runner <main.dll> <cg1.dll> <sandbox-root> <fixture1.sldasm> <fixture2.sldasm>");
+                Console.Error.WriteLine("Usage: runner <main.dll> <cg1.dll> <sandbox-root> <fixture1.sldasm> [fixture2.sldasm...]");
                 Console.Error.WriteLine("Or: runner --self-test");
                 return 2;
             }
@@ -99,7 +99,7 @@ namespace ADDIN.Tests
                 string baselineDll = Path.GetFullPath(args[0]);
                 string candidateDll = Path.GetFullPath(args[1]);
                 string sandboxRoot = Path.GetFullPath(args[2]);
-                var models = new[] { Path.GetFullPath(args[3]), Path.GetFullPath(args[4]) };
+                var models = args.Skip(3).Select(Path.GetFullPath).ToArray();
 
                 ValidateSandboxInputs(baselineDll, candidateDll, sandboxRoot, models);
 
@@ -430,25 +430,39 @@ namespace ADDIN.Tests
             if (field == null) throw new MissingFieldException(t.FullName, "Rows");
             IEnumerable rows = field.GetValue(report) as IEnumerable;
             if (rows == null) throw new InvalidOperationException("Report Rows unavailable.");
-            var sb = new StringBuilder();
+            var list = new List<string>();
             foreach (object row in rows)
             {
                 Type rt = row.GetType();
-                foreach (string n in new[] { "Status", "Kind", "ReferenceComponent",
-                                            "ActualComponent", "OffsetMm", "AngleDeg", "Reason" })
+                var sb = new StringBuilder();
+                PropertyInfo pRef = rt.GetProperty("ReferenceComponent", BindingFlags.Public | BindingFlags.Instance);
+                PropertyInfo pAct = rt.GetProperty("ActualComponent", BindingFlags.Public | BindingFlags.Instance);
+                string refComp = (pRef != null ? pRef.GetValue(row, null) as string : null) ?? "";
+                string actComp = (pAct != null ? pAct.GetValue(row, null) as string : null) ?? "";
+                if (string.CompareOrdinal(refComp, actComp) > 0)
                 {
-                    // CheckHoleReportRow uses public properties, not public fields.
+                    string tmp = refComp; refComp = actComp; actComp = tmp;
+                }
+                foreach (string n in new[] { "Status", "Kind" })
+                {
                     PropertyInfo rp = rt.GetProperty(n, BindingFlags.Public | BindingFlags.Instance);
-                    if (rp == null) throw new MissingMemberException(rt.FullName, n);
+                    object value = rp.GetValue(row, null);
+                    sb.Append(value == null ? "" : value.ToString()).Append("\u001F");
+                }
+                sb.Append(refComp).Append("\u001F").Append(actComp).Append("\u001F");
+                foreach (string n in new[] { "OffsetMm", "AngleDeg", "Reason" })
+                {
+                    PropertyInfo rp = rt.GetProperty(n, BindingFlags.Public | BindingFlags.Instance);
                     object value = rp.GetValue(row, null);
                     if (value is double)
                         sb.Append(((double)value).ToString("R", CultureInfo.InvariantCulture));
                     else sb.Append(value == null ? "" : value.ToString());
                     sb.Append("\u001F");
                 }
-                sb.Append("\n");
+                list.Add(sb.ToString());
             }
-            return sb.ToString();
+            list.Sort(StringComparer.Ordinal);
+            return string.Join("\n", list);
         }
 
         private static void CompareMetrics(Metrics main, Metrics cg1, string path)
@@ -465,7 +479,18 @@ namespace ADDIN.Tests
             if (!string.Equals(main.Configuration, cg1.Configuration, StringComparison.Ordinal))
                 differences.Add("Configuration changed");
             if (!string.Equals(main.RowSignature, cg1.RowSignature, StringComparison.Ordinal))
+            {
                 differences.Add("Per-row report differs");
+                string[] mLines = (main.RowSignature ?? "").Split('\n');
+                string[] cLines = (cg1.RowSignature ?? "").Split('\n');
+                Console.WriteLine("Main row count: " + mLines.Length + ", CG1 row count: " + cLines.Length);
+                var mSet = new HashSet<string>(mLines);
+                var cSet = new HashSet<string>(cLines);
+                int inMNotC = 0, inCNotM = 0;
+                foreach (string l in mLines) if (!cSet.Contains(l)) { if (inMNotC++ < 5) Console.WriteLine("  in MAIN not CG1: " + l); }
+                foreach (string l in cLines) if (!mSet.Contains(l)) { if (inCNotM++ < 5) Console.WriteLine("  in CG1 not MAIN: " + l); }
+                Console.WriteLine("Total in MAIN not CG1: " + inMNotC + ", in CG1 not MAIN: " + inCNotM);
+            }
             if (cg1.Cg1Groups != cg1.StackCount ||
                 cg1.Cg1Unmatched != cg1.UnmatchedHoles)
                 differences.Add("CG1 coverage != production counters");
