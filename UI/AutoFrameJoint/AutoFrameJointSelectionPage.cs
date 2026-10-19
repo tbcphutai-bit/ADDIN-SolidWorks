@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
@@ -44,6 +45,13 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool shown;
         private bool closing;
         private bool handlingAnalyze;
+        private bool updatingReadyState;
+
+        // Keep analysis output while the same two component occurrences remain
+        // selected. Do not use Name2 as an occurrence identity.
+        private Component2 analyzedA;
+        private Component2 analyzedB;
+        private string lastAnalysisMessage;
 
         /// <summary>
         /// onAnalyze is an injected BACKEND callback. It receives A and B
@@ -176,18 +184,36 @@ namespace ADDIN.UI.AutoFrameJoint
             }
         }
 
-        private bool SameOccurrence(Component2 x, Component2 y)
+        private bool IsSameDocumentActive()
+        {
+            try
+            {
+                ModelDoc2 current = app.ActiveDoc as ModelDoc2;
+                return current != null && assembly != null &&
+                    app.IsSame(current, assembly) ==
+                        (int)swObjectEquality.swObjectSame;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-PMP] Active document check: " + ex.Message);
+                return false; // Unsupported/failed COM identity is NOT success.
+            }
+        }
+
+        // Must be conclusively different. swObjectUnsupported (2) is not
+        // a safe basis for permitting two component instances.
+        private bool DefinitelyDifferent(Component2 x, Component2 y)
         {
             if (x == null || y == null) return false;
             try
             {
-                return app.IsSame(x, y) == (int)swObjectEquality.swObjectSame;
+                return app.IsSame(x, y) ==
+                    (int)swObjectEquality.swObjectNotSame;
             }
-            catch
+            catch (Exception ex)
             {
-                // Conservatively reject equal occurrence paths if API comparison fails.
-                return String.Equals(x.Name2, y.Name2,
-                    StringComparison.OrdinalIgnoreCase);
+                Trace.WriteLine("[AFJ-PMP] Component identity check: " + ex.Message);
+                return false;
             }
         }
 
@@ -202,93 +228,184 @@ namespace ADDIN.UI.AutoFrameJoint
                 ?? mgr.GetSelectedObject6(1, mark) as Component2;
         }
 
+        /// <summary>
+        /// When deepCheck=false, only query selection marks and COM identities.
+        /// Reading Part documents belongs to the Analyze button, never
+        /// OnSelectionboxListChanged (which occurs during SOLIDWORKS selection).
+        /// </summary>
         private bool TryReadSelection(out Component2 a, out Component2 b,
-                                      out string reason)
+                                      out string reason, bool deepCheck)
         {
+            a = null;
+            b = null;
+            if (!IsSameDocumentActive())
+            {
+                reason = "Assembly đã đổi. Đóng lệnh và mở lại.";
+                return false;
+            }
+
             a = Selected(MarkFrameA);
             b = Selected(MarkFrameB);
             if (a == null || b == null)
             {
-                reason = "Chọn đủ hai Frame (A và B).";
+                reason = "Chọn đủ Frame A và Frame B.";
                 return false;
             }
 
-            if (SameOccurrence(a, b))
+            if (!DefinitelyDifferent(a, b))
             {
-                reason = "Frame A và Frame B phải là hai Component khác nhau.";
+                reason = "Hai Frame trùng nhau hoặc chưa xác minh được.";
                 return false;
             }
 
-            // Query only. Never resolve, activate, or change configurations
-            // from a selection callback.
-            ModelDoc2 docA = a.GetModelDoc2() as ModelDoc2;
-            ModelDoc2 docB = b.GetModelDoc2() as ModelDoc2;
-            if (docA == null || docB == null)
+            if (deepCheck)
             {
-                reason = "Part chưa được tải; hãy Resolve Component.";
-                return false;
-            }
-            if (docA.GetType() != (int)swDocumentTypes_e.swDocPART ||
-                docB.GetType() != (int)swDocumentTypes_e.swDocPART)
-            {
-                reason = "Vui lòng chọn hai Part, không chọn Subassembly.";
-                return false;
+                // Slow/model-level checks only on explicit user action.
+                ModelDoc2 docA = a.GetModelDoc2() as ModelDoc2;
+                ModelDoc2 docB = b.GetModelDoc2() as ModelDoc2;
+                if (docA == null || docB == null)
+                {
+                    reason = "Part chưa tải. Hãy Resolve thủ công.";
+                    return false;
+                }
+                if (docA.GetType() != (int)swDocumentTypes_e.swDocPART ||
+                    docB.GetType() != (int)swDocumentTypes_e.swDocPART)
+                {
+                    reason = "Chỉ hỗ trợ hai Part, không nhận Subassembly.";
+                    return false;
+                }
             }
 
-            reason = "Đã chọn đúng hai Part.";
+            reason = deepCheck
+                ? "Hai Part hợp lệ để phân tích sơ bộ."
+                : "Đã chọn 2 Component — nhấn Phân tích.";
             return true;
+        }
+
+        private void ClearAnalysisResult()
+        {
+            analyzedA = null;
+            analyzedB = null;
+            lastAnalysisMessage = null;
+        }
+
+        private void StoreAnalysisResult(Component2 a, Component2 b, string message)
+        {
+            analyzedA = a;
+            analyzedB = b;
+            lastAnalysisMessage = message;
+        }
+
+        private bool IsPreviousPair(Component2 a, Component2 b)
+        {
+            // A/B must be the same occurrences in the same positions.
+            // swObjectUnsupported or COM failure must invalidate old output.
+            return analyzedA != null && analyzedB != null &&
+                ConclusivelySame(a, analyzedA) &&
+                ConclusivelySame(b, analyzedB);
+        }
+
+        private bool ConclusivelySame(Component2 a, Component2 b)
+        {
+            if (a == null || b == null) return false;
+            try
+            {
+                return app.IsSame(a, b) ==
+                    (int)swObjectEquality.swObjectSame;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-PMP] Stored identity check: " + ex.Message);
+                return false;
+            }
         }
 
         private void UpdateReadyState()
         {
-            if (!shown || closing) return;
-            Component2 a, b;
-            string reason;
-            bool ready = TryReadSelection(out a, out b, out reason);
-            if (analyzeButtonControl != null)
-                analyzeButtonControl.Enabled = ready && !handlingAnalyze;
-            if (statusLabel != null)
-                statusLabel.Caption = reason;
+            if (!shown || closing || updatingReadyState) return;
+            updatingReadyState = true;
+            try
+            {
+                Component2 a, b;
+                string reason;
+                bool ready = TryReadSelection(out a, out b, out reason, false);
+
+                if (!ready || !IsPreviousPair(a, b))
+                    ClearAnalysisResult();
+
+                if (analyzeButtonControl != null)
+                    analyzeButtonControl.Enabled = ready && !handlingAnalyze;
+                if (statusLabel != null)
+                    statusLabel.Caption = ready &&
+                        !String.IsNullOrEmpty(lastAnalysisMessage)
+                        ? lastAnalysisMessage : reason;
+            }
+            catch (Exception ex)
+            {
+                ClearAnalysisResult();
+                Trace.WriteLine("[AFJ-PMP] Ready state error: " + ex);
+                if (analyzeButtonControl != null)
+                    analyzeButtonControl.Enabled = false;
+                if (statusLabel != null)
+                    statusLabel.Caption = "Lỗi chọn Frame — xem Output.";
+            }
+            finally
+            {
+                updatingReadyState = false;
+            }
         }
 
         private void PerformAnalyze()
         {
             if (closing || handlingAnalyze) return;
 
-            Component2 a, b;
+            Component2 a = null, b = null;
             string reason;
-            if (!TryReadSelection(out a, out b, out reason))
-            {
-                statusLabel.Caption = reason;
-                return;
-            }
-
-            if (onAnalyze == null)
-            {
-                statusLabel.Caption =
-                    "Đã chọn đủ. Chưa kết nối chức năng Phân tích.";
-                return;
-            }
-
-            // The callback belongs to backend, not this UI class.
-            // Do NOT run geometry changes from selection callbacks.
             handlingAnalyze = true;
-            analyzeButtonControl.Enabled = false;
+            if (analyzeButtonControl != null)
+                analyzeButtonControl.Enabled = false;
+
             try
             {
-                string summary = onAnalyze(a, b);
-                statusLabel.Caption = String.IsNullOrWhiteSpace(summary)
-                    ? "Đã gửi 2 Frame để phân tích."
-                    : summary.Replace("\r", " ").Replace("\n", " ");
+                // Read the selected pair with the same shallow constraints as
+                // readiness, then validate component documents only here.
+                if (!TryReadSelection(out a, out b, out reason, true))
+                {
+                    if (a != null && b != null && DefinitelyDifferent(a, b))
+                        StoreAnalysisResult(a, b, reason);
+                    else
+                    {
+                        ClearAnalysisResult();
+                        if (statusLabel != null) statusLabel.Caption = reason;
+                    }
+                    return;
+                }
+
+                if (onAnalyze == null)
+                {
+                    StoreAnalysisResult(a, b,
+                        "Đã chọn 2 Frame. Chưa nối bộ phân tích.");
+                    return;
+                }
+
+                string result = onAnalyze(a, b);
+                StoreAnalysisResult(a, b,
+                    String.IsNullOrWhiteSpace(result)
+                        ? "Không nhận được kết quả phân tích."
+                        : result.Replace("\r", " ").Replace("\n", " "));
             }
             catch (Exception ex)
             {
-                statusLabel.Caption = "Không phân tích được: " + ex.Message;
+                Trace.WriteLine("[AFJ-PMP] Analyze error: " + ex);
+                if (a != null && b != null && DefinitelyDifferent(a, b))
+                    StoreAnalysisResult(a, b, "Lỗi phân tích — xem Output.");
+                else
+                    ClearAnalysisResult();
             }
             finally
             {
                 handlingAnalyze = false;
-                UpdateReadyState();
+                UpdateReadyState(); // preserves message for same A/B pair
             }
         }
 
@@ -303,7 +420,9 @@ namespace ADDIN.UI.AutoFrameJoint
 
         public void AfterClose()
         {
+            closing = true;
             shown = false;
+            ClearAnalysisResult();
             page = null;
             selectionA = null;
             selectionB = null;
@@ -311,12 +430,22 @@ namespace ADDIN.UI.AutoFrameJoint
             statusLabel = null;
             try
             {
-                // Only backend knows whether temporary preview bodies exist.
                 if (onClearPreview != null) onClearPreview();
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-PMP] Preview cleanup failed: " + ex);
             }
             finally
             {
-                if (onClosed != null) onClosed(this);
+                try
+                {
+                    if (onClosed != null) onClosed(this);
+                }
+                catch (Exception ex)
+                {
+                    Trace.WriteLine("[AFJ-PMP] Page-close callback failed: " + ex);
+                }
             }
         }
 
@@ -359,15 +488,14 @@ namespace ADDIN.UI.AutoFrameJoint
                 return false;
             if (type != (int)swSelectType_e.swSelCOMPONENTS)
                 return false;
-            if (assembly == null ||
-                assembly.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
+            if (!IsSameDocumentActive())
                 return false;
 
             Component2 candidate = selection as Component2;
             if (candidate == null) return false;
 
             Component2 other = Selected(id == BoxFrameA ? MarkFrameB : MarkFrameA);
-            if (other != null && SameOccurrence(candidate, other))
+            if (other != null && !DefinitelyDifferent(candidate, other))
                 return false;
 
             itemText = candidate.Name2;

@@ -63,21 +63,37 @@ namespace ADDIN.Commands.AutoFrameJoint
         /// </summary>
         public static string AnalyzePair(ISldWorks app, Component2 a, Component2 b)
         {
+            ModelDoc2 expected = app == null ? null : app.ActiveDoc as ModelDoc2;
+            return AnalyzePair(app, expected, a, b);
+        }
+
+        /// <summary>
+        /// The expected Assembly is captured BEFORE the PropertyManager opens.
+        /// Reject a switched document rather than analyzing A/B against a new
+        /// active Assembly. Fail closed when COM object identity is unsupported.
+        /// </summary>
+        public static string AnalyzePair(ISldWorks app, ModelDoc2 expectedAssembly,
+                                         Component2 a, Component2 b)
+        {
             try
             {
-                if (app == null)
-                    return "UNAVAILABLE: ISldWorks reference is null.";
+                if (app == null || expectedAssembly == null)
+                    return "UNAVAILABLE: Assembly context is unavailable.";
 
                 ModelDoc2 assembly = app.ActiveDoc as ModelDoc2;
                 if (assembly == null ||
                     assembly.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
-                    return "UNSUPPORTED: Open an Assembly document first.";
+                    return "UNSUPPORTED: Open the original Assembly document.";
+
+                if (app.IsSame(assembly, expectedAssembly) !=
+                    (int)swObjectEquality.swObjectSame)
+                    return "UNSUPPORTED: Active Assembly changed. Reopen the command.";
 
                 if (a == null || b == null)
                     return "NEEDS_SELECTION: Select Frame A and Frame B.";
 
-                if (app.IsSame(a, b) == (int)swObjectEquality.swObjectSame)
-                    return "NEEDS_SELECTION: Frame A and B must be distinct component occurrences.";
+                if (app.IsSame(a, b) != (int)swObjectEquality.swObjectNotSame)
+                    return "NEEDS_SELECTION: Two distinct component occurrences could not be confirmed.";
 
                 MathUtility math = app.GetMathUtility() as MathUtility;
                 if (math == null)
