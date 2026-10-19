@@ -21,6 +21,7 @@ internal static partial class NativeAssemblyBatchValidation
     private static readonly JavaScriptSerializer Json=new JavaScriptSerializer {MaxJsonLength=int.MaxValue};
     private static Assembly product;
     private static int assertions;
+    private static string captureDiagnosticsDirectory;
     private static object Get(object x,string name) { var f=x.GetType().GetField(name,All);return f!=null?f.GetValue(x):x.GetType().GetProperty(name,All).GetValue(x,null); }
     private static object Call(object x,string name,params object[] args)
     {try{return x.GetType().GetMethods(All).Single(m=>m.Name==name&&m.GetParameters().Length==args.Length).Invoke(x,args);}catch(TargetInvocationException ex){throw ex.InnerException??ex;}}
@@ -43,9 +44,30 @@ internal static partial class NativeAssemblyBatchValidation
         var clock=Stopwatch.StartNew();var op=Call(session,"BeginAssemblyBatch",Enum.Parse(T("BendAssembly.AssemblyCheckScope"),selected?"SelectedComponents":"EntireAssembly"),source,options,CancellationToken.None,null,null);
         Console.WriteLine("INVENTORY "+Json.Serialize(new {Items=Items(Get(session,"Items")).Length,
             Reasons=Items(Get(session,"InventoryOccurrences")).GroupBy(o=>Get(o,"Kind")+":"+Get(o,"Reason")).Select(g=>new {Reason=g.Key,Count=g.Count()})}));
-        var task=(Task)Get(op,"Completion");int turns=0;
+        var task=(Task)Get(op,"Completion");int turns=0,lastIndex=-1;
         while(!task.IsCompleted && clock.ElapsedMilliseconds<600000)
-        {Call(op,"Pump",1);turns++;Application.DoEvents();Thread.Sleep(1);}
+        {
+            int index=(int)Get(op,"index");
+            if(captureDiagnosticsDirectory!=null && index!=lastIndex)
+            {
+                var pending=Items(Get(session,"Items"));
+                File.AppendAllText(Path.Combine(captureDiagnosticsDirectory,"PRIVATE-capture-progress.jsonl"),Json.Serialize(new {
+                    Stage="before-pump",Index=index,Total=pending.Length,ElapsedMilliseconds=clock.Elapsed.TotalMilliseconds,
+                    Source=index<pending.Length?Path.GetFileName(Convert.ToString(Get(pending[index],"Path"))):null,
+                    Configuration=index<pending.Length?Get(pending[index],"Configuration"):null})+System.Environment.NewLine);
+                lastIndex=index;
+            }
+            Call(op,"Pump",1);turns++;
+            int after=(int)Get(op,"index");
+            if(captureDiagnosticsDirectory!=null && after!=index)
+            {
+                var item=Items(Get(session,"Items"))[after-1];
+                File.AppendAllText(Path.Combine(captureDiagnosticsDirectory,"PRIVATE-capture-progress.jsonl"),Json.Serialize(new {
+                    Stage="after-capture",Index=after,Captures=Get(op,"captures"),Hits=Get(op,"hits"),ElapsedMilliseconds=clock.Elapsed.TotalMilliseconds,
+                    Error=Get(item,"Error"),PlacementError=Get(item,"PlacementDiagnosticError"),HasNativeCapture=Get(item,"PlacementCapture")!=null})+System.Environment.NewLine);
+            }
+            Application.DoEvents();Thread.Sleep(1);
+        }
         Check(task.IsCompleted,"Native batch timeout: "+Get(op,"Diagnostic"));task.GetAwaiter().GetResult();var result=Get(op,"Result");
         wall=clock.Elapsed.TotalMilliseconds;sta=(double)Get(op,"MaximumStaCaptureMilliseconds");
         if(!(bool)Get(result,"Current"))
@@ -58,6 +80,8 @@ internal static partial class NativeAssemblyBatchValidation
                 if(!same)changes.Add(new {Name=Path.GetFileName(path),Exists=exists,Changed=true});
             }
             Console.WriteLine("NATIVE_FRESHNESS_DIAGNOSTIC "+Json.Serialize(changes));
+            Console.WriteLine("NATIVE_INCOMPLETE_CAPTURE "+Json.Serialize(new {Index=Get(op,"index"),Captures=Get(op,"captures"),Hits=Get(op,"hits"),
+                CaptureMilliseconds=Get(result,"CaptureMilliseconds"),MaximumStaCaptureMilliseconds=Get(op,"MaximumStaCaptureMilliseconds"),Diagnostic=Get(op,"Diagnostic")}));
         }
         Check((bool)Get(result,"Current"),"Native batch stale: "+Get(result,"InvalidReason")+" / "+Get(op,"Diagnostic"));
         Check(turns>0,"STA capture progresses via message-loop slices");return result;
@@ -97,6 +121,7 @@ internal static partial class NativeAssemblyBatchValidation
             product=Assembly.LoadFrom(args[0]);string output=Path.GetFullPath(args[1]);Directory.CreateDirectory(output);
             if(System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_CAPTURE_DIAGNOSTICS")=="1")
             {
+                captureDiagnosticsDirectory=output;
                 int staThread=Thread.CurrentThread.ManagedThreadId;
                 AppDomain.CurrentDomain.FirstChanceException+=(sender,eventArgs)=> {
                     if(Thread.CurrentThread.ManagedThreadId==staThread&&eventArgs.Exception is KeyNotFoundException)
