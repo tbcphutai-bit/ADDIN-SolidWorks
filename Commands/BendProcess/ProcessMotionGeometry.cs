@@ -24,7 +24,10 @@ namespace ADDIN.Commands.BendProcess
         public double PositionErrorMm { get; }
         public double AngleErrorRadians { get; }
         public double AxialErrorMm { get; }
-        public bool Valid => new[] { StartAngle, EndAngle, StartAxialMm, EndAxialMm, PositionErrorMm, AngleErrorRadians, AxialErrorMm }
+        private readonly bool valid;
+        private readonly Lazy<string> canonical;
+        public bool Valid => valid;
+        private bool ValidateInputs() => new[] { StartAngle, EndAngle, StartAxialMm, EndAxialMm, PositionErrorMm, AngleErrorRadians, AxialErrorMm }
             .All(ToolPoint.Finite) && Math.Abs(StartAngle) <= 8 * Math.PI && Math.Abs(EndAngle) <= 8 * Math.PI &&
             PositionErrorMm >= 0 && PositionErrorMm <= .01 && AngleErrorRadians >= 0 && AngleErrorRadians <= .01 &&
             AxialErrorMm >= 0 && AxialErrorMm <= .001 && new[] { PivotMm, StartTranslationMm, EndTranslationMm }
@@ -33,7 +36,8 @@ namespace ADDIN.Commands.BendProcess
             ToolPoint startTranslation = default(ToolPoint), ToolPoint endTranslation = default(ToolPoint),
             double startAxial = 0, double endAxial = 0, double positionError = 0, double angleError = 0, double axialError = 0)
         { PivotMm = pivot; StartAngle = startAngle; EndAngle = endAngle; StartTranslationMm = startTranslation; EndTranslationMm = endTranslation;
-            StartAxialMm = startAxial; EndAxialMm = endAxial; PositionErrorMm = positionError; AngleErrorRadians = angleError; AxialErrorMm = axialError; }
+            StartAxialMm = startAxial; EndAxialMm = endAxial; PositionErrorMm = positionError; AngleErrorRadians = angleError; AxialErrorMm = axialError;
+            valid=ValidateInputs();canonical=new Lazy<string>(BuildCanonical); }
         internal double Angle(double u) => StartAngle + (EndAngle - StartAngle) * u;
         internal double Axial(double u) => StartAxialMm + (EndAxialMm - StartAxialMm) * u;
         internal ToolPoint Translation(double u) => new ToolPoint(StartTranslationMm.X + (EndTranslationMm.X - StartTranslationMm.X) * u,
@@ -44,7 +48,8 @@ namespace ADDIN.Commands.BendProcess
             return new PlacementTransform2D(c, s, -s, c, PivotMm.X - c * PivotMm.X + s * PivotMm.Y + t.X,
                 PivotMm.Y - s * PivotMm.X - c * PivotMm.Y + t.Y);
         }
-        internal string Canonical => ToolEvidenceCanonical.Hash("AffineBendZMotionMmV1", ToolEvidenceCanonical.Point(PivotMm),
+        internal string Canonical => canonical.Value;
+        private string BuildCanonical() => ToolEvidenceCanonical.Hash("AffineBendZMotionMmV1", ToolEvidenceCanonical.Point(PivotMm),
             ToolEvidenceCanonical.Point(StartTranslationMm), ToolEvidenceCanonical.Point(EndTranslationMm),
             ToolEvidenceCanonical.Hash(new[] { StartAngle, EndAngle, StartAxialMm, EndAxialMm, PositionErrorMm, AngleErrorRadians, AxialErrorMm }
                 .Select(ToolEvidenceCanonical.Number).ToArray()));
@@ -66,12 +71,15 @@ namespace ADDIN.Commands.BendProcess
         }
         internal CollisionMaterial2D Move(CollisionMaterial2D source, double lo, double hi, string prefix)
         {
+            using(ProcessPerformanceScope.Measure("Motion.MoveMaterial"))
+            {
             if (source == null) return null;
             var t = At((lo + hi) / 2); double band = Band(source, lo, hi);
             Func<CollisionContour2D, CollisionContour2D> move = c => new CollisionContour2D(prefix + ":" + c.Id,
                 c.Boundary.Select(t.Apply), (CollisionInterval.P(c.UncertaintyMm) + CollisionInterval.P(band)).Hi, c.Validation);
             return new CollisionMaterial2D(source.FrameId, source.Components.Select(c => new CollisionComponent2D(move(c.Outer), c.Holes.Select(move))),
                 ToolEvidenceCanonical.Hash(source.Provenance, Canonical), source.SimulationOnly, () => source.Current, true);
+            }
         }
         internal bool Identity => StartAngle == 0 && EndAngle == 0 && StartTranslationMm.X == 0 && StartTranslationMm.Y == 0 &&
             EndTranslationMm.X == 0 && EndTranslationMm.Y == 0 && StartAxialMm == 0 && EndAxialMm == 0 &&
@@ -110,11 +118,14 @@ namespace ADDIN.Commands.BendProcess
         internal SheetEnvelopeCapture Sweep(double lo, double hi) => Envelope(lo, hi);
         private SheetEnvelopeCapture Envelope(double lo, double hi)
         {
+            using(ProcessPerformanceScope.Measure("Motion.Envelope"))
+            {
             if (!Source.Certificate.ContinuousCoverageProven || !Motion.Valid || Source.Domain == null)
                 return Source.ObservationsOnly(new double[0]);
             return new SheetEnvelopeCapture(Source.Binding, new[] { new MotionSolid(Source, Motion, lo, hi, Id) },
                 Source.Certificate.Tier, lo == hi ? "ExplicitProcessStateV1" : "WholeAffineMotionBoundaryBandV1",
                 Source.SimulationOnly, Source.Certificate.SolidToleranceMm + Motion.AxialErrorMm + 1e-8, new string[0]);
+            }
         }
         // Complete axial source enclosure combined with a complete angular /
         // translation displacement disk. Sweep snapshots are SUPERSETS, and
@@ -154,12 +165,13 @@ namespace ADDIN.Commands.BendProcess
 
     internal sealed class ProcessToolPose
     {
+        private readonly Lazy<string> sourceCanonical;
         public AxialToolOccupancy Source { get; }
         public ProcessMotionLaw Motion { get; }
         public string SetupSourceSha256 { get; }
         internal ToolAxialSetupEvidence SetupEvidence { get; private set; }
         internal ProcessToolPose(AxialToolOccupancy source, ProcessMotionLaw motion, string setupSourceSha256)
-        { Source = source; Motion = motion; SetupSourceSha256 = setupSourceSha256; }
+        { Source = source; Motion = motion; SetupSourceSha256 = setupSourceSha256;sourceCanonical=new Lazy<string>(BuildSourceCanonical); }
         internal static ProcessToolPose FromEvidence(ToolAxialSetupEvidence evidence, SheetEnvelopeCapture observed,
             ToolProfileLibrarySnapshot library, ProcessMotionLaw motion)
         {
@@ -168,7 +180,10 @@ namespace ADDIN.Commands.BendProcess
         }
         public bool Current => Source?.Current == true;
         public bool Valid => Source?.Verified == true && Motion?.Valid == true && ToolDatumEvidence.IsSha256(SetupSourceSha256);
-        internal string SourceCanonical => ToolEvidenceCanonical.Hash("ProcessToolSourceV1", SetupSourceSha256,
+        // Geometry/laws are immutable DTOs; only their Current leases are live.
+        // Cache identity bytes, never an approval/freshness decision.
+        internal string SourceCanonical => sourceCanonical.Value;
+        private string BuildSourceCanonical() => ToolEvidenceCanonical.Hash("ProcessToolSourceV1", SetupSourceSha256,
             Source?.Material == null ? null : AxialSolidPrimitive.MaterialHash(Source.Material), Source?.Provenance,
             Source == null ? null : ToolEvidenceCanonical.Hash(Source.Segments.Select(s => ToolEvidenceCanonical.Hash(
                 ToolEvidenceCanonical.Number(s.StartMm), ToolEvidenceCanonical.Number(s.EndMm))).ToArray()),
@@ -177,12 +192,15 @@ namespace ADDIN.Commands.BendProcess
         internal AxialToolOccupancy At(double u) => Sweep(u, u);
         internal AxialToolOccupancy Sweep(double lo, double hi)
         {
+            using(ProcessPerformanceScope.Measure("Motion.ToolPose"))
+            {
             if (!Valid) return Source;
             double a = Math.Min(Motion.Axial(lo), Motion.Axial(hi)), b = Math.Max(Motion.Axial(lo), Motion.Axial(hi));
             return new AxialToolOccupancy(Motion.Move(Source.Material, lo, hi, "TOOL"), Source.Segments.Select(s =>
                 new AxialInterval(s.StartMm + a, s.EndMm + b)), Source.AxialUncertaintyMm + Motion.AxialErrorMm + 1e-8,
                 ToolEvidenceCanonical.Hash(Canonical, ToolEvidenceCanonical.Number(lo), ToolEvidenceCanonical.Number(hi)),
                 Source.SimulationOnly, () => Current, Source.Reasons);
+            }
         }
     }
 }
