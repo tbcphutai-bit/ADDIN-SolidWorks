@@ -40,3 +40,6 @@
 
 ## Executable research reference (isolated)
 `tools/AutoFrameJointResearch/AutoFrameJointResearch.csproj` là ứng dụng Console .NET Framework 4.8 với thuật toán hình học cơ bản và self-tests C# 7.3. Chưa kết nối SOLIDWORKS; chưa tự đọc STEP; không tạo Feature; mọi dung sai trong tests là fixture chứ không phải tiêu chuẩn sản xuất. Copilot phải build và chạy tests tại Visual Studio trước khi gọi code này là được xác minh.
+
+## Prototype C# đọc Assembly (Phase 2A, chưa cắt)
+Xem [13_READONLY_PROBE_INSTRUCTIONS.md](13_READONLY_PROBE_INSTRUCTIONS.md). Mã nguồn `Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs` đã được đưa vào `ADDIN.csproj`, nhưng chưa có button/TaskPane để gọi; cần xác minh Build và SOLIDWORKS COM tại máy người dùng. Không tạo Feature hoặc sửa Part.

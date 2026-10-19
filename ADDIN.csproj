@@ -119,6 +119,7 @@
     <Compile Include="UI\RepairDimensionsPropertyManagerPage.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="Commands\AutoFrameJoint\AutoFrameJointReadOnlyProbe.cs" />
     <Compile Include="Commands\NativeToolBridges.cs" />
     <Compile Include="Commands\RepairDanglingDimensions.Native.cs" />
     <Compile Include="UI\MirrorAssemblyPropertyManagerPage.cs" />
