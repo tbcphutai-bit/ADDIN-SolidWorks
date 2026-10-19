@@ -40,6 +40,7 @@ namespace ADDIN.Commands
         public int PatternNg;
         public int MissingHoles;
         public double EngineSeconds;
+        public CheckHoleConnectionCoverage ConnectionCoverage;
         public string MarkerStatus = "Chưa vẽ sketch NG.";
         public readonly List<CheckHoleReportRow> Rows = new List<CheckHoleReportRow>();
 
@@ -68,6 +69,11 @@ namespace ADDIN.Commands
                 }
                 if (EngineSeconds > 0)
                     sb.Append(" | Xử lý: ").Append(EngineSeconds.ToString("0.00", CultureInfo.InvariantCulture)).Append(" s");
+                if (ConnectionCoverage != null)
+                    sb.AppendLine().Append("Nhóm lỗ đã ghép (chẩn đoán): ").Append(ConnectionCoverage.GroupCount)
+                      .Append(" | NG chưa rõ Master: ").Append(ConnectionCoverage.NgGroupsWithoutMaster)
+                      .Append(" | Lỗ chưa ghép: ").Append(ConnectionCoverage.UnmatchedHoleCount)
+                      .Append(" | ").Append(ConnectionCoverage.CoverageStatus);
                 if (!string.IsNullOrEmpty(MarkerStatus))
                     sb.AppendLine().Append(MarkerStatus);
                 return sb.ToString();
@@ -115,6 +121,7 @@ namespace ADDIN.Commands
         private readonly Button selectedMarkers = new Button();
         private readonly Button allMarkers = new Button();
         private readonly Button export = new Button();
+        private readonly Button connectionGroups = new Button();
         private readonly TableLayoutPanel detailLayout;
         private readonly TableLayoutPanel compactLayout = new TableLayoutPanel();
         private readonly Label compactSummary = new Label();
@@ -198,6 +205,7 @@ namespace ADDIN.Commands
             AddButton(toolbar, selectedMarkers, "Vẽ NG đã chọn", () => markAction(SelectedRows().Where(x => x.CanMark).Select(x => x.Id).ToList()));
             AddButton(toolbar, allMarkers, "Vẽ toàn bộ NG", () => markAction(null));
             AddButton(toolbar, export, "Xuất CSV", ExportReport);
+            AddButton(toolbar, connectionGroups, "Nhóm liên kết", ShowConnectionGroups);
             AddButton(toolbar, cancel, "Hủy", () => cancelAction());
 
             autoMarkers.Text = "Tự vẽ NG";
@@ -535,6 +543,7 @@ namespace ADDIN.Commands
             selectedMarkers.Enabled = !busy && rows.Any(x => x.CanMark);
             allMarkers.Enabled = !busy && report != null && report.Rows.Any(x => x.CanMark);
             export.Enabled = !busy && report != null;
+            connectionGroups.Enabled = !busy && report != null && report.ConnectionCoverage != null;
             rerun.Enabled = !busy;
             cancel.Enabled = busy;
             filter.Enabled = !busy;
@@ -550,6 +559,50 @@ namespace ADDIN.Commands
         {
             CheckHoleReportRow row = SelectedRows().FirstOrDefault();
             if (!busy && row != null) findAction(row);
+        }
+
+        // CG1 diagnostic-only. Display does not select Master, change any
+        // production NG decision, or create model geometry.
+        private void ShowConnectionGroups()
+        {
+            if (busy || report == null || report.ConnectionCoverage == null) return;
+            CheckHoleConnectionCoverage c = report.ConnectionCoverage;
+            using (var dialog = new Form())
+            {
+                dialog.Text = "CHECK HOLE - Nhóm liên kết (chẩn đoán)";
+                dialog.Size = new Size(1150, 580);
+                dialog.MinimumSize = new Size(850, 420);
+                dialog.StartPosition = FormStartPosition.CenterScreen;
+                dialog.Font = new Font("Segoe UI", 9F);
+                var description = new Label
+                {
+                    Dock = DockStyle.Top,
+                    Height = 72,
+                    Padding = new Padding(10),
+                    Text = "Nhóm lỗ đã ghép: " + c.GroupCount
+                        + " | NG chưa rõ Master: " + c.NgGroupsWithoutMaster
+                        + " | Lỗ chưa ghép: " + c.UnmatchedHoleCount
+                        + Environment.NewLine
+                        + "Hai đầu trục chỉ là ứng viên hình học, KHÔNG phải vật chủ được xác nhận."
+                        + Environment.NewLine
+                        + "CG1 chưa kiểm tra quan hệ đối với Part không có lỗ."
+                };
+                var table = new DataGridView
+                {
+                    Dock = DockStyle.Fill,
+                    ReadOnly = true,
+                    AutoGenerateColumns = true,
+                    AllowUserToAddRows = false,
+                    AllowUserToDeleteRows = false,
+                    RowHeadersVisible = false,
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+                    DataSource = c.Groups
+                };
+                dialog.Controls.Add(table);
+                dialog.Controls.Add(description);
+                dialog.ShowDialog();
+            }
         }
 
         private void ExportReport()
