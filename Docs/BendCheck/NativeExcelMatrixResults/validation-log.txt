@@ -1,0 +1,34 @@
+Product Debug/x64 BUILD PASS (zero errors)
+Product Release/x64 BUILD PASS (zero errors)
+Native harness Debug/x64 BUILD PASS
+Native harness Release/x64 BUILD PASS
+File: input-debug.log
+RESULT 13 passed; 0 failed; 46 assertions
+File: input-release.log
+RESULT 13 passed; 0 failed; 46 assertions
+File: managed-debug.log
+RESULT 302 passed; 0 failed; 9112 assertions; synthetic DXF only, no SOLIDWORKS API.
+File: managed-release.log
+RESULT 302 passed; 0 failed; 9112 assertions; synthetic DXF only, no SOLIDWORKS API.
+File: ui-debug.log
+RESULT 16 groups; 150 assertions; 0 failures
+File: ui-release.log
+RESULT 16 groups; 150 assertions; 0 failures
+File: planning.log
+RESULT 24 passed; 0 failed; 609 assertions (no SOLIDWORKS API).
+File: company-source.log
+Company fixed CAD pairs PASS: 18/18; assertions=16977; closed/valid Punch=17; physical setup=UNKNOWN 18/18.
+Native Debug: 9/9 functional PASS; 1158 assertions; worker capture count 0; sources unchanged; shutdown NOT_CONFIRMED; overall FAIL (exit 1)
+Native Release: 9/9 functional PASS; 1158 assertions; Rebuild/Refresh PASS; worker capture count 0; sources unchanged; shutdown NOT_CONFIRMED; overall FAIL (exit 1)
+Company33 sources: user explicitly confirmed original workbook and authorized preparing 33 new cases from it.
+Company33 Release: 33 real SLDPRT / 72 native bends / 1296 static + 1296 process candidates. 33 execution PASS / 0 FAIL / 0 NOT_RUN; 4077 assertions.
+Check Min Release: 69 MeetsMinimum / 3 BelowMinimum. XL-19/20/21 FeatureId 53 A=15 < 15.2 mm. Software PASS is distinct from Min NG.
+Original Excel and company Master DXF SHA256 unchanged. No CAD/Excel/sidecar uploaded.
+Company33 Release shutdown: NOT_CONFIRMED for all 3 partitions; native process exit 1 and overall lifecycle FAIL.
+Merge tests: missing 11 cases remain NOT_RUN with no fake geometry; duplicate batch rejected with no output; source SHA enforced.
+Company33 Debug: 33 execution PASS / 0 FAIL / 0 NOT_RUN; 4077 assertions; shutdown NOT_CONFIRMED, overall lifecycle FAIL (all 3 exits 1).
+Debug/Release equivalence: PASS, all 33 exact native geometry records and complete result graphs match, including Min/FeatureIds/status/reasons/witness/error values.
+Both configurations: 33 cold captures, 0 warm captures, 33 warm hits, worker capture count 0, original sources unchanged; no numeric queries.
+Company33 definitions: 18 symmetric U envelope variants, 9 controlled Z extensions, 6 controlled three-bend extensions; 11 per material; 11 below/at/above reference.
+Input matrix typed numeric cells, CSV equivalence, source hash and worksheet error scan PASS.
+Reproducible prepare script: 33 rows generated from private reviewed evidence and typed matrix; C# input validator PASS.
