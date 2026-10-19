@@ -330,6 +330,7 @@ namespace ADDIN.Commands
                     throw new InvalidOperationException("Model đã thay đổi trong lúc kiểm tra. Hãy chạy lại.");
                 Stopwatch reportWatch = Stopwatch.StartNew();
                 lastReport = BuildReport(model.GetTitle(), SafeConfigurationName(model), holes, results, patternIssues, 0);
+                lastReport.ConnectionCoverage = BuildConnectionCoverage(holes, results);
                 reportWatch.Stop();
                 profile.ReportBuildMs = reportWatch.ElapsedMilliseconds;
                 // Keep previous markers until a complete replacement sketch is confirmed.
