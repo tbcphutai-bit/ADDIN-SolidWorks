@@ -110,6 +110,7 @@ internal static partial class NativeAssemblyBatchValidation
 
     [STAThread] private static int Main(string[] args)
     {
+        if(args.Length>0 && args[0]=="--excel-matrix") return ExcelMatrixMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--create-seed") return SeedMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--part-ui") return UnifiedPartMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--lifecycle") return LifecycleMain(args.Skip(1).ToArray());
