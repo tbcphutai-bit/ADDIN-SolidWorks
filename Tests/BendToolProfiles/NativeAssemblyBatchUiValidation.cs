@@ -1,0 +1,164 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Windows.Forms;
+using SolidWorks.Interop.sldworks;
+
+internal static partial class NativeAssemblyBatchValidation
+{
+    private static Control UiControl(Form form,string name) => form.Controls.Find(name,true).Single();
+    private static void UiClick(Form form,string name) => ((Button)UiControl(form,name)).PerformClick();
+    private static void UiSpin(Func<bool> done)
+    {
+        var clock=Stopwatch.StartNew();
+        while(!done()&&clock.ElapsedMilliseconds<300000){NativeTestProcess.PumpMessages();Thread.Sleep(5);}
+        Check(done(),"UI timer/await completion timed out");
+    }
+    private static object[] UiParts(Form form) => ((DataGridView)UiControl(form,"dgvParts")).Rows.Cast<DataGridViewRow>().Select(r=>r.Tag).ToArray();
+    private static void UiCheckBindings(Form form,object snapshot)
+    {
+        var actual=UiParts(form);var expected=Items(Get(snapshot,"Parts"));
+        Check(actual.Length==expected.Length,"UI has exactly the current backend analysis rows");
+        foreach(var part in actual)
+        {
+            var raw=Get(part,"RawPartResult");int count=(int)Get(raw,"BendCount");
+            var bends=Items(Get(part,"Bends"));
+            var ids=Items(Get(raw,"StaticCandidates")).Concat(Items(Get(raw,"ProcessCandidates")))
+                .Select(c=>(int)Get(c,"FeatureId")).Distinct().OrderBy(x=>x).ToArray();
+            Check(bends.Select(b=>(int)Get(b,"FeatureId")).SequenceEqual(count==0?new int[0]:ids),"UI IDs match actual native backend FeatureIds");
+            foreach(var bend in bends)
+            {
+                Check(Get(bend,"AngleDeg")==null&&Get(bend,"RadiusMm")==null,"No native dimensions invented");
+                var tools=Items(Get(bend,"ToolCandidates"));Check(tools.Length==18,"18 live tool slots per native bend");
+                Check(tools.All(t=>Get(t,"GeometricStatus").ToString()=="UNKNOWN"&&Get(t,"ProcessStatus").ToString()=="UNKNOWN"),
+                    "No setup/process evidence means UNKNOWN, never CLEAR");
+            }
+        }
+        Check(UiControl(form,"lblDisclaimer").Text.Contains("CHƯA XÁC MINH"),"Live manufacturing disclaimer");
+    }
+    private static void ExerciseNativeUi(ISldWorks app,ModelDoc2 root,object source,string output,Component2 selected,
+        Dictionary<string,object> report,string label)
+    {
+        Activate(app,root);root.ClearSelection2(true);
+        string state=Json.Serialize(State(root));
+        var form=(Form)Activator.CreateInstance(product.GetType("ADDIN.UI.BendAssemblyBatchForm",true),All,null,
+            new object[]{root.GetTitle(),root.ConfigurationManager.ActiveConfiguration.Name},null);
+        var settings=New("BendToolStorageSettings",Path.Combine(output,"ui-private-settings.json"));
+        Call(settings,"SavePath",Get(Get(source,"Snapshot"),"SourcePath"),CancellationToken.None);
+        var provider=New("BendToolCatalogProvider",settings);
+        var backend=Activator.CreateInstance(product.GetType("ADDIN.UI.BendAssemblyBatchLiveBackend",true),All,null,new[]{app,root,provider},null);
+        var controller=Activator.CreateInstance(product.GetType("ADDIN.UI.BendAssemblyBatchController",true),All,null,new[]{form,backend},null);
+        try
+        {
+            form.Show();Application.DoEvents();Check(UiParts(form).Length==0&&!(bool)Get(form,"IsPreview"),"Native Form starts empty LIVE");
+            UiClick(form,"btnToggleMockup");Check((bool)Get(form,"IsPreview"),"Preview explicit before actual run");
+            UiClick(form,"btnRunBatch");Check(!(bool)Get(form,"IsPreview")&&UiParts(form).Length==0,"Native Run removes preview data immediately");
+            UiSpin(()=>!(bool)Get(controller,"Running"));
+            var cold=Get(controller,"displayed");Check(cold!=null&&(bool)Get(cold,"Current"),"Actual Form/Begin/Pump/Completion produced current snapshot: "+UiControl(form,"lblProgressTitle").Text);
+            UiCheckBindings(form,cold);
+            var counts=Items(Get(cold,"Parts")).Select(p=>(int)Get(p,"BendCount")).Distinct().OrderBy(x=>x).ToArray();
+            if(label=="zero-three-six")Check(counts.SequenceEqual(new[]{0,3,6}),"Actual Part inventories include 0,3,6 bends");
+            Check(((DataGridView)UiControl(form,"dgvParts")).Columns[1].HeaderText=="Configuration","BOM styling cannot overwrite live schema");
+            using(var bitmap=new Bitmap(form.Width,form.Height))
+            {form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"PRIVATE-live-"+label+".png"));}
+            UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));var warm=Get(controller,"displayed");
+            Console.WriteLine("UI_WARM "+Json.Serialize(new {Label=label,Current=warm!=null&&(bool)Get(warm,"Current"),
+                Captures=warm==null?null:Get(warm,"Captures"),Hits=warm==null?null:Get(warm,"CaptureHits"),Message=UiControl(form,"lblProgressTitle").Text}));
+            Check(warm!=null&&(bool)Get(warm,"Current"),"Actual UI warm run current: "+UiControl(form,"lblProgressTitle").Text);
+            UiCheckBindings(form,warm);
+            Check(!(bool)Get(cold,"Current"),"Superseded generation invalidated");
+            root.ClearSelection2(true);Call(form,"SetScope",Enum.Parse(T("BendAssembly.AssemblyCheckScope"),"SelectedComponents"));
+            UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));
+            Check(Get(controller,"displayed")==null&&UiParts(form).Length==0&&UiControl(form,"lblProgressPercent").Text!="100%",
+                "Empty Selected scope is rejected, never changed to Entire or success");
+            root.ClearSelection2(true);Check(selected.Select4(false,null,false),"Select actual component for UI scope");
+            Call(form,"SetScope",Enum.Parse(T("BendAssembly.AssemblyCheckScope"),"SelectedComponents"));
+            UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));var subset=Get(controller,"displayed");
+            Check(subset!=null&&(int)Get(subset,"LeafOccurrences")==1,"Actual UI Selected scope is one occurrence");UiCheckBindings(form,subset);
+            using(var bitmap=new Bitmap(form.Width,form.Height))
+            {form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"PRIVATE-live-selected-"+label+".png"));}
+            root.ClearSelection2(true);UiClick(form,"btnRefresh");UiSpin(()=>!(bool)Get(controller,"Running"));
+            Check(Get(controller,"displayed")!=null&&(int)Get(Get(controller,"displayed"),"LeafOccurrences")==1,"Refresh retains saved selected scope after selection changes");
+            UiClick(form,"btnRunBatch");UiClick(form,"btnCancel");Check((bool)Get(controller,"Running"),"Native Cancel waits for completion");
+            UiSpin(()=>!(bool)Get(controller,"Running"));Check(UiParts(form).Length==0&&UiControl(form,"lblProgressPercent").Text!="100%","No canceled CAD results or false completion");
+            UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));Check(UiParts(form).Length>0,"Restart after cancel");
+            var old=selected.Transform2;var values=((double[])old.ArrayData).ToArray();values[9]+=.001;
+            selected.Transform2=(MathTransform)((MathUtility)app.GetMathUtility()).CreateTransform(values);
+            UiSpin(()=>UiParts(form).Length==0);
+            Check(UiControl(form,"lblProgressTitle").Text.Contains("cũ"),"Native pose change withdraws stale UI");
+            selected.Transform2=old;root.ForceRebuild3(false);
+            UiClick(form,"btnRefresh");UiSpin(()=>!(bool)Get(controller,"Running"));Check(Get(controller,"displayed")!=null,
+                "Refresh after stale pose: "+UiControl(form,"lblProgressTitle").Text);
+            UiClick(form,"btnRunBatch");form.Close();Check(!form.IsDisposed,"Window close deferred while backend runs");
+            UiSpin(()=>form.IsDisposed);
+            report["Ui-"+label]=new {Entire=true,Selected=true,PreviewSeparated=true,Cold=true,WarmCaptureHits=Get(warm,"CaptureHits"),
+                Cancel=true,StalePose=true,Refresh=true,CloseDuringRun=true,BendCounts=counts,
+                WorkerComQueries=T("BendEnvelope.SheetNativeTopologyCapture").GetProperty("WrongThreadCount",All).GetValue(null,null)};
+        }
+        finally{((IDisposable)controller).Dispose();form.Dispose();}
+    }
+    private static ModelDoc2 UiSheet(ISldWorks app,string template,string path,int bends)
+    {
+        var doc=(ModelDoc2)app.NewDocument(template,0,0,0);Check(doc!=null,"Create private sheet fixture");
+        Check(Plane(doc).Select2(false,0),"Select native sheet plane");doc.SketchManager.InsertSketch(true);
+        // Open profile: one straight edge has zero bends; four perpendicular
+        // edges create three physical bends in the native base flange.
+        var xy=bends==0?new double[]{0,0,.05,0}:new double[]{0,0,.05,0,.05,.03,.08,.03,.08,.06};
+        for(int i=0;i+3<xy.Length;i+=2)doc.SketchManager.CreateLine(xy[i],xy[i+1],0,xy[i+2],xy[i+3],0);
+        doc.SketchManager.InsertSketch(true);Feature profile=null;
+        for(var f=(Feature)doc.FirstFeature();f!=null;f=(Feature)f.GetNextFeature())if(f.GetTypeName2()=="ProfileFeature")profile=f;
+        Check(profile!=null&&profile.Select2(false,0),"Select generated profile");
+        Check(doc.FeatureManager.InsertSheetMetalBaseFlange2(.002,false,.001,.06,.01,false,0,0,1,null,false,2,.0001,.0001,.5,true,false,true,true)!=null,"Native base flange");
+        doc.ConfigurationManager.ActiveConfiguration.Name="Default";
+        doc.ForceRebuild3(false);SaveAs(doc,path);return doc;
+    }
+    // --ui dll output(new) six-bend-seed assembly-template min-xlsx cut-plane-seed
+    private static int UiMain(string[] args)
+    {
+        if(args.Length!=6){Console.WriteLine("--ui dll output(new) six-bend-seed assembly-template min-xlsx cut-plane-seed");return 2;}
+        ISldWorks app=null;var disposable=new List<IDisposable>();var report=new Dictionary<string,object>();
+        string output=Path.GetFullPath(args[1]);Directory.CreateDirectory(output);
+        try
+        {
+            Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
+            product=Assembly.LoadFrom(args[0]);string seedHash=Sha(args[2]),edgeHash=Sha(args[5]);
+            app=NativeTestProcess.StartOwned(output);app.Visible=false;app.UserControl=false;
+            string partTemplate=Path.Combine(Path.GetDirectoryName(args[3]),"部品.PRTDOT");
+            var zero=UiSheet(app,partTemplate,Path.Combine(output,"ZERO.SLDPRT"),0);
+            var three=UiSheet(app,partTemplate,Path.Combine(output,"GENERATED-02.SLDPRT"),3);
+            string twinPath=Path.Combine(output,"GENERATED-03.SLDPRT");File.Copy(three.GetPathName(),twinPath,false);Open(app,twinPath);
+            string sixPath=Path.Combine(output,"SIX.SLDPRT");File.Copy(args[2],sixPath,false);File.SetAttributes(sixPath,FileAttributes.Normal);var six=Open(app,sixPath);
+            var root=(ModelDoc2)app.NewDocument(args[3],0,0,0);Check(root!=null,"New private UI assembly");
+            var assembly=(AssemblyDoc)root;Component2 selected=null;int n=0;
+            foreach(var doc in new[]{zero,three,six})
+            {
+                var c=assembly.AddComponent5(doc.GetPathName(),0,"",true,doc.ConfigurationManager.ActiveConfiguration.Name,n++*.2,0,0);
+                Check(c!=null,"Insert actual sheet fixture");if(doc==six)selected=c;
+            }
+            root.ForceRebuild3(false);SaveAs(root,Path.Combine(output,"UI-TEST.SLDASM"));Activate(app,root);
+            var source=Source(args[4],output);
+            ExerciseNativeUi(app,root,source,output,selected,report,"zero-three-six");
+            System.Environment.SetEnvironmentVariable("ADDIN_ASSEMBLY_UI_TEST","1");
+            // The existing cut fixture uses its template plane and requires a
+            // seed intersecting that plane. Copy the caller's matching fixture;
+            // never change an engine verdict to accommodate the generated profile.
+            string edgeSheet=Path.Combine(output,"EDGE-SEED.SLDPRT"),edgeTwin=Path.Combine(output,"EDGE-TWIN.SLDPRT");
+            File.Copy(args[5],edgeSheet,false);File.Copy(args[5],edgeTwin,false);
+            File.SetAttributes(edgeSheet,FileAttributes.Normal);File.SetAttributes(edgeTwin,FileAttributes.Normal);
+            Open(app,edgeSheet);Open(app,edgeTwin);Activate(app,root);
+            EdgeFixtures(app,root,args[3],output,disposable,report,source,edgeSheet,edgeTwin);
+            Check(Sha(args[2])==seedHash,"Original seed bytes unchanged");
+            Check(Sha(args[5])==edgeHash,"Original cut-plane seed bytes unchanged");
+            report["Result"]="PASS";report["Assertions"]=assertions;
+            File.WriteAllText(Path.Combine(output,"PRIVATE-native-ui-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;
+        }
+        catch(Exception ex){report["Result"]="FAIL";report["Assertions"]=assertions;report["Error"]=ex.ToString();File.WriteAllText(Path.Combine(output,"PRIVATE-native-ui-result.json"),Json.Serialize(report));Console.WriteLine(ex);return 1;}
+        finally{foreach(var d in disposable)d.Dispose();if(app!=null){try{app.CloseAllDocuments(true);app.ExitApp();}catch{}}}
+    }
+}

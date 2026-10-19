@@ -86,6 +86,7 @@ internal static partial class NativeAssemblyBatchValidation
 
     [STAThread] private static int Main(string[] args)
     {
+        if(args.Length>0 && args[0]=="--ui") return UiMain(args.Skip(1).ToArray());
         // dll, output(new), sheet-metal seed, seed length dimension, assembly
         // template, min workbook. Source files are only copied/read, never saved.
         if(args.Length!=6) {Console.WriteLine("dll output seed dimension assembly-template min-xlsx");return 2;}

@@ -34,6 +34,8 @@ namespace ADDIN.UI
         /// Raised when user clicks 'Quét lại' (Refresh).
         /// </summary>
         public event EventHandler RefreshRequested;
+        public event EventHandler PreviewRequested;
+        public event EventHandler<AssemblyCheckScope> ScopeChanged;
 
         /// <summary>
         /// Raised when a part is selected from the parts list.
@@ -62,7 +64,10 @@ namespace ADDIN.UI
         private BatchToolCandidateViewModel selectedTool;
         private AssemblyCheckScope currentScope = AssemblyCheckScope.EntireAssembly;
         private bool isRunning;
-        private bool isMockupMode = true;
+        private bool isMockupMode;
+        internal bool IsPreview => isMockupMode;
+        internal bool IsRunning => isRunning;
+        internal AssemblyCheckScope Scope => currentScope;
 
         #endregion
 
@@ -73,7 +78,7 @@ namespace ADDIN.UI
             InitializeComponent();
             ApplyCustomStyling();
             WireInternalEvents();
-            LoadMockupData();
+            ClearLive("Chưa chạy. Chọn phạm vi rồi bấm Run Batch Check.");
         }
 
         public BendAssemblyBatchForm(string hostTitle, string configurationName)
@@ -100,8 +105,9 @@ namespace ADDIN.UI
             badgeConcept.ForeColor = Color.FromArgb(71, 85, 105);
 
             // Grids modern styling
-            GridStyler.ApplyModernStyle(dgvParts);
-            GridStyler.ApplyModernStyle(dgvTools);
+            GridStyler.ApplyModernStyle(dgvParts, false);
+            GridStyler.ApplyModernStyle(dgvTools, false);
+            dgvParts.MultiSelect = dgvTools.MultiSelect = false;
 
             dgvParts.RowTemplate.Height = TaiTheme.Px(this, 34);
             dgvTools.RowTemplate.Height = TaiTheme.Px(this, 30);
@@ -164,7 +170,13 @@ namespace ADDIN.UI
             btnCancel.Click += OnCancelClicked;
             btnRefresh.Click += OnRefreshClicked;
             btnClose.Click += (s, e) => Close();
-            btnToggleMockup.Click += (s, e) => LoadMockupData();
+            btnToggleMockup.Text = "Preview (dữ liệu mẫu)";
+            btnToggleMockup.Click += (s, e) =>
+            {
+                if (isRunning) return;
+                if (PreviewRequested != null) PreviewRequested.Invoke(this, EventArgs.Empty);
+                else LoadMockupData();
+            };
 
             // Filters
             txtSearch.TextChanged += (s, e) => ApplyPartFilters();
@@ -184,8 +196,10 @@ namespace ADDIN.UI
 
         public void SetScope(AssemblyCheckScope scope)
         {
+            if (isRunning) return;
             currentScope = scope;
             UpdateScopeButtonsUI();
+            ScopeChanged?.Invoke(this, scope);
         }
 
         private void UpdateScopeButtonsUI()
@@ -204,22 +218,11 @@ namespace ADDIN.UI
         {
             if (RunBatchRequested != null)
             {
-                SetRunningState(true);
                 RunBatchRequested.Invoke(this, currentScope);
             }
             else
             {
-                // UI Mockup mode fallback
-                badgeConcept.Text = "UI Mockup Active";
-                badgeConcept.BackColor = Color.FromArgb(254, 243, 199);
-                badgeConcept.ForeColor = Color.FromArgb(146, 64, 14);
-
-                MessageBox.Show(this,
-                    "Backend Coordinator (Codex) chưa được nối với nút Run.\n" +
-                    "Đang chạy dữ liệu mô phỏng để xem trước bố cục giao diện hoàn chỉnh.",
-                    "Check Chấn — Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                LoadMockupData();
+                ClearLive("Backend chưa được kết nối. Chưa có kết quả CAD.");
             }
         }
 
@@ -229,8 +232,6 @@ namespace ADDIN.UI
             {
                 CancelBatchRequested.Invoke(this, EventArgs.Empty);
             }
-            SetRunningState(false);
-            lblProgressTitle.Text = "Đã dừng kiểm tra bởi người dùng.";
         }
 
         private void OnRefreshClicked(object sender, EventArgs e)
@@ -241,7 +242,7 @@ namespace ADDIN.UI
             }
             else
             {
-                LoadMockupData();
+                ClearLive("Chưa có backend để quét lại.");
             }
         }
 
@@ -259,11 +260,45 @@ namespace ADDIN.UI
             btnRefresh.Enabled = !running;
             btnScopeEntire.Enabled = !running;
             btnScopeSelected.Enabled = !running;
+            btnToggleMockup.Enabled = !running;
 
             if (running)
             {
                 lblProgressTitle.Text = "Đang kiểm tra chấn hàng loạt...";
             }
+        }
+
+        internal void SetRunMessage(string message, bool cancelling = false)
+        {
+            lblProgressTitle.Text = message;
+            if (cancelling) btnCancel.Enabled = false;
+        }
+
+        internal void ClearLive(string message)
+        {
+            isMockupMode = false;
+            badgeConcept.Text = "LIVE";
+            badgeConcept.BackColor = Color.FromArgb(241, 245, 249);
+            badgeConcept.ForeColor = Color.FromArgb(71, 85, 105);
+            lblDisclaimer.Text = "*Kết quả hình học theo ứng viên, không kết luận khả năng chấn toàn Part. Quá trình cần bằng chứng riêng. Sản xuất: CHƯA XÁC MINH.";
+            currentSummary = BatchSummaryViewModel.CreateEmpty();
+            currentSummary.Diagnostics.Add(message);
+            allParts.Clear();
+            ClearDetailSection();
+            RenderSummary();
+            ApplyPartFilters();
+            SetRunMessage(message);
+        }
+
+        internal void ShowStopped(string message, double totalSeconds, AssemblyBatchSnapshot snapshot = null)
+        {
+            ClearLive(message);
+            currentSummary.ElapsedSeconds = totalSeconds;
+            currentSummary.StageTimingsAvailable = snapshot != null;
+            currentSummary.NativeCaptureSeconds = (snapshot?.CaptureMilliseconds ?? 0) / 1000.0;
+            currentSummary.WorkerSeconds = (snapshot?.WorkerMilliseconds ?? 0) / 1000.0;
+            RenderSummary();
+            SetRunMessage(message);
         }
 
         #endregion
@@ -274,25 +309,28 @@ namespace ADDIN.UI
         /// Binds live AssemblyBatchSnapshot data produced by Codex backend.
         /// Thread-safe (marshals to STA UI thread if needed).
         /// </summary>
-        public void BindSnapshot(AssemblyBatchSnapshot snapshot)
+        public void BindSnapshot(AssemblyBatchSnapshot snapshot, double elapsedSeconds = 0)
         {
             if (InvokeRequired)
             {
-                BeginInvoke((Action)(() => BindSnapshot(snapshot)));
+                BeginInvoke((Action)(() => BindSnapshot(snapshot, elapsedSeconds)));
                 return;
             }
 
-            isMockupMode = false;
-            badgeConcept.Text = "Phase 4A.1 Live";
-            badgeConcept.BackColor = Color.FromArgb(220, 252, 231);
-            badgeConcept.ForeColor = Color.FromArgb(22, 101, 52);
+            ClearLive("Đang kiểm tra hiệu lực kết quả...");
+            if (snapshot == null || !snapshot.Current)
+            {
+                SetRunMessage("Kết quả không còn hiệu lực — " + snapshot?.InvalidReason);
+                return;
+            }
 
-            currentSummary = BatchViewModelConverter.FromSnapshot(snapshot);
+            currentSummary = BatchViewModelConverter.FromSnapshot(snapshot, elapsedSeconds);
             allParts = BatchViewModelConverter.PartsFromSnapshot(snapshot);
 
             RenderSummary();
             ApplyPartFilters();
-            SetRunningState(false);
+            SetRunMessage(currentSummary.CompletionConfirmed ? "Backend đã hoàn tất kiểm tra. Sản xuất: CHƯA XÁC MINH." :
+                "Tác vụ chưa hoàn tất đầy đủ; xem chẩn đoán.");
         }
 
         /// <summary>
@@ -309,13 +347,14 @@ namespace ADDIN.UI
             if (progress == null) return;
             int total = Math.Max(1, progress.TotalParts);
             int done = Math.Min(total, progress.CompletedParts);
-            int percent = (int)Math.Round((double)done / total * 100.0);
+            int percent = Math.Min(99, (int)Math.Round((double)done / total * 100.0));
 
             currentSummary.CheckedParts = done;
             currentSummary.ProgressPercent = percent;
             currentSummary.ElapsedSeconds = Math.Round(elapsedSeconds, 1);
+            currentSummary.CompletionConfirmed = false;
 
-            lblProgressTitle.Text = $"Đã kiểm tra {done} / {total} Part ({progress.CompletedBends} nếp, {progress.Candidates} dao)";
+            lblProgressTitle.Text = $"Đã xử lý {done} / {total} lượt ({progress.CompletedBends} nếp, {progress.Candidates} ứng viên); chờ backend xác nhận · {elapsedSeconds:0.0}s";
             lblProgressPercent.Text = $"{percent}%";
             pnlProgressBar.Invalidate();
         }
@@ -325,8 +364,10 @@ namespace ADDIN.UI
         /// </summary>
         public void LoadMockupData()
         {
+            if (isRunning) return;
             isMockupMode = true;
-            badgeConcept.Text = "UI Concept";
+            badgeConcept.Text = "PREVIEW";
+            lblDisclaimer.Text = "PREVIEW — DỮ LIỆU MẪU, không phải kết quả CAD. Chọn Run để kiểm tra Live.";
             badgeConcept.BackColor = Color.FromArgb(241, 245, 249);
             badgeConcept.ForeColor = Color.FromArgb(71, 85, 105);
 
@@ -335,12 +376,17 @@ namespace ADDIN.UI
             allParts = mockup.Item2;
 
             RenderSummary();
+            SetRunMessage("PREVIEW — DỮ LIỆU MẪU, không phải kết quả CAD.");
             ApplyPartFilters();
 
             // Select Frame-A by default to match the concept image
             if (dgvParts.Rows.Count > 0)
             {
                 dgvParts.Rows[0].Selected = true;
+                // SelectionChanged may fire as Add creates the first row,
+                // before its Tag is assigned. Bind the detail explicitly.
+                selectedPart = dgvParts.Rows[0].Tag as BatchPartViewModel;
+                RenderPartDetail(selectedPart);
             }
         }
 
@@ -351,7 +397,7 @@ namespace ADDIN.UI
         private void RenderSummary()
         {
             // Progress
-            lblProgressTitle.Text = $"Đã kiểm tra {currentSummary.CheckedParts} / {Math.Max(currentSummary.CheckedParts, currentSummary.UniqueParts)} Part";
+            lblProgressTitle.Text = $"Đã xử lý {currentSummary.CheckedParts} lượt kiểm tra · {currentSummary.UniqueParts} nguồn Part/cấu hình";
             lblProgressPercent.Text = $"{currentSummary.ProgressPercent}%";
             pnlProgressBar.Invalidate();
 
@@ -371,8 +417,12 @@ namespace ADDIN.UI
             }
             else
             {
-                txtDiagnostics.Text = "Không có cảnh báo bất thường trong quá trình kiểm tra.";
+                txtDiagnostics.Text = "Chưa có dữ liệu kiểm tra.";
             }
+            string stages = currentSummary.StageTimingsAvailable ?
+                $"Native capture: {currentSummary.NativeCaptureSeconds:0.000}s | Worker: {currentSummary.WorkerSeconds:0.000}s" :
+                "Native capture / Worker: Chưa có dữ liệu";
+            txtDiagnostics.AppendText($"\r\n\r\nTổng: {currentSummary.ElapsedSeconds:0.000}s | {stages}");
         }
 
         private void ApplyPartFilters()
@@ -424,6 +474,8 @@ namespace ADDIN.UI
             if (dgvParts.Rows.Count > 0)
             {
                 dgvParts.Rows[0].Selected = true;
+                selectedPart = dgvParts.Rows[0].Tag as BatchPartViewModel;
+                RenderPartDetail(selectedPart);
             }
             else
             {
@@ -461,7 +513,7 @@ namespace ADDIN.UI
                 if (firstBend == null) firstBend = bend;
                 var btnBend = new ModernButton
                 {
-                    Text = $"{bend.BendName} ({bend.AngleDeg:0.#}° R{bend.RadiusMm:0.#})",
+                    Text = bend.BendName,
                     Kind = ModernButtonKind.Subtle,
                     Tone = bend.Status == CollisionStatus.COLLISION ? ModernButtonTone.Danger :
                            bend.Status == CollisionStatus.CLEAR ? ModernButtonTone.Success : ModernButtonTone.Neutral,
@@ -470,6 +522,7 @@ namespace ADDIN.UI
                     Margin = new Padding(0, 0, 4, 0),
                     Tag = bend
                 };
+                toolTips.SetToolTip(btnBend, bend.ToString());
 
                 btnBend.Click += (s, ev) =>
                 {
@@ -488,7 +541,8 @@ namespace ADDIN.UI
             if (bend == null || selectedPart == null) return;
             selectedBend = bend;
 
-            lblDetailBendTitle.Text = $"Chi tiết nếp chấn — {selectedPart.PartName} / {bend.BendName}";
+            lblDetailBendTitle.Text = $"{selectedPart.PartName} / {bend.BendName} · Góc: {bend.AngleDisplay} · R: {bend.RadiusDisplay}";
+            toolTips.SetToolTip(lblDetailBendTitle, bend.ToString());
 
             // Highlight active bend button
             foreach (Control ctrl in pnlBendPills.Controls)
@@ -502,7 +556,7 @@ namespace ADDIN.UI
                 }
             }
 
-            BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.PartName, bend.BendIndex));
+            if (!isMockupMode) BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SourceKey, bend.FeatureId));
             PopulateToolsGrid(bend);
         }
 
@@ -513,24 +567,20 @@ namespace ADDIN.UI
 
             foreach (var tool in bend.ToolCandidates)
             {
-                string motionDisplay = tool.MotionPreBend == CollisionStatus.COLLISION ? "Va chạm trước chấn" :
-                                       tool.MotionDuringBend == CollisionStatus.COLLISION ? "Va chạm trong chấn" :
-                                       tool.MotionPostBend == CollisionStatus.COLLISION ? "Va chạm sau chấn" :
-                                       (tool.MotionPreBend == CollisionStatus.CLEAR && tool.MotionDuringBend == CollisionStatus.CLEAR) ? "CLEAR toàn hành trình" : "Chưa xác minh";
-
                 string clearanceText = tool.PunchClearanceMm.HasValue ? $"{tool.PunchClearanceMm.Value:+0.00;-0.00} mm" : "—";
 
                 int rowIndex = dgvTools.Rows.Add(
                     tool.ToolId,
                     tool.PunchStatusDisplay,
                     tool.HolderStatusDisplay,
-                    motionDisplay,
+                    tool.MotionDisplay,
                     tool.GeometricStatusDisplay,
                     tool.ManufacturingStatus,
                     clearanceText,
                     tool.CombinedReason
                 );
                 dgvTools.Rows[rowIndex].Tag = tool;
+                dgvTools.Rows[rowIndex].Cells[3].ToolTipText = tool.MotionDetail;
             }
 
             if (dgvTools.Rows.Count > 0)
@@ -547,6 +597,8 @@ namespace ADDIN.UI
                     }
                 }
                 dgvTools.Rows[defaultIndex].Selected = true;
+                selectedTool = dgvTools.Rows[defaultIndex].Tag as BatchToolCandidateViewModel;
+                if (selectedTool != null) RenderToolCallout(selectedTool);
             }
         }
 
@@ -578,6 +630,7 @@ namespace ADDIN.UI
 
         private void ClearDetailSection()
         {
+            selectedPart = null; selectedBend = null; selectedTool = null;
             lblDetailBendTitle.Text = "Chi tiết nếp chấn — Chưa chọn Part";
             pnlBendPills.Controls.Clear();
             dgvTools.Rows.Clear();

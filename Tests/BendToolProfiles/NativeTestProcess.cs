@@ -13,6 +13,20 @@ using Environment=System.Environment;
 // instance. Start our own executable and bind ONLY its exact ROT PID instead.
 internal static class NativeTestProcess
 {
+    [StructLayout(LayoutKind.Sequential)] private struct NativeMessage
+    { public IntPtr Window; public uint Message; public UIntPtr WParam; public IntPtr LParam; public uint Time; public int X,Y; public uint Private; }
+    [DllImport("user32.dll")] private static extern bool PeekMessage(out NativeMessage message,IntPtr window,uint first,uint last,uint remove);
+    [DllImport("user32.dll")] private static extern bool TranslateMessage(ref NativeMessage message);
+    [DllImport("user32.dll")] private static extern IntPtr DispatchMessage(ref NativeMessage message);
+    // Unlike DoEvents, this test pump returns even if timers continuously add
+    // work. Each native dispatch remains atomic; outer test deadlines still get
+    // a turn. It is not used by the production SOLIDWORKS message loop.
+    internal static void PumpMessages()
+    {
+        var clock=Stopwatch.StartNew();NativeMessage message;int count=0;
+        while(count++<32&&clock.ElapsedMilliseconds<20&&PeekMessage(out message,IntPtr.Zero,0,0,1))
+        {if(message.Message==0x12)break;TranslateMessage(ref message);DispatchMessage(ref message);}
+    }
     [DllImport("ole32.dll")] private static extern int CreateBindCtx(uint reserved,out IBindCtx context);
     internal static ISldWorks StartOwned(string output)
     {
@@ -32,7 +46,7 @@ internal static class NativeTestProcess
         {
             var app=Find(process.Id);
             if(app!=null&&app.GetProcessID()==process.Id&&process.StartTime.ToUniversalTime()==start)return app;
-            Application.DoEvents();Thread.Sleep(50);
+            PumpMessages();Thread.Sleep(50);
         }
         throw new InvalidOperationException("Owned SOLIDWORKS PID did not register; no fallback to another session");
     }
