@@ -106,3 +106,22 @@ In response to Review #8 BLOCKER A, [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.c
    - Stale marker feature `CHECK-HOLE-NG-STALE-MARKER` verified on `Fixture_OldMarker.SLDASM`.
 7. **Standalone CLI Self-Test:**
    - `FIXTURE_GENERATOR.exe --self-test` executes automated unit testing of sandbox consent, path containment, and negative rejection without requiring a running SOLIDWORKS instance.
+
+---
+
+## 5. Process Ownership, Mate Readback & Rebuild Verification Contract (Review #9)
+
+In response to Review #9 BLOCKER A and BLOCKER B, [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs) enforces additional systemic invariants:
+
+1. **Session Ownership & Interference Protection (BLOCKER A):**
+   - **Active Process Gate:** Before attempting any COM instantiation, `Process.GetProcessesByName("SLDWORKS")` is checked. If any existing SOLIDWORKS process is detected, the generator immediately throws `InvalidOperationException` and aborts (fail-closed) to prevent any disruption of active user engineering work.
+   - **Clean Session Verification:** Upon creating a new instance via `Activator.CreateInstance`, `app.ActiveDoc` is asserted to be `null`.
+   - **Lifecycle Ownership (`ownsSession`):** The instance is tracked via `bool ownsSession`. A top-level `try / finally` guarantees that if and only if the generator spawned the session, `app.ExitApp()` is called upon exit (both normal completion and exception termination).
+2. **Rebuild Return & API Verification (BLOCKER B):**
+   - **`EditRebuild3()` Enforcement:** Return value of `doc.EditRebuild3()` is checked at every single fixture generation stage (`if (!doc.EditRebuild3()) throw ...`).
+   - **Top-Level `MateGroup` Suppression Assert:** Return of `feat.SetSuppression2` on the top-level `MateGroup` feature is strictly verified (`if (!topSuppressed) throw ...`).
+   - **Post-Rebuild Mate Suppression Readback:** After `doc.EditRebuild3()` executes in Stage 2 (`Fixture_NG_Offset`), the generator re-traverses `MateGroup` sub-features and queries `sub.IsSuppressed()`, asserting that exactly 19 sub-features are actually suppressed in memory.
+   - **Component Collection Non-Null Checks:** Non-null and non-empty assertions (`comps != null && comps.Length > 0`) are enforced across all assembly inspection stages.
+3. **Truthful Testing State Separation (BLOCKER C):**
+   - `FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS`: Unit test of sandbox security gates and path containment executed and confirmed with exit code 0.
+   - `FIXTURE_GENERATOR_FULL_REGENERATION=NOT_TESTED`: The existing validated test fixtures in `D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures` from prior sessions are preserved; live CAD regeneration from scratch was not re-executed in this specific review pass to prevent overwriting verified fixtures and to protect running CAD sessions.

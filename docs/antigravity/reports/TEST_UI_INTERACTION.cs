@@ -432,7 +432,7 @@ namespace ADDIN.Tests
                     }
 
                     Console.WriteLine("    -> CSV All 9 Columns Verified Against Report.Rows (RFC-4180 Multiline Parser & Exact Cell Escaping): PASS");
-                    Console.WriteLine("    -> CSV Verification Level: CSV_ALL_9_COLUMNS_RFC4180_PASS");
+                    Console.WriteLine("    -> CSV Verification Level: CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS");
 
                     // [5] Post-Execution Invariance Checks
                     Console.WriteLine("\n[5] Verifying Post-Execution Assembly Safety & Invariance:");
@@ -473,7 +473,7 @@ namespace ADDIN.Tests
 
                 Console.WriteLine("\n=========================================================");
                 Console.WriteLine("ALL UI SAFETY AND INTERACTION CHECKS PASSED (EXIT 0)");
-                Console.WriteLine("Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_ALL_9_COLUMNS_RFC4180_PASS | UI_USER_CLICK_NOT_TESTED");
+                Console.WriteLine("Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS | UI_USER_CLICK_NOT_TESTED");
                 Console.WriteLine("=========================================================");
                 return 0;
             }
@@ -641,6 +641,11 @@ namespace ADDIN.Tests
                 }
             }
 
+            if (inQuotes)
+            {
+                throw new FormatException("Unclosed quote encountered in CSV data stream (malformed RFC-4180 record).");
+            }
+
             if (currentField.Length > 0 || currentRecord.Count > 0)
             {
                 currentRecord.Add(currentField.ToString());
@@ -740,8 +745,25 @@ namespace ADDIN.Tests
                 }
             }
 
+            // 5. Negative test: Unclosed quote throws FormatException (Review #9 MINOR)
+            try
+            {
+                ParseCsvRecords("\"Unclosed quote without terminating quote");
+                Console.Error.WriteLine("FAIL: ParseCsvRecords accepted unclosed quote without throwing.");
+                ok = false;
+            }
+            catch (FormatException)
+            {
+                // Expected: correctly caught malformed unclosed quote
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("FAIL: ParseCsvRecords threw unexpected exception type: " + ex.Message);
+                ok = false;
+            }
+
             Console.WriteLine(ok
-                ? "PASS: sandbox path enforcement and full RFC-4180 multiline CSV parsing self-test"
+                ? "PASS: sandbox path enforcement and CSV multiline production serializer self-test (CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS)"
                 : "FAIL: sandbox or CSV self-test");
             return ok ? 0 : 1;
         }

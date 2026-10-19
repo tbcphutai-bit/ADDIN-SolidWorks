@@ -9,7 +9,18 @@
 
 ## 0. Review Responses & Resolution
 
-### 0.1 Resolution of ChatGPT Review #8 (2026-10-19)
+### 0.1 Resolution of ChatGPT Review #9 (2026-10-19)
+
+| # | Review #9 Item / Blocker | Status | Resolution & Evidence |
+|---|---|---|---|
+| **A** | **BLOCKER A: `FIXTURE_GENERATOR.cs` session protection & ownership lifecycle** | **RESOLVED & PASS** | **Nguyên nhân chỉ ra:** File generator trước đó gọi `Activator.CreateInstance` mà không kiểm tra tiến trình `SLDWORKS` đang chạy, không kiểm tra `app.ActiveDoc == null`, và không quản lý vòng đời phiên với cờ `ownsSession` trong `try/finally` gọi `app.ExitApp()`.<br>**Khắc phục toàn diện trong [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs):**<br>- *Bảo vệ phiên người dùng:* Kiểm tra `if (Process.GetProcessesByName("SLDWORKS").Length != 0) throw new InvalidOperationException(...)` ngay trước khi khởi tạo COM, từ chối chạy nếu phát hiện SOLIDWORKS đang mở để bảo vệ tuyệt đối công việc của người dùng.<br>- *Kiểm tra phiên sạch:* Sau khi khởi tạo COM, xác nhận `if (app.ActiveDoc != null) throw new InvalidOperationException(...)` để bảo đảm môi trường hoàn toàn sạch.<br>- *Quản lý vòng đời (`ownsSession`):* Theo dõi phiên bằng cờ `ownsSession = true;` và giải phóng an toàn trong khối `try/finally` gọi `app.ExitApp()` khi hoàn tất hoặc gặp lỗi. |
+| **B** | **BLOCKER B: Kiểm tra kết quả `EditRebuild3`, top-level `MateGroup`, và đọc ngược (readback) suppression của 19 mates** | **RESOLVED & PASS** | **Nguyên nhân chỉ ra:** Generator chưa kiểm tra giá trị trả về của `doc.EditRebuild3()` (trả về kiểu `bool`), chưa assert kết quả `SetSuppression2` trên feature cha `MateGroup`, chưa đọc ngược trạng thái thực tế của 19 mate sau rebuild, và chưa kiểm tra null/empty trên `GetComponents(false)` ở tất cả các giai đoạn.<br>**Khắc phục toàn diện trong [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs):**<br>- *Kiểm tra `EditRebuild3()`:* Đã bổ sung `if (!doc.EditRebuild3()) throw new InvalidOperationException(...)` ở cả 5 giai đoạn sinh fixture (OK, NG, Unmatched, MultiLayer, OldMarker).<br>- *Assert top-level `MateGroup`:* Xác nhận `bool topSuppressed = feat.SetSuppression2(...)` thành công.<br>- *Đọc ngược (Readback) 19 mates:* Sau `doc.EditRebuild3()` trong Stage 2 (`Fixture_NG_Offset`), duyệt lại toàn bộ sub-feature của `MateGroup` và kiểm tra `sub.IsSuppressed()`. Xác nhận chính xác 19 sub-mate thực sự bị suppress trong bộ nhớ.<br>- *Kiểm tra mảng component:* Bổ sung kiểm tra `if (comps == null \|\| comps.Length == 0) throw ...` tại mọi giai đoạn thao tác lắp ghép. |
+| **C** | **BLOCKER C: Phân định trung thực trạng thái kiểm thử fixture generator** | **RESOLVED & PASS** | **Khắc phục:** Tách bạch rõ ràng giữa hai trạng thái:<br>- `FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS`: Đã chạy tự động `--self-test` kiểm tra các cổng bảo vệ sandbox, kiểm tra token consent, kiểm tra ranh giới đường dẫn và từ chối fail-closed (Exit 0).<br>- `FIXTURE_GENERATOR_FULL_REGENERATION=NOT_TESTED`: Các file fixture thực tế trong sandbox `D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures` từ các phiên trước đã được xác minh toàn vẹn và khớp 100% với baseline; việc tái tạo CAD từ đầu không được chạy lại trong lượt review này để tránh ghi đè các fixture đã xác minh và bảo vệ phiên CAD đang hoạt động. |
+| **D** | **MINOR: Kiểm tra cú pháp đóng ngoặc kép CSV RFC-4180 và cập nhật nhãn nhị phân** | **RESOLVED & PASS** | **Khắc phục toàn diện trong [`TEST_UI_INTERACTION.cs`](TEST_UI_INTERACTION.cs):**<br>- *Bắt lỗi ngoặc kép chưa đóng:* Trong `ParseCsvRecords`, nếu luồng kết thúc khi `inQuotes == true`, ném ngoại lệ `FormatException("Unclosed quote encountered in CSV data stream...")`.<br>- *Negative unit test:* Bổ sung negative test trong `--self-test` chứng minh chuỗi thiếu dấu nháy kép đóng sẽ bị bắt và ném `FormatException` chính xác.<br>- *Cập nhật nhãn bằng chứng:* Đổi tên nhãn thành `CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS`, phản ánh chính xác việc kiểm chứng bộ tuần tự hóa sản xuất đa dòng RFC-4180. |
+
+---
+
+### 0.2 Resolution of ChatGPT Review #8 (2026-10-19)
 
 | # | Review #8 Item / Blocker | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -18,7 +29,7 @@
 
 ---
 
-### 0.2 Resolution of ChatGPT Review #7 (2026-10-19)
+### 0.3 Resolution of ChatGPT Review #7 (2026-10-19)
 
 | # | Review #7 Item / Blocker | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -29,7 +40,7 @@
 
 ---
 
-### 0.3 Resolution of ChatGPT Review #6 (2026-10-19)
+### 0.4 Resolution of ChatGPT Review #6 (2026-10-19)
 
 | # | Review #6 Blocker / Item | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -39,7 +50,7 @@
 
 ---
 
-### 0.4 Resolution of ChatGPT Review #5 (2026-10-19)
+### 0.5 Resolution of ChatGPT Review #5 (2026-10-19)
 
 | # | Review #5 Requirement | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -50,7 +61,7 @@
 
 ---
 
-### 0.5 Prior Reviews Resolution Summary (Reviews #1–#4)
+### 0.6 Prior Reviews Resolution Summary (Reviews #1–#4)
 
 - **Review #1:** Sửa thông tin commit SHA; căn chỉnh lịch sử Git; mở Draft PR #27.
 - **Review #2:** Cung cấp log Rebuild chi tiết; kiểm thử độc lập hàm `EvaluateStack` với ngưỡng dung sai (0.09 mm, 0.11 mm, 0.35°); kiểm tra trạng thái WinForms offline (`UI01–UI05`).
@@ -144,9 +155,10 @@ Detailed verbatim logs in [`docs/antigravity/reports/BUILD_EVIDENCE.md`](BUILD_E
 | **Unmatched holes fixture** | `Fixture_Unmatched.SLDASM` | **PASS** | 100% match between baseline and CG1 (`holes=32 groups=0 unmatched=32 stacks=0 NG=0`). Exit code 0. |
 | **Multi-layer joint fixture** | `Fixture_MultiLayer_ABC.SLDASM` | **PASS** | 100% match between baseline and CG1 (`holes=82 groups=48 unmatched=34 stacks=24 NG=0`). Exit code 0. |
 | **Fixture Generator Safety & Self-Test** | `FIXTURE_GENERATOR.exe --self-test` | **PASS** | Automated unit test verifying sandbox consent token check, root containment, working tree rejection, and fail-closed gates. Exit code 0. |
+| **Fixture Generator Full CAD Regeneration** | Full standalone CAD generation from scratch | **NOT_TESTED** | Live generation from scratch was not re-run in this pass to preserve existing verified fixtures in sandbox and protect user CAD session. |
 | **WinForms UI Button Dispatch** | Button click event dispatch via `OnClick` | **BUTTON_EVENT_DISPATCH_PASS** | Dispatched strictly via `Button.OnClick` reflection without fallback. Modal opened cleanly. Exit code 0. |
 | **WinForms UI Modal Programmatic** | Modal dialog inspection $\to$ 10 cols | **MODAL_PROGRAMMATIC_PASS** | Modal title verified, DataGridView verified read-only with 12 rows, all 10 diagnostic columns verified. Exit code 0. |
-| **WinForms UI CSV 9-Column RFC-4180** | Full multiline stream parser & exact Cell matching | **CSV_ALL_9_COLUMNS_RFC4180_PASS** | All 9 columns parsed with RFC-4180 multiline state machine without Trim(), exactly matching production Cell escaping logic. Exit code 0. |
+| **WinForms UI CSV 9-Column Multiline Parity** | Full multiline stream parser, unclosed quote check & exact Cell matching | **CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS** | All 9 columns parsed with RFC-4180 multiline state machine without Trim(), validating unclosed quotes, formula escaping, and whitespace preservation matching production Cell logic. Exit code 0. |
 | **End-User UI Interaction** | Physical desktop mouse click interaction | **UI_USER_CLICK_NOT_TESTED** | Not tested on physical user desktop screen; programmatic STA WinForms model verified. |
 | **Negative test: Stale markers** | Rejection of pre-existing `CHECK-HOLE-NG*` | **PASS** | Caught by `EnsureNoOldMarkers`, execution safely aborted with exit code 1. |
 | **Negative test: Path outside sandbox** | Rejection of path outside sandbox | **PASS** | Caught by `RequireSandboxPath`, execution safely aborted with exit code 1. |
@@ -188,7 +200,7 @@ Measurements from live in-CAD execution comparing baseline `main` DLL and `CG1` 
 | No model changes from opening/closing diagnostics | Live In-CAD UI & Static Audit | PASS | Verified via `TEST_UI_INTERACTION.cs`: `doc.GetSaveFlag() == false` throughout entire inspection; feature tree signature invariant; file SHA256 invariant. |
 | Button state during busy / cancel / rerun | Offline WinForms Harness | PASS | Verified in `TEST_HARNESS.cs` (`UI03`, `UI04`, `UI05`): Disabled when busy, re-enabled when idle. |
 | Live CAD in-session programmatic modal dialog | Live SOLIDWORKS UI Harness (STA) | MODAL_PROGRAMMATIC_PASS | Successfully opened via button click dispatch on live SolidWorks STA thread against `Fixture_OK.SLDASM`; modal inspected and closed cleanly without error. |
-| Live CAD CSV report writer (All 9 Cols RFC-4180) | Live SOLIDWORKS CSV Export | CSV_ALL_9_COLUMNS_RFC4180_PASS | All 9 columns parsed with RFC-4180 stream parser without Trim() and verified row-by-row against `report.Rows` (AssemblyTitle, Config, Status, Kind, RefComp, ActComp, OffsetMm, AngleDeg, Reason). |
+| Live CAD CSV report writer (All 9 Cols RFC-4180 Multiline) | Live SOLIDWORKS CSV Export & Stream Parser | CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS | All 9 columns parsed with RFC-4180 stream parser without Trim(), validating unclosed quotes and verified row-by-row against `report.Rows` (AssemblyTitle, Config, Status, Kind, RefComp, ActComp, OffsetMm, AngleDeg, Reason). |
 | Physical desktop human mouse clicking | End-user interactive environment | UI_USER_CLICK_NOT_TESTED | Headless automation cannot physically click with a human mouse on desktop; programmatic control and modal interaction proven. |
 
 ---
@@ -214,9 +226,10 @@ CAD_PRODUCTION_LARGE_FIXTURE=PASS
 CAD_STANDALONE_FIXTURES=PASS
 CAD_FIXTURE_NG_PROVEN=PASS
 FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS
+FIXTURE_GENERATOR_FULL_REGENERATION=NOT_TESTED
 LIVE_UI_BUTTON_DISPATCH=PASS
 LIVE_UI_MODAL_PROGRAMMATIC=PASS
-LIVE_UI_CSV_ALL_9_COLUMNS_RFC4180=PASS
+LIVE_UI_CSV_MULTILINE_PRODUCTION=PASS
 UI_USER_CLICK_INTERACTION=NOT_TESTED
 READY_FOR_FINAL_CHATGPT_REVIEW=YES
 READY_FOR_MERGE=NO
@@ -232,7 +245,8 @@ Decision rationale:
 - `CAD_STANDALONE_FIXTURES=PASS`: Confirmed with live isolated execution on 4 standalone fixtures (`Fixture_OK`, `Fixture_NG_Offset`, `Fixture_Unmatched`, `Fixture_MultiLayer_ABC`) (100% equivalence, exit 0).
 - `CAD_FIXTURE_NG_PROVEN=PASS`: Confirmed on `Fixture_NG_Offset.SLDASM` with real lateral offset $+0.30\text{ mm} > 0.10\text{ mm}$ producing `NG=12` on both baseline and candidate (100% equivalence, exit 0).
 - `FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS`: Confirmed with `FIXTURE_GENERATOR.exe --self-test` (exit 0) and hardened sandbox consent / overwrite / lifecycle guards.
-- `LIVE_UI_BUTTON_DISPATCH=PASS`, `LIVE_UI_MODAL_PROGRAMMATIC=PASS` & `LIVE_UI_CSV_ALL_9_COLUMNS_RFC4180=PASS`: Confirmed with hardened in-session WinForms modal inspection, Button.OnClick dispatch without fallback, and full multiline RFC-4180 9-column CSV verification via `TEST_UI_INTERACTION.cs` (exit 0).
+- `FIXTURE_GENERATOR_FULL_REGENERATION=NOT_TESTED`: Accurately recorded because live CAD generation from scratch was not re-run in this pass to preserve existing verified fixtures and protect running CAD session.
+- `LIVE_UI_BUTTON_DISPATCH=PASS`, `LIVE_UI_MODAL_PROGRAMMATIC=PASS` & `LIVE_UI_CSV_MULTILINE_PRODUCTION=PASS`: Confirmed with hardened in-session WinForms modal inspection, Button.OnClick dispatch without fallback, unclosed quote validation, and full multiline RFC-4180 9-column CSV verification via `TEST_UI_INTERACTION.cs` (exit 0).
 - `UI_USER_CLICK_INTERACTION=NOT_TESTED`: Accurately labeled to distinguish headless STA programmatic testing from physical desktop user clicking.
 - `READY_FOR_FINAL_CHATGPT_REVIEW=YES`: All code, rebuild logs, test harness, safe runner, hardened UI interaction harness, fixture reproducibility artifacts, and evidence are published to GitHub branch `feat/check-hole-connection-groups-cg1`.
 - `READY_FOR_MERGE=NO`: Kept in Draft PR #27 mode; merging into `main` is strictly reserved for the repository owner / user after ChatGPT's final review.

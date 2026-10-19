@@ -17,6 +17,7 @@
 // - Fail-closed overwrite protection: requires explicit allowOverwrite flag to overwrite existing files.
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -79,13 +80,49 @@ namespace ADDIN.Tests
         {
             RequireSandboxConsent(sandboxRoot, fixtureDir);
 
-            Console.WriteLine("Connecting to SOLIDWORKS...");
-            ISldWorks app = (ISldWorks)Activator.CreateInstance(Type.GetTypeFromProgID("SldWorks.Application"));
-            if (app == null)
-                throw new InvalidOperationException("Failed to connect to SOLIDWORKS instance.");
+            // Review #9 BLOCKER A: Check for pre-existing SLDWORKS processes to protect active user session
+            if (Process.GetProcessesByName("SLDWORKS").Length != 0)
+            {
+                throw new InvalidOperationException(
+                    "Active SLDWORKS process detected. Fixture generator requires an isolated, non-interactive environment " +
+                    "to prevent interference with user work. Aborting to protect existing session.");
+            }
 
-            GenerateAll(app, sandboxRoot, fixtureDir, allowOverwrite);
-            return 0;
+            ISldWorks app = null;
+            bool ownsSession = false;
+            try
+            {
+                Console.WriteLine("Connecting to SOLIDWORKS...");
+                Type swType = Type.GetTypeFromProgID("SldWorks.Application", true);
+                app = (ISldWorks)Activator.CreateInstance(swType);
+                if (app == null)
+                    throw new InvalidOperationException("Failed to launch SOLIDWORKS instance.");
+
+                if (app.ActiveDoc != null)
+                {
+                    throw new InvalidOperationException(
+                        "New SOLIDWORKS instance already has an active document open. Aborting to ensure a clean session.");
+                }
+
+                ownsSession = true;
+                GenerateAll(app, sandboxRoot, fixtureDir, allowOverwrite);
+                return 0;
+            }
+            finally
+            {
+                if (ownsSession && app != null)
+                {
+                    try
+                    {
+                        Console.WriteLine("Exiting owned SOLIDWORKS session...");
+                        app.ExitApp();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine("Warning: Failed to exit owned SOLIDWORKS session: " + ex.Message);
+                    }
+                }
+            }
         }
 
         public static void RequireSandboxConsent(string sandboxRoot, string fixtureDir)
@@ -179,7 +216,9 @@ namespace ADDIN.Tests
                     }
                 }
 
-                doc.EditRebuild3();
+                if (!doc.EditRebuild3())
+                    throw new InvalidOperationException("EditRebuild3 FAILED for Fixture_OK");
+
                 errors = 0; warnings = 0;
                 bool saved = doc.Extension.SaveAs(okPath,
                     (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
@@ -212,8 +251,11 @@ namespace ADDIN.Tests
                 {
                     if (feat.GetTypeName2() == "MateGroup")
                     {
-                        feat.SetSuppression2((int)swFeatureSuppressionAction_e.swSuppressFeature,
+                        bool topSuppressed = feat.SetSuppression2((int)swFeatureSuppressionAction_e.swSuppressFeature,
                             (int)swInConfigurationOpts_e.swAllConfiguration, null);
+                        if (!topSuppressed)
+                            throw new InvalidOperationException("Failed to suppress top-level MateGroup feature.");
+
                         Feature sub = (Feature)feat.GetFirstSubFeature();
                         while (sub != null)
                         {
@@ -253,7 +295,36 @@ namespace ADDIN.Tests
                 if (!translated)
                     throw new InvalidOperationException("Component 'fr1' not found for translation.");
 
-                doc.EditRebuild3();
+                if (!doc.EditRebuild3())
+                    throw new InvalidOperationException("EditRebuild3 FAILED for Fixture_NG_Offset");
+
+                // Review #9 BLOCKER B: Readback suppression state of the 19 mates after rebuild
+                int readbackSuppressedMates = 0;
+                Feature checkMateGroup = (Feature)doc.FirstFeature();
+                while (checkMateGroup != null)
+                {
+                    if (checkMateGroup.GetTypeName2() == "MateGroup")
+                    {
+                        Feature sub = (Feature)checkMateGroup.GetFirstSubFeature();
+                        while (sub != null)
+                        {
+                            if (sub.IsSuppressed())
+                            {
+                                readbackSuppressedMates++;
+                            }
+                            sub = (Feature)sub.GetNextSubFeature();
+                        }
+                        break;
+                    }
+                    checkMateGroup = (Feature)checkMateGroup.GetNextFeature();
+                }
+
+                if (readbackSuppressedMates != 19)
+                {
+                    throw new InvalidOperationException(
+                        "Readback verification failed: expected 19 suppressed sub-mates in MateGroup after rebuild, but found " + readbackSuppressedMates);
+                }
+                Console.WriteLine("    -> Readback verified 19 suppressed sub-mates in MateGroup (PASS)");
 
                 // Readback verification of translation
                 bool verifiedOffset = false;
@@ -303,6 +374,9 @@ namespace ADDIN.Tests
 
                 AssemblyDoc assy = (AssemblyDoc)doc;
                 object[] comps = assy.GetComponents(false) as object[];
+                if (comps == null || comps.Length == 0)
+                    throw new InvalidOperationException("Cannot enumerate components in " + okPath + " for Fixture_Unmatched");
+
                 bool foundFr1 = false;
                 foreach (object o in comps)
                 {
@@ -318,7 +392,9 @@ namespace ADDIN.Tests
                 if (!foundFr1)
                     throw new InvalidOperationException("Component 'fr1' not found in Fixture_Unmatched generation.");
 
-                doc.EditRebuild3();
+                if (!doc.EditRebuild3())
+                    throw new InvalidOperationException("EditRebuild3 FAILED for Fixture_Unmatched");
+
                 errors = 0; warnings = 0;
                 bool saved = doc.Extension.SaveAs(unPath,
                     (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
@@ -346,6 +422,9 @@ namespace ADDIN.Tests
 
                 AssemblyDoc assy = (AssemblyDoc)doc;
                 object[] comps = assy.GetComponents(false) as object[];
+                if (comps == null || comps.Length == 0)
+                    throw new InvalidOperationException("Cannot enumerate components in " + baseAssy + " for Fixture_MultiLayer_ABC");
+
                 foreach (object o in comps)
                 {
                     Component2 c = (Component2)o;
@@ -358,7 +437,9 @@ namespace ADDIN.Tests
                     }
                 }
 
-                doc.EditRebuild3();
+                if (!doc.EditRebuild3())
+                    throw new InvalidOperationException("EditRebuild3 FAILED for Fixture_MultiLayer_ABC");
+
                 errors = 0; warnings = 0;
                 bool saved = doc.Extension.SaveAs(multiPath,
                     (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
@@ -384,6 +465,10 @@ namespace ADDIN.Tests
                 if (doc == null || errors != 0)
                     throw new InvalidOperationException("Failed to open " + okPath + ", errors=" + errors);
 
+                AssemblyDoc assy = (AssemblyDoc)doc;
+                if (assy == null)
+                    throw new InvalidOperationException("Expected AssemblyDoc for Fixture_OldMarker");
+
                 doc.SketchManager.Insert3DSketch(true);
                 doc.SketchManager.CreatePoint(0, 0, 0);
                 doc.SketchManager.Insert3DSketch(true);
@@ -392,6 +477,9 @@ namespace ADDIN.Tests
                 if (markerFeat == null)
                     throw new InvalidOperationException("Failed to create 3D sketch point.");
                 markerFeat.Name = "CHECK-HOLE-NG-STALE-MARKER";
+
+                if (!doc.EditRebuild3())
+                    throw new InvalidOperationException("EditRebuild3 FAILED for Fixture_OldMarker");
 
                 errors = 0; warnings = 0;
                 bool saved = doc.Extension.SaveAs(markerPath,
@@ -524,7 +612,7 @@ namespace ADDIN.Tests
             }
 
             Console.WriteLine(ok
-                ? "PASS: FIXTURE_GENERATOR sandbox consent and safety gates self-test"
+                ? "PASS: FIXTURE_GENERATOR sandbox consent and safety gates self-test (FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS)"
                 : "FAIL: FIXTURE_GENERATOR self-test");
             return ok ? 0 : 1;
         }

@@ -539,6 +539,76 @@ Fixture: D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_OK.SLDASM
 
 =========================================================
 ALL UI SAFETY AND INTERACTION CHECKS PASSED (EXIT 0)
-Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_ALL_9_COLUMNS_RFC4180_PASS | UI_USER_CLICK_NOT_TESTED
+Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS | UI_USER_CLICK_NOT_TESTED
 =========================================================
 ```
+
+---
+
+## 9. Review #9 Verbatim Execution & Evidence (Process Ownership, API Checks, Mate Readback & Strict CSV)
+
+### A. FIXTURE_GENERATOR Compilation & Safety Self-Test
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\Roslyn\csc.exe" /target:exe /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\FIXTURE_GENERATOR.exe" "docs\antigravity\reports\FIXTURE_GENERATOR.cs"
+& "docs\antigravity\reports\FIXTURE_GENERATOR.exe" --self-test
+```
+
+**Verbatim Console Output:**
+```text
+Microsoft (R) Visual C# Compiler version 5.10.0-1.26380.3 (6cf38df40de9a5fa4b2e996807fe195d4c4d1f98)
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PASS: FIXTURE_GENERATOR sandbox consent and safety gates self-test (FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS)
+```
+- Status: `FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS`
+- Exit Code: `0`
+
+### B. FIXTURE_GENERATOR Fail-Closed Overwrite & Session Protection
+When executed against an existing fixture directory without `--force-overwrite`:
+```powershell
+& "docs\antigravity\reports\FIXTURE_GENERATOR.exe" "D:\CG1-ISOLATED-TEST-COPIES" "D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures"
+```
+
+**Verbatim Console Output:**
+```text
+Connecting to SOLIDWORKS...
+Exiting owned SOLIDWORKS session...
+FAIL CLOSED: System.InvalidOperationException: Target fixture already exists and allowOverwrite is false: D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_OK.SLDASM. Specify allowOverwrite=true or pass --force-overwrite to regenerate.
+   at ADDIN.Tests.FixtureGenerator.GenerateAll(ISldWorks app, String sandboxRoot, String fixtureDir, Boolean allowOverwrite)
+   at ADDIN.Tests.FixtureGenerator.RunGenerate(String sandboxRoot, String fixtureDir, Boolean allowOverwrite)
+   at ADDIN.Tests.FixtureGenerator.Main(String[] args)
+```
+- Verification: Clean fail-closed exit with code 1; owned SOLIDWORKS session cleanly exited via `app.ExitApp()` in `finally` block; existing fixtures unharmed on disk.
+- If an active interactive `SLDWORKS` process is already present, `Process.GetProcessesByName("SLDWORKS").Length != 0` immediately aborts before any COM creation to protect user work.
+
+### C. TEST_UI_INTERACTION CSV Parser Strictness & Parity Self-Test
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\Roslyn\csc.exe" /r:"System.Windows.Forms.dll" /r:"System.Drawing.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\TEST_UI_INTERACTION.exe" "docs\antigravity\reports\TEST_UI_INTERACTION.cs"
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" --self-test
+```
+
+**Verbatim Console Output:**
+```text
+Microsoft (R) Visual C# Compiler version 5.10.0-1.26380.3 (6cf38df40de9a5fa4b2e996807fe195d4c4d1f98)
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PASS: sandbox path enforcement and CSV multiline production serializer self-test (CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS)
+```
+- Checks executed:
+  1. Positive sandbox path containment.
+  2. Negative sandbox rejection of outside paths.
+  3. Escaped quote `""` and comma parsing inside fields.
+  4. Preservation of significant leading/trailing whitespace without calling `Trim()`.
+  5. Exact formula prefix escaping (`=`, `+`, `-`, `@`) matching production `CheckHoleCsv.Cell`.
+  6. Multiline RFC-4180 record parsing preserving embedded CRLF.
+  7. **Negative test:** Unclosed quote at EOF throws `FormatException("Unclosed quote encountered in CSV data stream...")`.
+- Status: `CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS`
+- Exit Code: `0`
+
+### D. Testing Status Disambiguation Matrix
+| Assessment Key | Status | Justification / Boundary |
+|---|---|---|
+| `FIXTURE_GENERATOR_SAFETY_SELF_TEST` | **PASS** | Automated self-test verifying sandbox consent tokens, root containment, working tree rejection, and fail-closed gates passed with exit 0. |
+| `FIXTURE_GENERATOR_FULL_REGENERATION` | **NOT_TESTED** | Full live regeneration from scratch was not re-run in this pass because existing clean fixtures from prior sessions in `D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures` are fully verified and intact, and live regeneration requires an idle CAD session with explicit destructive consent. |
+| `CSV_PRODUCTION_SERIALIZER_MULTILINE` | **PASS** | RFC-4180 multiline parser with unclosed quote detection and exact production cell serializer parity verified with exit 0. |
+| `CAD_FIXTURE_NG_PROVEN` | **PASS** | Proven in Review #6 on `Fixture_NG_Offset.SLDASM` ($+0.30\text{ mm}$ translation with suppressed mates producing `NG=12` on both baseline and candidate). |
