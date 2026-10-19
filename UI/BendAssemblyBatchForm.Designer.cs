@@ -252,10 +252,13 @@ namespace ADDIN.UI
             this.lblHeaderSub.Text = "Kiểm tra chấn hàng loạt cụm chi tiết (Assembly)";
             this.lblHeaderSub.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
+            // 
             // pnlControlBar
             // 
             this.pnlControlBar.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(245)))), ((int)(((byte)(248)))));
-            this.pnlControlBar.Controls.Add(this.pnlControlLeft);
+            this.pnlControlBar.Controls.Add(this.pnlScope);
+            this.pnlControlBar.Controls.Add(this.cboStatusFilter);
+            this.pnlControlBar.Controls.Add(this.txtSearch);
             this.pnlControlBar.Controls.Add(this.pnlControlRight);
             this.pnlControlBar.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pnlControlBar.Location = new System.Drawing.Point(0, 52);
@@ -271,14 +274,13 @@ namespace ADDIN.UI
             this.pnlControlRight.Controls.Add(this.btnRunBatch);
             this.pnlControlRight.Controls.Add(this.btnCancel);
             this.pnlControlRight.Controls.Add(this.btnRefresh);
-            this.pnlControlRight.Dock = System.Windows.Forms.DockStyle.Right;
             this.pnlControlRight.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
-            this.pnlControlRight.Location = new System.Drawing.Point(908, 0);
+            this.pnlControlRight.Location = new System.Drawing.Point(908, 6);
             this.pnlControlRight.Margin = new System.Windows.Forms.Padding(0);
             this.pnlControlRight.Name = "pnlControlRight";
-            this.pnlControlRight.Padding = new System.Windows.Forms.Padding(0, 6, 16, 6);
-            this.pnlControlRight.Size = new System.Drawing.Size(356, 46);
-            this.pnlControlRight.TabIndex = 1;
+            this.pnlControlRight.Padding = new System.Windows.Forms.Padding(0);
+            this.pnlControlRight.Size = new System.Drawing.Size(340, 34);
+            this.pnlControlRight.TabIndex = 3;
             this.pnlControlRight.WrapContents = false;
             // 
             // btnRunBatch
@@ -287,7 +289,7 @@ namespace ADDIN.UI
             this.btnRunBatch.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
             this.btnRunBatch.Icon = ADDIN.UI.TaiIcon.Refresh;
             this.btnRunBatch.Kind = ADDIN.UI.ModernButtonKind.Primary;
-            this.btnRunBatch.Location = new System.Drawing.Point(180, 6);
+            this.btnRunBatch.Location = new System.Drawing.Point(180, 0);
             this.btnRunBatch.Margin = new System.Windows.Forms.Padding(6, 0, 0, 0);
             this.btnRunBatch.Name = "btnRunBatch";
             this.btnRunBatch.Padding = new System.Windows.Forms.Padding(12, 0, 12, 0);
@@ -304,7 +306,7 @@ namespace ADDIN.UI
             this.btnCancel.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.btnCancel.Icon = ADDIN.UI.TaiIcon.Stop;
             this.btnCancel.Kind = ADDIN.UI.ModernButtonKind.Standard;
-            this.btnCancel.Location = new System.Drawing.Point(97, 6);
+            this.btnCancel.Location = new System.Drawing.Point(97, 0);
             this.btnCancel.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
@@ -319,7 +321,7 @@ namespace ADDIN.UI
             this.btnRefresh.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.btnRefresh.Icon = ADDIN.UI.TaiIcon.Refresh;
             this.btnRefresh.Kind = ADDIN.UI.ModernButtonKind.Standard;
-            this.btnRefresh.Location = new System.Drawing.Point(2, 6);
+            this.btnRefresh.Location = new System.Drawing.Point(2, 0);
             this.btnRefresh.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
             this.btnRefresh.Name = "btnRefresh";
             this.btnRefresh.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
@@ -327,21 +329,6 @@ namespace ADDIN.UI
             this.btnRefresh.TabIndex = 3;
             this.btnRefresh.Text = "Quét lại";
             this.btnRefresh.Tone = ADDIN.UI.ModernButtonTone.Accent;
-            // 
-            // pnlControlLeft
-            // 
-            this.pnlControlLeft.Controls.Add(this.pnlScope);
-            this.pnlControlLeft.Controls.Add(this.cboStatusFilter);
-            this.pnlControlLeft.Controls.Add(this.txtSearch);
-            this.pnlControlLeft.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnlControlLeft.FlowDirection = System.Windows.Forms.FlowDirection.LeftToRight;
-            this.pnlControlLeft.Location = new System.Drawing.Point(0, 0);
-            this.pnlControlLeft.Margin = new System.Windows.Forms.Padding(0);
-            this.pnlControlLeft.Name = "pnlControlLeft";
-            this.pnlControlLeft.Padding = new System.Windows.Forms.Padding(16, 6, 4, 6);
-            this.pnlControlLeft.Size = new System.Drawing.Size(908, 46);
-            this.pnlControlLeft.TabIndex = 0;
-            this.pnlControlLeft.WrapContents = false;
             // 
             // pnlScope
             // 
@@ -351,7 +338,7 @@ namespace ADDIN.UI
             this.pnlScope.Controls.Add(this.btnScopeSelected);
             this.pnlScope.FlowDirection = System.Windows.Forms.FlowDirection.LeftToRight;
             this.pnlScope.Location = new System.Drawing.Point(16, 6);
-            this.pnlScope.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
+            this.pnlScope.Margin = new System.Windows.Forms.Padding(0);
             this.pnlScope.Name = "pnlScope";
             this.pnlScope.Size = new System.Drawing.Size(328, 34);
             this.pnlScope.TabIndex = 0;

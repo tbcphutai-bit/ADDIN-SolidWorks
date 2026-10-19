@@ -112,10 +112,121 @@ namespace ADDIN.UI
             RescaleDpiElements();
         }
 
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            RescaleDpiElements();
+            LayoutControlBar();
+        }
+
+        private bool inControlBarLayout;
+
+        public void LayoutControlBar()
+        {
+            if (inControlBarLayout || pnlControlBar == null || pnlControlRight == null || pnlScope == null) return;
+            int w = pnlControlBar.ClientSize.Width;
+            if (w <= 0) return;
+
+            try
+            {
+                inControlBarLayout = true;
+                pnlControlBar.SuspendLayout();
+
+                int padLeft = TaiTheme.Px(this, 16);
+                int padRight = TaiTheme.Px(this, 16);
+                int gap = TaiTheme.Px(this, 8);
+
+                int scopeW = pnlScope.PreferredSize.Width;
+                int scopeH = pnlScope.PreferredSize.Height;
+                int rightW = pnlControlRight.PreferredSize.Width;
+                int rightH = pnlControlRight.PreferredSize.Height;
+
+                int filterW = TaiTheme.Px(this, 160);
+                int filterH = TaiTheme.Px(this, 26);
+                int minSearchW = TaiTheme.Px(this, 120);
+                int searchH = TaiTheme.Px(this, 24);
+
+                int neededSingleRow = padLeft + scopeW + gap + filterW + gap + minSearchW + gap + rightW + padRight;
+
+                bool singleRow = w >= neededSingleRow;
+
+                if (singleRow)
+                {
+                    int barH = TaiTheme.Px(this, 46);
+                    if (pnlRoot != null && pnlRoot.RowStyles.Count > 1 && Math.Abs(pnlRoot.RowStyles[1].Height - barH) > 0.5f)
+                    {
+                        pnlRoot.RowStyles[1].Height = barH;
+                    }
+
+                    int scopeY = Math.Max(0, (barH - scopeH) / 2);
+                    pnlScope.SetBounds(padLeft, scopeY, scopeW, scopeH);
+
+                    int filterY = Math.Max(0, (barH - filterH) / 2);
+                    cboStatusFilter.SetBounds(pnlScope.Right + gap, filterY, filterW, filterH);
+
+                    int rightX = Math.Max(cboStatusFilter.Right + gap + minSearchW + gap, w - padRight - rightW);
+                    int rightY = Math.Max(0, (barH - rightH) / 2);
+                    pnlControlRight.SetBounds(rightX, rightY, rightW, rightH);
+
+                    int searchX = cboStatusFilter.Right + gap;
+                    int searchW = Math.Max(minSearchW, rightX - gap - searchX);
+                    int searchY = Math.Max(0, (barH - searchH) / 2);
+                    txtSearch.SetBounds(searchX, searchY, searchW, searchH);
+                }
+                else
+                {
+                    // 2-tier responsive mode: prevents clipping at narrow widths or 125%/150% DPI
+                    int tierH = Math.Max(scopeH, rightH);
+                    if (tierH < TaiTheme.Px(this, 36)) tierH = TaiTheme.Px(this, 36);
+                    int barH = tierH * 2 + TaiTheme.Px(this, 10);
+                    if (pnlRoot != null && pnlRoot.RowStyles.Count > 1 && Math.Abs(pnlRoot.RowStyles[1].Height - barH) > 0.5f)
+                    {
+                        pnlRoot.RowStyles[1].Height = barH;
+                    }
+
+                    // Row 1: Scope on left, Actions on right
+                    int y1 = TaiTheme.Px(this, 4);
+                    pnlScope.SetBounds(padLeft, y1 + (tierH - scopeH) / 2, scopeW, scopeH);
+
+                    int rightX = Math.Max(padLeft + scopeW + gap, w - padRight - rightW);
+                    pnlControlRight.SetBounds(rightX, y1 + (tierH - rightH) / 2, rightW, rightH);
+
+                    // Row 2: Filter and Search spanning full width
+                    int y2 = y1 + tierH + TaiTheme.Px(this, 4);
+                    int filterY2 = y2 + (tierH - filterH) / 2;
+                    cboStatusFilter.SetBounds(padLeft, filterY2, filterW, filterH);
+
+                    int searchX2 = padLeft + filterW + gap;
+                    int searchW2 = Math.Max(minSearchW, w - padRight - searchX2);
+                    int searchY2 = y2 + (tierH - searchH) / 2;
+                    txtSearch.SetBounds(searchX2, searchY2, searchW2, searchH);
+                }
+
+                pnlControlBar.ResumeLayout(true);
+            }
+            finally
+            {
+                inControlBarLayout = false;
+            }
+        }
+
         private void RescaleDpiElements()
         {
-            dgvParts.RowTemplate.Height = TaiTheme.Px(this, 34);
-            dgvTools.RowTemplate.Height = TaiTheme.Px(this, 30);
+            int partRowH = TaiTheme.Px(this, 34);
+            dgvParts.RowTemplate.Height = partRowH;
+            foreach (DataGridViewRow row in dgvParts.Rows)
+            {
+                row.Height = partRowH;
+            }
+            dgvParts.ColumnHeadersHeight = TaiTheme.Px(this, 32);
+
+            int toolRowH = TaiTheme.Px(this, 30);
+            dgvTools.RowTemplate.Height = toolRowH;
+            foreach (DataGridViewRow row in dgvTools.Rows)
+            {
+                row.Height = toolRowH;
+            }
+            dgvTools.ColumnHeadersHeight = TaiTheme.Px(this, 30);
 
             // Rescale Part grid columns proportionally to current DPI
             colPartName.Width = TaiTheme.Px(this, 240);
@@ -132,6 +243,17 @@ namespace ADDIN.UI
             colGeomStatus.Width = TaiTheme.Px(this, 105);
             colMfgStatus.Width = TaiTheme.Px(this, 115);
             colClearance.Width = TaiTheme.Px(this, 95);
+
+            // Rescale layout heights in pnlRoot
+            if (pnlRoot != null && pnlRoot.RowStyles.Count >= 5)
+            {
+                pnlRoot.RowStyles[0].Height = TaiTheme.Px(this, 52);
+                pnlRoot.RowStyles[2].Height = TaiTheme.Px(this, 126);
+                pnlRoot.RowStyles[4].Height = TaiTheme.Px(this, 46);
+            }
+
+            // Re-layout control bar for current DPI
+            LayoutControlBar();
 
             // Re-render custom drawn components
             pnlProgressBar.Invalidate();
@@ -236,6 +358,9 @@ namespace ADDIN.UI
             // Filters
             txtSearch.TextChanged += (s, e) => ApplyPartFilters();
             cboStatusFilter.SelectedIndexChanged += (s, e) => ApplyPartFilters();
+
+            // Responsive control bar resize
+            pnlControlBar.Resize += (s, e) => LayoutControlBar();
 
             // Grid selections
             dgvParts.SelectionChanged += DgvParts_SelectionChanged;
@@ -848,6 +973,10 @@ namespace ADDIN.UI
                 grid.Columns[3].Width = TaiTheme.Px(this, 110);
                 grid.Columns[4].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
 
+                int occRowH = TaiTheme.Px(this, 30);
+                grid.RowTemplate.Height = occRowH;
+                grid.ColumnHeadersHeight = TaiTheme.Px(this, 30);
+
                 Action<string> populateOccurrences = (filter) =>
                 {
                     grid.Rows.Clear();
@@ -862,6 +991,7 @@ namespace ADDIN.UI
                             if (!matchPath && !matchConfig && !matchReason) continue;
                         }
                         int idx = grid.Rows.Add(occ.DisplayPath, occ.Configuration, occ.Kind.ToString(), occ.StatusBadge, occ.Reason);
+                        grid.Rows[idx].Height = occRowH;
                         grid.Rows[idx].Tag = occ;
                     }
                 };
