@@ -49,6 +49,7 @@ internal static partial class ToolProfileTests
     }
     private static void ProcessTests()
     {
+        ProcessPerformanceTests();
         Test("process: real two-panel hinge has a certified whole angular CLEAR", () => {
             var plan = OneMotion(Material(Disk("TOOL",12,12,.4)),out var s,out var model);
             ProcessExpect(ProcessQuery(plan,s),CollisionStatus.CLEAR);

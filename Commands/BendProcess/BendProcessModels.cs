@@ -80,11 +80,11 @@ namespace ADDIN.Commands.BendProcess
         public IReadOnlyList<BendMotionSegment> Segments { get; }
         public bool SimulationOnly { get; }
         public IReadOnlyList<string> InputReasons { get; }
-        internal string InvalidatedReason => !lease.Current ? "STALE_PROCESS_SOURCE" : !Binding.Current ? "STALE_MODEL_OR_CONFIGURATION" :
+        internal string InvalidatedReason { get { using(ProcessPerformanceScope.Measure("Freshness.Plan")) return !lease.Current ? "STALE_PROCESS_SOURCE" : !Binding.Current ? "STALE_MODEL_OR_CONFIGURATION" :
             library != null && (!library.Current || library.PlacementSources?.Current == false) ? "STALE_TOOL_LIBRARY" :
             review?.Status == ToolReviewStatus.Stale ? "STALE_PROCESS_REVIEW" :
             Segments.SelectMany(s => new[] { s.Punch, s.Holder }).Any(t => t?.Current == false) ? "STALE_TOOL_SETUP_OR_HOLDER_EVIDENCE" :
-            Segments.SelectMany(s => s.Parts).Any(p => !p.Current) ? "STALE_PROCESS_GEOMETRY" : null;
+            Segments.SelectMany(s => s.Parts).Any(p => !p.Current) ? "STALE_PROCESS_GEOMETRY" : null; } }
         public void Invalidate() => lease.Invalidate();
         internal BendStateSnapshot State(BendMotionSegment segment, double u)
         { if (!Segments.Contains(segment)) throw new ArgumentException("State must belong to the bound process"); return new BendStateSnapshot(this, segment, u); }

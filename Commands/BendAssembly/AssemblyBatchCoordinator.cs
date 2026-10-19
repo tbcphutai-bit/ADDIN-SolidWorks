@@ -21,10 +21,13 @@ namespace ADDIN.Commands.BendAssembly
         public bool Deduplicate { get; }
         public AxialCollisionPolicy StaticPolicy { get; }
         public ProcessCollisionPolicy ProcessPolicy { get; }
+        internal Action<ProcessPerformanceSample> ProcessPerformance { get; private set; }
         internal AssemblyBatchOptions(int workers=2,int milliseconds=300000,int kernelBudget=1000000,bool cache=true,bool deduplicate=true,
             AxialCollisionPolicy staticPolicy=null,ProcessCollisionPolicy processPolicy=null)
         {Workers=workers;Milliseconds=milliseconds;KernelBudget=kernelBudget;UseCache=cache;Deduplicate=deduplicate;
             StaticPolicy=staticPolicy??new AxialCollisionPolicy();ProcessPolicy=processPolicy??new ProcessCollisionPolicy();}
+        internal AssemblyBatchOptions WithProcessPerformance(Action<ProcessPerformanceSample> sink) => new AssemblyBatchOptions(
+            Workers,Milliseconds,KernelBudget,UseCache,Deduplicate,StaticPolicy,ProcessPolicy) { ProcessPerformance=sink };
         internal bool Valid => Workers>=1&&Workers<=4&&Milliseconds>0&&Milliseconds<=1800000&&KernelBudget>0&&KernelBudget<=10000000&&StaticPolicy.Valid&&ProcessPolicy.Valid;
     }
     internal sealed class AssemblyBatchProgress
@@ -88,15 +91,19 @@ namespace ADDIN.Commands.BendAssembly
         public long CacheBytes { get; }
         public long PeakManagedBytes { get; }
         public string ProgressDiagnostic { get; }
+        public int ProcessFullAudits { get; }
+        public int ProcessSharedGuardChecks { get; }
+        public double ProcessFreshnessAuditMilliseconds { get; }
         public string ManufacturingStatus => "CHUA_XAC_MINH";
         public string WinnerToolId => null;
         internal AssemblyBatchSnapshot(AssemblyBatchRequest request,CollisionBatchRunState state,IEnumerable<AssemblyPartResult> parts,
             double workerMs,double envelopeMs,double staticMs,double processMs,double kernelMs,int queries,int peak,long[] deltas,long cacheBytes,long memory,string diagnostic,
-            Func<string> invalid,double precheckMs,int fastJobs)
+            Func<string> invalid,double precheckMs,int fastJobs,int processAudits=0,int processSharedChecks=0,double processAuditMs=0)
         {this.request=request;this.invalid=invalid;State=state;Parts=PlacementLists.Copy(parts);WorkerMilliseconds=workerMs;EnvelopeMilliseconds=envelopeMs;
             StaticMilliseconds=staticMs;ProcessMilliseconds=processMs;NumericKernelMilliseconds=kernelMs;KernelQueries=queries;PeakWorkers=peak;GeometryHits=deltas[0];GeometryMisses=deltas[1];
             StaticHits=deltas[2];StaticMisses=deltas[3];ProcessHits=deltas[4];ProcessMisses=deltas[5];CatalogHits=deltas[6];CatalogMisses=deltas[7];
-            CacheBytes=cacheBytes;PeakManagedBytes=memory;ProgressDiagnostic=diagnostic;PrecheckMilliseconds=precheckMs;FastPrecheckOnlyJobs=fastJobs;}
+            CacheBytes=cacheBytes;PeakManagedBytes=memory;ProgressDiagnostic=diagnostic;PrecheckMilliseconds=precheckMs;FastPrecheckOnlyJobs=fastJobs;
+            ProcessFullAudits=processAudits;ProcessSharedGuardChecks=processSharedChecks;ProcessFreshnessAuditMilliseconds=processAuditMs;}
     }
     internal sealed class AssemblyBatchCoordinator : IDisposable
     {
@@ -133,8 +140,11 @@ namespace ADDIN.Commands.BendAssembly
         {
             if(request==null)throw new ArgumentNullException(nameof(request));var timer=Stopwatch.StartNew();int executing=1,calls=0,running=0,peak=0,next=-1,done=0,bends=0,candidates=0;
             double envelopeMs=0,staticMs=0,processMs=0,kernelMs=0,precheckMs=0;int fastJobs=0;long memory=GC.GetTotalMemory(false);string diagnostic=null;var progressGate=new object();
+            int processAudits=0,processSharedChecks=0;double processAuditMs=0;
             long[] start={geometry.Hits,geometry.Misses,statics.Hits,statics.Misses,processes.Hits,processes.Misses,catalogs.Hits,catalogs.Misses};
             Func<string> invalid=()=> {
+                using(ProcessPerformanceScope.Measure("Freshness.AssemblyShared"))
+                {
                 // Kernel callbacks inspect cheap shared leases. The existing
                 // per-Part workers/queries still validate their own complete
                 // plan/setup. Scanning every other Part's every segment at each
@@ -145,6 +155,7 @@ namespace ADDIN.Commands.BendAssembly
                 if(token.IsCancellationRequested)state.Stop("CANCELLED");
                 if(Volatile.Read(ref executing)!=0&&timer.ElapsedMilliseconds>=options.Milliseconds)state.Stop("ASSEMBLY_TIME_BUDGET_EXCEEDED");
                 return state.Reason;
+                }
             };
             Func<string> fullInvalid=()=> {
                 if(request.InvalidReason!=null)state.Stop(request.InvalidReason);
@@ -217,8 +228,10 @@ namespace ADDIN.Commands.BendAssembly
                             Func<AssemblyProcessCertificate> checkProcess=()=> {
                                 ProcessBatchSnapshot result;
                                 using(new CollisionTimingScope(ms=>{lock(progressGate)kernelMs+=ms;}))
-                                    result=ProcessBatchWorker.RunSynchronously(pr,new ProcessBatchOptions(1,120000,Math.Min(1000000,options.KernelBudget),options.ProcessPolicy).WithAssemblyGuard(invalid,consume),token);
-                                lock(progressGate)processMs+=result.WorkerMilliseconds;
+                                    result=ProcessBatchWorker.RunSynchronously(pr,new ProcessBatchOptions(1,120000,Math.Min(1000000,options.KernelBudget),options.ProcessPolicy)
+                                        .WithAssemblyGuard(invalid,consume).WithPerformance(options.ProcessPerformance),token);
+                                lock(progressGate){processMs+=result.WorkerMilliseconds;processAudits+=result.FullAudits;
+                                    processSharedChecks+=result.SharedGuardChecks;processAuditMs+=result.FreshnessAuditMilliseconds;}
                                 return new AssemblyProcessCertificate(result.Candidates);
                             };
                             var sc=options.UseCache?statics.Get(resultKey,checkStatic,c=>source.Current&&AssemblyCacheKeys.CatalogCurrent(request.Library)&&c.Cacheable,c=>c.Bytes,token,out hit):checkStatic();
@@ -248,7 +261,8 @@ namespace ADDIN.Commands.BendAssembly
             Volatile.Write(ref executing,0);timer.Stop();
             long[] finish={geometry.Hits,geometry.Misses,statics.Hits,statics.Misses,processes.Hits,processes.Misses,catalogs.Hits,catalogs.Misses};
             return new AssemblyBatchSnapshot(request,state,output,timer.Elapsed.TotalMilliseconds,envelopeMs,staticMs,processMs,kernelMs,calls,peak,
-                finish.Zip(start,(a,b)=>a-b).ToArray(),geometry.Bytes+statics.Bytes+processes.Bytes+catalogs.Bytes,memory,diagnostic,fullInvalid,precheckMs,fastJobs);
+                finish.Zip(start,(a,b)=>a-b).ToArray(),geometry.Bytes+statics.Bytes+processes.Bytes+catalogs.Bytes,memory,diagnostic,fullInvalid,precheckMs,fastJobs,
+                processAudits,processSharedChecks,processAuditMs);
         }
         private static AssemblyPartResult Unknown(AssemblySourceInput source,AssemblyOccurrence[] occurrences,string reason,Func<string> invalid)
         {
