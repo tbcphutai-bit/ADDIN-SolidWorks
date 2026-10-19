@@ -540,9 +540,10 @@ namespace ADDIN.Tests
                 foreach (string n in new[] { "Status", "Kind", "ReferenceComponent",
                                             "ActualComponent", "OffsetMm", "AngleDeg", "Reason" })
                 {
-                    FieldInfo rf = rt.GetField(n);
-                    if (rf == null) throw new MissingFieldException(rt.FullName, n);
-                    object value = rf.GetValue(row);
+                    // CheckHoleReportRow uses public properties, not public fields.
+                    PropertyInfo rp = rt.GetProperty(n, BindingFlags.Public | BindingFlags.Instance);
+                    if (rp == null) throw new MissingMemberException(rt.FullName, n);
+                    object value = rp.GetValue(row, null);
                     if (value is double)
                         sb.Append(((double)value).ToString("R", CultureInfo.InvariantCulture));
                     else sb.Append(value == null ? "" : value.ToString());
