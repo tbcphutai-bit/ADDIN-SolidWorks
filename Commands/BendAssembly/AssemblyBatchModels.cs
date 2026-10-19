@@ -53,6 +53,55 @@ namespace ADDIN.Commands.BendAssembly
         internal string Canonical => ToolEvidenceCanonical.Hash(Id, ParentId, SourceIdentity, Configuration, TransformSha256, Kind.ToString(),
             GeometryShareable.ToString(), Mirrored.ToString(), Modified.ToString(), Virtual.ToString(), Flexible.ToString(), IsAssemblyBranch.ToString(),Reason);
     }
+    // An unverified occurrence must never veto capture or collision checking
+    // for its normal siblings in a legacy Check Min file/config group.
+    internal static class AssemblyOccurrenceEligibility
+    {
+        internal static string Reason(AssemblyOccurrence occurrence)
+        {
+            if (occurrence == null) return "MISSING_ASSEMBLY_OCCURRENCE";
+            if (!string.IsNullOrWhiteSpace(occurrence.Reason)) return occurrence.Reason;
+            if (occurrence.Kind != AssemblyOccurrenceKind.SheetMetal)
+                return "UNSUPPORTED_ASSEMBLY_OCCURRENCE:" + occurrence.Kind;
+            if (occurrence.Modified) return "ASSEMBLY_MODIFIED_BODY_REQUIRES_INSTANCE_GEOMETRY";
+            if (occurrence.Mirrored || !occurrence.RigidInstanceTransform) return "MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM";
+            if (occurrence.Flexible) return "FLEXIBLE_ASSEMBLY_CONTEXT_UNVERIFIED";
+            if (occurrence.Virtual) return "VIRTUAL_SOURCE_UNVERIFIED";
+            if (!occurrence.GeometryShareable) return "INSTANCE_GEOMETRY_NOT_CERTIFIED";
+            return null;
+        }
+        internal static string GroupReason(IEnumerable<AssemblyOccurrence> occurrences)
+        {
+            var reasons = occurrences.Select(Reason).ToArray();
+            if (reasons.Length == 0) return "EMPTY_ASSEMBLY_GROUP";
+            if (reasons.Any(r => r == null)) return null;
+            return reasons.Distinct(StringComparer.Ordinal).Count() == 1 ? reasons[0] : "NO_CERTIFIED_ASSEMBLY_OCCURRENCE";
+        }
+        internal static IReadOnlyList<AssemblySourceInput> Partition(string sourceKey, PlacementModelCapture model,
+            IEnumerable<AssemblyOccurrence> occurrences, IEnumerable<SheetEnvelopeCapture> envelopes,
+            IEnumerable<ToolAxialSetupEvidence> setups, IEnumerable<BendProcessPlan> plans, AssemblyProgramUse programUse,
+            string sourceReason, string conditionsRevision)
+        {
+            var all = occurrences.ToArray();
+            if (all.Length == 0) throw new InvalidOperationException("EMPTY_ASSEMBLY_SOURCE_GROUP");
+            var eligible = all.Where(o => Reason(o) == null).ToArray();
+            var output = new List<AssemblySourceInput>();
+            if (eligible.Length > 0)
+                output.Add(new AssemblySourceInput(sourceKey, model, eligible, envelopes, setups, plans, programUse,
+                    sourceReason, conditionsRevision));
+            foreach (var occurrence in all)
+            {
+                string reason = Reason(occurrence);
+                if (reason == null) continue;
+                // Retain known bend IDs if available, but never transfer reviewed
+                // machine/setup evidence or a reusable certificate to this instance.
+                output.Add(new AssemblySourceInput(sourceKey, model, new[] { occurrence },
+                    reason: reason, conditionsRevision: conditionsRevision));
+            }
+            return output;
+        }
+    }
+
     internal sealed class AssemblySourceInput
     {
         public string SourceKey { get; }

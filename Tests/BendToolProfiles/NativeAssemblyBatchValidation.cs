@@ -214,7 +214,7 @@ internal static partial class NativeAssemblyBatchValidation
             edge.SetSuppression2(0);root.ClearSelection2(true);edge.Select4(false,null,false);var suppressed=Session(app,root);disposable.Add((IDisposable)suppressed);Call(suppressed,"BuildInventory",true);
             Check((int)Get(suppressed,"SuppressedCount")==1,"Suppressed selected component accounted without body traversal");
             edge.SetSuppression2(oldState);
-            EdgeFixtures(app,root,args[4],output,disposable,report);
+            EdgeFixtures(app,root,args[4],output,disposable,report,source);
             report["Assertions"]=assertions;report["Result"]="PASS";report["CompanyNumericBenchmark"]=false;
             File.WriteAllText(Path.Combine(output,"assembly-batch-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;
         }

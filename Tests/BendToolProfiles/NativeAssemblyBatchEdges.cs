@@ -38,7 +38,7 @@ internal static partial class NativeAssemblyBatchValidation
     }
     private static object Inventory(ISldWorks app,ModelDoc2 root,List<IDisposable> disposable)
     {Activate(app,root);root.ClearSelection2(true);root.ForceRebuild3(false);var session=Session(app,root);disposable.Add((IDisposable)session);Call(session,"BuildInventory",false);return session;}
-    private static void EdgeFixtures(ISldWorks app,ModelDoc2 main,string assemblyTemplate,string output,List<IDisposable> disposable,Dictionary<string,object> report)
+    private static void EdgeFixtures(ISldWorks app,ModelDoc2 main,string assemblyTemplate,string output,List<IDisposable> disposable,Dictionary<string,object> report,object minimumSource=null)
     {
         string directory=Path.Combine(output,"edge-fixtures-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(directory);
         string partTemplate=System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_PART_TEMPLATE")??Path.Combine(Path.GetDirectoryName(assemblyTemplate),"部品.PRTDOT");
@@ -88,6 +88,8 @@ internal static partial class NativeAssemblyBatchValidation
             double determinant=t[0]*(t[4]*t[8]-t[5]*t[7])-t[1]*(t[3]*t[8]-t[5]*t[6])+t[2]*(t[3]*t[7]-t[4]*t[6]);
             Check(determinant<-.999999,"SOLIDWORKS retained an actual reflected transform");reflected.Add(c);
         }
+        var normalProbe=a.AddComponent5(sheetPath,0,"",true,"Default",.85,0,0);
+        Check(normalProbe!=null,"Add an ordinary same-source instance next to native reflected instances");
         inventory=Inventory(app,edgeRoot,disposable);
         Check(Items(Get(inventory,"InventoryOccurrences")).Count(o=>Convert.ToString(Get(o,"Reason"))=="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM")>=2,"Native reflections cannot inherit rigid-source certification");
         // Cut exactly one Assembly instance, with propagation to source disabled.
@@ -127,6 +129,33 @@ internal static partial class NativeAssemblyBatchValidation
         Console.WriteLine("CUT_NATIVE_RESULT "+Json.Serialize(new {Count=cutOccurrences.Length,Error=cutError,Warning=cutWarning,
             Occurrences=Items(Get(inventory,"InventoryOccurrences")).Select(o=>new{Kind=Get(o,"Kind").ToString(),Modified=Get(o,"Modified"),Reason=Get(o,"Reason")})}));
         Check(cutOccurrences.Length==1&&cutOccurrences.All(o=>!(bool)Get(o,"GeometryShareable")&&Convert.ToString(Get(o,"Reason"))=="ASSEMBLY_MODIFIED_BODY_REQUIRES_INSTANCE_GEOMETRY"),"One real assembly-cut body isolated");
+        // One file/config Min item now intentionally contains both an ordinary
+        // occurrence and reflected, unsupported siblings.
+        var mixed=Items(Get(inventory,"Items")).Where(item=>Items(Get(item,"AssemblyOccurrences"))
+            .Any(o=>string.Equals(Convert.ToString(Get(o,"DisplayPath")),normalProbe.Name2,StringComparison.Ordinal))).ToArray();
+        Check(mixed.Length==1,"Normal probe resolves to one shared Min file/config group");
+        var members=Items(Get(mixed[0],"AssemblyOccurrences"));
+        Check(members.Any(o=>Get(o,"Kind").ToString()=="SheetMetal"&&Get(o,"Reason")==null)&&
+            members.Count(o=>Convert.ToString(Get(o,"Reason"))=="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM")>=2&&
+            Get(mixed[0],"AssemblyBatchReason")==null,
+            "Native mixed source cannot let reflected members poison an eligible Min group");
+        if(minimumSource!=null)
+        {
+            double wall,sta;
+            var batch=Run(inventory,minimumSource,false,Options(2),out wall,out sta);
+            var parts=Items(Get(batch,"Parts"));
+            var ordinary=parts.Where(part=>Items(Get(part,"Occurrences"))
+                .Any(o=>string.Equals(Convert.ToString(Get(o,"DisplayPath")),normalProbe.Name2,StringComparison.Ordinal))).ToArray();
+            Check(ordinary.Length==1&&Get(ordinary[0],"Reason")==null&&
+                (int)Get(ordinary[0],"BendCount")>0&&Items(Get(ordinary[0],"StaticCandidates")).Length>0,
+                "Native eligible instance still captures bends and gets 18-tool results");
+            var reflectedParts=parts.Where(part=>Convert.ToString(Get(part,"Reason"))=="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM").ToArray();
+            Check(reflectedParts.Length>=2&&reflectedParts.All(part=>(int)Get(part,"Quantity")==1&&
+                Items(Get(part,"StaticCandidates")).Length>0),
+                "Native reflected instances are individually UNKNOWN, never inherited source certificates");
+            report["MixedOccurrenceIsolation"]=new {Normal=ordinary.Length,Blocked=reflectedParts.Length,
+                ExactReason="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM"};
+        }
         report["NativeEdgeFixtures"]=new {NonSheetMetal=1,Multibody=1,Virtual=1,OppositeHandMirrorFeature=mirrorFeature!=null,Mirrored=mirrored.Length,ReflectedTransforms=reflected.Count,AssemblyCut=cutOccurrences.Length};
         Activate(app,main);
     }

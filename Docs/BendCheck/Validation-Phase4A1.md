@@ -288,3 +288,20 @@ endings and confirm no WinForms/Designer/event-handler/Planning changes.
 Local build/test evidence is reported above. No GitHub Actions success is
 claimed from these local runs; remote CI status is reported separately in
 the Draft PR handoff.
+
+## Follow-up code-review fix: mixed valid/unsupported occurrences (pending Windows rerun)
+
+A subsequent PR #24 review found that `BendCheckItem.AssemblyBatchReason` could retain the first mirrored/flexible occurrence's
+error on a **shared file/config Check Min group**. The original `AssemblyNativeBatchOperation.Pump` then skipped native capture
+and propagated that single reason to every sibling. This could incorrectly turn eligible ordinary components into UNKNOWN.
+
+The follow-up commit changes only the Assembly inventory/batch partitioning and adds managed/native regressions:
+- Check Min retains the original `BendCheckItem` grouping, quantity and measurement semantics.
+- Eligibility is evaluated per `AssemblyOccurrence` (including mirror/modified/flexible/virtual/source identity).
+- A group containing eligible members is captured once. Valid siblings are analyzed together only with the original proof rules;
+  every blocked sibling receives its own source-reasoned UNKNOWN rows for each **known** bend × 18 tools, without setup evidence.
+- Regression covers both traversal orders, two valid + four blocked siblings sharing file/config, independent collision witnesses,
+  and a native reflected-transform + ordinary same-source fixture.
+- This change is **not yet re-run in Windows/SOLIDWORKS by this review**. Existing PASS/benchmark numbers above belong to the
+  earlier PR #24 commit and must not be presented as post-fix test results. Re-run Debug/Release x64, managed `--assembly-tests`,
+  native assembly fixture (including mixed-identity case), original Check Min/Planning, and controlled numeric benchmark before merge.

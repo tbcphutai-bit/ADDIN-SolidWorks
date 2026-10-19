@@ -258,6 +258,69 @@ internal static partial class ToolProfileTests
                 Check(previous==null||actual==previous,"Deterministic stable results");previous=actual;
             }
         });
+        Test("assembly: a blocked occurrence cannot poison healthy siblings with the same source/configuration",()=> {
+            using(var f=Seating())
+            {
+                var q=WorkerRequest(f,1,P(1,2));var plans=AssemblyPlans(q.Model);
+                var ordinaryA=Occurrence(0,0);var ordinaryB=Occurrence(0,1);
+                Func<int,string,AssemblyOccurrence> blocked=(index,reason)=> {
+                    var o=Occurrence(0,index);
+                    return new AssemblyOccurrence(o.Id,o.ParentId,o.DisplayPath,o.SourceIdentity,o.Configuration,o.Transform,
+                        AssemblyOccurrenceKind.Unsupported,false,
+                        mirrored:reason.StartsWith("MIRRORED",StringComparison.Ordinal),
+                        modified:reason.StartsWith("ASSEMBLY_MODIFIED",StringComparison.Ordinal),
+                        virtualPart:reason.StartsWith("VIRTUAL",StringComparison.Ordinal),
+                        flexible:reason.StartsWith("FLEXIBLE",StringComparison.Ordinal),reason:reason);
+                };
+                var issues=new[]{
+                    blocked(2,"MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM"),
+                    blocked(3,"FLEXIBLE_ASSEMBLY_CONTEXT_UNVERIFIED"),
+                    blocked(4,"ASSEMBLY_MODIFIED_BODY_REQUIRES_INSTANCE_GEOMETRY"),
+                    blocked(5,"VIRTUAL_SOURCE_UNVERIFIED")
+                };
+                Check(AssemblyOccurrenceEligibility.GroupReason(issues)=="NO_CERTIFIED_ASSEMBLY_OCCURRENCE",
+                    "Entirely blocked group keeps its group diagnostic");
+                foreach(bool issuesFirst in new[]{true,false})
+                {
+                    var group=(issuesFirst?issues.Concat(new[]{ordinaryA,ordinaryB}):new[]{ordinaryA,ordinaryB}.Concat(issues)).ToArray();
+                    Check(AssemblyOccurrenceEligibility.GroupReason(group)==null,"Mixed Min group remains capturable in either enumeration order");
+                    var input=LocalSource("S",q.Model,group,q.Envelopes,q.Setups,plans);
+                    Check(input.Reason==null,"All occurrences reference the same source and configuration");
+                    var split=AssemblyOccurrenceEligibility.Partition(input.SourceKey,input.Model,input.Occurrences,input.Envelopes,
+                        input.Setups,input.Plans,input.ProgramUse,input.Reason,input.ConditionsRevision);
+                    Check(split.Count==5&&split.Sum(s=>s.Occurrences.Count)==6&&split.Count(s=>s.Reason==null)==1,
+                        "One valid group plus four individually blocked occurrences");
+                    Check(split.Single(s=>s.Reason==null).Occurrences.Select(o=>o.Id).SequenceEqual(new[]{ordinaryA.Id,ordinaryB.Id}),
+                        "Normal siblings retain their own identities and quantities");
+                    using(var batch=new AssemblyBatchCoordinator())
+                    {
+                        var result=batch.RunAsync(AssemblyRequest(split,q.Library),new AssemblyBatchOptions(2)).Result;
+                        Check(result.Current&&result.AnalysisJobs==5&&result.Parts.Sum(part=>part.Quantity)==6&&result.KernelQueries>0,
+                            "Bad siblings do not suppress the numeric solver for valid instances");
+                        var healthy=result.Parts.Single(part=>part.Reason==null);
+                        Check(healthy.Quantity==2&&healthy.StaticCandidates.Count==18&&healthy.ProcessCandidates.Count==18&&
+                            healthy.StaticCandidates.Any(candidate=>candidate.CombinedResult==CollisionStatus.COLLISION),
+                            "Healthy siblings receive actual independently calculated collision witnesses");
+                        var singleStatic=CollisionBatchWorker.RunSynchronously(
+                            new CollisionBatchRequest(q.Model,q.Library,q.Envelopes,q.Setups),new CollisionBatchOptions(1,120000,1000000));
+                        var singleProcess=ProcessBatchWorker.RunSynchronously(
+                            new ProcessBatchRequest(q.Model,q.Library,plans,q.Envelopes),new ProcessBatchOptions(1,120000,1000000));
+                        var reference=new AssemblyPartResult("S",new[]{ordinaryA,ordinaryB},null,singleStatic.Candidates,
+                            singleProcess.Candidates,q.Model.Bends.Count,true,()=>null);
+                        Check(ResultFingerprint(new[]{healthy})==ResultFingerprint(new[]{reference}),
+                            "Eligible siblings agree with the independent per-Part results, reasons and witnesses");
+                        foreach(var bad in issues)
+                        {
+                            var row=result.Parts.Single(part=>part.Quantity==1&&part.Occurrences[0].Id==bad.Id);
+                            Check(row.Reason==bad.Reason&&row.StaticCandidates.Count==18&&row.ProcessCandidates.Count==18&&
+                                row.StaticCandidates.All(candidate=>candidate.CombinedResult==CollisionStatus.UNKNOWN)&&
+                                row.ProcessCandidates.All(candidate=>candidate.ProcessResult==CollisionStatus.UNKNOWN),
+                                "Blocked occurrence has its own diagnostic and 18 UNKNOWN slots: "+bad.Reason);
+                        }
+                    }
+                }
+            }
+        });
         Test("assembly: invalid policy and listener failure cannot fake success",()=> {
             var source=LocalSource("S",CollisionModel(Rect("BODY",0,0,1,1)),new[]{Occurrence(0,0)});
             using(var c=new AssemblyBatchCoordinator())

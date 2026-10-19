@@ -195,15 +195,19 @@ namespace ADDIN.Commands
                         while(index<owner.Items.Count && captured<maximumCaptures)
                         {
                             var item=owner.Items[index++]; var clock=Stopwatch.StartNew(); bool existing=item.Done;
-                            if (lease.Current && !token.IsCancellationRequested && item.Error==null&&item.AssemblyBatchReason==null) owner.Capture(item,minimum);
+                            bool hasEligible=item.AssemblyOccurrences.Any(o=>AssemblyOccurrenceEligibility.Reason(o)==null);
+                            if (lease.Current && !token.IsCancellationRequested && item.Error==null&&hasEligible) owner.Capture(item,minimum);
                             if(existing&&lease.Current)item.Context?.SetSource(minimum);
                             if (existing && item.PlacementCapture!=null) hits++; else if (item.PlacementCapture!=null) captures++;
                             clock.Stop(); captureMs+=clock.Elapsed.TotalMilliseconds; MaximumStaCaptureMilliseconds=Math.Max(MaximumStaCaptureMilliseconds,clock.Elapsed.TotalMilliseconds);
                             string revision; revisions.TryGetValue(item.Path??"",out revision);
                             string key=ToolEvidenceCanonical.Hash("NativeAssemblySourceV1",item.Key,revision,item.Stamp.ToString(),minimum?.Snapshot?.RuntimeCatalogSha256);
-                            var model=item.PlacementCapture; var data=model==null||!lease.Current?null:programs?.Invoke(key,model);
-                            sources.Add(new AssemblySourceInput(key,model,item.AssemblyOccurrences,data?.Envelopes,data?.Setups,data?.Plans,data?.Use,
-                                item.Error??item.AssemblyBatchReason??(model==null?item.PlacementDiagnosticError??"MISSING_NATIVE_CAPTURE":null),data?.ConditionsRevision));
+                            var model=item.PlacementCapture; var data=model==null||!lease.Current||!hasEligible?null:programs?.Invoke(key,model);
+                            string sourceReason=item.Error??(model==null&&hasEligible?item.PlacementDiagnosticError??"MISSING_NATIVE_CAPTURE":null);
+                            // Min preserves its file/config grouping; Batch separates
+                            // healthy occurrences and individual unsupported instances.
+                            sources.AddRange(AssemblyOccurrenceEligibility.Partition(key,model,item.AssemblyOccurrences,
+                                data?.Envelopes,data?.Setups,data?.Plans,data?.Use,sourceReason,data?.ConditionsRevision));
                             captured++;
                         }
                         if (index<owner.Items.Count) return;

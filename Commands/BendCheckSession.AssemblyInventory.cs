@@ -124,8 +124,9 @@ namespace ADDIN.Commands
                 item=new BendCheckItem {Key=key,Path=path,Name=string.IsNullOrEmpty(path)?occurrence.DisplayPath:Path.GetFileNameWithoutExtension(path),
                     Configuration=config,Model=model,AssemblyBodyModified=modified,Error=minimumError,AssemblyBatchReason=error};Items.Add(item);
             }
-            if(error!=null)item.AssemblyBatchReason=error;
             item.Instances.Add(component);item.AssemblyOccurrences.Add(occurrence);item.Quantity++;
+            // This field is only a group diagnostic, not an occurrence veto.
+            item.AssemblyBatchReason=AssemblyOccurrenceEligibility.GroupReason(item.AssemblyOccurrences);
         }
         private string AssemblyOccurrenceState()
         {
