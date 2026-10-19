@@ -49,10 +49,21 @@ namespace ADDIN.UI
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
-            var title = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 1, ColumnCount = 2, Margin = Padding.Empty };
-            title.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300)); title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            var title = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 1, ColumnCount = 3, Margin = Padding.Empty };
+            title.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
+            title.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, session.IsAssembly ? 180 : 0));
+            title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             title.Controls.Add(new Label { Text = "KIỂM TRA KÍCH THƯỚC CHẤN", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TaiTheme.Accent }, 0, 0);
-            totals = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, ForeColor = TaiTheme.Text, Font = new Font("Segoe UI", 10F, FontStyle.Bold) }; title.Controls.Add(totals, 1, 0); root.Controls.Add(title, 0, 0);
+            if (session.IsAssembly)
+            {
+                var btnBatchUI = new ModernButton { Text = "Batch UI (Phase 4A)", Dock = DockStyle.Fill, Kind = ModernButtonKind.Subtle, Tone = ModernButtonTone.Accent, Margin = new Padding(4, 4, 4, 4) };
+                btnBatchUI.Click += (s, e) => {
+                    var batchForm = new BendAssemblyBatchForm(model.GetTitle(), model.ConfigurationManager?.ActiveConfiguration?.Name);
+                    batchForm.Show(this);
+                };
+                title.Controls.Add(btnBatchUI, 1, 0);
+            }
+            totals = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, ForeColor = TaiTheme.Text, Font = new Font("Segoe UI", 10F, FontStyle.Bold) }; title.Controls.Add(totals, 2, 0); root.Controls.Add(title, 0, 0);
             var toolbar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 7, RowCount = 1, Margin = Padding.Empty };
             foreach (int width in new[] { 170, 0, 135, 175, 96, 76, 76 }) toolbar.ColumnStyles.Add(new ColumnStyle(width == 0 ? SizeType.Percent : SizeType.Absolute, width == 0 ? 100 : width));
             scope = new ComboBox { Name = "bendCheckScope", Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = session.IsAssembly, Font = new Font("Segoe UI", 10F) };
