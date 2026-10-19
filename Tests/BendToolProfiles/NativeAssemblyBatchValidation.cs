@@ -226,6 +226,8 @@ internal static partial class NativeAssemblyBatchValidation
                 Check(Json.Serialize(State(doc))==beforeDocs[doc.GetPathName()],"Source dirty/stamp/config unchanged by backend");
             Check(Sha(args[2])==seedHash,"Original seed bytes unchanged");
             Check((int)T("BendEnvelope.SheetNativeTopologyCapture").GetProperty("WrongThreadCount",All).GetValue(null,null)==0,"No native capture on worker");
+            if(System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_UI_120")=="1")
+                ExerciseLargeNativeUi(app,root,report,output);
             report["CoreReadOnlyResult"]="PASS";report["CoreAssertions"]=assertions;
             File.WriteAllText(Path.Combine(output,"assembly-core-result.json"),Json.Serialize(report));
             using(var cancel=new CancellationTokenSource())

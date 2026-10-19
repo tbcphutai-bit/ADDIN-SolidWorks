@@ -176,6 +176,20 @@ internal static class BendAssemblyUiTests
     }
     private static void FormTests()
     {
+        Test("Form converts a guarded snapshot once and reuses its Part models for summary", () =>
+        {
+            int reads=0;
+            using(var form=new BendAssemblyBatchForm())
+            {
+                form.Show();
+                form.BindSnapshot(Snapshot(Part(1,new[]{Geometry(42)}),()=>{reads++;return null;}));
+                Check(reads<=8,"One validation/conversion pass, no repeated full projection");
+                Check(RowCount(form)==1&&((DataGridView)Control(form,"dgvTools")).Rows.Count==18,"The same converted data feeds visible Part/bend/tools");
+                Check(form.LastBindingTimings!=null&&form.LastBindingTimings.ViewModelMilliseconds>=0&&
+                    form.LastBindingTimings.GridRenderingMilliseconds>=0,"Actual conversion and rendering are timed separately");
+                form.Close();
+            }
+        });
         Test("slow native capture yields between timer turns", () =>
         {
             using(var form=new BendAssemblyBatchForm())
@@ -277,6 +291,7 @@ internal static class BendAssemblyUiTests
         try
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+            if(args.Length==2&&args[0]=="--benchmark-ui")return ToolProfileTests.UiReadBenchmark(args[1]);
             ConverterTests(); FormTests();
             if(args.Length==2 && args[0]=="--render") Render(args[1]);
             Console.WriteLine("RESULT " + groups + " groups; " + assertions + " assertions; 0 failures"); return 0;

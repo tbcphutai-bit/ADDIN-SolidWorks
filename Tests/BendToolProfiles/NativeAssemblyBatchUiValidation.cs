@@ -40,6 +40,21 @@ internal static partial class NativeAssemblyBatchValidation
                     "No setup/process evidence means UNKNOWN, never CLEAR");
             }
         }
+        // Exercise the actual visible Part -> Bend -> 18-tool selection path,
+        // not only the detached converter objects.
+        var grid=(DataGridView)UiControl(form,"dgvParts");
+        foreach(DataGridViewRow row in grid.Rows)
+        {
+            grid.CurrentCell=row.Cells[0];row.Selected=true;
+            var pills=UiControl(form,"pnlBendPills").Controls.OfType<Button>().ToArray();
+            foreach(var pill in pills)
+            {
+                pill.PerformClick();var toolGrid=(DataGridView)UiControl(form,"dgvTools");
+                Check(toolGrid.Rows.Count==18&&toolGrid.Rows.Cast<DataGridViewRow>().All(t=>(int)Get(t.Tag,"FeatureId")==
+                    (int)Get(pill.Tag,"FeatureId")),"Visible bend grid binds all 18 candidates to its native FeatureId");
+            }
+            if(pills.Length==0)Check(((DataGridView)UiControl(form,"dgvTools")).Rows.Count==0,"Zero-bend visible Part has no fictional tools");
+        }
         Check(UiControl(form,"lblDisclaimer").Text.Contains("CHƯA XÁC MINH"),"Live manufacturing disclaimer");
     }
     private static void ExerciseNativeUi(ISldWorks app,ModelDoc2 root,object source,string output,Component2 selected,
@@ -62,6 +77,7 @@ internal static partial class NativeAssemblyBatchValidation
             UiSpin(()=>!(bool)Get(controller,"Running"));
             var cold=Get(controller,"displayed");Check(cold!=null&&(bool)Get(cold,"Current"),"Actual Form/Begin/Pump/Completion produced current snapshot: "+UiControl(form,"lblProgressTitle").Text);
             UiCheckBindings(form,cold);
+            report["UiTiming-"+label+"-cold"]=UiTimings(controller);
             var counts=Items(Get(cold,"Parts")).Select(p=>(int)Get(p,"BendCount")).Distinct().OrderBy(x=>x).ToArray();
             if(label=="zero-three-six")Check(counts.SequenceEqual(new[]{0,3,6}),"Actual Part inventories include 0,3,6 bends");
             Check(((DataGridView)UiControl(form,"dgvParts")).Columns[1].HeaderText=="Configuration","BOM styling cannot overwrite live schema");
@@ -72,6 +88,7 @@ internal static partial class NativeAssemblyBatchValidation
                 Captures=warm==null?null:Get(warm,"Captures"),Hits=warm==null?null:Get(warm,"CaptureHits"),Message=UiControl(form,"lblProgressTitle").Text}));
             Check(warm!=null&&(bool)Get(warm,"Current"),"Actual UI warm run current: "+UiControl(form,"lblProgressTitle").Text);
             UiCheckBindings(form,warm);
+            report["UiTiming-"+label+"-warm"]=UiTimings(controller);
             Check(!(bool)Get(cold,"Current"),"Superseded generation invalidated");
             root.ClearSelection2(true);Call(form,"SetScope",Enum.Parse(T("BendAssembly.AssemblyCheckScope"),"SelectedComponents"));
             UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));
@@ -88,6 +105,13 @@ internal static partial class NativeAssemblyBatchValidation
             UiClick(form,"btnRunBatch");UiClick(form,"btnCancel");Check((bool)Get(controller,"Running"),"Native Cancel waits for completion");
             UiSpin(()=>!(bool)Get(controller,"Running"));Check(UiParts(form).Length==0&&UiControl(form,"lblProgressPercent").Text!="100%","No canceled CAD results or false completion");
             UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));Check(UiParts(form).Length>0,"Restart after cancel");
+            var selectedModel=(ModelDoc2)selected.GetModelDoc2();selectedModel.ForceRebuild3(false);
+            UiSpin(()=>UiParts(form).Length==0);
+            Check(UiControl(form,"lblProgressTitle").Text.Contains("cũ"),"Native Part rebuild withdraws held Live results");
+            Activate(app,root);root.ForceRebuild3(false);
+            Check(root.Extension.NeedsRebuild2==0,"Rebuild Assembly after the edited child before recapture");
+            UiClick(form,"btnRefresh");UiSpin(()=>!(bool)Get(controller,"Running"));
+            Check(Get(controller,"displayed")!=null,"Refresh recaptures rebuilt Part: "+UiControl(form,"lblProgressTitle").Text);
             var old=selected.Transform2;var values=((double[])old.ArrayData).ToArray();values[9]+=.001;
             selected.Transform2=(MathTransform)((MathUtility)app.GetMathUtility()).CreateTransform(values);
             UiSpin(()=>UiParts(form).Length==0);
@@ -98,10 +122,33 @@ internal static partial class NativeAssemblyBatchValidation
             UiClick(form,"btnRunBatch");form.Close();Check(!form.IsDisposed,"Window close deferred while backend runs");
             UiSpin(()=>form.IsDisposed);
             report["Ui-"+label]=new {Entire=true,Selected=true,PreviewSeparated=true,Cold=true,WarmCaptureHits=Get(warm,"CaptureHits"),
-                Cancel=true,StalePose=true,Refresh=true,CloseDuringRun=true,BendCounts=counts,
+                Cancel=true,StalePart=true,StalePose=true,Refresh=true,CloseDuringRun=true,BendCounts=counts,
                 WorkerComQueries=T("BendEnvelope.SheetNativeTopologyCapture").GetProperty("WrongThreadCount",All).GetValue(null,null)};
         }
         finally{((IDisposable)controller).Dispose();form.Dispose();}
+    }
+    private static object UiTimings(object controller)
+    {
+        var timings=Get(controller,"LastRunTimings");
+        Check(timings!=null,"Run records real conversion/render timings");
+        return timings.GetType().GetProperties(All).ToDictionary(p=>p.Name,p=>p.GetValue(timings,null));
+    }
+    private static IEnumerable<Control> UiControls(Control parent)
+    {foreach(Control child in parent.Controls){yield return child;foreach(var nested in UiControls(child))yield return nested;}}
+    private static void ExerciseLauncher(ISldWorks app,ModelDoc2 root,Dictionary<string,object> report)
+    {
+        Activate(app,root);root.ClearSelection2(true);
+        using(var owner=(Form)Activator.CreateInstance(product.GetType("ADDIN.UI.BendCheckForm",true),All,null,new object[]{app,root,null},null))
+        {
+            owner.Show();var launch=UiControls(owner).OfType<Button>().Single(b=>b.Text=="Assembly Batch");launch.PerformClick();
+            var form=(Form)Get(owner,"batchForm");var controller=Get(owner,"batchController");
+            Check(form!=null&&controller!=null,"Assembly -> Check Chan -> Assembly Batch launches the live controller");
+            UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));
+            var result=Get(controller,"displayed");Check(result!=null&&(bool)Get(result,"Current"),"Launcher completes real native Run");
+            UiCheckBindings(form,result);report["LauncherTimings"]=UiTimings(controller);
+            form.Close();Check(Get(owner,"batchForm")==null,"Launcher releases closed child");owner.Close();
+            report["LauncherWorkflow"]="PASS";
+        }
     }
     private static ModelDoc2 UiSheet(ISldWorks app,string template,string path,int bends)
     {
@@ -143,6 +190,7 @@ internal static partial class NativeAssemblyBatchValidation
             }
             root.ForceRebuild3(false);SaveAs(root,Path.Combine(output,"UI-TEST.SLDASM"));Activate(app,root);
             var source=Source(args[4],output);
+            ExerciseLauncher(app,root,report);
             ExerciseNativeUi(app,root,source,output,selected,report,"zero-three-six");
             System.Environment.SetEnvironmentVariable("ADDIN_ASSEMBLY_UI_TEST","1");
             // The existing cut fixture uses its template plane and requires a

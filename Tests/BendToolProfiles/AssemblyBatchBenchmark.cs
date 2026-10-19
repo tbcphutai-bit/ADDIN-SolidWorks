@@ -80,11 +80,11 @@ internal static partial class ToolProfileTests
                     var request=AssemblyRequest(sources,library);clock.Restart();var cold=c.RunAsync(request,new AssemblyBatchOptions(4,milliseconds:1200000).WithProcessPerformance(sink)).Result;
                     double coldMs=clock.Elapsed.TotalMilliseconds;Check(cold.Current&&cold.KernelQueries>0,"Cold real solver work completes");
                     saveProfile(fixture.Name+"-cold");
-                    clock.Restart();string coldFingerprint=ResultFingerprint(cold.Parts);coldComparisonMs=clock.Elapsed.TotalMilliseconds;
+                    clock.Restart();string coldFingerprint=ResultFingerprintRead(cold);coldComparisonMs=clock.Elapsed.TotalMilliseconds;
                     Check(coldFingerprint==expected,"Cold batch identical to independent per-instance solver, including witnesses/reasons");
                     performance.Add(BatchPerformance(fixture.Name+"-cold",cold,coldMs));
                     clock.Restart();var warm=c.RunAsync(request,new AssemblyBatchOptions(4,milliseconds:1200000)).Result;double warmMs=clock.Elapsed.TotalMilliseconds;
-                    clock.Restart();string warmFingerprint=ResultFingerprint(warm.Parts);warmComparisonMs=clock.Elapsed.TotalMilliseconds;
+                    clock.Restart();string warmFingerprint=ResultFingerprintRead(warm);warmComparisonMs=clock.Elapsed.TotalMilliseconds;
                     Check(warm.Current&&warm.KernelQueries==0&&warmFingerprint==expected,"Warm cache exact proof reuse");
                     performance.Add(BatchPerformance(fixture.Name+"-warm",warm,warmMs));
                     performance.Add(new {Name=fixture.Name+"-measured-ratio",ColdSpeedup=baselineMs/coldMs,WarmSpeedup=baselineMs/warmMs});

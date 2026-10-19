@@ -41,6 +41,7 @@ namespace ADDIN.UI
         private bool running, pumping, closing, disposed, backendDisposed;
         private int generation;
         internal bool Running => running;
+        internal BendAssemblyBatchTimings LastRunTimings { get; private set; }
 
         internal BendAssemblyBatchController(BendAssemblyBatchForm form, IBendAssemblyBatchBackend backend)
         {
@@ -77,6 +78,7 @@ namespace ADDIN.UI
             if (running || disposed || closing) return;
             int run = ++generation;
             running = true; displayed = null; operation = null;
+            LastRunTimings = null;
             cancellation = new CancellationTokenSource();
             var token = cancellation.Token;
             elapsed.Restart();
@@ -117,6 +119,18 @@ namespace ADDIN.UI
                 {
                     displayed = snapshot;
                     form.BindSnapshot(snapshot, elapsed.Elapsed.TotalSeconds);
+                    var audit = Stopwatch.StartNew(); bool current = snapshot.Current;
+                    if (!current)
+                    {
+                        displayed = null;
+                        form.ShowStopped("Kết quả đổi trong khi hiển thị; cần Quét lại.", elapsed.Elapsed.TotalSeconds, snapshot);
+                    }
+                    else
+                    {
+                        LastRunTimings = form.LastBindingTimings;
+                        if (LastRunTimings != null) LastRunTimings.SnapshotValidationMilliseconds += audit.Elapsed.TotalMilliseconds;
+                        form.RecordVisibleTime(elapsed.Elapsed.TotalMilliseconds);
+                    }
                 }
             }
             catch (OperationCanceledException)

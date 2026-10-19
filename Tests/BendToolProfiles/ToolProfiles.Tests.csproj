@@ -56,6 +56,7 @@
     <Compile Include="ProcessTests.cs"/>
     <Compile Include="ProcessPerformanceTests.cs"/>
     <Compile Include="AssemblyBatchTests.cs"/>
+    <Compile Include="AssemblyReadTests.cs"/>
     <Compile Include="AssemblyBatchBenchmark.cs"/>
     <Compile Include="ProcessAdditionalTests.cs"/>
     <Compile Include="ProcessCompanyIntegration.cs"/>

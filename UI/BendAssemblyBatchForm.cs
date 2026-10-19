@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Diagnostics;
 using System.Windows.Forms;
 using ADDIN.Commands.BendAssembly;
 using ADDIN.Commands.BendCollision;
@@ -65,6 +66,8 @@ namespace ADDIN.UI
         private AssemblyCheckScope currentScope = AssemblyCheckScope.EntireAssembly;
         private bool isRunning;
         private bool isMockupMode;
+        private bool bindingParts, bindingTools;
+        internal BendAssemblyBatchTimings LastBindingTimings { get; private set; }
         internal bool IsPreview => isMockupMode;
         internal bool IsRunning => isRunning;
         internal AssemblyCheckScope Scope => currentScope;
@@ -276,6 +279,7 @@ namespace ADDIN.UI
 
         internal void ClearLive(string message)
         {
+            LastBindingTimings = null;
             isMockupMode = false;
             badgeConcept.Text = "LIVE";
             badgeConcept.BackColor = Color.FromArgb(241, 245, 249);
@@ -318,19 +322,42 @@ namespace ADDIN.UI
             }
 
             ClearLive("Đang kiểm tra hiệu lực kết quả...");
-            if (snapshot == null || !snapshot.Current)
+            var projection = BatchViewModelConverter.Convert(snapshot, elapsedSeconds);
+            if (!projection.Current)
             {
                 SetRunMessage("Kết quả không còn hiệu lực — " + snapshot?.InvalidReason);
                 return;
             }
 
-            currentSummary = BatchViewModelConverter.FromSnapshot(snapshot, elapsedSeconds);
-            allParts = BatchViewModelConverter.PartsFromSnapshot(snapshot);
+            currentSummary = projection.Summary;
+            allParts = projection.Parts;
+            LastBindingTimings = new BendAssemblyBatchTimings
+            {
+                NativeCaptureMilliseconds = snapshot.CaptureMilliseconds,
+                WorkerMilliseconds = snapshot.WorkerMilliseconds,
+                NumericSolverMilliseconds = snapshot.NumericKernelMilliseconds,
+                SnapshotValidationMilliseconds = projection.SnapshotValidationMilliseconds,
+                SnapshotCopyMilliseconds = projection.SnapshotCopyMilliseconds,
+                ViewModelMilliseconds = projection.ConversionMilliseconds
+            };
 
+            var render = Stopwatch.StartNew();
             RenderSummary();
             ApplyPartFilters();
             SetRunMessage(currentSummary.CompletionConfirmed ? "Backend đã hoàn tất kiểm tra. Sản xuất: CHƯA XÁC MINH." :
                 "Tác vụ chưa hoàn tất đầy đủ; xem chẩn đoán.");
+            // Complete pending grid paints before recording first visible output.
+            Update(); dgvParts.Update(); dgvTools.Update();
+            LastBindingTimings.GridRenderingMilliseconds = render.Elapsed.TotalMilliseconds;
+        }
+
+        internal void RecordVisibleTime(double runMilliseconds)
+        {
+            if (LastBindingTimings == null) return;
+            LastBindingTimings.RunToVisibleMilliseconds = runMilliseconds;
+            currentSummary.ElapsedSeconds = runMilliseconds / 1000.0;
+            var t = LastBindingTimings;
+            txtDiagnostics.AppendText($"\r\n\r\nSnapshot validation: {t.SnapshotValidationMilliseconds:0.00} ms | Đọc kết quả: {t.SnapshotCopyMilliseconds:0.00} ms | ViewModel: {t.ViewModelMilliseconds:0.00} ms | Grid: {t.GridRenderingMilliseconds:0.00} ms | Run → hiển thị: {t.RunToVisibleMilliseconds:0.00} ms");
         }
 
         /// <summary>
@@ -457,6 +484,9 @@ namespace ADDIN.UI
 
         private void PopulatePartsGrid()
         {
+            bindingParts = true; dgvParts.SuspendLayout();
+            try
+            {
             dgvParts.Rows.Clear();
             foreach (var part in displayedParts)
             {
@@ -470,6 +500,8 @@ namespace ADDIN.UI
                 );
                 dgvParts.Rows[rowIndex].Tag = part;
             }
+            }
+            finally { dgvParts.ResumeLayout(); bindingParts = false; }
 
             if (dgvParts.Rows.Count > 0)
             {
@@ -485,6 +517,7 @@ namespace ADDIN.UI
 
         private void DgvParts_SelectionChanged(object sender, EventArgs e)
         {
+            if (bindingParts) return;
             if (dgvParts.SelectedRows.Count == 0) return;
             var row = dgvParts.SelectedRows[0];
             var part = row.Tag as BatchPartViewModel;
@@ -562,6 +595,9 @@ namespace ADDIN.UI
 
         private void PopulateToolsGrid(BatchBendViewModel bend)
         {
+            bindingTools = true; dgvTools.SuspendLayout();
+            try
+            {
             dgvTools.Rows.Clear();
             if (bend == null || bend.ToolCandidates == null) return;
 
@@ -582,6 +618,8 @@ namespace ADDIN.UI
                 dgvTools.Rows[rowIndex].Tag = tool;
                 dgvTools.Rows[rowIndex].Cells[3].ToolTipText = tool.MotionDetail;
             }
+            }
+            finally { dgvTools.ResumeLayout(); bindingTools = false; }
 
             if (dgvTools.Rows.Count > 0)
             {
@@ -604,6 +642,7 @@ namespace ADDIN.UI
 
         private void DgvTools_SelectionChanged(object sender, EventArgs e)
         {
+            if (bindingTools) return;
             if (dgvTools.SelectedRows.Count == 0) return;
             var row = dgvTools.SelectedRows[0];
             var tool = row.Tag as BatchToolCandidateViewModel;

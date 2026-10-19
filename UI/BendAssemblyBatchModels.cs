@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 using ADDIN.Commands.BendAssembly;
 using ADDIN.Commands.BendCollision;
 using ADDIN.Commands.BendProcess;
@@ -177,24 +178,53 @@ namespace ADDIN.UI
     /// <summary>
     /// Converter to transform Phase 4A.1 backend AssemblyBatchSnapshot into UI view models.
     /// </summary>
+    internal sealed class BatchViewModelProjection
+    {
+        internal BatchSummaryViewModel Summary { get; set; } = BatchSummaryViewModel.CreateEmpty();
+        internal List<BatchPartViewModel> Parts { get; set; } = new List<BatchPartViewModel>();
+        internal double SnapshotValidationMilliseconds { get; set; }
+        internal double SnapshotCopyMilliseconds { get; set; }
+        internal double ConversionMilliseconds { get; set; }
+        internal bool Current { get; set; }
+    }
+
     internal static class BatchViewModelConverter
     {
-        public static BatchSummaryViewModel FromSnapshot(AssemblyBatchSnapshot snapshot, double elapsedSeconds = 0)
+        internal static BatchViewModelProjection Convert(AssemblyBatchSnapshot snapshot, double elapsedSeconds = 0)
         {
-            if (snapshot == null) return BatchSummaryViewModel.CreateEmpty();
+            var answer = new BatchViewModelProjection();
+            var read = snapshot?.ReadSnapshot();
+            if (read == null) return answer;
+            answer.SnapshotValidationMilliseconds = read.ValidationMilliseconds;
+            answer.SnapshotCopyMilliseconds = read.CopyMilliseconds;
+            var clock = Stopwatch.StartNew();
+            answer.Parts = PartsFromRead(read);
+            answer.Summary = SummaryFromRead(read, answer.Parts, elapsedSeconds);
+            answer.ConversionMilliseconds = clock.Elapsed.TotalMilliseconds;
+            clock.Restart(); answer.Current = read.Current;
+            answer.SnapshotValidationMilliseconds += clock.Elapsed.TotalMilliseconds;
+            if (!answer.Current)
+            { answer.Parts.Clear(); answer.Summary = BatchSummaryViewModel.CreateEmpty(); }
+            return answer;
+        }
+        public static BatchSummaryViewModel FromSnapshot(AssemblyBatchSnapshot snapshot, double elapsedSeconds = 0) =>
+            Convert(snapshot, elapsedSeconds).Summary;
+        public static List<BatchPartViewModel> PartsFromSnapshot(AssemblyBatchSnapshot snapshot) => Convert(snapshot).Parts;
 
-            var parts = PartsFromSnapshot(snapshot);
+        private static BatchSummaryViewModel SummaryFromRead(AssemblyBatchReadSnapshot read, List<BatchPartViewModel> parts, double elapsedSeconds)
+        {
+            var snapshot = read.Source;
             int clearCount = parts.Count(p => p.Status == CollisionStatus.CLEAR);
             int collCount = parts.Count(p => p.Status == CollisionStatus.COLLISION);
             int unkCount = snapshot.Parts.Count - clearCount - collCount;
             int checkedParts = clearCount + collCount + unkCount;
-            var reasons = snapshot.Parts.SelectMany(p => p.StaticCandidates.SelectMany(c => c.Reasons)
+            var reasons = read.Parts.SelectMany(p => p.StaticCandidates.SelectMany(c => c.Reasons)
                 .Concat(p.ProcessCandidates.SelectMany(c => c.PairSegments.SelectMany(s => s.Reasons))))
-                .Concat(snapshot.Parts.Select(p => p.Reason));
+                .Concat(read.Parts.Select(p => p.Reason));
             bool interrupted = reasons.Any(r => r != null && (r.Contains("BUDGET") || r.Contains("CANCELLED") ||
-                r.Contains("STALE") || r.Contains("SUPERSEDED"))) || snapshot.Parts.Any(p => !p.Current);
-            bool complete = snapshot.Complete && !interrupted && parts.All(p => p.Bends.Count == p.BendCount);
-            int progress = complete ? 100 : snapshot.Current && checkedParts > 0 ? 99 : 0;
+                r.Contains("STALE") || r.Contains("SUPERSEDED"))) || read.Parts.Any(p => !p.Current);
+            bool complete = snapshot.InventoryComplete && !interrupted && parts.All(p => p.Bends.Count == p.BendCount);
+            int progress = complete ? 100 : checkedParts > 0 ? 99 : 0;
 
             var diag = new List<string>();
             if (snapshot.LightweightOccurrences > 0)
@@ -203,8 +233,6 @@ namespace ADDIN.UI
                 diag.Add($"Bỏ qua {snapshot.UnsupportedOccurrences} component không hỗ trợ (Non-SheetMetal, Unloaded, v.v.).");
             if (snapshot.UnresolvedBranches > 0)
                 diag.Add($"Có {snapshot.UnresolvedBranches} nhánh subassembly chưa xác minh được danh sách chi tiết con.");
-            if (!string.IsNullOrWhiteSpace(snapshot.InvalidReason))
-                diag.Add($"Trạng thái kiểm tra: {snapshot.InvalidReason}");
             if (!complete) diag.Add("Tác vụ chưa hoàn tất hợp lệ; không xác nhận 100%.");
             diag.Add("Hình học và quá trình là kết quả theo từng ứng viên. Một dao COLLISION không kết luận toàn Part không thể chấn. Sản xuất: CHƯA XÁC MINH.");
 
@@ -232,12 +260,11 @@ namespace ADDIN.UI
             };
         }
 
-        public static List<BatchPartViewModel> PartsFromSnapshot(AssemblyBatchSnapshot snapshot)
+        private static List<BatchPartViewModel> PartsFromRead(AssemblyBatchReadSnapshot read)
         {
             var result = new List<BatchPartViewModel>();
-            if (snapshot?.Parts == null || !snapshot.Current) return result;
 
-            foreach (var part in snapshot.Parts)
+            foreach (var part in read.Parts)
             {
                 var occs = part.Occurrences ?? new AssemblyOccurrence[0];
                 string firstDisplay = occs.FirstOrDefault()?.DisplayPath ?? part.SourceKey;
@@ -255,7 +282,7 @@ namespace ADDIN.UI
                     Reason = !part.Current ? "SOURCE_INVALIDATED — cần chạy lại." : part.Reason ??
                         "Kết quả theo ứng viên; chưa xác minh sản xuất hoặc chọn dao cho toàn Part.",
                     SourceKey = part.SourceKey,
-                    RawPartResult = part
+                    RawPartResult = part.Source
                 };
 
                 foreach (var occ in occs)
@@ -290,6 +317,8 @@ namespace ADDIN.UI
                     .Concat(part.ProcessCandidates.Select(c => c.FeatureId)).Distinct().OrderBy(id => id).ToArray();
                 if (featureIds.Length != part.BendCount)
                     partVm.Reason += " Chưa có dữ liệu đầy đủ về FeatureId của các nếp chấn.";
+                var staticByFeature = part.StaticCandidates.ToLookup(c => c.FeatureId);
+                var processByFeature = part.ProcessCandidates.ToLookup(c => c.FeatureId);
                 foreach (int featureId in featureIds)
                 {
                     var bendVm = new BatchBendViewModel
@@ -300,10 +329,12 @@ namespace ADDIN.UI
                         Status = CollisionStatus.UNKNOWN
                     };
 
+                    var staticByTool = staticByFeature[featureId].ToLookup(c => c.ToolId, StringComparer.Ordinal);
+                    var processByTool = processByFeature[featureId].ToLookup(c => c.ToolId, StringComparer.Ordinal);
                     foreach (string toolId in CompanyToolIds.All)
                     {
-                        var statics = part.StaticCandidates.Where(c => c.ToolId == toolId && c.FeatureId == featureId).ToArray();
-                        var processes = part.ProcessCandidates.Where(c => c.ToolId == toolId && c.FeatureId == featureId).ToArray();
+                        var statics = staticByTool[toolId].ToArray();
+                        var processes = processByTool[toolId].ToArray();
                         var staticCand = part.Current && statics.Length == 1 ? statics[0] : null;
                         var procCand = part.Current && processes.Length == 1 ? processes[0] : null;
 

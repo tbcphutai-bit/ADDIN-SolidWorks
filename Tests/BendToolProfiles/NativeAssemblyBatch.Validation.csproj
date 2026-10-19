@@ -13,6 +13,7 @@
     <Compile Include="NativeAssemblyBatchEdges.cs"/>
     <Compile Include="NativeAssemblyMixedTests.cs"/>
     <Compile Include="NativeAssemblyBatchUiValidation.cs"/>
+    <Compile Include="NativeAssemblyLargeUiValidation.cs"/>
     <Compile Include="NativeTestProcess.cs"/>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

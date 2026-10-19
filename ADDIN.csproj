@@ -274,6 +274,7 @@
     </Compile>
     <Compile Include="UI\BendAssemblyBatchModels.cs" />
     <Compile Include="UI\BendAssemblyBatchController.cs" />
+    <Compile Include="UI\BendAssemblyBatchTimings.cs" />
     <Compile Include="UI\BendAssemblyBatchLiveBackend.cs" />
     <Compile Include="UI\BendAssemblyBatchForm.cs">
       <SubType>Form</SubType>

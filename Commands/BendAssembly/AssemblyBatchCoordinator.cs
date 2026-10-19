@@ -45,6 +45,7 @@ namespace ADDIN.Commands.BendAssembly
     {
         private readonly AssemblyBatchRequest request;
         private readonly Func<string> invalid;
+        private readonly AssemblyResultReadGuard readGuard;
         internal CollisionBatchRunState State { get; }
         public bool Current => invalid()==null;
         public bool InventoryComplete => !Occurrences.Any(o=>o.IsAssemblyBranch&&o.Kind!=AssemblyOccurrenceKind.Suppressed&&
@@ -96,14 +97,28 @@ namespace ADDIN.Commands.BendAssembly
         public double ProcessFreshnessAuditMilliseconds { get; }
         public string ManufacturingStatus => "CHUA_XAC_MINH";
         public string WinnerToolId => null;
+        internal AssemblyBatchReadSnapshot ReadSnapshot()
+        {
+            var clock = Stopwatch.StartNew();
+            double validationMs;
+            var guard = readGuard ?? new AssemblyResultReadGuard(invalid, invalid);
+            var read = guard.Copy(() => new AssemblyBatchReadSnapshot(this), out validationMs);
+            if (read != null)
+            {
+                read.ValidationMilliseconds = validationMs;
+                read.CopyMilliseconds = Math.Max(0, clock.Elapsed.TotalMilliseconds - validationMs);
+            }
+            return read;
+        }
         internal AssemblyBatchSnapshot(AssemblyBatchRequest request,CollisionBatchRunState state,IEnumerable<AssemblyPartResult> parts,
             double workerMs,double envelopeMs,double staticMs,double processMs,double kernelMs,int queries,int peak,long[] deltas,long cacheBytes,long memory,string diagnostic,
-            Func<string> invalid,double precheckMs,int fastJobs,int processAudits=0,int processSharedChecks=0,double processAuditMs=0)
+            Func<string> invalid,double precheckMs,int fastJobs,int processAudits=0,int processSharedChecks=0,double processAuditMs=0,
+            AssemblyResultReadGuard readGuard=null)
         {this.request=request;this.invalid=invalid;State=state;Parts=PlacementLists.Copy(parts);WorkerMilliseconds=workerMs;EnvelopeMilliseconds=envelopeMs;
             StaticMilliseconds=staticMs;ProcessMilliseconds=processMs;NumericKernelMilliseconds=kernelMs;KernelQueries=queries;PeakWorkers=peak;GeometryHits=deltas[0];GeometryMisses=deltas[1];
             StaticHits=deltas[2];StaticMisses=deltas[3];ProcessHits=deltas[4];ProcessMisses=deltas[5];CatalogHits=deltas[6];CatalogMisses=deltas[7];
             CacheBytes=cacheBytes;PeakManagedBytes=memory;ProgressDiagnostic=diagnostic;PrecheckMilliseconds=precheckMs;FastPrecheckOnlyJobs=fastJobs;
-            ProcessFullAudits=processAudits;ProcessSharedGuardChecks=processSharedChecks;ProcessFreshnessAuditMilliseconds=processAuditMs;}
+            ProcessFullAudits=processAudits;ProcessSharedGuardChecks=processSharedChecks;ProcessFreshnessAuditMilliseconds=processAuditMs;this.readGuard=readGuard;}
     }
     internal sealed class AssemblyBatchCoordinator : IDisposable
     {
@@ -162,6 +177,7 @@ namespace ADDIN.Commands.BendAssembly
                 if(!AssemblyCacheKeys.CatalogCurrent(request.Library))state.Stop("STALE_TOOL_GEOMETRY_OR_REVIEW");
                 return invalid();
             };
+            var readGuard = new AssemblyResultReadGuard(fullInvalid, invalid);
             Action consume=()=> {if(Interlocked.Increment(ref calls)>options.KernelBudget)state.Stop("ASSEMBLY_KERNEL_BUDGET_EXCEEDED");
                 var reason=invalid();if(reason!=null)throw new CollisionAbort(reason);};
             if(!options.Valid)state.Stop("INVALID_ASSEMBLY_BATCH_POLICY");
@@ -194,7 +210,7 @@ namespace ADDIN.Commands.BendAssembly
                         bool needsGeometry=source.Setups.Count>0||source.Plans.Count>0||source.Envelopes.Count>0;
                         lock(progressGate) {precheckMs+=precheck.Elapsed.TotalMilliseconds;if(!needsGeometry)fastJobs++;}
                         if(source.Model==null||reason!=null||fail!=null||occurrences.Any(o=>o.Modified||o.Mirrored||o.Flexible||!o.RigidInstanceTransform||o.Kind!=AssemblyOccurrenceKind.SheetMetal))
-                        {reason=reason??fail??"UNVERIFIED_INSTANCE_BODY_OR_CONTEXT";output[index]=Unknown(source,occurrences,reason,fullInvalid);}
+                        {reason=reason??fail??"UNVERIFIED_INSTANCE_BODY_OR_CONTEXT";output[index]=Unknown(source,occurrences,reason,readGuard.Check);}
                         else
                         {
                             string geoKey=AssemblyCacheKeys.Geometry(source);
@@ -236,18 +252,18 @@ namespace ADDIN.Commands.BendAssembly
                             };
                             var sc=options.UseCache?statics.Get(resultKey,checkStatic,c=>source.Current&&AssemblyCacheKeys.CatalogCurrent(request.Library)&&c.Cacheable,c=>c.Bytes,token,out hit):checkStatic();
                             var pc=options.UseCache?processes.Get(resultKey,checkProcess,c=>source.Current&&AssemblyCacheKeys.CatalogCurrent(request.Library)&&c.Cacheable,c=>c.Bytes,token,out hit):checkProcess();
-                            var restoredStatic=sc.Restore(sr,bundle.Envelopes,fullInvalid);var restoredProcess=pc.Restore(pr,fullInvalid);
+                            var restoredStatic=sc.Restore(sr,bundle.Envelopes,readGuard.Check);var restoredProcess=pc.Restore(pr,readGuard.Check);
                             if(source.ProgramUse.SimulationOnly)
                             {
                                 restoredStatic=PlacementLists.Copy(restoredStatic.Select(r=>new VolumeCandidateCollisionResult(r.ToolId,r.FeatureId,r.PunchResult,r.HolderResult,true)));
                                 restoredProcess=PlacementLists.Copy(restoredProcess.Select(r=>new ProcessCandidateResult(r.ToolId,r.FeatureId,r.PairSegments,true)));
                             }
                             output[index]=new AssemblyPartResult(source.SourceKey,occurrences,null,restoredStatic,restoredProcess,source.Model.Bends.Count,
-                                source.Model.SimulationOnly||source.ProgramUse.SimulationOnly,fullInvalid);
+                                source.Model.SimulationOnly||source.ProgramUse.SimulationOnly,readGuard.Check);
                         }
                     }
-                    catch(OperationCanceledException){state.Stop("CANCELLED");output[index]=Unknown(source,occurrences,"CANCELLED",fullInvalid);}
-                    catch(Exception ex){reason="ASSEMBLY_PART_FAILURE:"+ex.GetType().Name;state.Stop(reason);output[index]=Unknown(source,occurrences,reason,fullInvalid);}
+                    catch(OperationCanceledException){state.Stop("CANCELLED");output[index]=Unknown(source,occurrences,"CANCELLED",readGuard.Check);}
+                    catch(Exception ex){reason="ASSEMBLY_PART_FAILURE:"+ex.GetType().Name;state.Stop(reason);output[index]=Unknown(source,occurrences,reason,readGuard.Check);}
                     finally{Interlocked.Decrement(ref running);Interlocked.Decrement(ref totalActiveWorkers);workerSlots.Release();}
                     lock(progressGate)
                     {
@@ -262,7 +278,7 @@ namespace ADDIN.Commands.BendAssembly
             long[] finish={geometry.Hits,geometry.Misses,statics.Hits,statics.Misses,processes.Hits,processes.Misses,catalogs.Hits,catalogs.Misses};
             return new AssemblyBatchSnapshot(request,state,output,timer.Elapsed.TotalMilliseconds,envelopeMs,staticMs,processMs,kernelMs,calls,peak,
                 finish.Zip(start,(a,b)=>a-b).ToArray(),geometry.Bytes+statics.Bytes+processes.Bytes+catalogs.Bytes,memory,diagnostic,fullInvalid,precheckMs,fastJobs,
-                processAudits,processSharedChecks,processAuditMs);
+                processAudits,processSharedChecks,processAuditMs,readGuard);
         }
         private static AssemblyPartResult Unknown(AssemblySourceInput source,AssemblyOccurrence[] occurrences,string reason,Func<string> invalid)
         {
