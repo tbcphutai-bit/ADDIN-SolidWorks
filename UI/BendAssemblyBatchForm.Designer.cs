@@ -93,9 +93,17 @@ namespace ADDIN.UI
             this.lblDisclaimer = new System.Windows.Forms.Label();
             this.btnClose = new ADDIN.UI.ModernButton();
             this.toolTips = new System.Windows.Forms.ToolTip(this.components);
+            this.pnlHeaderLeft = new System.Windows.Forms.TableLayoutPanel();
+            this.pnlHeaderRight = new System.Windows.Forms.FlowLayoutPanel();
+            this.pnlControlLeft = new System.Windows.Forms.FlowLayoutPanel();
+            this.pnlControlRight = new System.Windows.Forms.FlowLayoutPanel();
             this.pnlRoot.SuspendLayout();
             this.pnlHeader.SuspendLayout();
+            this.pnlHeaderLeft.SuspendLayout();
+            this.pnlHeaderRight.SuspendLayout();
             this.pnlControlBar.SuspendLayout();
+            this.pnlControlLeft.SuspendLayout();
+            this.pnlControlRight.SuspendLayout();
             this.pnlScope.SuspendLayout();
             this.pnlOverview.SuspendLayout();
             this.tblMetrics.SuspendLayout();
@@ -148,24 +156,83 @@ namespace ADDIN.UI
             // pnlHeader
             // 
             this.pnlHeader.BackColor = System.Drawing.Color.White;
-            this.pnlHeader.Controls.Add(this.btnToggleMockup);
-            this.pnlHeader.Controls.Add(this.badgeConcept);
-            this.pnlHeader.Controls.Add(this.lblHeaderSub);
-            this.pnlHeader.Controls.Add(this.lblHeaderTitle);
+            this.pnlHeader.Controls.Add(this.pnlHeaderLeft);
+            this.pnlHeader.Controls.Add(this.pnlHeaderRight);
             this.pnlHeader.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pnlHeader.Location = new System.Drawing.Point(0, 0);
             this.pnlHeader.Margin = new System.Windows.Forms.Padding(0);
             this.pnlHeader.Name = "pnlHeader";
-            this.pnlHeader.Padding = new System.Windows.Forms.Padding(16, 8, 16, 8);
+            this.pnlHeader.Padding = new System.Windows.Forms.Padding(16, 6, 16, 6);
             this.pnlHeader.Size = new System.Drawing.Size(1264, 52);
             this.pnlHeader.TabIndex = 0;
             // 
+            // pnlHeaderRight
+            // 
+            this.pnlHeaderRight.AutoSize = true;
+            this.pnlHeaderRight.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.pnlHeaderRight.Controls.Add(this.badgeConcept);
+            this.pnlHeaderRight.Controls.Add(this.btnToggleMockup);
+            this.pnlHeaderRight.Dock = System.Windows.Forms.DockStyle.Right;
+            this.pnlHeaderRight.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
+            this.pnlHeaderRight.Location = new System.Drawing.Point(985, 6);
+            this.pnlHeaderRight.Margin = new System.Windows.Forms.Padding(0);
+            this.pnlHeaderRight.Name = "pnlHeaderRight";
+            this.pnlHeaderRight.Size = new System.Drawing.Size(263, 40);
+            this.pnlHeaderRight.TabIndex = 1;
+            this.pnlHeaderRight.WrapContents = false;
+            // 
+            // badgeConcept
+            // 
+            this.badgeConcept.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
+            this.badgeConcept.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold);
+            this.badgeConcept.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(71)))), ((int)(((byte)(85)))), ((int)(((byte)(105)))));
+            this.badgeConcept.Location = new System.Drawing.Point(173, 5);
+            this.badgeConcept.Margin = new System.Windows.Forms.Padding(4, 5, 0, 0);
+            this.badgeConcept.Name = "badgeConcept";
+            this.badgeConcept.Size = new System.Drawing.Size(90, 26);
+            this.badgeConcept.TabIndex = 2;
+            this.badgeConcept.Text = "UI Concept";
+            this.badgeConcept.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // btnToggleMockup
+            // 
+            this.btnToggleMockup.AutoSize = true;
+            this.btnToggleMockup.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.btnToggleMockup.Kind = ADDIN.UI.ModernButtonKind.Subtle;
+            this.btnToggleMockup.Location = new System.Drawing.Point(4, 4);
+            this.btnToggleMockup.Margin = new System.Windows.Forms.Padding(0, 4, 4, 0);
+            this.btnToggleMockup.Name = "btnToggleMockup";
+            this.btnToggleMockup.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
+            this.btnToggleMockup.Size = new System.Drawing.Size(165, 28);
+            this.btnToggleMockup.TabIndex = 3;
+            this.btnToggleMockup.Text = "Nạp dữ liệu mẫu";
+            this.btnToggleMockup.Tone = ADDIN.UI.ModernButtonTone.Accent;
+            this.toolTips.SetToolTip(this.btnToggleMockup, "Nạp bộ dữ liệu giả lập mẫu (120 components, Frame-A, Bracket-B, Panel-C) để xem thử bố cục giao diện");
+            // 
+            // pnlHeaderLeft
+            // 
+            this.pnlHeaderLeft.ColumnCount = 2;
+            this.pnlHeaderLeft.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            this.pnlHeaderLeft.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.pnlHeaderLeft.Controls.Add(this.lblHeaderTitle, 0, 0);
+            this.pnlHeaderLeft.Controls.Add(this.lblHeaderSub, 1, 0);
+            this.pnlHeaderLeft.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlHeaderLeft.Location = new System.Drawing.Point(16, 6);
+            this.pnlHeaderLeft.Margin = new System.Windows.Forms.Padding(0);
+            this.pnlHeaderLeft.Name = "pnlHeaderLeft";
+            this.pnlHeaderLeft.RowCount = 1;
+            this.pnlHeaderLeft.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.pnlHeaderLeft.Size = new System.Drawing.Size(969, 40);
+            this.pnlHeaderLeft.TabIndex = 0;
+            // 
             // lblHeaderTitle
             // 
+            this.lblHeaderTitle.Anchor = System.Windows.Forms.AnchorStyles.Left;
             this.lblHeaderTitle.AutoSize = true;
             this.lblHeaderTitle.Font = new System.Drawing.Font("Segoe UI", 13.5F, System.Drawing.FontStyle.Bold);
             this.lblHeaderTitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(95)))), ((int)(((byte)(208)))));
-            this.lblHeaderTitle.Location = new System.Drawing.Point(12, 12);
+            this.lblHeaderTitle.Location = new System.Drawing.Point(0, 7);
+            this.lblHeaderTitle.Margin = new System.Windows.Forms.Padding(0, 0, 12, 0);
             this.lblHeaderTitle.Name = "lblHeaderTitle";
             this.lblHeaderTitle.Size = new System.Drawing.Size(164, 25);
             this.lblHeaderTitle.TabIndex = 0;
@@ -173,74 +240,132 @@ namespace ADDIN.UI
             // 
             // lblHeaderSub
             // 
-            this.lblHeaderSub.AutoSize = true;
+            this.lblHeaderSub.AutoEllipsis = true;
+            this.lblHeaderSub.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblHeaderSub.Font = new System.Drawing.Font("Segoe UI", 9.5F);
             this.lblHeaderSub.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(92)))), ((int)(((byte)(104)))), ((int)(((byte)(122)))));
-            this.lblHeaderSub.Location = new System.Drawing.Point(180, 18);
+            this.lblHeaderSub.Location = new System.Drawing.Point(176, 0);
+            this.lblHeaderSub.Margin = new System.Windows.Forms.Padding(0);
             this.lblHeaderSub.Name = "lblHeaderSub";
-            this.lblHeaderSub.Size = new System.Drawing.Size(260, 17);
+            this.lblHeaderSub.Size = new System.Drawing.Size(793, 40);
             this.lblHeaderSub.TabIndex = 1;
             this.lblHeaderSub.Text = "Kiểm tra chấn hàng loạt cụm chi tiết (Assembly)";
-            // 
-            // badgeConcept
-            // 
-            this.badgeConcept.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.badgeConcept.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
-            this.badgeConcept.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold);
-            this.badgeConcept.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(71)))), ((int)(((byte)(85)))), ((int)(((byte)(105)))));
-            this.badgeConcept.Location = new System.Drawing.Point(1148, 12);
-            this.badgeConcept.Name = "badgeConcept";
-            this.badgeConcept.Size = new System.Drawing.Size(100, 26);
-            this.badgeConcept.TabIndex = 2;
-            this.badgeConcept.Text = "UI Concept";
-            this.badgeConcept.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // btnToggleMockup
-            // 
-            this.btnToggleMockup.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnToggleMockup.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            this.btnToggleMockup.Kind = ADDIN.UI.ModernButtonKind.Subtle;
-            this.btnToggleMockup.Location = new System.Drawing.Point(985, 11);
-            this.btnToggleMockup.Name = "btnToggleMockup";
-            this.btnToggleMockup.Size = new System.Drawing.Size(155, 28);
-            this.btnToggleMockup.TabIndex = 3;
-            this.btnToggleMockup.Text = "Nạp dữ liệu mẫu";
-            this.btnToggleMockup.Tone = ADDIN.UI.ModernButtonTone.Accent;
-            this.toolTips.SetToolTip(this.btnToggleMockup, "Nạp bộ dữ liệu giả lập mẫu (120 components, Frame-A, Bracket-B, Panel-C) để xem thử bố cục giao diện");
+            this.lblHeaderSub.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // pnlControlBar
             // 
             this.pnlControlBar.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(245)))), ((int)(((byte)(248)))));
-            this.pnlControlBar.Controls.Add(this.txtSearch);
-            this.pnlControlBar.Controls.Add(this.cboStatusFilter);
-            this.pnlControlBar.Controls.Add(this.btnRefresh);
-            this.pnlControlBar.Controls.Add(this.btnCancel);
-            this.pnlControlBar.Controls.Add(this.btnRunBatch);
-            this.pnlControlBar.Controls.Add(this.pnlScope);
+            this.pnlControlBar.Controls.Add(this.pnlControlLeft);
+            this.pnlControlBar.Controls.Add(this.pnlControlRight);
             this.pnlControlBar.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pnlControlBar.Location = new System.Drawing.Point(0, 52);
             this.pnlControlBar.Margin = new System.Windows.Forms.Padding(0);
             this.pnlControlBar.Name = "pnlControlBar";
-            this.pnlControlBar.Padding = new System.Windows.Forms.Padding(16, 6, 16, 6);
             this.pnlControlBar.Size = new System.Drawing.Size(1264, 46);
             this.pnlControlBar.TabIndex = 1;
             // 
+            // pnlControlRight
+            // 
+            this.pnlControlRight.AutoSize = true;
+            this.pnlControlRight.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            this.pnlControlRight.Controls.Add(this.btnRunBatch);
+            this.pnlControlRight.Controls.Add(this.btnCancel);
+            this.pnlControlRight.Controls.Add(this.btnRefresh);
+            this.pnlControlRight.Dock = System.Windows.Forms.DockStyle.Right;
+            this.pnlControlRight.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
+            this.pnlControlRight.Location = new System.Drawing.Point(908, 0);
+            this.pnlControlRight.Margin = new System.Windows.Forms.Padding(0);
+            this.pnlControlRight.Name = "pnlControlRight";
+            this.pnlControlRight.Padding = new System.Windows.Forms.Padding(0, 6, 16, 6);
+            this.pnlControlRight.Size = new System.Drawing.Size(356, 46);
+            this.pnlControlRight.TabIndex = 1;
+            this.pnlControlRight.WrapContents = false;
+            // 
+            // btnRunBatch
+            // 
+            this.btnRunBatch.AutoSize = true;
+            this.btnRunBatch.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
+            this.btnRunBatch.Icon = ADDIN.UI.TaiIcon.Refresh;
+            this.btnRunBatch.Kind = ADDIN.UI.ModernButtonKind.Primary;
+            this.btnRunBatch.Location = new System.Drawing.Point(180, 6);
+            this.btnRunBatch.Margin = new System.Windows.Forms.Padding(6, 0, 0, 0);
+            this.btnRunBatch.Name = "btnRunBatch";
+            this.btnRunBatch.Padding = new System.Windows.Forms.Padding(12, 0, 12, 0);
+            this.btnRunBatch.Size = new System.Drawing.Size(160, 34);
+            this.btnRunBatch.TabIndex = 1;
+            this.btnRunBatch.Text = "Run Batch Check";
+            this.btnRunBatch.Tone = ADDIN.UI.ModernButtonTone.Success;
+            this.toolTips.SetToolTip(this.btnRunBatch, "Bắt đầu chạy kiểm tra chấn hàng loạt cho các chi tiết");
+            // 
+            // btnCancel
+            // 
+            this.btnCancel.AutoSize = true;
+            this.btnCancel.Enabled = false;
+            this.btnCancel.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.btnCancel.Icon = ADDIN.UI.TaiIcon.Stop;
+            this.btnCancel.Kind = ADDIN.UI.ModernButtonKind.Standard;
+            this.btnCancel.Location = new System.Drawing.Point(97, 6);
+            this.btnCancel.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
+            this.btnCancel.Size = new System.Drawing.Size(77, 34);
+            this.btnCancel.TabIndex = 2;
+            this.btnCancel.Text = "Dừng";
+            this.btnCancel.Tone = ADDIN.UI.ModernButtonTone.Danger;
+            // 
+            // btnRefresh
+            // 
+            this.btnRefresh.AutoSize = true;
+            this.btnRefresh.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.btnRefresh.Icon = ADDIN.UI.TaiIcon.Refresh;
+            this.btnRefresh.Kind = ADDIN.UI.ModernButtonKind.Standard;
+            this.btnRefresh.Location = new System.Drawing.Point(2, 6);
+            this.btnRefresh.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
+            this.btnRefresh.Name = "btnRefresh";
+            this.btnRefresh.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
+            this.btnRefresh.Size = new System.Drawing.Size(91, 34);
+            this.btnRefresh.TabIndex = 3;
+            this.btnRefresh.Text = "Quét lại";
+            this.btnRefresh.Tone = ADDIN.UI.ModernButtonTone.Accent;
+            // 
+            // pnlControlLeft
+            // 
+            this.pnlControlLeft.Controls.Add(this.pnlScope);
+            this.pnlControlLeft.Controls.Add(this.cboStatusFilter);
+            this.pnlControlLeft.Controls.Add(this.txtSearch);
+            this.pnlControlLeft.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlControlLeft.FlowDirection = System.Windows.Forms.FlowDirection.LeftToRight;
+            this.pnlControlLeft.Location = new System.Drawing.Point(0, 0);
+            this.pnlControlLeft.Margin = new System.Windows.Forms.Padding(0);
+            this.pnlControlLeft.Name = "pnlControlLeft";
+            this.pnlControlLeft.Padding = new System.Windows.Forms.Padding(16, 6, 4, 6);
+            this.pnlControlLeft.Size = new System.Drawing.Size(908, 46);
+            this.pnlControlLeft.TabIndex = 0;
+            this.pnlControlLeft.WrapContents = false;
+            // 
             // pnlScope
             // 
+            this.pnlScope.AutoSize = true;
+            this.pnlScope.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.pnlScope.Controls.Add(this.btnScopeEntire);
             this.pnlScope.Controls.Add(this.btnScopeSelected);
+            this.pnlScope.FlowDirection = System.Windows.Forms.FlowDirection.LeftToRight;
             this.pnlScope.Location = new System.Drawing.Point(16, 6);
+            this.pnlScope.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.pnlScope.Name = "pnlScope";
-            this.pnlScope.Size = new System.Drawing.Size(310, 34);
+            this.pnlScope.Size = new System.Drawing.Size(328, 34);
             this.pnlScope.TabIndex = 0;
+            this.pnlScope.WrapContents = false;
             // 
             // btnScopeEntire
             // 
+            this.btnScopeEntire.AutoSize = true;
             this.btnScopeEntire.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.btnScopeEntire.Kind = ADDIN.UI.ModernButtonKind.Standard;
             this.btnScopeEntire.Location = new System.Drawing.Point(0, 0);
             this.btnScopeEntire.Margin = new System.Windows.Forms.Padding(0, 0, 4, 0);
             this.btnScopeEntire.Name = "btnScopeEntire";
+            this.btnScopeEntire.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
             this.btnScopeEntire.Selected = true;
             this.btnScopeEntire.Size = new System.Drawing.Size(145, 32);
             this.btnScopeEntire.TabIndex = 0;
@@ -250,57 +375,18 @@ namespace ADDIN.UI
             // 
             // btnScopeSelected
             // 
+            this.btnScopeSelected.AutoSize = true;
             this.btnScopeSelected.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.btnScopeSelected.Kind = ADDIN.UI.ModernButtonKind.Standard;
             this.btnScopeSelected.Location = new System.Drawing.Point(149, 0);
             this.btnScopeSelected.Margin = new System.Windows.Forms.Padding(0);
             this.btnScopeSelected.Name = "btnScopeSelected";
-            this.btnScopeSelected.Size = new System.Drawing.Size(155, 32);
+            this.btnScopeSelected.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
+            this.btnScopeSelected.Size = new System.Drawing.Size(175, 32);
             this.btnScopeSelected.TabIndex = 1;
             this.btnScopeSelected.Text = "Selected Components";
             this.btnScopeSelected.Tone = ADDIN.UI.ModernButtonTone.Neutral;
             this.toolTips.SetToolTip(this.btnScopeSelected, "Chỉ kiểm tra các component đang được chọn trong cây FeatureTree");
-            // 
-            // btnRunBatch
-            // 
-            this.btnRunBatch.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnRunBatch.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
-            this.btnRunBatch.Icon = ADDIN.UI.TaiIcon.Refresh;
-            this.btnRunBatch.Kind = ADDIN.UI.ModernButtonKind.Primary;
-            this.btnRunBatch.Location = new System.Drawing.Point(1088, 6);
-            this.btnRunBatch.Name = "btnRunBatch";
-            this.btnRunBatch.Size = new System.Drawing.Size(160, 34);
-            this.btnRunBatch.TabIndex = 1;
-            this.btnRunBatch.Text = "Run Batch Check";
-            this.btnRunBatch.Tone = ADDIN.UI.ModernButtonTone.Success;
-            this.toolTips.SetToolTip(this.btnRunBatch, "Bắt đầu chạy kiểm tra chấn hàng loạt cho các chi tiết");
-            // 
-            // btnCancel
-            // 
-            this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCancel.Enabled = false;
-            this.btnCancel.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.btnCancel.Icon = ADDIN.UI.TaiIcon.Stop;
-            this.btnCancel.Kind = ADDIN.UI.ModernButtonKind.Standard;
-            this.btnCancel.Location = new System.Drawing.Point(1005, 6);
-            this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(77, 34);
-            this.btnCancel.TabIndex = 2;
-            this.btnCancel.Text = "Dừng";
-            this.btnCancel.Tone = ADDIN.UI.ModernButtonTone.Danger;
-            // 
-            // btnRefresh
-            // 
-            this.btnRefresh.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnRefresh.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.btnRefresh.Icon = ADDIN.UI.TaiIcon.Refresh;
-            this.btnRefresh.Kind = ADDIN.UI.ModernButtonKind.Standard;
-            this.btnRefresh.Location = new System.Drawing.Point(908, 6);
-            this.btnRefresh.Name = "btnRefresh";
-            this.btnRefresh.Size = new System.Drawing.Size(91, 34);
-            this.btnRefresh.TabIndex = 3;
-            this.btnRefresh.Text = "Quét lại";
-            this.btnRefresh.Tone = ADDIN.UI.ModernButtonTone.Accent;
             // 
             // cboStatusFilter
             // 
@@ -312,7 +398,8 @@ namespace ADDIN.UI
             "Chỉ lỗi (COLLISION*)",
             "Chưa xác minh (UNKNOWN)",
             "Đạt hình học (CLEAR*)"});
-            this.cboStatusFilter.Location = new System.Drawing.Point(340, 10);
+            this.cboStatusFilter.Location = new System.Drawing.Point(352, 10);
+            this.cboStatusFilter.Margin = new System.Windows.Forms.Padding(8, 4, 8, 4);
             this.cboStatusFilter.Name = "cboStatusFilter";
             this.cboStatusFilter.Size = new System.Drawing.Size(185, 25);
             this.cboStatusFilter.TabIndex = 4;
@@ -320,9 +407,10 @@ namespace ADDIN.UI
             // txtSearch
             // 
             this.txtSearch.Font = new System.Drawing.Font("Segoe UI", 9.5F);
-            this.txtSearch.Location = new System.Drawing.Point(535, 10);
+            this.txtSearch.Location = new System.Drawing.Point(553, 10);
+            this.txtSearch.Margin = new System.Windows.Forms.Padding(0, 4, 4, 4);
             this.txtSearch.Name = "txtSearch";
-            this.txtSearch.Size = new System.Drawing.Size(200, 24);
+            this.txtSearch.Size = new System.Drawing.Size(190, 24);
             this.txtSearch.TabIndex = 5;
             this.toolTips.SetToolTip(this.txtSearch, "Lọc danh sách chi tiết theo tên Part hoặc cấu hình");
             // 
@@ -516,12 +604,12 @@ namespace ADDIN.UI
             // 
             // lblMetrics4Val
             // 
-            this.lblMetrics4Val.AutoSize = true;
-            this.lblMetrics4Val.Font = new System.Drawing.Font("Segoe UI", 13.5F, System.Drawing.FontStyle.Bold);
+            this.lblMetrics4Val.AutoEllipsis = true;
+            this.lblMetrics4Val.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
             this.lblMetrics4Val.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(22)))), ((int)(((byte)(125)))), ((int)(((byte)(76)))));
             this.lblMetrics4Val.Location = new System.Drawing.Point(8, 29);
             this.lblMetrics4Val.Name = "lblMetrics4Val";
-            this.lblMetrics4Val.Size = new System.Drawing.Size(206, 25);
+            this.lblMetrics4Val.Size = new System.Drawing.Size(222, 25);
             this.lblMetrics4Val.TabIndex = 1;
             this.lblMetrics4Val.Text = "14 CLEAR • 4 COLLISION";
             // 
@@ -751,28 +839,35 @@ namespace ADDIN.UI
             this.pnlDetailHeader.Dock = System.Windows.Forms.DockStyle.Top;
             this.pnlDetailHeader.Location = new System.Drawing.Point(16, 4);
             this.pnlDetailHeader.Name = "pnlDetailHeader";
-            this.pnlDetailHeader.Size = new System.Drawing.Size(836, 40);
+            this.pnlDetailHeader.Padding = new System.Windows.Forms.Padding(0, 2, 0, 4);
+            this.pnlDetailHeader.Size = new System.Drawing.Size(836, 62);
             this.pnlDetailHeader.TabIndex = 0;
-            // 
-            // lblDetailBendTitle
-            // 
-            this.lblDetailBendTitle.AutoSize = true;
-            this.lblDetailBendTitle.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold);
-            this.lblDetailBendTitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
-            this.lblDetailBendTitle.Location = new System.Drawing.Point(0, 10);
-            this.lblDetailBendTitle.Name = "lblDetailBendTitle";
-            this.lblDetailBendTitle.Size = new System.Drawing.Size(262, 19);
-            this.lblDetailBendTitle.TabIndex = 0;
-            this.lblDetailBendTitle.Text = "Chi tiết nếp chấn — Frame-A / Bend 01";
             // 
             // pnlBendPills
             // 
-            this.pnlBendPills.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.pnlBendPills.Location = new System.Drawing.Point(275, 4);
+            this.pnlBendPills.AutoScroll = true;
+            this.pnlBendPills.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlBendPills.FlowDirection = System.Windows.Forms.FlowDirection.LeftToRight;
+            this.pnlBendPills.Location = new System.Drawing.Point(0, 26);
+            this.pnlBendPills.Margin = new System.Windows.Forms.Padding(0);
             this.pnlBendPills.Name = "pnlBendPills";
-            this.pnlBendPills.Size = new System.Drawing.Size(558, 32);
+            this.pnlBendPills.Padding = new System.Windows.Forms.Padding(0, 2, 0, 2);
+            this.pnlBendPills.Size = new System.Drawing.Size(836, 32);
             this.pnlBendPills.TabIndex = 1;
+            this.pnlBendPills.WrapContents = false;
+            // 
+            // lblDetailBendTitle
+            // 
+            this.lblDetailBendTitle.AutoEllipsis = true;
+            this.lblDetailBendTitle.Dock = System.Windows.Forms.DockStyle.Top;
+            this.lblDetailBendTitle.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblDetailBendTitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
+            this.lblDetailBendTitle.Location = new System.Drawing.Point(0, 2);
+            this.lblDetailBendTitle.Name = "lblDetailBendTitle";
+            this.lblDetailBendTitle.Size = new System.Drawing.Size(836, 24);
+            this.lblDetailBendTitle.TabIndex = 0;
+            this.lblDetailBendTitle.Text = "Chi tiết nếp chấn — Frame-A / Bend 01";
+            this.lblDetailBendTitle.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // dgvTools
             // 
@@ -867,50 +962,58 @@ namespace ADDIN.UI
             this.pnlToolCallout.Dock = System.Windows.Forms.DockStyle.Top;
             this.pnlToolCallout.Location = new System.Drawing.Point(0, 0);
             this.pnlToolCallout.Name = "pnlToolCallout";
-            this.pnlToolCallout.Padding = new System.Windows.Forms.Padding(16, 12, 16, 12);
-            this.pnlToolCallout.Size = new System.Drawing.Size(398, 140);
+            this.pnlToolCallout.Padding = new System.Windows.Forms.Padding(16, 10, 16, 10);
+            this.pnlToolCallout.Size = new System.Drawing.Size(398, 155);
             this.pnlToolCallout.TabIndex = 0;
             // 
             // lblCalloutTitle
             // 
-            this.lblCalloutTitle.AutoSize = true;
+            this.lblCalloutTitle.AutoEllipsis = true;
+            this.lblCalloutTitle.Dock = System.Windows.Forms.DockStyle.Top;
             this.lblCalloutTitle.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
             this.lblCalloutTitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(15)))), ((int)(((byte)(23)))), ((int)(((byte)(42)))));
-            this.lblCalloutTitle.Location = new System.Drawing.Point(12, 10);
+            this.lblCalloutTitle.Location = new System.Drawing.Point(16, 10);
             this.lblCalloutTitle.Name = "lblCalloutTitle";
-            this.lblCalloutTitle.Size = new System.Drawing.Size(193, 17);
+            this.lblCalloutTitle.Size = new System.Drawing.Size(366, 22);
             this.lblCalloutTitle.TabIndex = 0;
             this.lblCalloutTitle.Text = "Chi tiết dao đang chọn";
+            this.lblCalloutTitle.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // lblCalloutPunch
             // 
-            this.lblCalloutPunch.AutoSize = true;
+            this.lblCalloutPunch.AutoEllipsis = true;
+            this.lblCalloutPunch.Dock = System.Windows.Forms.DockStyle.Top;
             this.lblCalloutPunch.Font = new System.Drawing.Font("Segoe UI", 9.5F);
             this.lblCalloutPunch.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(51)))), ((int)(((byte)(65)))), ((int)(((byte)(85)))));
-            this.lblCalloutPunch.Location = new System.Drawing.Point(12, 38);
+            this.lblCalloutPunch.Location = new System.Drawing.Point(16, 32);
             this.lblCalloutPunch.Name = "lblCalloutPunch";
-            this.lblCalloutPunch.Size = new System.Drawing.Size(211, 17);
+            this.lblCalloutPunch.Size = new System.Drawing.Size(366, 22);
             this.lblCalloutPunch.TabIndex = 1;
             this.lblCalloutPunch.Text = "Punch – AMD-STD-004 : UNKNOWN";
+            this.lblCalloutPunch.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // lblCalloutHolder
             // 
-            this.lblCalloutHolder.AutoSize = true;
+            this.lblCalloutHolder.AutoEllipsis = true;
+            this.lblCalloutHolder.Dock = System.Windows.Forms.DockStyle.Top;
             this.lblCalloutHolder.Font = new System.Drawing.Font("Segoe UI", 9.5F);
             this.lblCalloutHolder.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(51)))), ((int)(((byte)(65)))), ((int)(((byte)(85)))));
-            this.lblCalloutHolder.Location = new System.Drawing.Point(12, 62);
+            this.lblCalloutHolder.Location = new System.Drawing.Point(16, 54);
             this.lblCalloutHolder.Name = "lblCalloutHolder";
-            this.lblCalloutHolder.Size = new System.Drawing.Size(183, 17);
+            this.lblCalloutHolder.Size = new System.Drawing.Size(366, 22);
             this.lblCalloutHolder.TabIndex = 2;
             this.lblCalloutHolder.Text = "Upper Holder : Chưa xác minh";
+            this.lblCalloutHolder.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // lblCalloutReason
             // 
+            this.lblCalloutReason.AutoEllipsis = true;
+            this.lblCalloutReason.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblCalloutReason.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.lblCalloutReason.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(116)))), ((int)(((byte)(139)))));
-            this.lblCalloutReason.Location = new System.Drawing.Point(12, 88);
+            this.lblCalloutReason.Location = new System.Drawing.Point(16, 76);
             this.lblCalloutReason.Name = "lblCalloutReason";
-            this.lblCalloutReason.Size = new System.Drawing.Size(370, 42);
+            this.lblCalloutReason.Size = new System.Drawing.Size(366, 69);
             this.lblCalloutReason.TabIndex = 3;
             this.lblCalloutReason.Text = "Lý do: chưa đủ bằng chứng mapping và vị trí gá Holder.";
             // 
@@ -920,10 +1023,10 @@ namespace ADDIN.UI
             this.pnlDiagnosticsCard.Controls.Add(this.txtDiagnostics);
             this.pnlDiagnosticsCard.Controls.Add(this.lblDiagHeader);
             this.pnlDiagnosticsCard.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnlDiagnosticsCard.Location = new System.Drawing.Point(0, 140);
+            this.pnlDiagnosticsCard.Location = new System.Drawing.Point(0, 155);
             this.pnlDiagnosticsCard.Name = "pnlDiagnosticsCard";
             this.pnlDiagnosticsCard.Padding = new System.Windows.Forms.Padding(16, 8, 16, 8);
-            this.pnlDiagnosticsCard.Size = new System.Drawing.Size(398, 195);
+            this.pnlDiagnosticsCard.Size = new System.Drawing.Size(398, 180);
             this.pnlDiagnosticsCard.TabIndex = 1;
             // 
             // lblDiagHeader
@@ -950,14 +1053,14 @@ namespace ADDIN.UI
             this.txtDiagnostics.Name = "txtDiagnostics";
             this.txtDiagnostics.ReadOnly = true;
             this.txtDiagnostics.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtDiagnostics.Size = new System.Drawing.Size(366, 162);
+            this.txtDiagnostics.Size = new System.Drawing.Size(366, 147);
             this.txtDiagnostics.TabIndex = 1;
             // 
             // pnlFooter
             // 
             this.pnlFooter.BackColor = System.Drawing.Color.White;
-            this.pnlFooter.Controls.Add(this.btnClose);
             this.pnlFooter.Controls.Add(this.lblDisclaimer);
+            this.pnlFooter.Controls.Add(this.btnClose);
             this.pnlFooter.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pnlFooter.Location = new System.Drawing.Point(0, 775);
             this.pnlFooter.Margin = new System.Windows.Forms.Padding(0);
@@ -966,32 +1069,34 @@ namespace ADDIN.UI
             this.pnlFooter.Size = new System.Drawing.Size(1264, 46);
             this.pnlFooter.TabIndex = 4;
             // 
+            // btnClose
+            // 
+            this.btnClose.Dock = System.Windows.Forms.DockStyle.Right;
+            this.btnClose.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.btnClose.Kind = ADDIN.UI.ModernButtonKind.Standard;
+            this.btnClose.Location = new System.Drawing.Point(1168, 6);
+            this.btnClose.Margin = new System.Windows.Forms.Padding(8, 0, 0, 0);
+            this.btnClose.Name = "btnClose";
+            this.btnClose.Size = new System.Drawing.Size(80, 34);
+            this.btnClose.TabIndex = 1;
+            this.btnClose.Text = "Đóng";
+            this.btnClose.Tone = ADDIN.UI.ModernButtonTone.Neutral;
+            // 
             // lblDisclaimer
             // 
-            this.lblDisclaimer.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblDisclaimer.AutoEllipsis = true;
+            this.lblDisclaimer.Dock = System.Windows.Forms.DockStyle.Fill;
             this.lblDisclaimer.Font = new System.Drawing.Font("Segoe UI", 8.25F);
             this.lblDisclaimer.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(116)))), ((int)(((byte)(139)))));
-            this.lblDisclaimer.Location = new System.Drawing.Point(12, 6);
+            this.lblDisclaimer.Location = new System.Drawing.Point(16, 6);
+            this.lblDisclaimer.Margin = new System.Windows.Forms.Padding(0);
             this.lblDisclaimer.Name = "lblDisclaimer";
-            this.lblDisclaimer.Size = new System.Drawing.Size(1130, 34);
+            this.lblDisclaimer.Size = new System.Drawing.Size(1152, 34);
             this.lblDisclaimer.TabIndex = 0;
             this.lblDisclaimer.Text = "Chỉ là minh họa bố cục với dữ liệu giả lập. *CLEAR/COLLISION biểu thị kết quả hìn" +
     "h học trong phạm vi chứng minh, không phải kết luận toàn Part chấn được hoặc khô" +
     "ng.";
             this.lblDisclaimer.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            // 
-            // btnClose
-            // 
-            this.btnClose.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnClose.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.btnClose.Kind = ADDIN.UI.ModernButtonKind.Standard;
-            this.btnClose.Location = new System.Drawing.Point(1168, 6);
-            this.btnClose.Name = "btnClose";
-            this.btnClose.Size = new System.Drawing.Size(80, 32);
-            this.btnClose.TabIndex = 1;
-            this.btnClose.Text = "Đóng";
-            this.btnClose.Tone = ADDIN.UI.ModernButtonTone.Neutral;
             // 
             // BendAssemblyBatchForm
             // 
@@ -1007,9 +1112,18 @@ namespace ADDIN.UI
             this.pnlRoot.ResumeLayout(false);
             this.pnlHeader.ResumeLayout(false);
             this.pnlHeader.PerformLayout();
+            this.pnlHeaderLeft.ResumeLayout(false);
+            this.pnlHeaderLeft.PerformLayout();
+            this.pnlHeaderRight.ResumeLayout(false);
+            this.pnlHeaderRight.PerformLayout();
             this.pnlControlBar.ResumeLayout(false);
             this.pnlControlBar.PerformLayout();
+            this.pnlControlLeft.ResumeLayout(false);
+            this.pnlControlLeft.PerformLayout();
+            this.pnlControlRight.ResumeLayout(false);
+            this.pnlControlRight.PerformLayout();
             this.pnlScope.ResumeLayout(false);
+            this.pnlScope.PerformLayout();
             this.pnlOverview.ResumeLayout(false);
             this.pnlOverview.PerformLayout();
             this.tblMetrics.ResumeLayout(false);
@@ -1052,11 +1166,15 @@ namespace ADDIN.UI
 
         private System.Windows.Forms.TableLayoutPanel pnlRoot;
         private System.Windows.Forms.Panel pnlHeader;
+        private System.Windows.Forms.TableLayoutPanel pnlHeaderLeft;
+        private System.Windows.Forms.FlowLayoutPanel pnlHeaderRight;
         private System.Windows.Forms.Label lblHeaderTitle;
         private System.Windows.Forms.Label lblHeaderSub;
         private System.Windows.Forms.Label badgeConcept;
         private ModernButton btnToggleMockup;
         private System.Windows.Forms.Panel pnlControlBar;
+        private System.Windows.Forms.FlowLayoutPanel pnlControlLeft;
+        private System.Windows.Forms.FlowLayoutPanel pnlControlRight;
         private System.Windows.Forms.FlowLayoutPanel pnlScope;
         private ModernButton btnScopeEntire;
         private ModernButton btnScopeSelected;
