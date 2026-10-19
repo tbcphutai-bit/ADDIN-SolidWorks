@@ -18,6 +18,8 @@ Open these files and review the diff against `main` **before** making further ch
 
 **BẮT BUỘC:** Trước khi báo hoàn thành, Antigravity phải xác nhận **CODE ĐẦY ĐỦ (CODE COMPLETENESS GATE)** theo Mục 9. Build thành công một mình KHÔNG đủ điều kiện PASS. Trường hợp không thể xác minh phải ghi `NOT_VERIFIED`, không được tự xác nhận hoàn tất.
 
+**BẮT BUỘC BÁO CÁO LÊN GITHUB:** Sau khi làm xong, Anti phải cập nhật và commit file [`docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md`](reports/CHECK_HOLE_CG1_REPORT.md) trên **cùng branch CG1**, kèm bằng chứng và các trạng thái thật, sau đó push. Trả lại link report + commit SHA cho ChatGPT review. Chỉ gửi kết quả trong chat **không được tính là bàn giao hoàn tất**. Xem Mục 10.
+
 ## 1. Required behavior
 
 CG1 is a non-invasive diagnostic pass:
@@ -482,3 +484,47 @@ Outstanding limitations/blockers:
 CODE_COMPLETE: YES / NO / NOT_VERIFIED
 Ready for ChatGPT review: YES / NO
 ```
+
+## 10. BẮT BUỘC BÁO CÁO NGHIỆM THU NGAY TRÊN GITHUB (HAND-OFF TO CHATGPT)
+
+**Hạng mục này là điều kiện bàn giao độc lập với Code Completeness Gate.** Anti phải viết và push báo cáo sau khi tích hợp, build và kiểm thử. Không được chỉ gửi tóm tắt trong cửa sổ chat Antigravity.
+
+### 10.1. Vị trí báo cáo GitHub
+
+**File đã được tạo làm mẫu trên branch này:**
+`docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md`
+
+Mở file này, cập nhật tất cả thông tin theo kết quả thực tế rồi commit. Nội dung tối thiểu phải ghi: source commit SHA, danh sách đủ 4 file, code completeness audit, diff, hai kết quả build, T01–T10 từng case, so sánh baseline OK/NG/Missing/Pattern/marker/CSV, trạng thái giao diện, lỗi còn tồn, `CODE_COMPLETE`, và đánh giá sẵn sàng review. Có bằng chứng thì ghi link vào đúng ô. Không có bằng chứng thì ghi `NOT_VERIFIED` hoặc `NOT_TESTED`, không được báo PASS.
+
+Lưu ý: quy định trước đây **giới hạn bốn file source/project** vẫn giữ nguyên; **các file tài liệu báo cáo trong `docs/antigravity/` là ngoại lệ được cho phép**. Không dùng ngoại lệ này để sửa command khác.
+
+### 10.2. Thứ tự bàn giao bắt buộc
+
+1. Commit code CG1 đã sửa lên `feat/check-hole-connection-groups-cg1`; không merge vào `main`.
+2. Điền báo cáo `docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md`, không giữ placeholder ở những phần đã kiểm chứng; ghi rõ những phần còn chưa được kiểm chứng.
+3. Commit và push bản báo cáo đó lên **cùng branch**.
+4. Nếu có quyền, tạo **Draft Pull Request** từ branch CG1 vào `main`, gắn link báo cáo và ghi `Do not merge — pending ChatGPT/user review`. PR này chỉ để review, không phải để yêu cầu tự động merge. Nếu không có quyền tạo PR thì vẫn phải push báo cáo; ghi lý do không tạo PR.
+5. Trả lại **link GitHub tới file báo cáo, source commit SHA, report commit SHA, branch và link PR (nếu có)** để ChatGPT đọc lại code thực tế rồi kết luận có thể nghiệm thu hay cần sửa tiếp.
+
+### 10.3. Tiêu chí hoàn thành
+
+- `CODE_COMPLETE=YES`: chỉ khi code và các phép kiểm chứng bắt buộc thật sự đạt.
+- `CODE_COMPLETE=NOT_VERIFIED`: nếu thiếu môi trường, thiếu dữ liệu kiểm thử hoặc chưa đủ bằng chứng; vẫn phải **báo cáo trung thực và push GitHub**.
+- `CODE_COMPLETE=NO`: có lỗi hoặc code chưa đầy đủ chưa khắc phục.
+- `READY_FOR_CHATGPT_REVIEW=YES` chỉ khi source + báo cáo đã được push, link đọc được qua GitHub và mọi blocker đã được liệt kê.
+- `READY_FOR_MERGE=NO` cho tới khi được người dùng chấp thuận rõ ràng.
+
+**Mẫu trả lời cuối cùng cho người giao Anti:**
+
+```text
+CG1 SOURCE BRANCH: feat/check-hole-connection-groups-cg1
+SOURCE COMMIT: <SHA>
+REPORT COMMIT: <SHA>
+REPORT URL: https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md
+DRAFT PR URL: <URL hoặc NOT_CREATED + lý do>
+CODE_COMPLETE: YES / NO / NOT_VERIFIED
+READY_FOR_CHATGPT_REVIEW: YES / NO
+BLOCKERS/NOT_TESTED: <liệt kê>
+```
+
+**Định nghĩa bàn giao:** Công việc Anti chỉ được coi là **đã bàn giao để review** khi file báo cáo đã được cập nhật và xuất hiện trên GitHub, không chỉ khi Antigravity nói “xong”. Quyết định hoàn thành CG1 thuộc bước review tiếp theo, không do Anti tự tuyên bố.
