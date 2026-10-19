@@ -81,6 +81,7 @@ namespace ADDIN.UI
             InitializeComponent();
             ApplyCustomStyling();
             WireInternalEvents();
+            toolTips.SetToolTip(lblHeaderSub, lblHeaderSub.Text);
             ClearLive("Chưa chạy. Chọn phạm vi rồi bấm Run Batch Check.");
         }
 
@@ -90,8 +91,177 @@ namespace ADDIN.UI
             if (!string.IsNullOrWhiteSpace(hostTitle))
             {
                 lblHeaderSub.Text = $"Cụm lắp ráp: {hostTitle} • Cấu hình: {configurationName ?? "Default"}";
+                toolTips.SetToolTip(lblHeaderSub, lblHeaderSub.Text);
                 Text = $"CHECK CHẤN — {hostTitle}";
             }
+        }
+
+        #endregion
+
+        #region DPI & Responsive Scaling
+
+        protected override void OnDpiChanged(DpiChangedEventArgs e)
+        {
+            base.OnDpiChanged(e);
+            RescaleDpiElements();
+        }
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            base.OnFontChanged(e);
+            RescaleDpiElements();
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            RescaleDpiElements();
+            LayoutControlBar();
+        }
+
+        private bool inControlBarLayout;
+
+        public void LayoutControlBar()
+        {
+            if (inControlBarLayout || pnlControlBar == null || pnlControlRight == null || pnlScope == null) return;
+            int w = pnlControlBar.ClientSize.Width;
+            if (w <= 0) return;
+
+            try
+            {
+                inControlBarLayout = true;
+                pnlControlBar.SuspendLayout();
+
+                int padLeft = TaiTheme.Px(this, 16);
+                int padRight = TaiTheme.Px(this, 16);
+                int gap = TaiTheme.Px(this, 8);
+
+                int scopeW = pnlScope.PreferredSize.Width;
+                int scopeH = pnlScope.PreferredSize.Height;
+                int rightW = pnlControlRight.PreferredSize.Width;
+                int rightH = pnlControlRight.PreferredSize.Height;
+
+                int filterW = TaiTheme.Px(this, 160);
+                int filterH = TaiTheme.Px(this, 26);
+                int minSearchW = TaiTheme.Px(this, 120);
+                int searchH = TaiTheme.Px(this, 24);
+
+                int neededSingleRow = padLeft + scopeW + gap + filterW + gap + minSearchW + gap + rightW + padRight;
+
+                bool singleRow = w >= neededSingleRow;
+
+                if (singleRow)
+                {
+                    int barH = TaiTheme.Px(this, 46);
+                    if (pnlRoot != null && pnlRoot.RowStyles.Count > 1 && Math.Abs(pnlRoot.RowStyles[1].Height - barH) > 0.5f)
+                    {
+                        pnlRoot.RowStyles[1].Height = barH;
+                    }
+
+                    int scopeY = Math.Max(0, (barH - scopeH) / 2);
+                    pnlScope.SetBounds(padLeft, scopeY, scopeW, scopeH);
+
+                    int filterY = Math.Max(0, (barH - filterH) / 2);
+                    cboStatusFilter.SetBounds(pnlScope.Right + gap, filterY, filterW, filterH);
+
+                    int rightX = Math.Max(cboStatusFilter.Right + gap + minSearchW + gap, w - padRight - rightW);
+                    int rightY = Math.Max(0, (barH - rightH) / 2);
+                    pnlControlRight.SetBounds(rightX, rightY, rightW, rightH);
+
+                    int searchX = cboStatusFilter.Right + gap;
+                    int searchW = Math.Max(minSearchW, rightX - gap - searchX);
+                    int searchY = Math.Max(0, (barH - searchH) / 2);
+                    txtSearch.SetBounds(searchX, searchY, searchW, searchH);
+                }
+                else
+                {
+                    // 2-tier responsive mode: prevents clipping at narrow widths or 125%/150% DPI
+                    int tierH = Math.Max(scopeH, rightH);
+                    if (tierH < TaiTheme.Px(this, 36)) tierH = TaiTheme.Px(this, 36);
+                    int barH = tierH * 2 + TaiTheme.Px(this, 10);
+                    if (pnlRoot != null && pnlRoot.RowStyles.Count > 1 && Math.Abs(pnlRoot.RowStyles[1].Height - barH) > 0.5f)
+                    {
+                        pnlRoot.RowStyles[1].Height = barH;
+                    }
+
+                    // Row 1: Scope on left, Actions on right
+                    int y1 = TaiTheme.Px(this, 4);
+                    pnlScope.SetBounds(padLeft, y1 + (tierH - scopeH) / 2, scopeW, scopeH);
+
+                    int rightX = Math.Max(padLeft + scopeW + gap, w - padRight - rightW);
+                    pnlControlRight.SetBounds(rightX, y1 + (tierH - rightH) / 2, rightW, rightH);
+
+                    // Row 2: Filter and Search spanning full width
+                    int y2 = y1 + tierH + TaiTheme.Px(this, 4);
+                    int filterY2 = y2 + (tierH - filterH) / 2;
+                    cboStatusFilter.SetBounds(padLeft, filterY2, filterW, filterH);
+
+                    int searchX2 = padLeft + filterW + gap;
+                    int searchW2 = Math.Max(minSearchW, w - padRight - searchX2);
+                    int searchY2 = y2 + (tierH - searchH) / 2;
+                    txtSearch.SetBounds(searchX2, searchY2, searchW2, searchH);
+                }
+
+                pnlControlBar.ResumeLayout(true);
+            }
+            finally
+            {
+                inControlBarLayout = false;
+            }
+        }
+
+        private void RescaleDpiElements()
+        {
+            int partRowH = TaiTheme.Px(this, 34);
+            dgvParts.RowTemplate.Height = partRowH;
+            foreach (DataGridViewRow row in dgvParts.Rows)
+            {
+                row.Height = partRowH;
+            }
+            dgvParts.ColumnHeadersHeight = TaiTheme.Px(this, 32);
+
+            int toolRowH = TaiTheme.Px(this, 30);
+            dgvTools.RowTemplate.Height = toolRowH;
+            foreach (DataGridViewRow row in dgvTools.Rows)
+            {
+                row.Height = toolRowH;
+            }
+            dgvTools.ColumnHeadersHeight = TaiTheme.Px(this, 30);
+
+            // Rescale Part grid columns proportionally to current DPI
+            colPartName.Width = TaiTheme.Px(this, 240);
+            colPartConfig.Width = TaiTheme.Px(this, 130);
+            colPartQty.Width = TaiTheme.Px(this, 70);
+            colPartBends.Width = TaiTheme.Px(this, 70);
+            colPartStatus.Width = TaiTheme.Px(this, 140);
+
+            // Rescale Tool grid columns
+            colToolId.Width = TaiTheme.Px(this, 125);
+            colPunch.Width = TaiTheme.Px(this, 115);
+            colHolder.Width = TaiTheme.Px(this, 140);
+            colMotion.Width = TaiTheme.Px(this, 115);
+            colGeomStatus.Width = TaiTheme.Px(this, 105);
+            colMfgStatus.Width = TaiTheme.Px(this, 115);
+            colClearance.Width = TaiTheme.Px(this, 95);
+
+            // Rescale layout heights in pnlRoot
+            if (pnlRoot != null && pnlRoot.RowStyles.Count >= 5)
+            {
+                pnlRoot.RowStyles[0].Height = TaiTheme.Px(this, 52);
+                pnlRoot.RowStyles[2].Height = TaiTheme.Px(this, 126);
+                pnlRoot.RowStyles[4].Height = TaiTheme.Px(this, 46);
+            }
+
+            // Re-layout control bar for current DPI
+            LayoutControlBar();
+
+            // Re-render custom drawn components
+            pnlProgressBar.Invalidate();
+            cardMetrics1.Invalidate();
+            cardMetrics2.Invalidate();
+            cardMetrics3.Invalidate();
+            cardMetrics4.Invalidate();
+            cardMetrics5.Invalidate();
         }
 
         #endregion
@@ -112,8 +282,8 @@ namespace ADDIN.UI
             GridStyler.ApplyModernStyle(dgvTools, false);
             dgvParts.MultiSelect = dgvTools.MultiSelect = false;
 
-            dgvParts.RowTemplate.Height = TaiTheme.Px(this, 34);
-            dgvTools.RowTemplate.Height = TaiTheme.Px(this, 30);
+            // Scaled elements & DPI
+            RescaleDpiElements();
 
             // Double buffering for smooth resize without flicker
             UIHelper.EnableDoubleBuffer(pnlRoot);
@@ -137,6 +307,10 @@ namespace ADDIN.UI
             // Custom cell paint for status pills
             dgvParts.CellPainting += DgvParts_CellPainting;
             dgvTools.CellPainting += DgvTools_CellPainting;
+
+            // Rich cell tooltips
+            dgvParts.CellToolTipTextNeeded += DgvParts_CellToolTipTextNeeded;
+            dgvTools.CellToolTipTextNeeded += DgvTools_CellToolTipTextNeeded;
 
             // Search box placeholder / default styling
             txtSearch.ForeColor = TaiTheme.TextMuted;
@@ -184,6 +358,9 @@ namespace ADDIN.UI
             // Filters
             txtSearch.TextChanged += (s, e) => ApplyPartFilters();
             cboStatusFilter.SelectedIndexChanged += (s, e) => ApplyPartFilters();
+
+            // Responsive control bar resize
+            pnlControlBar.Resize += (s, e) => LayoutControlBar();
 
             // Grid selections
             dgvParts.SelectionChanged += DgvParts_SelectionChanged;
@@ -575,7 +752,7 @@ namespace ADDIN.UI
             selectedBend = bend;
 
             lblDetailBendTitle.Text = $"{selectedPart.PartName} / {bend.BendName} · Góc: {bend.AngleDisplay} · R: {bend.RadiusDisplay}";
-            toolTips.SetToolTip(lblDetailBendTitle, bend.ToString());
+            toolTips.SetToolTip(lblDetailBendTitle, $"{selectedPart.PartName} / {bend.BendName} (FeatureId {bend.FeatureId})\nGóc chấn: {bend.AngleDisplay}\nBán kính: {bend.RadiusDisplay}\nTrạng thái: {bend.StatusDisplay}");
 
             // Highlight active bend button
             foreach (Control ctrl in pnlBendPills.Controls)
@@ -665,18 +842,91 @@ namespace ADDIN.UI
 
             lblCalloutHolder.ForeColor = tool.HolderStatus == CollisionStatus.COLLISION ? TaiTheme.Danger :
                                         tool.HolderStatus == CollisionStatus.CLEAR ? TaiTheme.Success : Color.FromArgb(51, 65, 85);
+
+            toolTips.SetToolTip(lblCalloutTitle, $"Ứng viên: {tool.ToolId} (FeatureId {tool.FeatureId})");
+            toolTips.SetToolTip(lblCalloutPunch, $"Punch ({tool.ToolId}): {tool.PunchStatusDisplay}");
+            toolTips.SetToolTip(lblCalloutHolder, $"Upper Holder: {tool.HolderStatusDisplay}");
+            toolTips.SetToolTip(lblCalloutReason, $"Lý do / Bằng chứng:\n{tool.CombinedReason}");
         }
 
         private void ClearDetailSection()
         {
             selectedPart = null; selectedBend = null; selectedTool = null;
             lblDetailBendTitle.Text = "Chi tiết nếp chấn — Chưa chọn Part";
+            toolTips.SetToolTip(lblDetailBendTitle, "Chọn một chi tiết bên trên để xem các nếp chấn.");
             pnlBendPills.Controls.Clear();
             dgvTools.Rows.Clear();
             lblCalloutTitle.Text = "Chi tiết dao đang chọn";
             lblCalloutPunch.Text = "Punch : —";
             lblCalloutHolder.Text = "Upper Holder : —";
             lblCalloutReason.Text = "Chọn một chi tiết bên trên để xem đánh giá 18 bộ dao.";
+            toolTips.SetToolTip(lblCalloutPunch, null);
+            toolTips.SetToolTip(lblCalloutHolder, null);
+            toolTips.SetToolTip(lblCalloutReason, null);
+        }
+
+        private void DgvParts_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || e.RowIndex >= dgvParts.Rows.Count) return;
+            var row = dgvParts.Rows[e.RowIndex];
+            var part = row.Tag as BatchPartViewModel;
+            if (part == null) return;
+
+            switch (e.ColumnIndex)
+            {
+                case 0:
+                    e.ToolTipText = $"{part.PartName}\nSource: {part.SourceKey}\nSố lượng: {part.Quantity}\nSố nếp chấn: {part.BendCount}";
+                    break;
+                case 1:
+                    e.ToolTipText = $"Cấu hình Part: {part.Configuration}";
+                    break;
+                case 4:
+                    e.ToolTipText = $"Trạng thái hình học: {part.StatusDisplay}\nQuá trình: {part.ProcessStatus}\nSản xuất: {part.ManufacturingStatus}";
+                    break;
+                case 5:
+                    if (!string.IsNullOrWhiteSpace(part.Reason))
+                        e.ToolTipText = $"Lý do / Cảnh báo:\n{part.Reason}";
+                    break;
+            }
+        }
+
+        private void DgvTools_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || e.RowIndex >= dgvTools.Rows.Count) return;
+            var row = dgvTools.Rows[e.RowIndex];
+            var tool = row.Tag as BatchToolCandidateViewModel;
+            if (tool == null) return;
+
+            switch (e.ColumnIndex)
+            {
+                case 0:
+                    e.ToolTipText = $"Bộ dao: {tool.ToolId} (FeatureId {tool.FeatureId})";
+                    break;
+                case 1:
+                    e.ToolTipText = $"Chày (Punch): {tool.PunchStatusDisplay}\nTrạng thái tĩnh: {tool.PunchStatus}";
+                    break;
+                case 2:
+                    e.ToolTipText = $"Cối kẹp trên (Holder): {tool.HolderStatusDisplay}\nBằng chứng: {tool.HolderStatus}";
+                    break;
+                case 3:
+                    e.ToolTipText = $"Chuyển động: {tool.MotionDisplay}\nChi tiết: {tool.MotionDetail}";
+                    break;
+                case 4:
+                    e.ToolTipText = $"Đánh giá hình học: {tool.GeometricStatusDisplay}";
+                    break;
+                case 5:
+                    e.ToolTipText = $"Xác minh sản xuất: {tool.ManufacturingStatus}";
+                    break;
+                case 6:
+                    e.ToolTipText = tool.PunchClearanceMm.HasValue ?
+                        $"Khe hở chày: {tool.PunchClearanceMm.Value:+0.00;-0.00} mm" :
+                        "Không có dữ liệu khe hở (clearance)";
+                    break;
+                case 7:
+                    if (!string.IsNullOrWhiteSpace(tool.CombinedReason))
+                        e.ToolTipText = $"Lý do / Bằng chứng:\n{tool.CombinedReason}";
+                    break;
+            }
         }
 
         private void OnToggleOccurrencesClicked(object sender, EventArgs e)
@@ -690,10 +940,15 @@ namespace ADDIN.UI
             using (var form = new Form())
             {
                 form.Text = $"Danh sách chi tiết lặp lại (Occurrences) — {selectedPart.PartName} ({selectedPart.Quantity} chi tiết)";
-                form.Size = new Size(TaiTheme.Px(this, 750), TaiTheme.Px(this, 420));
+                form.Size = new Size(TaiTheme.Px(this, 820), TaiTheme.Px(this, 480));
+                form.MinimumSize = new Size(TaiTheme.Px(this, 650), TaiTheme.Px(this, 350));
                 form.StartPosition = FormStartPosition.CenterParent;
                 form.Font = Font;
                 form.BackColor = TaiTheme.Page;
+                form.ShowIcon = false;
+                form.MinimizeBox = false;
+                form.MaximizeBox = true;
+                form.FormBorderStyle = FormBorderStyle.Sizable;
 
                 var grid = new DataGridView
                 {
@@ -705,23 +960,52 @@ namespace ADDIN.UI
                     MultiSelect = false
                 };
                 GridStyler.ApplyModernStyle(grid);
+                UIHelper.EnableDoubleBuffer(grid);
 
                 grid.Columns.Add("path", "Đường dẫn trong Assembly (Display Path)");
                 grid.Columns.Add("config", "Cấu hình");
                 grid.Columns.Add("kind", "Loại");
                 grid.Columns.Add("status", "Trạng thái");
                 grid.Columns.Add("reason", "Lý do");
-                grid.Columns[0].Width = TaiTheme.Px(this, 300);
-                grid.Columns[1].Width = TaiTheme.Px(this, 100);
-                grid.Columns[2].Width = TaiTheme.Px(this, 90);
-                grid.Columns[3].Width = TaiTheme.Px(this, 100);
+                grid.Columns[0].Width = TaiTheme.Px(this, 320);
+                grid.Columns[1].Width = TaiTheme.Px(this, 110);
+                grid.Columns[2].Width = TaiTheme.Px(this, 95);
+                grid.Columns[3].Width = TaiTheme.Px(this, 110);
                 grid.Columns[4].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
 
-                foreach (var occ in selectedPart.Occurrences)
+                int occRowH = TaiTheme.Px(this, 30);
+                grid.RowTemplate.Height = occRowH;
+                grid.ColumnHeadersHeight = TaiTheme.Px(this, 30);
+
+                Action<string> populateOccurrences = (filter) =>
                 {
-                    int idx = grid.Rows.Add(occ.DisplayPath, occ.Configuration, occ.Kind.ToString(), occ.StatusBadge, occ.Reason);
-                    grid.Rows[idx].Tag = occ;
-                }
+                    grid.Rows.Clear();
+                    string f = (filter ?? string.Empty).Trim().ToLowerInvariant();
+                    foreach (var occ in selectedPart.Occurrences)
+                    {
+                        if (!string.IsNullOrEmpty(f))
+                        {
+                            bool matchPath = (occ.DisplayPath ?? string.Empty).ToLowerInvariant().Contains(f);
+                            bool matchConfig = (occ.Configuration ?? string.Empty).ToLowerInvariant().Contains(f);
+                            bool matchReason = (occ.Reason ?? string.Empty).ToLowerInvariant().Contains(f);
+                            if (!matchPath && !matchConfig && !matchReason) continue;
+                        }
+                        int idx = grid.Rows.Add(occ.DisplayPath, occ.Configuration, occ.Kind.ToString(), occ.StatusBadge, occ.Reason);
+                        grid.Rows[idx].Height = occRowH;
+                        grid.Rows[idx].Tag = occ;
+                    }
+                };
+
+                populateOccurrences(string.Empty);
+
+                grid.CellToolTipTextNeeded += (s, ce) =>
+                {
+                    if (ce.RowIndex >= 0 && ce.ColumnIndex >= 0 && ce.RowIndex < grid.Rows.Count)
+                    {
+                        var cellVal = grid.Rows[ce.RowIndex].Cells[ce.ColumnIndex].Value?.ToString();
+                        if (!string.IsNullOrWhiteSpace(cellVal)) ce.ToolTipText = cellVal;
+                    }
+                };
 
                 grid.DoubleClick += (s, ev) =>
                 {
@@ -732,7 +1016,70 @@ namespace ADDIN.UI
                     }
                 };
 
+                // Search top panel
+                var pnlTop = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = TaiTheme.Px(this, 40),
+                    Padding = new Padding(12, 6, 12, 6),
+                    BackColor = TaiTheme.Surface
+                };
+                var lblSearch = new Label
+                {
+                    Text = "Lọc occurrence:",
+                    Dock = DockStyle.Left,
+                    AutoSize = true,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Font = TaiTheme.Small,
+                    ForeColor = TaiTheme.TextMuted,
+                    Margin = new Padding(0, 4, 8, 0)
+                };
+                var txtOccSearch = new TextBox
+                {
+                    Dock = DockStyle.Fill,
+                    Font = TaiTheme.Body
+                };
+                txtOccSearch.TextChanged += (s, ev) => populateOccurrences(txtOccSearch.Text);
+                pnlTop.Controls.Add(txtOccSearch);
+                pnlTop.Controls.Add(lblSearch);
+
+                // Bottom status & close panel
+                var pnlBottom = new Panel
+                {
+                    Dock = DockStyle.Bottom,
+                    Height = TaiTheme.Px(this, 44),
+                    Padding = new Padding(12, 6, 12, 6),
+                    BackColor = TaiTheme.Surface
+                };
+                var lblStatus = new Label
+                {
+                    Dock = DockStyle.Fill,
+                    Text = $"Tổng số: {selectedPart.Occurrences.Count} occurrence(s) · Nhấp đúp vào dòng để highlight trên viewport SolidWorks",
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Font = TaiTheme.Small,
+                    ForeColor = TaiTheme.TextMuted
+                };
+                var btnOccClose = new ModernButton
+                {
+                    Dock = DockStyle.Right,
+                    Text = "Đóng",
+                    Width = TaiTheme.Px(this, 80),
+                    Height = TaiTheme.Px(this, 30),
+                    Kind = ModernButtonKind.Standard,
+                    Tone = ModernButtonTone.Neutral
+                };
+                btnOccClose.Click += (s, ev) => form.Close();
+                pnlBottom.Controls.Add(lblStatus);
+                pnlBottom.Controls.Add(btnOccClose);
+
                 form.Controls.Add(grid);
+                form.Controls.Add(pnlTop);
+                form.Controls.Add(pnlBottom);
+
+                form.CancelButton = btnOccClose;
+                form.KeyPreview = true;
+                form.KeyDown += (s, ev) => { if (ev.KeyCode == Keys.Escape) form.Close(); };
+
                 form.ShowDialog(this);
             }
         }
@@ -819,7 +1166,7 @@ namespace ADDIN.UI
                 g.SmoothingMode = SmoothingMode.AntiAlias;
 
                 int pillH = TaiTheme.Px(this, 22);
-                int pillW = TaiTheme.Px(this, 95);
+                int pillW = Math.Min(e.CellBounds.Width - 10, TaiTheme.Px(this, 100));
                 int pillX = e.CellBounds.X + (e.CellBounds.Width - pillW) / 2;
                 int pillY = e.CellBounds.Y + (e.CellBounds.Height - pillH) / 2;
                 var pillRect = new Rectangle(pillX, pillY, pillW, pillH);
