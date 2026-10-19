@@ -11,6 +11,40 @@ using SolidWorks.Interop.sldworks;
 
 internal static partial class NativeAssemblyBatchValidation
 {
+    private static int LifecycleMain(string[] args)
+    {
+        if(args.Length!=2)return 2;string output=Path.GetFullPath(args[1]);Directory.CreateDirectory(output);
+        ISldWorks app=null;Control control=null;var report=new Dictionary<string,object>();int code=1;
+        try
+        {
+            Application.EnableVisualStyles();product=Assembly.LoadFrom(args[0]);app=NativeTestProcess.StartOwned(output);int pid=app.GetProcessID();
+            control=(Control)Activator.CreateInstance(product.GetType("ADDIN.BomTaskPaneControl",true));
+            Call(control,"Init",app);Check(Get(control,"makeHoleUpdateTimer")!=null,"Control starts its real update monitor");
+            Call(control,"ShutdownFromSolidWorks");Call(control,"ShutdownFromSolidWorks");
+            Check(Get(control,"makeHoleUpdateTimer")==null,"Shutdown disposes timer that rooted disposed pane and application RCW in native dump");
+            Check(Get(control,"componentDrawingTimer")==null&&Get(control,"initialLayoutTimer")==null,"All pane timers released");
+            Check(Get(control,"balloonChecker")==null&&Get(control,"swApp")==null,"Command/application roots detached");
+            var addin=Activator.CreateInstance(product.GetType("ADDIN.SwAddin",true));
+            product.GetType("ADDIN.SwAddin").GetField("swApp",All).SetValue(addin,app);
+            product.GetType("ADDIN.SwAddin").GetField("InstanceSwApp",All).SetValue(null,app);
+            Check((bool)Call(addin,"DisconnectFromSW"),"First disconnect completes");
+            Check(app.GetProcessID()==pid,"Borrowed host RCW remains usable by its original client");
+            Check(product.GetType("ADDIN.SwAddin").GetField("InstanceSwApp",All).GetValue(null)==null,"Static application root cleared");
+            Check((bool)Call(addin,"DisconnectFromSW"),"Repeated disconnect remains idempotent");report["FunctionalResult"]="PASS";code=0;
+        }
+        catch(Exception ex){report["FunctionalResult"]="FAIL";report["Error"]=ex.ToString();}
+        finally
+        {
+            // A failing baseline test must not leave the diagnostic client timer
+            // running. This cleanup does not turn its failed assertion into PASS.
+            if(control!=null){var timer=Get(control,"makeHoleUpdateTimer") as System.Windows.Forms.Timer;if(timer!=null){timer.Stop();timer.Dispose();report["FailureCleanupStoppedTimer"]=true;}control.Dispose();}
+            if(app!=null)try{NativeTestProcess.RestoreCommandScope(app);app.ExitApp();}catch(Exception ex){report["ShutdownError"]=ex.ToString();}
+            int? exit=NativeTestProcess.WaitForOwnedExit(10000);report["ShutdownExitCode"]=exit;report["ShutdownResult"]=exit==0?"PASS":exit.HasValue?"FAIL":"NOT_CONFIRMED";
+            report["Assertions"]=assertions;report["Result"]=code==0&&exit==0?"PASS":"FAIL";
+            File.WriteAllText(Path.Combine(output,"lifecycle-result.json"),Json.Serialize(report));if(exit!=0)code=1;
+        }
+        Console.WriteLine(Json.Serialize(report));return code;
+    }
     private static int SeedMain(string[] args)
     {
         if(args.Length!=2)return 2;string output=Path.GetFullPath(args[0]);Directory.CreateDirectory(output);ISldWorks app=null;
@@ -106,7 +140,7 @@ internal static partial class NativeAssemblyBatchValidation
             report["Assertions"] = assertions; report["FunctionalResult"] = report["Result"];
             if (app != null)
             {
-                try { app.ExitApp(); } catch (Exception ex) { report["ShutdownError"] = ex.ToString(); }
+                try { NativeTestProcess.RestoreCommandScope(app); app.ExitApp(); } catch (Exception ex) { report["ShutdownError"] = ex.ToString(); }
                 int? exit = NativeTestProcess.WaitForOwnedExit(10000);
                 report["ShutdownExitCode"] = exit;
                 report["ShutdownResult"] = exit == 0 && !report.ContainsKey("ShutdownError") ? "PASS" : exit.HasValue ? "FAIL" : "NOT_CONFIRMED";

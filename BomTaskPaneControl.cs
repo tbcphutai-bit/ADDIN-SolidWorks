@@ -130,6 +130,7 @@ namespace ADDIN
         private string lastSelectedViewKey;
 
         private bool solidWorksClosing;
+        private bool taskPaneShutdownDone;
 
         private bool repairHolePanelMode;
 
@@ -401,6 +402,7 @@ namespace ADDIN
             swApp = app;
 
             solidWorksClosing = false;
+            taskPaneShutdownDone = false;
 
             StartComponentDrawingTimer();
 
@@ -481,6 +483,17 @@ namespace ADDIN
         public void ShutdownFromSolidWorks()
 
         {
+            if (taskPaneShutdownDone) return;
+            taskPaneShutdownDone = true;
+            solidWorksClosing = true;
+            // A native dump showed this timer strongly rooting the disposed
+            // pane and CheckBalloon's application RCW during CLR shutdown.
+            var monitor = makeHoleUpdateTimer; makeHoleUpdateTimer = null;
+            if (monitor != null) { monitor.Stop(); monitor.Tick -= MakeHoleUpdateTimer_Tick; monitor.Dispose(); }
+            DisposeComponentDrawingTimer();
+            DisposeInitialLayoutTimer();
+            DetachSolidWorksEvents();
+            balloonChecker = null;
             assemblyHoleChecker?.CloseResults();
             assemblyHoleChecker = null;
 
@@ -545,6 +558,8 @@ namespace ADDIN
             vCutPropertySetupCommand = null;
 
             drawingBomChecker = null;
+
+            balloonChecker = null;
 
             swApp = null;
 

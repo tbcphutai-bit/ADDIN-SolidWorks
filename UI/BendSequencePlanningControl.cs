@@ -14,7 +14,7 @@ namespace ADDIN.UI
     internal sealed class BendSequencePlanningControl : UserControl
     {
         private readonly DataGridView tools = Grid("sequenceTools"), sequences = Grid("sequenceOptions"), timeline = Grid("sequenceTimeline"), phases = Grid("sequencePhases");
-        private readonly Label summary = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
+        private readonly Label summary = new Label { Name = "sequenceSummary", Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
         private readonly TextBox evidence = new TextBox { Name = "sequenceEvidence", Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false };
         private readonly ComboBox filter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230 };
         private readonly CheckBox pin = new CheckBox { AutoSize = true, Text = "Giữ dao / thứ tự đang xem" };
@@ -67,7 +67,8 @@ namespace ADDIN.UI
             result = value; missingReason = reason;
             WithDisplay(() => {
                 summary.Text = sample ? "PREVIEW · dữ liệu mẫu" : value == null ? "Chưa có dữ liệu quá trình" :
-                    $"{value.CommonToolIds.Count}/18 có chứng minh* · {value.ElapsedMilliseconds:0} ms · {value.CacheHits}/{value.CacheMisses} hit/miss · CHƯA XÁC MINH";
+                    (value.EvidenceLevel==SequenceEvidenceLevel.SimulationOnly?"SIMULATION":value.EvidenceLevel==SequenceEvidenceLevel.ReviewedSourceGraph?"REVIEWED":"UNKNOWN") +
+                    $" · {value.CommonToolIds.Count}/18 · {value.ElapsedMilliseconds:0} ms · CHƯA XÁC MINH";
                 BindToolsCore();
             });
         }
@@ -103,6 +104,8 @@ namespace ADDIN.UI
                 if (tools.Rows.Count > 0)
                 {
                     var row = pin.Checked ? tools.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => Convert.ToString(r.Cells[0].Value) == pinnedTool) : null;
+                    if(row==null&&!pin.Checked&&result?.PreferredCheckedSequence!=null)
+                        row=tools.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Convert.ToString(r.Cells[0].Value)==result.PreferredCheckedSequence.ToolId);
                     row = row ?? tools.Rows[0]; tools.CurrentCell = row.Cells[0]; row.Selected = true;
                 }
             }
@@ -130,6 +133,8 @@ namespace ADDIN.UI
                 if (sequences.Rows.Count > 0)
                 {
                     var row = pin.Checked ? sequences.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => Convert.ToString(r.Cells[0].Value) == pinnedSequence) : null;
+                    if(row==null&&!pin.Checked&&result.PreferredCheckedSequence?.ToolId==tool.ToolId)
+                        row=sequences.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>ReferenceEquals(r.Tag,result.PreferredCheckedSequence));
                     row = row ?? sequences.Rows[0]; sequences.CurrentCell = row.Cells[0];
                 }
             }

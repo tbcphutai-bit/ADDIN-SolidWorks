@@ -12,7 +12,13 @@ using Environment=System.Environment;
 
 internal static class ToolLibraryProgram
 {
-    [STAThread] private static int Main(string[] args) => NativePlanningValidation.RunToolLibrary(args);
+    [STAThread] private static int Main(string[] args)
+    {
+        int code=NativePlanningValidation.RunToolLibrary(args);int? exit=NativeTestProcess.WaitForOwnedExit(10000);
+        if(args.Length>1)File.WriteAllText(Path.Combine(args[1],"native-server-shutdown.json"),new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new{
+            FunctionalExitCode=code,ShutdownExitCode=exit,ShutdownResult=exit==0?"PASS":exit.HasValue?"FAIL":"NOT_CONFIRMED"}));
+        return code!=0?code:exit==0?0:1;
+    }
 }
 internal static partial class NativePlanningValidation
 {
@@ -229,7 +235,7 @@ internal static partial class NativePlanningValidation
             report["assertions"]=checks;
             if (output!=null) File.WriteAllText(Path.Combine(output,"PRIVATE-library-native.json"),Json.Serialize(report));
             if (owned && app!=null)
-            { try {foreach(ModelDoc2 doc in app.GetDocuments() as object[]??new object[0]) if(doc.GetPathName().StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)) app.CloseDoc(doc.GetTitle());app.ExitApp();}catch(Exception ex){Console.WriteLine("Cleanup: "+ex.Message);} }
+            { try {NativeTestProcess.RestoreCommandScope(app);foreach(ModelDoc2 doc in app.GetDocuments() as object[]??new object[0]) if(doc.GetPathName().StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase)) app.CloseDoc(doc.GetTitle());app.ExitApp();}catch(Exception ex){Console.WriteLine("Cleanup: "+ex.Message);} }
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY",oldDirectory); Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST",oldManifest);
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",oldEvidence);
             Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",oldPlacement);

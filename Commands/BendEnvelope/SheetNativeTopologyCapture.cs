@@ -93,7 +93,8 @@ namespace ADDIN.Commands.BendEnvelope
                 return new NativeEnvelopeBody(id, native.GetType() == 0, native.GetFaceCount(), native.GetEdgeCount(), edgeData, faceData,circles:circles);
             }
             catch (Exception ex)
-            { return new NativeEnvelopeBody(id, false, 0, 0, null, null, "NATIVE_TOPOLOGY_CAPTURE_FAILED:" + ex.GetType().Name); }
+            { BendNativeCaptureDiagnostics.Failure(ex,"NativeEnvelope.Copy."+id);
+                return new NativeEnvelopeBody(id, false, 0, 0, null, null, "NATIVE_TOPOLOGY_CAPTURE_FAILED:" + ex.GetType().Name); }
             finally {Interlocked.Add(ref captureTicks,timer.ElapsedTicks);}
         }
     }

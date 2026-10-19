@@ -295,6 +295,17 @@ internal static class BendAssemblyUiTests
     }
     private static void UnifiedNavigationTests()
     {
+        Test("unified: imported signed simulation reaches existing 18-tool timeline with explicit evidence label",()=>{
+            var imported=ToolProfileTests.ImportedUiFixture();
+            var raw=new AssemblyPartResult("IMPORTED",new[]{Occ()},null,new[]{Geometry(7),Geometry(42)},null,2,true,()=>null,imported.Item1);
+            using(var form=new BendAssemblyBatchForm())
+            {
+                form.Show();form.BindSnapshot(Snapshot(raw));((TabControl)Control(form,"checkChanDetailTabs")).SelectedIndex=1;Application.DoEvents();
+                Check(((DataGridView)Control(form,"sequenceTools")).Rows.Count==18&&((DataGridView)Control(form,"sequenceOptions")).Rows.Count==2,"File-import planner is rendered, not placeholder rows");
+                Check(Control(form,"sequenceSummary").Text.StartsWith("SIMULATION")&&Control(form,"sequenceEvidence").Text.Contains("SimulationOnly"),"Simulation and reviewed evidence are direct labels");
+                imported.Item2.Lease.Invalidate();form.ClearLive("STALE_PROCESS_ARTIFACT");Check(((DataGridView)Control(form,"sequenceOptions")).Rows.Count==0,"Stale imported proof is removed");form.Close();
+            }
+        });
         Test("unified: real numeric planner -> 18 tools -> sequence -> native timeline -> independent phase witnesses", () => {
             var fixture = ToolProfileTests.SequenceUiFixture();
             var raw = new AssemblyPartResult("S", new[] { Occ() }, null, new[] { Geometry(7), Geometry(42) }, null, 2, true, () => null, fixture.Item1);
@@ -305,6 +316,10 @@ internal static class BendAssemblyUiTests
                 var tools = (DataGridView)Control(form, "sequenceTools"); var options = (DataGridView)Control(form, "sequenceOptions");
                 var timeline = (DataGridView)Control(form, "sequenceTimeline"); var phases = (DataGridView)Control(form, "sequencePhases");
                 Check(tools.Rows.Count == 18 && options.Rows.Count == 2, "Actual planner results bound lazily for one tool");
+                Check(ReferenceEquals(options.CurrentRow.Tag,fixture.Item1.PreferredCheckedSequence)&&
+                    ((BendSequenceResult)options.CurrentRow.Tag).ToolTypeCount==1&&((BendSequenceResult)options.CurrentRow.Tag).ToolChangeCount==0,
+                    "Default selection prefers a proven one-tool route with zero changes; simulation label remains");
+                tools.CurrentCell=tools.Rows[0].Cells[0];Application.DoEvents();
                 Check(options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "COLLISION") &&
                     options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "CLEAR"), "Different orders and actual numeric statuses visible");
                 var clear = options.Rows.Cast<DataGridViewRow>().First(r => Convert.ToString(r.Cells[1].Value) == "CLEAR");

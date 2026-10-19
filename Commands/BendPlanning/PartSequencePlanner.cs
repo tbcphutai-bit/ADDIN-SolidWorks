@@ -107,7 +107,7 @@ namespace ADDIN.Commands.BendPlanning
                 (p.Entities?.Sum(e => 1024L + (e.Curves?.Count ?? 0) * 512L) ?? 0)) ?? 0)) ?? 0;
             string missing = !options.Valid ? "INVALID_SEQUENCE_SEARCH_POLICY" : string.IsNullOrWhiteSpace(source) ? "MISSING_PART_SOURCE_IDENTITY" : model == null ? "MISSING_NATIVE_MODEL" :
                 model.Bends.Count == 0 ? "NO_BENDS_TO_PLAN" : space == null ? "MISSING_PROCESS_STATE_GRAPH_AND_KINEMATIC_SOURCE" :
-                !ReferenceEquals(space.Model, model) ? "SEQUENCE_MODEL_IDENTITY_MISMATCH" : space.Reasons.FirstOrDefault();
+                !ReferenceEquals(space.Model, model) ? "SEQUENCE_MODEL_IDENTITY_MISMATCH" : space.InputReasons.FirstOrDefault() ?? space.Reasons.FirstOrDefault();
             string scopeKey = ToolEvidenceCanonical.Hash("SequenceNumericCacheV1", source, AssemblyCacheKeys.TokenOf(model),
                 AssemblyCacheKeys.TokenOf(space), space?.PayloadSha256, AssemblyCacheKeys.Catalog(library), options.Canonical);
             var byState = space?.Transitions.GroupBy(t => t.BeforeStateId).ToDictionary(g => g.Key,
@@ -145,8 +145,8 @@ namespace ADDIN.Commands.BendPlanning
                         {
                             if (stored >= options.MaximumResults) { stop = "SEQUENCE_RESULT_MEMORY_BUDGET_EXCEEDED"; break; }
                             var edge = edges[i];
-                            string punch = edge.Plan.Segments.First().Punch?.SourceCanonical;
-                            string holder = edge.Plan.Segments.First().Holder?.SourceCanonical;
+                            string punch = edge.Plan.Segments.First().Punch?.AssemblyCanonical;
+                            string holder = edge.Plan.Segments.First().Holder?.AssemblyCanonical;
                             if (node.Setup != null && (node.Setup != edge.SetupIdentitySha256 || node.PunchSource != punch || node.HolderSource != holder))
                             { unknownFrontier = true; reasons.Add("INCONSISTENT_WHOLE_PART_PUNCH_HOLDER_SETUP"); continue; }
                             if (node.Previous != null && new[] { CollisionPairKind.WorkpiecePunch, CollisionPairKind.WorkpieceHolder }.Any(pair =>

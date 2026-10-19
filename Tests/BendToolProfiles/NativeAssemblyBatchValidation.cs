@@ -112,7 +112,17 @@ internal static partial class NativeAssemblyBatchValidation
     {
         if(args.Length>0 && args[0]=="--create-seed") return SeedMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--part-ui") return UnifiedPartMain(args.Skip(1).ToArray());
-        if(args.Length>0 && args[0]=="--ui") return UiMain(args.Skip(1).ToArray());
+        if(args.Length>0 && args[0]=="--lifecycle") return LifecycleMain(args.Skip(1).ToArray());
+        bool ui=args.Length>0&&args[0]=="--ui";
+        int code=ui?UiMain(args.Skip(1).ToArray()):AssemblyMain(args);
+        int? exit=NativeTestProcess.WaitForOwnedExit(10000);
+        string folder=ui?(args.Length>2?args[2]:null):(args.Length>1?args[1]:null);
+        if(folder!=null&&Directory.Exists(folder))File.WriteAllText(Path.Combine(folder,"native-server-shutdown.json"),Json.Serialize(new{
+            FunctionalExitCode=code,ShutdownExitCode=exit,ShutdownResult=exit==0?"PASS":exit.HasValue?"FAIL":"NOT_CONFIRMED"}));
+        return code!=0?code:exit==0?0:1;
+    }
+    private static int AssemblyMain(string[] args)
+    {
         // dll, output(new), sheet-metal seed, seed length dimension, assembly
         // template, min workbook. Source files are only copied/read, never saved.
         if(args.Length!=6) {Console.WriteLine("dll output seed dimension assembly-template min-xlsx");return 2;}
@@ -308,7 +318,7 @@ internal static partial class NativeAssemblyBatchValidation
             File.WriteAllText(Path.Combine(output,"assembly-batch-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;
         }
         catch(Exception ex){report["Result"]="FAIL";report["Assertions"]=assertions;report["Error"]=ex.ToString();if(args.Length>1)File.WriteAllText(Path.Combine(args[1],System.Environment.GetEnvironmentVariable("ADDIN_ASSEMBLY_EDGE_ONLY")=="1"?"assembly-edge-result.json":"assembly-batch-result.json"),Json.Serialize(report));Console.WriteLine(ex);return 1;}
-        finally {foreach(var d in disposable)d.Dispose();if(app!=null&&owned){try{app.CloseAllDocuments(true);app.ExitApp();}catch{}}}
+        finally {foreach(var d in disposable)d.Dispose();if(app!=null&&owned){try{NativeTestProcess.RestoreCommandScope(app);app.CloseAllDocuments(true);app.ExitApp();}catch{}}}
     }
     private static object CallStatic(string type,string method,params object[] args)
     {try{return T(type).GetMethods(All).Single(m=>m.Name==method&&m.GetParameters().Length==args.Length).Invoke(null,args);}catch(TargetInvocationException ex){throw ex.InnerException??ex;}}

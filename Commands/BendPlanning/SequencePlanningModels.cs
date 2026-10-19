@@ -49,6 +49,9 @@ namespace ADDIN.Commands.BendPlanning
         { Transition = transition; Pairs = PlacementLists.Copy(pairs); }
         private CollisionStatus Combine(CollisionPairKind pair)
         {
+            var poses=Transition.Plan.Segments.Select(s=>s.Tool(pair)).ToArray();
+            if(poses.Length==0||poses.Any(p=>p==null)||poses.Select(p=>p.AssemblyCanonical).Distinct().Count()!=1||
+                Enumerable.Range(1,poses.Length-1).Any(i=>!BendProcessPlan.Joins(poses[i-1].Motion,poses[i].Motion)))return CollisionStatus.UNKNOWN;
             var rows = Pairs.Where(p => p.Pair == pair).ToArray();
             if (rows.Any(p => p.ProcessPayloadSha256 != Transition.Plan.PayloadSha256 || p.ModelSnapshotId != Transition.Plan.Binding.ModelSnapshotId ||
                 p.FrameId != Transition.Plan.Binding.FrameId || !Transition.Plan.Segments.Any(s => s.Id == p.SegmentId && s.Phase == p.Phase)))
@@ -73,6 +76,10 @@ namespace ADDIN.Commands.BendPlanning
         public IReadOnlyList<SequenceStepResult> Steps { get; }
         public bool ReachesAllBends { get; }
         public bool SimulationOnly { get; }
+        public int ToolTypeCount => Steps.Select(s=>s.Transition.ToolId).Distinct(StringComparer.Ordinal).Count();
+        public int ToolChangeCount => Enumerable.Range(1,Math.Max(0,Steps.Count-1)).Count(i=>
+            Steps[i-1].Transition.ToolId!=Steps[i].Transition.ToolId ||
+            Steps[i-1].Transition.SetupIdentitySha256!=Steps[i].Transition.SetupIdentitySha256);
         public CollisionStatus Status => invalid() != null ? CollisionStatus.UNKNOWN : Steps.Any(s => s.Status == CollisionStatus.COLLISION) ?
             CollisionStatus.COLLISION : ReachesAllBends && Steps.Count > 0 && Steps.All(s => s.Status == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
         public string Reason => invalid() ?? (Status == CollisionStatus.COLLISION ? "WITNESSED_SEQUENCE_BRANCH_COLLISION" :
@@ -116,6 +123,15 @@ namespace ADDIN.Commands.BendPlanning
         public string WinnerToolId => null;
         public IReadOnlyList<SequenceToolResult> Tools { get; }
         public IReadOnlyList<string> CommonToolIds => PlacementLists.Copy(Current ? Tools.Where(t => t.Decision == SequenceToolDecision.ProvenInCheckedScope).Select(t => t.ToolId) : new string[0]);
+        // Preference within proven supplied process paths, never manufacturing
+        // approval. UNKNOWN/rejected paths are not eligible for preference.
+        // The present solver proves single-setup paths only: it must not invent
+        // an unprovided inter-tool changeover movement to produce a fallback.
+        public BendSequenceResult PreferredCheckedSequence => !Current ? null : Tools.SelectMany(t=>t.Sequences)
+            .Where(s=>s.ReachesAllBends&&s.Status==CollisionStatus.CLEAR)
+            .OrderBy(s=>s.ToolTypeCount).ThenBy(s=>s.ToolChangeCount)
+            .ThenBy(s=>s.ToolId,StringComparer.Ordinal)
+            .ThenBy(s=>string.Join(",",s.Steps.Select(step=>step.FeatureId)),StringComparer.Ordinal).FirstOrDefault();
         public int VisitedNodes { get; }
         public int KernelQueries { get; }
         public int CacheHits { get; }

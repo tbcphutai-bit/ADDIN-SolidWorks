@@ -261,6 +261,9 @@
     <Compile Include="Commands\BendAssembly\AssemblyBendMetadata.cs" />
     <Compile Include="Commands\BendPlanning\SequencePlanningModels.cs" />
     <Compile Include="Commands\BendPlanning\PartSequencePlanner.cs" />
+    <Compile Include="Commands\BendPlanning\ProcessPackageRecords.cs" />
+    <Compile Include="Commands\BendPlanning\ProcessPackageImporter.cs" />
+    <Compile Include="Commands\BendPlanning\ProcessProgramProvider.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolDxfReader.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileLibrary.cs" />

@@ -26,6 +26,7 @@ namespace ADDIN
         private int addinID;
         private ITaskpaneView swTaskPane;
         private BomTaskPaneControl uiControl;
+        private bool disconnecting;
 
         public void OpenStandaloneCurveMacro(string selectedPartNumbers)
         {
@@ -70,11 +71,17 @@ namespace ADDIN
 
         public bool DisconnectFromSW()
         {
-            UnloadTaskPane();
-            if (swApp != null)
+            if (disconnecting) return true;
+            disconnecting = true;
+            try { UnloadTaskPane(); }
+            finally
             {
-                TryReleaseComObject(swApp);
+                // ThisSW is borrowed from the host and shared by commands and
+                // other managed clients. Explicitly decrementing that RCW can
+                // disconnect a still-live client; never FinalRelease it.
+                if (ReferenceEquals(InstanceSwApp, swApp)) InstanceSwApp = null;
                 swApp = null;
+                disconnecting = false;
             }
             return true;
         }
@@ -113,33 +120,36 @@ namespace ADDIN
 
         private void UnloadTaskPane()
         {
-            if (uiControl != null)
+            // Retire fields before native/WinForms teardown can re-enter this
+            // callback. Delete the native view once, then dispose any remaining
+            // managed control; its Disposed handler may call shutdown again.
+            var control = uiControl; uiControl = null;
+            var view = swTaskPane; swTaskPane = null;
+            if (control != null)
             {
                 try
                 {
-                    uiControl.ShutdownFromSolidWorks();
-                    uiControl.Dispose();
+                    control.ShutdownFromSolidWorks();
                 }
                 catch
                 {
                 }
 
-                uiControl = null;
             }
 
-            if (swTaskPane != null)
+            if (view != null)
             {
                 try
                 {
-                    swTaskPane.DeleteView();
+                    view.DeleteView();
                 }
                 catch
                 {
                 }
 
-                TryReleaseComObject(swTaskPane);
-                swTaskPane = null;
+                TryReleaseComObject(view);
             }
+            if (control != null && !control.IsDisposed) try { control.Dispose(); } catch (Exception ex) { Trace.WriteLine("Taskpane disposal: " + ex); }
         }
 
         private static void TryReleaseComObject(object comObject)

@@ -35,6 +35,16 @@ namespace ADDIN.Commands
     internal sealed partial class BendCheckSession
     {
         private readonly AssemblyBatchCoordinator assemblyCoordinator = new AssemblyBatchCoordinator();
+        private readonly ProcessProgramProvider processPrograms = new ProcessProgramProvider();
+        private static async Task<AssemblyProgramData> ReadProcessProgramAsync(ProcessProgramProvider provider, string source, string path, PlacementModelCapture model,
+            ToolProfileLibrarySnapshot library, CancellationToken token)
+        {
+            var imported = await provider.ReadAsync(source, path, model, library, token).ConfigureAwait(false);
+            // Alternative process states belong to the sequence graph. They
+            // are not the one observed final sheet envelope or a single plan
+            // for the legacy per-bend static/process comparison.
+            return new AssemblyProgramData(use: imported.Use, revision: imported.Revision, sequence: imported.Sequence);
+        }
         private AssemblyNativeBatchOperation assemblyOperation;
         private PlacementLease assemblySceneLease;
         private string assemblyPoseState;
@@ -122,7 +132,7 @@ namespace ADDIN.Commands
         private void InvalidateAssemblyBackend()
         { assemblySceneLease?.Invalidate(); assemblyOperation?.Invalidate(); partOperation?.Invalidate(); }
         private void DisposeAssemblyBackend()
-        { InvalidateAssemblyBackend(); assemblyCoordinator.Dispose(); nativeInventoryReferences.Clear(); }
+        { InvalidateAssemblyBackend(); assemblyCoordinator.Dispose(); processPrograms.Dispose(); nativeInventoryReferences.Clear(); }
 
         internal sealed class AssemblyNativeBatchOperation
         {
@@ -142,8 +152,14 @@ namespace ADDIN.Commands
             private Task<Dictionary<string,string>> files;
             private Task<AssemblyBatchSnapshot> work;
             private Task<ToolProfileLibrarySnapshot> toolVerification;
+            private Task processVerification;
+            private Task<AssemblyProgramData> pendingProgram;
+            private string pendingSourceKey;
+            private int preparedIndex = -1;
             private DateTime nextFiles;
             private int index, captures, hits;
+            private volatile bool nativeCaptureActive;
+            internal bool NativeCaptureActive => nativeCaptureActive;
             private double captureMs;
             private bool validatingPublication;
             private readonly Stopwatch operationClock=Stopwatch.StartNew();
@@ -174,6 +190,7 @@ namespace ADDIN.Commands
             {
                 owner.RequireAssemblySta();
                 if (maximumCaptures < 1) throw new ArgumentOutOfRangeException(nameof(maximumCaptures));
+                owner.processPrograms.Poll();
                 if (completion.Task.IsCompleted) { owner.toolLibrary.Poll();owner.PollAssemblyBackend(); return; }
                 try
                 {
@@ -208,21 +225,35 @@ namespace ADDIN.Commands
                         int captured=0;
                         while(index<owner.Items.Count && captured<maximumCaptures)
                         {
-                            var item=owner.Items[index++]; var clock=Stopwatch.StartNew(); bool existing=item.Done;
+                            var item=owner.Items[index];
                             bool hasEligible=item.AssemblyOccurrences.Any(o=>AssemblyOccurrenceEligibility.Reason(o)==null);
-                            if (lease.Current && !token.IsCancellationRequested && item.Error==null&&hasEligible) owner.Capture(item,minimum);
-                            if(existing&&lease.Current)item.Context?.SetSource(minimum);
-                            if (existing && item.PlacementCapture!=null) hits++; else if (item.PlacementCapture!=null) captures++;
-                            clock.Stop(); captureMs+=clock.Elapsed.TotalMilliseconds; MaximumStaCaptureMilliseconds=Math.Max(MaximumStaCaptureMilliseconds,clock.Elapsed.TotalMilliseconds);
-                            string revision; revisions.TryGetValue(item.Path??"",out revision);
-                            string key=ToolEvidenceCanonical.Hash("NativeAssemblySourceV1",item.Key,revision,item.Stamp.ToString(),minimum?.Snapshot?.RuntimeCatalogSha256);
-                            var model=item.PlacementCapture; var data=model==null||!lease.Current||!hasEligible?null:programs?.Invoke(key,model);
+                            if (preparedIndex != index)
+                            {
+                                var clock=Stopwatch.StartNew(); bool existing=item.Done;
+                                if (lease.Current && !token.IsCancellationRequested && item.Error==null&&hasEligible)
+                                {
+                                    nativeCaptureActive=true;
+                                    try { owner.Capture(item,minimum); }
+                                    finally { nativeCaptureActive=false; }
+                                }
+                                if(existing&&lease.Current)item.Context?.SetSource(minimum);
+                                if (existing && item.PlacementCapture!=null) hits++; else if (item.PlacementCapture!=null) captures++;
+                                clock.Stop(); captureMs+=clock.Elapsed.TotalMilliseconds; MaximumStaCaptureMilliseconds=Math.Max(MaximumStaCaptureMilliseconds,clock.Elapsed.TotalMilliseconds);
+                                string revision; revisions.TryGetValue(item.Path??"",out revision);
+                                pendingSourceKey=ToolEvidenceCanonical.Hash("NativeAssemblySourceV1",item.Key,revision,item.Stamp.ToString(),minimum?.Snapshot?.RuntimeCatalogSha256);
+                                preparedIndex=index;
+                                pendingProgram=item.PlacementCapture==null||!lease.Current||!hasEligible?Task.FromResult<AssemblyProgramData>(null):
+                                    programs!=null?Task.FromResult(programs(pendingSourceKey,item.PlacementCapture)):
+                                    ReadProcessProgramAsync(owner.processPrograms,pendingSourceKey,item.Path,item.PlacementCapture,owner.ToolLibrary,token);
+                            }
+                            if (!pendingProgram.IsCompleted) return;
+                            var model=item.PlacementCapture; var data=pendingProgram.GetAwaiter().GetResult(); string key=pendingSourceKey;
                             string sourceReason=item.Error??(model==null&&hasEligible?item.PlacementDiagnosticError??"MISSING_NATIVE_CAPTURE":null);
                             // Min preserves its file/config grouping; Batch separates
                             // healthy occurrences and individual unsupported instances.
                             sources.AddRange(AssemblyOccurrenceEligibility.Partition(key,model,item.AssemblyOccurrences,
                                 data?.Envelopes,data?.Setups,data?.Plans,data?.Use,sourceReason,data?.ConditionsRevision,data?.Sequence,ReadMinimumMetadata(item)));
-                            captured++;
+                            index++; captured++;
                         }
                         if (index<owner.Items.Count) return;
                         owner.PollAssemblyBackendCore(true);
@@ -232,8 +263,9 @@ namespace ADDIN.Commands
                     }
                     if (!work.IsCompleted) return;
                     if(!lease.Current){Result=work.GetAwaiter().GetResult();completion.TrySetResult(Result);return;}
-                    if (!validatingPublication) { files=ReadFiles(paths);toolVerification=owner.toolLibrary.VerifyForPublicationAsync();validatingPublication=true; return; }
-                    if (!files.IsCompleted || !toolVerification.IsCompleted) return;
+                    if (!validatingPublication) { files=ReadFiles(paths);toolVerification=owner.toolLibrary.VerifyForPublicationAsync();processVerification=owner.processPrograms.VerifyForPublicationAsync();validatingPublication=true; return; }
+                    if (!files.IsCompleted || !toolVerification.IsCompleted || !processVerification.IsCompleted) return;
+                    processVerification.GetAwaiter().GetResult();
                     CheckRevisions(files.GetAwaiter().GetResult()); files=null;
                     var verifiedLibrary=toolVerification.GetAwaiter().GetResult();
                     if(!ReferenceEquals(verifiedLibrary,owner.ToolLibrary)||!verifiedLibrary.Current)
