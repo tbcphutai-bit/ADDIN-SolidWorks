@@ -149,6 +149,6 @@ Decision rules applied:
 1. Source commit under test: `0e7c336b9ba25c6fe29b798e1ae1d6248cbe8305`
 2. Report file: `docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md`
 3. Branch: `feat/check-hole-connection-groups-cg1`
-4. Draft PR: Created via GitHub CLI (`gh pr create --draft`) for review.
+4. Draft PR: https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/27
 
 > Mandatory GitHub report URL: https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md
