@@ -6,6 +6,7 @@ param(
     [ValidateSet('Inspect','Deploy','Restore')]
     [string]$Mode = 'Inspect',
     [switch]$Approved,
+    [switch]$ConfirmTemporaryCG1Replacement,
     [string]$InstalledDll = 'C:\Tao moi\ADDIN.dll',
     [string]$TestDll = 'C:\Tao moi\ADDIN-AutoFrameJoint-Launcher\bin\x64\Debug\ADDIN.dll',
     [string]$BackupRoot = 'C:\Tao moi\ADDIN-AutoFrameJoint-HostBackup',
@@ -14,7 +15,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$ExpectedInstalledSha256 = 'F8D0A4AC2E77A93B2D008EE213BAEFBE6E57EDD29ECBDAA5A7AFA5C505BDD126'
+$ExpectedInstalledSha256 = 'D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E'
+# Pinned to the exact currently installed Check Hole CG1 Release baseline.
+# A DIFFERENT installed hash means STOP and re-review, not bypass.
 $ExpectedTestSha256 = '643A093D78C64A638F0E050C4E6F9145AC54305A6F1F2A86D398A75EB8ED0D5B'
 $SwAddinClsid = '{D1C7F4B2-9A1E-4B5C-B234-A1B2C3D4E5F6}'
 
@@ -120,6 +123,11 @@ if (-not $Approved) {
 AssertClosed
 
 if ($Mode -eq 'Deploy') {
+    if (-not $ConfirmTemporaryCG1Replacement) {
+        throw "Deploy would temporarily replace the installed Check Hole CG1 Release. Explicit -ConfirmTemporaryCG1Replacement is required."
+    }
+    Write-Host "WARNING: Test DLL temporarily replaces current Check Hole CG1 Release."
+    Write-Host "The exact CG1 DLL and PDB will be backed up and MUST be restored after host test."
     AssertRegisteredAtInstalledLocation
     if ((Sha $InstalledDll) -ne $ExpectedInstalledSha256) {
         throw "Installed DLL SHA256 changed since Antigravity audit. STOP; re-review."
