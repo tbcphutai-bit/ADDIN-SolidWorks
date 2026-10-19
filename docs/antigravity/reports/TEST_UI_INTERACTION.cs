@@ -1,17 +1,18 @@
-// CG1 Review #5 & #6: WinForms UI interaction & safety test for Check Hole & "Nhóm liên kết".
+// CG1 Review #5, #6 & #7: WinForms UI interaction & safety test for Check Hole & "Nhóm liên kết".
 // C# 7.3 / .NET Framework 4.8.
 // Verifies:
-// 1. Fail-closed sandbox enforcement, component references under sandbox, dirty check,
-//    feature-tree signature invariance, marker checks, and disk file SHA256 invariance.
-// 2. WinForms toolbar button "Nhóm liên kết" state and PerformClick() trigger.
-// 3. Modal dialog inspection, mandatory non-authoritative disclaimer, and DataGridView assertions.
-// 4. CSV report schema and row-by-row consistency with CheckHoleReport.Rows.
-// 5. Negative tests (outside sandbox rejection, stale marker detection, self-test).
+// 1. Strict fail-closed sandbox enforcement, component references under sandbox (all components, including suppressed),
+//    clean open check, feature-tree signature invariance, marker checks, and disk file SHA256 invariance.
+// 2. WinForms toolbar button "Nhóm liên kết" state and Click event dispatch via OnClick (no direct method fallback).
+// 3. Modal dialog inspection, mandatory non-authoritative disclaimer, and DataGridView read-only assertions.
+// 4. CSV report RFC-4180 parsing and row-by-row verification across ALL 9 COLUMNS against CheckHoleReport.Rows.
+// 5. Negative tests (outside sandbox rejection, stale marker detection, sandbox & CSV self-test).
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -52,7 +53,7 @@ namespace ADDIN.Tests
 
             if (args.Length == 1 && args[0] == "--self-test")
             {
-                return SelfTestSandboxLogic();
+                return SelfTestSandboxAndCsvLogic();
             }
 
             if (args.Length < 3)
@@ -139,7 +140,7 @@ namespace ADDIN.Tests
                 Exception testFailure = null;
                 try
                 {
-                    // Fail-closed checks on opened document
+                    // Fail-closed checks on opened document (Review #7 BLOCKER A)
                     RequireSandboxPath(sandboxRoot, doc.GetPathName());
                     VerifyReferencesUnderSandbox(doc, sandboxRoot);
                     EnsureNoOldMarkers(doc);
@@ -215,8 +216,8 @@ namespace ADDIN.Tests
                     if (!btnConn.Enabled) throw new InvalidOperationException("Button 'Nhóm liên kết' should be enabled.");
                     Console.WriteLine("    -> Button 'Nhóm liên kết' enabled: PASS");
 
-                    // [3] Test "Nhóm liên kết" Modal Dialog Opening via btnConn.PerformClick()
-                    Console.WriteLine("\n[3] Testing 'Nhóm liên kết' Modal Dialog via PerformClick():");
+                    // [3] Test "Nhóm liên kết" Toolbar Button Event Dispatch via OnClick (Review #7 MINOR C)
+                    Console.WriteLine("\n[3] Testing 'Nhóm liên kết' Button Event Dispatch & Modal Dialog:");
                     bool modalVerified = false;
                     string dialogTitle = null;
                     string labelText = null;
@@ -251,22 +252,18 @@ namespace ADDIN.Tests
                     };
                     closeTimer.Start();
 
-                    // Invoke OnClick on btnConn to dispatch the Click event handler
+                    // Invoke OnClick strictly on btnConn - NO direct fallback to ShowConnectionGroups!
                     MethodInfo mOnClick = typeof(Button).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic);
-                    if (mOnClick != null)
-                    {
-                        mOnClick.Invoke(btnConn, new object[] { EventArgs.Empty });
-                    }
-                    else
-                    {
-                        MethodInfo mShow = resultsForm.GetType().GetMethod("ShowConnectionGroups", BindingFlags.NonPublic | BindingFlags.Instance);
-                        mShow.Invoke(resultsForm, null);
-                    }
+                    if (mOnClick == null)
+                        throw new MissingMethodException("Button.OnClick method missing.");
+
+                    mOnClick.Invoke(btnConn, new object[] { EventArgs.Empty });
                     closeTimer.Stop();
 
                     if (!modalVerified)
-                        throw new InvalidOperationException("Modal dialog did not open via btnConn.PerformClick().");
+                        throw new InvalidOperationException("Modal dialog did not open via btnConn Click event dispatch.");
 
+                    Console.WriteLine("    -> Button Click Event Dispatch: PASS (BUTTON_EVENT_DISPATCH_PASS)");
                     Console.WriteLine("    -> Modal Title: '" + dialogTitle + "' (PASS)");
                     Console.WriteLine("    -> Header Description Text:\n        " + (labelText ?? "").Replace("\n", "\n        "));
 
@@ -283,7 +280,7 @@ namespace ADDIN.Tests
                     }
                     Console.WriteLine("    -> Header Counts & Mandatory Disclaimer: PASS");
 
-                    // Strict DataGridView assertions (Review #6 requirement)
+                    // Strict DataGridView assertions
                     if (heldGrid == null || !heldGrid.ReadOnly)
                     {
                         throw new InvalidOperationException("Grid is missing or editable; read-only guarantee violated.");
@@ -305,8 +302,8 @@ namespace ADDIN.Tests
                     Console.WriteLine("    -> All 10 Diagnostic Columns Present: PASS");
                     Console.WriteLine("    -> Modal Evaluation Level: MODAL_PROGRAMMATIC_PASS");
 
-                    // [4] Test CSV Export & Verify Row-by-Row Content (Review #6 requirement)
-                    Console.WriteLine("\n[4] Testing CSV Report Export & Verification:");
+                    // [4] Test CSV Export & Verify ALL 9 COLUMNS (Review #7 BLOCKER B)
+                    Console.WriteLine("\n[4] Testing CSV Report Export & Strict 9-Column Verification:");
                     Type tCsv = asm.GetType("ADDIN.Commands.CheckHoleCsv");
                     if (tCsv == null) throw new MissingMemberException("CheckHoleCsv missing.");
                     MethodInfo mWriteCsv = tCsv.GetMethod("Write", BindingFlags.Public | BindingFlags.Static);
@@ -337,20 +334,100 @@ namespace ADDIN.Tests
                         throw new InvalidOperationException("CSV data row count (" + (csvLines.Length - 1) + ") does not match report rows (" + reportRows.Count + ").");
                     }
 
+                    string expectedTitle = (string)tReport.GetField("AssemblyTitle").GetValue(report) ?? "";
+                    string expectedConfig = (string)tReport.GetField("Configuration").GetValue(report) ?? "";
+
                     for (int i = 0; i < reportRows.Count; i++)
                     {
                         object row = reportRows[i];
-                        string status = (string)row.GetType().GetProperty("Status").GetValue(row, null);
+                        Type tRow = row.GetType();
+                        string expStatus = (string)tRow.GetProperty("Status").GetValue(row, null) ?? "";
+                        string expKind = (string)tRow.GetProperty("Kind").GetValue(row, null) ?? "";
+                        string expRef = (string)tRow.GetProperty("ReferenceComponent").GetValue(row, null) ?? "";
+                        string expAct = (string)tRow.GetProperty("ActualComponent").GetValue(row, null) ?? "";
+                        double? expOffset = (double?)tRow.GetProperty("OffsetMm").GetValue(row, null);
+                        double? expAngle = (double?)tRow.GetProperty("AngleDeg").GetValue(row, null);
+                        string expReason = (string)tRow.GetProperty("Reason").GetValue(row, null) ?? "";
+
                         string csvLine = csvLines[i + 1];
-                        string[] parts = csvLine.Split(',');
-                        string csvStatus = parts.Length > 2 ? parts[2].Trim('"', ' ') : "";
-                        if (parts.Length < 3 || !string.Equals(csvStatus, status.Trim(), StringComparison.OrdinalIgnoreCase))
+                        List<string> fields = ParseCsvLine(csvLine);
+                        if (fields.Count != 9)
                         {
-                            throw new InvalidOperationException("CSV row " + (i + 1) + " status mismatch: expected=" + status + ", in CSV=" + csvLine);
+                            throw new InvalidOperationException("CSV line " + (i + 1) + " parsed into " + fields.Count + " fields instead of 9: " + csvLine);
                         }
+
+                        // Verify Col 0: AssemblyTitle
+                        string actTitle = UnescapeCell(fields[0]);
+                        if (!string.Equals(actTitle, expectedTitle, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 0 (Assembly) mismatch: exp='" + expectedTitle + "', act='" + actTitle + "'");
+
+                        // Verify Col 1: Configuration
+                        string actConfig = UnescapeCell(fields[1]);
+                        if (!string.Equals(actConfig, expectedConfig, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 1 (Config) mismatch: exp='" + expectedConfig + "', act='" + actConfig + "'");
+
+                        // Verify Col 2: Status
+                        string actStatus = UnescapeCell(fields[2]);
+                        if (!string.Equals(actStatus, expStatus, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 2 (Status) mismatch: exp='" + expStatus + "', act='" + actStatus + "'");
+
+                        // Verify Col 3: Type / Kind
+                        string actKind = UnescapeCell(fields[3]);
+                        if (!string.Equals(actKind, expKind, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 3 (Type) mismatch: exp='" + expKind + "', act='" + actKind + "'");
+
+                        // Verify Col 4: Reference component
+                        string actRef = UnescapeCell(fields[4]);
+                        if (!string.Equals(actRef, expRef, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 4 (ReferenceComponent) mismatch: exp='" + expRef + "', act='" + actRef + "'");
+
+                        // Verify Col 5: Actual component
+                        string actAct = UnescapeCell(fields[5]);
+                        if (!string.Equals(actAct, expAct, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 5 (ActualComponent) mismatch: exp='" + expAct + "', act='" + actAct + "'");
+
+                        // Verify Col 6: Offset (mm)
+                        string actOffsetStr = fields[6].Trim();
+                        if (expOffset.HasValue)
+                        {
+                            if (string.IsNullOrEmpty(actOffsetStr) ||
+                                !double.TryParse(actOffsetStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double actOffset) ||
+                                Math.Abs(actOffset - expOffset.Value) > 1e-4)
+                            {
+                                throw new InvalidOperationException("CSV row " + (i + 1) + " Col 6 (OffsetMm) mismatch: exp=" + expOffset.Value + ", act='" + actOffsetStr + "'");
+                            }
+                        }
+                        else
+                        {
+                            if (!string.IsNullOrEmpty(actOffsetStr))
+                                throw new InvalidOperationException("CSV row " + (i + 1) + " Col 6 (OffsetMm) expected empty, got: '" + actOffsetStr + "'");
+                        }
+
+                        // Verify Col 7: Angle (deg)
+                        string actAngleStr = fields[7].Trim();
+                        if (expAngle.HasValue)
+                        {
+                            if (string.IsNullOrEmpty(actAngleStr) ||
+                                !double.TryParse(actAngleStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double actAngle) ||
+                                Math.Abs(actAngle - expAngle.Value) > 1e-4)
+                            {
+                                throw new InvalidOperationException("CSV row " + (i + 1) + " Col 7 (AngleDeg) mismatch: exp=" + expAngle.Value + ", act='" + actAngleStr + "'");
+                            }
+                        }
+                        else
+                        {
+                            if (!string.IsNullOrEmpty(actAngleStr))
+                                throw new InvalidOperationException("CSV row " + (i + 1) + " Col 7 (AngleDeg) expected empty, got: '" + actAngleStr + "'");
+                        }
+
+                        // Verify Col 8: Reason
+                        string actReason = UnescapeCell(fields[8]);
+                        if (!string.Equals(actReason, expReason, StringComparison.Ordinal))
+                            throw new InvalidOperationException("CSV row " + (i + 1) + " Col 8 (Reason) mismatch: exp='" + expReason + "', act='" + actReason + "'");
                     }
-                    Console.WriteLine("    -> CSV Export Row-by-Row Content Matches Report: PASS");
-                    Console.WriteLine("    -> CSV Writer Level: CSV_WRITER_PASS");
+
+                    Console.WriteLine("    -> CSV All 9 Columns Verified Against Report.Rows: PASS");
+                    Console.WriteLine("    -> CSV Verification Level: CSV_ALL_9_COLUMNS_AND_CONTENT_PASS");
 
                     // [5] Post-Execution Invariance Checks
                     Console.WriteLine("\n[5] Verifying Post-Execution Assembly Safety & Invariance:");
@@ -391,7 +468,7 @@ namespace ADDIN.Tests
 
                 Console.WriteLine("\n=========================================================");
                 Console.WriteLine("ALL UI SAFETY AND INTERACTION CHECKS PASSED (EXIT 0)");
-                Console.WriteLine("Status Levels: MODAL_PROGRAMMATIC_PASS | CSV_WRITER_PASS | UI_USER_CLICK_NOT_TESTED");
+                Console.WriteLine("Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_ALL_9_COLUMNS_AND_CONTENT_PASS | UI_USER_CLICK_NOT_TESTED");
                 Console.WriteLine("=========================================================");
                 return 0;
             }
@@ -419,34 +496,31 @@ namespace ADDIN.Tests
                 throw new InvalidOperationException("Path outside isolated fixture root: " + path);
         }
 
+        // Strict fail-closed reference verification (Review #7 BLOCKER A)
         private static void VerifyReferencesUnderSandbox(ModelDoc2 doc, string root)
         {
             AssemblyDoc assembly = doc as AssemblyDoc;
-            if (assembly == null) return;
-            object[] raw = (object[])assembly.GetComponents(false);
-            if (raw == null) return;
+            if (assembly == null)
+                throw new InvalidOperationException("Expected AssemblyDoc, got: " + (doc != null ? doc.GetType().ToString() : "null"));
 
-            int count = 0, outside = 0;
-            string prefix = Path.GetFullPath(root).TrimEnd(
-                Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                + Path.DirectorySeparatorChar;
+            object[] raw = assembly.GetComponents(false) as object[];
+            if (raw == null)
+                throw new InvalidOperationException("Cannot enumerate components; isolation unverified");
 
             foreach (object item in raw)
             {
                 Component2 comp = item as Component2;
-                if (comp == null || comp.IsSuppressed()) continue;
-                count++;
-                string compPath = comp.GetPathName();
-                if (string.IsNullOrEmpty(compPath) ||
-                    !Path.GetFullPath(compPath).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    outside++;
-                    Console.Error.WriteLine("Component outside sandbox: " + comp.Name2 + " -> " + compPath);
-                }
-            }
+                if (comp == null)
+                    throw new InvalidOperationException("Invalid component reference in assembly component list.");
 
-            if (outside > 0)
-                throw new InvalidOperationException("Assembly references components outside isolated fixture root (count=" + outside + ").");
+                string path = comp.GetPathName();
+                if (string.IsNullOrWhiteSpace(path))
+                    throw new InvalidOperationException("Unresolved/virtual reference: " + comp.Name2);
+
+                RequireSandboxPath(root, path);
+                if (!File.Exists(path))
+                    throw new FileNotFoundException("Missing fixture dependency: " + path);
+            }
         }
 
         private static void EnsureNoOldMarkers(ModelDoc2 doc)
@@ -496,7 +570,54 @@ namespace ADDIN.Tests
             return list;
         }
 
-        private static int SelfTestSandboxLogic()
+        // Robust RFC-4180 CSV parser respecting quotes and escaped quotes (Review #7 BLOCKER B)
+        internal static List<string> ParseCsvLine(string line)
+        {
+            var fields = new List<string>();
+            if (line == null) return fields;
+
+            var sb = new StringBuilder();
+            bool inQuotes = false;
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (c == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        sb.Append('"');
+                        i++; // skip escaped quote
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+                }
+                else if (c == ',' && !inQuotes)
+                {
+                    fields.Add(sb.ToString());
+                    sb.Clear();
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            fields.Add(sb.ToString());
+            return fields;
+        }
+
+        private static string UnescapeCell(string raw)
+        {
+            if (raw == null) return "";
+            string val = raw.Trim();
+            // CheckHoleCsv.Cell prefixes with "'" if text starts with '=+-@'
+            if (val.Length > 1 && val.StartsWith("'") && "=+-@".IndexOf(val[1]) >= 0)
+                val = val.Substring(1);
+            return val;
+        }
+
+        private static int SelfTestSandboxAndCsvLogic()
         {
             bool ok = true;
             try
@@ -512,9 +633,29 @@ namespace ADDIN.Tests
             }
             catch { /* expected */ }
 
+            // Test CSV parser with quotes, commas inside fields, and escaped quotes
+            string sampleLine = "\"Assy, 1\",\"Default\",\"OK\",\"Type\",\"Comp, A\",\"Comp, B\",0.3000,0.2000,\"Reason with, comma and \"\"escaped quotes\"\"\"";
+            List<string> fields = ParseCsvLine(sampleLine);
+            if (fields.Count != 9)
+            {
+                Console.Error.WriteLine("FAIL: ParseCsvLine field count: " + fields.Count);
+                ok = false;
+            }
+            else
+            {
+                if (fields[0] != "Assy, 1" ||
+                    fields[4] != "Comp, A" ||
+                    fields[6] != "0.3000" ||
+                    fields[8] != "Reason with, comma and \"escaped quotes\"")
+                {
+                    Console.Error.WriteLine("FAIL: ParseCsvLine content mismatch: " + string.Join(" | ", fields));
+                    ok = false;
+                }
+            }
+
             Console.WriteLine(ok
-                ? "PASS: sandbox path enforcement self-test"
-                : "FAIL: sandbox path enforcement self-test");
+                ? "PASS: sandbox path enforcement and CSV RFC-4180 parsing self-test"
+                : "FAIL: sandbox or CSV self-test");
             return ok ? 0 : 1;
         }
     }

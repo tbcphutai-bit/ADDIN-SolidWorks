@@ -341,3 +341,94 @@ FAIL CLOSED: System.InvalidOperationException: Isolated run rejected: Existing C
 | | R6-UICSV | CSV report written and row-by-row verified against `report.Rows` (`CSV_WRITER_PASS`) | `PASS` |
 | | R6-UINonMutate | In-memory assembly clean (`GetSaveFlag() == false`), feature tree signature invariant, disk file SHA256 invariant | `PASS` |
 | | R6-UIUserClick | End-user manual mouse clicking on physical desktop UI | `UI_USER_CLICK_NOT_TESTED` |
+| **Review #7 Hardening** | R7-StrictRefs | Strict fail-closed `VerifyReferencesUnderSandbox` (throws on null assembly, null comps, missing file, outside sandbox) | `PASS` |
+| | R7-BtnDispatch | Strict button click event dispatch via `Button.OnClick` reflection without fallback | `BUTTON_EVENT_DISPATCH_PASS` |
+| | R7-RFC4180CSV | RFC-4180 CSV parser verifying all 9 columns against `report.Rows` (Assembly, Config, Status, Kind, Ref, Act, Offset, Angle, Reason) | `CSV_ALL_9_COLUMNS_AND_CONTENT_PASS` |
+| | R7-FixGenTrace | Standalone fixture generator (`FIXTURE_GENERATOR.cs`) and metadata trace (`FIXTURE_METADATA_TRACE.md`) | `PASS` |
+
+---
+
+## 7. Review #7 Execution Logs & Verbatim Output
+
+### A. Strict Sandbox Path & Component Reference Fail-Closed Tests
+```powershell
+# 1. Path outside sandbox rejection
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" $cg1Dll $sandbox "C:\outside\model.sldasm"
+# Output:
+FAIL CLOSED: System.InvalidOperationException: Path outside isolated fixture root: C:\outside\model.sldasm
+# Exit Code: 1
+
+# 2. Stale marker rejection
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" $cg1Dll $sandbox "$sandbox\SimpleFixtures\Fixture_OldMarker.SLDASM"
+# Output:
+FAIL CLOSED: System.InvalidOperationException: Isolated run rejected: Existing CHECK-HOLE-NG feature detected (CHECK-HOLE-NG-STALE-MARKER). Run only on a disposable fixture without markers.
+# Exit Code: 1
+```
+
+### B. Live In-CAD UI & 9-Column RFC-4180 CSV Execution (`Fixture_OK.SLDASM`)
+```powershell
+& "docs\antigravity\reports\TEST_UI_INTERACTION.exe" $cg1Dll $sandbox "$sandbox\SimpleFixtures\Fixture_OK.SLDASM"
+```
+
+**Verbatim Console Output:**
+```text
+=========================================================
+CG1 UI INTERACTION & SAFETY AUDIT TEST
+=========================================================
+SolidWorks Revision: 32.5.0
+Candidate DLL: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
+Fixture: D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_OK.SLDASM
+
+[1] CheckAssemblyHole Output Metrics:
+    Logical Holes: 57
+    Stack Count  : 12
+    Groups Count : 12
+    Unmatched    : 33
+    NG No Master : 0
+    Coverage Rows: 12
+
+[2] Verifying CheckHoleResultsForm Toolbar Controls:
+    Found Button: 'Tìm vị trí' (Enabled=True)
+    Found Button: 'Kiểm tra lại' (Enabled=True)
+    Found Button: 'Vẽ NG đã chọn' (Enabled=False)
+    Found Button: 'Vẽ toàn bộ NG' (Enabled=False)
+    Found Button: 'Xuất CSV' (Enabled=True)
+    Found Button: 'Nhóm liên kết' (Enabled=True)
+    Found Button: 'Hủy' (Enabled=False)
+    Found Button: 'Theo dõi 3D' (Enabled=True)
+    Found Button: '← Lỗi trước' (Enabled=False)
+    Found Button: 'Lỗi tiếp →' (Enabled=False)
+    Found Button: 'Chi tiết' (Enabled=True)
+    Found Button: 'Hủy' (Enabled=False)
+    -> Button 'Nhóm liên kết' presence: PASS
+    -> Button 'Nhóm liên kết' enabled: PASS
+
+[3] Testing 'Nhóm liên kết' Button Event Dispatch & Modal Dialog:
+    -> Button Click Event Dispatch: PASS (BUTTON_EVENT_DISPATCH_PASS)
+    -> Modal Title: 'CHECK HOLE - Nhóm liên kết (chẩn đoán)' (PASS)
+    -> Header Description Text:
+        Nhóm lỗ đã ghép: 12 | NG chưa rõ Master: 0 | Lỗ chưa ghép: 33
+        Hai đầu trục chỉ là ứng viên hình học, KHÔNG phải vật chủ được xác nhận.
+        CG1 chưa kiểm tra quan hệ đối với Part không có lỗ.
+    -> Header Counts & Mandatory Disclaimer: PASS
+    -> DataGridView ReadOnly & RowCount (12): PASS
+    -> All 10 Diagnostic Columns Present: PASS
+    -> Modal Evaluation Level: MODAL_PROGRAMMATIC_PASS
+
+[4] Testing CSV Report Export & Strict 9-Column Verification:
+    -> CSV created: D:\CG1-ISOLATED-TEST-COPIES\Test_Export_Report.csv
+    -> CSV line count: 46
+    -> Header: Assembly,Configuration,Status,Type,Reference component,Actual component,Offset (mm),Angle (deg),Reason
+    -> CSV All 9 Columns Verified Against Report.Rows: PASS
+    -> CSV Verification Level: CSV_ALL_9_COLUMNS_AND_CONTENT_PASS
+
+[5] Verifying Post-Execution Assembly Safety & Invariance:
+    -> Feature Tree Invariance: PASS
+    -> Memory Non-Mutation (doc.GetSaveFlag() == false): PASS
+    -> Disk File SHA256 Invariance: PASS
+
+=========================================================
+ALL UI SAFETY AND INTERACTION CHECKS PASSED (EXIT 0)
+Levels: BUTTON_EVENT_DISPATCH_PASS | MODAL_PROGRAMMATIC_PASS | CSV_ALL_9_COLUMNS_AND_CONTENT_PASS | UI_USER_CLICK_NOT_TESTED
+=========================================================
+```

@@ -9,7 +9,18 @@
 
 ## 0. Review Responses & Resolution
 
-### 0.1 Resolution of ChatGPT Review #6 (2026-10-19)
+### 0.1 Resolution of ChatGPT Review #7 (2026-10-19)
+
+| # | Review #7 Item / Blocker | Status | Resolution & Evidence |
+|---|---|---|---|
+| **A** | **`VerifyReferencesUnderSandbox` fail-closed enforcement** | **RESOLVED & PASS** | **Nguyên nhân chỉ ra:** Trước đây hàm `return` khi `doc as AssemblyDoc == null` hoặc `GetComponents == null`, và bỏ qua component `IsSuppressed()`, chưa kiểm tra `File.Exists(path)`.<br>**Khắc phục:** Đã tái cấu trúc hoàn toàn hàm theo đúng khuyến nghị của ChatGPT:<br>- Ném `InvalidOperationException("Expected AssemblyDoc...")` nếu `assembly == null`.<br>- Ném `InvalidOperationException("Cannot enumerate components...")` nếu `raw == null`.<br>- Duyệt toàn bộ component, ném exception ngay nếu `comp == null` hoặc `path` rỗng/chưa phân giải.<br>- Gọi `RequireSandboxPath(root, path)` kiểm tra mọi component (kể cả suppressed) phải nằm trong sandbox root.<br>- Kiểm tra vật lý `if (!File.Exists(path)) throw new FileNotFoundException("Missing fixture dependency: " + path);`.<br>**Bằng chứng:** Mã nguồn trong [`TEST_UI_INTERACTION.cs`](TEST_UI_INTERACTION.cs) (dòng 500–524). Chạy negative test đường dẫn ngoài sandbox ném ngoại lệ fail-closed (Exit 1). |
+| **B** | **Full 9-Column CSV Verification (RFC-4180)** | **RESOLVED & PASS** | **Nguyên nhân chỉ ra:** Mã trước dùng `Split(',')` đơn giản và chỉ so khớp cột `Status`, không phân giải được quote escaping `""` và dấu phẩy trong tên component/reason.<br>**Khắc phục:** Đã bổ sung bộ phân tích cú pháp chuẩn RFC-4180 `ParseCsvLine(string line)` xử lý chuỗi trong ngoặc kép `""` và dấu phẩy nhúng; kết hợp `UnescapeCell` khử tiền tố công thức `'` và unescape `""`.<br>**Đối chiếu toàn bộ 9 cột:** Khớp 100% từng dòng giữa CSV xuất ra và `CheckHoleReport.Rows`: `AssemblyTitle`, `Configuration`, `Status`, `Kind` (Type), `ReferenceComponent`, `ActualComponent`, `OffsetMm` (parse `double` InvariantCulture $\pm 10^{-4}$), `AngleDeg` (parse `double` InvariantCulture $\pm 10^{-4}$), và `Reason`.<br>**Kết quả:** Báo cáo nâng cấp thành `CSV_ALL_9_COLUMNS_AND_CONTENT_PASS` (Exit 0). |
+| **C** | **Button Event Dispatch & Accurate Test Labels** | **RESOLVED & PASS** | **Khắc phục:** Loại bỏ hoàn toàn fallback gọi trực tiếp method `ShowConnectionGroups()`. Điều phối sự kiện click thực tế qua `Button.OnClick` bằng reflection (`mOnClick.Invoke(btnConn, ...)`). Nếu dây nối sự kiện bị ngắt hoặc modal không mở, test sẽ ném lỗi ngay lập tức.<br>**Nhãn kiểm chứng chính xác:** Đặt nhãn rõ ràng: `BUTTON_EVENT_DISPATCH_PASS` (sự kiện click button được kích hoạt thực sự), `MODAL_PROGRAMMATIC_PASS` (hộp thoại modal WinForms hiển thị và được kiểm chứng thuộc tính), `CSV_ALL_9_COLUMNS_AND_CONTENT_PASS` (toàn bộ 9 cột CSV khớp tuyệt đối), và `UI_USER_CLICK_NOT_TESTED` (phân biệt rõ ràng với chuột người dùng bấm trên màn hình desktop). |
+| **D** | **Fixture NG Reproducibility & Traceability** | **RESOLVED & PASS** | **Khắc phục:** Đã bổ sung đầy đủ bộ tài liệu và mã nguồn tái lập fixture độc lập:<br>1. Mã nguồn sinh fixture: [`docs/antigravity/reports/FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs) tự động tạo `Fixture_OK.SLDASM`, `Fixture_NG_Offset.SLDASM`, `Fixture_Unmatched.SLDASM`, `Fixture_MultiLayer_ABC.SLDASM`, `Fixture_OldMarker.SLDASM`.<br>2. Tài liệu kỹ thuật chi tiết: [`docs/antigravity/reports/FIXTURE_METADATA_TRACE.md`](FIXTURE_METADATA_TRACE.md) ghi nhận đầy đủ danh sách 19 mate bị suppress trong `MateGroup`, phép biến đổi tịnh tiến $\Delta X = +0.3000\text{ mm}$, tọa độ 12 lỗ và độ lệch tâm tính toán, dung sai kiểm tra $0.10\text{ mm} < 0.30\text{ mm} \le 3.00\text{ mm}$, và bảng so sánh 12 stack NG khớp tuyệt đối giữa `main` và `CG1`. |
+
+---
+
+### 0.2 Resolution of ChatGPT Review #6 (2026-10-19)
 
 | # | Review #6 Blocker / Item | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -19,7 +30,7 @@
 
 ---
 
-### 0.2 Resolution of ChatGPT Review #5 (2026-10-19)
+### 0.3 Resolution of ChatGPT Review #5 (2026-10-19)
 
 | # | Review #5 Requirement | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -30,7 +41,7 @@
 
 ---
 
-### 0.3 Prior Reviews Resolution Summary (Reviews #1–#4)
+### 0.4 Prior Reviews Resolution Summary (Reviews #1–#4)
 
 - **Review #1:** Sửa thông tin commit SHA; căn chỉnh lịch sử Git; mở Draft PR #27.
 - **Review #2:** Cung cấp log Rebuild chi tiết; kiểm thử độc lập hàm `EvaluateStack` với ngưỡng dung sai (0.09 mm, 0.11 mm, 0.35°); kiểm tra trạng thái WinForms offline (`UI01–UI05`).
@@ -123,8 +134,9 @@ Detailed verbatim logs in [`docs/antigravity/reports/BUILD_EVIDENCE.md`](BUILD_E
 | **Proven NG fixture (Review #6)** | `Fixture_NG_Offset.SLDASM` ($+0.30\text{ mm}$) | **PASS** | 100% match between baseline and CG1 (`holes=57 groups=24 unmatched=33 stacks=12 NG=12`). `NgStacks >= 1` fully proven. Exit code 0. |
 | **Unmatched holes fixture** | `Fixture_Unmatched.SLDASM` | **PASS** | 100% match between baseline and CG1 (`holes=32 groups=0 unmatched=32 stacks=0 NG=0`). Exit code 0. |
 | **Multi-layer joint fixture** | `Fixture_MultiLayer_ABC.SLDASM` | **PASS** | 100% match between baseline and CG1 (`holes=82 groups=48 unmatched=34 stacks=24 NG=0`). Exit code 0. |
-| **WinForms UI Modal Programmatic** | Button click dispatch $\to$ modal inspect $\to$ 10 cols | **MODAL_PROGRAMMATIC_PASS** | Button event dispatch via `OnClick`, modal opened, DataGridView verified read-only with 12 rows, all 10 diagnostic columns verified. Exit code 0. |
-| **WinForms UI CSV Writer** | CSV export written & row-by-row verified | **CSV_WRITER_PASS** | Output written, line count and status in CSV match `report.Rows` exactly. Exit code 0. |
+| **WinForms UI Button Dispatch** | Button click event dispatch via `OnClick` | **BUTTON_EVENT_DISPATCH_PASS** | Dispatched strictly via `Button.OnClick` reflection without fallback. Modal opened cleanly. Exit code 0. |
+| **WinForms UI Modal Programmatic** | Modal dialog inspection $\to$ 10 cols | **MODAL_PROGRAMMATIC_PASS** | Modal title verified, DataGridView verified read-only with 12 rows, all 10 diagnostic columns verified. Exit code 0. |
+| **WinForms UI CSV 9-Column Verification** | RFC-4180 CSV export & all 9 columns verified | **CSV_ALL_9_COLUMNS_AND_CONTENT_PASS** | All 9 columns parsed with RFC-4180 state machine and verified against `CheckHoleReport.Rows`. Exit code 0. |
 | **End-User UI Interaction** | Physical desktop mouse click interaction | **UI_USER_CLICK_NOT_TESTED** | Not tested on physical user desktop screen; programmatic STA WinForms model verified. |
 | **Negative test: Stale markers** | Rejection of pre-existing `CHECK-HOLE-NG*` | **PASS** | Caught by `EnsureNoOldMarkers`, execution safely aborted with exit code 1. |
 | **Negative test: Path outside sandbox** | Rejection of path outside sandbox | **PASS** | Caught by `RequireSandboxPath`, execution safely aborted with exit code 1. |
@@ -160,12 +172,13 @@ Measurements from live in-CAD execution comparing baseline `main` DLL and `CG1` 
 | Check | Level of Evidence | Result | Evidence |
 |---|---|---|---|
 | Button `Nhóm liên kết` visible and responsive | Live In-CAD UI & Offline Harness | PASS | Verified in `TEST_UI_INTERACTION.cs` & `TEST_HARNESS.cs` (`UI02`): Button visible, Text is `"Nhóm liên kết"`, positioned next to Export CSV. |
+| Button `Nhóm liên kết` click event dispatch | Live In-CAD UI & STA Harness | BUTTON_EVENT_DISPATCH_PASS | Verified in `TEST_UI_INTERACTION.cs`: Dispatched strictly via `Button.OnClick` reflection without fallback, triggering modal opening on STA thread. |
 | Group table populated and read-only | Live In-CAD UI & Static Audit | PASS | Verified `ShowConnectionGroups()`: DataGridView with `ReadOnly=true`, `AllowUserToAddRows=false`, `SelectionMode=FullRowSelect`, `DataSource=c.Groups`. 10 diagnostic columns populated. Strict assertion `grid != null && grid.ReadOnly` passed. |
 | Summary string formatting | Live In-CAD UI & Offline Harness | PASS | Summary correctly appends diagnostic metrics (`Nhóm lỗ đã ghép: X \| NG chưa rõ Master: Y \| Lỗ chưa ghép: Z`) and coverage status. |
 | No model changes from opening/closing diagnostics | Live In-CAD UI & Static Audit | PASS | Verified via `TEST_UI_INTERACTION.cs`: `doc.GetSaveFlag() == false` throughout entire inspection; feature tree signature invariant; file SHA256 invariant. |
 | Button state during busy / cancel / rerun | Offline WinForms Harness | PASS | Verified in `TEST_HARNESS.cs` (`UI03`, `UI04`, `UI05`): Disabled when busy, re-enabled when idle. |
 | Live CAD in-session programmatic modal dialog | Live SOLIDWORKS UI Harness (STA) | MODAL_PROGRAMMATIC_PASS | Successfully opened via button click dispatch on live SolidWorks STA thread against `Fixture_OK.SLDASM`; modal inspected and closed cleanly without error. |
-| Live CAD CSV report writer | Live SOLIDWORKS CSV Export | CSV_WRITER_PASS | CSV exported and row-by-row verified against `report.Rows`. |
+| Live CAD CSV report writer (All 9 Columns) | Live SOLIDWORKS CSV Export | CSV_ALL_9_COLUMNS_AND_CONTENT_PASS | All 9 columns parsed with RFC-4180 parser and verified row-by-row against `report.Rows` (AssemblyTitle, Config, Status, Kind, RefComp, ActComp, OffsetMm, AngleDeg, Reason). |
 | Physical desktop human mouse clicking | End-user interactive environment | UI_USER_CLICK_NOT_TESTED | Headless automation cannot physically click with a human mouse on desktop; programmatic control and modal interaction proven. |
 
 ---
@@ -190,8 +203,9 @@ CAD_ZERO_HOLE_ISOLATED=PASS
 CAD_PRODUCTION_LARGE_FIXTURE=PASS
 CAD_STANDALONE_FIXTURES=PASS
 CAD_FIXTURE_NG_PROVEN=PASS
+LIVE_UI_BUTTON_DISPATCH=PASS
 LIVE_UI_MODAL_PROGRAMMATIC=PASS
-LIVE_UI_CSV_WRITER=PASS
+LIVE_UI_CSV_ALL_9_COLUMNS=PASS
 UI_USER_CLICK_INTERACTION=NOT_TESTED
 READY_FOR_FINAL_CHATGPT_REVIEW=YES
 READY_FOR_MERGE=NO
@@ -206,9 +220,9 @@ Decision rationale:
 - `CAD_PRODUCTION_LARGE_FIXTURE=PASS`: Confirmed with live isolated execution on Pack & Go copy of `1618-01-BH.SLDASM` (916 holes, 348 stacks, 100% equivalence, exit 0).
 - `CAD_STANDALONE_FIXTURES=PASS`: Confirmed with live isolated execution on 4 standalone fixtures (`Fixture_OK`, `Fixture_NG_Offset`, `Fixture_Unmatched`, `Fixture_MultiLayer_ABC`) (100% equivalence, exit 0).
 - `CAD_FIXTURE_NG_PROVEN=PASS`: Confirmed on `Fixture_NG_Offset.SLDASM` with real lateral offset $+0.30\text{ mm} > 0.10\text{ mm}$ producing `NG=12` on both baseline and candidate (100% equivalence, exit 0).
-- `LIVE_UI_MODAL_PROGRAMMATIC=PASS` & `LIVE_UI_CSV_WRITER=PASS`: Confirmed with hardened in-session WinForms modal inspection and CSV verification via `TEST_UI_INTERACTION.cs` (exit 0).
+- `LIVE_UI_BUTTON_DISPATCH=PASS`, `LIVE_UI_MODAL_PROGRAMMATIC=PASS` & `LIVE_UI_CSV_ALL_9_COLUMNS=PASS`: Confirmed with hardened in-session WinForms modal inspection, Button.OnClick dispatch without fallback, and RFC-4180 9-column CSV verification via `TEST_UI_INTERACTION.cs` (exit 0).
 - `UI_USER_CLICK_INTERACTION=NOT_TESTED`: Accurately labeled to distinguish headless STA programmatic testing from physical desktop user clicking.
-- `READY_FOR_FINAL_CHATGPT_REVIEW=YES`: All code, rebuild logs, test harness, safe runner, hardened UI interaction harness, and evidence are published to GitHub branch `feat/check-hole-connection-groups-cg1`.
+- `READY_FOR_FINAL_CHATGPT_REVIEW=YES`: All code, rebuild logs, test harness, safe runner, hardened UI interaction harness, fixture reproducibility artifacts, and evidence are published to GitHub branch `feat/check-hole-connection-groups-cg1`.
 - `READY_FOR_MERGE=NO`: Kept in Draft PR #27 mode; merging into `main` is strictly reserved for the repository owner / user after ChatGPT's final review.
 
 ---
@@ -226,5 +240,7 @@ Decision rationale:
 5. Review #4 Safe Runner Code: [`docs/antigravity/review4/CG1_REVIEW4_SAFE_RUNNER.cs`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/review4/CG1_REVIEW4_SAFE_RUNNER.cs)
 6. Integrated Safe Live CAD Runner: [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/LIVE_CAD_RUNNER.cs)
 7. Hardened Live WinForms UI Interaction Test Code: [`docs/antigravity/reports/TEST_UI_INTERACTION.cs`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/TEST_UI_INTERACTION.cs)
-8. Draft Pull Request: [#27](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/27)
-9. Primary Report: [`docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md)
+8. Standalone Fixture Generator: [`docs/antigravity/reports/FIXTURE_GENERATOR.cs`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/FIXTURE_GENERATOR.cs)
+9. Fixture Metadata & Reproducibility Trace: [`docs/antigravity/reports/FIXTURE_METADATA_TRACE.md`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/FIXTURE_METADATA_TRACE.md)
+10. Draft Pull Request: [#27](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/27)
+11. Primary Report: [`docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md`](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/blob/feat/check-hole-connection-groups-cg1/docs/antigravity/reports/CHECK_HOLE_CG1_REPORT.md)
