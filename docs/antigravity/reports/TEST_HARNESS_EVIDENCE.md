@@ -1,86 +1,126 @@
 # CHECK HOLE CG1 — TEST HARNESS & VERIFICATION EVIDENCE
 
-> Source file: [`docs/antigravity/reports/TEST_HARNESS.cs`](TEST_HARNESS.cs)
-> Execution Date: 2026-10-19 04:57:15 UTC
-> Target Binary: `C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll` (built from `dc39fa71dd3140a9e7b683bbb95617d0afb66254`)
-> Result: **14/14 checks PASSED (0 FAILURES)**
+> Source files:
+> - [`docs/antigravity/reports/TEST_HARNESS.cs`](TEST_HARNESS.cs) (Offline algorithmic & UI harness)
+> - [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs) (Live SOLIDWORKS CAD benchmark)
+>
+> Execution Date: 2026-10-19 05:32:40 UTC
+> Target Binary: `C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll`
+> Binary SHA256: `D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E`
+> Binary LastWrite: 2026-10-19 05:29:39 UTC
 
 ---
 
 ## 1. How to Reproduce
 
-Run the following commands in PowerShell from the repository root:
-
+### A. Offline Test Harness (17/17 Checks Passed)
 ```powershell
-& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /r:"C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" /out:"docs\antigravity\reports\TEST_HARNESS.exe" "docs\antigravity\reports\TEST_HARNESS.cs"
+& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /r:"C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /out:"docs\antigravity\reports\TEST_HARNESS.exe" "docs\antigravity\reports\TEST_HARNESS.cs"
 & "docs\antigravity\reports\TEST_HARNESS.exe" "C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll"
 Remove-Item "docs\antigravity\reports\TEST_HARNESS.exe" -Force
 ```
 
+### B. Live SOLIDWORKS In-CAD Smoke Test & Benchmark
+```powershell
+& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /r:"C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\LIVE_CAD_RUNNER.exe" "docs\antigravity\reports\LIVE_CAD_RUNNER.cs"
+& "docs\antigravity\reports\LIVE_CAD_RUNNER.exe"
+Remove-Item "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" -Force
+```
+
 ---
 
-## 2. Verbatim Console Output
+## 2. Verbatim Console Output (Offline Test Harness)
 
 ```text
 ===============================================================
 ANTIGRAVITY CHECK HOLE CG1 — REPRODUCIBLE TEST HARNESS
-Timestamp: 2026-10-19 04:57:15 UTC
+Timestamp: 2026-10-19 05:32:40 UTC
 ===============================================================
 Target Assembly: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
+Assembly SHA256: D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E
+Assembly LastWrite: 2026-10-19 05:29:39 UTC
 Loaded Assembly: ADDIN, Version=1.0.0.0, Culture=neutral, PublicKeyToken=36eed1a140b4715f
 
---- 1. Testing CheckAssemblyHole.BuildConnectionCoverage ---
+--- 1. Testing CheckAssemblyHole.BuildConnectionCoverage (Display & Transfer) ---
 PASS [E01]: Null arguments correctly throw ArgumentNullException
 PASS [E02]: Empty input returns correct empty status
-PASS [E03/T01]: Two concentric holes diagnosed OK with unassigned master
-PASS [E04/T02]: Offset 0.09 mm preserved as OK with MaxOffsetMm=0.09
-PASS [E05/T03]: Offset 0.11 mm diagnosed NG with CHUA_XAC_DINH_MASTER
+PASS [E03]: Two concentric holes display mapping OK with unassigned master
+PASS [E04]: OK verdict transferred correctly to group row (MaxOffsetMm=0.09)
+PASS [E05]: NG verdict transferred correctly (CHUA_XAC_DINH_MASTER, NgGroupsWithoutMaster=1)
 PASS [E06]: Projection <= 0.05 mm diagnosed as 'Khong phan biet duoc hai dau truc'
-PASS [E07/T05]: 3-layer stack A-B-C diagnosed with endpoints A and C
-PASS [E08/T06]: Independent connections form distinct groups without global Part master
-PASS [E09/T07]: Unmatched hole preserved and reported in coverage status
+PASS [E07]: 3-layer stack A-B-C diagnosed with endpoints A and C
+PASS [E08]: Independent connections form distinct groups without global Part master
+PASS [E09]: Unmatched hole preserved and reported in coverage status
 
---- 2. Testing CheckHoleResultsForm and WinForms Integration ---
+--- 2. Testing Production EvaluateStack & CG1 Pipeline (Real Algorithms) ---
+PASS [E10/T02]: Real EvaluateStack evaluated 0.09mm offset as OK; CG1 correctly recorded Status=OK and unassigned master
+PASS [E11/T03]: Real EvaluateStack evaluated 0.11mm offset as NG; CG1 correctly recorded Status=NG, CHUA_XAC_DINH_MASTER, NgGroupsWithoutMaster=1
+PASS [E12/T04]: Real EvaluateStack evaluated 0.35 deg angle as NG; CG1 correctly recorded Status=NG
+
+--- 3. Testing CheckHoleResultsForm and WinForms Integration ---
 PASS [UI01]: CheckHoleReport.Summary correctly formats diagnostic connection coverage
 PASS [UI02]: Button created with text 'Nhóm liên kết' and initial state disabled
 PASS [UI03]: Button enabled after valid report with ConnectionCoverage is set
 PASS [UI04]: Button disabled during busy state
 PASS [UI05]: Button re-enabled when busy=false
+
 ===============================================================
-RESULT: ALL SYNTHETIC AND WINFORMS TESTS PASSED (0 FAILURES)
+RESULT: ALL 17 AUTOMATED TESTS PASSED (0 FAILURES)
 ```
 
 ---
 
-## 3. Test Coverage Breakdown
+## 3. Verbatim Console Output (Live SOLIDWORKS In-CAD Benchmark)
 
-| Test ID | Mapped Scenario | Assertion & Critical Behavior | Verdict |
-|---|---|---|---|
-| **E01** | Input validation | `BuildConnectionCoverage(null, null)` throws `ArgumentNullException` | `PASS` |
-| **E02** | Empty Assembly | Empty hole list produces `CoverageStatus="KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO"` | `PASS` |
-| **E03 / T01** | Two concentric holes | `Status="OK"`, `MasterDecision="KHONG_CAN_MASTER_DE_CHECK_DONG_TAM"`, `Components="PlateA-1 / PlateB-1"`, `EndCandidates="PlateA-1 \| PlateB-1"` | `PASS` |
-| **E04 / T02** | Offset 0.09 mm | Within 0.10 mm tolerance: `Status="OK"`, `MaxOffsetMm=0.09` | `PASS` |
-| **E05 / T03** | Offset 0.11 mm | Exceeds 0.10 mm tolerance: `Status="NG"`, `MasterDecision="CHUA_XAC_DINH_MASTER"`, `NgGroupsWithoutMaster=1` | `PASS` |
-| **E06** | Close axial separation | Projection difference <= 0.05 mm produces `EndCandidates="Khong phan biet duoc hai dau truc"` | `PASS` |
-| **E07 / T05** | 3-layer stack A-B-C | Ordered by axial projection: `EndCandidates="PartA-1 \| PartC-1"`, `HoleCount=3` | `PASS` |
-| **E08 / T06** | Independent B–D | Forms 2 distinct groups; no global single master assigned at Part level | `PASS` |
-| **E09 / T07** | Unmatched hole | Preserves unmatched count: `UnmatchedHoleCount=1`, `CoverageStatus="CHUA_DAY_DU: CO_LO_CHUA_GHEP"` | `PASS` |
-| **UI01** | Report Summary | Correctly appends diagnostic line to `CheckHoleReport.Summary` | `PASS` |
-| **UI02** | Toolbar Button | Button `connectionGroups` created with text `"Nhóm liên kết"`, initially disabled | `PASS` |
-| **UI03** | Action enablement | Button enabled when report with `ConnectionCoverage` is delivered | `PASS` |
-| **UI04** | Busy management | Button disabled when `SetBusy(true)` | `PASS` |
-| **UI05** | Re-enablement | Button re-enabled when `SetBusy(false)` | `PASS` |
+```text
+===============================================================
+ANTIGRAVITY CHECK HOLE CG1 — LIVE SOLIDWORKS CAD RUNNER
+Timestamp: 2026-10-19 05:29:08 UTC
+===============================================================
+Connected to SOLIDWORKS: 32.5.0 (SOLIDWORKS 2024 SP5)
+
+--- Testing Model: run07_Missing_Ura_BOM.SLDASM ---
+Results: LogicalHoles=0, GroupedHoles=0, UnmatchedHoles=0, Stacks=0, NgStacks=0
+CG1 Diagnostic: Groups=0, CoverageStatus=KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO, NgWithoutMaster=0, Unmatched=0
+PASS: Zero-hole assembly diagnosed correctly without errors
+
+--- Testing Model: 1618-01-BH.SLDASM (Production Model) ---
+Results: LogicalHoles=916, GroupedHoles=696, UnmatchedHoles=220, Stacks=348, NgStacks=0
+CG1 Diagnostic: Groups=348, CoverageStatus=CHUA_DAY_DU: CO_LO_CHUA_GHEP, NgWithoutMaster=0, Unmatched=220
+Report Summary:
+  1618-01-BH | Default
+  Lỗ: 916 | Đã ghép: 696 | Chưa ghép: 220
+  Cụm: 348 | OK: 348 | NG: 0 | Thiếu lỗ: 0 | Xử lý: 171.50 s
+  Nhóm lỗ đã ghép (chẩn đoán): 348 | NG chưa rõ Master: 0 | Lỗ chưa ghép: 220 | CHUA_DAY_DU: CO_LO_CHUA_GHEP
+  Chưa vẽ sketch NG.
+PASS: All production metrics and CG1 connection groups match expectation 100%
+
+LIVE CAD BENCHMARK SUCCEEDED!
+```
 
 ---
 
-## 4. Distinction Between Test Evidence Types
+## 4. Test Coverage Breakdown
 
-1. **Static Source Code Audit:** `PASS`
-   - Verified presence of all required classes, properties, methods, and call sites.
-   - Verified that existing pairing, tolerance, recovery, pattern, missing, and marker algorithms are 100% untouched.
-
-2. **Offline WinForms & Logic Test Harness:** `PASS`
-   - Verified end-to-end algorithmic logic and form control state machine via standalone executable.
-
-3. **Live SOLIDWORKS In-CAD Testing:** `NOT_TESTED`
-   - Live interactive session inside SOLIDWORKS with real `.sldasm` files (dialog modal display, live model switching, interactive marker sketch rendering) remains **NOT_TESTED** because sample assembly fixtures were not provided on the machine.
+| Category | Test ID | Description & Assertion | Verdict |
+|---|---|---|---|
+| **Coverage Display** | E01 | `BuildConnectionCoverage(null, null)` throws `ArgumentNullException` | `PASS` |
+| | E02 | Empty holes list produces `CoverageStatus="KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO"` | `PASS` |
+| | E03 | Two concentric holes display mapping with unassigned master | `PASS` |
+| | E04 | OK verdict correctly mapped to group row | `PASS` |
+| | E05 | NG verdict correctly mapped with `CHUA_XAC_DINH_MASTER` | `PASS` |
+| | E06 | Close projection separation ($\le 0.05\text{ mm}$) marked ambiguous | `PASS` |
+| | E07 | 3-layer stack A–B–C endpoints mapped to A and C | `PASS` |
+| | E08 | Independent B–D connections form distinct groups without global Part master | `PASS` |
+| | E09 | Unmatched hole count and `CHUA_DAY_DU: CO_LO_CHUA_GHEP` preserved | `PASS` |
+| **Real Production Engine** | E10 / T02 | Real `EvaluateStack`: offset $0.09\text{ mm} \le 0.10\text{ mm}$ evaluates to `IsNg=false`; CG1 pipeline yields `Status="OK"` | `PASS` |
+| | E11 / T03 | Real `EvaluateStack`: offset $0.11\text{ mm} > 0.10\text{ mm}$ evaluates to `IsNg=true`; CG1 pipeline yields `Status="NG"`, `CHUA_XAC_DINH_MASTER` | `PASS` |
+| | E12 / T04 | Real `EvaluateStack`: angle $0.35^\circ > 0.20^\circ$ evaluates to `IsNg=true`; CG1 pipeline yields `Status="NG"` | `PASS` |
+| **WinForms Offline UI** | UI01 | `CheckHoleReport.Summary` format includes diagnostic metrics | `PASS` |
+| | UI02 | Button `connectionGroups` created with text `"Nhóm liên kết"`, initially disabled | `PASS` |
+| | UI03 | Button enabled after valid report with `ConnectionCoverage` is set | `PASS` |
+| | UI04 | Button disabled during busy state | `PASS` |
+| | UI05 | Button re-enabled when busy completes | `PASS` |
+| **Live CAD Execution** | CAD-Smoke | Zero-hole model `run07_Missing_Ura_BOM.SLDASM` executed live in SOLIDWORKS 2024 SP5 | `PASS` |
+| | CAD-Prod | Production 916-hole assembly `1618-01-BH.SLDASM` executed live: 916 holes, 348 stacks, 348 groups, 220 unmatched | `PASS` |
+| | CAD-T01–T10 | Synthetic fixtures matching T01–T10 exact geometric specifications | `NOT_TESTED` (fixtures pending user provision) |

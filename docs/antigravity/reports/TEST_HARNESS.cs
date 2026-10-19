@@ -1,14 +1,17 @@
 // CG1 Diagnostic Test Harness
 // Standalone regression and verification harness for CheckHole Connection Groups (CG1).
 // Run with:
-//   csc /r:"C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" /out:TEST_HARNESS.exe TEST_HARNESS.cs
+//   csc /r:"C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /out:TEST_HARNESS.exe TEST_HARNESS.cs
 //   .\TEST_HARNESS.exe
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Windows.Forms;
+using ADDIN.Commands;
 
 namespace ADDIN.Tests
 {
@@ -28,19 +31,47 @@ namespace ADDIN.Tests
                 addinDllPath = args[0];
             }
 
+            AppDomain.CurrentDomain.AssemblyResolve += (s, ev) =>
+            {
+                string targetDir = Path.GetDirectoryName(addinDllPath);
+                string reqName = new AssemblyName(ev.Name).Name;
+                if (reqName.StartsWith("SolidWorks.Interop", StringComparison.OrdinalIgnoreCase))
+                {
+                    string swPath = Path.Combine(@"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS", reqName + ".dll");
+                    if (File.Exists(swPath)) return Assembly.LoadFrom(swPath);
+                }
+                string candidate = Path.Combine(targetDir, reqName + ".dll");
+                if (File.Exists(candidate)) return Assembly.LoadFrom(candidate);
+                string rootCandidate = Path.Combine(@"C:\Tao moi", reqName + ".dll");
+                if (File.Exists(rootCandidate)) return Assembly.LoadFrom(rootCandidate);
+                return null;
+            };
+
             Console.WriteLine("Target Assembly: " + addinDllPath);
+            if (File.Exists(addinDllPath))
+            {
+                using (var sha = SHA256.Create())
+                using (var stream = File.OpenRead(addinDllPath))
+                {
+                    byte[] hash = sha.ComputeHash(stream);
+                    Console.WriteLine("Assembly SHA256: " + BitConverter.ToString(hash).Replace("-", ""));
+                }
+                Console.WriteLine("Assembly LastWrite: " + File.GetLastWriteTimeUtc(addinDllPath).ToString("yyyy-MM-dd HH:mm:ss 'UTC'"));
+            }
+
             Assembly asm = Assembly.LoadFrom(addinDllPath);
             Console.WriteLine("Loaded Assembly: " + asm.FullName);
 
             int failures = 0;
 
-            failures += RunEngineTests(asm);
+            failures += RunBuildConnectionCoverageDisplayTests(asm);
+            failures += RunRealEvaluateStackToleranceTests(asm);
             failures += RunWinFormsUITests(asm);
 
-            Console.WriteLine("===============================================================");
+            Console.WriteLine("\n===============================================================");
             if (failures == 0)
             {
-                Console.WriteLine("RESULT: ALL SYNTHETIC AND WINFORMS TESTS PASSED (0 FAILURES)");
+                Console.WriteLine("RESULT: ALL 17 AUTOMATED TESTS PASSED (0 FAILURES)");
                 return 0;
             }
             else
@@ -50,9 +81,9 @@ namespace ADDIN.Tests
             }
         }
 
-        private static int RunEngineTests(Assembly asm)
+        private static int RunBuildConnectionCoverageDisplayTests(Assembly asm)
         {
-            Console.WriteLine("\n--- 1. Testing CheckAssemblyHole.BuildConnectionCoverage ---");
+            Console.WriteLine("\n--- 1. Testing CheckAssemblyHole.BuildConnectionCoverage (Display & Transfer) ---");
             int errors = 0;
 
             Type checkType = asm.GetType("ADDIN.Commands.CheckAssemblyHole");
@@ -129,7 +160,7 @@ namespace ADDIN.Tests
                 }
             }
 
-            // Case E03 (corresponds to T01): Two concentric round holes (OK)
+            // Case E03: Two concentric round holes display mapping
             {
                 var h1 = createHole("PlateA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
                 var h2 = createHole("PlateB-1", new double[] { 0, 0, 0.010 }, new double[] { 0, 0, 1 });
@@ -148,16 +179,16 @@ namespace ADDIN.Tests
 
                 if (st == "OK" && md == "KHONG_CAN_MASTER_DE_CHECK_DONG_TAM" && ec == "PlateA-1 | PlateB-1" && cp == "PlateA-1 / PlateB-1")
                 {
-                    Console.WriteLine("PASS [E03/T01]: Two concentric holes diagnosed OK with unassigned master");
+                    Console.WriteLine("PASS [E03]: Two concentric holes display mapping OK with unassigned master");
                 }
                 else
                 {
-                    Console.WriteLine("FAIL [E03/T01]: Expected OK, got st=" + st + ", md=" + md + ", ec=" + ec);
+                    Console.WriteLine("FAIL [E03]: Expected OK, got st=" + st + ", md=" + md + ", ec=" + ec);
                     errors++;
                 }
             }
 
-            // Case E04 (corresponds to T02): Offset 0.09 mm (OK within 0.10 mm tolerance)
+            // Case E04: Status transfer test for OK verdict
             {
                 var h1 = createHole("PartA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
                 var h2 = createHole("PartB-1", new double[] { 0.00009, 0, 0.010 }, new double[] { 0, 0, 1 });
@@ -173,16 +204,16 @@ namespace ADDIN.Tests
                 string st = (string)g.GetType().GetProperty("Status").GetValue(g, null);
                 if (st == "OK" && Math.Abs(offsetMm - 0.09) < 1e-4)
                 {
-                    Console.WriteLine("PASS [E04/T02]: Offset 0.09 mm preserved as OK with MaxOffsetMm=0.09");
+                    Console.WriteLine("PASS [E04]: OK verdict transferred correctly to group row (MaxOffsetMm=0.09)");
                 }
                 else
                 {
-                    Console.WriteLine("FAIL [E04/T02]: st=" + st + ", offset=" + offsetMm);
+                    Console.WriteLine("FAIL [E04]: st=" + st + ", offset=" + offsetMm);
                     errors++;
                 }
             }
 
-            // Case E05 (corresponds to T03): Offset 0.11 mm (NG > 0.10 mm tolerance)
+            // Case E05: Status transfer test for NG verdict
             {
                 var h1 = createHole("PartA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
                 var h2 = createHole("PartB-1", new double[] { 0.00011, 0, 0.010 }, new double[] { 0, 0, 1 });
@@ -200,11 +231,11 @@ namespace ADDIN.Tests
 
                 if (st == "NG" && md == "CHUA_XAC_DINH_MASTER" && ngNoMaster == 1)
                 {
-                    Console.WriteLine("PASS [E05/T03]: Offset 0.11 mm diagnosed NG with CHUA_XAC_DINH_MASTER");
+                    Console.WriteLine("PASS [E05]: NG verdict transferred correctly (CHUA_XAC_DINH_MASTER, NgGroupsWithoutMaster=1)");
                 }
                 else
                 {
-                    Console.WriteLine("FAIL [E05/T03]: st=" + st + ", md=" + md + ", ngNoMaster=" + ngNoMaster);
+                    Console.WriteLine("FAIL [E05]: st=" + st + ", md=" + md + ", ngNoMaster=" + ngNoMaster);
                     errors++;
                 }
             }
@@ -234,7 +265,7 @@ namespace ADDIN.Tests
                 }
             }
 
-            // Case E07 (corresponds to T05): 3-layer stack A-B-C
+            // Case E07: 3-layer stack A-B-C
             {
                 var hA = createHole("PartA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
                 var hB = createHole("PartB-1", new double[] { 0, 0, 0.02 }, new double[] { 0, 0, 1 });
@@ -253,16 +284,16 @@ namespace ADDIN.Tests
 
                 if (cp == "PartA-1 / PartB-1 / PartC-1" && ec == "PartA-1 | PartC-1" && count == 3)
                 {
-                    Console.WriteLine("PASS [E07/T05]: 3-layer stack A-B-C diagnosed with endpoints A and C");
+                    Console.WriteLine("PASS [E07]: 3-layer stack A-B-C diagnosed with endpoints A and C");
                 }
                 else
                 {
-                    Console.WriteLine("FAIL [E07/T05]: cp=" + cp + ", ec=" + ec + ", count=" + count);
+                    Console.WriteLine("FAIL [E07]: cp=" + cp + ", ec=" + ec + ", count=" + count);
                     errors++;
                 }
             }
 
-            // Case E08 (corresponds to T06): Independent connections A-B and B-D
+            // Case E08: Independent connections A-B and B-D
             {
                 var hA = createHole("PartA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
                 var hB1 = createHole("PartB-1", new double[] { 0, 0, 0.01 }, new double[] { 0, 0, 1 });
@@ -280,16 +311,16 @@ namespace ADDIN.Tests
 
                 if (groupCount == 2 && coverageStatus == "DA_GHEP_LO_NHAN_DIEN; CHUA_KIEM_TRA_PART_KHONG_CO_LO")
                 {
-                    Console.WriteLine("PASS [E08/T06]: Independent connections form distinct groups without global Part master");
+                    Console.WriteLine("PASS [E08]: Independent connections form distinct groups without global Part master");
                 }
                 else
                 {
-                    Console.WriteLine("FAIL [E08/T06]: groupCount=" + groupCount + ", status=" + coverageStatus);
+                    Console.WriteLine("FAIL [E08]: groupCount=" + groupCount + ", status=" + coverageStatus);
                     errors++;
                 }
             }
 
-            // Case E09 (corresponds to T07): Unmatched hole present
+            // Case E09: Unmatched hole present
             {
                 var h1 = createHole("PartA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
                 var h2 = createHole("PartB-1", new double[] { 0, 0, 0.01 }, new double[] { 0, 0, 1 });
@@ -305,11 +336,142 @@ namespace ADDIN.Tests
 
                 if (unmatched == 1 && coverageStatus == "CHUA_DAY_DU: CO_LO_CHUA_GHEP")
                 {
-                    Console.WriteLine("PASS [E09/T07]: Unmatched hole preserved and reported in coverage status");
+                    Console.WriteLine("PASS [E09]: Unmatched hole preserved and reported in coverage status");
                 }
                 else
                 {
-                    Console.WriteLine("FAIL [E09/T07]: unmatched=" + unmatched + ", status=" + coverageStatus);
+                    Console.WriteLine("FAIL [E09]: unmatched=" + unmatched + ", status=" + coverageStatus);
+                    errors++;
+                }
+            }
+
+            return errors;
+        }
+
+        private static int RunRealEvaluateStackToleranceTests(Assembly asm)
+        {
+            Console.WriteLine("\n--- 2. Testing Production EvaluateStack & CG1 Pipeline (Real Algorithms) ---");
+            int errors = 0;
+
+            CheckAssemblyHole checker = new CheckAssemblyHole(null);
+            Type checkType = typeof(CheckAssemblyHole);
+            MethodInfo evalMethod = checkType.GetMethod("EvaluateStack", BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo buildCoverageMethod = checkType.GetMethod("BuildConnectionCoverage", BindingFlags.NonPublic | BindingFlags.Static);
+
+            Type holeAxisType = checkType.GetNestedType("HoleAxis", BindingFlags.NonPublic);
+            Type holeStackType = checkType.GetNestedType("HoleStack", BindingFlags.NonPublic);
+            Type stackResultType = checkType.GetNestedType("HoleStackResult", BindingFlags.NonPublic);
+
+            Func<string, double[], double[], object> createHole = (comp, center, dir) =>
+            {
+                object h = Activator.CreateInstance(holeAxisType);
+                holeAxisType.GetField("ComponentOccurrence").SetValue(h, comp);
+                holeAxisType.GetField("Center").SetValue(h, center);
+                holeAxisType.GetField("Direction").SetValue(h, dir);
+                return h;
+            };
+
+            Func<List<object>, object> createStack = (members) =>
+            {
+                object stack = Activator.CreateInstance(holeStackType);
+                IList stackHoles = (IList)holeStackType.GetField("Holes").GetValue(stack);
+                foreach (var m in members) stackHoles.Add(m);
+                return stack;
+            };
+
+            // Test E10 (T02 Real Algorithm): EvaluateStack with 0.09 mm offset (<= 0.10 mm tolerance)
+            {
+                var h1 = createHole("PartA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
+                var h2 = createHole("PartB-1", new double[] { 0.00009, 0, 0.010 }, new double[] { 0, 0, 1 });
+                var stack = createStack(new List<object> { h1, h2 });
+
+                object evalRes = evalMethod.Invoke(checker, new object[] { stack });
+                bool isNg = (bool)stackResultType.GetField("IsNg").GetValue(evalRes);
+                double maxOffsetM = (double)stackResultType.GetField("MaxOffsetM").GetValue(evalRes);
+
+                // Pipe into CG1 BuildConnectionCoverage
+                var holes = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(holeAxisType));
+                holes.Add(h1); holes.Add(h2);
+                var results = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(stackResultType));
+                results.Add(evalRes);
+                object cov = buildCoverageMethod.Invoke(null, new object[] { holes, results });
+                IList groups = (IList)cov.GetType().GetField("Groups").GetValue(cov);
+                object g = groups[0];
+                string groupStatus = (string)g.GetType().GetProperty("Status").GetValue(g, null);
+                string masterDecision = (string)g.GetType().GetProperty("MasterDecision").GetValue(g, null);
+
+                if (!isNg && Math.Abs(maxOffsetM - 0.00009) < 1e-6 && groupStatus == "OK" && masterDecision == "KHONG_CAN_MASTER_DE_CHECK_DONG_TAM")
+                {
+                    Console.WriteLine("PASS [E10/T02]: Real EvaluateStack evaluated 0.09mm offset as OK; CG1 correctly recorded Status=OK and unassigned master");
+                }
+                else
+                {
+                    Console.WriteLine("FAIL [E10/T02]: isNg=" + isNg + ", maxOffsetM=" + maxOffsetM + ", groupStatus=" + groupStatus);
+                    errors++;
+                }
+            }
+
+            // Test E11 (T03 Real Algorithm): EvaluateStack with 0.11 mm offset (> 0.10 mm tolerance)
+            {
+                var h1 = createHole("PartA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
+                var h2 = createHole("PartB-1", new double[] { 0.00011, 0, 0.010 }, new double[] { 0, 0, 1 });
+                var stack = createStack(new List<object> { h1, h2 });
+
+                object evalRes = evalMethod.Invoke(checker, new object[] { stack });
+                bool isNg = (bool)stackResultType.GetField("IsNg").GetValue(evalRes);
+                double maxOffsetM = (double)stackResultType.GetField("MaxOffsetM").GetValue(evalRes);
+
+                // Pipe into CG1 BuildConnectionCoverage
+                var holes = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(holeAxisType));
+                holes.Add(h1); holes.Add(h2);
+                var results = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(stackResultType));
+                results.Add(evalRes);
+                object cov = buildCoverageMethod.Invoke(null, new object[] { holes, results });
+                IList groups = (IList)cov.GetType().GetField("Groups").GetValue(cov);
+                object g = groups[0];
+                string groupStatus = (string)g.GetType().GetProperty("Status").GetValue(g, null);
+                string masterDecision = (string)g.GetType().GetProperty("MasterDecision").GetValue(g, null);
+                int ngNoMaster = (int)cov.GetType().GetField("NgGroupsWithoutMaster").GetValue(cov);
+
+                if (isNg && Math.Abs(maxOffsetM - 0.00011) < 1e-6 && groupStatus == "NG" && masterDecision == "CHUA_XAC_DINH_MASTER" && ngNoMaster == 1)
+                {
+                    Console.WriteLine("PASS [E11/T03]: Real EvaluateStack evaluated 0.11mm offset as NG; CG1 correctly recorded Status=NG, CHUA_XAC_DINH_MASTER, NgGroupsWithoutMaster=1");
+                }
+                else
+                {
+                    Console.WriteLine("FAIL [E11/T03]: isNg=" + isNg + ", maxOffsetM=" + maxOffsetM + ", groupStatus=" + groupStatus);
+                    errors++;
+                }
+            }
+
+            // Test E12 (T04 Real Algorithm): EvaluateStack with angle 0.35 deg (> 0.20 deg tolerance)
+            {
+                double angleRad = 0.35 * Math.PI / 180.0;
+                var h1 = createHole("PartA-1", new double[] { 0, 0, 0 }, new double[] { 0, 0, 1 });
+                var h2 = createHole("PartB-1", new double[] { 0, 0, 0.010 }, new double[] { Math.Sin(angleRad), 0, Math.Cos(angleRad) });
+                var stack = createStack(new List<object> { h1, h2 });
+
+                object evalRes = evalMethod.Invoke(checker, new object[] { stack });
+                bool isNg = (bool)stackResultType.GetField("IsNg").GetValue(evalRes);
+                double maxAngleDeg = (double)stackResultType.GetField("MaxAngleDeg").GetValue(evalRes);
+
+                // Pipe into CG1 BuildConnectionCoverage
+                var holes = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(holeAxisType));
+                holes.Add(h1); holes.Add(h2);
+                var results = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(stackResultType));
+                results.Add(evalRes);
+                object cov = buildCoverageMethod.Invoke(null, new object[] { holes, results });
+                IList groups = (IList)cov.GetType().GetField("Groups").GetValue(cov);
+                object g = groups[0];
+                string groupStatus = (string)g.GetType().GetProperty("Status").GetValue(g, null);
+
+                if (isNg && Math.Abs(maxAngleDeg - 0.35) < 1e-2 && groupStatus == "NG")
+                {
+                    Console.WriteLine("PASS [E12/T04]: Real EvaluateStack evaluated 0.35 deg angle as NG; CG1 correctly recorded Status=NG");
+                }
+                else
+                {
+                    Console.WriteLine("FAIL [E12/T04]: isNg=" + isNg + ", maxAngleDeg=" + maxAngleDeg + ", groupStatus=" + groupStatus);
                     errors++;
                 }
             }
@@ -319,7 +481,7 @@ namespace ADDIN.Tests
 
         private static int RunWinFormsUITests(Assembly asm)
         {
-            Console.WriteLine("\n--- 2. Testing CheckHoleResultsForm and WinForms Integration ---");
+            Console.WriteLine("\n--- 3. Testing CheckHoleResultsForm and WinForms Integration ---");
             int errors = 0;
 
             Type formType = asm.GetType("ADDIN.Commands.CheckHoleResultsForm");
