@@ -152,3 +152,260 @@ Before/after: OK, NG, Missing, Pattern, unmatched, marker counts:
 Known risks / unresolved:
 Ready for review: YES / NO
 ```
+
+---
+
+## 8. MÃ NGUỒN C# ĐẦY ĐỦ CHO ANTIGRAVITY (CG1)
+
+**ĐÃ ĐƯỢC COMMIT VÀ TÍCH HỢP TRÊN BRANCH NÀY. KHÔNG DÁN LẠI HOẶC TẠO FILE TRÙNG.** Đây là bản mã tham khảo đầy đủ đặt trong Markdown theo yêu cầu, để Anti đọc một tài liệu duy nhất. Khi có khác biệt, so sánh với file .cs thực tế trên branch và báo lại, không tự ý ghi đè.
+
+### 8.1 File mới: `Commands/CheckAssemblyHole.ConnectionGroups.cs`
+
+Mã C# 7.3 / .NET Framework 4.8. Toàn bộ file:
+
+```csharp
+// CG1 — Read-only diagnostics over the existing CHECK HOLE stacks.
+// .NET Framework 4.8, C# 7.3. Does not modify HoleAxis, HoleStack,
+// tolerance thresholds, matching or OK/NG verdicts.
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace ADDIN.Commands
+{
+    internal sealed class CheckHoleConnectionGroupRow
+    {
+        public int Id { get; set; }
+        public string Status { get; set; }
+        public string Components { get; set; }
+        public int HoleCount { get; set; }
+        public string EndCandidates { get; set; }
+        public string MasterDecision { get; set; }
+        public string MatchSource { get; set; }
+        public double MaxOffsetMm { get; set; }
+        public double MaxAngleDeg { get; set; }
+        public string Note { get; set; }
+    }
+
+    internal sealed class CheckHoleConnectionCoverage
+    {
+        public int LogicalHoleCount;
+        public int GroupCount;
+        public int PairedHoleCount;
+        public int UnmatchedHoleCount;
+        public int NgGroupsWithoutMaster;
+        public int ComponentOccurrencesWithHoles;
+        public string CoverageStatus;
+        public readonly List<CheckHoleConnectionGroupRow> Groups =
+            new List<CheckHoleConnectionGroupRow>();
+    }
+
+    public sealed partial class CheckAssemblyHole
+    {
+        /// <summary>
+        /// CG1: automated grouping of *existing matched hole stacks*.
+        /// A stack is geometric evidence, NOT proof of fastening intent.
+        /// Do not use this output to create missing-hole NG or to select an
+        /// authoritative master without further design/assembly evidence.
+        /// </summary>
+        private static CheckHoleConnectionCoverage BuildConnectionCoverage(
+            List<HoleAxis> holes, List<HoleStackResult> results)
+        {
+            if (holes == null) throw new ArgumentNullException("holes");
+            if (results == null) throw new ArgumentNullException("results");
+
+            var coverage = new CheckHoleConnectionCoverage();
+            var paired = new HashSet<HoleAxis>();
+            coverage.LogicalHoleCount = holes.Count;
+            coverage.ComponentOccurrencesWithHoles = holes
+                .Where(h => h != null)
+                .Select(h => h.ComponentOccurrence ?? "")
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count();
+
+            foreach (HoleStackResult result in results)
+            {
+                if (result == null || result.Stack == null || result.Reference == null)
+                    continue;
+
+                List<HoleAxis> members = result.Stack.Holes
+                    .Where(h => h != null).Distinct().ToList();
+                if (members.Count < 2) continue;
+                foreach (HoleAxis member in members) paired.Add(member);
+
+                // The axis orientation is canonical, not a known assembly approach.
+                // These are merely two geometric endpoints, NOT a master/host.
+                double[] axis = result.Reference.Direction;
+                var ordered = members
+                    .OrderBy(h => Dot(h.Center, axis))
+                    .ThenBy(h => h.ComponentOccurrence ?? "", StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                double firstProjection = Dot(ordered[0].Center, axis);
+                double lastProjection = Dot(ordered[ordered.Count - 1].Center, axis);
+                string endCandidates;
+                if (lastProjection - firstProjection <= 0.00005) // 0.05 mm: display only
+                {
+                    endCandidates = "Khong phan biet duoc hai dau truc";
+                }
+                else
+                {
+                    endCandidates = (ordered[0].ComponentOccurrence ?? "?") + " | "
+                        + (ordered[ordered.Count - 1].ComponentOccurrence ?? "?");
+                }
+
+                var row = new CheckHoleConnectionGroupRow
+                {
+                    Id = coverage.Groups.Count + 1,
+                    Status = result.IsNg ? "NG" : "OK",
+                    Components = string.Join(" / ", members
+                        .Select(h => h.ComponentOccurrence ?? "?")
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)),
+                    HoleCount = members.Count,
+                    EndCandidates = endCandidates,
+                    MasterDecision = result.IsNg
+                        ? "CHUA_XAC_DINH_MASTER"
+                        : "KHONG_CAN_MASTER_DE_CHECK_DONG_TAM",
+                    MatchSource = result.Stack.MatchSource.ToString(),
+                    MaxOffsetMm = result.MaxOffsetM * 1000.0,
+                    MaxAngleDeg = result.MaxAngleDeg,
+                    Note = result.IsNg
+                        ? "NG hinh hoc da co; chua quy loi cho Part nao"
+                        : "Cum hinh hoc OK; khong suy ra y dinh lap ghep"
+                };
+                coverage.Groups.Add(row);
+                if (result.IsNg) coverage.NgGroupsWithoutMaster++;
+            }
+
+            coverage.GroupCount = coverage.Groups.Count;
+            coverage.PairedHoleCount = paired.Count;
+            coverage.UnmatchedHoleCount = holes.Count(h => h != null && !paired.Contains(h));
+            coverage.CoverageStatus = holes.Count == 0
+                ? "KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO"
+                : coverage.UnmatchedHoleCount > 0
+                    ? "CHUA_DAY_DU: CO_LO_CHUA_GHEP"
+                    : "DA_GHEP_LO_NHAN_DIEN; CHUA_KIEM_TRA_PART_KHONG_CO_LO";
+            return coverage;
+        }
+    }
+}
+```
+
+### 8.2 Điểm tích hợp trong `Commands/CheckAssemblyHole.cs`
+
+Ngay **sau** lời gọi `BuildReport`, mã đang tồn tại trên branch là:
+
+```csharp
+                lastReport = BuildReport(model.GetTitle(), SafeConfigurationName(model), holes, results, patternIssues, 0);
+                lastReport.ConnectionCoverage = BuildConnectionCoverage(holes, results);
+```
+
+Chỉ thêm dòng `ConnectionCoverage` khi chưa có; tuyệt đối không thay đổi `BuildReport`, `EvaluateStack`, các threshold hoặc mọi nhánh NG hiện tại.
+
+### 8.3 Tích hợp model và summary trong `Commands/CheckHoleResultsForm.cs`
+
+Property mới nằm trong `internal sealed class CheckHoleReport`:
+
+```csharp
+        public CheckHoleConnectionCoverage ConnectionCoverage;
+```
+
+Đoạn bổ sung ở cuối `CheckHoleReport.Summary` (trước đoạn `MarkerStatus`):
+
+```csharp
+                if (ConnectionCoverage != null)
+                    sb.AppendLine().Append("Nhóm lỗ đã ghép (chẩn đoán): ").Append(ConnectionCoverage.GroupCount)
+                      .Append(" | NG chưa rõ Master: ").Append(ConnectionCoverage.NgGroupsWithoutMaster)
+                      .Append(" | Lỗ chưa ghép: ").Append(ConnectionCoverage.UnmatchedHoleCount)
+                      .Append(" | ").Append(ConnectionCoverage.CoverageStatus);
+```
+
+### 8.4 Nút giao diện và trạng thái
+
+Trong `CheckHoleResultsForm`, thêm trường:
+
+```csharp
+        private readonly Button connectionGroups = new Button();
+```
+
+Trong constructor, đặt cạnh nút `Xuất CSV`:
+
+```csharp
+            AddButton(toolbar, connectionGroups, "Nhóm liên kết", ShowConnectionGroups);
+```
+
+Trong `UpdateActions()`:
+
+```csharp
+            connectionGroups.Enabled = !busy && report != null && report.ConnectionCoverage != null;
+```
+
+### 8.5 Toàn bộ method hiển thị nhóm lỗ
+
+Đặt trong class `CheckHoleResultsForm` trước `ExportReport()`:
+
+```csharp
+        // CG1 diagnostic-only. Display does not select Master, change any
+        // production NG decision, or create model geometry.
+        private void ShowConnectionGroups()
+        {
+            if (busy || report == null || report.ConnectionCoverage == null) return;
+            CheckHoleConnectionCoverage c = report.ConnectionCoverage;
+            using (var dialog = new Form())
+            {
+                dialog.Text = "CHECK HOLE - Nhóm liên kết (chẩn đoán)";
+                dialog.Size = new Size(1150, 580);
+                dialog.MinimumSize = new Size(850, 420);
+                dialog.StartPosition = FormStartPosition.CenterScreen;
+                dialog.Font = new Font("Segoe UI", 9F);
+                var description = new Label
+                {
+                    Dock = DockStyle.Top,
+                    Height = 72,
+                    Padding = new Padding(10),
+                    Text = "Nhóm lỗ đã ghép: " + c.GroupCount
+                        + " | NG chưa rõ Master: " + c.NgGroupsWithoutMaster
+                        + " | Lỗ chưa ghép: " + c.UnmatchedHoleCount
+                        + Environment.NewLine
+                        + "Hai đầu trục chỉ là ứng viên hình học, KHÔNG phải vật chủ được xác nhận."
+                        + Environment.NewLine
+                        + "CG1 chưa kiểm tra quan hệ đối với Part không có lỗ."
+                };
+                var table = new DataGridView
+                {
+                    Dock = DockStyle.Fill,
+                    ReadOnly = true,
+                    AutoGenerateColumns = true,
+                    AllowUserToAddRows = false,
+                    AllowUserToDeleteRows = false,
+                    RowHeadersVisible = false,
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+                    DataSource = c.Groups
+                };
+                dialog.Controls.Add(table);
+                dialog.Controls.Add(description);
+                dialog.ShowDialog();
+            }
+        }
+```
+
+Giao diện này chỉ đọc bản kết quả đã tính, không sửa model, không tự chọn vật chủ, không tạo marker và không sửa sự kiện ngoài phạm vi CG1.
+
+### 8.6 `ADDIN.csproj` — thêm file nguồn
+
+Trong ItemGroup chứa `Commands\\CheckAssemblyHole.cs`, có thêm dòng:
+
+```xml
+    <Compile Include="Commands\CheckAssemblyHole.ConnectionGroups.cs" />
+```
+
+### 8.7 Thứ tự chạy và tiêu chuẩn hoàn thành
+
+1. Switch vào branch CG1 đã có đầy đủ code. **Không chạy script ZIP cũ và không tạo trùng các đoạn code ở trên.**
+2. Review bốn file thay đổi với diff `main...HEAD`. Mọi logic production không liên quan phải giữ nguyên.
+3. Build Debug|x64, Release|x64 trong Windows/Visual Studio với SOLIDWORKS Interop chuẩn của dự án. Ghi log và giải thích lỗi.
+4. Chạy bài test T01–T10 trong Mục 4. Kiểm tra kết quả OK/NG, missing/pattern, marker, CSV **không thay đổi** so với baseline.
+5. Nếu chưa có Assembly kiểm thử, báo **NOT_TESTED**; không nói PASS.
+6. Commit phần sửa lỗi hợp lệ trên branch CG1 và báo SHA để ChatGPT review.
+
+**Ranh giới CG1:** Đây là lớp chẩn đoán các nhóm lỗ đã ghép, không tự xác định toàn bộ Part phải có lỗ; CG2 mới xét quan hệ Part kể cả khi thiếu lỗ.
