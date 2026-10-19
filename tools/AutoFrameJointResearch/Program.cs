@@ -14,6 +14,7 @@ namespace ADDIN.AutoFrameJointResearch
                     return 2;
                 }
                 int passed=FrameJointGeometryTests.Run();
+                passed+=FrameJointNumericTests.Run();
                 Console.WriteLine("SUCCESS: "+passed+" pure-geometry assertions.");
                 return 0;
             }

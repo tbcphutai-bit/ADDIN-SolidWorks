@@ -33,6 +33,7 @@
   <ItemGroup>
     <Compile Include="FrameJointGeometry.cs" />
     <Compile Include="FrameJointGeometryTests.cs" />
+    <Compile Include="FrameJointNumericTests.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -73,14 +73,53 @@ namespace ADDIN.AutoFrameJointResearch
     {
         private static double Clamp(double x,double lo,double hi) { return Math.Max(lo,Math.Min(hi,x)); }
 
+        // System.Double.IsFinite is not available in .NET Framework 4.8.
+        private static bool IsFinite(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
+        private static bool IsFinite(V3 value)
+        {
+            return IsFinite(value.X) && IsFinite(value.Y) && IsFinite(value.Z);
+        }
+
+        private static JointResult Invalid(string reason)
+        {
+            return new JointResult {
+                Status=JointSolveStatus.InvalidInput,
+                Reason=reason,
+                Winner=FrameWinner.Undetermined,
+                WinnerSource=WinnerEvidence.Unresolved,
+                CanAutomaticallyChooseCut=false
+            };
+        }
+
         public static JointResult Analyze(JointInputs x)
         {
             if (x==null || x.A==null || x.B==null)
-                return new JointResult { Status=JointSolveStatus.InvalidInput, Reason="Two frames required." };
-            if (x.PositionToleranceMm<=0 || x.LengthTieToleranceMm<0 ||
-                x.AngleParallelToleranceDeg<=0 || x.AngleParallelToleranceDeg>=90 ||
-                x.PanelNormal.Norm < 1e-12)
-                return new JointResult { Status=JointSolveStatus.InvalidInput, Reason="Invalid tolerances/normal." };
+                return Invalid("Two frames required.");
+
+            // Reject NaN/Infinity before comparisons and vector normalization.
+            // Comparisons such as NaN <= 0 are FALSE and therefore insufficient.
+            if (!IsFinite(x.PositionToleranceMm) ||
+                !IsFinite(x.LengthTieToleranceMm) ||
+                !IsFinite(x.AngleParallelToleranceDeg) ||
+                x.PositionToleranceMm<=0 || x.LengthTieToleranceMm<0 ||
+                x.AngleParallelToleranceDeg<=0 || x.AngleParallelToleranceDeg>=90)
+                return Invalid("Non-finite or out-of-range tolerances.");
+
+            if (!IsFinite(x.A.Start) || !IsFinite(x.A.End) ||
+                !IsFinite(x.B.Start) || !IsFinite(x.B.End) ||
+                !IsFinite(x.PanelNormal))
+                return Invalid("Non-finite frame coordinates or panel normal.");
+
+            double lengthA=x.A.LengthMm, lengthB=x.B.LengthMm;
+            double normalLength=x.PanelNormal.Norm;
+            if (!IsFinite(lengthA) || !IsFinite(lengthB) ||
+                !IsFinite(normalLength) ||
+                lengthA<1e-9 || lengthB<1e-9 || normalLength<1e-12)
+                return Invalid("Degenerate or numerically overflowing geometry.");
 
             var n = x.PanelNormal.Unit();
             var da=x.A.Axis;
@@ -137,11 +176,24 @@ namespace ADDIN.AutoFrameJointResearch
             }
 
             V3 delta=x.B.Start-x.A.Start;
+            if (!IsFinite(delta))
+                return Invalid("Coordinate difference overflow.");
+
             double t=V3.Dot(V3.Cross(delta,db),n)/determinant;
             double u=V3.Dot(V3.Cross(delta,da),n)/determinant;
+            if (!IsFinite(t) || !IsFinite(u))
+                return Invalid("Axis intersection calculation overflow.");
+
             V3 pa=x.A.Start+da*t, pb=x.B.Start+db*u;
+            if (!IsFinite(pa) || !IsFinite(pb))
+                return Invalid("Axis intersection coordinate overflow.");
+
             result.AxisIntersection=(pa+pb)*0.5;
-            if ((pa-pb).Norm>x.PositionToleranceMm)
+            double pointGap=(pa-pb).Norm;
+            if (!IsFinite(result.AxisIntersection) || !IsFinite(pointGap))
+                return Invalid("Axis intersection numeric overflow.");
+
+            if (pointGap>x.PositionToleranceMm)
             {
                 result.Status=JointSolveStatus.NonPlanar;
                 result.Reason="Computed axis points do not coincide.";
