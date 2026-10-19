@@ -612,3 +612,28 @@ PASS: sandbox path enforcement and CSV multiline production serializer self-test
 | `FIXTURE_GENERATOR_FULL_REGENERATION` | **NOT_TESTED** | Full live regeneration from scratch was not re-run in this pass because existing clean fixtures from prior sessions in `D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures` are fully verified and intact, and live regeneration requires an idle CAD session with explicit destructive consent. |
 | `CSV_PRODUCTION_SERIALIZER_MULTILINE` | **PASS** | RFC-4180 multiline parser with unclosed quote detection and exact production cell serializer parity verified with exit 0. |
 | `CAD_FIXTURE_NG_PROVEN` | **PASS** | Proven in Review #6 on `Fixture_NG_Offset.SLDASM` ($+0.30\text{ mm}$ translation with suppressed mates producing `NG=12` on both baseline and candidate). |
+
+---
+
+## 10. Review #10 Verbatim Execution & Evidence (Ownership Timing & Genuine Working-Tree Test)
+
+### A. FIXTURE_GENERATOR Compilation & Review #10 Hardened Self-Test
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\Roslyn\csc.exe" /target:exe /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\FIXTURE_GENERATOR.exe" "docs\antigravity\reports\FIXTURE_GENERATOR.cs"
+& "docs\antigravity\reports\FIXTURE_GENERATOR.exe" --self-test
+Remove-Item "docs\antigravity\reports\FIXTURE_GENERATOR.exe" -Force
+```
+
+**Verbatim Console Output:**
+```text
+Microsoft (R) Visual C# Compiler version 5.10.0-1.26380.3 (6cf38df40de9a5fa4b2e996807fe195d4c4d1f98)
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PASS: FIXTURE_GENERATOR sandbox consent and safety gates self-test (FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS)
+```
+- Status: `FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS`
+- Exit Code: `0`
+
+### B. Summary of Review #10 Fixes
+1. **Issue A (Ownership Timing):** `ownsSession = true` is now set immediately upon non-null return from `Activator.CreateInstance`. Any exception during active document query or detection of an active document safely triggers `app.ExitApp()` in the `finally` block, ensuring no background SOLIDWORKS process is leaked.
+2. **Issue B (Genuine Working-Tree Guard Verification):** Negative case 3 in `SelfTestSandboxLogic` now constructs a valid temporary sandbox inside `cwd` with consent and valid internal containment. It explicitly verifies that Guard 3 throws `InvalidOperationException` matching `"working project tree or git repo"`, completely eliminating false positives from the containment check. Temporary test artifacts are deleted in `finally`.

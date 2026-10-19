@@ -98,13 +98,27 @@ namespace ADDIN.Tests
                 if (app == null)
                     throw new InvalidOperationException("Failed to launch SOLIDWORKS instance.");
 
-                if (app.ActiveDoc != null)
+                // Review #10 Issue A: Mark ownership immediately upon successful instantiation so that
+                // any failure during active document inspection will still trigger clean app.ExitApp() in finally.
+                ownsSession = true;
+
+                ModelDoc2 activeDoc = null;
+                try
+                {
+                    activeDoc = (ModelDoc2)app.ActiveDoc;
+                }
+                catch (Exception ex)
                 {
                     throw new InvalidOperationException(
-                        "New SOLIDWORKS instance already has an active document open. Aborting to ensure a clean session.");
+                        "Failed to query ActiveDoc on newly created SOLIDWORKS instance: " + ex.Message, ex);
                 }
 
-                ownsSession = true;
+                if (activeDoc != null)
+                {
+                    throw new InvalidOperationException(
+                        "New SOLIDWORKS instance unexpectedly has an active document open. Aborting to ensure clean session.");
+                }
+
                 GenerateAll(app, sandboxRoot, fixtureDir, allowOverwrite);
                 return 0;
             }
@@ -575,33 +589,86 @@ namespace ADDIN.Tests
 
                 // Negative case 1: Missing consent
                 File.Delete(consent);
+                bool caughtMissingConsent = false;
                 try
                 {
                     RequireSandboxConsent(tempDir, subDir);
-                    Console.Error.WriteLine("FAIL: Missing consent did not throw.");
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("Sandbox consent token missing"))
+                {
+                    caughtMissingConsent = true;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("FAIL: Missing consent threw unexpected exception: " + ex.Message);
+                }
+                if (!caughtMissingConsent)
+                {
+                    Console.Error.WriteLine("FAIL: Missing consent did not throw expected exception.");
                     ok = false;
                 }
-                catch { /* expected */ }
 
                 // Negative case 2: Outside sandbox
                 File.WriteAllText(consent, "TEST_CONSENT");
+                bool caughtOutsideSandbox = false;
                 try
                 {
                     RequireSandboxConsent(tempDir, @"C:\outside\dir");
-                    Console.Error.WriteLine("FAIL: Path outside sandbox did not throw.");
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("outside sandboxRoot"))
+                {
+                    caughtOutsideSandbox = true;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("FAIL: Outside sandbox threw unexpected exception: " + ex.Message);
+                }
+                if (!caughtOutsideSandbox)
+                {
+                    Console.Error.WriteLine("FAIL: Path outside sandbox did not throw expected exception.");
                     ok = false;
                 }
-                catch { /* expected */ }
 
-                // Negative case 3: Inside project working directory
+                // Negative case 3: Genuine inside project working directory rejection (Review #10 Issue B)
+                // Creates a sandbox INSIDE cwd with consent and valid internal containment,
+                // proving that execution is rejected specifically by the working-tree guard.
                 string cwd = Directory.GetCurrentDirectory();
+                string mockWorktreeSandbox = Path.Combine(cwd, ".tmp_cg1_worktree_test_" + Guid.NewGuid().ToString("N"));
+                string mockWorktreeFixtures = Path.Combine(mockWorktreeSandbox, "Fixtures");
                 try
                 {
-                    RequireSandboxConsent(tempDir, cwd);
-                    Console.Error.WriteLine("FAIL: Working directory path did not throw.");
-                    ok = false;
+                    Directory.CreateDirectory(mockWorktreeFixtures);
+                    File.WriteAllText(Path.Combine(mockWorktreeSandbox, "CG1_SANDBOX_OK.txt"), "TEST_CONSENT");
+
+                    bool caughtExpectedWorktreeException = false;
+                    try
+                    {
+                        // Containment: mockWorktreeFixtures is inside mockWorktreeSandbox (passes Guards 1 & 2),
+                        // but both are inside cwd (must be rejected by Guard 3!).
+                        RequireSandboxConsent(mockWorktreeSandbox, mockWorktreeFixtures);
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("working project tree or git repo"))
+                    {
+                        caughtExpectedWorktreeException = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine("FAIL: Working directory guard threw unexpected exception: " + ex.Message);
+                    }
+
+                    if (!caughtExpectedWorktreeException)
+                    {
+                        Console.Error.WriteLine("FAIL: Working directory path was not rejected by working project tree guard.");
+                        ok = false;
+                    }
                 }
-                catch { /* expected */ }
+                finally
+                {
+                    if (Directory.Exists(mockWorktreeSandbox))
+                    {
+                        try { Directory.Delete(mockWorktreeSandbox, true); } catch { }
+                    }
+                }
             }
             finally
             {

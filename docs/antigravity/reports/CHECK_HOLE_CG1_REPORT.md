@@ -7,20 +7,30 @@
 
 ---
 
-## 0. Review Responses & Resolution
+### 0. Review Responses & Resolution
 
-### 0.1 Resolution of ChatGPT Review #9 (2026-10-19)
+### 0.1 Resolution of ChatGPT Review #10 (2026-10-19)
+
+| # | Review #10 Item / Issue | Status | Resolution & Evidence |
+|---|---|---|---|
+| **A** | **Issue A: `ownsSession` flag set too late (cleanup can be skipped on ActiveDoc check failure)** | **RESOLVED & PASS** | **Nguyên nhân chỉ ra:** Trong phiên bản trước, `ownsSession = true;` được đặt sau khi kiểm tra `app.ActiveDoc != null`. Nếu `app.ActiveDoc` ném ngoại lệ hoặc không rỗng, `ownsSession` vẫn là `false` nên khối `finally` bỏ qua `app.ExitApp()`, dẫn đến nguy cơ rò rỉ tiến trình `SLDWORKS` ngầm.<br>**Khắc phục toàn diện trong [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs):**<br>- Đặt `ownsSession = true;` ngay sau khi khởi tạo thành công COM instance (`app != null`), vì trước đó đã xác nhận `Process.GetProcessesByName("SLDWORKS").Length == 0` (chắc chắn đây là phiên do generator tạo ra).<br>- Bao bọc việc đọc `app.ActiveDoc` trong `try/catch` có kiểm soát. Nếu xảy ra lỗi hoặc `activeDoc != null`, khối `finally` luôn luôn thực thi `app.ExitApp()`, bảo đảm 100% không rò rỉ phiên. |
+| **B** | **Issue B: Test 'reject working project tree' is a false-positive (containment guard preempted working-tree guard)** | **RESOLVED & PASS** | **Nguyên nhân chỉ ra:** `SelfTestSandboxLogic()` trước đó truyền `RequireSandboxConsent(tempDir, cwd)` với `tempDir` nằm trong `%TEMP%` và `cwd` là thư mục dự án. Ngoại lệ bị ném ra do `cwd` nằm ngoài `tempDir` (Guard 2 - containment), chứ không phải do guard working tree (Guard 3) kích hoạt.<br>**Khắc phục toàn diện trong [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs):**<br>- Tạo một mock sandbox hợp lệ nằm *bên trong* `cwd` (`.tmp_cg1_worktree_test_<guid>`) có đầy đủ `CG1_SANDBOX_OK.txt` và thư mục con `Fixtures` (thỏa mãn Guard 1 và Guard 2).<br>- Gọi `RequireSandboxConsent(mockWorktreeSandbox, mockWorktreeFixtures)` và xác nhận chính xác ngoại lệ `InvalidOperationException` chứa chuỗi `"working project tree or git repo"` do Guard 3 ném ra.<br>- Dọn dẹp an toàn thư mục mock test trong khối `finally`. Kiểm tra `FIXTURE_GENERATOR.exe --self-test` $\to$ PASS (Exit 0). |
+| **C** | **Auxiliary Status & Production Scope Confirmation** | **VERIFIED & MAINTAINED** | - `CODE_COMPLETE=PASS` chỉ áp dụng nghiêm ngặt cho phạm vi mã nguồn production CG1 (`CheckAssemblyHole.cs`, `CheckAssemblyHole.ConnectionGroups.cs`, `CheckHoleResultsForm.cs`, `ADDIN.csproj`).<br>- Auxiliary fixture generator được ghi nhận chính xác: `FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS` và `FIXTURE_GENERATOR_FULL_REGENERATION=NOT_TESTED`.<br>- PR tiếp tục giữ ở chế độ Draft (`READY_FOR_MERGE=NO`), không merge vào `main` và không triển khai CG2. |
+
+---
+
+### 0.2 Resolution of ChatGPT Review #9 (2026-10-19)
 
 | # | Review #9 Item / Blocker | Status | Resolution & Evidence |
 |---|---|---|---|
 | **A** | **BLOCKER A: `FIXTURE_GENERATOR.cs` session protection & ownership lifecycle** | **RESOLVED & PASS** | **Nguyên nhân chỉ ra:** File generator trước đó gọi `Activator.CreateInstance` mà không kiểm tra tiến trình `SLDWORKS` đang chạy, không kiểm tra `app.ActiveDoc == null`, và không quản lý vòng đời phiên với cờ `ownsSession` trong `try/finally` gọi `app.ExitApp()`.<br>**Khắc phục toàn diện trong [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs):**<br>- *Bảo vệ phiên người dùng:* Kiểm tra `if (Process.GetProcessesByName("SLDWORKS").Length != 0) throw new InvalidOperationException(...)` ngay trước khi khởi tạo COM, từ chối chạy nếu phát hiện SOLIDWORKS đang mở để bảo vệ tuyệt đối công việc của người dùng.<br>- *Kiểm tra phiên sạch:* Sau khi khởi tạo COM, xác nhận `if (app.ActiveDoc != null) throw new InvalidOperationException(...)` để bảo đảm môi trường hoàn toàn sạch.<br>- *Quản lý vòng đời (`ownsSession`):* Theo dõi phiên bằng cờ `ownsSession = true;` và giải phóng an toàn trong khối `try/finally` gọi `app.ExitApp()` khi hoàn tất hoặc gặp lỗi. |
 | **B** | **BLOCKER B: Kiểm tra kết quả `EditRebuild3`, top-level `MateGroup`, và đọc ngược (readback) suppression của 19 mates** | **RESOLVED & PASS** | **Nguyên nhân chỉ ra:** Generator chưa kiểm tra giá trị trả về của `doc.EditRebuild3()` (trả về kiểu `bool`), chưa assert kết quả `SetSuppression2` trên feature cha `MateGroup`, chưa đọc ngược trạng thái thực tế của 19 mate sau rebuild, và chưa kiểm tra null/empty trên `GetComponents(false)` ở tất cả các giai đoạn.<br>**Khắc phục toàn diện trong [`FIXTURE_GENERATOR.cs`](FIXTURE_GENERATOR.cs):**<br>- *Kiểm tra `EditRebuild3()`:* Đã bổ sung `if (!doc.EditRebuild3()) throw new InvalidOperationException(...)` ở cả 5 giai đoạn sinh fixture (OK, NG, Unmatched, MultiLayer, OldMarker).<br>- *Assert top-level `MateGroup`:* Xác nhận `bool topSuppressed = feat.SetSuppression2(...)` thành công.<br>- *Đọc ngược (Readback) 19 mates:* Sau `doc.EditRebuild3()` trong Stage 2 (`Fixture_NG_Offset`), duyệt lại toàn bộ sub-feature của `MateGroup` và kiểm tra `sub.IsSuppressed()`. Xác nhận chính xác 19 sub-mate thực sự bị suppress trong bộ nhớ.<br>- *Kiểm tra mảng component:* Bổ sung kiểm tra `if (comps == null \|\| comps.Length == 0) throw ...` tại mọi giai đoạn thao tác lắp ghép. |
 | **C** | **BLOCKER C: Phân định trung thực trạng thái kiểm thử fixture generator** | **RESOLVED & PASS** | **Khắc phục:** Tách bạch rõ ràng giữa hai trạng thái:<br>- `FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS`: Đã chạy tự động `--self-test` kiểm tra các cổng bảo vệ sandbox, kiểm tra token consent, kiểm tra ranh giới đường dẫn và từ chối fail-closed (Exit 0).<br>- `FIXTURE_GENERATOR_FULL_REGENERATION=NOT_TESTED`: Các file fixture thực tế trong sandbox `D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures` từ các phiên trước đã được xác minh toàn vẹn và khớp 100% với baseline; việc tái tạo CAD từ đầu không được chạy lại trong lượt review này để tránh ghi đè các fixture đã xác minh và bảo vệ phiên CAD đang hoạt động. |
-| **D** | **MINOR: Kiểm tra cú pháp đóng ngoặc kép CSV RFC-4180 và cập nhật nhãn nhị phân** | **RESOLVED & PASS** | **Khắc phục toàn diện trong [`TEST_UI_INTERACTION.cs`](TEST_UI_INTERACTION.cs):**<br>- *Bắt lỗi ngoặc kép chưa đóng:* Trong `ParseCsvRecords`, nếu luồng kết thúc khi `inQuotes == true`, ném ngoại lệ `FormatException("Unclosed quote encountered in CSV data stream...")`.<br>- *Negative unit test:* Bổ sung negative test trong `--self-test` chứng minh chuỗi thiếu dấu nháy kép đóng sẽ bị bắt và ném `FormatException` chính xác.<br>- *Cập nhật nhãn bằng chứng:* Đổi tên nhãn thành `CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS`, phản ánh chính xác việc kiểm chứng bộ tuần tự hóa sản xuất đa dòng RFC-4180. |
+| **D** | **MINOR: Kiểm tra cú pháp đóng ngoặc kép CSV RFC-4180 và cập nhật nhãn nhị phân** | **RESOLVED & PASS** | **Khắc phục toàn diện trong [`TEST_UI_INTERACTION.cs`](TEST_UI_INTERACTION.cs):**<br>- *Bắt lỗi ngoặc kép chưa đóng:* Trong `ParseCsvRecords`, nếu luồng kết thúc khi `inQuotes == true`, ném ngay `FormatException("Unclosed quote encountered in CSV data stream...")`.<br>- *Negative unit test:* Bổ sung negative test trong `--self-test` chứng minh chuỗi thiếu dấu nháy kép đóng sẽ bị bắt và ném `FormatException` chính xác.<br>- *Cập nhật nhãn bằng chứng:* Đổi tên nhãn thành `CSV_PRODUCTION_SERIALIZER_MULTILINE_PASS`, phản ánh chính xác việc kiểm chứng bộ tuần tự hóa sản xuất đa dòng RFC-4180. |
 
 ---
 
-### 0.2 Resolution of ChatGPT Review #8 (2026-10-19)
+### 0.3 Resolution of ChatGPT Review #8 (2026-10-19)
 
 | # | Review #8 Item / Blocker | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -29,7 +39,7 @@
 
 ---
 
-### 0.3 Resolution of ChatGPT Review #7 (2026-10-19)
+### 0.4 Resolution of ChatGPT Review #7 (2026-10-19)
 
 | # | Review #7 Item / Blocker | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -40,7 +50,7 @@
 
 ---
 
-### 0.4 Resolution of ChatGPT Review #6 (2026-10-19)
+### 0.5 Resolution of ChatGPT Review #6 (2026-10-19)
 
 | # | Review #6 Blocker / Item | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -50,7 +60,7 @@
 
 ---
 
-### 0.5 Resolution of ChatGPT Review #5 (2026-10-19)
+### 0.6 Resolution of ChatGPT Review #5 (2026-10-19)
 
 | # | Review #5 Requirement | Status | Resolution & Evidence |
 |---|---|---|---|
@@ -61,7 +71,7 @@
 
 ---
 
-### 0.6 Prior Reviews Resolution Summary (Reviews #1–#4)
+### 0.7 Prior Reviews Resolution Summary (Reviews #1–#4)
 
 - **Review #1:** Sửa thông tin commit SHA; căn chỉnh lịch sử Git; mở Draft PR #27.
 - **Review #2:** Cung cấp log Rebuild chi tiết; kiểm thử độc lập hàm `EvaluateStack` với ngưỡng dung sai (0.09 mm, 0.11 mm, 0.35°); kiểm tra trạng thái WinForms offline (`UI01–UI05`).

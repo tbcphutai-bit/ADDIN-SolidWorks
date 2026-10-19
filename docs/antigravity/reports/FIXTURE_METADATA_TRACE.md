@@ -125,3 +125,17 @@ In response to Review #9 BLOCKER A and BLOCKER B, [`FIXTURE_GENERATOR.cs`](FIXTU
 3. **Truthful Testing State Separation (BLOCKER C):**
    - `FIXTURE_GENERATOR_SAFETY_SELF_TEST=PASS`: Unit test of sandbox security gates and path containment executed and confirmed with exit code 0.
    - `FIXTURE_GENERATOR_FULL_REGENERATION=NOT_TESTED`: The existing validated test fixtures in `D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures` from prior sessions are preserved; live CAD regeneration from scratch was not re-executed in this specific review pass to prevent overwriting verified fixtures and to protect running CAD sessions.
+
+---
+
+## 6. Prompt Ownership Marking & Genuine Working-Tree Guard Verification (Review #10)
+
+In response to Review #10 Issue A and Issue B:
+
+1. **Immediate Ownership Marking (`ownsSession = true`):**
+   - In `RunGenerate`, ownership flag `ownsSession = true` is set immediately upon non-null return from `Activator.CreateInstance(swType)` (which is only invoked after verifying 0 existing `SLDWORKS` processes).
+   - If querying `app.ActiveDoc` throws or detects an active document, `ownsSession` is already `true`, guaranteeing that `app.ExitApp()` is executed in the `finally` block to prevent orphaned background processes.
+2. **Genuine Working-Tree Guard Self-Test:**
+   - In `SelfTestSandboxLogic`, Negative Case 3 explicitly creates a temporary test sandbox *inside* the current working directory (`cwd`) with full consent (`CG1_SANDBOX_OK.txt`) and valid internal containment.
+   - This asserts specifically that Guard 3 (`fullRoot.StartsWith(workingDir) || fullDir.StartsWith(workingDir)`) triggers and throws `InvalidOperationException("fixtureDir cannot be inside working project tree or git repo: ...")`, eliminating false-positives where containment failure previously preempted the worktree check.
+   - Temporary test directory is safely and unconditionally deleted in `finally`.
