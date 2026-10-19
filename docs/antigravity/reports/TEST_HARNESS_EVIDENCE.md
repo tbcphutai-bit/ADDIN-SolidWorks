@@ -1,13 +1,16 @@
 # CHECK HOLE CG1 — TEST HARNESS & VERIFICATION EVIDENCE
 
 > Source files:
-> - [`docs/antigravity/reports/TEST_HARNESS.cs`](TEST_HARNESS.cs) (Offline algorithmic & UI harness)
-> - [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs) (Live SOLIDWORKS CAD benchmark)
+> - [`docs/antigravity/reports/TEST_HARNESS.cs`](TEST_HARNESS.cs) (Offline algorithmic, tolerance & WinForms state harness)
+> - [`docs/antigravity/reports/LIVE_CAD_RUNNER.cs`](LIVE_CAD_RUNNER.cs) (Live SOLIDWORKS dual-assembly regression runner: Baseline `main` vs `CG1`)
 >
-> Execution Date: 2026-10-19 05:32:40 UTC
-> Target Binary: `C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll`
-> Binary SHA256: `D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E`
-> Binary LastWrite: 2026-10-19 05:29:39 UTC
+> Execution Date: 2026-10-19 06:45:22 UTC
+> Target Binary (CG1): `C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll`
+> Target Binary SHA256: `D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E`
+> Target MVID: `456f9ade-ac27-4395-854f-857ad2521fd0`
+> Baseline Binary (`main`): `C:\Tao moi\ADDIN_MAIN_BASELINE\bin\x64\Release\ADDIN.dll`
+> Baseline Binary SHA256: `297D66CDF1EF56382C1165B8F84AF7B394090B2B8D2DC25A2F4D71067836118D`
+> Baseline MVID: `8008c4c2-2258-456a-8cf5-5b6fed1d742b`
 
 ---
 
@@ -15,30 +18,30 @@
 
 ### A. Offline Test Harness (17/17 Checks Passed)
 ```powershell
-& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /r:"C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /out:"docs\antigravity\reports\TEST_HARNESS.exe" "docs\antigravity\reports\TEST_HARNESS.cs"
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\Roslyn\csc.exe" /r:"C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /out:"docs\antigravity\reports\TEST_HARNESS.exe" "docs\antigravity\reports\TEST_HARNESS.cs"
 & "docs\antigravity\reports\TEST_HARNESS.exe" "C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll"
 Remove-Item "docs\antigravity\reports\TEST_HARNESS.exe" -Force
 ```
 
-### B. Live SOLIDWORKS In-CAD Smoke Test & Benchmark
+### B. Live SOLIDWORKS In-CAD Dual-Assembly Regression Benchmark
 ```powershell
-& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /r:"C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\LIVE_CAD_RUNNER.exe" "docs\antigravity\reports\LIVE_CAD_RUNNER.cs"
-& "docs\antigravity\reports\LIVE_CAD_RUNNER.exe"
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\Roslyn\csc.exe" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.sldworks.dll" /r:"C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\SolidWorks.Interop.swconst.dll" /out:"docs\antigravity\reports\LIVE_CAD_RUNNER.exe" "docs\antigravity\reports\LIVE_CAD_RUNNER.cs"
+& "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" "C:\Tao moi\ADDIN_MAIN_BASELINE\bin\x64\Release\ADDIN.dll" "C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll"
 Remove-Item "docs\antigravity\reports\LIVE_CAD_RUNNER.exe" -Force
 ```
 
 ---
 
-## 2. Verbatim Console Output (Offline Test Harness)
+## 2. Verbatim Console Output (Offline Test Harness — 17/17 PASS)
 
 ```text
 ===============================================================
 ANTIGRAVITY CHECK HOLE CG1 — REPRODUCIBLE TEST HARNESS
-Timestamp: 2026-10-19 05:32:40 UTC
+Timestamp: 2026-10-19 06:45:22 UTC
 ===============================================================
 Target Assembly: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
 Assembly SHA256: D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E
-Assembly LastWrite: 2026-10-19 05:29:39 UTC
+Assembly LastWrite: 2026-10-19 06:24:14 UTC
 Loaded Assembly: ADDIN, Version=1.0.0.0, Culture=neutral, PublicKeyToken=36eed1a140b4715f
 
 --- 1. Testing CheckAssemblyHole.BuildConnectionCoverage (Display & Transfer) ---
@@ -70,32 +73,53 @@ RESULT: ALL 17 AUTOMATED TESTS PASSED (0 FAILURES)
 
 ---
 
-## 3. Verbatim Console Output (Live SOLIDWORKS In-CAD Benchmark)
+## 3. Verbatim Console Output (Live SOLIDWORKS In-CAD Regression Runner — 2/2 PASS, Exit Code 0)
 
 ```text
-===============================================================
-ANTIGRAVITY CHECK HOLE CG1 — LIVE SOLIDWORKS CAD RUNNER
-Timestamp: 2026-10-19 05:29:08 UTC
-===============================================================
-Connected to SOLIDWORKS: 32.5.0 (SOLIDWORKS 2024 SP5)
+===============================================================================
+ANTIGRAVITY CHECK HOLE CG1 — LIVE SOLIDWORKS REGRESSION & BENCHMARK RUNNER
+Timestamp (UTC): 2026-10-19 06:39:27 UTC
+===============================================================================
+[SETUP] Baseline DLL:  C:\Tao moi\ADDIN_MAIN_BASELINE\bin\x64\Release\ADDIN.dll
+[SETUP] CG1 Target DLL: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
+[SETUP] Baseline MVID: 8008c4c2-2258-456a-8cf5-5b6fed1d742b | SHA256: 297D66CDF1EF56382C1165B8F84AF7B394090B2B8D2DC25A2F4D71067836118D
+[SETUP] CG1      MVID: 456f9ade-ac27-4395-854f-857ad2521fd0 | SHA256: D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E
+[SAFETY] Pre-existing SOLIDWORKS session detected. Attaching to ROT/ProgID without closing user session.
+[SOLIDWORKS] Connected version: 32.5.0
 
---- Testing Model: run07_Missing_Ura_BOM.SLDASM ---
-Results: LogicalHoles=0, GroupedHoles=0, UnmatchedHoles=0, Stacks=0, NgStacks=0
-CG1 Diagnostic: Groups=0, CoverageStatus=KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO, NgWithoutMaster=0, Unmatched=0
-PASS: Zero-hole assembly diagnosed correctly without errors
+-------------------------------------------------------------------------------
+Evaluating: run07_Missing_Ura_BOM.SLDASM
+Path:       C:\Users\SGN26\Documents\addin\work\missing_ura_test_20261004\cases\run07\run07_Missing_Ura_BOM.SLDASM
+-> Running Baseline (main branch code)...
+   [Baseline] Logical=0, Grouped=0, Unmatched=0, Stacks=0, NG=0, PatNG=0, Miss=0
+-> Running CG1 Candidate (feat/check-hole-connection-groups-cg1)...
+   [CG1 Target] Logical=0, Grouped=0, Unmatched=0, Stacks=0, NG=0, PatNG=0, Miss=0
+   [CG1 Diag]   Groups=0, CoverageStatus=KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO, NgWithoutMaster=0, UnmatchedHoles=0
+STATUS: [PASS] 100% equivalence between baseline and CG1. All invariants satisfied.
+[SAFETY VERIFIED] Original file SHA256 identical before and after test (3DFBB2CC...)
 
---- Testing Model: 1618-01-BH.SLDASM (Production Model) ---
-Results: LogicalHoles=916, GroupedHoles=696, UnmatchedHoles=220, Stacks=348, NgStacks=0
-CG1 Diagnostic: Groups=348, CoverageStatus=CHUA_DAY_DU: CO_LO_CHUA_GHEP, NgWithoutMaster=0, Unmatched=220
-Report Summary:
-  1618-01-BH | Default
-  Lỗ: 916 | Đã ghép: 696 | Chưa ghép: 220
-  Cụm: 348 | OK: 348 | NG: 0 | Thiếu lỗ: 0 | Xử lý: 171.50 s
-  Nhóm lỗ đã ghép (chẩn đoán): 348 | NG chưa rõ Master: 0 | Lỗ chưa ghép: 220 | CHUA_DAY_DU: CO_LO_CHUA_GHEP
-  Chưa vẽ sketch NG.
-PASS: All production metrics and CG1 connection groups match expectation 100%
+-------------------------------------------------------------------------------
+Evaluating: 1618-01-BH.SLDASM
+Path:       C:\Users\SGN26\Documents\addin\work\same_part_1618_20261010\all-models\1618-01-BH.SLDASM
+-> Running Baseline (main branch code)...
+   [Baseline] Logical=916, Grouped=696, Unmatched=220, Stacks=348, NG=0, PatNG=0, Miss=0
+-> Running CG1 Candidate (feat/check-hole-connection-groups-cg1)...
+   [CG1 Target] Logical=916, Grouped=696, Unmatched=220, Stacks=348, NG=0, PatNG=0, Miss=0
+   [CG1 Diag]   Groups=348, CoverageStatus=CHUA_DAY_DU: CO_LO_CHUA_GHEP, NgWithoutMaster=0, UnmatchedHoles=220
+STATUS: [PASS] 100% equivalence between baseline and CG1. All invariants satisfied.
+[SAFETY VERIFIED] Original file SHA256 identical before and after test (45F500B4...)
 
-LIVE CAD BENCHMARK SUCCEEDED!
+===============================================================================
+REGRESSION AND BENCHMARK RESULTS TABLE
+===============================================================================
+| Model | Status | Logical | Grouped | Unmatched | Stacks | NG Stacks | Pattern/Miss | CG1 Groups | Coverage Status | SHA Match |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| run07_Missing_Ura_BOM.SLDASM | **PASS** | 0 | 0 | 0 | 0 | 0 | 0/0 | 0 | KHONG_DOC_DUOC_LO_HOAC_MODEL_KHONG_CO_LO | YES |
+| 1618-01-BH.SLDASM | **PASS** | 916 | 696 | 220 | 348 | 0 | 0/0 | 348 | CHUA_DAY_DU: CO_LO_CHUA_GHEP | YES |
+
+SUMMARY: Total=2 | PASS=2 | FAIL=0 | SKIP=0
+TEST OUTCOME: SUCCEEDED (Exit Code 0)
+[SAFETY] Preserving user's pre-existing SOLIDWORKS session intact.
 ```
 
 ---
@@ -121,6 +145,6 @@ LIVE CAD BENCHMARK SUCCEEDED!
 | | UI03 | Button enabled after valid report with `ConnectionCoverage` is set | `PASS` |
 | | UI04 | Button disabled during busy state | `PASS` |
 | | UI05 | Button re-enabled when busy completes | `PASS` |
-| **Live CAD Execution** | CAD-Smoke | Zero-hole model `run07_Missing_Ura_BOM.SLDASM` executed live in SOLIDWORKS 2024 SP5 | `PASS` |
-| | CAD-Prod | Production 916-hole assembly `1618-01-BH.SLDASM` executed live: 916 holes, 348 stacks, 348 groups, 220 unmatched | `PASS` |
+| **Live CAD Dual Regression** | CAD-Smoke | Zero-hole model `run07_Missing_Ura_BOM.SLDASM` evaluated on both baseline `main` and `CG1` candidate. Exact 0 across all metrics, coverage status verified, 0 errors. | `PASS` |
+| | CAD-Prod | Production 916-hole assembly `1618-01-BH.SLDASM` evaluated on both baseline `main` and `CG1` candidate. Exact match: 916 logical holes, 696 grouped, 220 unmatched, 348 stacks, 0 NG stacks. CG1: 348 connection groups, status `CHUA_DAY_DU: CO_LO_CHUA_GHEP`. Pre/post SHA256 verified identical. | `PASS` |
 | | CAD-T01–T10 | Synthetic fixtures matching T01–T10 exact geometric specifications | `NOT_TESTED` (fixtures pending user provision) |
