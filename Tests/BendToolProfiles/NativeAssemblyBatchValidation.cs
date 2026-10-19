@@ -24,7 +24,7 @@ internal static partial class NativeAssemblyBatchValidation
     private static string captureDiagnosticsDirectory;
     private static object Get(object x,string name) { var f=x.GetType().GetField(name,All);return f!=null?f.GetValue(x):x.GetType().GetProperty(name,All).GetValue(x,null); }
     private static object Call(object x,string name,params object[] args)
-    {try{return x.GetType().GetMethods(All).Single(m=>m.Name==name&&m.GetParameters().Length==args.Length).Invoke(x,args);}catch(TargetInvocationException ex){throw ex.InnerException??ex;}}
+    {try{return x.GetType().GetMethods(All).Single(m=>m.Name==name&&m.GetParameters().Length==args.Length).Invoke(x,args);}catch(TargetInvocationException ex){System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException??ex).Throw();throw;}}
     private static Type T(string name)=>product.GetType("ADDIN.Commands."+name,true);
     private static object New(string name,params object[] args)=>Activator.CreateInstance(T(name),All,null,args,null);
     private static object[] Items(object x)=>((IEnumerable)x).Cast<object>().ToArray();
@@ -110,6 +110,8 @@ internal static partial class NativeAssemblyBatchValidation
 
     [STAThread] private static int Main(string[] args)
     {
+        if(args.Length>0 && args[0]=="--create-seed") return SeedMain(args.Skip(1).ToArray());
+        if(args.Length>0 && args[0]=="--part-ui") return UnifiedPartMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--ui") return UiMain(args.Skip(1).ToArray());
         // dll, output(new), sheet-metal seed, seed length dimension, assembly
         // template, min workbook. Source files are only copied/read, never saved.
@@ -197,6 +199,17 @@ internal static partial class NativeAssemblyBatchValidation
             if(System.Environment.GetEnvironmentVariable("ADDIN_ASSEMBLY_EDGE_ONLY")=="1")
             {EdgeFixtures(app,root,args[4],output,disposable,report,Source(args[5],output));report["Result"]="EDGE_ONLY_PASS";report["Assertions"]=assertions;File.WriteAllText(Path.Combine(output,"assembly-edge-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;}
             var files=Directory.GetFiles(output,"*.SLDPRT").Concat(Directory.GetFiles(output,"*.SLDASM")).ToDictionary(p=>p,Sha);
+            if(System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_INVENTORY_ONLY")=="1")
+            {
+                report["Scope"]="NATIVE_INVENTORY_ONLY_NOT_FULL_BATCH";
+                var inventorySession = Session(app, root); disposable.Add((IDisposable)inventorySession);
+                Call(inventorySession,"BuildInventory",false);
+                Check(Items(Get(inventorySession,"Items")).Length==25,"Inventory-only actual 25 source/config groups");
+                Check(Items(Get(inventorySession,"InventoryOccurrences")).Count(o=>!(bool)Get(o,"IsAssemblyBranch"))==120,"Inventory-only actual 120 leaves");
+                foreach(var original in fixtureSources)Check(Sha(original.Key)==original.Value,"Inventory-only fixture source unchanged");
+                report["Scope"]="NATIVE_INVENTORY_ONLY_NOT_FULL_BATCH";report["Result"]="PASS";report["Assertions"]=assertions;
+                File.WriteAllText(Path.Combine(output,"assembly-inventory-result.json"),Json.Serialize(report));Console.WriteLine(Json.Serialize(report));return 0;
+            }
             var beforeDocs=(app.GetDocuments() as object[]).OfType<ModelDoc2>().Where(d=>files.ContainsKey(d.GetPathName())).ToDictionary(d=>d.GetPathName(),d=>Json.Serialize(State(d)));
             var source=Source(args[5],output);root.ClearSelection2(true);var session=Session(app,root);disposable.Add((IDisposable)session);
             object bodyInfo;var nativeBodies=leaves[0].GetBodies3(0,out bodyInfo) as object[];var firstModel=(ModelDoc2)leaves[0].GetModelDoc2();

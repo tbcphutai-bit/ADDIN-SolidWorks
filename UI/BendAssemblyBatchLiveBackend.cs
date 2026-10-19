@@ -7,10 +7,11 @@ using SolidWorks.Interop.sldworks;
 
 namespace ADDIN.UI
 {
-    internal sealed class BendAssemblyBatchLiveBackend : IBendAssemblyBatchBackend
+    internal sealed class BendAssemblyBatchLiveBackend : IBendAssemblyBatchBackend, IBendBatchLocator
     {
         private readonly BendCheckSession session;
         private readonly BendToolCatalogProvider minimum;
+        internal bool HasSelection => session.HasSelection;
         internal BendAssemblyBatchLiveBackend(ISldWorks app, ModelDoc2 host)
             : this(app, host, new BendToolCatalogProvider()) { }
         internal BendAssemblyBatchLiveBackend(ISldWorks app, ModelDoc2 host, BendToolCatalogProvider minimum)
@@ -25,7 +26,9 @@ namespace ADDIN.UI
         public void Invalidate() => session.Invalidate();
         public IBendAssemblyBatchOperation BeginAssemblyBatch(AssemblyCheckScope scope, BendToolCatalogReadResult source,
             CancellationToken token, IProgress<AssemblyBatchProgress> progress) =>
-            new NativeOperation(session.BeginAssemblyBatch(scope, source, new AssemblyBatchOptions(), token, progress));
+            session.IsAssembly ? (IBendAssemblyBatchOperation)new NativeOperation(session.BeginAssemblyBatch(scope, source, new AssemblyBatchOptions(), token, progress)) :
+            new PartOperation(session.BeginPartBatch(source, token, progress));
+        public bool Locate(AssemblyBatchSnapshot snapshot, string source, int feature) => session.LocateBatchBend(snapshot, source, feature);
         public void Dispose() => session.Dispose();
         private sealed class NativeOperation : IBendAssemblyBatchOperation
         {
@@ -33,6 +36,14 @@ namespace ADDIN.UI
             internal NativeOperation(BendCheckSession.AssemblyNativeBatchOperation operation) { this.operation = operation; }
             public Task<AssemblyBatchSnapshot> Completion => operation.Completion;
             public void Pump() => operation.Pump(maximumCaptures: 1);
+            public void Cancel() => operation.Cancel();
+        }
+        private sealed class PartOperation : IBendAssemblyBatchOperation
+        {
+            private readonly BendCheckSession.PartNativeBatchOperation operation;
+            internal PartOperation(BendCheckSession.PartNativeBatchOperation operation) { this.operation = operation; }
+            public Task<AssemblyBatchSnapshot> Completion => operation.Completion;
+            public void Pump() => operation.Pump();
             public void Cancel() => operation.Cancel();
         }
     }

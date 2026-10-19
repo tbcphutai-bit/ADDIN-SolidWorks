@@ -51,13 +51,16 @@ namespace ADDIN.Commands.BendPlacement
     internal sealed class PlacementBendSnapshot
     {
         public int FeatureId { get; }
+        public string PersistentId { get; }
         public string BodyId { get; }
         public BendWorkFrame Frame { get; }
         public double? ThicknessMm { get; }
         public double BendMinMm { get; }
         public double BendMaxMm { get; }
         internal PlacementBendSnapshot(int id,string body,BendWorkFrame frame,double? thickness,double min,double max)
-        {FeatureId=id;BodyId=body;Frame=frame;ThicknessMm=thickness;BendMinMm=min;BendMaxMm=max;}
+            : this(id, body, frame, thickness, min, max, null) { }
+        internal PlacementBendSnapshot(int id,string body,BendWorkFrame frame,double? thickness,double min,double max,string persistentId)
+        {FeatureId=id;BodyId=body;Frame=frame;ThicknessMm=thickness;BendMinMm=min;BendMaxMm=max;PersistentId=persistentId;}
     }
     internal sealed class PlacementModelCapture
     {

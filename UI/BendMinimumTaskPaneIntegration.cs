@@ -8,7 +8,10 @@ namespace ADDIN
     public partial class BomTaskPaneControl
     {
         private ModernButton btnCheckBendMinimum;
-        private BendCheckForm bendCheckWindow;
+        private BendAssemblyBatchForm bendCheckWindow;
+        private BendAssemblyBatchController bendCheckController;
+        private ModelDoc2 bendCheckHost;
+        private string bendCheckConfiguration;
 
         private void EnsureBendMinimumButton()
         {
@@ -22,7 +25,9 @@ namespace ADDIN
                 if(!CanRunModelMacro(btnCheckBendMinimum))return;
                 if (bendCheckWindow != null && !bendCheckWindow.IsDisposed)
                 {
-                    if (bendCheckWindow.IsForActiveModel) { bendCheckWindow.Show(); bendCheckWindow.Activate(); return; }
+                    var active = swApp.ActiveDoc as ModelDoc2;
+                    if (active != null && swApp.IsSame(active, bendCheckHost) == (int)SolidWorks.Interop.swconst.swObjectEquality.swObjectSame &&
+                        active.ConfigurationManager.ActiveConfiguration.Name == bendCheckConfiguration) { bendCheckWindow.Show(); bendCheckWindow.Activate(); return; }
                     bendCheckWindow.Close();
                     if (bendCheckWindow != null && !bendCheckWindow.IsDisposed) return;
                 }
@@ -30,9 +35,13 @@ namespace ADDIN
                 {
                     var model = swApp.ActiveDoc as ModelDoc2;
                     if (model == null) return;
-                    bendCheckWindow = new BendCheckForm(swApp, model, () =>
-                        vCutBendAssignmentControl != null && !vCutBendAssignmentControl.IsDisposed && vCutBendAssignmentControl.Visible ? vCutBendAssignmentControl.Rows : null);
-                    bendCheckWindow.FormClosed += (sender, args) => bendCheckWindow = null;
+                    bendCheckHost = model; bendCheckConfiguration = model.ConfigurationManager.ActiveConfiguration.Name;
+                    bendCheckWindow = new BendAssemblyBatchForm(model.GetTitle(), bendCheckConfiguration);
+                    var backend = new BendAssemblyBatchLiveBackend(swApp, model);
+                    bendCheckController = new BendAssemblyBatchController(bendCheckWindow, backend);
+                    if (model.GetType() == (int)SolidWorks.Interop.swconst.swDocumentTypes_e.swDocPART) bendCheckWindow.SetPartMode();
+                    else if (backend.HasSelection) bendCheckWindow.SetScope(ADDIN.Commands.BendAssembly.AssemblyCheckScope.SelectedComponents);
+                    bendCheckWindow.FormClosed += (sender, args) => { bendCheckWindow = null; bendCheckController = null; bendCheckHost = null; };
                     bendCheckWindow.Show();
                 }
                 catch (Exception ex) { System.Windows.Forms.MessageBox.Show(this, ex.Message, "Check chấn"); }
@@ -42,7 +51,7 @@ namespace ADDIN
         }
         private void CloseBendMinimumWindow()
         {
-            var window = bendCheckWindow; bendCheckWindow = null;
+            var window = bendCheckWindow;
             if (window != null && !window.IsDisposed) window.Close();
         }
     }

@@ -35,12 +35,15 @@ namespace ADDIN.Commands.BendAssembly
                     v.Material==null?null:AxialSolidPrimitive.MaterialHash(v.Material),ToolEvidenceCanonical.Number(v.MaterialAxialMarginMm))).ToArray()))).ToArray()));
         internal static string Catalog(ToolProfileLibrarySnapshot library) => ToolEvidenceCanonical.Hash("AssemblyCatalogV1", TokenOf(library),
             library?.Fingerprint, library?.ConfigurationSha256, library?.PlacementSources?.Fingerprint);
-        internal static string Program(AssemblySourceInput s) => ToolEvidenceCanonical.Hash("AssemblyWholeProgramV1", s.ConditionsRevision,
+        private static string LegacyProgram(AssemblySourceInput s) => ToolEvidenceCanonical.Hash("AssemblyWholeProgramV1", s.ConditionsRevision,
             ToolEvidenceCanonical.Hash(s.Setups.Select(e => ToolEvidenceCanonical.Hash(e.ToolId, e.FeatureId.ToString(), e.Pair.ToString(), e.PayloadSha256)).OrderBy(x => x).ToArray()),
             ToolEvidenceCanonical.Hash(s.Plans.Select(p => p.PayloadSha256).OrderBy(x => x).ToArray()));
+        internal static string Program(AssemblySourceInput s) => s.Sequence == null ? LegacyProgram(s) :
+            ToolEvidenceCanonical.Hash("AssemblySequenceProgramV1", LegacyProgram(s), s.Sequence.PayloadSha256);
         // Kept separate from the externally reviewed program payload: equal
         // coordinates are not equal authority or immutable object bindings.
         internal static string EvidenceBindings(AssemblySourceInput s) => ToolEvidenceCanonical.Hash("AssemblyEvidenceBindingsV1",
+            TokenOf(s.Sequence),
             ToolEvidenceCanonical.Hash(s.Setups.Select(e=>ToolEvidenceCanonical.Hash(TokenOf(e),e.PayloadSha256,e.Review.Status.ToString(),
                 e.Occupancy.Verified.ToString(),e.Occupancy.SimulationOnly.ToString())).OrderBy(x=>x,StringComparer.Ordinal).ToArray()),
             ToolEvidenceCanonical.Hash(s.Plans.Select(p=>ToolEvidenceCanonical.Hash(TokenOf(p),p.PayloadSha256,p.SimulationOnly.ToString(),

@@ -54,6 +54,8 @@
     <Compile Include="..\..\Commands\BendProcess\ProcessPerformance.cs"><Link>ProcessPerformance.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendProcess\ProcessBatchWorker.cs"><Link>ProcessBatchWorker.cs</Link></Compile>
     <Compile Include="ProcessTests.cs"/>
+    <Compile Include="..\..\Commands\BendPlanning\*.cs" />
+    <Compile Include="SequencePlannerTests.cs" />
     <Compile Include="ProcessPerformanceTests.cs"/>
     <Compile Include="AssemblyBatchTests.cs"/>
     <Compile Include="AssemblyReadTests.cs"/>

@@ -207,7 +207,7 @@ namespace ADDIN.Commands
                 if (item.Rows.Count == 0) item.Error = "Không có nếp chấn được hỗ trợ.";
                 CapturePlanningDraft(item);
             }
-            catch (Exception ex) { item.Error = ex.Message; item.Context?.Invalidate(); }
+            catch (Exception ex) { BendNativeCaptureDiagnostics.Failure(ex, "CheckMin.NativeCapture"); item.Error = ex.Message; item.Context?.Invalidate(); }
             finally
             {
                 item.Done = true; item.ToolProfiles = toolLibrary.Snapshot;

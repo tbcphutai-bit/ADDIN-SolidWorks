@@ -53,12 +53,11 @@ namespace ADDIN.UI
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
             var title = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 1, ColumnCount = 3, Margin = Padding.Empty };
             title.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
-            title.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, session.IsAssembly ? 180 : 0));
+            title.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
             title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             title.Controls.Add(new Label { Text = "KIỂM TRA KÍCH THƯỚC CHẤN", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = TaiTheme.Accent }, 0, 0);
-            if (session.IsAssembly)
             {
-                var btnBatchUI = new ModernButton { Text = "Assembly Batch", Dock = DockStyle.Fill, Kind = ModernButtonKind.Subtle, Tone = ModernButtonTone.Accent, Margin = new Padding(4, 4, 4, 4) };
+                var btnBatchUI = new ModernButton { Text = "Check chấn", Dock = DockStyle.Fill, Kind = ModernButtonKind.Subtle, Tone = ModernButtonTone.Accent, Margin = new Padding(4, 4, 4, 4) };
                 btnBatchUI.Click += (s, e) => {
                     if (batchForm != null && !batchForm.IsDisposed) { batchForm.Activate(); return; }
                     if (capturing) return;

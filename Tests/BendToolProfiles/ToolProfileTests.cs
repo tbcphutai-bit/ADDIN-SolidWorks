@@ -68,6 +68,12 @@ internal static partial class ToolProfileTests
         if (args.Length>0 && args[0]=="--assembly-tests") return AssemblyOnly(args);
         if (args.Length>0 && args[0]=="--assembly-benchmark") return AssemblyBenchmark(args);
         if (args.Length>0 && args[0]=="--process-reference") return ProcessReference(args);
+        if (args.Length>1 && args[0]=="--sequence-benchmark") return SequenceBenchmark(args[1]);
+        if (args.Length>0 && args[0]=="--sequence-tests")
+        {
+            temporary=Path.Combine(Path.GetTempPath(),"ADDIN-SequenceTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
+            SequencePlannerTests(); Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions"); return failed==0?0:1;
+        }
         if (args.Length>0 && args[0]=="--process-tests")
         {
             temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ProcessTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
@@ -249,6 +255,7 @@ internal static partial class ToolProfileTests
         CollisionPlacementTests();
         EnvelopeTests();
         ProcessTests();
+        SequencePlannerTests();
         AssemblyBatchTests();
         Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; synthetic DXF only, no SOLIDWORKS API.");
         // Keep failures available for inspection; no recursive cleanup of a

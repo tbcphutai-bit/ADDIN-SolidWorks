@@ -61,7 +61,7 @@ namespace ADDIN.Commands.BendPlacement
                         min=(g.Min-middle)*1000;max=(g.Max-middle)*1000;
                     }
                 }
-                bends.Add(new PlacementBendSnapshot(row.FeatureId,bodyId,frame,row.ModelThicknessMm,min,max));
+                bends.Add(new PlacementBendSnapshot(row.FeatureId,bodyId,frame,row.ModelThicknessMm,min,max,row.PersistentId));
             }
             bool complete=item.Context!=null&&nativeBodies.Sum(b=>b.Faces.Count)==item.Context.FaceCount&&nativeBodies.Sum(b=>b.Edges.Count)==item.Context.EdgeCount;
             if(!item.Current||item.Context?.Current!=true||item.Model.GetUpdateStamp()!=item.Stamp||

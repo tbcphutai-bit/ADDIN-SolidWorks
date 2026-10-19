@@ -21,6 +21,7 @@ namespace ADDIN.Commands.BendAssembly
         internal AssemblyResultReadGuard(Func<string> full, Func<string> shared)
         { this.full = full; this.shared = shared; }
         internal string Check() => ReferenceEquals(active, this) ? shared() : full();
+        internal bool ActiveOnCurrentThread => ReferenceEquals(active, this);
         internal T Copy<T>(Func<T> copy, out double validationMs) where T : class
         {
             var clock = Stopwatch.StartNew();
