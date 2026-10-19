@@ -199,7 +199,7 @@ namespace ADDIN.UI
         private void Tick(object sender, EventArgs args)
         {
             if (disposed || pumping) return;
-            RequireSta(); pumping = true;
+            RequireSta(); timer.Stop(); pumping = true;
             try
             {
                 operation?.Pump();
@@ -220,7 +220,14 @@ namespace ADDIN.UI
             finally
             {
                 pumping = false;
-                if (disposed) { DisposeBackend(); if (!running) dispatcher.Dispose(); } else CloseWhenSafe();
+                if (disposed) { DisposeBackend(); if (!running) dispatcher.Dispose(); }
+                else
+                {
+                    // Schedule relative to the end of an atomic COM capture.
+                    // An overdue WM_TIMER must not immediately start another
+                    // capture/audit and monopolize the host message queue.
+                    CloseWhenSafe(); timer.Start();
+                }
             }
         }
         private void FormClosing(object sender, FormClosingEventArgs args)

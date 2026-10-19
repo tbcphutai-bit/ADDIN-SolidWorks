@@ -32,6 +32,9 @@ real minimum-workbook provider. `BendAssemblyBatchController` starts
 awaits `Completion`. A private STA dispatch handle explicitly returns I/O and
 completion continuations to the originating thread; this also works when native
 COM/message pumping has replaced the ambient SynchronizationContext.
+The timer is stopped during Pump and restarted afterward, leaving an idle gap
+even when an atomic capture takes longer than the timer interval. The native
+test driver also uses a bounded message pump so its deadlines can run.
 
 Only managed workbook I/O and the existing managed workers run off STA. There
 is no synchronous Task wait in the integration. An individual native capture is

@@ -176,6 +176,21 @@ internal static class BendAssemblyUiTests
     }
     private static void FormTests()
     {
+        Test("slow native capture yields between timer turns", () =>
+        {
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend();
+                using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Spin(()=>backend.Operation!=null);
+                    backend.Operation.PumpAction=()=>Thread.Sleep(80);
+                    Spin(()=>backend.Operation.Pumps>=2);
+                    backend.Operation.PumpAction=null;
+                    backend.Operation.Done.SetResult(Snapshot(Part(0)));Spin(()=>!controller.Running);form.Close();
+                }
+            }
+        });
         Test("Form live/preview/run/progress/cancel/stale/refresh/close lifecycle on STA", () =>
         {
             using (var form = new BendAssemblyBatchForm())

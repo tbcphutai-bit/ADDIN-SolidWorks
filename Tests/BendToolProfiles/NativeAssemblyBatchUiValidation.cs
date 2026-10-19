@@ -17,7 +17,7 @@ internal static partial class NativeAssemblyBatchValidation
     private static void UiSpin(Func<bool> done)
     {
         var clock=Stopwatch.StartNew();
-        while(!done()&&clock.ElapsedMilliseconds<300000){Application.DoEvents();Thread.Sleep(5);}
+        while(!done()&&clock.ElapsedMilliseconds<300000){NativeTestProcess.PumpMessages();Thread.Sleep(5);}
         Check(done(),"UI timer/await completion timed out");
     }
     private static object[] UiParts(Form form) => ((DataGridView)UiControl(form,"dgvParts")).Rows.Cast<DataGridViewRow>().Select(r=>r.Tag).ToArray();
