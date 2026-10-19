@@ -77,6 +77,8 @@
     <Compile Include="..\..\Commands\BendPlacement\BendPlacementMath.cs"><Link>BendPlacementMath.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendPlacement\BendPlacementModels.cs"><Link>BendPlacementModels.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendPlacement\BendMasterAssemblyReader.cs"><Link>BendMasterAssemblyReader.cs</Link></Compile>
+    <Compile Include="..\..\Commands\BendPlacement\CompanyCadPairs.cs"><Link>CompanyCadPairs.cs</Link></Compile>
+    <Compile Include="CompanyCadPairTests.cs" />
     <Compile Include="..\..\Commands\BendPlacement\BendLimitWorkbookReader.cs"><Link>BendLimitWorkbookReader.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendPlacement\BendPlacementSources.cs"><Link>BendPlacementSources.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendPlacement\BendSheetSection.cs"><Link>BendSheetSection.cs</Link></Compile>

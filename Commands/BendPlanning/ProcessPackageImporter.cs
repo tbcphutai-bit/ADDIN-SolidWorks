@@ -122,6 +122,7 @@ namespace ADDIN.Commands.BendPlanning
             var setups=new List<ToolAxialSetupEvidence>();string sha=null,revision=null;var reasons=new List<string>();PartSequenceSpace sequence=null;AssemblyProgramUse use=null;
             try
             {
+                if(library?.Error!=null)throw new InvalidDataException("PROCESS_TOOL_LIBRARY_UNAVAILABLE");
                 if(library==null||!model.CompleteBodyCoverage)throw new InvalidDataException("PROCESS_COMPLETE_NATIVE_MODEL_OR_TOOL_LIBRARY_MISSING");
                 if(model.Bends.Any(b=>b.Frame==null))throw new InvalidDataException("MISSING_NATIVE_BEND_FRAME_FOR_PROCESS_REGISTRATION");
                 path=Path.GetFullPath(path);string root=Path.GetDirectoryName(path);var bytes=PlacementSourceIo.Read(path,4*1024*1024,token);
@@ -184,7 +185,12 @@ namespace ADDIN.Commands.BendPlanning
                     };
                     Func<ProcessToolRecord,SheetEnvelopeCapture,CollisionPairKind,ProcessToolPose> tool=(record,sheet,pair)=>{
                         if(record==null)return null;var law=Motion(record.Motion,error);
-                        if(record.AxialSetup!=null&&record.SimulationGeometry!=null)throw new InvalidDataException("AMBIGUOUS_PROCESS_TOOL_SOURCE");
+                        if(new[]{record.AxialSetup!=null,record.SimulationGeometry!=null,record.CadReferenceSimulation!=null}.Count(v=>v)>1)throw new InvalidDataException("AMBIGUOUS_PROCESS_TOOL_SOURCE");
+                        if(record.CadReferenceSimulation!=null)
+                        {
+                            proofFile(record.CadReferenceSimulation.Review);
+                            return CadReferenceSimulation.Read(record.CadReferenceSimulation,t.ToolId,pair,sheet,library,law,verifier,root,token);
+                        }
                         if(record.AxialSetup!=null)
                         {
                             if(record.AxialSetup.ToolId!=t.ToolId||record.AxialSetup.FeatureId!=t.FeatureId||record.AxialSetup.Pair!=pair.ToString())throw new InvalidDataException("MISMATCHED_PROCESS_TOOL_SETUP_IDENTITY");
@@ -192,6 +198,8 @@ namespace ADDIN.Commands.BendPlanning
                             return ProcessToolPose.FromEvidence(setup,sheet,library,law);
                         }
                         if(record.SimulationGeometry==null)return null;
+                        if(library.UsesFixedCadPairs||library.PlacementSources?.Tools.SingleOrDefault(a=>a.Id==t.ToolId)?.CadPair!=null)
+                            throw new InvalidDataException("FIXED_CAD_PAIR_REQUIRES_SOURCE_BOUND_SIMULATION_GEOMETRY");
                         var fixture=prism(record.SimulationGeometry);string payload=ToolEvidenceCanonical.Hash("ImportedSimulationToolV1",t.ToolId,pair.ToString(),registration,fixture.GeometrySha256);
                         payloads[t.Id+"/"+pair+"/"+record.SimulationGeometry.Id]=payload;proofFile(record.SimulationReview);
                         var review=verifier.Verify("SimulationProcessTool",payload,record.SimulationReview,root,token);

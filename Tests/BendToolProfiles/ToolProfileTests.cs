@@ -56,6 +56,13 @@ internal static partial class ToolProfileTests
     }
     private static int Main(string[] args)
     {
+        if (args.Length>0 && args[0]=="--cad-pair-inventory") return CadPairInventory(args);
+        if (args.Length>0 && args[0]=="--cad-pairs-company") return CadPairCompany(args);
+        if (args.Length>0 && args[0]=="--cad-pair-tests")
+        {
+            temporary=Path.Combine(Path.GetTempPath(),"ADDIN-CadPairTests-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(temporary);
+            CompanyCadPairTests();Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions");return failed==0?0:1;
+        }
         if (args.Length>0 && args[0]=="--company") return CompanyIntegration(args);
         if (args.Length>0 && args[0]=="--placement-company") return PlacementCompanyIntegration(args);
         if (args.Length>0 && args[0]=="--holder-company") return HolderCompanyIntegration(args);
@@ -255,6 +262,7 @@ internal static partial class ToolProfileTests
         });
         RegionAndDatumTests();
         PlacementTests();
+        CompanyCadPairTests();
         HolderTests();
         CollisionTests();
         CollisionPlacementTests();

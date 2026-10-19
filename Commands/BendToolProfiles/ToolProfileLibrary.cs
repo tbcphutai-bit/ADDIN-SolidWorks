@@ -16,6 +16,7 @@ namespace ADDIN.Commands.BendTools
         public string ManifestPath { get; set; }
         public string DatumEvidencePath { get; set; }
         public string PlacementConfigurationPath { get; set; }
+        public bool UseMasterPairsAsLibrary { get; set; }
     }
     internal sealed class ToolProfileSourceSettings
     {
@@ -28,13 +29,17 @@ namespace ADDIN.Commands.BendTools
             if (!string.IsNullOrWhiteSpace(directory)) return new ToolProfileSourceConfiguration { DirectoryPath=directory,
                 ManifestPath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST"),
                 DatumEvidencePath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE"),
-                PlacementConfigurationPath=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG") };
-            if (!File.Exists(path)) return new ToolProfileSourceConfiguration {PlacementConfigurationPath=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG")};
+                PlacementConfigurationPath=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG"),
+                UseMasterPairsAsLibrary=Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")=="1" };
+            if (!File.Exists(path)) return new ToolProfileSourceConfiguration {PlacementConfigurationPath=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG"),
+                UseMasterPairsAsLibrary=Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")=="1"};
             if (new FileInfo(path).Length>65536) throw new InvalidDataException("DXF source settings exceed 64 KB.");
             var result=new JavaScriptSerializer().Deserialize<ToolProfileSourceConfiguration>(File.ReadAllText(path,Encoding.UTF8));
             if (result==null || result.Version!=1) throw new InvalidDataException("Unsupported DXF source settings version.");
             string placement=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG");
             if(!string.IsNullOrWhiteSpace(placement))result.PlacementConfigurationPath=placement;
+            string masterMode=Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS");
+            if(masterMode!=null)result.UseMasterPairsAsLibrary=masterMode=="1";
             return result;
         }
     }
@@ -85,10 +90,13 @@ namespace ADDIN.Commands.BendTools
         {
             lock (gate)
             {
+                bool fixedCadMode=previous?.UsesFixedCadPairs==true;
                 try
                 {
                     cancellation.ThrowIfCancellationRequested(); var config=configuration();
+                    fixedCadMode=config?.UseMasterPairsAsLibrary==true;
                     if (config==null || config.Version!=1) throw new InvalidDataException("Unsupported DXF source settings version.");
+                    if(config.UseMasterPairsAsLibrary)return Publish(FixedCadMode(ReadMasterPairs(config,cancellation)));
                     if (string.IsNullOrWhiteSpace(config.DirectoryPath)) return Publish(Failure("DXF source directory is not configured."));
                     string expanded=Environment.ExpandEnvironmentVariables(config.DirectoryPath);
                     if (!Path.IsPathRooted(expanded)) throw new InvalidDataException("DXF source directory must be an absolute path.");
@@ -133,13 +141,40 @@ namespace ADDIN.Commands.BendTools
                     return Publish(new ToolProfileLibrarySnapshot { ConfigurationSha256=configSha,Fingerprint=fingerprint,Tools=tools.AsReadOnly(),Sources=provenance.AsReadOnly(),PlacementSources=placement });
                 }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { return Publish(Failure(ex.Message)); }
+                catch (Exception ex) { var failure=Failure(ex.Message);return Publish(fixedCadMode?FixedCadMode(failure):failure); }
             }
+        }
+        private static ToolProfileLibrarySnapshot FixedCadMode(ToolProfileLibrarySnapshot snapshot)
+        {
+            snapshot.UsesFixedCadPairs=true;
+            snapshot.Fingerprint=HashText("FixedCompanyCadPairsModeV2\n"+snapshot.Fingerprint);
+            return snapshot;
         }
         private ToolProfileLibrarySnapshot Publish(ToolProfileLibrarySnapshot snapshot)
         {
             if (previous!=null && previous.Current && previous.Fingerprint==snapshot.Fingerprint) return previous;
             previous?.Invalidate(); previous=snapshot; return snapshot;
+        }
+        private static ToolProfileLibrarySnapshot ReadMasterPairs(ToolProfileSourceConfiguration config,CancellationToken token)
+        {
+            if(string.IsNullOrWhiteSpace(config.PlacementConfigurationPath))return Failure("Company CAD pairs require an explicit placement configuration.");
+            var placement=BendPlacement.BendPlacementSources.Read(config.PlacementConfigurationPath,token);
+            var tools=new List<CompanyToolProfile>();
+            foreach(string id in CompanyToolIds.All)
+            {
+                token.ThrowIfCancellationRequested();var pair=placement.Tools.Single(t=>t.Id==id);var parts=new List<ToolGeometryPart>();
+                if(pair.Punch!=null)parts.Add(new ToolGeometryPart {Role=ToolGeometryRole.CompanyPunchProfile,Source=pair.Source,Entities=pair.Punch.SourceEntities,Region=pair.Punch.Region});
+                if(pair.Holder!=null)parts.Add(new ToolGeometryPart {Role=ToolGeometryRole.HolderClampReference,Source=pair.Source,Entities=pair.Holder.SourceEntities,Region=pair.Holder.Region});
+                bool read=pair.CadPair?.Matched==true&&pair.MappingIdentified;
+                var validation=new ToolProfileValidationResult {SourceFilesExist=pair.Source?.FileExists==true,PunchGeometryReadComplete=read,
+                    PunchEntitiesSupported=pair.Punch?.Supported==true,PunchClosed=read&&pair.Punch.ObservedClosed,
+                    Region=pair.Punch?.Region??ToolRegionValidator.Validate(null),Reasons=pair.Reasons,DatumEvidence=pair.MasterDatums};
+                tools.Add(new CompanyToolProfile {Id=id,Parts=parts.AsReadOnly(),Validation=validation,Datums=pair.MasterDatums});
+            }
+            var sources=placement.Tools.Select(t=>t.Source).Where(p=>p!=null).GroupBy(p=>p.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).ToArray();
+            string configSha=HashText("FixedCompanyCadPairsV2\n"+Path.GetFullPath(config.PlacementConfigurationPath)+"\n"+ToolGeometryTolerance.Version+"\n"+placement.Fingerprint);
+            return new ToolProfileLibrarySnapshot {ConfigurationSha256=configSha,Fingerprint=configSha,Tools=tools.AsReadOnly(),
+                Sources=Array.AsReadOnly(sources),PlacementSources=placement};
         }
         internal static ToolProfileLibrarySnapshot Failure(string reason)
         {

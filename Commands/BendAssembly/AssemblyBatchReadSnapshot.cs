@@ -44,10 +44,11 @@ namespace ADDIN.Commands.BendAssembly
         internal bool Current => source.Current;
         internal AssemblyBatchSnapshot Source => source;
         internal IReadOnlyList<AssemblyPartRead> Parts { get; }
+        internal IReadOnlyList<ToolAssemblyProfile> ToolPairs { get; }
         internal double ValidationMilliseconds { get; set; }
         internal double CopyMilliseconds { get; set; }
         internal AssemblyBatchReadSnapshot(AssemblyBatchSnapshot source)
-        { this.source = source; Parts = PlacementLists.Copy(source.Parts.Select(p => new AssemblyPartRead(p))); }
+        { this.source = source; Parts = PlacementLists.Copy(source.Parts.Select(p => new AssemblyPartRead(p))); ToolPairs=PlacementLists.Copy(source.ToolPairs); }
     }
     internal sealed class AssemblyPartRead
     {

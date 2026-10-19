@@ -115,6 +115,7 @@ namespace ADDIN.Commands.BendPlanning
     }
     internal sealed class ProcessToolRecord
     {
+        public CadReferenceSimulationRecord CadReferenceSimulation { get; set; }
         public ToolAxialSetupRecord AxialSetup { get; set; }
         public ProcessMotionRecord Motion { get; set; }
         // Explicitly reviewed software fixtures only. This path is forbidden

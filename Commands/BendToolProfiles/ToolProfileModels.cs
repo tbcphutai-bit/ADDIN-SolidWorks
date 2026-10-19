@@ -67,6 +67,7 @@ namespace ADDIN.Commands.BendTools
 
     internal sealed class ToolProfileLibrarySnapshot
     {
+        public bool UsesFixedCadPairs { get; internal set; }
         private int current=1;
         public bool Current => Volatile.Read(ref current)==1;
         public string Status => "CHUA_XAC_MINH";

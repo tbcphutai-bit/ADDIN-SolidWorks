@@ -107,6 +107,7 @@ namespace ADDIN.Commands.BendAssembly
         public double ProcessFreshnessAuditMilliseconds { get; }
         public string ManufacturingStatus => "CHUA_XAC_MINH";
         public string WinnerToolId => null;
+        internal IReadOnlyList<ToolAssemblyProfile> ToolPairs => request.Library?.PlacementSources?.Tools??new ToolAssemblyProfile[0];
         internal AssemblyBatchReadSnapshot ReadSnapshot()
         {
             var clock = Stopwatch.StartNew();

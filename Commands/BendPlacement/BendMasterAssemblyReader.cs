@@ -27,6 +27,7 @@ namespace ADDIN.Commands.BendPlacement
         public string HolderRootInsert { get; set; }
         public string HolderBlock { get; set; }
         public ToolProfileSelection Holder { get; set; }
+        public CadPresentationPairRecord PresentationPair { get; set; }
     }
     internal static class PlacementSourceIo
     {
@@ -55,6 +56,7 @@ namespace ADDIN.Commands.BendPlacement
             internal string Fingerprint;
             internal IReadOnlyList<ToolAssemblyProfile> Tools;
             internal IReadOnlyList<string> Reasons;
+            internal ToolProfileProvenance Source;
         }
         internal static Result Read(string source,string manifestPath,string datumPath,CancellationToken token,string holderEvidencePath=null,string seatingEvidencePath=null,string authoritiesPath=null)
         {
@@ -64,8 +66,12 @@ namespace ADDIN.Commands.BendPlacement
                 byte[] bytes=PlacementSourceIo.Read(source,32*1024*1024,token);sha=PlacementSourceIo.Hash(bytes);
                 byte[] mapping=PlacementSourceIo.Read(manifestPath,1024*1024,token);manifestSha=PlacementSourceIo.Hash(mapping);
                 var manifest=PlacementSourceIo.Json<MasterAssemblyManifest>(mapping);
-                if(manifest==null||manifest.Version!=1||manifest.Tools==null||manifest.Tools.Any(t=>t==null||!CompanyToolIds.All.Contains(t.Id,StringComparer.OrdinalIgnoreCase))||
+                if(manifest==null||(manifest.Version!=1&&manifest.Version!=2)||manifest.Tools==null||manifest.Tools.Any(t=>t==null||!CompanyToolIds.All.Contains(t.Id,StringComparer.OrdinalIgnoreCase))||
                     manifest.Tools.GroupBy(t=>t.Id,StringComparer.OrdinalIgnoreCase).Any(g=>g.Count()>1))throw new InvalidDataException("Invalid master mapping/version/identity.");
+                if(manifest.Version==2&&(manifest.Tools.Count!=CompanyToolIds.All.Count||manifest.Tools.Any(t=>string.IsNullOrWhiteSpace(t.PresentationPair?.SlotId))||
+                    manifest.Tools.GroupBy(t=>t.PresentationPair.SlotId,StringComparer.OrdinalIgnoreCase).Any(g=>g.Count()!=1)||
+                    manifest.Tools.GroupBy(t=>t.PresentationPair.FrameHandle,StringComparer.OrdinalIgnoreCase).Any(g=>g.Count()!=1)))
+                    throw new InvalidDataException("Invalid or incomplete CAD presentation slots.");
                 if(!ToolDatumEvidence.IsSha256(manifest.MasterSha256)||!string.Equals(sha,manifest.MasterSha256,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("STALE_MASTER_MAPPING");
                 var provenance=new ToolProfileProvenance {Path=source,Sha256=sha,FileExists=true,ByteCount=bytes.Length};
                 var doc=ToolDxfReader.Read(bytes,provenance,token);
@@ -84,8 +90,10 @@ namespace ADDIN.Commands.BendPlacement
                     bool identified=definition.ExpectedLabel!=null&&definition.ExpectedLabel.Split(new[]{' ','|',':',';','\t','#','(',')'},StringSplitOptions.RemoveEmptyEntries).Contains(id,StringComparer.OrdinalIgnoreCase)&&
                         labels.Count(l=>l.Item1==definition.LabelHandle&&l.Item2==definition.ExpectedLabel)==1;
                     if(!identified)r.Add("UNVERIFIED_TOOL_IDENTITY");
-                    var punch=Select(doc,definition.Punch,definition.PunchRootInsert,definition.PunchBlock,"PUNCH",r);
-                    var holder=Select(doc,definition.Holder,definition.HolderRootInsert,definition.HolderBlock,"HOLDER",r);
+                    var punch=Select(doc,definition.Punch,definition.PunchRootInsert,definition.PunchBlock,"PUNCH",r,manifest.Version==2);
+                    var holder=Select(doc,definition.Holder,definition.HolderRootInsert,definition.HolderBlock,"HOLDER",r,manifest.Version==2);
+                    var cadPair=manifest.Version==2?CadPairBinding.Validate(id,sha,manifestSha,definition,doc,punch,holder,identified):null;
+                    if(cadPair!=null){r.AddRange(cadPair.Reasons);identified=identified&&cadPair.Matched;}
                     var temp=new CompanyToolProfile {Id=id,Parts=new[]{new ToolGeometryPart {Role=ToolGeometryRole.CompanyPunchProfile,Source=provenance,Entities=punch}},
                         Validation=new ToolProfileValidationResult {PunchGeometryReadComplete=identified&&punch.Count>0&&punch.All(e=>e.UnsupportedReason==null&&e.Curves.Count>0)}};
                     string geometryHash=ToolDatumEvidence.GeometryHash(temp,token);
@@ -109,7 +117,7 @@ namespace ADDIN.Commands.BendPlacement
                     if(datums.Status!=DatumEvidenceStatus.VerifiedRecord)r.Add("MISSING_DATUM_EVIDENCE");
                     r.AddRange(obstacle.Reasons);if(!mappingReview.RecordVerified)r.Add(mappingReview.Reason);
                     r.AddRange(seating.Reasons);
-                    profiles.Add(new ToolAssemblyProfile(id,sha,manifestSha,p,h,datums,identified,r,obstacle,seating,mappingReview));
+                    profiles.Add(new ToolAssemblyProfile(id,sha,manifestSha,p,h,datums,identified,r,obstacle,seating,mappingReview,cadPair,provenance));
                 }
                 // A shared physical source entity cannot silently belong to two
                 // tool slots or both roles. Reused block definitions are fine
@@ -117,8 +125,13 @@ namespace ADDIN.Commands.BendPlacement
                 var assignments=profiles.SelectMany(p=>(p.Punch?.EntityKeys??new string[0]).Select(k=>new {p.Id,Key=k,Role="P"})
                     .Concat((p.Holder?.EntityKeys??new string[0]).Select(k=>new {p.Id,Key=k,Role="H"}))).ToArray();
                 var overlaps=new HashSet<string>(assignments.GroupBy(a=>a.Key).Where(g=>g.Count()>1).SelectMany(g=>g.Select(a=>a.Id)),StringComparer.OrdinalIgnoreCase);
-                profiles=profiles.Select(p=>overlaps.Contains(p.Id)?new ToolAssemblyProfile(p.Id,sha,manifestSha,p.Punch,p.Holder,p.MasterDatums,false,p.Reasons.Concat(new[]{"AMBIGUOUS_MASTER_ROLE"}),p.HolderObstacles,p.SeatingEvidence,p.MappingReview):p).ToList();
-                return new Result {Tools=PlacementLists.Copy(profiles),Reasons=PlacementLists.Reasons(reasons),Fingerprint=PlacementSourceIo.Hash(sha+manifestSha+evidence.Fingerprint+holderEvidence.Fingerprint)};
+                // Root reuse must also fail when an invalid/empty selection hid
+                // the duplicate. No closest-holder or INSERT-order fallback.
+                var reused=new HashSet<string>(manifest.Version!=2?new string[0]:manifest.Tools.SelectMany(t=>new[]{new {t.Id,Root=t.PunchRootInsert},new {t.Id,Root=t.HolderRootInsert}})
+                    .Where(t=>!string.IsNullOrWhiteSpace(t.Root)).GroupBy(t=>t.Root,StringComparer.OrdinalIgnoreCase).Where(g=>g.Count()>1).SelectMany(g=>g.Select(t=>t.Id)),StringComparer.OrdinalIgnoreCase);
+                profiles=profiles.Select(p=>overlaps.Contains(p.Id)||reused.Contains(p.Id)?new ToolAssemblyProfile(p.Id,sha,manifestSha,p.Punch,p.Holder,p.MasterDatums,false,p.Reasons.Concat(new[]{"AMBIGUOUS_MASTER_ROLE"}),p.HolderObstacles,p.SeatingEvidence,p.MappingReview,
+                    p.CadPair==null?null:new CadPairBinding(p.Id,sha,manifestSha,manifest.Tools.Single(t=>string.Equals(t.Id,p.Id,StringComparison.OrdinalIgnoreCase)),false,new[]{"AMBIGUOUS_MASTER_ROLE"}),provenance):p).ToList();
+                return new Result {Tools=PlacementLists.Copy(profiles),Reasons=PlacementLists.Reasons(reasons),Source=provenance,Fingerprint=PlacementSourceIo.Hash(sha+manifestSha+evidence.Fingerprint+holderEvidence.Fingerprint)};
             }
             catch(OperationCanceledException){throw;}
             catch(Exception ex)
@@ -129,13 +142,13 @@ namespace ADDIN.Commands.BendPlacement
             }
         }
         private static ToolAssemblyProfile Missing(string id,string sha,string mapping,string reason)=>new ToolAssemblyProfile(id,sha,mapping,null,null,null,false,new[]{reason,"MISSING_DATUM_EVIDENCE","UNVERIFIED_HOLDER"});
-        private static IReadOnlyList<ToolDxfEntity> Select(ToolDxfDocument doc,ToolProfileSelection selector,string root,string block,string role,List<string> reasons)
+        private static IReadOnlyList<ToolDxfEntity> Select(ToolDxfDocument doc,ToolProfileSelection selector,string root,string block,string role,List<string> reasons,bool completeInstance=false)
         {
             if(selector==null||!selector.HasSelector||string.IsNullOrWhiteSpace(root)||string.IsNullOrWhiteSpace(block))
             {reasons.Add("MISSING_"+role+"_SELECTION");return new ToolDxfEntity[0];}
             var matching=doc.Entities.Where(e=>selector.Matches(e)&&e.InsertHandles.Count>0&&string.Equals(e.InsertHandles[0],root,StringComparison.OrdinalIgnoreCase)&&
                 e.Blocks.Count>0&&string.Equals(e.Blocks[0],block,StringComparison.OrdinalIgnoreCase)).ToArray();
-            var selected=matching.Where(e=>!e.Annotation&&!e.PaperSpace&&!Decorative(e.Layer)).ToArray();
+            var selected=matching.Where(e=>!e.Annotation&&!e.PaperSpace&&(completeInstance||!Decorative(e.Layer))).ToArray();
             if(matching.Length!=selected.Length)reasons.Add("ANNOTATION_SELECTION_REJECTED");
             if(selected.Length==0){reasons.Add("MISSING_"+role+"_GEOMETRY");return selected;}
             if(selected.Select(e=>e.InstancePath.Split('/').FirstOrDefault(s=>s.Length>0)).Distinct().Count()!=1||
