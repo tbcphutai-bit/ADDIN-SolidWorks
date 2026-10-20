@@ -93,6 +93,22 @@ namespace ADDIN.Commands.AutoFrameJoint
                     return false;
                 }
 
+                // Check visible occurrence state in the active Assembly without
+                // changing suppression, visibility or resolving lightweight parts.
+                // IsHidden(false) checks display visibility without treating
+                // every Lightweight occurrence as hidden.
+                if (frameA.IsSuppressed() || frameB.IsSuppressed())
+                {
+                    message = "Frame A hoặc B đang Suppressed. Hãy Unsuppress trước khi xem.";
+                    return false;
+                }
+
+                if (frameA.IsHidden(false) || frameB.IsHidden(false))
+                {
+                    message = "Frame A hoặc B đang Hidden. Hãy Show Component trước khi xem.";
+                    return false;
+                }
+
                 // COLORREF is 0x00BBGGRR, not System.Drawing.Color.ToArgb().
                 int colorA = ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235));
                 int colorB = ColorTranslator.ToWin32(Color.FromArgb(255, 155, 60));
@@ -101,7 +117,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int countB = ShowComponent(frameB, colorB, 0.65);
                 RedrawSafely(); // One redraw after the complete pair, not per body.
                 message = String.Format(
-                    "Đã hiển thị {0} body A + {1} body B. Đây là hình gốc, CHƯA CẮT.",
+                    "Đang xem bản sao trạng thái hiện tại: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
                     countA, countB);
                 return true;
             }
@@ -112,7 +128,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 bool cleaned = ClearInternal(out cleanError);
                 message = cleaned
                     ? "Không tạo được Preview: " + ex.Message
-                    : "Lỗi Preview; còn body cần dọn: " + cleanError;
+                    : "Lỗi Preview (" + ex.Message + "); còn " + shown.Count +
+                      " body chưa dọn được bằng Hide(): " + cleanError;
                 return false;
             }
             finally
