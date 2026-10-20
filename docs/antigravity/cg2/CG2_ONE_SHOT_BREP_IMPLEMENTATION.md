@@ -9,6 +9,21 @@
 **Target:** C# 7.3 / .NET Framework 4.8 / SOLIDWORKS Windows, Debug|x64 & Release|x64.
 **Status:** ChatGPT wrote source on GitHub; **not built or CAD-tested by ChatGPT**. Antigravity must verify reality.
 
+## QUY ĐỊNH PHÂN CÔNG ĐÃ ĐÍNH CHÍNH — CHATGPT VIẾT CODE, ANTI CHỈ ÁP DỤNG
+
+**Đây là yêu cầu trực tiếp của chủ dự án, có ưu tiên cao hơn bất kỳ câu chữ cũ nào trong tài liệu:**
+
+- **ChatGPT sở hữu 100% thiết kế thuật toán và mã C#**, kể cả bản sửa compile/API/logic. ChatGPT phải cung cấp source hoàn chỉnh và chỉ rõ tên file, class, method, anchor đặt code, `ADDIN.csproj` và việc thêm/xóa đoạn cũ nếu cần.
+- **Antigravity chỉ copy/paste hoặc đồng bộ CHÍNH XÁC code ChatGPT đã viết vào đúng file/class**, build, chạy kiểm thử SOLIDWORKS trong sandbox, thu thập lỗi, ghi báo cáo, commit/push. **KHÔNG tự viết, sửa, đổi tên, tái cấu trúc, tối ưu hay chữa lỗi C#** khi chưa được ChatGPT cung cấp patch cụ thể.
+- Nếu compile/API/behavior FAIL, **DỪNG thay đổi code**, gửi nguyên compiler error/code location/SOLIDWORKS Interop version/fixture và log lên PR. **ChatGPT viết patch mới**, Anti chỉ áp dụng rồi build/test lại.
+- Chỉ chỉnh tài liệu/báo cáo theo nội dung ChatGPT cung cấp; không biến NOT_TESTED/FAIL thành PASS.
+- **TÌNH TRẠNG RIÊNG CỦA CG2 HIỆN TẠI:** ChatGPT đã commit code trực tiếp vào các file class của branch. Anti phải **pull để lấy đúng code**, kiểm tra rằng code đã nằm ở đúng vị trí; **không copy/paste lần nữa thành class/method trùng**. Những bản vá *tiếp theo* sẽ được ChatGPT viết đầy đủ trên GitHub để Anti thực hiện đúng thao tác copy/paste/apply, không tự sáng tác.
+- Giữ PR #33 Draft, không merge và không bắt đầu CG3.
+
+**Anti chỉ có một đợt bàn giao:** kiểm tra code đã đặt đúng, build/test một lượt, báo đầy đủ kết quả. Nếu có lỗi cần patch, báo về ChatGPT để người viết code sửa.
+
+---
+
 ## 1. Cụ thể đã có code gì?
 
 | File | Code thật đã commit |
@@ -46,7 +61,7 @@ READY_FOR_MERGE=NO
 
 ## 2. ANTIGRAVITY — thực hiện TẤT CẢ trong một đợt
 
-**(A) Pull, kiểm code C# ChatGPT đã viết, chỉ sửa lỗi compile hoặc lỗi BREP chứng minh được.**
+**(A) Pull, kiểm code C# ChatGPT đã viết và xác nhận đúng vị trí. KHÔNG tự sửa C# dù có lỗi compile/API/BREP. Gửi đầy đủ lỗi để ChatGPT viết patch.**
 
 ```powershell
 git fetch origin
@@ -81,7 +96,7 @@ if ($LASTEXITCODE -ne 0) { throw "BUILD_RELEASE_X64_FAIL" }
 **(C) Push một báo cáo hoàn chỉnh rồi dừng chờ ChatGPT kiểm tra trực tiếp.**
 
 - Ghi tất cả số liệu trong `docs/antigravity/cg2/CG2_REPORT.md` và cập nhật bảng `CG2_ANTI_CODE_STATUS_REPORT.md` (class/method touched, before/after, author, API details, SHA DLL/log, C# changed/not changed).
-- Commit + push CHỈ branch CG2; phản hồi PR #33 full SHA và summary 6 CAD cases; nếu COM API không tương thích thì Anti tự chỉnh method mới chính xác và ghi compiler diagnostics, không đụng Check Hole engine cũ.
+- Commit + push CHỈ branch CG2; phản hồi PR #33 full SHA và summary 6 CAD cases; nếu COM API không tương thích thì Anti ghi nguyên compiler diagnostics để ChatGPT tự viết bản sửa; Anti KHÔNG được tự chỉnh method hay engine.
 - **Không merge main, không đẩy CG1, không khởi động CG3.** ChatGPT sẽ đọc source diff và ra **một review tổng hợp duy nhất** thay vì bắt Anti báo cáo từng phần.
 
 ## 3. Acceptance gates rõ ràng
@@ -125,7 +140,7 @@ if ($LASTEXITCODE -ne 0) { throw "BUILD_RELEASE_X64_FAIL" }
 
 ## 5. TOÀN BỘ SOURCE MỚI — CheckAssemblyHole.MaterialEvidence.cs
 
-Source này ĐÃ commit. Anti phải đọc và sửa tại file đó nếu có lỗi, KHÔNG chèn bản thứ hai.
+Source này ĐÃ commit và nằm đúng file class trên GitHub. Anti chỉ pull/áp dụng nguyên vẹn; nếu có lỗi, báo về ChatGPT để ChatGPT sửa rồi cung cấp patch mới. KHÔNG chèn bản thứ hai.
 
 ```csharp
 // CG2 BREP MATERIAL EVIDENCE — diagnostic-only, read-only.
