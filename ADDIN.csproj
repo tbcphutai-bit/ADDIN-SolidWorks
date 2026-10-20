@@ -596,7 +596,8 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PreBuildEvent Condition="'$(KillSolidWorksOnBuild)' == 'true'">taskkill /f /im sldworks.exe /fi "status eq running" 2&gt;nul &amp; set errorlevel=0</PreBuildEvent>
+    <!-- Build must never force-close a SOLIDWORKS session used by another command. -->
+    <PreBuildEvent></PreBuildEvent>
     <!-- No automatic deploy. Deploy only via a separate reviewed backup/hash/restore operation. -->
     <PostBuildEvent></PostBuildEvent>
   </PropertyGroup>

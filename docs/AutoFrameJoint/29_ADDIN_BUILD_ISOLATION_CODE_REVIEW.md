@@ -4,6 +4,8 @@
 **Target:** `fix/shared-addin-build-output-isolation-20261020`.  
 **Scope:** `ADDIN.csproj` only plus this documentation. **No C# changes. Not merged. Not deployed. Not built here.**
 
+**2026-10-20 no-build hold:** Another command is currently debugging in SOLIDWORKS. The user explicitly requested **WRITE SOURCE ONLY**; no build, rebuild, Visual Studio termination, SOLIDWORKS termination, DLL copy, registry action, or runtime test until the user says the other debug session is finished.
+
 ## Ground truth (actual ADDIN.csproj)
 Previously:
 - `Debug|x64` has `<OutputPath>C:\Tao moi\</OutputPath>`. Its output itself is placed at the COM-registered install directory.
@@ -16,6 +18,13 @@ Inside `Debug|x64` property group:
 <!-- Keep Debug builds inside the current worktree, never in the registered Add-in folder. -->
 <OutputPath>bin\x64\Debug\</OutputPath>
 ```
+Also remove the pre-build force-close behavior that formerly ran `taskkill /f /im sldworks.exe` when `KillSolidWorksOnBuild=true`:
+```xml
+<!-- Build must never force-close a SOLIDWORKS session used by another command. -->
+<PreBuildEvent></PreBuildEvent>
+```
+The user must close SOLIDWORKS **manually** before any later deployment. A normal build may be performed without ending other sessions.
+
 Inside final PropertyGroup after `Microsoft.CSharp.targets` import:
 ```xml
 <!-- No automatic deploy. Deploy only via a separate reviewed backup/hash/restore operation. -->
@@ -25,6 +34,10 @@ Inside final PropertyGroup after `Microsoft.CSharp.targets` import:
 This makes normal project builds put Debug output into `<worktree>\bin\x64\Debug\`; Release remains `<worktree>\bin\x64\Release\`. A normal rebuild must not copy DLL/PDB to the installed COM path.
 
 **Critical limit:** A different branch/worktree still using an OLD `ADDIN.csproj` can overwrite `C:\Tao moi\ADDIN.dll`. This patch protects ONLY builds performed from worktrees that contain it. All CG2/Codex/Antigravity builds must be coordinated; DO NOT merge to CG2 or another branch automatically.
+
+## Instructions to Antigravity — SOURCE ONLY FOR NOW
+
+Do not execute build commands in this document while another command is being debugged in SOLIDWORKS. Read and prepare code only. Wait for the user's explicit **debug finished** signal before running the build checks below.
 
 ## Instructions to Antigravity — EXACT review workflow
 
