@@ -688,6 +688,51 @@ namespace ADDIN.Tests
             }
             else Console.WriteLine("PASS: bounded source axis clipped to near-target range");
 
+            // A shifted parallel ray NEVER intersects the target AABB.
+            // Previous projection-based code incorrectly returned true.
+            object[] shifted = {
+                new[] { 0.0, 0.03, 0.0 }, new[] { 1.0, 0.0, 0.0 },
+                b, null, null, 0.0
+            };
+            bool falseHit = (bool)prep.Invoke(null, shifted);
+            if (falseHit)
+            {
+                Console.WriteLine("FAIL: ray parallel to AABB, but outside Y slab, was accepted");
+                errors++;
+            }
+            else Console.WriteLine("PASS: ray outside target Y slab correctly rejected");
+
+            // A rotated/diagonal axis must intersect the actual shared
+            // interval of all three slabs, not merely projected box extents.
+            object diagonalBox = boxMaker.Invoke(null, new object[] {
+                "rotated-B", new[] { 0.03, 0.03, -0.005, 0.05, 0.05, 0.005 } });
+            object[] diagonal = {
+                new[] { 0.0, 0.0, 0.0 }, new[] { 1.0, 1.0, 0.0 },
+                diagonalBox, null, null, 0.0
+            };
+            bool diagonalHit = (bool)prep.Invoke(null, diagonal);
+            if (!diagonalHit || diagonal[3] == null || diagonal[4] == null ||
+                (double)diagonal[5] <= 0)
+            {
+                Console.WriteLine("FAIL: valid diagonal ray missed target AABB");
+                errors++;
+            }
+            else Console.WriteLine("PASS: diagonal ray-AABB slab intersection");
+
+            object farBox = boxMaker.Invoke(null, new object[] {
+                "far-B", new[] { 0.055, -0.01, -0.01, 0.08, 0.01, 0.01 } });
+            object[] truncated = {
+                new[] { 0.0, 0.0, 0.0 }, new[] { 1.0, 0.0, 0.0 },
+                farBox, null, null, 0.0
+            };
+            if ((bool)prep.Invoke(null, truncated))
+            {
+                Console.WriteLine("FAIL: target AABB beyond 60mm window was accepted");
+                errors++;
+            }
+            else Console.WriteLine("PASS: incomplete ray range rejected, must remain UNVERIFIED");
+
+
             if (errors == 0)
                 Console.WriteLine("UNIT_OFFLINE_PASS: BREP field contracts & bounded source ray; "
                     + "real SOLIDWORKS material intersection NOT_TESTED in this harness");
@@ -844,7 +889,9 @@ namespace ADDIN.Tests
                                 Console.WriteLine("PASS: Modal title is exactly 'CHECK HOLE - Quan hệ Part / CG2 (chẩn đoán)'");
                             else { Console.WriteLine("FAIL: Modal title mismatch: " + modalTitle); errors++; }
 
-                            if (modalHeader != null && modalHeader.Contains("CHỈ LÀ AABB/BROAD-PHASE: không chứng minh tiếp xúc vật liệu, không chứng minh thiếu lỗ, không xác định Master, không tạo NG."))
+                            if (modalHeader != null && modalHeader.Contains("BREP_SOLID_ON_AXIS: chỉ chứng minh có solid trên trục;") &&
+                modalHeader.Contains("KHÔNG khẳng định cần lỗ xuyên") &&
+                modalHeader.Contains("không xác định Master, không tạo NG."))
                                 Console.WriteLine("PASS: Mandatory broad-phase disclaimer present in header");
                             else { Console.WriteLine("FAIL: Mandatory disclaimer missing in modal header: " + modalHeader); errors++; }
 
