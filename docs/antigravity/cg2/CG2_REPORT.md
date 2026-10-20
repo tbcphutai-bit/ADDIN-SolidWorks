@@ -1,5 +1,11 @@
 # CHECK HOLE CG2 — ANTIGRAVITY VERIFICATION REPORT
 
+> **UPDATE — ChatGPT Review #3 source patch (requires new test run):**
+> Added `CG2_REVIEW3_REPEATABILITY.cs`, integrated `--repeatability` in `CG2_LIVE_CAD_RUNNER.cs`, and published complete C# plus steps in [`CG2_REVIEW3_CODE.md`](CG2_REVIEW3_CODE.md). **This code has NOT yet been compiled or exercised on SOLIDWORKS by Antigravity.**
+> The results below refer to the **previous runner version**. Its large-Assembly raw CSV byte comparison failed. The hypothesis `GetComponents(false)` order / 223 swapped pairs remains `ROOT_CAUSE=UNVERIFIED` pending newly instrumented CG1→CG1, CG2→CG2, CG1→CG2 runs. Until then `CG2_REVIEW3_REPEATABILITY=NOT_TESTED`, `STRICT_CSV_BYTE_PARITY_916=FAIL_PREVIOUS_RUN`, `READY_FOR_MERGE=NO`.
+
+---
+
 > STATUS: **REVIEW #2 RETEST COMPLETE — FACTUAL EVIDENCE RECORDED**  
 > Branch: `feat/check-hole-cg2-part-relations` | PR: [Draft PR #33](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/33)  
 > Retest executed on code committed by ChatGPT for Review #2 (`CG2_LIVE_CAD_RUNNER.cs`, `CG2_TEST_HARNESS.cs`, `CG2_REVIEW2_CODE.md`).  
