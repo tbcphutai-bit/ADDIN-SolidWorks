@@ -351,6 +351,28 @@ namespace ADDIN.Commands
                     };
                     lastReport.PartRelations.Warnings.Add(cg2Error.GetType().Name);
                 }
+                // CG2 BREP diagnostic: actual solid hit evidence, never promotes CHECK_ONLY to NG.
+                // Any COM/body/transform failure leaves the candidate UNVERIFIED.
+                try
+                {
+                    if (lastReport.PartRelations != null)
+                        EnrichCg2BrepMaterialEvidence(assembly, holes, lastReport.PartRelations);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception cg2BrepError)
+                {
+                    Debug.WriteLine("[CHECK HOLE CG2 BREP] material evidence unavailable: " + cg2BrepError);
+                    if (lastReport.PartRelations != null)
+                    {
+                        lastReport.PartRelations.IsPartial = true;
+                        lastReport.PartRelations.CoverageStatus = "PARTIAL_UNVERIFIED";
+                        lastReport.PartRelations.Warnings.Add(
+                            "BREP material screening failed: " + cg2BrepError.GetType().Name);
+                    }
+                }
                 ThrowIfCanceled();
                 if (!string.Equals(inputState, CaptureModelState(model), StringComparison.Ordinal))
                     throw new InvalidOperationException("Model đã thay đổi trong khi CG2 quét; hãy chạy lại.");
