@@ -121,7 +121,7 @@ namespace ADDIN.UI
         }
         private void RequestScan()
         {
-            if (capturing || disposed) return;
+            if (capturing || disposed || PauseForBatch()) return;
             ClearDetail(); selectedItem = null; scanning = pendingStart = false;
             try
             {
@@ -137,7 +137,7 @@ namespace ADDIN.UI
         }
         private void Tick()
         {
-            if (disposed || capturing) return;
+            if (disposed || capturing || PauseForBatch()) return;
             try
             {
                 if (sourceRead != null && sourceRead.IsCompleted)
@@ -209,6 +209,16 @@ namespace ADDIN.UI
                 expandBends.Enabled = !scanning && !pendingStart && !capturing;
                 if (closingPending && !capturing) { closingPending = false; BeginInvoke(new Action(Close)); }
             }
+        }
+        private bool PauseForBatch()
+        {
+            // Shown can be queued before the launcher is clicked, then start
+            // this timer after the Click handler has stopped it. Enforce the
+            // existing single-owner rule at the scan entry points as well;
+            // never re-enter host COM while the child Batch owns the model.
+            if (batchForm == null || batchForm.IsDisposed) return false;
+            timer.Stop();
+            return true;
         }
         private void Populate()
         {
