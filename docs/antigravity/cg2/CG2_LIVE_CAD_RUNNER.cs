@@ -19,7 +19,7 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Tests
 {
-    internal static class Cg2LiveCadRunner
+    internal static partial class Cg2LiveCadRunner
     {
         private const string MarkerPrefix = "CHECK-HOLE-NG";
         private const string SandboxConsentFile = "CG1_SANDBOX_OK.txt";
@@ -44,6 +44,8 @@ namespace ADDIN.Tests
             public string RowSignature;
             public int RowCount;
             public object RawReport;
+            public string ComponentTraversal;
+            public string OrderedRowSignature;
 
             // CG1 metrics
             public bool HasCg1;
@@ -69,6 +71,7 @@ namespace ADDIN.Tests
             public Metrics Candidate;
         }
 
+        private static bool s_captureRepeatabilityTrace;
         private static string s_baselineDir;
         private static string s_candidateDir;
 
@@ -117,7 +120,12 @@ namespace ADDIN.Tests
                 string baselineDll = Path.GetFullPath(args[0]);
                 string candidateDll = Path.GetFullPath(args[1]);
                 string sandboxRoot = Path.GetFullPath(args[2]);
-                var models = args.Skip(3).Select(Path.GetFullPath).ToArray();
+                bool repeatabilityMode = args.Length == 5 &&
+                    string.Equals(args[4], "--repeatability", StringComparison.Ordinal);
+                var models = repeatabilityMode
+                    ? new[] { Path.GetFullPath(args[3]) }
+                    : args.Skip(3).Select(Path.GetFullPath).ToArray();
+                s_captureRepeatabilityTrace = repeatabilityMode;
 
                 ValidateSandboxInputs(baselineDll, candidateDll, sandboxRoot, models);
 
@@ -149,6 +157,9 @@ namespace ADDIN.Tests
                 Console.WriteLine("CANDIDATE (CG2) SHA256: " + Sha256(candidateDll));
                 Console.WriteLine("MARKER POLICY: AutoCreateMarkers=false enforced in safe test mode.");
                 Console.WriteLine("MARKER_GENERATION_PARITY: NOT_TESTED (protected fixture sandbox policy)");
+                if (repeatabilityMode)
+                    return RunRepeatability(app, baselineType, candidateType,
+                        baselineAsm, candidateAsm, sandboxRoot, models[0]);
 
                 int passed = 0, failed = 0, skipped = 0;
                 foreach (string fixture in models)
@@ -468,6 +479,8 @@ namespace ADDIN.Tests
             {
                 RequireSandboxPath(root, doc.GetPathName());
                 VerifyReferencesUnderSandbox(doc, root);
+                string componentTraversal = s_captureRepeatabilityTrace
+                    ? SnapshotComponentTraversal(doc) : null;
                 string beforeFeatures = FeatureSignature(doc);
                 EnsureNoOldMarkers(doc);
                 if (doc.GetSaveFlag())
@@ -492,6 +505,11 @@ namespace ADDIN.Tests
 
                 metrics = ReadReport(report);
                 metrics.RawReport = report;
+                if (s_captureRepeatabilityTrace)
+                {
+                    metrics.ComponentTraversal = componentTraversal;
+                    metrics.OrderedRowSignature = OrderedRowSignatureExact(report);
+                }
 
                 if (isCandidate)
                 {
