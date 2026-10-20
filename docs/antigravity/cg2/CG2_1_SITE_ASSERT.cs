@@ -102,10 +102,10 @@ namespace ADDIN.Tests
                 if (metrics.Cg2SubassemblyContainers < minContainers)
                     throw new InvalidOperationException("CG2.1 nested Subassembly coverage missing at line " + lineNumber);
 
-                var matches = metrics.Cg2ExpectedCandidates.Where(c =>
-                    string.Equals(c.SourceOccurrence, source, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(c.TargetOccurrence, target, StringComparison.OrdinalIgnoreCase) &&
-                    (hole == "*" || string.Equals(c.SourceHoleLabel, hole, StringComparison.Ordinal))).ToList();
+                var matches = metrics.Cg2ExpectedCandidates.Where(candidate =>
+                    string.Equals(candidate.SourceOccurrence, source, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(candidate.TargetOccurrence, target, StringComparison.OrdinalIgnoreCase) &&
+                    (hole == "*" || string.Equals(candidate.SourceHoleLabel, hole, StringComparison.Ordinal))).ToList();
 
                 if (expectedEvidence == "SUPPRESSED")
                 {
