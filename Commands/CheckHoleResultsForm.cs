@@ -88,7 +88,9 @@ namespace ADDIN.Commands
                       .Append(PartRelations.BrepNoAxisHitCount)
                       .Append(" | Chưa xác minh: ")
                       .Append(PartRelations.BrepUnknownCount + PartRelations.BrepNotTestedCount)
-                      .Append(" | ").Append(PartRelations.CoverageStatus);
+                      .Append(" | ").Append(PartRelations.CoverageStatus)
+                      .Append(" | Container Subassembly: ").Append(PartRelations.SubassemblyContainerCount)
+                      .Append(" | Part chưa resolve: ").Append(PartRelations.UnresolvedLeafOccurrenceCount);
                 if (!string.IsNullOrEmpty(MarkerStatus))
                     sb.AppendLine().Append(MarkerStatus);
                 return sb.ToString();
@@ -654,6 +656,8 @@ namespace ADDIN.Commands
                         + "Độ phủ: " + c.CoverageStatus
                         + " | Đã thử cặp Part: " + c.ComparedComponentPairs
                         + " | Đã thử trục lỗ: " + c.TestedHoleRelations
+                        + " | Subassembly container: " + c.SubassemblyContainerCount
+                        + " | Part chưa resolve: " + c.UnresolvedLeafOccurrenceCount
                         + Environment.NewLine
                         + "BREP_SOLID_ON_AXIS: chỉ chứng minh có solid trên trục; "
                         + "KHÔNG khẳng định cần lỗ xuyên, không xác định Master, không tạo NG."
