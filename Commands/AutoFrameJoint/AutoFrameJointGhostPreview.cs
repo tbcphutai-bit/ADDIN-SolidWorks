@@ -47,6 +47,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             sourceAssembly = originalAssembly;
         }
 
+        // Includes bodies with a pending cleanup after a COM display error.
+        // Do not treat this property as proof all bodies are rendered.
         public bool IsShowing { get { return shown.Count != 0; } }
 
         public bool TryShow(Component2 frameA, Component2 frameB,
@@ -97,6 +99,7 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 int countA = ShowComponent(frameA, colorA, 0.65);
                 int countB = ShowComponent(frameB, colorB, 0.65);
+                RedrawSafely(); // One redraw after the complete pair, not per body.
                 message = String.Format(
                     "Đã hiển thị {0} body A + {1} body B. Đây là hình gốc, CHƯA CẮT.",
                     countA, countB);
@@ -209,18 +212,22 @@ namespace ADDIN.Commands.AutoFrameJoint
                         appearanceError.Message);
                 }
 
+                // Register the COM body BEFORE entering Display3.
+                // If COM throws after a partial draw, cleanup still has a
+                // strong reference to the possibly displayed body.
+                ShownBody tracked = new ShownBody(copy, part);
+                shown.Add(tracked);
+
                 // Non-selectable preview avoids swModifyBlock.
-                // Display in the selected Component context; no transform is
-                // applied here to avoid double-positioning a component body.
+                // Display in the selected Component context; do not apply
+                // another component transform.
                 int result = copy.Display3(
                     component, colorRef,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
                 if (result != 0)
                     throw new InvalidOperationException(
-                        "IBody2.Display3 thất bại, mã lỗi=" + result);
-
-                // Retain a managed reference until Hide() completes.
-                shown.Add(new ShownBody(copy, part));
+                        "IBody2.Display3 thất bại, mã lỗi=" + result +
+                        ". Body giữ lại để dọn bằng Hide().");
                 count++;
             }
             return count;
@@ -230,9 +237,24 @@ namespace ADDIN.Commands.AutoFrameJoint
         /// Hide before releasing managed references. Failed hides are RETAINED
         /// for another cleanup attempt; never lose a displayed Body2 reference.
         /// </summary>
+        private void RedrawSafely()
+        {
+            try
+            {
+                // Do not activate an Assembly or redraw a different document.
+                if (IsOriginalAssemblyActive())
+                    sourceAssembly.GraphicsRedraw2();
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-GHOST] Graphics redraw warning: " + ex);
+            }
+        }
+
         private bool ClearInternal(out string error)
         {
             error = null;
+            bool attempted = shown.Count > 0;
             List<ShownBody> failed = new List<ShownBody>();
             for (int i = shown.Count - 1; i >= 0; i--)
             {
@@ -252,6 +274,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             shown.Clear();
             failed.Reverse();
             shown.AddRange(failed);
+            if (attempted)
+                RedrawSafely();
             return failed.Count == 0;
         }
     }
