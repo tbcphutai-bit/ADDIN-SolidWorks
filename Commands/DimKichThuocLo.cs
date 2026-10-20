@@ -211,7 +211,7 @@ namespace ADDIN.Commands
                 model.ClearSelection2(true);
                 model.GraphicsRedraw2();
 
-                MessageBox.Show(
+                if (nativeShowCompletion || diameterCount + positionCount + pitchCount == 0) MessageBox.Show(
                     "Hoan tat! Tim thay " + holes.Count + " lo, gom thanh " + holeGroups.Count + " cum lo." + System.Environment.NewLine +
                     "Da tao " + diameterCount + " kich thuoc duong kinh, " +
                     positionCount + " kich thuoc vi tri va " +

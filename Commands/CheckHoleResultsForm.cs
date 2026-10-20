@@ -41,6 +41,7 @@ namespace ADDIN.Commands
         public int MissingHoles;
         public double EngineSeconds;
         public CheckHoleConnectionCoverage ConnectionCoverage;
+        public CheckHoleCg2Report PartRelations;
         public string MarkerStatus = "Chưa vẽ sketch NG.";
         public readonly List<CheckHoleReportRow> Rows = new List<CheckHoleReportRow>();
 
@@ -74,6 +75,22 @@ namespace ADDIN.Commands
                       .Append(" | NG chưa rõ Master: ").Append(ConnectionCoverage.NgGroupsWithoutMaster)
                       .Append(" | Lỗ chưa ghép: ").Append(ConnectionCoverage.UnmatchedHoleCount)
                       .Append(" | ").Append(ConnectionCoverage.CoverageStatus);
+                if (PartRelations != null)
+                    sb.AppendLine().Append("CG2 / Quan hệ Part (AABB chẩn đoán): ")
+                      .Append(PartRelations.RecordedNearbyPairs)
+                      .Append(" cặp gần | Ứng viên cần xem: ")
+                      .Append(PartRelations.CandidateCount)
+                      .Append(" | Part không phát hiện lỗ: ")
+                      .Append(PartRelations.ComponentsWithoutDetectedHoles)
+                      .Append(" | BREP có vật liệu: ")
+                      .Append(PartRelations.BrepSolidEvidenceCount)
+                      .Append(" | BREP không giao trục: ")
+                      .Append(PartRelations.BrepNoAxisHitCount)
+                      .Append(" | Chưa xác minh: ")
+                      .Append(PartRelations.BrepUnknownCount + PartRelations.BrepNotTestedCount)
+                      .Append(" | ").Append(PartRelations.CoverageStatus)
+                      .Append(" | Container Subassembly: ").Append(PartRelations.SubassemblyContainerCount)
+                      .Append(" | Part chưa resolve: ").Append(PartRelations.UnresolvedLeafOccurrenceCount);
                 if (!string.IsNullOrEmpty(MarkerStatus))
                     sb.AppendLine().Append(MarkerStatus);
                 return sb.ToString();
@@ -122,6 +139,7 @@ namespace ADDIN.Commands
         private readonly Button allMarkers = new Button();
         private readonly Button export = new Button();
         private readonly Button connectionGroups = new Button();
+        private readonly Button partRelations = new Button();
         private readonly TableLayoutPanel detailLayout;
         private readonly TableLayoutPanel compactLayout = new TableLayoutPanel();
         private readonly Label compactSummary = new Label();
@@ -206,6 +224,7 @@ namespace ADDIN.Commands
             AddButton(toolbar, allMarkers, "Vẽ toàn bộ NG", () => markAction(null));
             AddButton(toolbar, export, "Xuất CSV", ExportReport);
             AddButton(toolbar, connectionGroups, "Nhóm liên kết", ShowConnectionGroups);
+            AddButton(toolbar, partRelations, "Quan hệ Part (CG2)", ShowPartRelations);
             AddButton(toolbar, cancel, "Hủy", () => cancelAction());
 
             autoMarkers.Text = "Tự vẽ NG";
@@ -544,6 +563,7 @@ namespace ADDIN.Commands
             allMarkers.Enabled = !busy && report != null && report.Rows.Any(x => x.CanMark);
             export.Enabled = !busy && report != null;
             connectionGroups.Enabled = !busy && report != null && report.ConnectionCoverage != null;
+            partRelations.Enabled = !busy && report != null && report.PartRelations != null;
             rerun.Enabled = !busy;
             cancel.Enabled = busy;
             filter.Enabled = !busy;
@@ -602,6 +622,99 @@ namespace ADDIN.Commands
                 dialog.Controls.Add(table);
                 dialog.Controls.Add(description);
                 dialog.ShowDialog();
+            }
+        }
+
+
+        // CG2: diagnostic-only. AABB screening is NOT physical contact or
+        // confirmation that a counterpart hole is required. No model edits.
+        private void ShowPartRelations()
+        {
+            if (busy || report == null || report.PartRelations == null) return;
+            CheckHoleCg2Report c = report.PartRelations;
+            using (var dialog = new Form())
+            {
+                dialog.Text = "CHECK HOLE - Quan hệ Part / CG2 (chẩn đoán)";
+                dialog.Size = new Size(1150, 630);
+                dialog.MinimumSize = new Size(850, 460);
+                dialog.StartPosition = FormStartPosition.CenterScreen;
+                dialog.Font = new Font("Segoe UI", 9F);
+
+                var header = new Label
+                {
+                    Dock = DockStyle.Top,
+                    Height = 94,
+                    Padding = new Padding(8),
+                    Text = "Component có bounding box: " + c.ComponentsWithBounds
+                        + " | Part chưa nhận diện lỗ: " + c.ComponentsWithoutDetectedHoles
+                        + " | Cặp AABB gần: " + c.RecordedNearbyPairs
+                        + " | Ứng viên AABB: " + c.CandidateCount
+                        + " | BREP có vật liệu: " + c.BrepSolidEvidenceCount
+                        + " | BREP không giao trục: " + c.BrepNoAxisHitCount
+                        + " | Chưa xác minh: " + (c.BrepUnknownCount + c.BrepNotTestedCount)
+                        + Environment.NewLine
+                        + "Độ phủ: " + c.CoverageStatus
+                        + " | Đã thử cặp Part: " + c.ComparedComponentPairs
+                        + " | Đã thử trục lỗ: " + c.TestedHoleRelations
+                        + " | Subassembly container: " + c.SubassemblyContainerCount
+                        + " | Part chưa resolve: " + c.UnresolvedLeafOccurrenceCount
+                        + Environment.NewLine
+                        + "BREP_SOLID_ON_AXIS: chỉ chứng minh có solid trên trục; "
+                        + "KHÔNG khẳng định cần lỗ xuyên, không xác định Master, không tạo NG."
+                };
+                var tabs = new TabControl { Dock = DockStyle.Fill };
+
+                var candidatePage = new TabPage("Ứng viên cần kiểm tra");
+                candidatePage.Controls.Add(new DataGridView
+                {
+                    Dock = DockStyle.Fill,
+                    ReadOnly = true,
+                    AutoGenerateColumns = true,
+                    AllowUserToAddRows = false,
+                    AllowUserToDeleteRows = false,
+                    RowHeadersVisible = false,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    // Prioritize physical BREP evidence; retain ALL AABB candidates.
+                    // BREP_NO_AXIS_HIT comes last, not deleted (avoid false negatives).
+                    DataSource = c.ExpectedHoleCandidates
+                        .OrderBy(row => row.MaterialEvidence == "BREP_SOLID_ON_AXIS" ? 0
+                            : row.MaterialEvidence == "BREP_NO_AXIS_HIT" ? 2 : 1)
+                        .ThenBy(row => row.Id).ToList()
+                });
+                tabs.TabPages.Add(candidatePage);
+
+                var relationPage = new TabPage("Cặp Component gần nhau");
+                relationPage.Controls.Add(new DataGridView
+                {
+                    Dock = DockStyle.Fill,
+                    ReadOnly = true,
+                    AutoGenerateColumns = true,
+                    AllowUserToAddRows = false,
+                    AllowUserToDeleteRows = false,
+                    RowHeadersVisible = false,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    DataSource = c.NearbyPairs
+                });
+                tabs.TabPages.Add(relationPage);
+
+                if (c.Warnings.Count > 0)
+                {
+                    var warningPage = new TabPage("Giới hạn dữ liệu");
+                    warningPage.Controls.Add(new TextBox
+                    {
+                        Multiline = true,
+                        ReadOnly = true,
+                        Dock = DockStyle.Fill,
+                        ScrollBars = ScrollBars.Vertical,
+                        Text = string.Join(Environment.NewLine, c.Warnings)
+                    });
+                    tabs.TabPages.Add(warningPage);
+                }
+                dialog.Controls.Add(tabs);
+                dialog.Controls.Add(header);
+                dialog.ShowDialog(this);
             }
         }
 

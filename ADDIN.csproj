@@ -208,6 +208,7 @@
     <Compile Include="Commands\AutoVCutSectionCommand.Assembly.cs" />
     <Compile Include="Commands\AutoVCutSectionCommand.PartLayout.cs" />
     <Compile Include="Commands\AutoVCutSectionCommand.PartMarks.cs" />
+    <Compile Include="Commands\AutoVCutSectionCommand.OmoteMark.cs" />
     <Compile Include="Commands\PartSectionLayoutPlanner.cs" />
     <Compile Include="Commands\VCutPropertySetupCommand.cs" />
     <Compile Include="Commands\BendPanelGeometry.cs" />
@@ -318,6 +319,8 @@
     </Compile>
     <Compile Include="Commands\CheckAssemblyHole.cs" />
     <Compile Include="Commands\CheckAssemblyHole.ConnectionGroups.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.PartRelations.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.MaterialEvidence.cs" />
     <Compile Include="Commands\CheckAssemblyHole.Results.cs" />
     <Compile Include="Commands\CheckAssemblyHole.MissingPattern.cs" />
     <Compile Include="Commands\CheckAssemblyHole.SkippedPattern.cs" />
