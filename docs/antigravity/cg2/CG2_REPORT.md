@@ -1,5 +1,7 @@
 # CHECK HOLE CG2 — ANTIGRAVITY ONE-SHOT BREP VERIFICATION REPORT
 
+> **CHATGPT SOURCE REVIEW / PATCH UPDATE:** Các số đo và kết luận BREP bên dưới là bằng chứng **lịch sử từ DLL trước bản vá mới**, KHÔNG phải kết quả chạy của code BREP vừa sửa. ChatGPT đã sửa `Cg2PrepareBoundedRay`, tách classifier `ENTER/EXIT` để unit-test và cập nhật assertion WinForms trong `CG2_TEST_HARNESS.cs`. Build/fixture CAD của source mới = **NOT_TESTED** cho tới khi Antigravity pull và chạy lại. Lượt trước **CAD-M01 chưa đạt** vì chưa có fixture dương tính chắn solid; `BREP_SOLID_ON_AXIS=0` không chứng minh tính năng nhận diện vật liệu hoạt động. Raw CSV byte comparison vẫn FAIL (2 PASS / 4 FAIL), `ROOT_CAUSE_OF_ORDER_CHANGE=NOT_PROVEN`, `READY_FOR_MERGE=NO`. Xem [CG2_BREP_REVIEW_PATCH.md](CG2_BREP_REVIEW_PATCH.md) trước khi áp dụng code.
+
 > **STATUS: CG2 ONE-SHOT BREP VERIFICATION COMPLETE — FACTUAL EVIDENCE RECORDED**
 > Branch: `feat/check-hole-cg2-part-relations` | PR: [Draft PR #33](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/33)
 > All C# code authored and committed by ChatGPT. Antigravity applied code verbatim (`C_SHARP_EDITED_WITHOUT_CHATGPT_PATCH=NO`).
@@ -192,7 +194,7 @@ docs\antigravity\cg2\CG2_LIVE_CAD_RUNNER.exe "C:\Tao moi\backup_cg1_release_snap
 2. **Normalized Row Detailed Parity:** 100% identical across all 13 fields when sorted and Reference/Actual canonicalized.
 3. **Strict CSV Byte Comparison:**
    - Byte counts are 100% identical on every fixture (8,262 vs 8,262; 8,505 vs 8,505; 5,675 vs 5,675; 11,769 vs 11,769; 107 vs 107; 129,522 vs 129,522).
-   - Differences occur at the very first data rows (byte 175-190) due to SOLIDWORKS `GetComponents(false)` component traversal order variations across fresh read-only document opens, as proven in Review #3 repeatability suite.
+   - Differences occur at the very first data rows (byte 175-190) while pre-run component-order snapshots also differed; the actual production traversal root cause is NOT_PROVEN.
    - Overall runner exit code: `SUMMARY: PASS=2 FAIL=4 SKIP=0 EXIT=1`.
 4. **3D Marker Parity:** `AutoCreateMarkers=false` strictly enforced in safe sandbox mode (`MARKER_GENERATION_PARITY=NOT_TESTED`).
 
@@ -219,7 +221,7 @@ BREP_NO_AXIS_HIT=187 (13 Fixture_OK + 13 MultiLayer + 161 1618-01-BH)
 BREP_UNKNOWN=1136 (984 unresolved part + 84 topology + 68 ambiguous)
 BREP_NOT_TESTED_BUDGET=0
 CG1_VS_CG2_PRODUCTION_VERDICTS=PASS
-STRICT_CSV_BYTE_PARITY=FAIL (2 PASS, 4 FAIL due to baseline traversal non-determinism)
+STRICT_CSV_BYTE_PARITY=FAIL (2 PASS, 4 FAIL; baseline nondeterminism observed, exact production traversal cause NOT_PROVEN)
 MARKER_GENERATION_PARITY=NOT_TESTED
 READY_FOR_CHATGPT_SOURCE_REVIEW=YES
 READY_FOR_MERGE=NO
