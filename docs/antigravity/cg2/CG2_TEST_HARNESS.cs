@@ -705,7 +705,7 @@ namespace ADDIN.Tests
             // A rotated/diagonal axis must intersect the actual shared
             // interval of all three slabs, not merely projected box extents.
             object diagonalBox = boxMaker.Invoke(null, new object[] {
-                "rotated-B", new[] { 0.03, 0.03, -0.005, 0.05, 0.05, 0.005 } });
+                "rotated-B", new[] { 0.02, 0.02, -0.005, 0.035, 0.035, 0.005 } });
             object[] diagonal = {
                 new[] { 0.0, 0.0, 0.0 }, new[] { 1.0, 1.0, 0.0 },
                 diagonalBox, null, null, 0.0
