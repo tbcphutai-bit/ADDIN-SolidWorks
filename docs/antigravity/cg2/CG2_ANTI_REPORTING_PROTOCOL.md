@@ -8,14 +8,24 @@
 
 ## A. Phân công cố định
 
+### Phân quyền viết code — yêu cầu bắt buộc của chủ dự án (ưu tiên cao nhất)
+
+**ChatGPT là người duy nhất tác giả/sửa mã C# cho CG2.** Mọi code, bản vá compiler/API, thay đổi logic, unit-test mới, lệnh tạo class/file đều phải do ChatGPT viết và công bố trên GitHub trước.
+
+**Antigravity KHÔNG được tự viết hoặc tự sửa code C#.** Nhiệm vụ chỉ là đưa nguyên văn code ChatGPT đã cung cấp vào đúng class/file (hoặc pull nếu ChatGPT đã commit vào vị trí đó), xây dựng solution, chạy kiểm thử và ghi đầy đủ lỗi/bằng chứng. Nếu code lỗi, Anti **không tự sửa**; báo lỗi trực tiếp lên PR để ChatGPT tạo code thay thế và chỉ rõ vị trí cần chèn.
+
+**Hiện trạng CG2:** source đã do ChatGPT đưa sẵn vào class và commit trên GitHub, vì vậy Anti chỉ pull/đối chiếu để tránh dán trùng. Trong các lần sửa sau, ChatGPT cung cấp code đầy đủ kèm exact file/class/anchor; Anti chỉ áp dụng không thay đổi.
+
+Báo cáo Anti phải nêu chính xác `APPLIED_CHATGPT_CODE`, `C_SHARP_EDITED_WITHOUT_CHATGPT_PATCH=NO`, `BUILD_RESULT`, `CAD_TEST_RESULT`, `ERROR_DETAILS` (nếu có) và `HEAD_SHA`.
+
 **ChatGPT — kiến trúc / mã tham chiếu / kiểm soát kỹ thuật**
 1. Đọc trực tiếp GitHub SOURCE C# ở commit Anti vừa push; không dùng tin nhắn/báo cáo của Anti làm chứng cứ đủ để nghiệm thu.
 2. Đọc diff GitHub so với SHA trước đó và base CG1; kiểm tra hành vi từng method, điều kiện nhánh, ngoại lệ, trạng thái CAD, side effects, thứ tự COM, dung sai, phạm vi sản xuất, regression.
 3. Đánh giá từng finding **PASS_STATIC / FAIL_CODE / NOT_VERIFIED_RUNTIME / BLOCKED**; đưa đường dẫn file, method, dòng, nguyên nhân, và **code C# sửa cụ thể** hoặc đúng văn bản thay thế nếu chỉ là docs. Nếu yêu cầu sửa code, ưu tiên tự commit patch/guide lên GitHub để Anti triển khai và kiểm thử.
 4. Đăng review thực chất lên PR, chốt còn blocker nào; không phê duyệt merge chỉ vì Anti ghi CODE_COMPLETE=PASS.
 
-**Antigravity — triển khai, build, chạy CAD và cung cấp bằng chứng**
-1. Đọc chỉ thị và code đã được ChatGPT commit trên GitHub. Không chèn duplicate class/method, không âm thầm đổi engine production.
+**Antigravity — CHỈ DÁN/ÁP DỤNG CODE CHATGPT, build, chạy CAD và cung cấp bằng chứng**
+1. Đọc chỉ thị và code ChatGPT viết trên GitHub. Copy/paste nguyên văn vào đúng class/file khi chưa có; nếu đã commit đúng vị trí thì pull, không dán trùng. Không được tự chỉnh C# kể cả để sửa lỗi build/API.
 2. Mỗi lần làm xong **bắt buộc** cập nhật `docs/antigravity/cg2/CG2_ANTI_CODE_STATUS_REPORT.md` trước khi báo trong chat; báo **đã viết những file, class và method nào**, nêu ai là tác giả (ChatGPT/Anti), chính xác các lệnh test, và cả phần CHƯA LÀM.
 3. Commit + push tất cả mã nguồn/QA code/tài liệu được dùng; không viện dẫn file local chưa push làm bằng chứng. Nếu chỉ sửa docs, ghi rõ **C# CHANGED = NONE**; không được nói "đã viết C#" ở commit chỉ đổi .md.
 4. Mọi PASS phải có assertion thực sự, exit code, log và SHA binary. Báo FAIL/NOT_TESTED/BLOCKED trung thực; **không tự chuyển FAIL thành PASS**.
@@ -25,7 +35,7 @@
 
 Báo cả **toàn bộ CG2 hiện có** và **những thay đổi của commit hiện tại**; phân biệt rõ:
 - **Code do ChatGPT tạo:** không nhận nhầm là Anti viết.
-- **Code do Anti bổ sung/sửa:** chỉ rõ file và method, tác động trước/sau.
+- **Code Anti áp dụng theo patch ChatGPT:** chỉ rõ file/method và mã định danh patch ChatGPT. Không cho phép code Anti tự tác giả hay tự sửa.
 - **Code đã đọc nhưng không sửa:** ghi VERIFIED_BY_READING, không tự báo AUTHOR=ANTI.
 - **Chưa xây dựng:** ghi NOT_IMPLEMENTED.
 - **Đã viết nhưng chưa build/không chạy:** CODE_WRITTEN_NOT_TESTED.
@@ -139,7 +149,7 @@ Khi Anti báo xong, ChatGPT sẽ:
 2. Đọc từng file C# thực sự bị sửa, **đọc đúng method đã báo**, đối chiếu engine/marker/NG.
 3. Xác nhận có/không bằng chứng code thực thi branch, kiểm tra assertions và các mã lỗi/thoát.
 4. Đăng review gồm `ACCEPTED_STATIC`, `NEEDS_FIX`, `NOT_TESTED` theo từng file/method.
-5. Nếu `NEEDS_FIX`, cung cấp mẫu code hoặc **tự tạo patch + .md trên GitHub** để Anti chỉ cần pull, build, test và báo cáo lại.
+5. Nếu `NEEDS_FIX`, **ChatGPT phải viết đầy đủ mã C# thay thế** và nêu chính xác vị trí đặt code trên GitHub. Anti chỉ copy/paste hoặc pull code đó, build, test và báo cáo lại; không tự sửa.
 6. Chỉ chấp thuận Merge khi người dùng explicitly cho phép; không tự mở CG3.
 
 **Không cần lặp review cho phần không thay đổi.** Chỉ ghi nhận regressions đã chứng minh và blocker đủ quan trọng.
