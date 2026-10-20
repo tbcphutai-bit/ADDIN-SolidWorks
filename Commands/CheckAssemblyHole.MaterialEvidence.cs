@@ -62,8 +62,19 @@ namespace ADDIN.Commands
 
             object[] components = ToObjectArray(assembly.GetComponents(false));
             var lookup = new Dictionary<string, Component2>(StringComparer.OrdinalIgnoreCase);
+            int scannedComponents = 0;
             foreach (object obj in components)
             {
+                if ((scannedComponents++ & 31) == 0)
+                {
+                    ThrowIfCanceled();
+                    if (cg2BrepTimer.ElapsedMilliseconds >= Cg2MaxBrepElapsedMs)
+                    {
+                        report.IsPartial = true;
+                        Cg2Warn(report, "BREP time budget reached while indexing nested Part occurrences.");
+                        break;
+                    }
+                }
                 Component2 component = obj as Component2;
                 if (!IsUsableComponent(component)) continue;
                 // Exclude Subassembly containers: only their resolved nested Part
