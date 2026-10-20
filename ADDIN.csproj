@@ -39,7 +39,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
-    <OutputPath>C:\Tao moi\</OutputPath>
+    <!-- Keep Debug builds inside the current worktree, never in the registered Add-in folder. -->
+    <OutputPath>bin\x64\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <RegisterForComInterop>false</RegisterForComInterop>
     <DebugType>full</DebugType>
@@ -596,6 +597,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PreBuildEvent Condition="'$(KillSolidWorksOnBuild)' == 'true'">taskkill /f /im sldworks.exe /fi "status eq running" 2&gt;nul &amp; set errorlevel=0</PreBuildEvent>
-    <PostBuildEvent>copy /Y "$(TargetDir)$(TargetName).dll" "C:\Tao moi\ADDIN.dll" &amp; copy /Y "$(TargetDir)$(TargetName).pdb" "C:\Tao moi\ADDIN.pdb" 2&gt;nul &amp; set errorlevel=0</PostBuildEvent>
+    <!-- No automatic deploy. Deploy only via a separate reviewed backup/hash/restore operation. -->
+    <PostBuildEvent></PostBuildEvent>
   </PropertyGroup>
 </Project>
