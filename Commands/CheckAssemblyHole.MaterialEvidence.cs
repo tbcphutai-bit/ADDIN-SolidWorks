@@ -3,6 +3,7 @@
 // C# 7.3, SOLIDWORKS >= 2018 SP02 API, .NET Framework 4.8.
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using SolidWorks.Interop.sldworks;
@@ -14,6 +15,7 @@ namespace ADDIN.Commands
     {
         // The ray test is deliberately capped; it is NOT a full-assembly validator.
         private const int Cg2MaxBrepRayChecks = 500;
+        private const int Cg2MaxBrepElapsedMs = 60000; // cooperative diagnostic time budget
         private const int Cg2MaxBrepBodiesPerOccurrence = 40;
         private const double Cg2MinMaterialSpanM = 0.00010; // 0.10 mm, diagnostic evidence threshold
         private const double Cg2BrepStartMarginM = 0.010; // start outside approximate target box
@@ -50,6 +52,7 @@ namespace ADDIN.Commands
             if (assembly == null || holes == null || report == null)
                 return;
 
+            Stopwatch cg2BrepTimer = Stopwatch.StartNew();
             foreach (CheckHoleCg2ExpectedHoleRow candidate in report.ExpectedHoleCandidates)
             {
                 candidate.MaterialEvidence = "NOT_TESTED";
@@ -63,6 +66,11 @@ namespace ADDIN.Commands
             {
                 Component2 component = obj as Component2;
                 if (!IsUsableComponent(component)) continue;
+                // Exclude Subassembly containers: only their resolved nested Part
+                // occurrences can supply actual solid-body material evidence.
+                bool isSubassembly;
+                if (!Cg2IsResolvedPartOccurrence(component, out isSubassembly))
+                    continue;
                 string key = SafeComponentName(component);
                 if (!string.IsNullOrWhiteSpace(key) && !lookup.ContainsKey(key))
                     lookup.Add(key, component);
@@ -83,9 +91,12 @@ namespace ADDIN.Commands
             foreach (CheckHoleCg2ExpectedHoleRow row in prioritized)
             {
                 ThrowIfCanceled();
-                if (report.BrepRayTestedCount >= Cg2MaxBrepRayChecks)
+                if (report.BrepRayTestedCount >= Cg2MaxBrepRayChecks ||
+                    cg2BrepTimer.ElapsedMilliseconds >= Cg2MaxBrepElapsedMs)
                 {
-                    row.MaterialEvidence = "NOT_TESTED_BUDGET";
+                    row.MaterialEvidence =
+                        cg2BrepTimer.ElapsedMilliseconds >= Cg2MaxBrepElapsedMs
+                            ? "NOT_TESTED_TIME_BUDGET" : "NOT_TESTED_BUDGET";
                     report.BrepNotTestedCount++;
                     report.IsPartial = true;
                     continue;
@@ -182,7 +193,7 @@ namespace ADDIN.Commands
             }
 
             if (report.BrepNotTestedCount > 0)
-                Cg2Warn(report, "BREP ray budget reached: "
+                Cg2Warn(report, "BREP ray/time budget reached: "
                     + report.BrepNotTestedCount.ToString(CultureInfo.InvariantCulture)
                     + " candidates NOT TESTED. AABB remains CHECK_ONLY.");
 
