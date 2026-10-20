@@ -317,6 +317,12 @@ namespace ADDIN.Commands
             return Math.Sqrt(sq) <= Math.Max(0.002, Math.Sqrt(diagSq)*0.05);
         }
 
+        /// <summary>
+        /// Actual infinite-line versus AABB slab intersection, then a finite ray
+        /// that begins BEFORE the target AABB (rather than inside its solid).
+        /// AABB is approximate; failure to establish the entire test window
+        /// returns UNVERIFIED_RAY_RANGE, NEVER BREP_NO_AXIS_HIT.
+        /// </summary>
         private static bool Cg2PrepareBoundedRay(
             double[] source, double[] direction, Cg2Box box,
             out double[] start, out double[] unit, out double maxDistM)
@@ -326,26 +332,56 @@ namespace ADDIN.Commands
             maxDistM = 0;
             if (!Cg2ValidVector(source) || !Cg2ValidVector(direction) || box == null)
                 return false;
+
             double mag = Math.Sqrt(direction.Take(3).Sum(x => x*x));
             if (mag < 1e-12) return false;
             unit = direction.Take(3).Select(x => x/mag).ToArray();
 
-            double minT = 0, maxT = 0;
+            // Exact slab algorithm for the APPROXIMATE target AABB. The previous
+            // projection method summed componentwise min/max dot products;
+            // those are NOT ray/box intersections (a parallel displaced ray
+            // incorrectly passed), so it could use an invalid ray window.
+            double entryT = double.NegativeInfinity;
+            double exitT = double.PositiveInfinity;
             for (int k = 0; k < 3; k++)
             {
-                double p = (box.Min[k] - source[k])*unit[k];
-                double q = (box.Max[k] - source[k])*unit[k];
-                minT += Math.Min(p, q);
-                maxT += Math.Max(p, q);
+                double lo = box.Min[k];
+                double hi = box.Max[k];
+                if (double.IsNaN(lo) || double.IsNaN(hi) ||
+                    double.IsInfinity(lo) || double.IsInfinity(hi) ||
+                    lo > hi) return false;
+
+                double d = unit[k];
+                if (Math.Abs(d) < 1e-12)
+                {
+                    if (source[k] < lo || source[k] > hi) return false;
+                    continue;
+                }
+
+                double a = (lo - source[k]) / d;
+                double b = (hi - source[k]) / d;
+                if (a > b) { double swap = a; a = b; b = swap; }
+                entryT = Math.Max(entryT, a);
+                exitT = Math.Min(exitT, b);
+                if (entryT > exitT) return false;
             }
-            minT = Math.Max(minT-Cg2BrepStartMarginM, -Cg2MaxAxisReachM);
-            maxT = Math.Min(maxT+Cg2BrepStartMarginM, Cg2MaxAxisReachM);
-            if (maxT <= minT + Cg2MinMaterialSpanM) return false;
+            if (double.IsNaN(entryT) || double.IsInfinity(entryT) ||
+                double.IsNaN(exitT) || double.IsInfinity(exitT))
+                return false;
+
+            // Start OUTSIDE the component AABB. Do not claim "no solid" if
+            // the finite diagnostic window truncates a target body.
+            double fromT = entryT - Cg2BrepStartMarginM;
+            double toT = exitT + Cg2BrepStartMarginM;
+            if (fromT < -Cg2MaxAxisReachM || toT > Cg2MaxAxisReachM ||
+                toT - fromT < Cg2MinMaterialSpanM)
+                return false;
+
             start = new[] {
-                source[0] + unit[0]*minT,
-                source[1] + unit[1]*minT,
-                source[2] + unit[2]*minT };
-            maxDistM = maxT - minT;
+                source[0] + unit[0]*fromT,
+                source[1] + unit[1]*fromT,
+                source[2] + unit[2]*fromT };
+            maxDistM = toT - fromT;
             return true;
         }
 
