@@ -370,6 +370,8 @@ namespace ADDIN.Tests
                 ok = false;
             }
             else Console.WriteLine("PASS: Review3 quoted-multiline CSV record splitter");
+            if (!SelfTestCg21SiteAssertions())
+                ok = false;
             return ok ? 0 : 1;
         }
 
