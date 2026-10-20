@@ -125,6 +125,7 @@
     <Compile Include="UI\AutoFrameJointTaskPaneLauncher.cs" />
     <Compile Include="Commands\AutoFrameJoint\AutoFrameJointCommandEntry.cs" />
     <Compile Include="Commands\AutoFrameJoint\AutoFrameJointGhostPreview.cs" />
+    <Compile Include="Commands\AutoFrameJoint\AutoFrameJointGhostSessionManager.cs" />
     <Compile Include="Commands\NativeToolBridges.cs" />
     <Compile Include="Commands\RepairDanglingDimensions.Native.cs" />
     <Compile Include="UI\MirrorAssemblyPropertyManagerPage.cs" />
