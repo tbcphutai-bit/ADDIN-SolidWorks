@@ -426,6 +426,9 @@ namespace ADDIN.Tests
                 // 1. Rigorous Row-by-Row Metrics & Signature Comparison (Review #1 BLOCKER B)
                 CompareMetrics(baseline, candidate, model);
                 ValidateCg2ExpectedCandidates(Path.GetFileName(model), candidate);
+                // Exact fixture A->B/hole/physical evidence assertions, if a
+                // local site manifest exists under the approved sandbox.
+                AssertCg21Sites(root, Path.GetFileName(model), candidate);
 
                 // 2. Real CSV Line-by-Line Parity Verification (Review #1 BLOCKER B)
                 VerifyCsvParity(root, Path.GetFileName(model), baseline.RawReport, candidate.RawReport, baseAsm, candAsm);
