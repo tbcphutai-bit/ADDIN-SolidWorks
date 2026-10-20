@@ -1,5 +1,7 @@
 # CHECK HOLE CG2 — ANTIGRAVITY ONE-SHOT BREP VERIFICATION REPORT
 
+> **CHATGPT COM-9 PATCH mới (chưa build/test):** Bản code vừa được ChatGPT sửa trong `CheckAssemblyHole.MaterialEvidence.cs` và `CG2_TEST_HARNESS.cs` đã hỗ trợ mảng 6/9 doubles mỗi ray hit và bổ sung test thực nghiệm COM giả lập. Tất cả kết quả PASS bên dưới là **log Anti của DLL trước patch này**. `COM9_PATCH_BUILD=NOT_TESTED`; `COM9_PATCH_LIVE_SOLID_POSITIVE=NOT_TESTED`; `READY_FOR_MERGE=NO`. Không suy ra CG2 sản xuất đã báo `BREP_SOLID_ON_AXIS` thành công cho tới khi Anti test lại. Xem [CG2_BREP_COM9_FIX.md](CG2_BREP_COM9_FIX.md).
+
 > **STATUS: CG2 BREP REVIEW PATCH VERIFICATION COMPLETE — FACTUAL EVIDENCE RECORDED**
 > Branch: `feat/check-hole-cg2-part-relations` | PR: [Draft PR #33](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/33)  
 > Remote HEAD SHA: `327d1026505411a7db1f9c2122afa1f658883435`  
