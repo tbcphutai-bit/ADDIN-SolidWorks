@@ -58,7 +58,16 @@ namespace CheckChan.NativeAcceptance
                 string dll=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_TARGET_DLL");fixture=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_FIXTURE");
                 if(!Path.IsPathRooted(dll)||!File.Exists(dll)||!Path.IsPathRooted(fixture)||!File.Exists(fixture))throw new InvalidOperationException("EXPLICIT_PRIVATE_INPUTS_REQUIRED");
                 LoadRepresentativeCases();
+                PrepareComControl();
+                if(comControl=="A")
+                {
+                    Assert(!ProductAssemblyLoaded,"CONTROL_A_PRODUCT_MUST_NOT_BE_LOADED");
+                    state["NoProductControl"]=true;state["ProductAssemblyLoaded"]=false;state["DllSha256"]="NOT_LOADED";
+                    Write("NO_PRODUCT_CONTROL_READY");
+                    timer=new System.Windows.Forms.Timer {Interval=100};timer.Tick+=Tick;clock.Start();timer.Start();return true;
+                }
                 assembly=Assembly.LoadFrom(dll);state["RequestedPath"]=dll;state["LoadedPath"]=assembly.Location;state["DllSha256"]=Sha(assembly.Location);state["Mvid"]=assembly.ManifestModule.ModuleVersionId;
+                if(comControl!=null)state["ProductAssemblyLoaded"]=ProductAssemblyLoaded;
                 if(!string.Equals(dll,assembly.Location,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("TARGET_DLL_IDENTITY_MISMATCH");
                 target=Activator.CreateInstance(assembly.GetType("ADDIN.SwAddin",true));Write("BEFORE_TARGET_CONNECT");
                 state["TargetConnectReturned"]=target.GetType().GetMethod("ConnectToSW").Invoke(target,new[]{host,(object)cookie});
@@ -133,6 +142,7 @@ namespace CheckChan.NativeAcceptance
                     state["BorrowedHostStillUsable"]=app.GetProcessID()==Process.GetCurrentProcess().Id;
                     if(!Equals(state["TargetAppAndPaneDetached"],true)||!Equals(state["BorrowedHostStillUsable"],true))throw new InvalidOperationException("TARGET_DETACH_OR_BORROWED_HOST_CONTRACT_FAILED");
                 }
+                if(comControl=="A"){Assert(!ProductAssemblyLoaded,"CONTROL_A_LOADED_PRODUCT_LATE");state["ProductAssemblyLoaded"]=false;state["TargetDisconnect"]="NOT_APPLICABLE_NO_PRODUCT";}
                 Write("TARGET_DISCONNECTED");return true;
             }
             catch(Exception ex){state["DisconnectError"]=ex.ToString();Write("DISCONNECT_FAILED");return false;}

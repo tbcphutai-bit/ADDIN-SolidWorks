@@ -15,6 +15,19 @@ namespace CheckChan.NativeAcceptance
         public Dictionary<string,string> ProtectedSha256 { get; set; }
         internal static string Hash(string path)
         { return NativeMatrix.MatrixInput.Hash(path); }
+        internal static string ComControlMode(string value)
+        {
+            if(string.IsNullOrEmpty(value))return null;
+            if(value!="A"&&value!="B")throw new InvalidDataException("Only explicit COM controls A or B are supported");
+            return value;
+        }
+        internal static int ComControlTests()
+        {
+            int n=0;Action<bool> check=ok=>{n++;if(!ok)throw new InvalidDataException("COM control guard regression");};
+            check(ComControlMode(null)==null);check(ComControlMode("")==null);check(ComControlMode("A")=="A");check(ComControlMode("B")=="B");
+            foreach(string input in new[]{"C","a"," "}){bool rejected=false;try{ComControlMode(input);}catch(InvalidDataException){rejected=true;}check(rejected);}
+            Console.WriteLine("PASS COM control guards: "+n+" assertions; no native call");return 0;
+        }
         internal static RepresentativeAcceptanceInput Read(string path)
         {
             var value=new JavaScriptSerializer().Deserialize<RepresentativeAcceptanceInput>(File.ReadAllText(path));

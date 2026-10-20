@@ -4,9 +4,11 @@
   <ItemGroup><Reference Include="System"/><Reference Include="System.Core"/><Reference Include="System.Drawing"/><Reference Include="System.Windows.Forms"/><Reference Include="System.Web.Extensions"/>
     <Reference Include="SolidWorks.Interop.sldworks"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.sldworks.dll</HintPath></Reference>
     <Reference Include="SolidWorks.Interop.swpublished"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.swpublished.dll</HintPath></Reference>
+    <Reference Include="SolidWorks.Interop.swconst"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.swconst.dll</HintPath></Reference>
     <Compile Include="NativeAcceptanceAddin.cs"/>
     <Compile Include="AcceptanceEventFile.cs"/>
     <Compile Include="NativeRepresentativeAcceptance.cs"/>
+    <Compile Include="NativeComFeatureControl.cs"/>
     <Compile Include="RepresentativeAcceptanceInput.cs"/>
     <Compile Include="ExcelNativeMatrixInput.cs"/>
   </ItemGroup><Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

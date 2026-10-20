@@ -164,7 +164,9 @@ namespace CheckChan.NativeAcceptance
                 app.ActivateDoc3(representativeModel.GetTitle(),false,0,ref error);
                 representativeResults[representativeIndex]["OpenWarning"]=warning;
                 representativeStates.Clear();foreach(ModelDoc2 m in (app.GetDocuments() as object[]??new object[0]))representativeStates[m]=ModelState(m);
+                if(comControl!=null){state["ComControlCase"]=item.CaseId;state["ComControlPhase"]="BEFORE_UNCHANGED_FACE_AUDIT";Write("COM_CONTROL_RUNNING");}
                 if(item.DocumentType==1)AuditRepresentativePart(item);
+                if(comControl!=null&&item.CaseId=="XL-19"){CompleteComControl(item);return;}
                 OpenRepresentativeWindow();StartRepresentativeRun("btnRunBatch");representativeStage=1;
             }
             else if(Equals(Value(representativeController,"Running"),true)){timer.Start();return;}
@@ -222,6 +224,7 @@ namespace CheckChan.NativeAcceptance
                 representativeResults[representativeIndex]["OpenClose"]="PASS";representativeResults[representativeIndex]["Execution"]="PASS";
                 representativeResults[representativeIndex]["TotalMilliseconds"]=clock.Elapsed.TotalMilliseconds;
                 app.CloseDoc(representativeModel.GetTitle());representativeModel=null;representativeIndex++;representativeStage=0;clock.Restart();
+                if(comControl=="B"){state["ComControlPhase"]="XL17_CLOSED_NEXT_XL19";state["Assertions"]=representativeAssertions;Write("COM_CONTROL_RUNNING");}
                 if(CloseProbeOnly||representativeIndex==representativeCases.Cases.Length)
                 { state["Assertions"]=representativeAssertions;state["FunctionalResult"]="PASS";state["ProtectedSourcesUnchanged"]=true;Write("COMMAND_COMPLETED");return; }
             }

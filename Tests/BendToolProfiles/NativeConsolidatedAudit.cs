@@ -21,8 +21,11 @@ internal static partial class NativeAssemblyBatchValidation
         try
         {
             var cases=args.Length==6?CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.Read(args[5]):null;
+            string comControl=CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.ComControlMode(System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_COM_CONTROL"));
+            if(comControl!=null&&cases==null)throw new InvalidDataException("COM controls require the protected native manifest");
             int start=CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.StartIndexAfterXl02(System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_PASSED_XL02_AUDIT"),dll);
             int requested=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_CLOSE_REPRO")=="1"?1:cases==null?1:cases.Cases.Length-start;
+            if(comControl!=null){start=comControl=="A"?2:1;requested=comControl=="A"?1:2;report["ComControl"]=comControl;}
             report["StartCaseIndex"]=start;
             report["RequestedCases"]=requested;
             if(cases!=null)report["RepresentativeCases"]=cases.Cases.Select(c=>new {c.CaseId,c.Path,Execution="NOT_RUN"}).ToArray();
@@ -88,6 +91,8 @@ internal static partial class NativeAssemblyBatchValidation
             report["InprocessResult"]=state;
             if(state!=null&&state.ContainsKey("RepresentativeCases"))report["RepresentativeCases"]=state["RepresentativeCases"];
             bool function=state!=null&&Convert.ToString(state["Stage"])=="COMMAND_COMPLETED"&&Convert.ToInt32(state["Pid"])==app.GetProcessID()&&Convert.ToString(state["DllSha256"])==Sha(dll).Replace("-","").ToLowerInvariant();
+            if(comControl=="A")function=state!=null&&Convert.ToString(state["Stage"])=="COMMAND_COMPLETED"&&Convert.ToInt32(state["Pid"])==app.GetProcessID()&&
+                state.ContainsKey("NoProductControl")&&Equals(state["NoProductControl"],true)&&state.ContainsKey("ProductAssemblyLoaded")&&Equals(state["ProductAssemblyLoaded"],false);
             report["FunctionalResult"]=function?"PASS":"FAIL";code=function?0:1;
             report["UnloadBridgeResult"]=app.UnloadAddIn(bridge);
             if(activation!=null)report["BridgeDisconnectReturned"]=activation.GetType().InvokeMember("DisconnectFromSW",BindingFlags.InvokeMethod,null,activation,new object[0]);
@@ -95,7 +100,10 @@ internal static partial class NativeAssemblyBatchValidation
             if(File.Exists(events))
             {
                 var disconnected=Json.Deserialize<Dictionary<string,object>>(CheckChan.NativeAcceptance.AcceptanceEventFile.Read(events));report["DisconnectResult"]=disconnected;
-                if(!disconnected.ContainsKey("TargetDisconnectReturned")||!Equals(disconnected["TargetDisconnectReturned"],true)||Convert.ToString(disconnected["Stage"])!="TARGET_DISCONNECTED")
+                bool detach=comControl=="A"?disconnected.ContainsKey("NoProductControl")&&Equals(disconnected["NoProductControl"],true)&&
+                    disconnected.ContainsKey("ProductAssemblyLoaded")&&Equals(disconnected["ProductAssemblyLoaded"],false):
+                    disconnected.ContainsKey("TargetDisconnectReturned")&&Equals(disconnected["TargetDisconnectReturned"],true);
+                if(!detach||Convert.ToString(disconnected["Stage"])!="TARGET_DISCONNECTED")
                 {report["FunctionalResult"]="FAIL";code=1;}
             }
             else {report["FunctionalResult"]="FAIL";code=1;}

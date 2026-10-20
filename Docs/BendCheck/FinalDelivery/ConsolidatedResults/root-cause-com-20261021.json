@@ -1,0 +1,51 @@
+{
+  "schema": "check-chan-com-root-cause-v1",
+  "date": "2026-10-21",
+  "baseline": "c67d2d7f61a43fe735bc2b3209b86911a68f1c5c",
+  "pr": 37,
+  "conclusion": "UNKNOWN",
+  "classification": { "harness": "NOT_PROVEN", "addinComLifetime": "NOT_PROVEN", "solidworksApiInterop": "NOT_PROVEN" },
+  "productionFixApplied": false,
+  "productionSourceChanged": false,
+  "crashResolved": "NOT_PROVEN",
+  "originalDump": {
+    "pid": 24660,
+    "sha256": "9428349f6906dfa2669ea8426f5f8e6f78260e6f8bbab36f2d344cbe38ee0853",
+    "bytes": 3982759335,
+    "exception": "0xC0000374",
+    "heapBucket": "HEAP_CORRUPTION_ACTIONABLE_BlockNotBusy_DOUBLE_FREE_c0000374_ucrtbase.dll!free_base",
+    "detection": "NativeRepresentativeAcceptance.cs baseline line 76, IndependentBendIds+0x1bf: cast face.GetFeature() result to Feature",
+    "faultStack": ["IndependentBendIds", "clr!JIT_ChkCastAny", "clr!ObjIsInstanceOf", "clr!ComObject::SupportsInterface", "clr!SafeRelease", "slduiu!auFacet_c::GetThisClass+0x244", "mfc140u!CCmdTarget::InternalRelease+0x43", "sldappu!auCmdTarget_c::~auCmdTarget_c+0x94", "ucrtbase!free_base", "ntdll!RtlFreeHeap"],
+    "rcw": {
+      "apartment": "STA",
+      "creatingClrThread": 1,
+      "context": "0x33bfcd8",
+      "model": { "object": "0x6b2eaab0", "rcw": "0x2cf6ef80", "managedRefCount": 9 },
+      "face": { "object": "0x6b32a998", "rcw": "0x5a407630", "managedRefCount": 1, "bodyFaceArrayIndex": 11 },
+      "feature": { "object": "0x6b30d498", "rcw": "0x5a4030d0", "identity": "0x5a491f80", "managedRefCount": 2, "gcFrameRoots": 2, "cachedInterfaces": ["Feature", "IFeature"] },
+      "countsAreNativeAddRefCounts": false,
+      "disconnectedFlagObserved": false
+    },
+    "nativeBlock": { "userAddress": "0x5a491ed0", "bytes": 320, "featureInterfaceOffset": 176, "heapFlag": "LFH;free", "deletingDestructorFrame": 6, "deletingDestructorRbx": "0x5a491ed0", "firstFreeStack": "UNAVAILABLE" },
+    "oldController": { "object": "0x6b25f178", "disposed": true, "backendDisposed": true, "running": false, "pumping": false, "operation": null, "timerEnabled": false, "items": 0, "hostRoot": "harness -> disposed controller -> backend -> disposed session -> old XL17 Host RCW", "causeEstablishedByRetention": false }
+  },
+  "product": { "configuration": "Release/x64", "sha256": "ef78be68e8bc66294f1e794562ccf18ced48ebac4b55d6df1fda6aae04b80722", "mvid": "4dff6174-11ad-4576-ae03-d6e10b0f22f6", "rebuilt": false },
+  "interop": {
+    "version": "32.5.0.48",
+    "sha256": "fa85c4e9b26d0ba996c53362e95afe42ab563c96f27d87cd6809d262f3d3c4cb",
+    "getFeature": { "return": "System.Object", "marshalAs": "IDispatch", "dispId": 6 },
+    "iGetFeature": { "return": "SolidWorks.Interop.sldworks.Feature", "marshalAs": "Interface", "dispId": 27 },
+    "replacementProvenToFix": false
+  },
+  "experiments": [
+    { "arm": "A", "pid": 57388, "creationUtc": "2026-10-20T23:43:09.6755732Z", "scope": "XL19 standalone; common STA diagnostic bridge only, ADDIN.dll absent", "functional": "PASS", "assertions": 37, "productLoaded": false, "originalGetFeatureAssertionsPreserved": true, "typedComparison": "PASS", "cylinders": 4, "featureIds": [53,59], "persistentRoundtrips": 4, "firstChanceAv": 0, "heapEvents": 0, "heapDumps": 0, "shutdown": "PASS", "exit": 0, "xl19AuditMilliseconds": 2788.5896 },
+    { "arm": "B", "pid": 17156, "creationUtc": "2026-10-20T23:44:00.7470395Z", "scope": "XL17 actual Check Chan Run/Refresh/Cancel/Close/reopen/close/document close, then XL19 API audit", "functional": "PASS", "assertions": 201, "productLoaded": true, "originalGetFeatureAssertionsPreserved": true, "typedComparison": "PASS", "cylinders": 4, "featureIds": [53,59], "persistentRoundtrips": 4, "firstChanceAv": 3, "firstChanceAvLocalTime": "2026-10-21T06:44:09+07:00", "firstChanceAvStack": "NOT_CAPTURED: collector filtered C0000374", "firstChanceAvCause": "UNKNOWN", "heapEvents": 0, "heapDumps": 0, "disconnect": "PASS", "targetDetach": "PASS", "borrowedHost": "PASS", "shutdown": "PASS", "exit": 0, "xl17Milliseconds": 7206.3669, "xl19AuditMilliseconds": 1074.6278, "xl19CheckChanRunOrMinNg": "NOT_RUN" }
+  ],
+  "controlLimit": { "allowed": 2, "executed": 2, "retries": 0, "additionalNativeRuns": 0, "full33": "NOT_RUN", "assembly120x25": "NOT_RUN" },
+  "probeOrder": "Unchanged GetFeature oracle first; IGetFeature comparison second; not an isolated cold-call proof for IGetFeature",
+  "tests": { "runnerReleaseBuild": "PASS", "bridgeReleaseBuild": "PASS", "modeGuards": { "result": "PASS", "assertions": 7 }, "wrapperSyntax": "PASS", "independentMethodExactSourceComparison": "PASS", "productDebugOrRebuild": "NOT_RUN", "broadRegression": "NOT_RUN" },
+  "probeBinaries": { "runnerSha256": "d6c72ce81d7846f047104d45472c23f9690a0a94ad760965604bae4534008649", "bridgeSha256": "7d69f5b0d321f8f81d5bb082ecbd3a4dd9d65f6ac2d82012af0d7282f21a2f76" },
+  "protection": { "startupKeysPerArm": 57, "startupValuesPerArm": 88, "startupChangedBothArms": false, "filesCheckedPerArm": 15, "changedFiles": 0, "privateRegistrationRemovedBothArms": true, "cadOrDumpUploaded": false },
+  "acceptance": { "heapFix": "NOT_PROVEN", "fiveCaseAcceptanceSuperseded": false, "nativeStability": "BLOCKED", "production": "BLOCKED", "companyNumericQueries": 0 },
+  "missingEvidence": ["Allocation and first-free stack of the exact native Feature wrapper", "Stack of the three first-chance C0000005 events in B", "Native ownership/reference trace or vendor symbols sufficient to attribute the invalid release"]
+}

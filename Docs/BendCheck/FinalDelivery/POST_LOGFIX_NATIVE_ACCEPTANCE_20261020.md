@@ -1,5 +1,7 @@
 # PR #37 — nghiệm thu native sau sửa log harness
 
+Điều tra kế tiếp: [COM/RCW và hai đối chứng ngày 21/10](ROOT_CAUSE_COM_20261021.md). Hai đối chứng mới hoàn tất nhưng chưa tái hiện heap và chưa xác định bên gây lỗi; không thay kết quả nghiệm thu năm ca ở tài liệu này bằng PASS của probe API.
+
 **BLOCKED — lỗi heap chưa hết.** Tiếp tục từ `68049e1e3ed420954bba7aa693ecba910fd6733b`, cùng branch/PR #37. Không sửa sản phẩm, Check Min, 18 dao, Collision Engine hoặc UI; không merge. [Kết quả máy đọc được](ConsolidatedResults/post-logfix-native-20261020.json).
 
 ## Kết quả năm trường hợp
