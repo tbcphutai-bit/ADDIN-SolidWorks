@@ -51,7 +51,7 @@ function Run-Tool([string]$Name, [string]$Executable, [string[]]$Arguments, [str
     $old = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        & $Executable @Arguments 2>&1 | Tee-Object -FilePath $log
+        & $Executable @Arguments 2>&1 | Tee-Object -FilePath $log | Out-Host
         $code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $old }
     if ($null -eq $code) { $code = 1 }
