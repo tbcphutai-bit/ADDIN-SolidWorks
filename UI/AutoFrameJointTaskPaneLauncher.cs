@@ -24,7 +24,7 @@ namespace ADDIN
             {
                 Name = "btnAutoFrameJoint",
                 Text = "Giao góc Frame",
-                Subtitle = "Chọn 2 thanh · chỉ phân tích",
+                Subtitle = "Phân tích · Xem A/B",
                 Kind = ModernButtonKind.Tile,
                 Icon = TaiIcon.Assembly,
                 Tone = ModernButtonTone.Accent,
@@ -56,7 +56,8 @@ namespace ADDIN
             tabModelMacroPage.Controls.Add(btnAutoFrameJoint);
             SetBomCommandToolTip(btnAutoFrameJoint,
                 "Chọn Frame A và Frame B trong Assembly. " +
-                "Chỉ phân tích sơ bộ; chưa Preview 3D và chưa cắt Part.");
+                "Mở PropertyManager để chọn Frame A/B, phân tích dài/ngắn " +
+                "và xem bản sao hình học hiện tại. Chưa mô phỏng vết cắt, không sửa Part.");
         }
     }
 }
