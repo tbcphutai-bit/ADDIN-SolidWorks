@@ -733,6 +733,49 @@ namespace ADDIN.Tests
             else Console.WriteLine("PASS: incomplete ray range rejected, must remain UNVERIFIED");
 
 
+            MethodInfo classifier = checker.GetMethod(
+                "Cg2ClassifyRayPointData", BindingFlags.NonPublic | BindingFlags.Static);
+            if (classifier == null)
+            {
+                Console.WriteLine("FAIL: CG2 pure BREP ENTRY/EXIT result classifier missing");
+                errors++;
+            }
+            else
+            {
+                // Each hit: BodyIndex, RayIndex, Flags, X,Y,Z (6 doubles).
+                // These synthetic arrays validate only the classifier;
+                // actual COM GetRayIntersectionsPoints requires real CAD.
+                double[] enterExit = {
+                    0, 0, 16, 0.020, 0, 0,
+                    0, 0, 32, 0.024, 0, 0
+                };
+                object[] okRay = {
+                    enterExit, 2, 1, new[] { 0.0, 0.0, 0.0 },
+                    new[] { 1.0, 0.0, 0.0 }, 0.05, 0.0
+                };
+                string hit = (string)classifier.Invoke(null, okRay);
+                if (hit != "BREP_SOLID_ON_AXIS" ||
+                    Math.Abs((double)okRay[6]-0.004) > 1e-9)
+                {
+                    Console.WriteLine("FAIL: synthetic ENTRY->EXIT positive-material span");
+                    errors++;
+                }
+                else Console.WriteLine("PASS: synthetic 4mm solid ENTRY/EXIT span confirmed");
+
+                double[] onlyEnter = { 0, 0, 16, 0.020, 0, 0 };
+                object[] ambiguous = {
+                    onlyEnter, 1, 1, new[] { 0.0, 0.0, 0.0 },
+                    new[] { 1.0, 0.0, 0.0 }, 0.05, 0.0
+                };
+                if ((string)classifier.Invoke(null, ambiguous) !=
+                    "UNVERIFIED_AMBIGUOUS_HITS")
+                {
+                    Console.WriteLine("FAIL: lone ENTRY classified as proven material");
+                    errors++;
+                }
+                else Console.WriteLine("PASS: lone ENTRY remains UNVERIFIED");
+            }
+
             if (errors == 0)
                 Console.WriteLine("UNIT_OFFLINE_PASS: BREP field contracts & bounded source ray; "
                     + "real SOLIDWORKS material intersection NOT_TESTED in this harness");
