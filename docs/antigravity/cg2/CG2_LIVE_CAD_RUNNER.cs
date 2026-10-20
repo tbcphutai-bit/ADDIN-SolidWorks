@@ -34,6 +34,9 @@ namespace ADDIN.Tests
             public double AxisToBoxMm;
             public string Classification;
             public string Reason;
+            public string MaterialEvidence;
+            public double MaterialSpanMm;
+            public int MaterialHitCount;
         }
 
         private sealed class Metrics
@@ -56,6 +59,9 @@ namespace ADDIN.Tests
             public bool HasCg2;
             public int Cg2Bounds, Cg2NoHole, Cg2Pairs, Cg2Candidates;
             public int Cg2ComparedPairs, Cg2TestedHoles;
+            public int Cg2SubassemblyContainers, Cg2UnresolvedLeafParts;
+            public int Cg2BrepRayTested, Cg2BrepSolid, Cg2BrepNoAxisHit;
+            public int Cg2BrepUnknown, Cg2BrepNotTested;
             public bool Cg2IsPartial;
             public string Cg2CoverageStatus;
             public readonly List<CandidateDetail> Cg2ExpectedCandidates = new List<CandidateDetail>();
@@ -167,33 +173,39 @@ namespace ADDIN.Tests
                     Console.WriteLine("\n=======================================================");
                     Console.WriteLine("TESTING FIXTURE: " + Path.GetFileName(fixture));
                     Console.WriteLine("=======================================================");
-                    ModelComparison result = RunComparison(app, baselineType, candidateType, baselineAsm, candidateAsm, sandboxRoot, fixture);
+                    ModelComparison result = RunComparison(app, baselineType, candidateType,
+                        baselineAsm, candidateAsm, sandboxRoot, fixture);
+                    // Print physical evidence even when strict raw CSV parity fails.
+                    // The comparison's final FAIL/exit status must remain unchanged.
+                    if (result.Candidate != null)
+                    {
+                        var m = result.Candidate;
+                        Console.WriteLine("  PRODUCTION: Holes=" + m.LogicalHoles +
+                            " Stacks=" + m.StackCount + " NG=" + m.NgStacks +
+                            " PatternNG=" + m.PatternNg + " Missing=" + m.MissingHoles +
+                            " Rows=" + m.RowCount);
+                        Console.WriteLine("  CG2 COVERAGE: Bounds=" + m.Cg2Bounds +
+                            " NoHoles=" + m.Cg2NoHole +
+                            " SubassemblyContainers=" + m.Cg2SubassemblyContainers +
+                            " UnresolvedLeafParts=" + m.Cg2UnresolvedLeafParts +
+                            " Candidates=" + m.Cg2Candidates +
+                            " Partial=" + m.Cg2IsPartial + " Status=" + m.Cg2CoverageStatus);
+                        Console.WriteLine("  BREP: Tested=" + m.Cg2BrepRayTested +
+                            " Solid=" + m.Cg2BrepSolid + " NoAxisHit=" + m.Cg2BrepNoAxisHit +
+                            " Unknown=" + m.Cg2BrepUnknown +
+                            " NotTested=" + m.Cg2BrepNotTested);
+                        LogCandidateInvestigation(Path.GetFileName(fixture), m);
+                    }
                     if (result.Passed)
                     {
                         passed++;
                         Console.WriteLine("RESULT: PASS | " + Path.GetFileName(fixture));
-                        Console.WriteLine("  Holes=" + result.Candidate.LogicalHoles +
-                                          ", Stacks=" + result.Candidate.StackCount +
-                                          ", NG=" + result.Candidate.NgStacks +
-                                          ", PatternNG=" + result.Candidate.PatternNg +
-                                          ", Missing=" + result.Candidate.MissingHoles +
-                                          ", Rows=" + result.Candidate.RowCount);
-                        Console.WriteLine("  CG1: Groups=" + result.Candidate.Cg1Groups +
-                                          ", Unmatched=" + result.Candidate.Cg1Unmatched +
-                                          ", Status=" + result.Candidate.Cg1CoverageStatus);
-                        Console.WriteLine("  CG2: Bounds=" + result.Candidate.Cg2Bounds +
-                                          ", NoHoles=" + result.Candidate.Cg2NoHole +
-                                          ", NearbyPairs=" + result.Candidate.Cg2Pairs +
-                                          ", Candidates=" + result.Candidate.Cg2Candidates +
-                                          ", Status=" + result.Candidate.Cg2CoverageStatus);
-
-                        // Detailed investigation output for Review #1 BLOCKER C
-                        LogCandidateInvestigation(Path.GetFileName(fixture), result.Candidate);
                     }
                     else
                     {
                         failed++;
-                        Console.WriteLine("RESULT: FAIL | " + Path.GetFileName(fixture) + " | " + result.Error);
+                        Console.WriteLine("RESULT: FAIL | " + Path.GetFileName(fixture) +
+                            " | " + result.Error);
                     }
                 }
 
@@ -219,24 +231,28 @@ namespace ADDIN.Tests
             }
         }
 
-        // Actual CG2 diagnostics. AABB candidates are NOT proven missing holes.
+        // Always report real BREP/AABB candidates, even on strict CSV failure.
+        // The fixture manifest's exact site assertion is still a separate gate.
         private static void LogCandidateInvestigation(string modelName, Metrics m)
         {
-            if (!string.Equals(modelName, "Fixture_OK.SLDASM", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(modelName, "Fixture_MultiLayer_ABC.SLDASM", StringComparison.OrdinalIgnoreCase))
-                return;
-
-            Console.WriteLine("\n  [CG2 AABB CANDIDATE EVIDENCE: " + modelName + "]");
-            Console.WriteLine("  Actual recorded candidates=" + m.Cg2ExpectedCandidates.Count
-                + " | Total candidate count=" + m.Cg2Candidates);
-            foreach (var c in m.Cg2ExpectedCandidates.Take(6))
+            Console.WriteLine("  [CG2.1 SITE EVIDENCE: " + modelName + "]");
+            Console.WriteLine("  Stored=" + m.Cg2ExpectedCandidates.Count +
+                " Total=" + m.Cg2Candidates + " (stored list may be capped)");
+            var ordered = m.Cg2ExpectedCandidates
+                .OrderBy(c => c.MaterialEvidence == "BREP_SOLID_ON_AXIS" ? 0 :
+                    c.MaterialEvidence != null &&
+                    c.MaterialEvidence.StartsWith("UNVERIFIED", StringComparison.Ordinal) ? 1 : 2)
+                .ThenBy(c => c.Id).Take(20);
+            foreach (CandidateDetail c in ordered)
                 Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-                    "  Candidate #{0}: Source=[{1}] ({2}) -> Target=[{3}] | Gap={4:F3}mm | AxisDist={5:F3}mm | {6}",
-                    c.Id, c.SourceOccurrence, c.SourceHoleLabel,
-                    c.TargetOccurrence, c.BoxSeparationMm, c.AxisToBoxMm, c.Classification));
-            Console.WriteLine("  PHYSICAL_MATERIAL_CONTACT=NOT_VERIFIED");
-            Console.WriteLine("  MISSING_HOLE_AT_SITE=NOT_VERIFIED");
-            Console.WriteLine("  COAXIAL_SITE_SUPPRESSION=NOT_VERIFIED");
+                    "  Candidate #{0}: Source=[{1}] ({2}) -> Target=[{3}] | " +
+                    "Gap={4:F3}mm AxisDist={5:F3}mm | {6} | BREP={7} Hits={8} Span={9:F3}mm",
+                    c.Id, c.SourceOccurrence, c.SourceHoleLabel, c.TargetOccurrence,
+                    c.BoxSeparationMm, c.AxisToBoxMm, c.Classification,
+                    c.MaterialEvidence ?? "NOT_RECORDED", c.MaterialHitCount, c.MaterialSpanMm));
+            Console.WriteLine("  BREP_HIT_PROVES_MISSING_HOLE=NO");
+            Console.WriteLine("  CONTACT_OR_FASTENING_INTENT=NOT_VERIFIED");
+            Console.WriteLine("  EXACT_NESTED_SITE=REQUIRES_FIXTURE_MANIFEST_ASSERTION");
         }
 
         // The fixture manifest identifies exact occurrence IDs; NO substring
@@ -259,7 +275,13 @@ namespace ADDIN.Tests
                     || string.IsNullOrWhiteSpace(c.SourceHoleLabel)
                     || !string.Equals(c.Classification, "CHECK_ONLY", StringComparison.Ordinal)
                     || double.IsNaN(c.BoxSeparationMm) || double.IsInfinity(c.BoxSeparationMm)
-                    || double.IsNaN(c.AxisToBoxMm) || double.IsInfinity(c.AxisToBoxMm))
+                    || double.IsNaN(c.AxisToBoxMm) || double.IsInfinity(c.AxisToBoxMm)
+                    || double.IsNaN(c.MaterialSpanMm) || double.IsInfinity(c.MaterialSpanMm)
+                    || c.MaterialSpanMm < 0 || c.MaterialHitCount < 0
+                    || (c.MaterialEvidence == "BREP_SOLID_ON_AXIS" &&
+                        (c.MaterialHitCount < 2 || c.MaterialSpanMm < 0.1))
+                    || (c.MaterialEvidence == "BREP_NO_AXIS_HIT" &&
+                        (c.MaterialHitCount != 0 || c.MaterialSpanMm != 0)))
                     throw new InvalidOperationException("CG2 candidate provenance/values invalid at ID="
                         + (c == null ? "<null>" : c.Id.ToString(CultureInfo.InvariantCulture)));
             }
@@ -398,6 +420,8 @@ namespace ADDIN.Tests
             {
                 Metrics baseline = RunOneIsolated(app, baselineType, root, model, isCandidate: false);
                 Metrics candidate = RunOneIsolated(app, candidateType, root, model, isCandidate: true);
+                response.Baseline = baseline;
+                response.Candidate = candidate;
 
                 // 1. Rigorous Row-by-Row Metrics & Signature Comparison (Review #1 BLOCKER B)
                 CompareMetrics(baseline, candidate, model);
@@ -647,6 +671,13 @@ namespace ADDIN.Tests
                 m.Cg2Candidates = IntField(pt, partRel, "CandidateCount");
                 m.Cg2ComparedPairs = IntField(pt, partRel, "ComparedComponentPairs");
                 m.Cg2TestedHoles = IntField(pt, partRel, "TestedHoleRelations");
+                m.Cg2SubassemblyContainers = IntField(pt, partRel, "SubassemblyContainerCount");
+                m.Cg2UnresolvedLeafParts = IntField(pt, partRel, "UnresolvedLeafOccurrenceCount");
+                m.Cg2BrepRayTested = IntField(pt, partRel, "BrepRayTestedCount");
+                m.Cg2BrepSolid = IntField(pt, partRel, "BrepSolidEvidenceCount");
+                m.Cg2BrepNoAxisHit = IntField(pt, partRel, "BrepNoAxisHitCount");
+                m.Cg2BrepUnknown = IntField(pt, partRel, "BrepUnknownCount");
+                m.Cg2BrepNotTested = IntField(pt, partRel, "BrepNotTestedCount");
                 m.Cg2IsPartial = (bool)pt.GetField("IsPartial").GetValue(partRel);
                 m.Cg2CoverageStatus = (string)pt.GetField("CoverageStatus").GetValue(partRel);
 
@@ -665,7 +696,10 @@ namespace ADDIN.Tests
                             BoxSeparationMm = (double)crt.GetProperty("BoxSeparationMm").GetValue(cRow, null),
                             AxisToBoxMm = (double)crt.GetProperty("AxisToBoxMm").GetValue(cRow, null),
                             Classification = (string)crt.GetProperty("Classification").GetValue(cRow, null),
-                            Reason = (string)crt.GetProperty("Reason").GetValue(cRow, null)
+                            Reason = (string)crt.GetProperty("Reason").GetValue(cRow, null),
+                            MaterialEvidence = (string)crt.GetProperty("MaterialEvidence").GetValue(cRow, null),
+                            MaterialHitCount = (int)crt.GetProperty("MaterialHitCount").GetValue(cRow, null),
+                            MaterialSpanMm = (double)crt.GetProperty("MaterialSpanMm").GetValue(cRow, null)
                         });
                     }
                 }
