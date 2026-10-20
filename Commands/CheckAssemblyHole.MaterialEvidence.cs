@@ -415,7 +415,23 @@ namespace ADDIN.Commands
             if (count == 0) return "BREP_NO_AXIS_HIT";
             if (count > 200) return "UNVERIFIED_TOO_MANY_RAY_HITS";
             double[] points = ToDoubleArray(model.GetRayIntersectionsPoints());
-            if (points == null || points.Length < 6*count)
+            return Cg2ClassifyRayPointData(points, count, bodies.Length,
+                start, direction, limitM, out longestSpanM);
+        }
+
+        // Pure parser of the native SOLIDWORKS ray results, testable with
+        // artificial ENTRY/EXIT arrays; COM tests must additionally prove
+        // GetRayIntersectionsPoints uses the same indexing in the installed
+        // SOLIDWORKS version.
+        private static string Cg2ClassifyRayPointData(
+            double[] points, int count, int bodyCount,
+            double[] start, double[] direction, double limitM,
+            out double longestSpanM)
+        {
+            longestSpanM = 0;
+            if (count <= 0 || bodyCount <= 0 || points == null ||
+                points.Length < count*6 ||
+                !Cg2ValidVector(start) || !Cg2ValidVector(direction))
                 return "UNVERIFIED_RAY_POINTS";
 
             double mag = Math.Sqrt(direction.Take(3).Sum(x => x*x));
@@ -427,7 +443,7 @@ namespace ADDIN.Commands
                 int body = (int)Math.Round(points[offset]);
                 int ray = (int)Math.Round(points[offset + 1]);
                 int flags = (int)Math.Round(points[offset + 2]);
-                if (body < 0 || body >= bodies.Length || ray != 0)
+                if (body < 0 || body >= bodyCount || ray != 0)
                     return "UNVERIFIED_RAY_TOPOLOGY";
                 double t = 0;
                 for (int k = 0; k < 3; k++)
