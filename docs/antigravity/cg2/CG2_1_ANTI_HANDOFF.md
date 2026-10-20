@@ -1,3 +1,129 @@
+
+# UPDATE — ONE-SHOT AUTO BUILD + CAD RUNNER + EXACT SITE TESTS
+
+This section OVERRIDES any earlier manual multi-step build commands below. ChatGPT
+has already committed all code. Anti must never paste a duplicate partial class,
+write C#, or edit a PowerShell script. PR #33 remains DRAFT, READY_FOR_MERGE=NO.
+
+## New files already committed
+
+- docs/antigravity/cg2/CG2_1_ONE_SHOT.ps1 — one batch for Git fast-forward
+  pull, MSBuild Debug+Release x64, compiled offline harness, compiled CAD runner,
+  runner self-test, optional sandbox fixtures, and repeatability.
+- docs/antigravity/cg2/CG2_1_SITE_ASSERT.cs — source-to-target-to-hole
+  checks using a fixture-specific manifest. Included in standalone CAD runner,
+  NEVER in ADDIN.csproj.
+- docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs — enhanced logs of BREP
+  material status, hits, span, Subassembly containers, unresolved Parts,
+  EVEN when raw CSV comparison fails. Raw CSV FAIL still produces exit 1.
+
+## Anti preflight
+
+1. Open Windows Developer PowerShell in CG2 repository root (typically
+   C:\Tao moi\ADDIN), with a CLEAN worktree, on branch
+   feat/check-hole-cg2-part-relations.
+2. Identify the real stored CG1 DLL (the prior report used
+   C:\Tao moi\backup_cg1_release_snapshot\ADDIN.dll).
+3. Verify disposable Pack-and-Go fixtures, with all dependencies under a
+   sandbox directory (the prior report used D:\CG1-ISOLATED-TEST-COPIES).
+   Explicit CG1_SANDBOX_OK.txt MUST ALREADY EXIST. Do not auto-create it.
+4. Close the user's SOLIDWORKS sessions manually before the runner; never
+   disable existing process/model/marker/reference safeguards.
+5. Supply only verified existing SLDASM fixture paths, not guessed paths.
+6. Verify VS MSBuild and Roslyn C# compiler, and SOLIDWORKS interop DLLs.
+   The one-shot script discovers these from PATH/vswhere and project
+   reference hints, respectively.
+
+## The ONE command block
+
+Open PowerShell in your repository and paste this block ONCE, after
+substituting confirmed fixture paths (remove any that do not exist):
+
+    cd "C:\Tao moi\ADDIN"
+    $root = "D:\CG1-ISOLATED-TEST-COPIES"
+    $cg1 = "C:\Tao moi\backup_cg1_release_snapshot\ADDIN.dll"
+    $fixtures = @(
+        "$root\Fixture_BREP_Positive.SLDASM"
+        "$root\Fixture_OK.SLDASM"
+        "$root\Fixture_NG_Offset.SLDASM"
+        "$root\Fixture_Unmatched.SLDASM"
+        "$root\Fixture_MultiLayer_ABC.SLDASM"
+    )
+    # Append verified nested/rotated/916-hole fixture paths if approved.
+    & ".\docs\antigravity\cg2\CG2_1_ONE_SHOT.ps1" -RepoRoot (Get-Location).Path -BaselineDll $cg1 -SandboxRoot $root -Fixtures $fixtures -RepeatabilityFixture "$root\Fixture_OK.SLDASM" -RunCad
+    Write-Host "ONE_SHOT_EXIT=$LASTEXITCODE"
+
+If the sandbox or CG1 baseline is not ready, run OFFLINE tests only
+(the CAD and exact fixture assertions are NOT_TESTED, not PASS):
+
+    cd "C:\Tao moi\ADDIN"
+    & ".\docs\antigravity\cg2\CG2_1_ONE_SHOT.ps1" -RepoRoot (Get-Location).Path
+    Write-Host "ONE_SHOT_EXIT=$LASTEXITCODE"
+
+The script uses a temporary output folder instead of overwriting the
+project's hardcoded Debug DLL path at C:\Tao moi\ADDIN.dll. It writes a
+CG2_1_ONE_SHOT_SUMMARY.txt file and per-stage *.log under
+%TEMP%\CG2_1_ONE_SHOT_<timestamp>. NO automatic Git commit or upload.
+It fails/returns a nonzero exit code when a mandatory stage fails;
+independent repeatability may still run after CSV regression failure.
+
+## Required local exact-site manifest
+
+To PROVE a specific Part B site, create inside sandbox:
+
+    <sandbox-root>\CG2_1_EXPECTED_SITES.tsv
+
+Nine TAB-separated columns, one expected site per line, with optional
+comment lines starting with #:
+
+    FixtureFileName [TAB] SourceOccurrence [TAB] TargetOccurrence
+    [TAB] SourceHoleLabel [TAB] ExpectedEvidence [TAB] MinSpanMm
+    [TAB] MaxSpanMm [TAB] MinHits [TAB] MinSubassemblyContainers
+
+Only examples of values (REPLACE with exact IDs observed in the user's
+approved fixtures, do not treat these as real test evidence):
+
+    Fixture_Nested.SLDASM <TAB> PartA-1 <TAB> PartB-1@Subassembly-1 <TAB> Hole#1 <TAB> BREP_SOLID_ON_AXIS <TAB> 2.9 <TAB> 3.1 <TAB> 2 <TAB> 1
+    Fixture_Offset.SLDASM <TAB> PartA-1 <TAB> PartB-1 <TAB> Hole#1 <TAB> CHECK_ONLY <TAB> 0 <TAB> 10000 <TAB> 0 <TAB> 0
+    Fixture_Void.SLDASM <TAB> PartA-1 <TAB> PartB-1 <TAB> Hole#1 <TAB> BREP_NO_AXIS_HIT <TAB> 0 <TAB> 0 <TAB> 0 <TAB> 0
+
+Replace the literal string <TAB> in examples with a real tab character.
+Exact occurrence names and Hole# values must come from the model itself.
+A wildcard * label is only accepted when a source-target pair has exactly
+ONE candidate; otherwise site assertion FAILS. A missing manifest prints
+CG2_1_EXACT_SITE_ASSERT=NOT_TESTED, not PASS. CHECK_ONLY does NOT prove a
+missing hole, and BREP_SOLID_ON_AXIS does not prove fastening intent.
+
+## One-pass verification matrix
+
+- Ordinary Part aligned holes and 0.30mm/2mm displaced counterparts.
+- Intermediate Part B with one specific absent hole (site assertion needed).
+- Solid plate hit with 3mm/2mm spans and empty/void target.
+- Nested Parts in a Subassembly, repeated Part occurrence and rotation:
+  exact source/target/hole and nonzero Subassembly container coverage.
+- The historically 916-hole Assembly if it is safe/available:
+  elapsed time, BREP positives/no-hits/unknown/NOT_TESTED_BUDGET,
+  NOT_TESTED_TIME_BUDGET, coverage and COM errors.
+- Regression CG1 vs CG2 production holes, stacks, NG, missing, pattern, rows.
+  Report raw CSV byte equality SEPARATELY; historical three of five raw
+  comparisons failed. Never rebrand a byte FAIL as PASS.
+- MARKER_GENERATION_PARITY=NOT_TESTED with AutoCreateMarkers=false.
+
+## Status and reporting rule
+
+The new code is committed but has NOT been built or run by ChatGPT on
+Windows SOLIDWORKS. Source review is not runtime proof.
+
+Anti updates ONLY CG2_REPORT.md and CG2_ANTI_CODE_STATUS_REPORT.md with
+actual Windows logs, DLL SHA256, commit SHA, runner exit codes, fixture
+assertion PASS/FAIL/NOT_TESTED, and elapsed seconds. DO NOT push any
+sensitive raw CAD/CSV/logs or DLLs. ONE report-only commit on CG2 branch,
+one PR #33 comment, then STOP. If any C# bug is found, STOP changing C#:
+ChatGPT writes the next patch.
+
+---
+## Historical CG2.1 handoff text (superseded where overlapping)
+
 # CG2.1 — CHATGPT CODE PATCH / ANTIGRAVITY ONE-SHOT BUILD & CAD TEST
 
 **Scope:** Only branch `feat/check-hole-cg2-part-relations`, PR #33 (Draft). **NO MERGE, NO CG3.**
