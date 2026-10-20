@@ -5,6 +5,7 @@
 // No selection, feature edits, Part edits, master decisions, or production NG.
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using SolidWorks.Interop.sldworks;
@@ -44,6 +45,8 @@ namespace ADDIN.Commands
         public int ComponentsWithBounds;
         public int ComponentsWithoutDetectedHoles;
         public int SkippedOrUnreadableCount;
+        public int SubassemblyContainerCount;
+        public int UnresolvedLeafOccurrenceCount;
         public int ComparedComponentPairs;
         public int TestedHoleRelations;
         public int RecordedNearbyPairs;
@@ -68,8 +71,11 @@ namespace ADDIN.Commands
         private const double Cg2NearBoxGapM = 0.002;    // broad-phase AABB gap: 2 mm
         private const double Cg2AxisBoxPadM = 0.0005;   // 0.5 mm for broad phase
         private const double Cg2MaxAxisReachM = 0.060;  // 60 mm around source hole
-        private const double Cg2KnownHoleRadialM = 0.004; // suppress likely known counterpart
-        private const double Cg2KnownHoleAngleDeg = 3.0;
+        // Only suppress a counterpart already coaxial within PRODUCTION OK tolerances.
+// 4mm / 3deg previously hid misaligned diagnostic candidates.
+        private const double Cg2KnownHoleRadialM = PositionToleranceM;
+        private const double Cg2KnownHoleAngleDeg = AngleToleranceDeg;
+        private const int Cg2MaxBroadPhaseElapsedMs = 60000;
         private const int Cg2MaxPairChecks = 300000;
         private const int Cg2MaxHoleChecks = 500000;
         private const int Cg2MaxStoredPairs = 1500;
@@ -94,6 +100,9 @@ namespace ADDIN.Commands
             if (holes == null) throw new ArgumentNullException("holes");
 
             CheckHoleCg2Report report = new CheckHoleCg2Report();
+            Stopwatch cg2Timer = Stopwatch.StartNew();
+            // SOLIDWORKS GetComponents(false) includes nested child occurrences.
+            // Classify leaf Parts; never treat a Subassembly container as solid.
             object[] components = ToObjectArray(assembly.GetComponents(false));
             report.TotalOccurrenceCount = components.Length;
             var boxes = new List<Cg2Box>();
@@ -104,11 +113,35 @@ namespace ADDIN.Commands
 
             for (int i = 0; i < components.Length; i++)
             {
-                if ((i & 31) == 0) ThrowIfCanceled();
+                if ((i & 31) == 0)
+                {
+                    ThrowIfCanceled();
+                    if (cg2Timer.ElapsedMilliseconds >= Cg2MaxBroadPhaseElapsedMs)
+                    {
+                        report.IsPartial = true;
+                        Cg2Warn(report, "CG2 AABB time budget reached during component scan.");
+                        break;
+                    }
+                }
                 Component2 component = components[i] as Component2;
                 if (!IsUsableComponent(component))
                 {
                     report.SkippedOrUnreadableCount++;
+                    continue;
+                }
+                bool isSubassembly;
+                if (!Cg2IsResolvedPartOccurrence(component, out isSubassembly))
+                {
+                    if (isSubassembly)
+                        report.SubassemblyContainerCount++;
+                    else
+                    {
+                        report.SkippedOrUnreadableCount++;
+                        report.UnresolvedLeafOccurrenceCount++;
+                        if (report.UnresolvedLeafOccurrenceCount <= 3)
+                            Cg2Warn(report, "Unresolved physical Part occurrence: " +
+                                SafeComponentName(component));
+                    }
                     continue;
                 }
                 report.EligibleComponentCount++;
@@ -153,6 +186,14 @@ namespace ADDIN.Commands
                 if ((i & 31) == 0) ThrowIfCanceled();
                 for (int j = i + 1; j < boxes.Count; j++)
                 {
+                    if ((j & 127) == 0 &&
+                        cg2Timer.ElapsedMilliseconds >= Cg2MaxBroadPhaseElapsedMs)
+                    {
+                        report.IsPartial = true;
+                        pairBudgetExhausted = true;
+                        Cg2Warn(report, "CG2 AABB time budget reached during pair scan.");
+                        break;
+                    }
                     if (report.ComparedComponentPairs >= Cg2MaxPairChecks)
                     {
                         report.IsPartial = true;
@@ -185,7 +226,16 @@ namespace ADDIN.Commands
             bool holeBudgetExhausted = false;
             foreach (HoleAxis hole in holes)
             {
-                if ((sourceHoleId++ & 63) == 0) ThrowIfCanceled();
+                if ((sourceHoleId++ & 63) == 0)
+                {
+                    ThrowIfCanceled();
+                    if (cg2Timer.ElapsedMilliseconds >= Cg2MaxBroadPhaseElapsedMs)
+                    {
+                        report.IsPartial = true;
+                        Cg2Warn(report, "CG2 AABB time budget reached during hole scan.");
+                        break;
+                    }
+                }
                 if (!Cg2ValidVector(hole == null ? null : hole.Center) ||
                     !Cg2ValidVector(hole.Direction)) continue;
 
@@ -195,6 +245,14 @@ namespace ADDIN.Commands
 
                 foreach (Tuple<Cg2Box, double> n in neighbors)
                 {
+                    if ((report.TestedHoleRelations & 127) == 0 &&
+                        cg2Timer.ElapsedMilliseconds >= Cg2MaxBroadPhaseElapsedMs)
+                    {
+                        report.IsPartial = true;
+                        holeBudgetExhausted = true;
+                        Cg2Warn(report, "CG2 AABB time budget reached during neighbor scan.");
+                        break;
+                    }
                     if (report.TestedHoleRelations >= Cg2MaxHoleChecks)
                     {
                         report.IsPartial = true;
@@ -249,6 +307,24 @@ namespace ADDIN.Commands
         {
             if (report.Warnings.Count < 20)
                 report.Warnings.Add(warning);
+        }
+
+        // GetComponents(false) already returns descendants of Subassemblies.
+        // The assembly occurrence itself is NOT a physical material target.
+        // Unresolved/invalid components must remain PARTIAL, not NO_HOLE.
+        private static bool Cg2IsResolvedPartOccurrence(
+            Component2 component, out bool isSubassembly)
+        {
+            isSubassembly = false;
+            if (component == null) return false;
+            try
+            {
+                ModelDoc2 model = component.GetModelDoc2() as ModelDoc2;
+                if (model is PartDoc) return true;
+                isSubassembly = model is AssemblyDoc;
+            }
+            catch { /* fail closed: unknown component type */ }
+            return false;
         }
 
         private static Cg2Box Cg2ReadBox(string occurrence, double[] raw)
