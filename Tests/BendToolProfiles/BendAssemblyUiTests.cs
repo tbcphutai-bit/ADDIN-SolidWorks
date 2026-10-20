@@ -216,6 +216,8 @@ internal static class BendAssemblyUiTests
             Check(BendCheckDisplayText.Clearance(null)=="Chưa tính được"&&BendCheckDisplayText.Clearance(0)=="0 mm","Missing clearance differs from measured zero");
             Check(BendCheckDisplayText.Reasons("TOOL_AXIAL_EXTENT_UNVERIFIED",true)=="TOOL_AXIAL_EXTENT_UNVERIFIED"&&
                 BendCheckDisplayText.Reasons("TOOL_AXIAL_EXTENT_UNVERIFIED").Contains("chiều dài"),"Exact raw recovery plus useful explanation");
+            Check(!BendCheckDisplayText.Reasons("CERTIFIED_WHOLE_SEGMENT_SEPARATED").Contains("Chưa đủ dữ liệu")&&
+                BendCheckDisplayText.Reasons("WHOLE_SUPPLIED_SEQUENCE_CLEAR_IN_CHECKED_SCOPE").Contains("phạm vi"),"Proven numeric evidence has an accurate scope explanation");
         });
         Test("Vietnamese live view keeps 18 UNKNOWN candidates and technical recovery without rebinding review",()=>{
             var numeric=new VolumeCandidateCollisionResult(CompanyToolIds.All[0],42,

@@ -121,26 +121,33 @@ namespace ADDIN.UI
             value==Commands.BendPlanning.SequenceEvidenceLevel.SimulationOnly?"Dữ liệu mô phỏng":
             value==Commands.BendPlanning.SequenceEvidenceLevel.ReviewedSourceGraph?"Đã kiểm tra nguồn quy trình":"Chưa đủ dữ liệu";
 
+        private static readonly Dictionary<string,string> additionalReasons=new Dictionary<string,string>(StringComparer.Ordinal) {
+            {"HOLDER_MATERIAL_SOLID_HOLE_REFERENCE_ROLES_UNREVIEWED","Chưa phân loại vật liệu, lỗ và đường tham khảo của đầu kẹp chày"},
+            {"PHYSICAL_SEATING_DATUM_UNVERIFIED","Chưa xác minh mốc và vị trí gá thực tế"},
+            {"MISSING_PROCESS_STATE_GRAPH_AND_KINEMATIC_SOURCE","Thiếu hình dạng phôi trung gian và dữ liệu chuyển động"},
+            {"FINAL_STATIC_PROVIDER_NOT_CONFIGURED","Chưa cấu hình hồ sơ gá để kiểm tra vị trí tĩnh"},
+            {"FINAL_STATIC_NOT_MAPPED_FOR_NATIVE_PART","Chưa gắn hồ sơ gá với chi tiết và cấu hình này"},
+            {"OPEN_OR_INVALID_PUNCH_MATERIAL","Biên dạng chày chưa kín hoặc chưa hợp lệ"},
+            {"SOURCE_STALE_OR_UNMATCHED","Nguồn dao đã thay đổi hoặc chưa nhận đúng cặp"},
+            {"CANCELLED","Đã dừng kiểm tra"},{"STALE","Dữ liệu đã thay đổi – hãy quét lại"},
+            {"STALE_SOURCE","Dữ liệu đã thay đổi – hãy quét lại"},
+            {"SOURCE_CHANGED_DURING_DISPLAY","Dữ liệu thay đổi khi hiển thị – hãy quét lại"},
+            {"PROCESS_JOB_TIME_BUDGET_EXCEEDED","Chưa kiểm tra xong trong thời gian cho phép"},
+            {"WHOLE_SUPPLIED_SEQUENCE_CLEAR_IN_CHECKED_SCOPE","Đã kiểm tra hết thứ tự được cung cấp, chưa phát hiện va chạm trong phạm vi đó"},
+            {"WITNESSED_SEQUENCE_BRANCH_COLLISION","Có bằng chứng va chạm trong thứ tự chấn này"},
+            {"INCOMPLETE_OR_UNKNOWN_SEQUENCE","Thứ tự chấn chưa được kiểm tra đầy đủ"},
+            {"CERTIFIED_WHOLE_SEGMENT_SEPARATED","Đã chứng minh khoảng hở trên toàn đoạn chuyển động được khai báo"},
+            {"CERTIFIED_WHOLE_SEGMENT_OUTSIDE_APPROVED_CONTACT","Ngoài vùng tiếp xúc tạo hình đã xác minh không có va chạm"},
+            {"EXPECTED_CONTACT","Tiếp xúc tạo hình nằm trong vùng đã xác minh"}
+        };
+
         private static BendUserText Get(Dictionary<string, BendUserText> map, string code)
         {
             BendUserText result;
             if (code != null && map.TryGetValue(code, out result)) return result;
             if(ReferenceEquals(map,reasonCodes)&&code!=null)
             {
-                var extra=new Dictionary<string,string>(StringComparer.Ordinal) {
-                    {"HOLDER_MATERIAL_SOLID_HOLE_REFERENCE_ROLES_UNREVIEWED","Chưa phân loại vật liệu, lỗ và đường tham khảo của đầu kẹp chày"},
-                    {"PHYSICAL_SEATING_DATUM_UNVERIFIED","Chưa xác minh mốc và vị trí gá thực tế"},
-                    {"MISSING_PROCESS_STATE_GRAPH_AND_KINEMATIC_SOURCE","Thiếu hình dạng phôi trung gian và dữ liệu chuyển động"},
-                    {"FINAL_STATIC_PROVIDER_NOT_CONFIGURED","Chưa cấu hình hồ sơ gá để kiểm tra vị trí tĩnh"},
-                    {"FINAL_STATIC_NOT_MAPPED_FOR_NATIVE_PART","Chưa gắn hồ sơ gá với chi tiết và cấu hình này"},
-                    {"OPEN_OR_INVALID_PUNCH_MATERIAL","Biên dạng chày chưa kín hoặc chưa hợp lệ"},
-                    {"SOURCE_STALE_OR_UNMATCHED","Nguồn dao đã thay đổi hoặc chưa nhận đúng cặp"},
-                    {"CANCELLED","Đã dừng kiểm tra"},{"STALE","Dữ liệu đã thay đổi – hãy quét lại"},
-                    {"STALE_SOURCE","Dữ liệu đã thay đổi – hãy quét lại"},
-                    {"SOURCE_CHANGED_DURING_DISPLAY","Dữ liệu thay đổi khi hiển thị – hãy quét lại"},
-                    {"PROCESS_JOB_TIME_BUDGET_EXCEEDED","Chưa kiểm tra xong trong thời gian cho phép"}
-                };
-                string caption;if(extra.TryGetValue(code,out caption))return new BendUserText(caption,"Xem hồ sơ dao và chi tiết kỹ thuật để bổ sung đúng dữ liệu.",code);
+                string caption;if(additionalReasons.TryGetValue(code,out caption))return new BendUserText(caption,"Nội dung chỉ áp dụng trong phạm vi dữ liệu đã kiểm tra. Xem mã gốc ở chi tiết kỹ thuật.",code);
             }
             // Original code is retained only for technical detail/diagnostics.
             return new BendUserText("Chưa đủ dữ liệu – xem chi tiết kỹ thuật",
