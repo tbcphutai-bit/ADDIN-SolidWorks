@@ -74,6 +74,70 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
 
         /// <summary>
+        /// Read-only recovery guidance for an existing Preview session.
+        /// IMPORTANT: inactive Assembly does NOT mean the document was closed.
+        /// This method never discards a session, never calls Hide and never
+        /// activates or closes a SOLIDWORKS document.
+        ///
+        /// The return value indicates whether diagnostics could be read;
+        /// it does not mean that all temporary bodies were hidden.
+        /// </summary>
+        public bool TryDescribeRecovery(out string message)
+        {
+            Session session = current;
+            if (session == null)
+            {
+                message = "Không có Ghost Session tồn đọng.";
+                return true;
+            }
+
+            if (!IsOnOwnerThread(session))
+            {
+                message = "Chỉ kiểm tra Ghost Session trên đúng luồng SOLIDWORKS.";
+                return false;
+            }
+
+            bool active = IsBoundAssemblyActive(session.App, session.Assembly);
+            bool tracked = session.Ghost.IsShowing;
+
+            if (tracked && !active)
+            {
+                message = "Phiên Ghost còn Temporary Body được giữ tham chiếu, " +
+                          "nhưng Assembly nguồn không active hoặc không truy cập được. " +
+                          "Không thể kết luận tài liệu đã đóng. Không xóa session. " +
+                          "Nếu Assembly vẫn mở, hãy chuyển về đúng Assembly rồi " +
+                          "thử dọn lại; nếu đã đóng, dừng Preview và báo kỹ thuật.";
+                return true;
+            }
+
+            if (tracked && session.CloseRequested)
+            {
+                message = "PropertyManager đã đóng nhưng còn Temporary Body " +
+                          "chưa dọn. Khi đang ở đúng Assembly, gọi " +
+                          "RetryClosedCleanup từ luồng SOLIDWORKS.";
+                return true;
+            }
+
+            if (tracked)
+            {
+                message = "Preview hiện còn body được quản lý. " +
+                          "Dùng TryClear của đúng phiên trước khi tạo phiên khác.";
+                return true;
+            }
+
+            if (session.CloseRequested)
+            {
+                message = "Phiên đã yêu cầu đóng và không còn body được theo dõi. " +
+                          "Có thể gọi RetryClosedCleanup để hoàn tất vòng đời.";
+                return true;
+            }
+
+            message = "Phiên PropertyManager vẫn đang mở. " +
+                      "Không khởi tạo một phiên khác chồng lên phiên này.";
+            return true;
+        }
+
+        /// <summary>
         /// Called once from the SOLIDWORKS UI thread when a future PMP starts.
         /// A second PMP cannot replace an existing or pending session.
         /// </summary>
