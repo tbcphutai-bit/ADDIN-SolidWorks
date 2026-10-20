@@ -336,6 +336,18 @@ namespace ADDIN.Tests
             }
             else Console.WriteLine("PASS: malformed candidate was rejected");
 
+            // Also exercise the linked Review #3 source: multiline CSV records
+            // must not be split at embedded CRLF inside quoted fields.
+            string sample = "a,b\r\n\"line1\r\nline2\",\"a\"\"b\"\r\n";
+            string[] records = SplitCsvRecords(sample).ToArray();
+            bool splitOk = records.Length == 2 &&
+                records[1] == "\"line1\r\nline2\",\"a\"\"b\"";
+            if (!splitOk)
+            {
+                Console.WriteLine("FAIL: Review3 quoted-multiline CSV record splitter");
+                ok = false;
+            }
+            else Console.WriteLine("PASS: Review3 quoted-multiline CSV record splitter");
             return ok ? 0 : 1;
         }
 
