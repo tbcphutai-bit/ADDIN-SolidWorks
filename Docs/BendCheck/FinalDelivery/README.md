@@ -10,6 +10,8 @@
 4. [Reference/HolderMaterialReviewDraft.cs](Reference/HolderMaterialReviewDraft.cs) — unsigned managed Holder inventory and explicit reviewer-assigned contour proposal, using existing HolderObstacleSet contracts.
 5. [Reference/FinalEvidenceGate.cs](Reference/FinalEvidenceGate.cs) — pure output gate separating numeric evidence, simulation, missing inputs and native lifecycle.
 6. [Reference/FinalEvidenceGateTests.cs](Reference/FinalEvidenceGateTests.cs) — assertions to integrate into existing test harness before reporting PASS.
+7. [UX_VIETNAMESE_TERMINOLOGY.md](UX_VIETNAMESE_TERMINOLOGY.md) — **mandatory next-phase user-facing Vietnamese wording and UX clarity**, status safety, original source UI anchors, screenshot and DPI validation.
+8. [Reference/BendCheckVietnameseText.cs](Reference/BendCheckVietnameseText.cs) — presentation-only C# label dictionary example; Codex must review, integrate and test it without changing backend status enums.
 
 The *.cs in Reference/ are **deliberately not included in ADDIN.csproj / ToolProfiles.Tests.csproj**. They are review-ready candidate code, not alleged compiled/verified functionality. Codex must adapt and wire them to the real source, run Debug/Release builds and native tests and report actual results. This branch intentionally changes no UI, production engine, COM or Add-in registration.
 
