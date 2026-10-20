@@ -117,6 +117,35 @@ namespace ADDIN.Tests
             if (buildMethod == null) { Console.WriteLine("FAIL: BuildCg2PartRelations method missing"); errors++; }
             else Console.WriteLine("PASS: CheckAssemblyHole.BuildCg2PartRelations method exists");
 
+            MethodInfo physicalPartResolver = checkerType.GetMethod(
+                "Cg2IsResolvedPartOccurrence", BindingFlags.NonPublic | BindingFlags.Static);
+            if (physicalPartResolver == null)
+            {
+                Console.WriteLine("FAIL: physical Part-vs-Subassembly resolver missing");
+                errors++;
+            }
+            else Console.WriteLine("PASS: CG2.1 leaf resolver exists; live nested CAD test still required");
+
+            foreach (string field in new[] { "SubassemblyContainerCount", "UnresolvedLeafOccurrenceCount" })
+                if (cg2ReportType.GetField(field) == null)
+                {
+                    Console.WriteLine("FAIL: CG2.1 coverage field missing: " + field);
+                    errors++;
+                }
+
+            FieldInfo broadBudget = checkerType.GetField(
+                "Cg2MaxBroadPhaseElapsedMs", BindingFlags.NonPublic | BindingFlags.Static);
+            FieldInfo brepBudget = checkerType.GetField(
+                "Cg2MaxBrepElapsedMs", BindingFlags.NonPublic | BindingFlags.Static);
+            if (broadBudget == null || brepBudget == null ||
+                (int)broadBudget.GetRawConstantValue() != 60000 ||
+                (int)brepBudget.GetRawConstantValue() != 60000)
+            {
+                Console.WriteLine("FAIL: CG2.1 bounded-time diagnostics constants");
+                errors++;
+            }
+            else Console.WriteLine("PASS: CG2.1 time budgets exist; actual timeout branch NOT_TESTED offline");
+
             return errors;
         }
 
@@ -212,18 +241,30 @@ namespace ADDIN.Tests
 
                 double rad2deg = Math.PI / 180.0;
                 object hNear = Activator.CreateInstance(holeAxisType);
-                holeAxisType.GetField("Center").SetValue(hNear, new double[] { 0.003, 0, 0.015 });
-                holeAxisType.GetField("Direction").SetValue(hNear, new double[] { Math.Sin(2.0 * rad2deg), 0, Math.Cos(2.0 * rad2deg) });
+                holeAxisType.GetField("Center").SetValue(hNear, new double[] { 0.00008, 0, 0.015 });
+                holeAxisType.GetField("Direction").SetValue(hNear,
+                    new double[] { Math.Sin(0.1 * rad2deg), 0, Math.Cos(0.1 * rad2deg) });
                 bool isNearMatch = (bool)counterpart.Invoke(null, new object[] { hA, hNear });
-                if (isNearMatch) Console.WriteLine("PASS: Cg2LikelyKnownCounterpart matches hole within 4mm radial / 3 deg");
-                else { Console.WriteLine("FAIL: Cg2LikelyKnownCounterpart failed on near hole"); errors++; }
+                if (isNearMatch) Console.WriteLine("PASS: matched hole within 0.10mm / 0.20deg is suppressed");
+                else { Console.WriteLine("FAIL: tightly coaxial hole was not suppressed"); errors++; }
 
                 object hFar = Activator.CreateInstance(holeAxisType);
-                holeAxisType.GetField("Center").SetValue(hFar, new double[] { 0.005, 0, 0.015 });
+                holeAxisType.GetField("Center").SetValue(hFar, new double[] { 0.00030, 0, 0.015 });
                 holeAxisType.GetField("Direction").SetValue(hFar, new double[] { 0, 0, 1 });
                 bool isFarMatch = (bool)counterpart.Invoke(null, new object[] { hA, hFar });
-                if (!isFarMatch) Console.WriteLine("PASS: Cg2LikelyKnownCounterpart rejects hole with > 4mm radial offset");
-                else { Console.WriteLine("FAIL: Cg2LikelyKnownCounterpart falsely matched far radial hole"); errors++; }
+                if (!isFarMatch) Console.WriteLine("PASS: 0.30mm-offset hole is NOT silently suppressed");
+                else { Console.WriteLine("FAIL: 0.30mm-offset diagnostic candidate was hidden"); errors++; }
+
+                object hMisaligned = Activator.CreateInstance(holeAxisType);
+                holeAxisType.GetField("Center").SetValue(hMisaligned, new double[] { 0.002, 0, 0.015 });
+                holeAxisType.GetField("Direction").SetValue(hMisaligned,
+                    new double[] { Math.Sin(2.0 * rad2deg), 0, Math.Cos(2.0 * rad2deg) });
+                if ((bool)counterpart.Invoke(null, new object[] { hA, hMisaligned }))
+                {
+                    Console.WriteLine("FAIL: 2mm / 2deg misalignment was suppressed as a counterpart");
+                    errors++;
+                }
+                else Console.WriteLine("PASS: 2mm / 2deg misalignment remains a CG2 diagnostic candidate");
             }
 
             return errors;
@@ -243,8 +284,8 @@ namespace ADDIN.Tests
             MethodInfo counterpart = checkerType.GetMethod("Cg2LikelyKnownCounterpart", BindingFlags.NonPublic | BindingFlags.Static);
 
             // CG2-T01: Two Parts, aligned holes
-            // Assert that when coaxial counterpart hole exists within 4mm/3deg, candidate IS suppressed;
-            // and when counterpart is missing or offset > 4mm, candidate IS NOT suppressed.
+            // Assert that when coaxial counterpart hole exists within 0.10mm/0.20deg, candidate IS suppressed;
+            // and when counterpart is missing or offset > 0.10mm, candidate IS NOT suppressed.
             {
                 object boxA = readBox.Invoke(null, new object[] { "PartA-1", new double[] { 0, 0, 0, 0.020, 0.020, 0.010 } });
                 object boxB = readBox.Invoke(null, new object[] { "PartB-1", new double[] { 0, 0, 0.011, 0.020, 0.020, 0.021 } });
@@ -264,9 +305,9 @@ namespace ADDIN.Tests
                 holeAxisType.GetField("Direction").SetValue(hBCoaxial, new double[] { 0, 0, 1 });
                 bool suppressed = (bool)counterpart.Invoke(null, new object[] { hA, hBCoaxial });
 
-                // Negative case: counterpart offset 6mm (> 4mm)
+                // Negative case: counterpart offset 0.30mm (> 0.10mm)
                 object hBFar = Activator.CreateInstance(holeAxisType);
-                holeAxisType.GetField("Center").SetValue(hBFar, new double[] { 0.016, 0.010, 0.015 });
+                holeAxisType.GetField("Center").SetValue(hBFar, new double[] { 0.0103, 0.010, 0.015 });
                 holeAxisType.GetField("Direction").SetValue(hBFar, new double[] { 0, 0, 1 });
                 bool suppressedFar = (bool)counterpart.Invoke(null, new object[] { hA, hBFar });
 
