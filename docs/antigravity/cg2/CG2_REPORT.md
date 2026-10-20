@@ -1,14 +1,14 @@
 # CHECK HOLE CG2 — ANTIGRAVITY VERIFICATION REPORT
 
-> **UPDATE — ChatGPT Review #3 source patch (requires new test run):**
-> Added `CG2_REVIEW3_REPEATABILITY.cs`, integrated `--repeatability` in `CG2_LIVE_CAD_RUNNER.cs`, and published complete C# plus steps in [`CG2_REVIEW3_CODE.md`](CG2_REVIEW3_CODE.md). **This code has NOT yet been compiled or exercised on SOLIDWORKS by Antigravity.**
-> The results below refer to the **previous runner version**. Its large-Assembly raw CSV byte comparison failed. The hypothesis `GetComponents(false)` order / 223 swapped pairs remains `ROOT_CAUSE=UNVERIFIED` pending newly instrumented CG1→CG1, CG2→CG2, CG1→CG2 runs. Until then `CG2_REVIEW3_REPEATABILITY=NOT_TESTED`, `STRICT_CSV_BYTE_PARITY_916=FAIL_PREVIOUS_RUN`, `READY_FOR_MERGE=NO`.
+> **UPDATE — ChatGPT Review #3 Repeatability Suite Executed:**  
+> Standalone runner combining `CG2_LIVE_CAD_RUNNER.cs` and `CG2_REVIEW3_REPEATABILITY.cs` was compiled with Roslyn C# 7.3 and executed with `--repeatability` on the 916-hole assembly `1618-01-BH.SLDASM` in sandbox `D:\CG1-ISOLATED-TEST-COPIES`.  
+> **Key Results:** `CG1_REPEATABLE_BYTES=NO`, `CG2_REPEATABLE_BYTES=NO`, `CG1_VS_CG2_BYTE_PARITY=FAIL`, `PRODUCTION_CANONICAL_COUNTERS=PASS`, `DIAGNOSTIC_CLASSIFICATION=BASELINE_NONDETERMINISM_OBSERVED`, `REPEATABILITY_EXIT_CODE=1`.  
+> Full sanitized runner trace and pairwise comparisons are recorded in [`CG2_REVIEW3_EVIDENCE.md`](CG2_REVIEW3_EVIDENCE.md).
 
 ---
 
-> STATUS: **REVIEW #2 RETEST COMPLETE — FACTUAL EVIDENCE RECORDED**  
+> STATUS: **REVIEW #3 REPEATABILITY COMPLETE — FACTUAL EVIDENCE RECORDED**  
 > Branch: `feat/check-hole-cg2-part-relations` | PR: [Draft PR #33](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/33)  
-> Retest executed on code committed by ChatGPT for Review #2 (`CG2_LIVE_CAD_RUNNER.cs`, `CG2_TEST_HARNESS.cs`, `CG2_REVIEW2_CODE.md`).  
 > Broad-phase AABB spatial screening confirmed read-only (`CHECK_ONLY`); zero mutations to production Check Hole verdicts, tolerances, or 3D markers.  
 > PR #33 remains strictly in **Draft** mode (`READY_FOR_MERGE=NO`). No merge into `main` and no CG3 implementation.
 
@@ -28,8 +28,9 @@
 | Candidate CG2 Release Binary | `C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll` (SHA256: `8D470DEA5B0900BF4E5FD50CFF3B219BB1F1AA9323A52CD2B9853F5377C1B046`) |
 | Candidate CG2 Debug Binary | `C:\Tao moi\ADDIN.dll` (SHA256: `0A41103C4D04C85136777E2AD34F83ED7D311C906F7DECCF8DB7229FA19D02EC`) |
 | Test Harness | `docs/antigravity/cg2/CG2_TEST_HARNESS.cs` |
-| Live CAD Runner | `docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs` |
-| Review #2 Reference Doc | `docs/antigravity/cg2/CG2_REVIEW2_CODE.md` |
+| Live CAD Runner | `docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs` & `docs/antigravity/cg2/CG2_REVIEW3_REPEATABILITY.cs` |
+| Review #3 Reference Doc | `docs/antigravity/cg2/CG2_REVIEW3_CODE.md` |
+| Review #3 Evidence Doc | `docs/antigravity/cg2/CG2_REVIEW3_EVIDENCE.md` |
 
 ---
 
@@ -128,14 +129,15 @@ Executed with exit code 0:
 ```text
 PASS: exit policy handles PASS / FAIL / SKIP / empty cases
 PASS: malformed candidate was rejected
+PASS: Review3 quoted-multiline CSV record splitter
 ```
-The negative candidate validation test (rejecting `Classification != "CHECK_ONLY"`, empty occurrence strings, or non-positive IDs) passed.
+The negative candidate validation test (rejecting `Classification != "CHECK_ONLY"`, empty occurrence strings, or non-positive IDs) and the Review #3 multiline CSV parser passed cleanly.
 
 ---
 
 ## E. In-CAD Sandbox Regression Retest (6 Assemblies)
 
-Executed in isolated sandbox `D:\CG1-ISOLATED-TEST-COPIES` using Review #2 code:
+Executed in isolated sandbox `D:\CG1-ISOLATED-TEST-COPIES`:
 ```powershell
 docs\antigravity\cg2\CG2_LIVE_CAD_RUNNER.exe "C:\Tao moi\backup_cg1_release_snapshot\ADDIN.dll" "C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll" "D:\CG1-ISOLATED-TEST-COPIES" "D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_OK.SLDASM" "D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_NG_Offset.SLDASM" "D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_Unmatched.SLDASM" "D:\CG1-ISOLATED-TEST-COPIES\SimpleFixtures\Fixture_MultiLayer_ABC.SLDASM" "D:\CG1-ISOLATED-TEST-COPIES\ZeroHole\run07_Missing_Ura_BOM.SLDASM" "D:\CG1-ISOLATED-TEST-COPIES\ProductionCopy\1618-01-BH.SLDASM"
 ```
@@ -149,15 +151,7 @@ docs\antigravity\cg2\CG2_LIVE_CAD_RUNNER.exe "C:\Tao moi\backup_cg1_release_snap
 | `Fixture_Unmatched.SLDASM` | 32 | 0 | 0 | 0 | 32 | **0** (asserted zero) | **PASS** (5,675 bytes, identical SHA256) | **PASS** (all 13 fields) | `PASS` |
 | `Fixture_MultiLayer_ABC.SLDASM`| 82 | 24 | 0 | 0 | 58 | **13** (exact `fr1-2` -> `1-1`) | **PASS** (11,769 bytes, identical SHA256)| **PASS** (all 13 fields) | `PASS` |
 | `run07_Missing_Ura_BOM.SLDASM` | 0 | 0 | 0 | 0 | 0 | **0** (asserted zero) | **PASS** (107 bytes, identical SHA256) | **PASS** (all 13 fields) | `PASS` |
-| `1618-01-BH.SLDASM` (916 holes)| 916 | 348 | 0 | 0 | 568 | 1,297 candidates | **FAIL_ORDER_SENSITIVE** (129,522 bytes vs 129,522 bytes, 1st diff byte 175) | **PASS** (all 13 fields, 568 rows) | `CSV_ORDER_DIFFERENCE` |
-
-### Factual Classification of `1618-01-BH.SLDASM` CSV Difference
-- **Length & Counts:** Baseline CSV = 129,522 bytes (569 lines); Candidate CSV = 129,522 bytes (569 lines). Exactly identical byte length and line count.
-- **Production Metrics:** 100% identical (916 Logical Holes, 348 Stacks, 0 NG, 0 Pattern NG, 0 Missing Holes, 568 Report Rows).
-- **Row Detailed Parity:** All 568 report rows match across all 13 fields in `ReportRowSignature()`.
-- **Root Cause of Strict Byte Difference at Byte 175:**
-  On consecutive `OpenDoc6` calls in SolidWorks, `assembly.GetComponents(false)` on this 82-component assembly traverses subassemblies in a different order (e.g. subassembly `A15` first vs subassembly `A3` first). This changes the sequential insertion order of concentric stacks into `report.Rows` and swaps the `{Reference, Actual}` designation on 223 undirected pairs without changing any physical connection, geometry, offset ($< 10^{-11}\text{ mm}$), or verdict.
-  Per Review #2 instructions, this is **factually reported as an output line-ordering sensitivity under strict byte comparison** without applying artificial sorting to mask it.
+| `1618-01-BH.SLDASM` (916 holes)| 916 | 348 | 0 | 0 | 568 | 1,297 candidates | **FAIL_BASELINE_NONDETERMINISTIC** (See Section G) | **PASS** (all 13 fields, 568 rows) | `BASELINE_NONDETERMINISTIC` |
 
 ---
 
@@ -168,10 +162,67 @@ docs\antigravity\cg2\CG2_LIVE_CAD_RUNNER.exe "C:\Tao moi\backup_cg1_release_snap
 | Source C# candidate provenance assertions | **VERIFIED** | Strict checks on ID, occurrences, label, and `CHECK_ONLY` |
 | Exact occurrence A->B screening evidence | **VERIFIED** | Exactly 13 A->B candidates observed in `Fixture_OK` and `Fixture_MultiLayer_ABC` |
 | Strict raw CSV byte parity (small/simple fixtures) | **VERIFIED** | 5 of 5 fixtures pass byte-for-byte (`SequenceEqual == true`) |
-| Strict raw CSV byte parity (916-hole assembly) | **LINE_ORDER_SENSITIVE** | 129,522 bytes identical, 569 lines identical, line sequence reflects SolidWorks COM traversal |
+| Strict raw CSV byte parity (916-hole assembly) | **FAIL (Exit 1)** | Factual failure: `CG1_REPEATABLE_BYTES=NO`, `CG2_REPEATABLE_BYTES=NO` (SOLIDWORKS COM `GetComponents` ordering) |
+| Canonicalized mathematical/verdict parity | **PASS (100%)** | 916 holes, 348 stacks, 0 NG, 568 rows identical across all 4 fresh opens |
+| Review #3 Repeatability diagnostic runner | **EXECUTED** | 4 fresh CAD opens, 3 pair comparisons executed; output in `CG2_REVIEW3_EVIDENCE.md` |
 | Negative candidate validation | **VERIFIED** | Self-test asserts rejection of non-CHECK_ONLY candidates |
 | Full 12 scenarios CG2 end-to-end | **NOT_VERIFIED** | Primitive tests pass; full integrated pipeline remains partially covered by fixtures |
 | BREP/material contact & fastening intent | **NOT_IMPLEMENTED** | Broad-phase AABB screening only; disclaimer mandatory in UI |
 | CG1 production results unaffected | **VERIFIED** | 0 NG changes, 0 tolerance changes, 0 feature mutations |
 | 3D marker generation parity | **NOT_TESTED** | `AutoCreateMarkers=false` strictly enforced in safe sandbox mode |
-| Ready for merge | **NO** | PR #33 kept in Draft mode |
+| Ready for merge | **NO** | PR #33 kept strictly in Draft mode |
+
+---
+
+## G. Review #3 Repeatability Diagnostic Results (`1618-01-BH.SLDASM`)
+
+### 1. Diagnostic Protocol
+The diagnostic runner executed 4 sequential fresh read-only CAD document opens of `1618-01-BH.SLDASM` in the approved sandbox:
+- `cg1_1`: Baseline CG1 open #1
+- `cg1_2`: Baseline CG1 open #2
+- `cg2_1`: Candidate CG2 open #1
+- `cg2_2`: Candidate CG2 open #2
+
+### 2. Run Metrics & SHA256 Signatures
+
+| Run | DLL | CSV Length | CSV SHA256 | Holes | Stacks | NG | Rows |
+|---|---|---|---|---|---|---|---|
+| `cg1_1` | Baseline | 129,522 | `587E3D0FE823C30A3C9A239CF763F911DF304D205532D4D2CC2DE6EA624A070C` | 916 | 348 | 0 | 568 |
+| `cg1_2` | Baseline | 129,522 | `40448A13CB1EE3EC530E5D5DACBD2D197D590BC6B1DDBED0CDEB89787C8CD63E` | 916 | 348 | 0 | 568 |
+| `cg2_1` | Candidate | 129,522 | `CDE84C5DCDEFF197B3BCB9473F2C4E24D1CB89381B6584FB14BE952CF9531748` | 916 | 348 | 0 | 568 |
+| `cg2_2` | Candidate | 129,522 | `D00892D549CB3F596B41E1985168CD6CCEEB11632EA9E3B1FC8A3F98C1180161` | 916 | 348 | 0 | 568 |
+
+### 3. Pairwise Diagnostics
+1. **`cg1_1` vs `cg1_2` (Baseline self-repeatability):**
+   - `CSV_BYTE_EQUAL=False` (differs at byte 175)
+   - `ORDERED_GETCOMPONENTS_EQUAL=False` (Component 0 was `1618-02-bh-A6-1` vs `1618-02-bh-A10-1`)
+   - `RAW_ROW_ORDER_AND_EXACT_VALUES_EQUAL=False`
+   - `CANONICALIZED_ROW_SIGNATURE_EQUAL=True`
+2. **`cg2_1` vs `cg2_2` (Candidate self-repeatability):**
+   - `CSV_BYTE_EQUAL=False` (differs at byte 175)
+   - `ORDERED_GETCOMPONENTS_EQUAL=False` (Component 0 was `1618-02-bh-A10-1` vs `1618-04-wr-A02-new-1`)
+   - `RAW_ROW_ORDER_AND_EXACT_VALUES_EQUAL=False`
+   - `CANONICALIZED_ROW_SIGNATURE_EQUAL=True`
+3. **`cg1_1` vs `cg2_1` (Cross-build comparison):**
+   - `CSV_BYTE_EQUAL=False` (differs at byte 175)
+   - `ORDERED_GETCOMPONENTS_EQUAL=False`
+   - `RAW_ROW_ORDER_AND_EXACT_VALUES_EQUAL=False`
+   - `CANONICALIZED_ROW_SIGNATURE_EQUAL=True`
+
+### 4. Diagnostic Summary Output
+```text
+CG1_REPEATABLE_BYTES=NO
+CG2_REPEATABLE_BYTES=NO
+CG1_VS_CG2_BYTE_PARITY=FAIL
+PRODUCTION_CANONICAL_COUNTERS=PASS
+DIAGNOSTIC_CLASSIFICATION=BASELINE_NONDETERMINISM_OBSERVED
+CAUSE_OF_ORDER_CHANGE=NOT_YET_PROVEN_BY_THIS_CLASSIFICATION
+SKETCH_MARKER_WRITE_PARITY=NOT_TESTED
+
+REPEATABILITY_EXIT_CODE=1
+```
+
+### 5. Technical Conclusion
+- **Strict Byte Parity:** Exits with `1` (FAIL) per Review #3 specification. This is not converted to PASS.
+- **Physical/Engineering Parity:** 100% PASS on all canonical counters, 916 holes, 348 stacks, 0 NG, and 568 rows.
+- **Empirical Demonstration:** The component traversal returned by SOLIDWORKS `AssemblyDoc.GetComponents(false)` varies between document opens for complex multi-level assemblies, which alters the row insertion order in both baseline CG1 and candidate CG2.
