@@ -124,15 +124,22 @@ SKETCH_MARKER_WRITE_PARITY=NOT_TESTED
 REPEATABILITY_EXIT_CODE=1
 ```
 
-### Key Technical Findings:
-1. **Source of Non-Deterministic Byte Order:**  
-   The underlying SOLIDWORKS COM API call `AssemblyDoc.GetComponents(false)` does **not** return components in a fixed or deterministic order across successive fresh document opens on large assemblies (`1618-01-BH.SLDASM` with 82 components).
-2. **Impact on Production Check Hole:**  
-   Because the baseline CG1 algorithm scans components in the order returned by SOLIDWORKS COM API:
-   - Successive runs of the **same binary** (`cg1_1` vs `cg1_2`) yield different component orders.
-   - This in turn produces different raw row insertion sequences into the report, causing CSV bytes to differ starting at byte 175 (the first data row).
-   - The same behavior occurs in CG2 (`cg2_1` vs `cg2_2`).
-3. **Parity of Mathematical & Engineering Verdicts:**  
-   When row orientation and order are canonicalized (`CANONICALIZED_ROW_SIGNATURE_EQUAL`), all runs are **100% identical** across all 568 rows, 916 logical holes, 348 stacks, 0 NG, 0 Pattern NG, and 0 Missing Holes.
-4. **Exit Code Policy:**  
-   The diagnostic runner faithfully exits with `1` because strict raw byte parity failed. This exit code is not masked or claimed as PASS.
+### Key Technical Findings — Evidence vs. Inference
+
+1. **OBSERVED:** CG1→CG1 và CG2→CG2 đều tạo CSV có SHA256 khác nhau dù metrics 916 holes / 348 stacks / 0 NG / 568 rows giữ nguyên trong phiên thử này. CG1→CG2 cũng khác byte.
+2. **OBSERVED:** `SnapshotComponentTraversal()` (gọi trước `Run()`) ghi nhận Component-order snapshots khác nhau; raw ordered row signatures khác nhau.
+3. **NOT PROVEN:** Check Hole production gọi `GetComponents(false)` độc lập trong `ReadAssemblyHoles()`. Runner hiện không log chính array mà production đã duyệt. Vì vậy mối quan hệ nhân quả duy nhất giữa thứ tự GetComponents và thay đổi CSV chỉ là giả thuyết phù hợp dữ liệu, không phải causal proof.
+4. **NORMALIZED MATCH:** `ReportRowSignature()` sort rows, canonicalize Reference/Actual và format số theo F6. Việc chữ ký khớp chứng minh normalized comparison khớp theo tiêu chí đã đặt, không chứng minh exact full-precision/ordered equality.
+5. **ACCEPTANCE STATUS:** Strict byte parity FAIL (exit 1) như đo được; `MARKER_GENERATION_PARITY=NOT_TESTED`; full CG2 T01–T12 end-to-end chưa được xác minh đầy đủ; precise material/fastener intent not implemented.
+
+```text
+RAW_CSV_BYTE_PARITY=FAIL
+BASELINE_RAW_CSV_NONDETERMINISM=OBSERVED
+PRE_RUN_GETCOMPONENTS_ORDER_VARIATION=OBSERVED
+PRODUCTION_TRAVERSAL_CAUSE=NOT_PROVEN
+EXACT_ALL_FIELD_GEOMETRY_PARITY=NOT_VERIFIED
+CANONICALIZED_ROW_PARITY=PASS_WITH_NORMALIZATION
+MARKER_GENERATION_PARITY=NOT_TESTED
+CG2_END_TO_END_ALL_SCENARIOS=NOT_VERIFIED
+READY_FOR_MERGE=NO
+```

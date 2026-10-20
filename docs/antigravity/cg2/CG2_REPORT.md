@@ -162,13 +162,14 @@ docs\antigravity\cg2\CG2_LIVE_CAD_RUNNER.exe "C:\Tao moi\backup_cg1_release_snap
 | Source C# candidate provenance assertions | **VERIFIED** | Strict checks on ID, occurrences, label, and `CHECK_ONLY` |
 | Exact occurrence A->B screening evidence | **VERIFIED** | Exactly 13 A->B candidates observed in `Fixture_OK` and `Fixture_MultiLayer_ABC` |
 | Strict raw CSV byte parity (small/simple fixtures) | **VERIFIED** | 5 of 5 fixtures pass byte-for-byte (`SequenceEqual == true`) |
-| Strict raw CSV byte parity (916-hole assembly) | **FAIL (Exit 1)** | Factual failure: `CG1_REPEATABLE_BYTES=NO`, `CG2_REPEATABLE_BYTES=NO` (SOLIDWORKS COM `GetComponents` ordering) |
-| Canonicalized mathematical/verdict parity | **PASS (100%)** | 916 holes, 348 stacks, 0 NG, 568 rows identical across all 4 fresh opens |
+| Strict raw CSV byte parity (916-hole assembly) | **FAIL (Exit 1)** | CG1→CG1, CG2→CG2 và CG1→CG2 đều khác byte; nguyên nhân duy nhất chưa xác minh |
+| Canonicalized counters/row signatures | **PASS (normalized comparison only)** | 916 logical holes, 348 stacks, 0 NG, 568 rows; signature đã sort/swap Ref–Actual và làm tròn F6 |
+| Exact ordered-row / Reference–Actual / full-precision parity | **NOT_VERIFIED** | Trace raw-ordered rows khác nhau; không được gọi 100% identical |
 | Review #3 Repeatability diagnostic runner | **EXECUTED** | 4 fresh CAD opens, 3 pair comparisons executed; output in `CG2_REVIEW3_EVIDENCE.md` |
 | Negative candidate validation | **VERIFIED** | Self-test asserts rejection of non-CHECK_ONLY candidates |
 | Full 12 scenarios CG2 end-to-end | **NOT_VERIFIED** | Primitive tests pass; full integrated pipeline remains partially covered by fixtures |
 | BREP/material contact & fastening intent | **NOT_IMPLEMENTED** | Broad-phase AABB screening only; disclaimer mandatory in UI |
-| CG1 production results unaffected | **VERIFIED** | 0 NG changes, 0 tolerance changes, 0 feature mutations |
+| CG1 production results unaffected | **VERIFIED (fixtures)** | Trên sáu fixture, counters/verdicts và canonicalized rows so được; chưa bao phủ mọi model hay marker generation |
 | 3D marker generation parity | **NOT_TESTED** | `AutoCreateMarkers=false` strictly enforced in safe sandbox mode |
 | Ready for merge | **NO** | PR #33 kept strictly in Draft mode |
 
@@ -222,7 +223,23 @@ SKETCH_MARKER_WRITE_PARITY=NOT_TESTED
 REPEATABILITY_EXIT_CODE=1
 ```
 
-### 5. Technical Conclusion
-- **Strict Byte Parity:** Exits with `1` (FAIL) per Review #3 specification. This is not converted to PASS.
-- **Physical/Engineering Parity:** 100% PASS on all canonical counters, 916 holes, 348 stacks, 0 NG, and 568 rows.
-- **Empirical Demonstration:** The component traversal returned by SOLIDWORKS `AssemblyDoc.GetComponents(false)` varies between document opens for complex multi-level assemblies, which alters the row insertion order in both baseline CG1 and candidate CG2.
+### 5. Kết luận kỹ thuật — giới hạn bằng chứng
+
+- **Quan sát được:** Trong 4 lần mở riêng của cùng bản sao Assembly 916 lỗ, CSV byte khác nhau cả khi chạy lại chính binary CG1 và chính binary CG2. Số logical holes = 916, stacks = 348, NG = 0 và report rows = 568 ở cả 4 lần.
+- **Quan sát được:** Snapshot riêng của `GetComponents(false)` trước `Run()` trả về thứ tự Component khác nhau. Các raw ordered rows cũng khác. `CANONICALIZED_ROW_SIGNATURE_EQUAL=True` khi đã chuẩn hóa hướng Reference/Actual, sắp xếp dòng và làm tròn F6.
+- **Chưa chứng minh:** Snapshot `GetComponents(false)` không phải array chính xác mà production `ReadAssemblyHoles()` sử dụng. Vì vậy chưa thể khẳng định API traversal là nguyên nhân duy nhất của raw CSV order difference, hay 223 reference/actual swaps đã được đếm bằng assertion.
+- **Giới hạn:** Không có bằng chứng dữ liệu raw full-precision, role Reference/Actual và thứ tự từng dòng giống tuyệt đối; marker generation/update chưa kiểm thử. Kết quả này không chứng minh CG2 đã nhận diện thật vật liệu, mối ghép hoặc lỗ thiếu.
+- **Điều đã được hỗ trợ:** CSV mismatch không chỉ xuất hiện do thêm CG2 vì CG1→CG1 cũng không ổn định trong lần thử. Không dùng quan sát này để kết luận có hoặc không có bug trong mọi model.
+- **Kết quả kiểm thử:** `REPEATABILITY_EXIT_CODE=1` và `RAW_CSV_BYTE_PARITY=FAIL` được giữ nguyên; không đổi thành PASS.
+
+```text
+RAW_CSV_BYTE_PARITY=FAIL
+BASELINE_RAW_CSV_NONDETERMINISM=OBSERVED
+PRE_RUN_GETCOMPONENTS_ORDER_VARIATION=OBSERVED
+PRODUCTION_TRAVERSAL_CAUSE=NOT_PROVEN
+EXACT_ALL_FIELD_GEOMETRY_PARITY=NOT_VERIFIED
+CANONICALIZED_ROW_PARITY=PASS_WITH_NORMALIZATION
+MARKER_GENERATION_PARITY=NOT_TESTED
+CG2_END_TO_END_ALL_SCENARIOS=NOT_VERIFIED
+READY_FOR_MERGE=NO
+```
