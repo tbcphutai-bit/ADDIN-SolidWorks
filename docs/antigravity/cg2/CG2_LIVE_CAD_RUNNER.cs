@@ -208,38 +208,72 @@ namespace ADDIN.Tests
             }
         }
 
+        // Actual CG2 diagnostics. AABB candidates are NOT proven missing holes.
         private static void LogCandidateInvestigation(string modelName, Metrics m)
         {
-            if (string.Equals(modelName, "Fixture_OK.SLDASM", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(modelName, "Fixture_OK.SLDASM", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(modelName, "Fixture_MultiLayer_ABC.SLDASM", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            Console.WriteLine("\n  [CG2 AABB CANDIDATE EVIDENCE: " + modelName + "]");
+            Console.WriteLine("  Actual recorded candidates=" + m.Cg2ExpectedCandidates.Count
+                + " | Total candidate count=" + m.Cg2Candidates);
+            foreach (var c in m.Cg2ExpectedCandidates.Take(6))
+                Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                    "  Candidate #{0}: Source=[{1}] ({2}) -> Target=[{3}] | Gap={4:F3}mm | AxisDist={5:F3}mm | {6}",
+                    c.Id, c.SourceOccurrence, c.SourceHoleLabel,
+                    c.TargetOccurrence, c.BoxSeparationMm, c.AxisToBoxMm, c.Classification));
+            Console.WriteLine("  PHYSICAL_MATERIAL_CONTACT=NOT_VERIFIED");
+            Console.WriteLine("  MISSING_HOLE_AT_SITE=NOT_VERIFIED");
+            Console.WriteLine("  COAXIAL_SITE_SUPPRESSION=NOT_VERIFIED");
+        }
+
+        // The fixture manifest identifies exact occurrence IDs; NO substring
+        // matching like "B" / "fr", and NO fallback to unrelated candidates.
+        // It proves candidate provenance ONLY, not a real missing hole.
+        private static void ValidateCg2ExpectedCandidates(string modelName, Metrics m)
+        {
+            if (!m.HasCg2)
+                throw new InvalidOperationException("CG2 diagnostics missing");
+
+            if (m.Cg2ExpectedCandidates.Count > m.Cg2Candidates)
+                throw new InvalidOperationException("Stored candidates exceed reported candidate count");
+
+            var seenIds = new HashSet<int>();
+            foreach (CandidateDetail c in m.Cg2ExpectedCandidates)
             {
-                Console.WriteLine("\n  [ANALYSIS: Fixture_OK.SLDASM Candidate Root Cause]");
-                Console.WriteLine("  - Total Holes: 57 | Matched into Stacks: 24 (12 stacks x 2 holes) | Unmatched: 33");
-                Console.WriteLine("  - Coaxial Suppression: All 12 matched coaxial pairs were recognized by Cg2LikelyKnownCounterpart");
-                Console.WriteLine("    within 4mm radial / 3 deg and SUPPRESSED from expected-hole candidate list.");
-                Console.WriteLine("  - Root Cause of 13 Candidates: The 13 candidates are strictly from unmatched holes (flange & outer mountings)");
-                Console.WriteLine("    whose axis crosses the adjacent component's expanded AABB, but the adjacent component has NO hole at that site.");
-                Console.WriteLine("  - Sample Candidates for Fixture_OK:");
-                foreach (var c in m.Cg2ExpectedCandidates.Take(5))
-                {
-                    Console.WriteLine(string.Format("      Candidate #{0}: Source=[{1}] ({2}) -> Target=[{3}] | BoxSep={4:F2}mm | AxisDist={5:F2}mm | {6}",
-                        c.Id, c.SourceOccurrence, c.SourceHoleLabel, c.TargetOccurrence, c.BoxSeparationMm, c.AxisToBoxMm, c.Reason));
-                }
+                if (c == null || c.Id <= 0 || !seenIds.Add(c.Id)
+                    || string.IsNullOrWhiteSpace(c.SourceOccurrence)
+                    || string.IsNullOrWhiteSpace(c.TargetOccurrence)
+                    || string.IsNullOrWhiteSpace(c.SourceHoleLabel)
+                    || !string.Equals(c.Classification, "CHECK_ONLY", StringComparison.Ordinal)
+                    || double.IsNaN(c.BoxSeparationMm) || double.IsInfinity(c.BoxSeparationMm)
+                    || double.IsNaN(c.AxisToBoxMm) || double.IsInfinity(c.AxisToBoxMm))
+                    throw new InvalidOperationException("CG2 candidate provenance/values invalid at ID="
+                        + (c == null ? "<null>" : c.Id.ToString(CultureInfo.InvariantCulture)));
             }
-            else if (string.Equals(modelName, "Fixture_MultiLayer_ABC.SLDASM", StringComparison.OrdinalIgnoreCase))
+
+            if (string.Equals(modelName, "Fixture_Unmatched.SLDASM", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(modelName, "run07_Missing_Ura_BOM.SLDASM", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine("\n  [ANALYSIS: Fixture_MultiLayer_ABC.SLDASM Site-Specific Missing Hole Evidence]");
-                Console.WriteLine("  - Assembly has 3 stacked components (A, B, C). Total Holes: 82 | Stacks: 24 | Unmatched: 34");
-                Console.WriteLine("  - Target Part B Candidate Identification:");
-                var targetBCandidates = m.Cg2ExpectedCandidates.Where(c => c.TargetOccurrence.IndexOf("中骨", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                                           c.TargetOccurrence.IndexOf("B", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                                           c.TargetOccurrence.IndexOf("fr", StringComparison.OrdinalIgnoreCase) >= 0).ToList();
-                Console.WriteLine(string.Format("    Found {0} candidates targeting intermediate components.", targetBCandidates.Count));
-                var displayList = targetBCandidates.Count > 0 ? targetBCandidates : m.Cg2ExpectedCandidates;
-                foreach (var c in displayList.Take(6))
-                {
-                    Console.WriteLine(string.Format("      Candidate #{0}: Source=[{1}] ({2}) -> Target=[{3}] | BoxSep={4:F2}mm | AxisDist={5:F2}mm | Class={6}",
-                        c.Id, c.SourceOccurrence, c.SourceHoleLabel, c.TargetOccurrence, c.BoxSeparationMm, c.AxisToBoxMm, c.Classification));
-                }
+                if (m.Cg2Candidates != 0 || m.Cg2ExpectedCandidates.Count != 0)
+                    throw new InvalidOperationException("Expected zero candidates for fixture " + modelName);
+            }
+
+            if (string.Equals(modelName, "Fixture_OK.SLDASM", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(modelName, "Fixture_MultiLayer_ABC.SLDASM", StringComparison.OrdinalIgnoreCase))
+            {
+                const string sourceA = "1618-04-bh-A10-fr1-2";
+                const string expectedB = "1618-04-bh-A10-1-1";
+                var found = m.Cg2ExpectedCandidates.Where(c =>
+                    string.Equals(c.SourceOccurrence, sourceA, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(c.TargetOccurrence, expectedB, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (found.Count == 0)
+                    throw new InvalidOperationException(
+                        "No actual CHECK_ONLY AABB candidate with exact source A and target B: " + modelName);
+                Console.WriteLine("  EXACT OCCURRENCE A->B candidates observed: " + found.Count
+                    + " (AABB screening ONLY; site material not proven)");
             }
         }
 
@@ -312,10 +346,11 @@ namespace ADDIN.Tests
 
                 // 1. Rigorous Row-by-Row Metrics & Signature Comparison (Review #1 BLOCKER B)
                 CompareMetrics(baseline, candidate, model);
+                ValidateCg2ExpectedCandidates(Path.GetFileName(model), candidate);
 
                 // 2. Real CSV Line-by-Line Parity Verification (Review #1 BLOCKER B)
                 VerifyCsvParity(root, Path.GetFileName(model), baseline.RawReport, candidate.RawReport, baseAsm, candAsm);
-                Console.WriteLine("  CSV Parity: PASS (All records byte-equivalent between baseline and candidate)");
+                Console.WriteLine("  CSV_BYTE_PARITY=PASS (strict raw byte comparison)");
 
                 response.Baseline = baseline;
                 response.Candidate = candidate;
@@ -329,125 +364,50 @@ namespace ADDIN.Tests
             return response;
         }
 
-        private static void VerifyCsvParity(string root, string modelName, object baselineReport, object candidateReport, Assembly baseAsm, Assembly candAsm)
+        // STRICT CSV BYTE PARITY. No sorting, no swapping of components,
+        // no ReadAllLines (which breaks quoted multiline CSV records).
+        // This checks the REAL production CheckHoleCsv.Write() output.
+        private static void VerifyCsvParity(
+            string root, string modelName,
+            object baselineReport, object candidateReport,
+            Assembly baseAsm, Assembly candAsm)
         {
             string testDir = Path.Combine(root, "CsvTestParity");
             if (!Directory.Exists(testDir)) Directory.CreateDirectory(testDir);
 
-            string baseCsv = Path.Combine(testDir, Path.GetFileNameWithoutExtension(modelName) + "_baseline.csv");
-            string candCsv = Path.Combine(testDir, Path.GetFileNameWithoutExtension(modelName) + "_candidate.csv");
+            string stem = Path.GetFileNameWithoutExtension(modelName);
+            string baseCsv = Path.Combine(testDir, stem + "_baseline.csv");
+            string candCsv = Path.Combine(testDir, stem + "_candidate.csv");
+            Type baseType = baseAsm.GetType("ADDIN.Commands.CheckHoleCsv", true);
+            Type candType = candAsm.GetType("ADDIN.Commands.CheckHoleCsv", true);
+            MethodInfo baseWrite = baseType.GetMethod("Write", BindingFlags.Public | BindingFlags.Static);
+            MethodInfo candWrite = candType.GetMethod("Write", BindingFlags.Public | BindingFlags.Static);
+            if (baseWrite == null || candWrite == null)
+                throw new MissingMethodException("CheckHoleCsv.Write is missing");
 
-            Type baseCsvType = baseAsm.GetType("ADDIN.Commands.CheckHoleCsv");
-            if (baseCsvType == null) throw new MissingMemberException("Baseline CheckHoleCsv missing");
-            MethodInfo baseWriteMethod = baseCsvType.GetMethod("Write", BindingFlags.Public | BindingFlags.Static);
-
-            Type candCsvType = candAsm.GetType("ADDIN.Commands.CheckHoleCsv");
-            if (candCsvType == null) throw new MissingMemberException("Candidate CheckHoleCsv missing");
-            MethodInfo candWriteMethod = candCsvType.GetMethod("Write", BindingFlags.Public | BindingFlags.Static);
-
-            baseWriteMethod.Invoke(null, new object[] { baseCsv, baselineReport });
-            candWriteMethod.Invoke(null, new object[] { candCsv, candidateReport });
+            // Distinct report objects, same isolated output folder.
+            baseWrite.Invoke(null, new object[] { baseCsv, baselineReport });
+            candWrite.Invoke(null, new object[] { candCsv, candidateReport });
 
             if (!File.Exists(baseCsv) || !File.Exists(candCsv))
-                throw new FileNotFoundException("Generated CSV file missing.");
+                throw new FileNotFoundException("CSV parity output was not created");
+            byte[] a = File.ReadAllBytes(baseCsv);
+            byte[] b = File.ReadAllBytes(candCsv);
+            if (a.Length == 0 || b.Length == 0)
+                throw new InvalidOperationException("CSV parity output is empty");
 
-            string[] baseLines = File.ReadAllLines(baseCsv, Encoding.UTF8);
-            string[] candLines = File.ReadAllLines(candCsv, Encoding.UTF8);
-
-            if (baseLines.Length != candLines.Length)
+            if (!a.SequenceEqual(b))
+            {
+                int first = 0;
+                int n = Math.Min(a.Length, b.Length);
+                while (first < n && a[first] == b[first]) first++;
                 throw new InvalidOperationException(string.Format(
-                    "CSV line count mismatch on {0}: baseline={1} vs candidate={2}", modelName, baseLines.Length, candLines.Length));
-
-            if (baseLines.Length == 0)
-                throw new InvalidOperationException("CSV file is empty: " + modelName);
-
-            // Verify header line byte-for-byte
-            if (!string.Equals(baseLines[0], candLines[0], StringComparison.Ordinal))
-                throw new InvalidOperationException("CSV header mismatch:\n  Baseline : " + baseLines[0] + "\n  Candidate: " + candLines[0]);
-
-            // Canonicalize and sort data rows for RFC-4180 record-by-record comparison
-            var baseRecords = CanonicalizeCsvLines(baseLines.Skip(1));
-            var candRecords = CanonicalizeCsvLines(candLines.Skip(1));
-
-            for (int i = 0; i < baseRecords.Count; i++)
-            {
-                if (!string.Equals(baseRecords[i], candRecords[i], StringComparison.Ordinal))
-                    throw new InvalidOperationException(string.Format(
-                        "CSV record mismatch on {0} at record {1}:\n  Baseline : {2}\n  Candidate: {3}",
-                        modelName, i + 1, baseRecords[i], candRecords[i]));
+                    CultureInfo.InvariantCulture,
+                    "CSV_BYTE_PARITY_FAIL model={0}, baselineBytes={1}, candidateBytes={2}, firstDiffByte={3}",
+                    modelName, a.Length, b.Length, first));
             }
-        }
-
-        private static List<string> CanonicalizeCsvLines(IEnumerable<string> lines)
-        {
-            var list = new List<string>();
-            foreach (string line in lines)
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                List<string> fields = ParseCsvLine(line);
-                if (fields.Count != 9)
-                    throw new InvalidOperationException("CSV row does not contain 9 columns: " + line);
-
-                string refComp = fields[4];
-                string actComp = fields[5];
-                if (!string.IsNullOrEmpty(refComp) && !string.IsNullOrEmpty(actComp) &&
-                    string.CompareOrdinal(refComp, actComp) > 0)
-                {
-                    fields[4] = actComp;
-                    fields[5] = refComp;
-                }
-                list.Add(string.Join("\u001F", fields));
-            }
-            list.Sort(StringComparer.Ordinal);
-            return list;
-        }
-
-        private static List<string> ParseCsvLine(string line)
-        {
-            var fields = new List<string>();
-            var sb = new StringBuilder();
-            bool inQuotes = false;
-            for (int i = 0; i < line.Length; i++)
-            {
-                char c = line[i];
-                if (inQuotes)
-                {
-                    if (c == '"')
-                    {
-                        if (i + 1 < line.Length && line[i + 1] == '"')
-                        {
-                            sb.Append('"');
-                            i++;
-                        }
-                        else
-                        {
-                            inQuotes = false;
-                        }
-                    }
-                    else
-                    {
-                        sb.Append(c);
-                    }
-                }
-                else
-                {
-                    if (c == '"')
-                    {
-                        inQuotes = true;
-                    }
-                    else if (c == ',')
-                    {
-                        fields.Add(sb.ToString());
-                        sb.Length = 0;
-                    }
-                    else
-                    {
-                        sb.Append(c);
-                    }
-                }
-            }
-            fields.Add(sb.ToString());
-            return fields;
+            Console.WriteLine("  CSV_BYTE_PARITY=PASS; exact bytes=" + a.Length
+                + "; sha256=" + Sha256(baseCsv));
         }
 
         private static Metrics RunOneIsolated(
