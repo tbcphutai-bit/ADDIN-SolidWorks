@@ -742,9 +742,9 @@ namespace ADDIN.Tests
             }
             else
             {
-                // Each hit: BodyIndex, RayIndex, Flags, X,Y,Z (6 doubles).
-                // These synthetic arrays validate only the classifier;
-                // actual COM GetRayIntersectionsPoints requires real CAD.
+                // Each hit is 6 doubles (without normals) OR 9 doubles
+                // (with normals), as verified on SOLIDWORKS 2024 SP5.
+                // Synthetic tests prove parser math, not the COM call itself.
                 double[] enterExit = {
                     0, 0, 16, 0.020, 0, 0,
                     0, 0, 32, 0.024, 0, 0
@@ -761,6 +761,57 @@ namespace ADDIN.Tests
                     errors++;
                 }
                 else Console.WriteLine("PASS: synthetic 4mm solid ENTRY/EXIT span confirmed");
+                
+                // Exact 2024 SP5 COM layout observed by Antigravity from a
+                // 3mm solid target: body, ray, flags, xyz, surface normal xyz.
+                // Normal ny=-1 on hit 0 MUST NOT be read as hit 1 RayIndex.
+                double[] native9 = {
+                    0, 0, 17, 3.432, 0.000, -1.094, 0, -1, 0,
+                    0, 0, 33, 3.432, 0.003, -1.094, 0,  1, 0
+                };
+                object[] nineHit = {
+                    native9, 2, 1, new[] { 3.432, -0.010, -1.094 },
+                    new[] { 0.0, 1.0, 0.0 }, 0.030, 0.0
+                };
+                string nineResult = (string)classifier.Invoke(null, nineHit);
+                if (nineResult != "BREP_SOLID_ON_AXIS" ||
+                    Math.Abs((double)nineHit[6] - 0.003) > 1e-9)
+                {
+                    Console.WriteLine("FAIL: SOLIDWORKS 2024 nine-double/hit ENTER-EXIT layout; result=" +
+                        nineResult);
+                    errors++;
+                }
+                else Console.WriteLine("PASS: 9-double COM layout returns 3.000mm solid span");
+
+                // Unknown result-array shapes must remain UNVERIFIED rather
+                // than guess 6 or 9 values per native intersection.
+                object[] badShape = {
+                    new double[17], 2, 1, new[] { 3.432, -0.010, -1.094 },
+                    new[] { 0.0, 1.0, 0.0 }, 0.030, 0.0
+                };
+                if ((string)classifier.Invoke(null, badShape) != "UNVERIFIED_RAY_LAYOUT")
+                {
+                    Console.WriteLine("FAIL: malformed COM ray payload was accepted");
+                    errors++;
+                }
+                else Console.WriteLine("PASS: unsupported ray-result stride remains UNVERIFIED");
+
+                // A malformed second RayIndex is topology ambiguity, never
+                // a material-positive hit.
+                double[] invalidRayIndex = (double[])native9.Clone();
+                invalidRayIndex[10] = 1;
+                object[] invalidIndexArgs = {
+                    invalidRayIndex, 2, 1, new[] { 3.432, -0.010, -1.094 },
+                    new[] { 0.0, 1.0, 0.0 }, 0.030, 0.0
+                };
+                if ((string)classifier.Invoke(null, invalidIndexArgs) !=
+                    "UNVERIFIED_RAY_TOPOLOGY")
+                {
+                    Console.WriteLine("FAIL: malformed second ray index was accepted");
+                    errors++;
+                }
+                else Console.WriteLine("PASS: invalid second ray index remains UNVERIFIED");
+
 
                 double[] onlyEnter = { 0, 0, 16, 0.020, 0, 0 };
                 object[] ambiguous = {
