@@ -161,7 +161,7 @@ namespace ADDIN.UI
             technical.CheckedChanged+=(s,e)=>{
                 technicalDetails=technical.Checked;sequenceView.SetTechnicalDetails(technicalDetails);
                 if(!isRunning)RenderSummary();
-                foreach(DataGridViewRow row in dgvParts.Rows)if(row.Tag is BatchPartViewModel part)row.Cells[5].Value=Explain(part.Reason);
+                foreach(DataGridViewRow row in dgvParts.Rows)if(row.Tag is BatchPartViewModel part)row.Cells[5].Value=BendCheckDisplayText.PartReason(part,technicalDetails);
                 foreach(DataGridViewRow row in dgvTools.Rows)if(row.Tag is BatchToolCandidateViewModel tool)row.Cells[7].Value=Explain(tool.CombinedReason);
                 if(selectedTool!=null)RenderToolCallout(selectedTool,false);
             };
@@ -771,7 +771,7 @@ namespace ADDIN.UI
                     part.Quantity,
                     part.BendCount,
                     part.StatusDisplay,
-                    Explain(part.Reason)
+                    BendCheckDisplayText.PartReason(part,technicalDetails)
                 );
                 dgvParts.Rows[rowIndex].Tag = part;
             }
@@ -998,8 +998,10 @@ namespace ADDIN.UI
             if(cad!=null)toolTips.SetToolTip(lblCalloutTitle, $"{tool.ToolId} · ô {cad.SlotId} · {cad.Status}\nDXF SHA256: {cad.SourceSha256}\n{cad.CoordinateSystem}\n{cad.EvidenceReference}");
             toolTips.SetToolTip(lblCalloutPunch, $"Punch ({tool.ToolId}): {tool.PunchStatusDisplay}");
             toolTips.SetToolTip(lblCalloutHolder, $"Đầu kẹp chày: {tool.HolderStatusDisplay}");
-            toolTips.SetToolTip(lblCalloutPunch, $"Chày chấn: {tool.PunchStatusDisplay} · khoảng hở ≥ {tool.PunchClearanceMm} mm\n{tool.PunchReason}\nBằng chứng vị trí: {tool.PunchWitness?.PointMm}");
-            toolTips.SetToolTip(lblCalloutHolder, $"Đầu kẹp chày: {tool.HolderStatusDisplay} · khoảng hở ≥ {tool.HolderClearanceMm} mm\n{tool.HolderReason}\nBằng chứng vị trí: {tool.HolderWitness?.PointMm}");
+            toolTips.SetToolTip(lblCalloutPunch, "Chày chấn: "+tool.PunchStatusDisplay+" · Khoảng hở: "+BendCheckDisplayText.Clearance(tool.PunchClearanceMm)+"\n"+Explain(tool.PunchReason)+"\nChi tiết kỹ thuật: "+tool.PunchReason+
+                (technicalDetails&&tool.PunchWitness!=null?"\nVị trí bằng chứng va chạm: "+tool.PunchWitness.PointMm:""));
+            toolTips.SetToolTip(lblCalloutHolder, "Đầu kẹp chày: "+tool.HolderStatusDisplay+" · Khoảng hở: "+BendCheckDisplayText.Clearance(tool.HolderClearanceMm)+"\n"+Explain(tool.HolderReason)+"\nChi tiết kỹ thuật: "+tool.HolderReason+
+                (technicalDetails&&tool.HolderWitness!=null?"\nVị trí bằng chứng va chạm: "+tool.HolderWitness.PointMm:""));
             toolTips.SetToolTip(lblCalloutReason, $"Lý do / Bằng chứng:\n{tool.CombinedReason}");
         }
 
@@ -1037,7 +1039,7 @@ namespace ADDIN.UI
             switch (e.ColumnIndex)
             {
                 case 0:
-                    e.ToolTipText = $"{part.PartName}\nSource: {part.SourceKey}\nSố lượng: {part.Quantity}\nSố nếp chấn: {part.BendCount}";
+                    e.ToolTipText = $"{part.PartName}\nMã liên kết nguồn: {part.SourceKey}\nSố lượng: {part.Quantity}\nSố nếp chấn: {part.BendCount}";
                     break;
                 case 1:
                     e.ToolTipText = $"Cấu hình Part: {part.Configuration}";

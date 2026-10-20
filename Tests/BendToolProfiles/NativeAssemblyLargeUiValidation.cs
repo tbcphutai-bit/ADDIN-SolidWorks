@@ -13,7 +13,7 @@ internal static partial class NativeAssemblyBatchValidation
         Activate(app,root);root.ClearSelection2(true);
         using(var owner=(Form)Activator.CreateInstance(product.GetType("ADDIN.UI.BendCheckForm",true),All,null,new object[]{app,root,null},null))
         {
-            owner.Show();UiControls(owner).OfType<Button>().Single(b=>b.Text=="Assembly Batch").PerformClick();
+            owner.Show();LegacyBatchButton(owner).PerformClick();
             var form=(Form)Get(owner,"batchForm");var controller=Get(owner,"batchController");
             foreach(string stage in new[]{"cold","warm"})
             {

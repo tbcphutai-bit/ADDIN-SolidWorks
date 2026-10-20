@@ -12,6 +12,7 @@ using ADDIN.Commands.BendPlanning;
 
 internal static partial class ToolProfileTests
 {
+    internal static SheetEnvelopeCapture[] EditorContextUiFixtures()=>BatchEnvelopes(CollisionModel(Rect("CONTROLLED_EDITOR",0,0,1,1),2)).ToArray();
     private static HolderMaterialDefinition ExplicitDraftRoles(HolderMaterialReviewDraft d)
     {
         string solid=d.Rows.Single(r=>r.Handle=="H").EntityKey;
@@ -22,6 +23,40 @@ internal static partial class ToolProfileTests
     {bool rejected=false;try{action();}catch(Exception ex) when(ex is InvalidDataException||ex is InvalidOperationException){rejected=true;}Check(rejected,why);}
     private static void FinalEvidenceReviewTests()
     {
+        Test("consolidated editor: JSON assignments preserve holes islands parents and non-material roles",()=>{
+            var d=HolderMaterialReviewDraftBuilder.Create(CadPairUiLibrary().PlacementSources.Tools[0],CancellationToken.None);
+            var p=ToolEvidenceReviewWorkspace.Create(d);var keys=d.Rows.Select(r=>r.EntityKey).ToArray();
+            p.Material.Contours=new List<HolderContourDefinition> {
+                new HolderContourDefinition {Id="outer",MaterialKind="Solid",EntityKeys=new[]{keys[0]}},
+                new HolderContourDefinition {Id="hole",MaterialKind="Hole",ParentId="outer",EntityKeys=new[]{keys[1]}},
+                new HolderContourDefinition {Id="island",MaterialKind="Island",ParentId="hole",EntityKeys=new[]{keys[2]}}};
+            p.Material.Excluded=new List<HolderExcludedEntity>{new HolderExcludedEntity {EntityKey=keys[3],Role="Annotation"}};
+            var rows=ADDIN.UI.HolderReviewEditorData.ReadAssignments(d,ToolEvidenceReviewWorkspace.Read(ToolEvidenceReviewWorkspace.Serialize(p),d));
+            var round=ADDIN.UI.HolderReviewEditorData.Material(d,rows,p.Material.CombinationRule);
+            Check(round.Contours.Count==3&&round.Contours.Single(c=>c.Id=="island").ParentId=="hole"&&round.Contours.Single(c=>c.Id=="hole").ParentId=="outer","Exact parent hierarchy survives serialized authoring input; not geometry approval");
+            Check(round.Excluded.Single().Role=="Annotation"&&round.Review==null&&!d.MaterialReviewed,"No classification fixture is promoted to reviewed material");
+            rows.Single(r=>r.EntityKey==keys[3]).Role="Reference";rows.Single(r=>r.ContourId=="hole").ContourId="hole-new";rows.Single(r=>r.ContourId=="island").ParentId="hole-new";
+            var changed=ADDIN.UI.HolderReviewEditorData.Material(d,rows,null);Check(changed.Contours.Single(c=>c.MaterialKind=="Island").ParentId=="hole-new"&&changed.Excluded.Single().Role=="Reference","Editing imported rows survives second export");
+            p.Material.Contours[0].EntityKeys=new[]{"FOREIGN"};ReviewReject(()=>ADDIN.UI.HolderReviewEditorData.ReadAssignments(d,p),"Foreign source entity rejected before UI mutation");
+        });
+        Test("consolidated editor: stale source, wrong child binding, duplicate and cyclic metadata fail closed",()=>{
+            bool current=true;var d=HolderMaterialReviewDraftBuilder.Create(CadPairUiLibrary().PlacementSources.Tools[0],CancellationToken.None,()=>current);
+            var p=ToolEvidenceReviewWorkspace.Create(d);p.Material=ExplicitDraftRoles(d);p.Material.ToolId="WRONG";
+            ReviewReject(()=>ADDIN.UI.HolderReviewEditorData.ReadAssignments(d,p),"Nested source identity checked on import");
+            p=ToolEvidenceReviewWorkspace.Create(d);p.Material=ExplicitDraftRoles(d);p.Material.Excluded.Add(new HolderExcludedEntity {EntityKey=p.Material.Contours[0].EntityKeys[0],Role="Reference"});
+            ReviewReject(()=>ADDIN.UI.HolderReviewEditorData.ReadAssignments(d,p),"Duplicate role rejected");
+            p=ToolEvidenceReviewWorkspace.Create(d);p.Material=ExplicitDraftRoles(d);p.Material.Contours[0].ParentId="missing";
+            ReviewReject(()=>ADDIN.UI.HolderReviewEditorData.ReadAssignments(d,p),"No missing/self parent accepted");
+            current=false;ReviewReject(()=>ADDIN.UI.HolderReviewEditorData.ReadAssignments(d,p),"Stale binding cannot populate editor");
+        });
+        Test("consolidated editor: independently attested input only forks explicitly and cannot self-approve",()=>{
+            var d=HolderMaterialReviewDraftBuilder.Create(CadPairUiLibrary().PlacementSources.Tools[0],CancellationToken.None);
+            var p=ToolEvidenceReviewWorkspace.Create(d);p.Material=ExplicitDraftRoles(d);p.Material.Review=new ToolReviewProof();p.Seating.PhysicalInspectionConfirmed=true;
+            var edited=ADDIN.UI.HolderReviewEditorData.ForkUnsigned(d,p);
+            Check(p.Material.Review!=null&&p.Seating.PhysicalInspectionConfirmed==true,"Original input and assertions not overwritten");
+            Check(edited.Material.Review==null&&!edited.Seating.PhysicalInspectionConfirmed&&!ADDIN.UI.HolderReviewEditorData.HasAttestation(edited),"Explicit fork has no inherited signature/physical approval");
+            ToolEvidenceReviewWorkspace.PrepareUnsigned(edited,d);Check(!d.Source.ClampVerified,"No runtime library promotion");
+        });
         Test("final review: inventory all source entities without inferred roles",()=>{
             var lib=CadPairUiLibrary();var p=lib.PlacementSources.Tools[0];var d=HolderMaterialReviewDraftBuilder.Create(p,CancellationToken.None,()=>lib.Current);
             Check(d.FixedPairMatched&&d.Rows.Count==p.Holder.SourceEntities.Count,"Complete unchanged selection");
@@ -231,6 +266,7 @@ internal static partial class ToolProfileTests
             {
                 var d=HolderMaterialReviewDraftBuilder.Create(tool,CancellationToken.None,()=>lib.Current&&lib.PlacementSources.Current);
                 Check(d.FixedPairMatched&&d.Rows.Count==tool.Holder.EntityKeys.Count,"Every actual Holder key "+tool.Id);
+                Check(new HashSet<string>(d.Topology.SourceEntityGroups.SelectMany(g=>g),StringComparer.Ordinal).SetEquals(tool.Holder.EntityKeys),"Every actual entity remains selectable without role inference "+tool.Id);
                 var proposal=ToolEvidenceReviewWorkspace.Create(d);ToolEvidenceReviewWorkspace.PrepareUnsigned(proposal,d);
                 File.WriteAllText(Path.Combine(output,"PRIVATE-"+tool.Id+"-UNSIGNED.json"),ToolEvidenceReviewWorkspace.Serialize(proposal));
                 File.WriteAllText(Path.Combine(output,"PRIVATE-"+tool.Id+"-inventory.json"),Json.Serialize(d));

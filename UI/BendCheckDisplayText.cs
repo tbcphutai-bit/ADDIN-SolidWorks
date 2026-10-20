@@ -107,6 +107,22 @@ namespace ADDIN.UI
             return string.Join("; ",raw.Split(new[]{';','\r','\n'},StringSplitOptions.RemoveEmptyEntries)
                 .Select(s=>Reason(s.Trim()).Caption).Distinct());
         }
+        internal static string PartReason(BatchPartViewModel part,bool technical=false)
+        {
+            if(technical)return part.Reason??"";
+            var candidates=part.Bends.SelectMany(b=>b.ToolCandidates).ToArray();
+            if(candidates.Length>=18&&candidates.All(c=>c.PunchStatus==Commands.BendCollision.CollisionStatus.UNKNOWN&&
+                c.HolderStatus==Commands.BendCollision.CollisionStatus.UNKNOWN&&c.ProcessStatus==Commands.BendCollision.CollisionStatus.UNKNOWN))
+            {
+                var raw=candidates.SelectMany(c=>new[]{c.PunchReason,c.HolderReason,c.CombinedReason}).Where(s=>s!=null)
+                    .SelectMany(s=>s.Split(new[]{';','\r','\n'},StringSplitOptions.RemoveEmptyEntries)).Select(s=>s.Trim()).Distinct().ToList();
+                if(candidates.Any(c=>c.CadAssembly?.HolderObstacles?.GeometrySupportedForCollision==false))raw.Add("HOLDER_MATERIAL_ROLES_UNREVIEWED");
+                if(candidates.Any(c=>c.CadAssembly!=null&&c.CadAssembly.SeatingEvidence?.CoordinateRecordReady!=true))raw.Add("PHYSICAL_SEATING_DATUM_UNVERIFIED");
+                string reasons=string.Join("; ",raw.Where(s=>reasonCodes.ContainsKey(s)||additionalReasons.ContainsKey(s)).Select(s=>Reason(s).Caption).Distinct());
+                return "18 bộ dao chưa có kết luận. "+(reasons.Length==0?"Xem hồ sơ gá, chiều dài hữu dụng và dữ liệu phôi/chuyển động còn thiếu.":reasons);
+            }
+            return Reasons(part.Reason);
+        }
         internal static string Coverage(Commands.BendPlanning.SequenceSearchCoverage value)
         {
             switch(value)
@@ -150,8 +166,8 @@ namespace ADDIN.UI
                 string caption;if(additionalReasons.TryGetValue(code,out caption))return new BendUserText(caption,"Nội dung chỉ áp dụng trong phạm vi dữ liệu đã kiểm tra. Xem mã gốc ở chi tiết kỹ thuật.",code);
             }
             // Original code is retained only for technical detail/diagnostics.
-            return new BendUserText("Chưa đủ dữ liệu – xem chi tiết kỹ thuật",
-                "Mã này chưa có giải thích tiếng Việt. Hãy xem mã gốc trong chi tiết kỹ thuật.",
+            return new BendUserText(ReferenceEquals(map,reasonCodes)?"Thông tin chưa có diễn giải tiếng Việt – xem chi tiết kỹ thuật":"Trạng thái chưa được hỗ trợ – xem chi tiết kỹ thuật",
+                "Đây là phần diễn giải chưa có bản dịch, không phải kết luận numeric. Mã gốc còn nguyên trong chi tiết kỹ thuật.",
                 code ?? "");
         }
     }

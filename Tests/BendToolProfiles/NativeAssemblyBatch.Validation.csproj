@@ -19,6 +19,7 @@
     <Compile Include="NativeAssemblyLargeUiValidation.cs"/>
     <Compile Include="NativeTestProcess.cs"/>
     <Compile Include="NativeShutdownAudit.cs"/>
+    <Compile Include="NativeConsolidatedAudit.cs"/>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

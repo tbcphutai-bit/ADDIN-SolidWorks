@@ -91,11 +91,15 @@ namespace ADDIN.Commands.BendPlacement
         public int ConnectedComponents { get; }
         public int ClosedSimpleComponents { get; }
         public int OpenOrBranchedComponents { get; }
+        // Selection aid only; a source entity can span more than one observed
+        // curve component. It is always selected whole, never split/repaired.
+        public IReadOnlyList<IReadOnlyList<string>> SourceEntityGroups {get;}
         public bool IsMaterialClassification => false;
         internal HolderTopologyInventory(IReadOnlyList<HolderEntityGeometry> entities,CancellationToken token)
         {
-            var curves=entities.Where(e=>e.Supported).SelectMany(e=>e.NominalCurves).ToArray();
-            if(curves.Length>8192){OpenOrBranchedComponents=1;return;}
+            var owned=entities.Where(e=>e.Supported).SelectMany(e=>e.NominalCurves.Select(c=>new{Curve=c,Key=e.EntityKey})).ToArray();
+            var curves=owned.Select(o=>o.Curve).ToArray();var groups=new List<IReadOnlyList<string>>();
+            if(curves.Length>8192){OpenOrBranchedComponents=1;SourceEntityGroups=PlacementLists.Copy(entities.Select(e=>(IReadOnlyList<string>)PlacementLists.Copy(new[]{e.EntityKey})));return;}
             var nodes=new Dictionary<string,List<int>>();var parent=Enumerable.Range(0,curves.Length).ToArray();
             Func<int,int> root=null;root=i=>{while(parent[i]!=i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
             var points=new List<ToolPoint>();var pointEdges=new List<int>();double t=1e-5;
@@ -109,9 +113,13 @@ namespace ADDIN.Commands.BendPlacement
             foreach(var group in Enumerable.Range(0,curves.Length).GroupBy(root))
             {
                 token.ThrowIfCancellationRequested();ConnectedComponents++;
+                groups.Add(PlacementLists.Copy(group.Select(i=>owned[i].Key).Distinct(StringComparer.Ordinal)));
                 var region=ToolRegionValidator.Validate(new[]{new ToolDxfEntity {Type="INVENTORY_ONLY",Curves=group.Select(i=>curves[i]).ToArray()}},cancellation:token);
                 if(region.IsValidRegion)ClosedSimpleComponents++;else OpenOrBranchedComponents++;
             }
+            var grouped=new HashSet<string>(groups.SelectMany(g=>g),StringComparer.Ordinal);
+            groups.AddRange(entities.Where(e=>!grouped.Contains(e.EntityKey)).Select(e=>(IReadOnlyList<string>)PlacementLists.Copy(new[]{e.EntityKey})));
+            SourceEntityGroups=PlacementLists.Copy(groups);
         }
     }
     internal sealed class HolderObstacleSet

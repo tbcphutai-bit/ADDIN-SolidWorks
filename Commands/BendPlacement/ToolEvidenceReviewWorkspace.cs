@@ -143,7 +143,7 @@ namespace ADDIN.Commands.BendPlacement
             ValidateRecordIdentities(p,draft);
             return p;
         }
-        private static void ValidateRecordIdentities(ToolEvidenceReviewProposal p,HolderMaterialReviewDraft draft)
+        internal static void ValidateRecordIdentities(ToolEvidenceReviewProposal p,HolderMaterialReviewDraft draft)
         {
             var source=draft.Source;
             if(p.Material!=null&&(p.Material.ToolId!=draft.ToolId||p.Material.BindingSha256!=draft.BindingSha256))throw new InvalidDataException("WRONG_MATERIAL_PROPOSAL_BINDING");

@@ -111,6 +111,7 @@ internal static partial class NativeAssemblyBatchValidation
     [STAThread] private static int Main(string[] args)
     {
         if(args.Length>0 && args[0]=="--shutdown-audit") return ShutdownAuditMain(args.Skip(1).ToArray());
+        if(args.Length>0 && args[0]=="--inprocess-addin") return InprocessAddinMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--excel-existing") return ExcelMatrixMain(args.Skip(1).ToArray(),true);
         if(args.Length>0 && args[0]=="--excel-matrix") return ExcelMatrixMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--create-seed") return SeedMain(args.Skip(1).ToArray());

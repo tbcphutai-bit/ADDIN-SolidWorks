@@ -14,6 +14,9 @@ using SolidWorks.Interop.sldworks;
 internal static partial class NativeAssemblyBatchValidation
 {
     private static Control UiControl(Form form,string name) => form.Controls.Find(name,true).Single();
+    // Baseline and localized legacy form expose the same action, with different
+    // captions. Do not change production handlers to accommodate a stale test.
+    private static Button LegacyBatchButton(Form form)=>UiControls(form).OfType<Button>().Single(b=>b.Text=="Check chấn"||b.Text=="Assembly Batch");
     private static void UiClick(Form form,string name) => ((Button)UiControl(form,name)).PerformClick();
     private static void UiSpin(Func<bool> done)
     {
