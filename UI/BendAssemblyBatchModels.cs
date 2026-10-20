@@ -22,8 +22,7 @@ namespace ADDIN.UI
         public int BendCount { get; set; }
         public CollisionStatus Status { get; set; }
         public CollisionStatus ProcessStatus { get; set; } = CollisionStatus.UNKNOWN;
-        public string StatusDisplay => Status == CollisionStatus.COLLISION ? "Có dao COLLISION*" :
-                                       Status == CollisionStatus.CLEAR ? "CLEAR*" : "UNKNOWN";
+        public string StatusDisplay => Status == CollisionStatus.COLLISION ? "Có phương án va chạm*" : BendCheckDisplayText.Collision(Status);
         public string ManufacturingStatus => "CHƯA XÁC MINH";
         public string Reason { get; set; }
         public string SourceKey { get; set; }
@@ -69,8 +68,7 @@ namespace ADDIN.UI
         public string RadiusDisplay => RadiusMm.HasValue ? $"R{RadiusMm:0.##} mm" : "Chưa có dữ liệu";
         public int FeatureId { get; set; }
         public CollisionStatus Status { get; set; }
-        public string StatusDisplay => Status == CollisionStatus.COLLISION ? "COLLISION*" :
-                                       Status == CollisionStatus.CLEAR ? "CLEAR*" : "UNKNOWN";
+        public string StatusDisplay => BendCheckDisplayText.Collision(Status);
         public List<BatchToolCandidateViewModel> ToolCandidates { get; set; } = new List<BatchToolCandidateViewModel>();
 
         public override string ToString() => $"{BendName} (Góc: {AngleDisplay}; bán kính: {RadiusDisplay}) - {StatusDisplay}";
@@ -99,12 +97,10 @@ namespace ADDIN.UI
         public string ToolId { get; set; }
         public int FeatureId { get; set; }
         public CollisionStatus PunchStatus { get; set; }
-        public string PunchStatusDisplay => PunchStatus == CollisionStatus.COLLISION ? "COLLISION" :
-                                            PunchStatus == CollisionStatus.CLEAR ? "CLEAR" : "UNKNOWN";
+        public string PunchStatusDisplay => BendCheckDisplayText.Collision(PunchStatus);
 
         public CollisionStatus HolderStatus { get; set; }
-        public string HolderStatusDisplay => HolderStatus == CollisionStatus.COLLISION ? "COLLISION" :
-                                             HolderStatus == CollisionStatus.CLEAR ? "CLEAR" : "UNKNOWN";
+        public string HolderStatusDisplay => BendCheckDisplayText.Collision(HolderStatus);
 
         public CollisionStatus MotionPreBend { get; set; }
         public CollisionStatus MotionDuringBend { get; set; }
@@ -124,13 +120,12 @@ namespace ADDIN.UI
                     holder.Select(s => s.SegmentId).OrderBy(s => s, StringComparer.Ordinal));
             return complete && rows.All(s => s.Status == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
         }
-        public string MotionDisplay => ProcessStatus.ToString();
+        public string MotionDisplay => BendCheckDisplayText.Collision(ProcessStatus);
         public string MotionDetail => MotionSegments.Count == 0 ? "Chưa có dữ liệu quá trình." :
             string.Join(Environment.NewLine, MotionSegments.Select(s => s.ToString()));
 
         public CollisionStatus GeometricStatus { get; set; }
-        public string GeometricStatusDisplay => GeometricStatus == CollisionStatus.COLLISION ? "COLLISION*" :
-                                                GeometricStatus == CollisionStatus.CLEAR ? "CLEAR*" : "UNKNOWN";
+        public string GeometricStatusDisplay => BendCheckDisplayText.Collision(GeometricStatus);
 
         public string ManufacturingStatus => "CHƯA XÁC MINH";
         public double? PunchClearanceMm { get; set; }
@@ -167,6 +162,7 @@ namespace ADDIN.UI
         public long StaticCertificateHits { get; set; }
         public long ProcessCertificateHits { get; set; }
         public double MemoryMb { get; set; }
+        public long NumericQueries { get; set; }
         public List<string> Diagnostics { get; set; } = new List<string>();
 
         public static BatchSummaryViewModel CreateEmpty() => new BatchSummaryViewModel
@@ -237,13 +233,13 @@ namespace ADDIN.UI
 
             var diag = new List<string>();
             if (snapshot.LightweightOccurrences > 0)
-                diag.Add($"Phát hiện {snapshot.LightweightOccurrences} component ở trạng thái Lightweight. Cần Resolve để kiểm tra đầy đủ.");
+                diag.Add($"Có {snapshot.LightweightOccurrences} chi tiết chưa nạp đầy đủ. Cần nạp đầy đủ trong SOLIDWORKS để kiểm tra.");
             if (snapshot.UnsupportedOccurrences > 0)
-                diag.Add($"Bỏ qua {snapshot.UnsupportedOccurrences} component không hỗ trợ (Non-SheetMetal, Unloaded, v.v.).");
+                diag.Add($"Bỏ qua {snapshot.UnsupportedOccurrences} chi tiết chưa hỗ trợ hoặc chưa nạp được.");
             if (snapshot.UnresolvedBranches > 0)
-                diag.Add($"Có {snapshot.UnresolvedBranches} nhánh subassembly chưa xác minh được danh sách chi tiết con.");
+                diag.Add($"Có {snapshot.UnresolvedBranches} nhánh cụm lắp ráp con chưa xác minh được danh sách chi tiết con.");
             if (!complete) diag.Add("Tác vụ chưa hoàn tất hợp lệ; không xác nhận 100%.");
-            diag.Add("Hình học và quá trình là kết quả theo từng ứng viên. Một dao COLLISION không kết luận toàn Part không thể chấn. Sản xuất: CHƯA XÁC MINH.");
+            diag.Add("Hình học và quá trình là kết quả theo từng ứng viên. Một phương án dao va chạm không chứng minh toàn bộ chi tiết không chấn được. Sản xuất: CHƯA XÁC MINH.");
 
             return new BatchSummaryViewModel
             {
@@ -265,6 +261,7 @@ namespace ADDIN.UI
                 StaticCertificateHits = snapshot.StaticHits,
                 ProcessCertificateHits = snapshot.ProcessHits,
                 MemoryMb = Math.Round(snapshot.PeakManagedBytes / (1024.0 * 1024.0), 1),
+                NumericQueries = snapshot.KernelQueries,
                 Diagnostics = diag
             };
         }
@@ -297,12 +294,12 @@ namespace ADDIN.UI
                 foreach (var occ in occs)
                 {
                     string badge = "Bình thường";
-                    if (occ.Kind == AssemblyOccurrenceKind.Lightweight) badge = "Lightweight";
-                    else if (occ.Kind == AssemblyOccurrenceKind.Suppressed) badge = "Suppressed";
+                    if (occ.Kind == AssemblyOccurrenceKind.Lightweight) badge = "Chưa nạp đầy đủ";
+                    else if (occ.Kind == AssemblyOccurrenceKind.Suppressed) badge = "Tạm loại";
                     else if (occ.Kind != AssemblyOccurrenceKind.SheetMetal) badge = occ.Kind.ToString();
-                    else if (occ.Mirrored) badge = "Mirrored";
-                    else if (occ.Flexible) badge = "Flexible";
-                    else if (occ.Modified) badge = "Modified-in-Assem";
+                    else if (occ.Mirrored) badge = "Đối xứng";
+                    else if (occ.Flexible) badge = "Cụm linh hoạt";
+                    else if (occ.Modified) badge = "Đã sửa trong cụm";
 
                     partVm.Occurrences.Add(new BatchOccurrenceViewModel
                     {
@@ -335,7 +332,7 @@ namespace ADDIN.UI
                     var bendVm = new BatchBendViewModel
                     {
                         BendIndex = partVm.Bends.Count + 1,
-                        BendName = native == null ? $"FeatureId {featureId}" : $"{native.Name} [{featureId}]",
+                        BendName = native == null ? $"Mã nếp {featureId}" : $"{native.Name} [{featureId}]",
                         FeatureId = featureId,
                         AngleDeg = native?.AngleDeg, RadiusMm = native?.RadiusMm,
                         Status = CollisionStatus.UNKNOWN

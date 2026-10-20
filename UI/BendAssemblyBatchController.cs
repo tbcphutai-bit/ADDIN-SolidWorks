@@ -73,7 +73,7 @@ namespace ADDIN.UI
             RequireSta();
             if (running || displayed?.Current != true || form.IsPreview) return;
             try { (backend as IBendBatchLocator)?.Locate(displayed, target.Item1, target.Item2); }
-            catch (Exception ex) { form.RecordDiagnostic("CAD highlight: " + ex.GetType().Name + " — " + ex.Message); }
+            catch (Exception ex) { form.RecordDiagnostic("Lỗi làm sáng vị trí trên CAD: " + ex.GetType().Name + " — " + ex.Message); }
         }
         private async void RunRequested(object sender, AssemblyCheckScope scope) { await RunAsync(scope); }
         private async void RefreshRequested(object sender, EventArgs args)
@@ -122,7 +122,7 @@ namespace ADDIN.UI
                 var snapshot = await completion;
                 if (disposed) return;
                 if (token.IsCancellationRequested)
-                    form.ShowStopped("Backend đã dừng tác vụ. Không có kết quả hiện hành.", elapsed.Elapsed.TotalSeconds, snapshot);
+                    form.ShowStopped("Đã dừng kiểm tra. Không có kết quả hiện hành.", elapsed.Elapsed.TotalSeconds, snapshot);
                 else if (snapshot == null || !snapshot.Current)
                     form.ShowStopped("Kết quả không còn hiệu lực — " + snapshot?.InvalidReason, elapsed.Elapsed.TotalSeconds, snapshot);
                 else
@@ -201,8 +201,8 @@ namespace ADDIN.UI
             cancellation?.Cancel();
             operation?.Cancel();
             displayed = null;
-            form.ShowStopped("Đang hủy; chờ backend xác nhận dừng...", elapsed.Elapsed.TotalSeconds);
-            if (running) form.SetRunMessage("Đang hủy; chờ backend xác nhận dừng...", true);
+            form.ShowStopped("Đang hủy; chờ xác nhận dừng...", elapsed.Elapsed.TotalSeconds);
+            if (running) form.SetRunMessage("Đang hủy; chờ xác nhận dừng...", true);
         }
         private void PreviewRequested(object sender, EventArgs args)
         {
@@ -218,7 +218,7 @@ namespace ADDIN.UI
             backend.Invalidate();
             try { if (scope == AssemblyCheckScope.SelectedComponents) backend.CaptureSelection(); }
             catch (Exception ex) { form.ClearLive("Không đọc được phạm vi chọn — " + ex.Message); return; }
-            form.ClearLive("Phạm vi đã đổi. Bấm Run để kiểm tra; Quét lại giữ nguyên phạm vi đã chọn.");
+            form.ClearLive("Phạm vi đã đổi. Bấm Bắt đầu kiểm tra; Quét lại giữ nguyên phạm vi đã chọn.");
         }
         private void Tick(object sender, EventArgs args)
         {
@@ -239,7 +239,7 @@ namespace ADDIN.UI
             {
                 cancellation?.Cancel(); operation?.Cancel(); displayed = null;
                 form.ClearLive("Không kiểm tra được hiệu lực dữ liệu — " + ex.Message);
-                if (running) form.SetRunMessage("Đang dừng sau lỗi backend; chờ xác nhận...", true);
+                if (running) form.SetRunMessage("Đang dừng sau lỗi kiểm tra; chờ xác nhận...", true);
             }
             finally
             {

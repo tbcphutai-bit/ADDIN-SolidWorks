@@ -245,4 +245,3 @@ internal static partial class ToolProfileTests
         catch(Exception ex){Console.WriteLine(ex);return 1;}
     }
 }
-

@@ -56,6 +56,23 @@ internal static partial class NativeAssemblyBatchValidation
                 object addin=app.GetAddInObject("{D1C7F4B2-9A1E-4B5C-B234-A1B2C3D4E5F6}");
                 try {report["InProcessIdentity"]=addin?.GetType().InvokeMember("GetBendCheckBinaryIdentity",BindingFlags.InvokeMethod,null,addin,new object[0]);}
                 catch(Exception ex){report["InProcessIdentityUnavailable"]=ex.GetType().Name;}
+                string fixture=System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_CLOSE_PROBE_PART");
+                if(!string.IsNullOrWhiteSpace(fixture))
+                {
+                    if(!Path.IsPathRooted(fixture)||!File.Exists(fixture))throw new InvalidOperationException("Explicit existing read-only A/B fixture required");
+                    NativeTestProcess.KeepOwnedBackgroundSession(app);
+                    string before=Sha(fixture);int error=0,warning=0;
+                    var part=app.OpenDoc6(fixture,1,3,"",ref error,ref warning) as ModelDoc2;
+                    Check(part!=null,"Owned A/B opens same existing Part");
+                    report["FixtureFeatureCount"]=part.FeatureManager.GetFeatureCount(true);
+                    report["FixtureSha256"]=before;report["FixtureWasDirty"]=part.GetSaveFlag();
+                    app.CloseDoc(part.GetTitle());part=null;
+                    Check(Sha(fixture)==before,"Owned A/B leaves original fixture bytes unchanged");
+                    report["FixtureUnchanged"]=true;
+                    // This checks load/open/close/lifetime. It does not claim
+                    // that a command in the loaded add-in actually ran.
+                    report["FixtureScope"]="ReadOnlyOpenClose_NotCommandExecution";
+                }
             }
             else if(variant=="pane-release"||variant=="pane-no-release")
             {

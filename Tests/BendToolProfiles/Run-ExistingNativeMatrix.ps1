@@ -34,7 +34,7 @@ for($batch=0;$batch -lt 3;$batch++){
     # change it to PASS and never terminates an existing/user-owned process.
     $ownership=Get-Content -LiteralPath "$target\ownership.json" -Raw | ConvertFrom-Json
     $owned=Get-Process -Id $ownership.Pid -ErrorAction SilentlyContinue
-    if($owned -and $owned.StartTime.ToUniversalTime().ToString('o') -eq $ownership.StartUtc){
+    if($owned -and $owned.StartTime.ToUniversalTime().Ticks -eq ([DateTime]$ownership.StartUtc).ToUniversalTime().Ticks){
         if(-not $owned.WaitForExit(30000)){throw 'Owned process still alive; later partitions NOT RUN. No forced termination.'}
     }
 }

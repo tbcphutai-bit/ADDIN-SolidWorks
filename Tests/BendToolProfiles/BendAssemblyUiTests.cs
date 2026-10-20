@@ -82,9 +82,9 @@ internal static class BendAssemblyUiTests
             foreach(var bend in part.Bends){Check(bend.ToolCandidates.Count==18,"18 fixed pair candidates");
                 Check(bend.ToolCandidates.All(t=>t.CadAssembly?.CadPair?.Matched==true&&t.CadAssembly.Id==t.ToolId&&!t.CadAssembly.ClampVerified),"Source identities stay with their ToolId");}
             using(var form=new BendAssemblyBatchForm()){form.Show();form.BindSnapshot(snapshot);Application.DoEvents();
-                Check(Control(form,"lblCalloutHolder").Text.Contains("CAD reference"),"Reference status visible");
+                Check(Control(form,"lblCalloutHolder").Text.Contains("CAD tham khảo"),"Reference status visible");
                 var evidence=(DataGridView)typeof(BendAssemblyBatchForm).GetField("phaseEvidence",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(form);
-                Check(evidence.Rows.Cast<DataGridViewRow>().Any(r=>Convert.ToString(r.Cells[0].Value)=="CAD / Holder"),"Exact Holder identity visible in existing evidence area");form.Close();}
+                Check(evidence.Rows.Cast<DataGridViewRow>().Any(r=>Convert.ToString(r.Cells[0].Value)=="CAD / Đầu kẹp chày"),"Exact Holder identity visible in existing evidence area");form.Close();}
         });
         Test("native nonconsecutive FeatureIds and 18 independent slots; no angle/radius inference", () =>
         {
@@ -139,7 +139,7 @@ internal static class BendAssemblyUiTests
         Test("one colliding tool is not a whole-Part manufacturing verdict", () =>
         {
             var vm = BatchViewModelConverter.PartsFromSnapshot(Snapshot(Part(1, new[] { Geometry(42, CollisionStatus.COLLISION) }))).Single();
-            Check(vm.StatusDisplay == "Có dao COLLISION*" && vm.ManufacturingStatus == "CHƯA XÁC MINH", "Candidate conflict label");
+            Check(vm.StatusDisplay == "Có phương án va chạm*" && vm.ManufacturingStatus == "CHƯA XÁC MINH", "Candidate conflict label");
             Check(vm.Bends[0].ToolCandidates.Skip(1).All(t => t.GeometricStatus == CollisionStatus.UNKNOWN), "Other tools unaffected");
         });
         Test("invalidated source removes results and phase evidence expires", () =>
@@ -206,6 +206,37 @@ internal static class BendAssemblyUiTests
     }
     private static void FormTests()
     {
+        Test("Vietnamese vocabulary preserves codes, phase meaning and missing clearance",()=>{
+            foreach(var value in Enum.GetValues(typeof(CollisionStatus)).Cast<CollisionStatus>())
+                Check(BendCheckDisplayText.Collision(value.ToString()).OriginalCode==value.ToString(),"Raw collision enum unchanged");
+            foreach(var value in Enum.GetValues(typeof(BendProcessPhase)).Cast<BendProcessPhase>())
+                Check(BendCheckDisplayText.ProcessPhase(value.ToString()).OriginalCode==value.ToString()&&!BendCheckDisplayText.Phase(value).Contains(value.ToString()),"Five phases localized without changing identity");
+            Check(BendCheckDisplayText.CheckMin("BelowMinimum").Caption=="Cạnh chấn không đạt tối thiểu","Real Min NG remains NG");
+            Check(BendCheckDisplayText.Collision("UNRECOGNIZED").Caption.StartsWith("Chưa đủ dữ liệu"),"Unknown code cannot become CLEAR");
+            Check(BendCheckDisplayText.Clearance(null)=="Chưa tính được"&&BendCheckDisplayText.Clearance(0)=="0 mm","Missing clearance differs from measured zero");
+            Check(BendCheckDisplayText.Reasons("TOOL_AXIAL_EXTENT_UNVERIFIED",true)=="TOOL_AXIAL_EXTENT_UNVERIFIED"&&
+                BendCheckDisplayText.Reasons("TOOL_AXIAL_EXTENT_UNVERIFIED").Contains("chiều dài"),"Exact raw recovery plus useful explanation");
+        });
+        Test("Vietnamese live view keeps 18 UNKNOWN candidates and technical recovery without rebinding review",()=>{
+            var numeric=new VolumeCandidateCollisionResult(CompanyToolIds.All[0],42,
+                Static(Pairs[0],CollisionStatus.UNKNOWN,"TOOL_AXIAL_EXTENT_UNVERIFIED"),
+                Static(Pairs[1],CollisionStatus.UNKNOWN,"HOLDER_MATERIAL_ROLES_UNREVIEWED"),true);
+            using(var form=new BendAssemblyBatchForm())
+            {
+                form.Show();form.BindSnapshot(Snapshot(Part(1,new[]{numeric})));
+                var grid=(DataGridView)Control(form,"dgvTools");
+                Check(grid.Rows.Count==18&&grid.Rows.Cast<DataGridViewRow>().All(r=>((BatchToolCandidateViewModel)r.Tag).GeometricStatus==CollisionStatus.UNKNOWN),"No numeric work cannot become success");
+                Check(Control(form,"txtDiagnostics").Text.Contains("Chưa thực hiện phép tính va chạm"),"Zero queries are visible");
+                string nativeSource=((BatchToolCandidateViewModel)grid.Rows[0].Tag).ToolId;
+                Check(Convert.ToString(grid.Rows[0].Cells[7].Value).Contains("chiều dài"),"Missing axial input explained");
+                ((CheckBox)Control(form,"checkChanTechnical")).Checked=true;
+                Check(Convert.ToString(grid.Rows[0].Cells[7].Value).Contains("TOOL_AXIAL_EXTENT_UNVERIFIED")&&
+                    ((BatchToolCandidateViewModel)grid.Rows[0].Tag).ToolId==nativeSource&&((BatchToolCandidateViewModel)grid.Rows[0].Tag).FeatureId==42,"Technical view recovers exact code without changing native identity");
+                form.LoadMockupData();Check(Control(form,"badgeConcept").Text=="DỮ LIỆU MINH HỌA","Synthetic illustration cannot masquerade as live CAD");
+                form.ClearLive("STALE");Check(RowCount(form)==0,"Stale results withdrawn regardless of display language");
+                form.Close();
+            }
+        });
         Test("Form converts a guarded snapshot once and reuses its Part models for summary", () =>
         {
             int reads=0;
@@ -264,7 +295,7 @@ internal static class BendAssemblyUiTests
                     backend.Operation.Done.SetResult(Snapshot(Part(1,new[] { Geometry(42) }), () => stale)); Spin(() => !controller.Running);
                     Check(RowCount(form)==1 && Control(form,"lblProgressPercent").Text=="100%", "Backend completion publishes live inventory");
                     Check(((DataGridView)Control(form,"dgvTools")).Rows.Count==18, "Initial row automatically opens real bend detail");
-                    Check(((DataGridView)Control(form,"dgvParts")).Columns[1].HeaderText=="Configuration", "Designer schema retained");
+                    Check(((DataGridView)Control(form,"dgvParts")).Columns[1].HeaderText=="Cấu hình", "Localized header retains the same configuration column");
                     stale="STALE_SOURCE"; Spin(() => RowCount(form)==0);
                     Click(form,"btnRefresh"); Check(controller.Running && backend.Captures==1,"Refresh retains captured selection");
                     Spin(() => backend.Operation != null);
@@ -313,6 +344,9 @@ internal static class BendAssemblyUiTests
             { form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size)); bitmap.Save(Path.Combine(output,"form-"+size.Width+"-scale-"+(int)(factor*100)+".png")); }
             Console.WriteLine("LAYOUT_SCALE " + factor + " deviceDpi=" + form.DeviceDpi + " client=" + form.ClientSize);
             Check(Control(form,"btnRunBatch").Visible && Control(form,"dgvParts").Width>0 && Control(form,"dgvTools").Height>0,"Usable scaled controls");
+            var scope=Control(form,"btnScopeEntire");
+            Check(scope.Width>=TextRenderer.MeasureText(scope.Text,scope.Font).Width+scope.Padding.Horizontal,"Full Vietnamese scope caption fits");
+            Check(Control(form,"badgeConcept").Width>=TextRenderer.MeasureText(Control(form,"badgeConcept").Text,Control(form,"badgeConcept").Font).Width,"Evidence source badge fits");
             var tabs=(TabControl)Control(form,"checkChanDetailTabs");
             for(int tab=0;tab<tabs.TabPages.Count;tab++)
             {
@@ -331,7 +365,7 @@ internal static class BendAssemblyUiTests
             {
                 form.Show();form.BindSnapshot(Snapshot(raw));((TabControl)Control(form,"checkChanDetailTabs")).SelectedIndex=1;Application.DoEvents();
                 Check(((DataGridView)Control(form,"sequenceTools")).Rows.Count==18&&((DataGridView)Control(form,"sequenceOptions")).Rows.Count==2,"File-import planner is rendered, not placeholder rows");
-                Check(Control(form,"sequenceSummary").Text.StartsWith("SIMULATION")&&Control(form,"sequenceEvidence").Text.Contains("SimulationOnly"),"Simulation and reviewed evidence are direct labels");
+                ((CheckBox)Control(form,"checkChanTechnical")).Checked=true; Check(Control(form,"sequenceSummary").Text.StartsWith("Dữ liệu mô phỏng")&&Control(form,"sequenceEvidence").Text.Contains("SimulationOnly"),"Simulation and reviewed evidence are direct labels");
                 imported.Item2.Lease.Invalidate();form.ClearLive("STALE_PROCESS_ARTIFACT");Check(((DataGridView)Control(form,"sequenceOptions")).Rows.Count==0,"Stale imported proof is removed");form.Close();
             }
         });
@@ -349,9 +383,9 @@ internal static class BendAssemblyUiTests
                     ((BendSequenceResult)options.CurrentRow.Tag).ToolTypeCount==1&&((BendSequenceResult)options.CurrentRow.Tag).ToolChangeCount==0,
                     "Default selection prefers a proven one-tool route with zero changes; simulation label remains");
                 tools.CurrentCell=tools.Rows[0].Cells[0];Application.DoEvents();
-                Check(options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "COLLISION") &&
-                    options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "CLEAR"), "Different orders and actual numeric statuses visible");
-                var clear = options.Rows.Cast<DataGridViewRow>().First(r => Convert.ToString(r.Cells[1].Value) == "CLEAR");
+                Check(options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == BendCheckDisplayText.Collision(CollisionStatus.COLLISION)) &&
+                    options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == BendCheckDisplayText.Collision(CollisionStatus.CLEAR)), "Different orders and actual numeric statuses visible");
+                var clear = options.Rows.Cast<DataGridViewRow>().First(r => Convert.ToString(r.Cells[1].Value) == BendCheckDisplayText.Collision(CollisionStatus.CLEAR));
                 options.CurrentCell = clear.Cells[0];
                 Check(timeline.Rows.Count == 2 && Convert.ToInt32(timeline.Rows[0].Cells[1].Value) == 42 && phases.Rows.Count == 10, "Native timeline + five Punch/Holder phase pairs");
                 tabs.SelectedIndex = 0;
@@ -368,7 +402,7 @@ internal static class BendAssemblyUiTests
             using (var form = new BendAssemblyBatchForm())
             {
                 form.Show(); form.SetPartMode();
-                Check(Control(form, "btnScopeEntire").Text == "Part hiện tại" && !Control(form, "btnScopeSelected").Visible, "Single Part uses same window");
+                Check(Control(form, "btnScopeEntire").Text == "Chi tiết đang mở" && !Control(form, "btnScopeSelected").Visible, "Single Part uses same window");
                 var parts = Enumerable.Range(0, 2000).Select(i => new BatchPartViewModel { SourceKey = "SOURCE" + i, PartName = "SAMPLE " + i,
                     Configuration = "Default", Quantity = 1, Reason = "Missing data", Status = CollisionStatus.UNKNOWN }).ToList();
                 typeof(BendAssemblyBatchForm).GetField("allParts",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).SetValue(form,parts);
@@ -388,9 +422,9 @@ internal static class BendAssemblyUiTests
             {
                 form.Show(); form.BindSnapshot(Snapshot(raw));
                 var grid = (DataGridView)Control(form,"batchMinimumEvidence");
-                Check(grid.Rows.Count==2 && Convert.ToString(grid.Rows[0].Cells[1].Value)=="NG Min" && Convert.ToDouble(grid.Rows[0].Cells[4].Value)==10,
+                Check(grid.Rows.Count==2 && Convert.ToString(grid.Rows[0].Cells[1].Value)=="Không đạt tối thiểu" && Convert.ToDouble(grid.Rows[0].Cells[4].Value)==10,
                     "Exact Min result/outer dimension projected without recalculation");
-                Check(((DataGridView)Control(form,"dgvTools")).Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[4].Value).Contains("UNKNOWN")),
+                Check(((DataGridView)Control(form,"dgvTools")).Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[4].Value).Contains("Chưa đủ dữ liệu")),
                     "Min NG cannot invent a Max manufacturing verdict");
                 var unsupported = new AssemblyPartResult("S",new[]{Occ()},"MISSING_NATIVE_MAX_CAPTURE",null,null,0,false,()=>null,null,metadata);
                 form.BindSnapshot(Snapshot(unsupported));Check(grid.Rows.Count==2,"Optional Max capture failure does not hide existing Check Min dimensions");
@@ -407,7 +441,7 @@ internal static class BendAssemblyUiTests
             form.Show();var watch=Stopwatch.StartNew();form.BindSnapshot(Snapshot(raw));
             var tabs=(TabControl)Control(form,"checkChanDetailTabs");tabs.SelectedIndex=1;Application.DoEvents();form.Update();
             double visible=watch.Elapsed.TotalMilliseconds;var options=(DataGridView)Control(form,"sequenceOptions");
-            var clear=options.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Convert.ToString(r.Cells[1].Value)=="CLEAR");
+            var clear=options.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Convert.ToString(r.Cells[1].Value)==BendCheckDisplayText.Collision(CollisionStatus.CLEAR));
             if(clear!=null)options.CurrentCell=clear.Cells[0];
             using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"simulation-sequence.png"));}
             File.WriteAllText(Path.Combine(output,"planner-ui-timing.json"),new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new{

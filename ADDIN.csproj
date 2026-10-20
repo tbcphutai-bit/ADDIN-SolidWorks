@@ -234,6 +234,7 @@
     <Compile Include="Commands\NativeEntityReferenceIndex.cs" />
     <Compile Include="Commands\BendPlacement\ToolEvidenceReviewWorkspace.cs" />
     <Compile Include="UI\BendToolEvidenceControl.cs" />
+    <Compile Include="UI\BendCheckDisplayText.cs" />
     <Compile Include="Commands\BendPlacement\HolderObstaclePlacement2D.cs" />
     <Compile Include="Commands\BendPlacement\ToolPairSeatingEvidence.cs" />
     <Compile Include="Commands\BendPlacement\ToolHolderEvidenceReader.cs" />

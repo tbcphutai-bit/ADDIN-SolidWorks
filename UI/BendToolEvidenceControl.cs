@@ -37,14 +37,15 @@ namespace ADDIN.UI
             var tabs=new TabControl {Dock=DockStyle.Fill};var geometry=new TabPage("CAD / vai trò");var input=new TabPage("Hồ sơ gá / JSON");
             var split=new SplitContainer {Dock=DockStyle.Fill,Orientation=Orientation.Vertical};
             split.Panel1.Controls.Add(canvas);split.Panel2.Controls.Add(entities);geometry.Controls.Add(split);input.Controls.Add(editor);
-            var zoomBar=new FlowLayoutPanel {Dock=DockStyle.Top,AutoSize=true,WrapContents=false};
+            var zoomBar=new FlowLayoutPanel {Dock=DockStyle.Top,AutoSize=true,WrapContents=true};
             foreach(string mode in new[]{"Holder","Punch","All","Selected"})
-            {string fit=mode;var b=new Button {Text=mode,AutoSize=true};b.Click+=(s,e)=>canvas.Fit(fit);zoomBar.Controls.Add(b);}
+            {string fit=mode;var b=new Button {Text=mode=="Holder"?"Đầu kẹp chày":mode=="Punch"?"Chày chấn":mode=="All"?"Toàn bộ":"Đường đang chọn",AutoSize=true};b.Click+=(s,e)=>canvas.Fit(fit);zoomBar.Controls.Add(b);}
             split.Panel1.Controls.Add(zoomBar);
-            foreach(string text in new[]{"Handle / key","Loại","Layer","Hình học","Sai số mm"})
+            foreach(string text in new[]{"Mã đường CAD","Loại","Lớp CAD","Hình học","Sai số (mm)"})
             {int i=entities.Columns.Add("e"+entities.Columns.Count,text);entities.Columns[i].ReadOnly=true;}
-            entities.Columns.Add(new DataGridViewComboBoxColumn {Name="role",HeaderText="Vai trò đề xuất",DataSource=new[]{"NeedsReview","Solid","Hole","Island","Decorative","Centerline","Reference","Annotation"}});
-            entities.Columns.Add("contour","Contour ID");entities.Columns.Add("parent","Parent ID");
+            var roles=new System.Collections.Generic.Dictionary<string,string> {{"NeedsReview","Chưa phân loại"},{"Solid","Vật liệu"},{"Hole","Lỗ"},{"Island","Vùng vật liệu trong lỗ"},{"Decorative","Minh họa"},{"Centerline","Đường tâm"},{"Reference","Tham khảo"},{"Annotation","Ghi chú"}};
+            entities.Columns.Add(new DataGridViewComboBoxColumn {Name="role",HeaderText="Vai trò đề xuất",DisplayMember="Value",ValueMember="Key",DataSource=roles.ToArray()});
+            entities.Columns.Add("contour","Mã đường bao");entities.Columns.Add("parent","Đường bao cha");
             entities.Columns[0].AutoSizeMode=DataGridViewAutoSizeColumnMode.None;entities.Columns[0].Width=76;
             entities.DataError+=(s,e)=>{e.ThrowException=false;detail.Text="Vai trò không hợp lệ.";};
             entities.SelectionChanged+=(s,e)=> {canvas.SelectedKey=entities.CurrentRow?.Tag as string;canvas.Invalidate();};
@@ -64,7 +65,7 @@ namespace ADDIN.UI
         {
             var b=new Button {Name=name,Text=text,AutoSize=true};parent.Controls.Add(b);
             b.Click+=(s,e)=>{try {action();}catch(Exception ex) when(ex is InvalidOperationException||ex is ArgumentException||ex is IOException||ex is UnauthorizedAccessException)
-                {detail.Text="UNKNOWN · "+ex.Message;}};
+                {detail.Text="Chưa đủ dữ liệu · "+BendCheckDisplayText.Reasons(ex.Message)+"\r\nChi tiết kỹ thuật: "+ex.Message;}};
         }
         private void AddAsyncButton(Control parent,string name,string text,Func<Task> action)
         {
@@ -75,7 +76,7 @@ namespace ADDIN.UI
                 try{await action();}
                 catch(OperationCanceledException){if(!IsDisposed)detail.Text="Đã hủy chuẩn bị hồ sơ / nguồn đã đổi.";}
                 catch(Exception ex) when(ex is InvalidOperationException||ex is ArgumentException||ex is IOException||ex is UnauthorizedAccessException)
-                {if(!IsDisposed)detail.Text="UNKNOWN · "+ex.Message;}
+                {if(!IsDisposed)detail.Text="Chưa đủ dữ liệu · "+BendCheckDisplayText.Reasons(ex.Message)+"\r\nChi tiết kỹ thuật: "+ex.Message;}
                 finally{if(!button.IsDisposed)button.Enabled=true;}
             };
         }
@@ -85,18 +86,18 @@ namespace ADDIN.UI
             // exports. A changed source/snapshot discards the editable proposal.
             draft=null;proposal=null;entities.Rows.Clear();editor.Clear();detail.Clear();canvas.ShowSource(null,null);importRoot=null;
             nativeSheet=sheet;
-            if(source?.CadPair?.Matched!=true||current?.Invoke()!=true){status.Text="UNKNOWN · Chọn dao từ kết quả còn hiệu lực.";return;}
+            if(source?.CadPair?.Matched!=true||current?.Invoke()!=true){status.Text="Chưa đủ dữ liệu · Chọn dao từ kết quả còn hiệu lực.";return;}
             draft=HolderMaterialReviewDraftBuilder.Create(source,CancellationToken.None,current);
             proposal=ToolEvidenceReviewWorkspace.Create(draft,sheet);editor.Text=ToolEvidenceReviewWorkspace.Serialize(proposal);
             binding=true;
-            try {foreach(var row in draft.Rows) {int i=entities.Rows.Add(row.Handle,row.SourceType,row.Layer,(row.GeometrySupported?"Supported":row.UnsupportedReason)+
+            try {foreach(var row in draft.Rows) {int i=entities.Rows.Add(row.Handle,row.SourceType,row.Layer,(row.GeometrySupported?"Đọc được":BendCheckDisplayText.Reasons(row.UnsupportedReason))+
                     (row.ReviewedRole==null?"":" · reviewed "+row.ReviewedRole),
                     row.BoundaryApproximationErrorMm.ToString("R"),"NeedsReview","","");entities.Rows[i].Tag=row.EntityKey;}}
             finally {binding=false;}
             canvas.ShowSource(source,draft);
-            status.Text=source.Id+" · "+draft.Status+" · "+draft.Rows.Count+" entities · "+draft.ConnectedComponents+" components\n"+
-                "CAD reference / WCS trình bày · CHƯA XÁC MINH · "+source.CadPair.PunchInsert+" / "+source.CadPair.HolderInsert;
-            detail.Text=string.Join(Environment.NewLine,draft.MissingReasons)+Environment.NewLine+"Độ dài 4200/6000 trong Excel không được tự điền vào chiều dài dao.";
+            status.Text=source.Id+" · "+(draft.Status=="MATERIAL_REVIEWED"?"Đã kiểm tra phân loại vật liệu":"Cần phân loại vật liệu đầu kẹp chày")+" · "+draft.Rows.Count+" đường · "+draft.ConnectedComponents+" nhóm liên thông\n"+
+                "CAD tham khảo / tọa độ trình bày · Chưa xác minh sản xuất";
+            detail.Text=BendCheckDisplayText.Reasons(string.Join(";",draft.MissingReasons))+Environment.NewLine+"Mốc 4200/6000 trong Excel không phải chiều dài hữu dụng của dao.";
         }
         internal void ApplyRoles()
         {
@@ -120,12 +121,12 @@ namespace ADDIN.UI
             }
             p.Material=HolderMaterialReviewDraftBuilder.PrepareUnsigned(draft,contours,excluded,p.Material?.CombinationRule);
             proposal=ToolEvidenceReviewWorkspace.PrepareUnsigned(p,draft);editor.Text=ToolEvidenceReviewWorkspace.Serialize(proposal);
-            detail.Text="Đã ghi đề xuất chưa ký. Chưa phải material đã duyệt; collision vẫn theo bộ xác minh hiện có.";
+            detail.Text="Đã ghi đề xuất chưa ký. Chưa phải vật liệu đã duyệt; kiểm tra va chạm vẫn qua bộ xác minh hiện có.";
             canvas.Proposed=proposal.Material;canvas.Invalidate();
         }
         private void LoadProposal()
         {
-            using(var dialog=new OpenFileDialog {Filter="Private review JSON|*.json"})
+            using(var dialog=new OpenFileDialog {Filter="Hồ sơ gá riêng (JSON)|*.json"})
                 if(dialog.ShowDialog(this)==DialogResult.OK)
                 {
                     if(new FileInfo(dialog.FileName).Length>4*1024*1024)throw new InvalidDataException("REVIEW_PROPOSAL_SIZE_LIMIT");
@@ -145,7 +146,7 @@ namespace ADDIN.UI
                 authorities=PlacementSourceIo.Resolve(Path.GetDirectoryName(path),placement.ReviewAuthoritiesPath);
             }
             var audit=ToolEvidenceReviewWorkspace.Audit(p,draft,ToolReviewVerifier.Load(authorities,CancellationToken.None),importRoot??Directory.GetCurrentDirectory(),CancellationToken.None);
-            detail.Text=audit.Status+" · material "+audit.MaterialReady+" · tọa độ "+audit.CoordinatesReady+" · physical "+audit.PhysicalPairVerified+"\r\n"+
+            detail.Text=(audit.Status=="REVIEWED_INPUT_SCOPE"?"Đã kiểm tra phạm vi hồ sơ":"Chưa đủ dữ liệu")+" · vật liệu "+(audit.MaterialReady?"đã kiểm tra":"chưa đủ")+" · tọa độ "+(audit.CoordinatesReady?"đã kiểm tra":"chưa đủ")+" · gá thực tế "+(audit.PhysicalPairVerified?"đã kiểm tra":"chưa đủ")+"\r\n"+
                 string.Join("\r\n",audit.Reasons)+"\r\n"+string.Join("\r\n",audit.Payloads.Select(v=>v.Key+" payload: "+v.Value));
         }
         private async Task ExportProposalAsync()
@@ -159,19 +160,19 @@ namespace ADDIN.UI
                 // placeholder used when no setup exists. Worker receives ONLY
                 // managed model DTOs; freshness is checked again on the UI STA.
                 var model=sheet.Binding.Model;int feature=sheet.Binding.FeatureId;var token=preparationLifetime.Token;
-                detail.Text="Đang chuẩn bị hình học cuối và binding native…";
+                detail.Text="Đang chuẩn bị hình học cuối và mã liên kết CAD…";
                 var final=await Task.Run(()=>PrismaticEnvelopeCompiler.Read(model,model.Bends.Single(b=>b.FeatureId==feature),token),token);
                 if(IsDisposed||!ReferenceEquals(selected,draft)||editor.Text!=inputText||!selected.Current||!final.Current)throw new OperationCanceledException();
                 foreach(var record in prepared.Axial.Where(r=>r.FeatureId==feature))record.EnvelopeGeometrySha256=final.GeometrySha256;
             }
             proposal=ToolEvidenceReviewWorkspace.PrepareUnsigned(prepared,selected);
-            using(var dialog=new SaveFileDialog {Filter="Private review JSON|*.json",FileName=draft.ToolId+"-UNSIGNED.json"})
+            using(var dialog=new SaveFileDialog {Filter="Hồ sơ gá riêng (JSON)|*.json",FileName=draft.ToolId+"-UNSIGNED.json"})
                 if(dialog.ShowDialog(this)==DialogResult.OK)
                 {
                     if(!ReferenceEquals(selected,draft))throw new OperationCanceledException();
                     var final=ToolEvidenceReviewWorkspace.PrepareUnsigned(proposal,selected);
                     File.WriteAllText(dialog.FileName,ToolEvidenceReviewWorkspace.Serialize(final));editor.Text=ToolEvidenceReviewWorkspace.Serialize(final);
-                    detail.Text="Đã xuất hồ sơ chưa ký với binding hình học cuối. CAD và cấu hình production không đổi.";
+                    detail.Text="Đã xuất hồ sơ chưa ký với liên kết hình học cuối. CAD và cấu hình sản xuất không đổi.";
                 }
         }
         private void ExportProcessTemplate()

@@ -24,6 +24,9 @@ namespace ADDIN.UI
         private string missingReason;
         private string baseEvidence;
         private bool binding;
+        private bool technical;
+        internal void SetTechnicalDetails(bool value) {technical=value;BindTools();}
+        private string Explain(string raw)=>BendCheckDisplayText.Reasons(raw,technical);
         internal event EventHandler<int> FeatureSelected;
         internal BendSequencePlanningControl()
         {
@@ -39,10 +42,10 @@ namespace ADDIN.UI
             root.Controls.Add(summary, 1, 0); root.Controls.Add(tools, 0, 1); root.Controls.Add(sequences, 1, 1);
             root.Controls.Add(timeline, 0, 2); root.Controls.Add(phases, 1, 2); root.Controls.Add(evidence, 0, 3); root.Controls.Add(preview, 1, 3);
             Controls.Add(root);
-            Columns(tools, "ToolId", "Phạm vi", "Phương án", "Bằng chứng");
-            Columns(sequences, "Thứ tự FeatureId", "Process", "Phạm vi / lý do");
-            Columns(timeline, "Bước", "FeatureId", "Punch", "Holder");
-            Columns(phases, "Phase", "Cặp", "Kết quả", "Witness / lý do");
+            Columns(tools, "Mã bộ dao", "Phạm vi", "Phương án", "Bằng chứng");
+            Columns(sequences, "Thứ tự mã nếp", "Quá trình chấn", "Phạm vi / lý do");
+            Columns(timeline, "Bước", "Mã nếp", "Chày chấn", "Đầu kẹp chày");
+            Columns(phases, "Giai đoạn", "Cặp", "Kết quả", "Bằng chứng / lý do");
             filter.SelectedIndexChanged += (s, e) => BindTools();
             // WinForms SelectionChanged precedes CurrentCell replacement.
             // Read CurrentRow only after CurrentCellChanged, or the old order
@@ -66,14 +69,13 @@ namespace ADDIN.UI
         {
             result = value; missingReason = reason;
             WithDisplay(() => {
-                summary.Text = sample ? "PREVIEW · dữ liệu mẫu" : value == null ? "Chưa có dữ liệu quá trình" :
-                    (value.EvidenceLevel==SequenceEvidenceLevel.SimulationOnly?"SIMULATION":value.EvidenceLevel==SequenceEvidenceLevel.ReviewedSourceGraph?"REVIEWED":"UNKNOWN") +
-                    $" · {value.CommonToolIds.Count}/18 · {value.ElapsedMilliseconds:0} ms · CHƯA XÁC MINH";
+                summary.Text = sample ? "DỮ LIỆU MINH HỌA" : value == null ? "Chưa có dữ liệu quá trình" :
+                    BendCheckDisplayText.Evidence(value.EvidenceLevel) +
+                    $" · {value.CommonToolIds.Count}/18 có phương án đã kiểm tra · {value.ElapsedMilliseconds:0} ms · Chưa xác minh sản xuất";
                 BindToolsCore();
             });
         }
-        private static string CoverageLabel(SequenceSearchCoverage coverage) => coverage == SequenceSearchCoverage.ExhaustiveDeclaredSpace ? "Đủ phạm vi nguồn" :
-            coverage == SequenceSearchCoverage.Bounded ? "Có giới hạn" : coverage == SequenceSearchCoverage.Interrupted ? "Đã dừng / cũ" : "Thiếu chứng cứ";
+        private static string CoverageLabel(SequenceSearchCoverage coverage) => BendCheckDisplayText.Coverage(coverage);
         private void WithDisplay(Action render)
         {
             var source = result;
@@ -81,14 +83,14 @@ namespace ADDIN.UI
             if (!source.ReadDisplay(render))
             {
                 result = null; missingReason = source.InvalidReason ?? "SOURCE_CHANGED_DURING_DISPLAY";
-                summary.Text = "STALE · cần Quét lại"; BindToolsCore();
+                summary.Text = "Dữ liệu đã thay đổi – hãy quét lại"; BindToolsCore();
             }
         }
         private void BindTools() => WithDisplay(BindToolsCore);
         private void BindToolsCore()
         {
             binding = true; tools.Rows.Clear(); sequences.Rows.Clear(); timeline.Rows.Clear(); phases.Rows.Clear(); preview.SetStep(null);
-            evidence.Text = (missingReason == null ? "" : missingReason + "\r\n") + "Chưa có process-state graph, kinematics và bằng chứng gá dao. Không suy ra thứ tự từ Part đã chấn.";
+            evidence.Text = (missingReason == null ? "" : Explain(missingReason) + "\r\n") + "Thiếu hình dạng phôi trung gian, chuyển động hoặc hồ sơ gá dao. Không suy ra thứ tự từ chi tiết đã chấn xong.";
             try
             {
                 foreach (string id in CompanyToolIds.All)
@@ -96,8 +98,7 @@ namespace ADDIN.UI
                     var item = result?.Tools.FirstOrDefault(t => t.ToolId == id);
                     if (filter.SelectedIndex > 0 && item != null && (int)item.Decision != filter.SelectedIndex - 1) continue;
                     var reason = result?.Current == false ? result.InvalidReason : item == null ? missingReason ?? "MISSING_PROCESS_STATE_GRAPH_AND_KINEMATIC_SOURCE" : string.Join("; ", item.Reasons);
-                    string decision = item?.Decision == SequenceToolDecision.ProvenInCheckedScope ? "Có chứng minh*" :
-                        item?.Decision == SequenceToolDecision.RejectedInDeclaredConditions ? "Bị loại*" : "Cần xác minh";
+                    string decision = BendCheckDisplayText.SequenceDecision((item?.Decision??SequenceToolDecision.NeedsEvidence).ToString()).Caption;
                     int i = tools.Rows.Add(id, item == null ? "Thiếu chứng cứ" : CoverageLabel(item.Coverage), item?.Sequences.Count ?? 0, decision);
                     tools.Rows[i].Tag = item; foreach (DataGridViewCell cell in tools.Rows[i].Cells) cell.ToolTipText = reason;
                 }
@@ -123,12 +124,13 @@ namespace ADDIN.UI
                 foreach (var sequence in tool.Sequences)
                 {
                     string ids = string.Join(" → ", sequence.Steps.Select(s => s.FeatureId));
-                    int i = sequences.Rows.Add(ids.Length == 0 ? "Chưa có bước" : ids, sequence.Status, sequence.Reason);
+                    int i = sequences.Rows.Add(ids.Length == 0 ? "Chưa có bước" : ids, BendCheckDisplayText.Collision(sequence.Status), Explain(sequence.Reason));
                     sequences.Rows[i].Tag = sequence;
                 }
-                baseEvidence = $"{tool.ToolId}\r\n{tool.Coverage}\r\n{result.EvidenceLevel}\r\n" +
-                    "Sản xuất: CHUA_XAC_MINH\r\n" + string.Join("\r\n", tool.Reasons) + "\r\nRevision: " + result.Revision +
-                    "\r\nKhông tìm thấy trong search giới hạn không chứng minh Part không chấn được.";
+                baseEvidence = tool.ToolId+"\r\n"+CoverageLabel(tool.Coverage)+"\r\n"+BendCheckDisplayText.Evidence(result.EvidenceLevel)+"\r\n" +
+                    "Chưa xác minh điều kiện sản xuất\r\n" + Explain(string.Join(";",tool.Reasons)) +
+                    (technical?"\r\nPhiên bản nguồn: "+result.Revision+"\r\n"+result.EvidenceLevel:"")+
+                    "\r\nKhông tìm thấy phương án trong giới hạn đã xét không có nghĩa chi tiết không chấn được.";
                 evidence.Text = baseEvidence;
                 if (sequences.Rows.Count > 0)
                 {
@@ -150,7 +152,7 @@ namespace ADDIN.UI
             {
                 if (result?.Current != true || sequence == null) return;
                 foreach (var step in sequence.Steps)
-                { int i = timeline.Rows.Add(timeline.Rows.Count + 1, step.FeatureId, step.Punch, step.Holder); timeline.Rows[i].Tag = step; }
+                { int i = timeline.Rows.Add(timeline.Rows.Count + 1, step.FeatureId, BendCheckDisplayText.Collision(step.Punch), BendCheckDisplayText.Collision(step.Holder)); timeline.Rows[i].Tag = step; }
                 if (timeline.Rows.Count > 0) timeline.CurrentCell = timeline.Rows[0].Cells[0];
             }
             finally { binding = false; }
@@ -163,8 +165,10 @@ namespace ADDIN.UI
             if (result?.Current != true || step == null) { preview.SetStep(null); return; }
             foreach (var pair in step.Pairs)
             {
-                string reason = pair.Witness == null ? string.Join("; ", pair.Reasons) : $"u={pair.Witness.Parameter:0.######} · {pair.Witness.PartId} · margin>{pair.Witness.Geometry.CrossSectionInteriorMarginLowerMm:0.######} mm";
-                phases.Rows.Add(pair.Phase, pair.Pair == CollisionPairKind.WorkpiecePunch ? "Punch" : "Holder", pair.Status, reason);
+                string raw=string.Join("; ",pair.Reasons);
+                string reason = pair.Witness == null ? Explain(raw) : $"Bằng chứng tại {pair.Witness.Parameter*100:0.####}% chuyển động · độ dự phòng >{pair.Witness.Geometry.CrossSectionInteriorMarginLowerMm:0.######} mm";
+                int row=phases.Rows.Add(BendCheckDisplayText.Phase(pair.Phase), pair.Pair == CollisionPairKind.WorkpiecePunch ? "Chày chấn" : "Đầu kẹp chày", BendCheckDisplayText.Collision(pair.Status), reason);
+                foreach(DataGridViewCell cell in phases.Rows[row].Cells)cell.ToolTipText=reason+"\nChi tiết kỹ thuật: "+pair.Phase+" / "+pair.Pair+" / "+pair.Status+" / "+raw;
             }
             evidence.Text = baseEvidence + "\r\nBước: " + step.FeatureId + " · " + step.Transition.BeforeStateId + " → " + step.Transition.AfterStateId;
             preview.SetStep(step, () => result?.Current == true);
@@ -199,7 +203,7 @@ namespace ADDIN.UI
                         var line = (curve.Kind == "ARC" ? Enumerable.Range(0, 33).Select(i => CollisionGeometry.Point(curve, i / 32.0)) : new[] { curve.Start, curve.End }).Select(map).ToArray();
                         e.Graphics.DrawLines(pen, line);
                     }
-                    e.Graphics.DrawString("u=" + u.ToString("0.0"), Font, Brushes.DimGray, (float)(state * width + 6), ClientSize.Height - 16);
+                    e.Graphics.DrawString((u*100).ToString("0")+"% chuyển động", Font, Brushes.DimGray, (float)(state * width + 6), ClientSize.Height - 16);
                 }
             }
         }

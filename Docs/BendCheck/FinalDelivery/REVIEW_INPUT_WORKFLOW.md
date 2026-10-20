@@ -47,6 +47,10 @@ The existing private `process-provider.json` configuration accepts:
 
 The importer compiles full final-envelope coverage and verifies these records using existing code. Missing records keep all 18 candidate rows; an unsupported sheet envelope remains UNKNOWN. Static results never become a process graph.
 
+On unsigned export, the pane prepares the exact final native envelope on a managed worker and fills its digest. It does not export the fast-precheck placeholder as a proven envelope. Edited/stale/reselected input withdraws an in-flight export. No datum, placement, length or approval is generated during this step.
+
+An existing process-only PartLocal approval is preserved when no static setup is supplied. It cannot authorize a broader program containing new static setup records; cross-instance numeric sharing remains conservative. Native geometry still groups/captures once for truly equivalent sources. Do not claim additional batch acceleration without the corresponding scope approval.
+
 ## Process / simulation input
 
 **Xuất quy trình trống** copies current native FeatureId/PersistentId/frame/revision binding into `ProcessPackageRecord` and leaves geometry, states, transitions, graph completeness, motion and approvals absent. Add the reviewed whole-sheet geometry, all five phases, before/after states, constraints and source artifacts through the existing importer. Map the resulting package in the existing configuration's `Sources`, with exact SHA/revision and native file/configuration.

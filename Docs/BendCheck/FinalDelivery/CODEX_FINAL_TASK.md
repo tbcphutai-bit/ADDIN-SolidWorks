@@ -69,6 +69,14 @@ Keep the current single Check Chấn form and Check Min untouched. Show:
 
 Antigravity may polish UI only after Codex's functional contracts are complete; protect backend, COM, event handlers and Check Min.
 
+## Mandatory additional workstream — plain-language Vietnamese UX
+
+The user explicitly said many terms on the live Check Chấn form are difficult to understand. During **this same next implementation phase**, Codex MUST deliver a comprehensible Vietnamese UI, not postpone this to another Phase or only rewrite the documentation.
+
+Read [UX_VIETNAMESE_TERMINOLOGY.md](UX_VIETNAMESE_TERMINOLOGY.md) and study [Reference/BendCheckVietnameseText.cs](Reference/BendCheckVietnameseText.cs). Cover the real Form/Designer, BendSequencePlanningControl, view-model StatusDisplay, buttons, columns, tooltips, progress, stale/error/empty states and dialogs. Translate user-facing words such as Run Batch Check, Entire Assembly, FeatureId, Witness, Process, CLEAR/COLLISION/UNKNOWN and Holder into plain language. Use **"Đầu kẹp chày"** for Upper Holder, not "cối chấn" (the lower V-die is separate). Keep expert raw codes, IDs and SHA in expandable technical detail. Keep Check Min labels correct, especially the three genuine NG in XL-19/20/21. No production PASS from CLEAR or an all-UNKNOWN 18-tool screen.
+
+Code changes must be presentation-only and built/tested by Codex: do not modify solver enums, hashes, proof, source IDs, cache, controller events, existing Check Min mathematics or app registration. Test real WinForms 1024×680 and Windows DPI 100/125/150 where available, report NOT_RUN otherwise. Include user-readable before/after screenshots and examples of both sufficient and missing evidence. Antigravity may help visual styling only while protecting backend/event handlers.
+
 ## Required delivery / final proposal
 
 Open ONE Draft PR targeting feature/check-chan-native-excel-4200-6000, with:
