@@ -27,14 +27,14 @@
 
 | File / method | Functionality đã thấy trong code | Tác giả đoạn sửa cuối | Đã sửa trong vòng này? | Build / Test evidence |
 |---|---|---|---|---|
-| `Commands/CheckAssemblyHole.PartRelations.cs :: BuildCg2PartRelations` | Quét occurrence Component, xây dựng AABB near graph, phát hiện ứng viên `CHECK_ONLY`, cơ chế cap partial an toàn | ChatGPT (initial CG2) | **NO** (0 dòng sửa) | BUILD_PASS (Release x64 & Debug x64); RUNTIME_PASS trong Live CAD Runner |
-| `Commands/CheckAssemblyHole.cs :: Run` | Một lệnh chẩn đoán CG2 sau khi hoàn tất CG1, bọc `try/catch` fallback gán `ERROR_UNVERIFIED` an toàn | ChatGPT (CG2 integration) | **NO** (0 dòng sửa) | BUILD_PASS; RUNTIME_PASS trên 6 Assembly sandbox |
+| `Commands/CheckAssemblyHole.PartRelations.cs :: BuildCg2PartRelations` | Quét occurrence Component, xây dựng AABB near graph, phát hiện ứng viên `CHECK_ONLY`, cơ chế cap partial an toàn | ChatGPT (initial CG2) | **NO** (0 dòng sửa) | BUILD_PASS theo log Anti; CG2 AABB diagnostic đã chạy trên các fixture sandbox; strict CSV byte parity trên fixture lớn vẫn FAIL |
+| `Commands/CheckAssemblyHole.cs :: Run` | Một lệnh chẩn đoán CG2 sau khi hoàn tất CG1, bọc `try/catch` fallback gán `ERROR_UNVERIFIED` an toàn | ChatGPT (CG2 integration) | **NO** (0 dòng sửa) | BUILD_PASS theo log Anti; RUNTIME_EXECUTED trên 6 Assembly sandbox; counters/verdicts sau chuẩn hóa khớp, CSV byte trên Assembly lớn FAIL |
 | `Commands/CheckHoleResultsForm.cs :: ShowPartRelations` | WinForms modal hiển thị quan hệ Part; 2 tabs always; 3rd warning tab conditional on Warnings.Count>0 | ChatGPT (CG2 integration) | **NO** (0 dòng sửa) | BUILD_PASS; Offline WinForms test with injected warning passed according to Anti logs; real user-click UI test not independently verified. |
 | `ADDIN.csproj` | Khai báo compile entry `CheckAssemblyHole.PartRelations.cs` | ChatGPT (CG2 integration) | **NO** (0 dòng sửa) | BUILD_PASS (MSBuild 18.10.1 build sạch 0 error) |
 | `CG2_TEST_HARNESS.cs :: RunScenarioTestsT01ToT12` | Kiểm thử primitive hình học và logic biên CG2-T01..T12 với nhãn `NOT_TESTED` rõ ràng | Mixed: Anti initial / ChatGPT Review #2 | **NO** (0 dòng sửa) | BUILD_PASS; UNIT_PRIMITIVE_PASS (`SELF_TEST_EXIT_CODE=0`) |
 | `CG2_LIVE_CAD_RUNNER.cs :: VerifyCsvParity` | So sánh byte thô (`SequenceEqual`) giữa baseline CG1 và candidate CG2 | ChatGPT (Review #2) | **NO** (0 dòng sửa) | BUILD_PASS; RUNTIME_TESTED (5 fixture nhỏ byte PASS, 1 fixture lớn byte FAIL exit 1) |
 | `CG2_LIVE_CAD_RUNNER.cs :: ValidateCg2ExpectedCandidates` | Kiểm tra provenance ứng viên (ID, occurrence, label, `Classification == CHECK_ONLY`) | ChatGPT (Review #2) | **NO** (0 dòng sửa) | BUILD_PASS; Observed 13 A->B candidate rows in Anti's fixture log; runner assertion requires found.Count > 0 (not exactly 13). AABB_CANDIDATE_OBSERVED, MISSING_HOLE_PROVEN=NO. |
-| `CG2_LIVE_CAD_RUNNER.cs :: RunOneIsolated` | Thực thi sandbox an toàn, kiểm tra sandbox consent, old markers, dirty state, SHA256 file | Mixed: Anti initial / ChatGPT Review #2 & #3 | **NO** (0 dòng sửa) | BUILD_PASS; RUNTIME_PASS (áp dụng fail-closed trên mọi fixture) |
+| `CG2_LIVE_CAD_RUNNER.cs :: RunOneIsolated` | Thực thi sandbox an toàn, kiểm tra sandbox consent, old markers, dirty state, SHA256 file | Mixed: Anti initial / ChatGPT Review #2 & #3 | **NO** (0 dòng sửa) | BUILD_PASS theo log Anti; isolated runner đã chạy trên 6 fixture; không coi raw CSV parity toàn bộ là PASS |
 | `CG2_REVIEW3_REPEATABILITY.cs :: RunRepeatability` | 4 lần mở fresh read-only, đối chiếu 3 cặp (CG1↔CG1, CG2↔CG2, CG1↔CG2), xuất raw rows và component traversal | ChatGPT (Review #3) | **NO** (0 dòng sửa) | BUILD_PASS; RUNTIME_EXECUTED; STRICT_BYTE_PARITY=FAIL; NORMALIZED_COUNTERS=PASS; EXIT=1 |
 | `CG2_REVIEW4_DOC_CHECK.ps1` | Script kiểm tra tự động văn bản báo cáo và các status line bắt buộc | ChatGPT (Review #4) | **NO** (0 dòng sửa) | SCRIPT_PASS (`CG2_REVIEW4_DOC_CHECK=PASS`, exit code 0) |
 
@@ -67,7 +67,7 @@
 | Suy diễn ý đồ thiết kế bắt buộc phải có lỗ đối ứng | **NOT_IMPLEMENTED** | N/A | Ứng viên AABB gần không phải bằng chứng thiếu lỗ; cần ý đồ kỹ thuật |
 | Tự động suy diễn Part Chủ (Master) cho từng mối ghép | **NOT_IMPLEMENTED** | N/A | Nằm ngoài phạm vi CG2; dành cho CG3 nếu được duyệt |
 | Kiểm thử tích hợp toàn diện 12 kịch bản CG2-T01..T12 | **NOT_VERIFIED** | NO | Các bài test unit primitive đã pass nhưng chưa bao phủ toàn bộ pipeline CAD |
-| So sánh byte thô CSV trên Assembly 916 lỗ | **FAIL_PREVIOUS_RUN** | YES (Đo thực tế) | Exit code 1; byte khác nhau tại byte 175 do thứ tự traversal thay đổi |
+| So sánh byte thô CSV trên Assembly 916 lỗ | **FAIL_PREVIOUS_RUN** | YES (Đo thực tế) | Exit code 1; byte khác nhau tại byte 175; snapshot thứ tự Component thay đổi nhưng nguyên nhân trực tiếp trong ReadAssemblyHoles chưa được chứng minh |
 | Kiểm thử tạo/cập nhật 3D Sketch Marker | **NOT_TESTED** | NO | Chính sách an toàn sandbox: `AutoCreateMarkers=false` bắt buộc |
 | Hiệu chỉnh văn bản báo cáo theo Review #4 & Review #5 | **COMPLETED** | YES | Đã sửa `CG2_REPORT.md`, `CG2_REVIEW3_EVIDENCE.md` và `CG2_ANTI_CODE_STATUS_REPORT.md`; `CG2_REVIEW4_DOC_CHECK=PASS` |
 
