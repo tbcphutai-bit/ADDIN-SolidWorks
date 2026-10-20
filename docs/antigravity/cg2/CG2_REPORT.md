@@ -1,5 +1,10 @@
 # CHECK HOLE CG2 — ANTIGRAVITY VERIFICATION REPORT
 
+> **UPDATE / ChatGPT code patch after Review #2 (2026-10-20):**
+> The PASS table below is historical evidence from commit `11dc8321`, **NOT verification of the new code** now committed on this branch. ChatGPT changed `CG2_LIVE_CAD_RUNNER.cs` and `CG2_TEST_HARNESS.cs` and published [full code](CG2_REVIEW2_CODE.md). Anti must recompile and rerun fixtures before marking current code PASS. `CG2_REVIEW2_PATCH=NOT_TESTED`; `CG2_T01_TO_T12_END_TO_END=NOT_VERIFIED`; `READY_FOR_MERGE=NO`. Strict `CSV_BYTE_PARITY` is now checked separately; previous canonicalized CSV parity does not prove byte identity.
+
+---
+
 > STATUS: **VERIFIED — RESOLVED REVIEW #1 BLOCKERS WITH FACTUAL EVIDENCE**
 > CG2 Auto Part Relations diagnostic v1 verified against CG1 baseline release binary.
 > Broad-phase AABB spatial screening confirmed read-only (`CHECK_ONLY`); zero mutations to production Check Hole verdicts, tolerances, CSV exports, or 3D markers.
