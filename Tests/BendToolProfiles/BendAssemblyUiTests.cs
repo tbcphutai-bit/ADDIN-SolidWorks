@@ -269,14 +269,14 @@ internal static class BendAssemblyUiTests
         internal IProgress<AssemblyBatchProgress> Progress;
         internal AssemblyCheckScope Scope;
         internal int Captures, Invalidations, Disposals;
-        internal bool RejectBegin;
+        internal bool RejectBegin, RejectInvalidate;
         public async Task<BendToolCatalogReadResult> ReadMinimumAsync(CancellationToken token)
         { Operation = null; await Task.Delay(10,token).ConfigureAwait(false); return null; }
         public IBendAssemblyBatchOperation BeginAssemblyBatch(AssemblyCheckScope scope, BendToolCatalogReadResult minimum,
             CancellationToken token, IProgress<AssemblyBatchProgress> progress)
         { if(RejectBegin)throw new InvalidOperationException("No selected components"); Scope = scope; Progress = progress; return Operation = new FakeOperation(); }
         public void CaptureSelection() { Captures++; }
-        public void Invalidate() { Invalidations++; }
+        public void Invalidate() { Invalidations++; if(RejectInvalidate)throw new System.Runtime.InteropServices.COMException("CAD disconnected",unchecked((int)0x800706BE)); }
         public void Dispose() { Check(Operation?.InsidePump!=true,"Never dispose native owner during reentrant Pump"); Disposals++; }
     }
     private static Control Control(Form form, string name) => form.Controls.Find(name, true).Single();
@@ -290,6 +290,30 @@ internal static class BendAssemblyUiTests
     }
     private static void FormTests()
     {
+        Test("failed CAD invalidation withdraws live results; Refresh, scope and Preview recover",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend();
+                using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Spin(()=>backend.Operation!=null);
+                    backend.Operation.Done.SetResult(Snapshot(Part(1,new[]{Geometry(42)})));Spin(()=>!controller.Running);
+                    Check(RowCount(form)==1,"A live result exists before CAD disconnect");
+                    backend.RejectInvalidate=true;
+                    Click(form,"btnRefresh");Application.DoEvents();
+                    Check(!controller.Running&&RowCount(form)==0&&Control(form,"btnRunBatch").Enabled,"Refresh RPC cannot publish old success or escape async-void handler");
+                    Check(Control(form,"txtDiagnostics").Text.Contains("COMException"),"Technical failure remains available");
+                    form.SetScope(AssemblyCheckScope.SelectedComponents);
+                    Check(backend.Captures==0&&RowCount(form)==0,"Failed scope change cannot capture a misleading selection");
+                    Click(form,"btnToggleMockup");Check(!form.IsPreview,"Failed invalidation cannot switch to illustrative success");
+                    Check(backend.Invalidations==3,"Each explicit action makes one bounded attempt");
+                    backend.RejectInvalidate=false;Click(form,"btnRefresh");Spin(()=>backend.Operation!=null&&controller.Running);
+                    backend.Operation.Done.SetResult(Snapshot(Part(1,new[]{Geometry(42)})));Spin(()=>!controller.Running);
+                    Check(RowCount(form)==1&&backend.Scope==AssemblyCheckScope.SelectedComponents,"User can retry after restoring CAD without reopening the Form");
+                    form.Close();Check(backend.Disposals==1,"Error and retry preserve one native owner disposal");
+                }
+            }
+        });
         Test("Vietnamese vocabulary preserves codes, phase meaning and missing clearance",()=>{
             foreach(var value in Enum.GetValues(typeof(CollisionStatus)).Cast<CollisionStatus>())
                 Check(BendCheckDisplayText.Collision(value.ToString()).OriginalCode==value.ToString(),"Raw collision enum unchanged");
@@ -566,7 +590,8 @@ internal static class BendAssemblyUiTests
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             if(args.Length==2&&args[0]=="--benchmark-ui")return ToolProfileTests.UiReadBenchmark(args[1]);
-            ConverterTests(); FormTests(); UnifiedNavigationTests();
+            if(args.Length==1&&args[0]=="--controller-tests")FormTests();
+            else { ConverterTests(); FormTests(); UnifiedNavigationTests(); }
             if(args.Length==2 && args[0]=="--render") { Render(args[1]); RenderPlanner(args[1]); RenderHolder(args[1]); }
             Console.WriteLine("RESULT " + groups + " groups; " + assertions + " assertions; 0 failures"); return 0;
         }

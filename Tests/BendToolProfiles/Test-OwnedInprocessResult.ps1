@@ -22,7 +22,7 @@ foreach($case in $cases){
     $record=Join-Path $OutputDirectory ($case.Name+'.json')
     @{Result=$case.Result;FunctionalResult=$case.Result;ShutdownResult='TEST';InprocessResult=@{DllSha256=$case.Sha}} |
         ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $record -Encoding UTF8
-    $header='$runCode='+$case.Code+"`r`n"+'$ProductDll='+"'"+$case.Product.Replace("'","''")+"'`r`n"+
+    $header='$ErrorActionPreference=''Stop'''+"`r`n"+'$runCode='+$case.Code+"`r`n"+'$ProductDll='+"'"+$case.Product.Replace("'","''")+"'`r`n"+
         '$report=Get-Content -LiteralPath '+"'"+$record.Replace("'","''")+"' -Raw | ConvertFrom-Json`r`n"
     $script=Join-Path $OutputDirectory ($case.Name+'.ps1')
     Set-Content -LiteralPath $script -Value ($header+$gate) -Encoding UTF8

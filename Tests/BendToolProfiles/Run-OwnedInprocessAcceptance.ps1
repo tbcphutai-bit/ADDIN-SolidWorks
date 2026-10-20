@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory=$true)][string]$BridgeDll,
     [Parameter(Mandatory=$true)][string]$ReadOnlyFixture,
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
-    [string]$SessionExcludedAddin
+    [string]$SessionExcludedAddin,
+    [string]$RepresentativeManifest
 )
 $ErrorActionPreference='Stop'
 foreach($file in @($Harness,$ProductDll,$BridgeDll,$ReadOnlyFixture)) {
@@ -30,7 +31,12 @@ try {
     # This flag only causes StartOwned to UnloadAddIn in its exact owned PID.
     # No daily startup flag or installed production COM registration is edited.
     $env:ADDIN_NATIVE_EXCLUDE_ADDIN=$SessionExcludedAddin
-    & $Harness --inprocess-addin $ProductDll $OutputDirectory $BridgeDll $ReadOnlyFixture none
+    $arguments=@('--inprocess-addin',$ProductDll,$OutputDirectory,$BridgeDll,$ReadOnlyFixture,'none')
+    if($RepresentativeManifest){
+        if(-not [IO.Path]::IsPathRooted($RepresentativeManifest) -or -not(Test-Path -LiteralPath $RepresentativeManifest -PathType Leaf)){throw 'Explicit existing representative manifest required'}
+        $arguments+=$RepresentativeManifest
+    }
+    & $Harness @arguments
     $runCode=$LASTEXITCODE
 } finally {
     $env:ADDIN_NATIVE_EXCLUDE_ADDIN=$oldExclude
@@ -48,5 +54,9 @@ if($runCode -ne 0 -or $report.Result -ne 'PASS'){
     Write-Output "Owned in-process acceptance failed: functional=$($report.FunctionalResult), shutdown=$($report.ShutdownResult). See the private audit."
     exit 1
 }
-if($report.InprocessResult.DllSha256 -ne (Get-FileHash -LiteralPath $ProductDll -Algorithm SHA256).Hash.ToLowerInvariant()){throw 'Actual in-process DLL SHA mismatch'}
+$hashAlgorithm=[Security.Cryptography.SHA256]::Create()
+$dllStream=[IO.File]::OpenRead($ProductDll)
+try {$observedExpectedSha=([BitConverter]::ToString($hashAlgorithm.ComputeHash($dllStream))).Replace('-','').ToLowerInvariant()}
+finally {$dllStream.Dispose();$hashAlgorithm.Dispose()}
+if($report.InprocessResult.DllSha256 -ne $observedExpectedSha){throw 'Actual in-process DLL SHA mismatch'}
 exit 0

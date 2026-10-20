@@ -79,8 +79,23 @@ namespace ADDIN.UI
         private async void RefreshRequested(object sender, EventArgs args)
         {
             if (running || disposed) return;
-            backend.Invalidate();
+            if (!TryInvalidate()) return;
             await RunAsync(form.Scope);
+        }
+        private bool TryInvalidate()
+        {
+            RequireSta();
+            // Guard the backend boundary before RunAsync's exception handler.
+            // Withdraw the previous result even when that read fails.
+            displayed = null;
+            form.ClearLive("Đang cập nhật nguồn CAD; chưa có kết quả hiện hành.");
+            try { backend.Invalidate(); return true; }
+            catch (Exception ex)
+            {
+                form.ClearLive("Không cập nhật được nguồn CAD — " + ex.Message + ". Mở lại chi tiết rồi Quét lại.");
+                form.RecordDiagnostic(ex.GetType().Name + " — " + ex.Message);
+                return false;
+            }
         }
         internal async Task RunAsync(AssemblyCheckScope scope)
         {
@@ -208,14 +223,14 @@ namespace ADDIN.UI
         {
             if (running || disposed) return;
             operation?.Cancel(); operation = null; displayed = null;
-            backend.Invalidate();
+            if (!TryInvalidate()) return;
             form.LoadMockupData();
         }
         private void ScopeChanged(object sender, AssemblyCheckScope scope)
         {
             if (running || disposed) return;
             operation?.Cancel(); operation = null; displayed = null;
-            backend.Invalidate();
+            if (!TryInvalidate()) return;
             try { if (scope == AssemblyCheckScope.SelectedComponents) backend.CaptureSelection(); }
             catch (Exception ex) { form.ClearLive("Không đọc được phạm vi chọn — " + ex.Message); return; }
             form.ClearLive("Phạm vi đã đổi. Bấm Bắt đầu kiểm tra; Quét lại giữ nguyên phạm vi đã chọn.");

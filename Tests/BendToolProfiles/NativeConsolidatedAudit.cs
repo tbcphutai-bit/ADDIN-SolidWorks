@@ -12,7 +12,7 @@ internal static partial class NativeAssemblyBatchValidation
 {
     private static int InprocessAddinMain(string[] args)
     {
-        if(args.Length!=5)return 2;
+        if(args.Length!=5&&args.Length!=6)return 2;
         string dll=Path.GetFullPath(args[0]),output=Path.GetFullPath(args[1]),bridge=Path.GetFullPath(args[2]),fixture=Path.GetFullPath(args[3]);
         if(Directory.Exists(output))throw new IOException("Fresh private output required");Directory.CreateDirectory(output);
         const string id="{6AFCF01D-40B5-46EE-8C93-86B42821DF67}",keyPath=@"Software\Classes\CLSID\"+id;
@@ -20,6 +20,9 @@ internal static partial class NativeAssemblyBatchValidation
         var report=new Dictionary<string,object>();ISldWorks app=null;ITaskpaneView bridgeView=null;object activation=null;int code=1;bool created=false,createdProg=false;
         try
         {
+            var cases=args.Length==6?CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.Read(args[5]):null;
+            report["RequestedCases"]=cases==null?1:cases.Cases.Length;
+            if(cases!=null)report["RepresentativeCases"]=cases.Cases.Select(c=>new {c.CaseId,c.Path,Execution="NOT_RUN"}).ToArray();
             using(var existing=Registry.CurrentUser.OpenSubKey(keyPath))if(existing!=null)throw new InvalidOperationException("Refuse to replace any existing COM registration");
             using(var existing=Registry.CurrentUser.OpenSubKey(progKey))if(existing!=null)throw new InvalidOperationException("Refuse to replace any existing ProgID registration");
             var name=AssemblyName.GetAssemblyName(bridge);
@@ -35,6 +38,7 @@ internal static partial class NativeAssemblyBatchValidation
             System.Environment.SetEnvironmentVariable("ADDIN_ACCEPTANCE_HOST_DIRECTORY",output);
             System.Environment.SetEnvironmentVariable("ADDIN_ACCEPTANCE_TARGET_DLL",dll);
             System.Environment.SetEnvironmentVariable("ADDIN_ACCEPTANCE_FIXTURE",fixture);
+            System.Environment.SetEnvironmentVariable("ADDIN_ACCEPTANCE_CASES",args.Length==6?Path.GetFullPath(args[5]):null);
             app=NativeTestProcess.StartOwned(output);NativeTestProcess.KeepOwnedBackgroundSession(app);report["OwnedPid"]=app.GetProcessID();
             if(args[4]=="unload")
             {
@@ -63,16 +67,23 @@ internal static partial class NativeAssemblyBatchValidation
                 if(activation==null)throw new InvalidOperationException("INPROCESS_BRIDGE_ACTIVATION_FAILED");
                 report["BridgeConnectReturned"]=activation.GetType().InvokeMember("ConnectToSW",BindingFlags.InvokeMethod,null,activation,new object[]{app,0});
             }
-            while(watch.ElapsedMilliseconds<65000)
+            // Same 60 s diagnostic limit per case, not a larger solver budget.
+            while(watch.ElapsedMilliseconds<65000*(cases==null?1:cases.Cases.Length))
             {
                 if(File.Exists(events))
                 {
                     try{state=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(events));}catch(IOException){}
                     if(state!=null&&(Convert.ToString(state["Stage"])=="COMMAND_COMPLETED"||Convert.ToString(state["Stage"])=="FAIL"))break;
                 }
+                // A dead owned server cannot complete the remaining cases.
+                // Preserve its last event/exit code instead of waiting out
+                // every NOT RUN case or looking for another ROT session.
+                int? earlyExit=NativeTestProcess.WaitForOwnedExit(0);
+                if(earlyExit.HasValue){report["OwnedExitBeforeCompletion"]=earlyExit;break;}
                 NativeTestProcess.PumpMessages();Thread.Sleep(20);
             }
             report["InprocessResult"]=state;
+            if(state!=null&&state.ContainsKey("RepresentativeCases"))report["RepresentativeCases"]=state["RepresentativeCases"];
             bool function=state!=null&&Convert.ToString(state["Stage"])=="COMMAND_COMPLETED"&&Convert.ToInt32(state["Pid"])==app.GetProcessID()&&Convert.ToString(state["DllSha256"])==Sha(dll).Replace("-","").ToLowerInvariant();
             report["FunctionalResult"]=function?"PASS":"FAIL";code=function?0:1;
             report["UnloadBridgeResult"]=app.UnloadAddIn(bridge);

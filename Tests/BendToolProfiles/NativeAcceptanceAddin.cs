@@ -18,7 +18,7 @@ using SolidWorks.Interop.swpublished;
 namespace CheckChan.NativeAcceptance
 {
     [ComVisible(true),Guid("6AFCF01D-40B5-46EE-8C93-86B42821DF67"),ProgId("CheckChan.PrivateAcceptanceHost"),ClassInterface(ClassInterfaceType.AutoDual)]
-    public sealed class AcceptanceAddin:UserControl,ISwAddin
+    public sealed partial class AcceptanceAddin:UserControl,ISwAddin
     {
         private ISldWorks app;private object target;private Assembly assembly;private System.Windows.Forms.Timer timer;
         private string root,fixture,before;private TraceListener listener;private readonly Stopwatch clock=new Stopwatch();
@@ -57,6 +57,7 @@ namespace CheckChan.NativeAcceptance
                 listener=new TextWriterTraceListener(Path.Combine(root,"PRIVATE-target-trace.txt"));Trace.Listeners.Add(listener);Trace.AutoFlush=true;
                 string dll=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_TARGET_DLL");fixture=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_FIXTURE");
                 if(!Path.IsPathRooted(dll)||!File.Exists(dll)||!Path.IsPathRooted(fixture)||!File.Exists(fixture))throw new InvalidOperationException("EXPLICIT_PRIVATE_INPUTS_REQUIRED");
+                LoadRepresentativeCases();
                 assembly=Assembly.LoadFrom(dll);state["RequestedPath"]=dll;state["LoadedPath"]=assembly.Location;state["DllSha256"]=Sha(assembly.Location);state["Mvid"]=assembly.ManifestModule.ModuleVersionId;
                 if(!string.Equals(dll,assembly.Location,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("TARGET_DLL_IDENTITY_MISMATCH");
                 target=Activator.CreateInstance(assembly.GetType("ADDIN.SwAddin",true));Write("BEFORE_TARGET_CONNECT");
@@ -75,6 +76,7 @@ namespace CheckChan.NativeAcceptance
             timer.Stop();
             try
             {
+                if(representativeCases!=null){RepresentativeTick();return;}
                 if(clock.ElapsedMilliseconds>60000)throw new TimeoutException("Original 60s command diagnostic deadline expired");
                 if(!started)
                 {
@@ -103,7 +105,13 @@ namespace CheckChan.NativeAcceptance
                 if(bends==0||candidates!=18*bends||!Equals(state["FixtureUnchanged"],true))throw new InvalidOperationException("COMMAND_RESULT_OR_ORIGINAL_BYTE_INVARIANT_FAILED");
                 timer.Stop();window.Close();state["FunctionalResult"]="PASS";Write("COMMAND_COMPLETED");
             }
-            catch(Exception ex){timer.Stop();state["FunctionalResult"]="FAIL";state["Error"]=ex.ToString();Write("FAIL");}
+            catch(Exception ex)
+            {
+                timer.Stop();state["FunctionalResult"]="FAIL";state["Error"]=ex.ToString();
+                if(representativeCases!=null&&representativeIndex<representativeResults.Count)
+                {representativeResults[representativeIndex]["Execution"]="FAIL";representativeResults[representativeIndex]["Error"]=ex.ToString();representativeResults[representativeIndex]["Step"]=representativeStage;}
+                Write("FAIL");
+            }
         }
         public bool DisconnectFromSW()
         {
