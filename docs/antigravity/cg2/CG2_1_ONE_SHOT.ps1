@@ -172,9 +172,11 @@ try {
     $runnerExe = Join-Path $logRoot "Cg2LiveCadRunner.exe"
     $runner = Require-File (Join-Path $src "CG2_LIVE_CAD_RUNNER.cs") "Runner C# source"
     $repeat = Require-File (Join-Path $src "CG2_REVIEW3_REPEATABILITY.cs") "Repeatability C# source"
+    $siteAssert = Require-File (Join-Path $src "CG2_1_SITE_ASSERT.cs") "Site assertion C# source"
     $rc = Run-Tool "COMPILE_RUNNER" $csc @(
         "/nologo", "/target:exe", "/langversion:7.3", "/platform:x64",
-        "/r:System.Core.dll", "/r:$sw", "/r:$swconst", "/out:$runnerExe", $runner, $repeat
+        "/r:System.Core.dll", "/r:$sw", "/r:$swconst", "/out:$runnerExe",
+        $runner, $repeat, $siteAssert
     ) $logRoot
     if ($rc -ne 0) { $status.RUNNER_SELF_TEST = "FAIL"; throw "Runner compiler failed" }
     $rc = Run-Tool "RUNNER_SELF_TEST" $runnerExe @("--self-test") $logRoot
