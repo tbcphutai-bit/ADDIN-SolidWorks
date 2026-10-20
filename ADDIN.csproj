@@ -208,6 +208,7 @@
     <Compile Include="Commands\AutoVCutSectionCommand.Assembly.cs" />
     <Compile Include="Commands\AutoVCutSectionCommand.PartLayout.cs" />
     <Compile Include="Commands\AutoVCutSectionCommand.PartMarks.cs" />
+    <Compile Include="Commands\AutoVCutSectionCommand.OmoteMark.cs" />
     <Compile Include="Commands\PartSectionLayoutPlanner.cs" />
     <Compile Include="Commands\VCutPropertySetupCommand.cs" />
     <Compile Include="Commands\BendPanelGeometry.cs" />

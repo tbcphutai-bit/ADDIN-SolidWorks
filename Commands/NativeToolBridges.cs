@@ -12,7 +12,8 @@ namespace ADDIN.Commands
 {
     internal sealed partial class SplineToArcsCommand
     {
-        internal void RunNative(SplineArcOptions options)
+        private bool nativeShowCompletion = true;
+        internal void RunNative(SplineArcOptions options, bool showCompletion = true)
         {
             var model = swApp.ActiveDoc as ModelDoc2;
             Edge edge; SwView view; double[] point;
@@ -20,7 +21,14 @@ namespace ADDIN.Commands
                 !TryGetSelectedCurve(model, out edge, out view, out point)) throw new InvalidOperationException("Chọn cạnh spline trong Drawing View.");
             var curve = edge.GetCurve() as Curve;
             if (curve == null || IsLineOrCircle(curve)) throw new InvalidOperationException("Cạnh đã chọn không phải spline.");
-            currentOptions = options; Execute(model, edge, view, point, options);
+            bool previousCompletion = nativeShowCompletion;
+            try
+            {
+                nativeShowCompletion = showCompletion;
+                currentOptions = options;
+                Execute(model, edge, view, point, options);
+            }
+            finally { nativeShowCompletion = previousCompletion; }
         }
     }
     internal sealed partial class Repair3DSplineCommand
@@ -79,12 +87,14 @@ namespace ADDIN.Commands
                 (g.Representative.IsSlot ? "Slot " + (g.Representative.ModelRadius * 2000).ToString("0.###") + " × " + (g.Representative.SlotLength * 1000).ToString("0.###") : "φ" + (g.Representative.ModelRadius * 2000).ToString("0.###")) +
                 " mm | SL " + g.Holes.Count + (g.SeedFeature == null ? "" : " | " + g.SeedFeature.Name)).ToArray() };
         }
-        internal void RunNative(double offsetMm, double laneMm)
+        private bool nativeShowCompletion = true;
+        internal void RunNative(double offsetMm, double laneMm, bool showCompletion = true)
         {
             if (!NativeToolValues.Positive(offsetMm) || !NativeToolValues.Positive(laneMm)) throw new InvalidOperationException("Khoảng cách DIM phải lớn hơn 0.");
             double oldOffset = nativeCalloutOffsetM, oldLane = nativeLaneStepM;
-            try { nativeCalloutOffsetM = offsetMm / 1000; nativeLaneStepM = laneMm / 1000; GenerateHoleDimensions(); }
-            finally { nativeCalloutOffsetM = oldOffset; nativeLaneStepM = oldLane; }
+            bool oldCompletion = nativeShowCompletion;
+            try { nativeCalloutOffsetM = offsetMm / 1000; nativeLaneStepM = laneMm / 1000; nativeShowCompletion = showCompletion; GenerateHoleDimensions(); }
+            finally { nativeCalloutOffsetM = oldOffset; nativeLaneStepM = oldLane; nativeShowCompletion = oldCompletion; }
         }
     }
     public partial class TaoDimKegaki
@@ -132,13 +142,10 @@ namespace ADDIN.Commands
             if (count == 0) return false;
             SwView target = null;
             for (int i = 1; i <= count; i++) {
-                int type = selection.GetSelectedObjectType3(i, -1);
-                SwView candidate;
-                if (type == (int)swSelectType_e.swSelDRAWINGVIEWS)
-                    candidate = selection.GetSelectedObject6(i, -1) as SwView;
-                else if (type == (int)swSelectType_e.swSelEDGES || type == (int)swSelectType_e.swSelDIMENSIONS)
-                    candidate = selection.GetSelectedObjectsDrawingView2(i, -1) as SwView;
-                else return false;
+                // Drawing sketch entities and faces can identify the same View
+                // too. Resolve the owning View instead of filtering object types.
+                SwView candidate = selection.GetSelectedObject6(i, -1) as SwView ??
+                    selection.GetSelectedObjectsDrawingView2(i, -1) as SwView;
                 if (candidate == null || candidate.Type == (int)swDrawingViewTypes_e.swDrawingSheet) return false;
                 if (target != null && !ReferenceEquals(target, candidate) && swApp.IsSame(target, candidate) != (int)swObjectEquality.swObjectSame)
                     return false;

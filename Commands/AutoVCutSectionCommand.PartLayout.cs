@@ -153,6 +153,10 @@ namespace ADDIN.Commands
                 view != null; view = view.GetNextView() as SolidWorks.Interop.sldworks.View)
             {
                 if (view.GetSection() == null || !SamePartSectionBase(view, parent)) continue;
+                // Unbreak/scale/rebreak may replace the temporary cut body.
+                // Remove our generated symbol before that topology changes;
+                // it is recreated on the final visible skin below.
+                RemoveOwnedOmoteMarks(drawing, view);
                 members.Add(new PartSectionMember { Name = view.GetName2(),
                     Annotations = view.GetName2() == newName ? null : CaptureAssemblySectionLayout(view) });
             }
@@ -264,8 +268,15 @@ namespace ADDIN.Commands
             }
             section = FindSectionView(drawingDoc, newName);
             foreach (var member in members)
+            {
                 if (Math.Abs(FindSectionView(drawingDoc, member.Name).ScaleDecimal - section.ScaleDecimal) > 1e-9)
                     throw new InvalidOperationException("Chưa đồng bộ đủ tỉ lệ các mặt cắt; hãy kiểm tra bản vẽ.");
+                string markNotice;
+                if (!UpdatePartOmoteSurfaceMark(drawing, drawingDoc,
+                    FindSectionView(drawingDoc, member.Name), out markNotice))
+                    notes.Add(member.Name + ": " + markNotice);
+            }
+            drawing.EditRebuild3();
             Log("PART SECTION LAYOUT shared=" + FormatSectionScale(section.ScaleDecimal) +
                 " unitMm=(" + Mm(unitWidth) + "," + Mm(unitHeight) + ") sections=" + members.Count +
                 " placed=" + placed + " sheet=" + sheet.GetName());

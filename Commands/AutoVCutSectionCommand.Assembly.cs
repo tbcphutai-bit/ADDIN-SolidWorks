@@ -183,6 +183,9 @@ namespace ADDIN.Commands
                         "Hãy sắp xếp lại các View trước khi in; cần kiểm tra chỗ chồng nhau.";
                 }
                 drawing.EditRebuild3();
+                string omoteMarkNotice;
+                if (!UpdateAssemblyOmoteSurfaceMark(drawing, drawingDoc, section, outer, out omoteMarkNotice))
+                    dimensionNotice += "\n" + omoteMarkNotice;
                 Log("ASSEMBLY SECTION outer=" + outer.ComponentName +
                     " label=" + label + " omote=" + omoteVisible +
                     " verified=" + sideVerified + " dims=" + dimensions +

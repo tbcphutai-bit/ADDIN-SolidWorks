@@ -1337,14 +1337,14 @@ namespace ADDIN
 
         {
             if (!CanRunModelMacro(btnRepair3DSpline)) return;
-            ShowNativeToolPage(NativeToolKind.RepairSpline);
+            ShowNativeRepairSpline();
         }
 
 
         private void btnVCutSection_Click(object sender, EventArgs e)
 
         {
-            ShowNativeVCutSectionPage();
+            RunSelectedSection();
         }
 
 
