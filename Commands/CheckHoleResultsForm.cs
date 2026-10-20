@@ -82,6 +82,12 @@ namespace ADDIN.Commands
                       .Append(PartRelations.CandidateCount)
                       .Append(" | Part không phát hiện lỗ: ")
                       .Append(PartRelations.ComponentsWithoutDetectedHoles)
+                      .Append(" | BREP có vật liệu: ")
+                      .Append(PartRelations.BrepSolidEvidenceCount)
+                      .Append(" | BREP không giao trục: ")
+                      .Append(PartRelations.BrepNoAxisHitCount)
+                      .Append(" | Chưa xác minh: ")
+                      .Append(PartRelations.BrepUnknownCount + PartRelations.BrepNotTestedCount)
                       .Append(" | ").Append(PartRelations.CoverageStatus);
                 if (!string.IsNullOrEmpty(MarkerStatus))
                     sb.AppendLine().Append(MarkerStatus);
@@ -640,14 +646,17 @@ namespace ADDIN.Commands
                     Text = "Component có bounding box: " + c.ComponentsWithBounds
                         + " | Part chưa nhận diện lỗ: " + c.ComponentsWithoutDetectedHoles
                         + " | Cặp AABB gần: " + c.RecordedNearbyPairs
-                        + " | Ứng viên xem lại: " + c.CandidateCount
+                        + " | Ứng viên AABB: " + c.CandidateCount
+                        + " | BREP có vật liệu: " + c.BrepSolidEvidenceCount
+                        + " | BREP không giao trục: " + c.BrepNoAxisHitCount
+                        + " | Chưa xác minh: " + (c.BrepUnknownCount + c.BrepNotTestedCount)
                         + Environment.NewLine
                         + "Độ phủ: " + c.CoverageStatus
                         + " | Đã thử cặp Part: " + c.ComparedComponentPairs
                         + " | Đã thử trục lỗ: " + c.TestedHoleRelations
                         + Environment.NewLine
-                        + "CHỈ LÀ AABB/BROAD-PHASE: không chứng minh tiếp xúc vật liệu, "
-                        + "không chứng minh thiếu lỗ, không xác định Master, không tạo NG."
+                        + "BREP_SOLID_ON_AXIS: chỉ chứng minh có solid trên trục; "
+                        + "KHÔNG khẳng định cần lỗ xuyên, không xác định Master, không tạo NG."
                 };
                 var tabs = new TabControl { Dock = DockStyle.Fill };
 
@@ -662,7 +671,12 @@ namespace ADDIN.Commands
                     RowHeadersVisible = false,
                     AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                     SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    // Prioritize physical BREP evidence; retain ALL AABB candidates.
+                    // BREP_NO_AXIS_HIT comes last, not deleted (avoid false negatives).
                     DataSource = c.ExpectedHoleCandidates
+                        .OrderBy(row => row.MaterialEvidence == "BREP_SOLID_ON_AXIS" ? 0
+                            : row.MaterialEvidence == "BREP_NO_AXIS_HIT" ? 2 : 1)
+                        .ThenBy(row => row.Id).ToList()
                 });
                 tabs.TabPages.Add(candidatePage);
 
