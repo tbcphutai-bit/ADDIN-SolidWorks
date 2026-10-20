@@ -12,6 +12,51 @@ namespace ADDIN.Tests
     {
         private const string Cg21SiteManifestName = "CG2_1_EXPECTED_SITES.tsv";
 
+        // Offline positive and negative tests: the site manifest must FAIL if
+        // a production candidate has the wrong physical material span.
+        private static bool SelfTestCg21SiteAssertions()
+        {
+            string testRoot = Path.Combine(Path.GetTempPath(),
+                "CG2_1_site_selftest_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(testRoot);
+            try
+            {
+                File.WriteAllText(Path.Combine(testRoot, Cg21SiteManifestName),
+                    "Fixture_Pos.SLDASM\tPartA-1\tPartB-1\tHole#1\tBREP_SOLID_ON_AXIS\t2.9\t3.1\t2\t1\r\n");
+                var m = new Metrics
+                {
+                    HasCg2 = true, Cg2Candidates = 1, Cg2SubassemblyContainers = 1
+                };
+                var c = new CandidateDetail
+                {
+                    Id = 1, SourceOccurrence = "PartA-1",
+                    TargetOccurrence = "PartB-1", SourceHoleLabel = "Hole#1",
+                    Classification = "CHECK_ONLY", MaterialEvidence = "BREP_SOLID_ON_AXIS",
+                    MaterialSpanMm = 3.0, MaterialHitCount = 2
+                };
+                m.Cg2ExpectedCandidates.Add(c);
+                AssertCg21Sites(testRoot, "Fixture_Pos.SLDASM", m);
+                c.MaterialSpanMm = 1.0;
+                bool failedAsExpected = false;
+                try { AssertCg21Sites(testRoot, "Fixture_Pos.SLDASM", m); }
+                catch (InvalidOperationException) { failedAsExpected = true; }
+                Console.WriteLine(failedAsExpected ?
+                    "PASS: CG2.1 manifest rejects wrong material span" :
+                    "FAIL: CG2.1 manifest accepted incorrect material span");
+                return failedAsExpected;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("FAIL: CG2.1 site manifest self-test: " + ex.Message);
+                return false;
+            }
+            finally
+            {
+                try { Directory.Delete(testRoot, true); }
+                catch { /* local temp cleanup best effort */ }
+            }
+        }
+
         private static void AssertCg21Sites(string sandboxRoot, string fixtureName, Metrics metrics)
         {
             string manifest = Path.Combine(sandboxRoot, Cg21SiteManifestName);
