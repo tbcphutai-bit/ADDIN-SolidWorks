@@ -41,6 +41,14 @@ namespace CheckChan.NativeAcceptance
             string manifest=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_CASES");if(string.IsNullOrWhiteSpace(manifest))return;
             representativeCases=RepresentativeAcceptanceInput.Read(manifest);
             foreach(var c in representativeCases.Cases)representativeResults.Add(new Dictionary<string,object>{{"CaseId",c.CaseId},{"FixturePath",c.Path},{"Execution","NOT_RUN"}});
+            string proof=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_PASSED_XL02_AUDIT");
+            representativeIndex=RepresentativeAcceptanceInput.StartIndexAfterXl02(proof,System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_TARGET_DLL"));
+            if(representativeIndex==1)
+            {
+                if(CloseProbeOnly)throw new InvalidDataException("XL-02 probe cannot skip its own case");
+                representativeResults[0]["Execution"]="PRIOR_GATE_PASS_NOT_RERUN";
+                state["PriorXl02AuditSha256"]=RepresentativeAcceptanceInput.Hash(proof);
+            }
             state["RepresentativeCases"]=representativeResults;
         }
         private object RepresentativeControl=>Field(target,"uiControl");

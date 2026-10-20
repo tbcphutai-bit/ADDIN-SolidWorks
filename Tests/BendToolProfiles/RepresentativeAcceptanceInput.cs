@@ -38,6 +38,46 @@ namespace CheckChan.NativeAcceptance
                 if(!System.IO.Path.IsPathRooted(source.Key)||!File.Exists(source.Key)||!string.Equals(Hash(source.Key),source.Value,StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("Representative input missing or stale: "+source.Key);
         }
+        // Test selection only, never manufacturing evidence. Resume the four
+        // remaining fixtures only after the exact product DLL completed XL-02.
+        internal static int StartIndexAfterXl02(string proofPath,string productDll)
+        {
+            if(string.IsNullOrWhiteSpace(proofPath))return 0;
+            if(!System.IO.Path.IsPathRooted(proofPath)||!File.Exists(proofPath))throw new InvalidDataException("Explicit existing XL-02 gate required");
+            var proof=new JavaScriptSerializer().DeserializeObject(File.ReadAllText(proofPath)) as Dictionary<string,object>;
+            object result,function,shutdown,state;
+            if(!proof.TryGetValue("Result",out result)||!Equals(result,"PASS")||!proof.TryGetValue("FunctionalResult",out function)||!Equals(function,"PASS")||
+                !proof.TryGetValue("ShutdownResult",out shutdown)||!Equals(shutdown,"PASS")||!proof.TryGetValue("InprocessResult",out state))
+                throw new InvalidDataException("XL-02 lifecycle has not passed");
+            var data=state as Dictionary<string,object>;object sha,cases;
+            if(data==null||!data.TryGetValue("DllSha256",out sha)||!Equals(sha,Hash(productDll))||!data.TryGetValue("RepresentativeCases",out cases))
+                throw new InvalidDataException("XL-02 gate does not match this product DLL");
+            var rows=cases as object[];var first=rows?.FirstOrDefault() as Dictionary<string,object>;object id;
+            if(first==null||!first.TryGetValue("CaseId",out id)||!Equals(id,"XL-02")||
+                new[]{"Execution","IdleClose","CloseDuringRun","OpenClose","Cancel"}.Any(key=>!first.ContainsKey(key)||!Equals(first[key],"PASS")))
+                throw new InvalidDataException("XL-02 close/cancel gate is incomplete");
+            return 1;
+        }
+        internal static int GateTests(string proofPath,string productDll)
+        {
+            int assertions=0;Action<bool> check=ok=>{assertions++;if(!ok)throw new Exception("Prior XL-02 gate regression");};
+            string copy=System.IO.Path.GetTempFileName();var json=new JavaScriptSerializer();string baseline=File.ReadAllText(proofPath);
+            try
+            {
+                check(StartIndexAfterXl02(null,productDll)==0);check(StartIndexAfterXl02(proofPath,productDll)==1);
+                Action<Action<Dictionary<string,object>>> reject=change=>{
+                    var value=(Dictionary<string,object>)json.DeserializeObject(baseline);change(value);File.WriteAllText(copy,json.Serialize(value));
+                    bool failed=false;try{StartIndexAfterXl02(copy,productDll);}catch(InvalidDataException){failed=true;}check(failed);
+                };
+                reject(p=>p["Result"]="FAIL");reject(p=>p["ShutdownResult"]="FAIL");
+                reject(p=>((Dictionary<string,object>)p["InprocessResult"])["DllSha256"]=new string('0',64));
+                reject(p=>((Dictionary<string,object>)((object[])((Dictionary<string,object>)p["InprocessResult"])["RepresentativeCases"])[0]).Remove("IdleClose"));
+                reject(p=>((Dictionary<string,object>)((object[])((Dictionary<string,object>)p["InprocessResult"])["RepresentativeCases"])[0])["CaseId"]="XL-17");
+                Console.WriteLine("PASS prior XL-02 gate: "+assertions+" assertions; no native/CAD call");return 0;
+            }
+            catch(Exception ex){Console.WriteLine("FAIL "+ex);return 1;}
+            finally{File.Delete(copy);}
+        }
         internal static int Tests()
         {
             int checks=0;Action<bool> check=ok=>{checks++;if(!ok)throw new Exception("Representative manifest regression");};

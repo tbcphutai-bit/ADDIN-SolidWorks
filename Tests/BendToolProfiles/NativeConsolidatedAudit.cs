@@ -21,7 +21,9 @@ internal static partial class NativeAssemblyBatchValidation
         try
         {
             var cases=args.Length==6?CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.Read(args[5]):null;
-            int requested=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_CLOSE_REPRO")=="1"?1:cases==null?1:cases.Cases.Length;
+            int start=CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.StartIndexAfterXl02(System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_PASSED_XL02_AUDIT"),dll);
+            int requested=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_CLOSE_REPRO")=="1"?1:cases==null?1:cases.Cases.Length-start;
+            report["StartCaseIndex"]=start;
             report["RequestedCases"]=requested;
             if(cases!=null)report["RepresentativeCases"]=cases.Cases.Select(c=>new {c.CaseId,c.Path,Execution="NOT_RUN"}).ToArray();
             using(var existing=Registry.CurrentUser.OpenSubKey(keyPath))if(existing!=null)throw new InvalidOperationException("Refuse to replace any existing COM registration");

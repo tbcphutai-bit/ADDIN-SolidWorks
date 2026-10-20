@@ -1,5 +1,7 @@
 # PR #37 — điều tra riêng crash khi đóng Check Chấn đang Run
 
+**Cập nhật lượt kế tiếp từ baseline `68049e1`:** [nghiệm thu sau sửa log harness](POST_LOGFIX_NATIVE_ACCEPTANCE_20261020.md). XL-02 đã qua idle/running close → Disconnect → ExitApp, exit 0. Phiên bốn ca tiếp theo vẫn heap crash, có dump đúng PID 24660, tại independent audit XL-19 sau khi XL-17 hoàn tất chức năng. Không thay kết luận lịch sử của PID 73032 bằng dump PID mới. Registry trước/sau hai phiên mới không khác; mismatch cũ dưới đây vẫn chưa xác định. **Heap chưa được chứng minh đã sửa.**
+
 **BLOCKED: chưa xác định nguyên nhân heap corruption; chưa sửa COM lifetime của sản phẩm.** Tiếp tục từ `e0adf89195f8d2daf15984814270aa226b0d307a`. Không tạo PR/Phase, không merge, không chạy 33 Part hoặc Assembly 120/25. [Kết quả máy đọc được](ConsolidatedResults/close-crash-20261020.json).
 
 ## Bằng chứng đúng PID và giới hạn một lượt
