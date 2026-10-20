@@ -1,7 +1,7 @@
 // CG2 Diagnostic Test Harness — C# 7.3 / .NET Framework 4.8
 // Standalone regression and verification harness for CheckHole Auto Part Relations (CG2).
 // Rigorous algorithmic, geometric, state invariance, and WinForms UI verification.
-// All tests assert real algorithmic outputs and fail if production logic is broken.
+// Primitive tests call CG2 geometry functions; full CAD scenarios require separate in-CAD assertions.
 
 using System;
 using System.Collections;
@@ -76,7 +76,7 @@ namespace ADDIN.Tests
             Console.WriteLine("\n===============================================================");
             if (failures == 0)
             {
-                Console.WriteLine("RESULT: ALL CG2 AUTOMATED UNIT & GEOMETRY TESTS PASSED (0 FAILURES)");
+                Console.WriteLine("RESULT: CG2 PRIMITIVE/SANITY CHECKS PASSED (0 FAILURES); integrated CAD scenarios separately graded");
                 return 0;
             }
             else
@@ -230,7 +230,7 @@ namespace ADDIN.Tests
 
         private static int RunScenarioTestsT01ToT12(Assembly asm)
         {
-            Console.WriteLine("\n--- 3. Testing Scenarios CG2-T01 through CG2-T12 with Real Algorithmic Assertions ---");
+            Console.WriteLine("\n--- 3. CG2 primitive tests (NOT full CG2-T01..T12 integrated coverage) ---");
             int errors = 0;
 
             Type checkerType = asm.GetType("ADDIN.Commands.CheckAssemblyHole");
@@ -271,7 +271,7 @@ namespace ADDIN.Tests
 
                 if (isNear && hit && suppressed && !suppressedFar)
                 {
-                    Console.WriteLine("PASS [CG2-T01]: Coaxial counterpart suppresses candidate; offset > 4mm generates candidate (asserted on real Cg2 algorithms)");
+                    Console.WriteLine("UNIT_PRIMITIVE_PASS [CG2-T01]: Cg2LikelyKnownCounterpart returns expected values; full BuildCg2PartRelations test NOT_TESTED");
                 }
                 else
                 {
@@ -303,7 +303,7 @@ namespace ADDIN.Tests
 
                 if (candidateCreated && distMm < 60.0)
                 {
-                    Console.WriteLine("PASS [CG2-T02]: B lacks hole -> axis intersects B at " + distMm.ToString("F2") + "mm, candidate created targeting B as CHECK_ONLY (0 NG)");
+                    Console.WriteLine("UNIT_PRIMITIVE_PASS [CG2-T02]: Axis intersects box B at " + distMm.ToString("F2") + "mm, but integrated ExpectedHoleCandidates for B NOT_TESTED");
                 }
                 else
                 {
@@ -328,7 +328,7 @@ namespace ADDIN.Tests
 
                 if (hit && classification == "CHECK_ONLY" && reason.Contains("NOT verified"))
                 {
-                    Console.WriteLine("PASS [CG2-T03]: Blind fastener site generates broad-phase CHECK_ONLY candidate, never missing-hole NG");
+                    Console.WriteLine("UNIT_PRIMITIVE_PASS [CG2-T03]: axis crosses box; production intent/NG decision NOT_TESTED");
                 }
                 else
                 {
@@ -355,7 +355,7 @@ namespace ADDIN.Tests
                 // Both sites hit Part B independently
                 if (nearAB && nearDB && hitA && hitD)
                 {
-                    Console.WriteLine("PASS [CG2-T04]: Two independent sites on PartB generate separate occurrence rows (Source=A and Source=D) without Part-global master");
+                    Console.WriteLine("UNIT_PRIMITIVE_PASS [CG2-T04]: Two rays intersect B AABB; actual occurrence rows NOT_TESTED");
                 }
                 else
                 {
@@ -375,7 +375,7 @@ namespace ADDIN.Tests
                 // Candidate must be labeled CHECK_ONLY, NOT solid contact
                 if (hitVoid)
                 {
-                    Console.WriteLine("PASS [CG2-T05]: Concave cavity AABB false positive correctly caught as broad-phase CHECK_ONLY with disclaimer");
+                    Console.WriteLine("UNIT_PRIMITIVE_PASS [CG2-T05]: Axis hits AABB; no real BREP material test conducted");
                 }
                 else
                 {
@@ -397,7 +397,7 @@ namespace ADDIN.Tests
 
                 if (occ1 == "Bracket-1" && occ2 == "Bracket-2" && occ1 != occ2)
                 {
-                    Console.WriteLine("PASS [CG2-T06]: Distinct occurrences (" + occ1 + ", " + occ2 + ") tracked independently without file-level collapse");
+                    Console.WriteLine("UNIT_PRIMITIVE_PASS [CG2-T06]: Cg2ReadBox preserves occurrence strings (" + occ1 + ", " + occ2 + ") ; full assembly occurrence reconciliation NOT_TESTED");
                 }
                 else
                 {
@@ -419,7 +419,7 @@ namespace ADDIN.Tests
 
                 if (skippedCount == 3 && coverageStatus == "PARTIAL_UNVERIFIED")
                 {
-                    Console.WriteLine("PASS [CG2-T07]: Invalid/unreadable bounds reject box and trigger CoverageStatus=PARTIAL_UNVERIFIED (asserted on real Cg2ReadBox)");
+                    Console.WriteLine("UNIT_PRIMITIVE_PASS [CG2-T07]: invalid bounds rejected by Cg2ReadBox; integrated partial status NOT_TESTED");
                 }
                 else
                 {
@@ -444,7 +444,7 @@ namespace ADDIN.Tests
 
                 if (near && candidateCount == 0 && coverage == "BBOX_SCREENED_NOT_MATERIAL_VERIFIED")
                 {
-                    Console.WriteLine("PASS [CG2-T08]: Zero-hole assembly records nearby pairs, 0 candidates, 0 NG, and complete coverage status");
+                    Console.WriteLine("UNIT_SANITY_PASS [CG2-T08]: literal zero-hole branch sanity; production scan validated separately by CAD runner");
                 }
                 else
                 {
@@ -469,7 +469,7 @@ namespace ADDIN.Tests
                 bool cappedLogic = (maxPairs == 300000 && maxHoles == 500000 && maxStoredPairs == 1500 && maxStoredCand == 2000);
                 if (cappedLogic)
                 {
-                    Console.WriteLine(string.Format("PASS [CG2-T09]: Capping thresholds verified (MaxPairs={0}, MaxHoles={1}, StoredPairs={2}, StoredCand={3}) triggering PARTIAL_UNVERIFIED",
+                    Console.WriteLine(string.Format("UNIT_CONSTANTS_PASS [CG2-T09]: cap constants checked ({0}, {1}, {2}, {3}); actual capping branch NOT_TESTED",
                         maxPairs, maxHoles, maxStoredPairs, maxStoredCand));
                 }
                 else
@@ -507,7 +507,7 @@ namespace ADDIN.Tests
 
                 if (cancelRethrown && passesSame && rejectsMutated)
                 {
-                    Console.WriteLine("PASS [CG2-T10]: Cancellation cleanly propagates and model state invariance guard rejects in-memory mutations");
+                    Console.WriteLine("UNIT_SANITY_PASS [CG2-T10]: synthetic OperationCanceledException and string comparison; actual cancellation/rerun NOT_TESTED");
                 }
                 else
                 {
@@ -562,7 +562,7 @@ namespace ADDIN.Tests
 
                         if (!isNgOk && isNgNg)
                         {
-                            Console.WriteLine("PASS [CG2-T11]: Production EvaluateStack evaluates 0.09mm as OK and 0.11mm as NG; verified 100% invariant to CG2");
+                            Console.WriteLine("UNIT_EVALUATESTACK_PASS [CG2-T11]: production EvaluateStack threshold 0.09/0.11mm; cross-binary parity tested separately");
                         }
                         else
                         {
@@ -604,7 +604,7 @@ namespace ADDIN.Tests
 
                 if (logHoles == 100 && ngSt == 5 && isPart && cov == "ERROR_UNVERIFIED" && warnings.Count == 1)
                 {
-                    Console.WriteLine("PASS [CG2-T12]: Non-fatal CG2 exception falls back to ERROR_UNVERIFIED and preserves production report intact");
+                    Console.WriteLine("UNIT_OBJECT_SETUP_PASS [CG2-T12]: synthetic fallback object only; actual Run() error branch NOT_TESTED");
                 }
                 else
                 {
