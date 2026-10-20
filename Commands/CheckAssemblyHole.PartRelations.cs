@@ -31,6 +31,10 @@ namespace ADDIN.Commands
         public double AxisToBoxMm { get; set; }
         public string Classification { get; set; }
         public string Reason { get; set; }
+        // Actual BREP solid-body ray intersection evidence. Not an NG verdict.
+        public string MaterialEvidence { get; set; }
+        public double MaterialSpanMm { get; set; }
+        public int MaterialHitCount { get; set; }
     }
 
     internal sealed class CheckHoleCg2Report
@@ -46,6 +50,11 @@ namespace ADDIN.Commands
         public int CandidateCount;
         public bool IsPartial;
         public string CoverageStatus;
+        public int BrepRayTestedCount;
+        public int BrepSolidEvidenceCount;
+        public int BrepNoAxisHitCount;
+        public int BrepUnknownCount;
+        public int BrepNotTestedCount;
         public readonly List<CheckHoleCg2RelationRow> NearbyPairs =
             new List<CheckHoleCg2RelationRow>();
         public readonly List<CheckHoleCg2ExpectedHoleRow> ExpectedHoleCandidates =
