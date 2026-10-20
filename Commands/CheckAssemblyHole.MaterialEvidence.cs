@@ -371,10 +371,18 @@ namespace ADDIN.Commands
 
             // Start OUTSIDE the component AABB. Do not claim "no solid" if
             // the finite diagnostic window truncates a target body.
-            double fromT = entryT - Cg2BrepStartMarginM;
-            double toT = exitT + Cg2BrepStartMarginM;
-            if (fromT < -Cg2MaxAxisReachM || toT > Cg2MaxAxisReachM ||
-                toT - fromT < Cg2MinMaterialSpanM)
+            // Keep the diagnostic ±60 mm window but use as much exterior
+            // clearance as it allows. A 55 mm target exit leaves only 5 mm,
+            // so requiring a fixed 10 mm at BOTH ends would reject a valid ray.
+            const double minimumOutsideMarginM = 0.00005;
+            double beforeSlack = entryT + Cg2MaxAxisReachM;
+            double afterSlack = Cg2MaxAxisReachM - exitT;
+            if (beforeSlack < minimumOutsideMarginM ||
+                afterSlack < minimumOutsideMarginM)
+                return false;
+            double fromT = entryT - Math.Min(Cg2BrepStartMarginM, beforeSlack);
+            double toT = exitT + Math.Min(Cg2BrepStartMarginM, afterSlack);
+            if (toT - fromT < Cg2MinMaterialSpanM)
                 return false;
 
             start = new[] {
