@@ -403,9 +403,10 @@ namespace ADDIN.Commands
             if (model == null || bodies == null || bodies.Length == 0)
                 return "UNVERIFIED_NO_BODY";
 
-            // With only ENTRY_EXIT option, GetRayIntersectionsPoints gives
-            // six doubles per hit: BodyIndex, RayIndex, Type, x, y, z.
-            // This is a read-only geometry operation, not a sketch/edit.
+            // SOLIDWORKS 2024 SP5 returned 9 doubles per hit with normals
+            // even though only ENTRY_EXIT was requested. Never assume a fixed
+            // stride: Cg2ClassifyRayPointData verifies the full array layout.
+            // RayIntersections is read-only; no sketch or feature is created.
             int count = model.Extension.RayIntersections(
                 bodies, start, direction,
                 (int)swRayPtsOpts_e.swRayPtsOptsENTRY_EXIT,
@@ -430,21 +431,48 @@ namespace ADDIN.Commands
         {
             longestSpanM = 0;
             if (count <= 0 || bodyCount <= 0 || points == null ||
-                points.Length < count*6 ||
                 !Cg2ValidVector(start) || !Cg2ValidVector(direction))
                 return "UNVERIFIED_RAY_POINTS";
+
+            // Expected layouts per SOLIDWORKS API documentation:
+            // 6 doubles: body, ray, flags, hit X/Y/Z
+            // 9 doubles: same six, followed by hit normal X/Y/Z.
+            // On 2024 SP5, the installed COM API produced 9 even with
+            // swRayPtsOptsENTRY_EXIT only. Reject every other shape instead
+            // of reading a normal component as the next hit's RayIndex.
+            int stride;
+            if (points.Length == count * 9)
+                stride = 9;
+            else if (points.Length == count * 6)
+                stride = 6;
+            else
+                return "UNVERIFIED_RAY_LAYOUT";
 
             double mag = Math.Sqrt(direction.Take(3).Sum(x => x*x));
             if (mag < 1e-12) return "UNVERIFIED_ZERO_RAY";
             var rays = new List<Cg2RayHit>();
             for (int i = 0; i < count; i++)
             {
-                int offset = i * 6;
-                int body = (int)Math.Round(points[offset]);
-                int ray = (int)Math.Round(points[offset + 1]);
-                int flags = (int)Math.Round(points[offset + 2]);
-                if (body < 0 || body >= bodyCount || ray != 0)
+                int offset = i * stride;
+                for (int k = 0; k < stride; k++)
+                    if (double.IsNaN(points[offset + k]) ||
+                        double.IsInfinity(points[offset + k]))
+                        return "UNVERIFIED_RAY_COORDINATES";
+
+                // COM indices and bitmask must be integral; never silently
+                // round malformed payloads into an apparently valid hit.
+                double bodyValue = points[offset];
+                double rayValue = points[offset + 1];
+                double flagValue = points[offset + 2];
+                if (bodyValue != Math.Truncate(bodyValue) ||
+                    rayValue != Math.Truncate(rayValue) ||
+                    flagValue != Math.Truncate(flagValue) ||
+                    bodyValue < 0 || bodyValue >= bodyCount ||
+                    rayValue != 0 || flagValue < 0 ||
+                    flagValue > int.MaxValue)
                     return "UNVERIFIED_RAY_TOPOLOGY";
+                int body = (int)bodyValue;
+                int flags = (int)flagValue;
                 double t = 0;
                 for (int k = 0; k < 3; k++)
                 {
