@@ -58,6 +58,16 @@ function Run-Tool([string]$Name, [string]$Executable, [string[]]$Arguments, [str
     Write-Host "$Name EXIT=$code LOG=$log"
     return [int]$code
 }
+function Assert-InstalledUnchanged([string[]]$Paths, [hashtable]$Before) {
+    foreach ($path in $Paths) {
+        $after = if (Test-Path -LiteralPath $path -PathType Leaf) {
+            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+        } else { "<ABSENT>" }
+        if ($after -ne $Before[$path]) {
+            throw "Installed Add-in artifact modified during isolated build: $path. Stop all dependent tests."
+        }
+    }
+}
 function Validate-Fixture([string]$Root, [string]$Model) {
     $path = [IO.Path]::GetFullPath($Model)
     $prefix = [IO.Path]::GetFullPath($Root).TrimEnd('\','/') + '\'
@@ -136,11 +146,25 @@ try {
     $debug = Join-Path $logRoot "Debug"
     New-Item -ItemType Directory -Force -Path $release,$debug | Out-Null
 
-    # Override the project's hardcoded Debug output C:\Tao moi\ to protect installed DLL.
+    # Use isolated folders AND override the csproj PostBuildEvent globally:
+    # that event otherwise copies DLL/PDB to C:\Tao moi\ on EVERY build,
+    # even if OutputPath is isolated. NEVER touch the installed Add-in.
+    $installedArtifacts = @(
+        "C:\Tao moi\ADDIN.dll",
+        "C:\Tao moi\ADDIN.pdb"
+    )
+    $installedBefore = @{}
+    foreach ($artifact in $installedArtifacts) {
+        $installedBefore[$artifact] = if (Test-Path -LiteralPath $artifact -PathType Leaf) {
+            (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash
+        } else { "<ABSENT>" }
+    }
+
     $rc = Run-Tool "BUILD_RELEASE_X64" $msbuild @(
         $project, "/t:Rebuild", "/p:Configuration=Release", "/p:Platform=x64",
-        "/p:OutputPath=$release\", "/v:minimal"
+        "/p:OutputPath=$release\", "/p:PostBuildEvent=", "/v:minimal"
     ) $logRoot
+    Assert-InstalledUnchanged $installedArtifacts $installedBefore
     if ($rc -ne 0) {
         $status.BUILD_RELEASE_X64 = "FAIL"
         throw "Release build failure"
@@ -151,8 +175,9 @@ try {
 
     $rc = Run-Tool "BUILD_DEBUG_X64" $msbuild @(
         $project, "/t:Rebuild", "/p:Configuration=Debug", "/p:Platform=x64",
-        "/p:OutputPath=$debug\", "/v:minimal"
+        "/p:OutputPath=$debug\", "/p:PostBuildEvent=", "/v:minimal"
     ) $logRoot
+    Assert-InstalledUnchanged $installedArtifacts $installedBefore
     if ($rc -ne 0) { $status.BUILD_DEBUG_X64 = "FAIL"; throw "Debug build failure" }
     [void](Require-File (Join-Path $debug "ADDIN.dll") "Debug ADDIN.dll")
     $status.BUILD_DEBUG_X64 = "PASS"
