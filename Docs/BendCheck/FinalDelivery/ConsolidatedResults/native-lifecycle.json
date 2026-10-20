@@ -1,0 +1,961 @@
+{
+  "CurrentCheckpoint": "7c837b96b7231ca5d689b3602a48622a52e7908b",
+  "Current": {
+    "debug": {
+      "Inprocess": {
+        "Inprocess": {
+          "Pid": 8400,
+          "Apartment": "STA",
+          "DllSha256": "cab8a4345f3a115004c19e94e08d2f63cd85573b5e3e9b113657fc0bb9eb1252",
+          "Mvid": "3b9aa812-3575-4834-80f8-9168cd7ee301",
+          "TargetConnectReturned": true,
+          "CommandWindowOpened": true,
+          "Parts": 1,
+          "Bends": 2,
+          "Candidates": 36,
+          "NativeFeatureIds": [
+            53,
+            59
+          ],
+          "FixtureUnchanged": true,
+          "FunctionalResult": "PASS"
+        },
+        "Disconnect": {
+          "TargetDisconnectReturned": true,
+          "TargetAppAndPaneDetached": true,
+          "BorrowedHostStillUsable": true
+        },
+        "ShutdownResult": "PASS",
+        "Result": "PASS",
+        "Protection": {
+          "FixtureBytesUnchanged": true,
+          "StartupSettingsUnchanged": true
+        }
+      },
+      "Part": {
+        "Result": "PASS",
+        "Assertions": 219,
+        "FunctionalResult": "PASS",
+        "ShutdownResult": "PASS",
+        "ShutdownExitCode": 0,
+        "Part0Result": "PASS",
+        "Part3Result": "PASS",
+        "Part6Result": "PASS",
+        "Part3RebuildRefresh": "PASS",
+        "Part0Cold": {
+          "PlanningMilliseconds": 0,
+          "NativeCaptureMilliseconds": 1612.3888000000002,
+          "WorkerMilliseconds": 9.492600000000001,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.1179,
+          "SnapshotCopyMilliseconds": 1.2166,
+          "ViewModelMilliseconds": 9.5504,
+          "GridRenderingMilliseconds": 51.8652,
+          "RunToVisibleMilliseconds": 2906.4789
+        },
+        "Part0Warm": {
+          "PlanningMilliseconds": 0,
+          "NativeCaptureMilliseconds": 0.0078000000000000005,
+          "WorkerMilliseconds": 0.45580000000000004,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.034,
+          "SnapshotCopyMilliseconds": 0.011800000000000001,
+          "ViewModelMilliseconds": 0.0591,
+          "GridRenderingMilliseconds": 12.0328,
+          "RunToVisibleMilliseconds": 766.2354
+        },
+        "Part3Cold": {
+          "PlanningMilliseconds": 1.4022000000000001,
+          "NativeCaptureMilliseconds": 17381.6489,
+          "WorkerMilliseconds": 29.1231,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.064,
+          "SnapshotCopyMilliseconds": 1.2546,
+          "ViewModelMilliseconds": 6.402200000000001,
+          "GridRenderingMilliseconds": 200.2311,
+          "RunToVisibleMilliseconds": 20528.0623
+        },
+        "Part3Warm": {
+          "PlanningMilliseconds": 0.28550000000000003,
+          "NativeCaptureMilliseconds": 0.0048000000000000004,
+          "WorkerMilliseconds": 4.8636,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.05790000000000001,
+          "SnapshotCopyMilliseconds": 0.6459,
+          "ViewModelMilliseconds": 1.2167000000000001,
+          "GridRenderingMilliseconds": 147.2747,
+          "RunToVisibleMilliseconds": 1054.0813
+        },
+        "Part6Cold": {
+          "PlanningMilliseconds": 0.2998,
+          "NativeCaptureMilliseconds": 34622.2134,
+          "WorkerMilliseconds": 8.521600000000001,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.047200000000000006,
+          "SnapshotCopyMilliseconds": 0.9937000000000001,
+          "ViewModelMilliseconds": 2.6601,
+          "GridRenderingMilliseconds": 200.8158,
+          "RunToVisibleMilliseconds": 36714.404500000004
+        },
+        "Part6Warm": {
+          "PlanningMilliseconds": 0.31010000000000004,
+          "NativeCaptureMilliseconds": 0.0044,
+          "WorkerMilliseconds": 8.793000000000001,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.0528,
+          "SnapshotCopyMilliseconds": 1.0523,
+          "ViewModelMilliseconds": 2.6779,
+          "GridRenderingMilliseconds": 182.9499,
+          "RunToVisibleMilliseconds": 1096.923
+        }
+      },
+      "AssemblyCommandScope": {
+        "Result": "PASS",
+        "Assertions": 4152,
+        "BaselineFixtureSourceUnchanged": true,
+        "CompanyNumericBenchmark": false,
+        "Performance": [
+          {
+            "Name": "cold-all",
+            "WallMs": 76195.0505,
+            "MaximumStaCaptureMs": 3772.5561000000002,
+            "Components": 120,
+            "UniqueParts": 25,
+            "Jobs": 120,
+            "Captures": 25,
+            "CaptureHits": 0,
+            "InventoryMs": 3698.8707000000004,
+            "CaptureMs": 66881.76849999999,
+            "EnvelopeMs": 7.692200000000001,
+            "StaticMs": 149.54710000000003,
+            "ProcessMs": 209.1144999999999,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 1.6448000000000031,
+            "PrecheckOnlyJobs": 120,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 0,
+            "CatalogMisses": 1,
+            "GeometryHits": 95,
+            "GeometryMisses": 25,
+            "StaticHits": 0,
+            "StaticMisses": 120,
+            "ProcessHits": 0,
+            "ProcessMisses": 120,
+            "CacheBytes": 34777984,
+            "PeakManagedBytes": 242169320,
+            "PeakWorkers": 4
+          },
+          {
+            "Name": "warm-all",
+            "WallMs": 5652.9951,
+            "MaximumStaCaptureMs": 0.0061,
+            "Components": 120,
+            "UniqueParts": 25,
+            "Jobs": 120,
+            "Captures": 0,
+            "CaptureHits": 25,
+            "InventoryMs": 1217.6688000000001,
+            "CaptureMs": 0.11270000000000002,
+            "EnvelopeMs": 0,
+            "StaticMs": 117.878,
+            "ProcessMs": 131.19779999999994,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 0.5098000000000008,
+            "PrecheckOnlyJobs": 120,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 1,
+            "CatalogMisses": 0,
+            "GeometryHits": 120,
+            "GeometryMisses": 0,
+            "StaticHits": 0,
+            "StaticMisses": 120,
+            "ProcessHits": 0,
+            "ProcessMisses": 120,
+            "CacheBytes": 40962392,
+            "PeakManagedBytes": 183704848,
+            "PeakWorkers": 4
+          },
+          {
+            "Name": "selected-10",
+            "WallMs": 17145.5121,
+            "MaximumStaCaptureMs": 2737.7272000000003,
+            "Components": 10,
+            "UniqueParts": 7,
+            "Jobs": 10,
+            "Captures": 7,
+            "CaptureHits": 0,
+            "InventoryMs": 301.3326,
+            "CaptureMs": 14739.884000000002,
+            "EnvelopeMs": 1.818,
+            "StaticMs": 12.7599,
+            "ProcessMs": 22.676,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 0.0569,
+            "PrecheckOnlyJobs": 10,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 0,
+            "CatalogMisses": 1,
+            "GeometryHits": 3,
+            "GeometryMisses": 7,
+            "StaticHits": 0,
+            "StaticMisses": 10,
+            "ProcessHits": 0,
+            "ProcessMisses": 10,
+            "CacheBytes": 3241776,
+            "PeakManagedBytes": 206856120,
+            "PeakWorkers": 2
+          }
+        ],
+        "Ui120-cold": {
+          "PlanningMilliseconds": 195.17080000000004,
+          "NativeCaptureMilliseconds": 56783.2803,
+          "WorkerMilliseconds": 1080.1555,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.4544,
+          "SnapshotCopyMilliseconds": 530.6901,
+          "ViewModelMilliseconds": 378.7774,
+          "GridRenderingMilliseconds": 301.8378,
+          "RunToVisibleMilliseconds": 72988.17210000001
+        },
+        "Ui120-warm": {
+          "PlanningMilliseconds": 147.80840000000003,
+          "NativeCaptureMilliseconds": 0.20599999999999996,
+          "WorkerMilliseconds": 1113.4566,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.15480000000000002,
+          "SnapshotCopyMilliseconds": 529.0757000000001,
+          "ViewModelMilliseconds": 386.15250000000003,
+          "GridRenderingMilliseconds": 358.88980000000004,
+          "RunToVisibleMilliseconds": 14725.057700000001
+        },
+        "NativeLifecycle": {
+          "Cancellation": true,
+          "RestartCaptureHits": 25,
+          "ChangedWorkbookBeforePublication": true
+        },
+        "LightweightProbe": {
+          "SetReturn": 2,
+          "Observed": 1,
+          "RestoreReturn": 2,
+          "Restored": true,
+          "StampBefore": 908,
+          "StampAfter": 908,
+          "DirtyBefore": false,
+          "DirtyAfter": false,
+          "BackendResolveCount": 0
+        },
+        "MixedNativeScopes": {
+          "All": true,
+          "Selected": true,
+          "Normal": 2,
+          "Reflected": 2,
+          "AssemblyCut": 1,
+          "Flexible": 1,
+          "Lightweight": 0,
+          "Suppressed": 1,
+          "MinimumGroupQuantity": 5,
+          "MinimumGeometryReads": 1,
+          "NumericQueries": 0,
+          "WorkerComQueries": 0
+        },
+        "MixedOccurrenceIsolation": {
+          "Normal": 1,
+          "Blocked": 2,
+          "ExactReason": "MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM"
+        },
+        "NativeEdgeFixtures": {
+          "NonSheetMetal": 1,
+          "Multibody": 1,
+          "Virtual": 1,
+          "OppositeHandMirrorFeature": false,
+          "Mirrored": 0,
+          "ReflectedTransforms": 2,
+          "AssemblyCut": 1
+        },
+        "LegacyLateShownOwnershipGuard": "PASS",
+        "LegacyMinResumesAfterBatch": "PASS",
+        "OppositeHandMirrorFeature": "NOT_RUN: native CreateFeature returned null; no mirrored flag fabricated",
+        "LightweightInFlexibleFixture": "NOT_RUN: requested lightweight but native state was 2; standalone native LW batch is checked separately",
+        "Shutdown": {
+          "FunctionalExitCode": 0,
+          "ShutdownExitCode": 0,
+          "ShutdownResult": "PASS"
+        }
+      },
+      "AssemblyDefaultScope": {
+        "Result": "FAIL",
+        "Assertions": 56,
+        "Reason": "RPC_0x800706BE_IComponent2_GetParent_before_numeric_and_late_timer_test",
+        "ShutdownExitCode": -1
+      },
+      "Native33": "NOT_RUN on current binary"
+    },
+    "release": {
+      "Inprocess": "FAIL_STARTUP before product load",
+      "Part": "NOT_RUN on current binary",
+      "Assembly": "NOT_RUN on current binary",
+      "Native33": "NOT_RUN on current binary"
+    }
+  },
+  "RetainedCheckpoint": "60aa31d762d4f2f0d4cf7b24bae5082be545d2d8",
+  "Retained": {
+    "debug": {
+      "ProductSha256": "b4fa22ad7ffe3e5fdae03773df0242f33d138aa6b2fc396cb9a8fc6858493bcd",
+      "Inprocess": {
+        "Inprocess": {
+          "Pid": 57892,
+          "Apartment": "STA",
+          "DllSha256": "b4fa22ad7ffe3e5fdae03773df0242f33d138aa6b2fc396cb9a8fc6858493bcd",
+          "Mvid": "75cd5d7e-99b7-440c-80d8-df61254bca38",
+          "TargetConnectReturned": true,
+          "CommandWindowOpened": true,
+          "Parts": 1,
+          "Bends": 2,
+          "Candidates": 36,
+          "NativeFeatureIds": [
+            53,
+            59
+          ],
+          "FixtureUnchanged": true,
+          "FunctionalResult": "PASS"
+        },
+        "Disconnect": {
+          "TargetDisconnectReturned": true,
+          "TargetAppAndPaneDetached": true,
+          "BorrowedHostStillUsable": true
+        },
+        "ShutdownResult": "PASS",
+        "Result": "PASS",
+        "Protection": {
+          "FixtureBytesUnchanged": true,
+          "StartupSettingsUnchanged": true
+        }
+      },
+      "Part": {
+        "Result": "PASS",
+        "Assertions": 219,
+        "FunctionalResult": "PASS",
+        "ShutdownResult": "PASS",
+        "ShutdownExitCode": 0,
+        "Part0Result": "PASS",
+        "Part3Result": "PASS",
+        "Part6Result": "PASS",
+        "Part3RebuildRefresh": "PASS",
+        "Part0Cold": {
+          "PlanningMilliseconds": 0,
+          "NativeCaptureMilliseconds": 587.4814,
+          "WorkerMilliseconds": 26.015900000000002,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.4073,
+          "SnapshotCopyMilliseconds": 1.2034,
+          "ViewModelMilliseconds": 20.087600000000002,
+          "GridRenderingMilliseconds": 82.1572,
+          "RunToVisibleMilliseconds": 2725.5074
+        },
+        "Part0Warm": {
+          "PlanningMilliseconds": 0,
+          "NativeCaptureMilliseconds": 0.0054,
+          "WorkerMilliseconds": 0.6588,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.124,
+          "SnapshotCopyMilliseconds": 0.02940000000000001,
+          "ViewModelMilliseconds": 9.1129,
+          "GridRenderingMilliseconds": 25.323,
+          "RunToVisibleMilliseconds": 1121.163
+        },
+        "Part3Cold": {
+          "PlanningMilliseconds": 5.3356,
+          "NativeCaptureMilliseconds": 2827.1171,
+          "WorkerMilliseconds": 139.0235,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.11810000000000001,
+          "SnapshotCopyMilliseconds": 2.0029000000000003,
+          "ViewModelMilliseconds": 15.4267,
+          "GridRenderingMilliseconds": 326.09360000000004,
+          "RunToVisibleMilliseconds": 5997.6814
+        },
+        "Part3Warm": {
+          "PlanningMilliseconds": 0.686,
+          "NativeCaptureMilliseconds": 0.0077,
+          "WorkerMilliseconds": 15.5746,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.06840000000000002,
+          "SnapshotCopyMilliseconds": 1.2255,
+          "ViewModelMilliseconds": 2.3245,
+          "GridRenderingMilliseconds": 166.2259,
+          "RunToVisibleMilliseconds": 1565.7314000000001
+        },
+        "Part6Cold": {
+          "PlanningMilliseconds": 0.9156000000000001,
+          "NativeCaptureMilliseconds": 5412.3628,
+          "WorkerMilliseconds": 72.257,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.0563,
+          "SnapshotCopyMilliseconds": 1.2759,
+          "ViewModelMilliseconds": 2.3972,
+          "GridRenderingMilliseconds": 306.4015,
+          "RunToVisibleMilliseconds": 8294.5299
+        },
+        "Part6Warm": {
+          "PlanningMilliseconds": 0.9061,
+          "NativeCaptureMilliseconds": 0.009000000000000001,
+          "WorkerMilliseconds": 50.798,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.10370000000000001,
+          "SnapshotCopyMilliseconds": 1.0677,
+          "ViewModelMilliseconds": 2.0820000000000003,
+          "GridRenderingMilliseconds": 247.24820000000003,
+          "RunToVisibleMilliseconds": 1924.0729000000001
+        }
+      },
+      "Assembly": {
+        "Result": "PASS",
+        "Assertions": 4149,
+        "BaselineFixtureSourceUnchanged": true,
+        "CompanyNumericBenchmark": false,
+        "Performance": [
+          {
+            "Name": "cold-all",
+            "WallMs": 77479.48610000001,
+            "MaximumStaCaptureMs": 3728.3605000000002,
+            "Components": 120,
+            "UniqueParts": 25,
+            "Jobs": 120,
+            "Captures": 25,
+            "CaptureHits": 0,
+            "InventoryMs": 3901.9468,
+            "CaptureMs": 66292.3525,
+            "EnvelopeMs": 14.8419,
+            "StaticMs": 386.79579999999976,
+            "ProcessMs": 473.6563,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 2.90420000000001,
+            "PrecheckOnlyJobs": 120,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 0,
+            "CatalogMisses": 1,
+            "GeometryHits": 95,
+            "GeometryMisses": 25,
+            "StaticHits": 0,
+            "StaticMisses": 120,
+            "ProcessHits": 0,
+            "ProcessMisses": 120,
+            "CacheBytes": 34777984,
+            "PeakManagedBytes": 224567224,
+            "PeakWorkers": 4
+          },
+          {
+            "Name": "warm-all",
+            "WallMs": 9003.1515,
+            "MaximumStaCaptureMs": 0.011300000000000001,
+            "Components": 120,
+            "UniqueParts": 25,
+            "Jobs": 120,
+            "Captures": 0,
+            "CaptureHits": 25,
+            "InventoryMs": 1857.5088,
+            "CaptureMs": 0.14479999999999998,
+            "EnvelopeMs": 0,
+            "StaticMs": 306.0376000000001,
+            "ProcessMs": 496.2673999999999,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 1.0966999999999991,
+            "PrecheckOnlyJobs": 120,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 1,
+            "CatalogMisses": 0,
+            "GeometryHits": 120,
+            "GeometryMisses": 0,
+            "StaticHits": 0,
+            "StaticMisses": 120,
+            "ProcessHits": 0,
+            "ProcessMisses": 120,
+            "CacheBytes": 40962392,
+            "PeakManagedBytes": 199197680,
+            "PeakWorkers": 4
+          },
+          {
+            "Name": "selected-10",
+            "WallMs": 13497.662600000001,
+            "MaximumStaCaptureMs": 2827.4280000000003,
+            "Components": 10,
+            "UniqueParts": 4,
+            "Jobs": 10,
+            "Captures": 4,
+            "CaptureHits": 0,
+            "InventoryMs": 557.784,
+            "CaptureMs": 10695.972300000001,
+            "EnvelopeMs": 2.1751,
+            "StaticMs": 21.4075,
+            "ProcessMs": 34.5952,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 0.07180000000000002,
+            "PrecheckOnlyJobs": 10,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 0,
+            "CatalogMisses": 1,
+            "GeometryHits": 6,
+            "GeometryMisses": 4,
+            "StaticHits": 0,
+            "StaticMisses": 10,
+            "ProcessHits": 0,
+            "ProcessMisses": 10,
+            "CacheBytes": 3032688,
+            "PeakManagedBytes": 219544176,
+            "PeakWorkers": 2
+          }
+        ],
+        "Ui120-cold": {
+          "PlanningMilliseconds": 113.20289999999999,
+          "NativeCaptureMilliseconds": 68566.7497,
+          "WorkerMilliseconds": 1122.6025,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.32530000000000003,
+          "SnapshotCopyMilliseconds": 709.6886000000001,
+          "ViewModelMilliseconds": 301.7087,
+          "GridRenderingMilliseconds": 263.3142,
+          "RunToVisibleMilliseconds": 166465.97100000002
+        },
+        "Ui120-warm": {
+          "PlanningMilliseconds": 88.35260000000001,
+          "NativeCaptureMilliseconds": 0.15460000000000002,
+          "WorkerMilliseconds": 919.5913,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.1922,
+          "SnapshotCopyMilliseconds": 410.84000000000003,
+          "ViewModelMilliseconds": 275.4393,
+          "GridRenderingMilliseconds": 348.61060000000003,
+          "RunToVisibleMilliseconds": 18144.177200000002
+        },
+        "NativeLifecycle": {
+          "Cancellation": true,
+          "RestartCaptureHits": 25,
+          "ChangedWorkbookBeforePublication": true
+        },
+        "LightweightProbe": {
+          "SetReturn": 2,
+          "Observed": 1,
+          "RestoreReturn": 2,
+          "Restored": true,
+          "StampBefore": 908,
+          "StampAfter": 908,
+          "DirtyBefore": false,
+          "DirtyAfter": false,
+          "BackendResolveCount": 0
+        },
+        "MixedNativeScopes": {
+          "All": true,
+          "Selected": true,
+          "Normal": 2,
+          "Reflected": 2,
+          "AssemblyCut": 1,
+          "Flexible": 1,
+          "Lightweight": 0,
+          "Suppressed": 1,
+          "MinimumGroupQuantity": 5,
+          "MinimumGeometryReads": 1,
+          "NumericQueries": 0,
+          "WorkerComQueries": 0
+        },
+        "MixedOccurrenceIsolation": {
+          "Normal": 1,
+          "Blocked": 2,
+          "ExactReason": "MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM"
+        },
+        "NativeEdgeFixtures": {
+          "NonSheetMetal": 1,
+          "Multibody": 1,
+          "Virtual": 1,
+          "OppositeHandMirrorFeature": false,
+          "Mirrored": 0,
+          "ReflectedTransforms": 2,
+          "AssemblyCut": 1
+        },
+        "OppositeHandMirrorFeature": "NOT_RUN: native CreateFeature returned null; no mirrored flag fabricated",
+        "LightweightInFlexibleFixture": "NOT_RUN: requested lightweight but native state was 2; standalone native LW batch is checked separately",
+        "Shutdown": {
+          "FunctionalExitCode": 0,
+          "ShutdownExitCode": 0,
+          "ShutdownResult": "PASS"
+        }
+      },
+      "Native33": {
+        "FunctionalResult": "PASS",
+        "OverallResult": "PASS",
+        "ShutdownResult": "PASS",
+        "Assertions": 3879,
+        "Execution": {
+          "PASS": 33
+        },
+        "NativeGeometryExactlyEqualToPr35": true,
+        "ColdOutputExactlyEqualToPr35": true,
+        "ProtectedSourcesUnchanged": true,
+        "NativeBends": 72,
+        "StaticRows": 1296,
+        "ProcessRows": 1296,
+        "Minimum": {
+          "MeetsMinimum": 69,
+          "BelowMinimum": 3
+        },
+        "Manufacturing": {
+          "CHUA_XAC_MINH": 33
+        },
+        "Cold": {
+          "MeanVisibleMs": 3897.9171060606063,
+          "MinimumVisibleMs": 3370.8652,
+          "MaximumVisibleMs": 5185.4791000000005,
+          "Captures": 33,
+          "CaptureHits": 0,
+          "NumericQueries": 0
+        },
+        "Warm": {
+          "MeanVisibleMs": 1187.4517545454546,
+          "MinimumVisibleMs": 998.3886,
+          "MaximumVisibleMs": 1793.8654000000001,
+          "Captures": 0,
+          "CaptureHits": 33,
+          "NumericQueries": 0
+        },
+        "ComparisonResult": "PASS"
+      }
+    },
+    "release": {
+      "ProductSha256": "029b3df3ae9229575e031ded6e2eace1ac892a064db67d98b087df0553542720",
+      "Inprocess": {
+        "Inprocess": {
+          "Pid": 37108,
+          "Apartment": "STA",
+          "DllSha256": "029b3df3ae9229575e031ded6e2eace1ac892a064db67d98b087df0553542720",
+          "Mvid": "c0ed19d9-9e97-45d2-912b-f5776e4b324b",
+          "TargetConnectReturned": true,
+          "CommandWindowOpened": true,
+          "Parts": 1,
+          "Bends": 2,
+          "Candidates": 36,
+          "NativeFeatureIds": [
+            53,
+            59
+          ],
+          "FixtureUnchanged": true,
+          "FunctionalResult": "PASS"
+        },
+        "Disconnect": {
+          "TargetDisconnectReturned": true,
+          "TargetAppAndPaneDetached": true,
+          "BorrowedHostStillUsable": true
+        },
+        "ShutdownResult": "PASS",
+        "Result": "PASS",
+        "Protection": {
+          "FixtureBytesUnchanged": true,
+          "StartupSettingsUnchanged": true
+        }
+      },
+      "Part": {
+        "Result": "PASS",
+        "Assertions": 219,
+        "FunctionalResult": "PASS",
+        "ShutdownResult": "PASS",
+        "ShutdownExitCode": 0,
+        "Part0Result": "PASS",
+        "Part3Result": "PASS",
+        "Part6Result": "PASS",
+        "Part3RebuildRefresh": "PASS",
+        "Part0Cold": {
+          "PlanningMilliseconds": 0,
+          "NativeCaptureMilliseconds": 616.0399,
+          "WorkerMilliseconds": 28.495900000000002,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.175,
+          "SnapshotCopyMilliseconds": 1.8316000000000001,
+          "ViewModelMilliseconds": 32.9947,
+          "GridRenderingMilliseconds": 83.19420000000001,
+          "RunToVisibleMilliseconds": 2473.5788000000002
+        },
+        "Part0Warm": {
+          "PlanningMilliseconds": 0,
+          "NativeCaptureMilliseconds": 0.0034000000000000002,
+          "WorkerMilliseconds": 0.368,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.026900000000000004,
+          "SnapshotCopyMilliseconds": 0.0202,
+          "ViewModelMilliseconds": 0.0811,
+          "GridRenderingMilliseconds": 25.905800000000003,
+          "RunToVisibleMilliseconds": 894.3625000000001
+        },
+        "Part3Cold": {
+          "PlanningMilliseconds": 3.5824000000000003,
+          "NativeCaptureMilliseconds": 3243.3922000000002,
+          "WorkerMilliseconds": 142.6626,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.0531,
+          "SnapshotCopyMilliseconds": 2.1878,
+          "ViewModelMilliseconds": 11.0129,
+          "GridRenderingMilliseconds": 299.7889,
+          "RunToVisibleMilliseconds": 5329.5348
+        },
+        "Part3Warm": {
+          "PlanningMilliseconds": 0.5499,
+          "NativeCaptureMilliseconds": 0.0021000000000000003,
+          "WorkerMilliseconds": 8.520100000000001,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.05660000000000001,
+          "SnapshotCopyMilliseconds": 16.235300000000002,
+          "ViewModelMilliseconds": 1.9826000000000001,
+          "GridRenderingMilliseconds": 262.9268,
+          "RunToVisibleMilliseconds": 1102.7915
+        },
+        "Part6Cold": {
+          "PlanningMilliseconds": 0.6935,
+          "NativeCaptureMilliseconds": 5873.0247,
+          "WorkerMilliseconds": 49.1971,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.035,
+          "SnapshotCopyMilliseconds": 1.2972000000000001,
+          "ViewModelMilliseconds": 4.7603,
+          "GridRenderingMilliseconds": 269.18260000000004,
+          "RunToVisibleMilliseconds": 7799.696900000001
+        },
+        "Part6Warm": {
+          "PlanningMilliseconds": 0.6321,
+          "NativeCaptureMilliseconds": 0.0059,
+          "WorkerMilliseconds": 21.357100000000003,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.0581,
+          "SnapshotCopyMilliseconds": 2.6486,
+          "ViewModelMilliseconds": 3.3541000000000003,
+          "GridRenderingMilliseconds": 275.6958,
+          "RunToVisibleMilliseconds": 1570.8027000000002
+        }
+      },
+      "Assembly": {
+        "Result": "PASS",
+        "Assertions": 4149,
+        "BaselineFixtureSourceUnchanged": true,
+        "CompanyNumericBenchmark": false,
+        "Performance": [
+          {
+            "Name": "cold-all",
+            "WallMs": 78369.4948,
+            "MaximumStaCaptureMs": 3463.82,
+            "Components": 120,
+            "UniqueParts": 25,
+            "Jobs": 120,
+            "Captures": 25,
+            "CaptureHits": 0,
+            "InventoryMs": 3762.2851,
+            "CaptureMs": 67288.699,
+            "EnvelopeMs": 16.258900000000004,
+            "StaticMs": 385.47010000000023,
+            "ProcessMs": 451.0329,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 16.8341999999999,
+            "PrecheckOnlyJobs": 120,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 0,
+            "CatalogMisses": 1,
+            "GeometryHits": 95,
+            "GeometryMisses": 25,
+            "StaticHits": 0,
+            "StaticMisses": 120,
+            "ProcessHits": 0,
+            "ProcessMisses": 120,
+            "CacheBytes": 34777984,
+            "PeakManagedBytes": 152761944,
+            "PeakWorkers": 4
+          },
+          {
+            "Name": "warm-all",
+            "WallMs": 8698.8116,
+            "MaximumStaCaptureMs": 0.0241,
+            "Components": 120,
+            "UniqueParts": 25,
+            "Jobs": 120,
+            "Captures": 0,
+            "CaptureHits": 25,
+            "InventoryMs": 1728.8700000000001,
+            "CaptureMs": 0.11980000000000002,
+            "EnvelopeMs": 0,
+            "StaticMs": 264.58650000000006,
+            "ProcessMs": 550.5404000000001,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 0.5081000000000006,
+            "PrecheckOnlyJobs": 120,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 1,
+            "CatalogMisses": 0,
+            "GeometryHits": 120,
+            "GeometryMisses": 0,
+            "StaticHits": 0,
+            "StaticMisses": 120,
+            "ProcessHits": 0,
+            "ProcessMisses": 120,
+            "CacheBytes": 40962392,
+            "PeakManagedBytes": 213755136,
+            "PeakWorkers": 4
+          },
+          {
+            "Name": "selected-10",
+            "WallMs": 21041.661,
+            "MaximumStaCaptureMs": 3083.7455,
+            "Components": 10,
+            "UniqueParts": 7,
+            "Jobs": 10,
+            "Captures": 7,
+            "CaptureHits": 0,
+            "InventoryMs": 505.70730000000003,
+            "CaptureMs": 17651.4688,
+            "EnvelopeMs": 2.0202999999999998,
+            "StaticMs": 14.358799999999999,
+            "ProcessMs": 35.00300000000001,
+            "KernelMs": 0,
+            "Queries": 0,
+            "PrecheckMs": 0.044000000000000004,
+            "PrecheckOnlyJobs": 10,
+            "ResolveCount": 0,
+            "ResolveMilliseconds": 0,
+            "CatalogHits": 0,
+            "CatalogMisses": 1,
+            "GeometryHits": 3,
+            "GeometryMisses": 7,
+            "StaticHits": 0,
+            "StaticMisses": 10,
+            "ProcessHits": 0,
+            "ProcessMisses": 10,
+            "CacheBytes": 3241776,
+            "PeakManagedBytes": 171068568,
+            "PeakWorkers": 2
+          }
+        ],
+        "Ui120-cold": {
+          "PlanningMilliseconds": 78.6786,
+          "NativeCaptureMilliseconds": 68126.59980000001,
+          "WorkerMilliseconds": 860.9545,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.27180000000000004,
+          "SnapshotCopyMilliseconds": 407.0452,
+          "ViewModelMilliseconds": 295.0621,
+          "GridRenderingMilliseconds": 309.8687,
+          "RunToVisibleMilliseconds": 166994.17380000002
+        },
+        "Ui120-warm": {
+          "PlanningMilliseconds": 121.5053,
+          "NativeCaptureMilliseconds": 0.0973,
+          "WorkerMilliseconds": 1069.8079,
+          "NumericSolverMilliseconds": 0,
+          "SnapshotValidationMilliseconds": 0.1295,
+          "SnapshotCopyMilliseconds": 276.75320000000005,
+          "ViewModelMilliseconds": 317.94190000000003,
+          "GridRenderingMilliseconds": 254.86100000000002,
+          "RunToVisibleMilliseconds": 18102.0479
+        },
+        "NativeLifecycle": {
+          "Cancellation": true,
+          "RestartCaptureHits": 25,
+          "ChangedWorkbookBeforePublication": true
+        },
+        "LightweightProbe": {
+          "SetReturn": 2,
+          "Observed": 1,
+          "RestoreReturn": 2,
+          "Restored": true,
+          "StampBefore": 908,
+          "StampAfter": 908,
+          "DirtyBefore": false,
+          "DirtyAfter": false,
+          "BackendResolveCount": 0
+        },
+        "MixedNativeScopes": {
+          "All": true,
+          "Selected": true,
+          "Normal": 2,
+          "Reflected": 2,
+          "AssemblyCut": 1,
+          "Flexible": 1,
+          "Lightweight": 0,
+          "Suppressed": 1,
+          "MinimumGroupQuantity": 5,
+          "MinimumGeometryReads": 1,
+          "NumericQueries": 0,
+          "WorkerComQueries": 0
+        },
+        "MixedOccurrenceIsolation": {
+          "Normal": 1,
+          "Blocked": 2,
+          "ExactReason": "MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM"
+        },
+        "NativeEdgeFixtures": {
+          "NonSheetMetal": 1,
+          "Multibody": 1,
+          "Virtual": 1,
+          "OppositeHandMirrorFeature": false,
+          "Mirrored": 0,
+          "ReflectedTransforms": 2,
+          "AssemblyCut": 1
+        },
+        "OppositeHandMirrorFeature": "NOT_RUN: native CreateFeature returned null; no mirrored flag fabricated",
+        "LightweightInFlexibleFixture": "NOT_RUN: requested lightweight but native state was 2; standalone native LW batch is checked separately",
+        "Shutdown": {
+          "FunctionalExitCode": 0,
+          "ShutdownExitCode": 0,
+          "ShutdownResult": "PASS"
+        }
+      },
+      "Native33": {
+        "FunctionalResult": "PASS",
+        "OverallResult": "PASS",
+        "ShutdownResult": "PASS",
+        "Assertions": 3879,
+        "Execution": {
+          "PASS": 33
+        },
+        "NativeGeometryExactlyEqualToPr35": true,
+        "ColdOutputExactlyEqualToPr35": true,
+        "ProtectedSourcesUnchanged": true,
+        "NativeBends": 72,
+        "StaticRows": 1296,
+        "ProcessRows": 1296,
+        "Minimum": {
+          "MeetsMinimum": 69,
+          "BelowMinimum": 3
+        },
+        "Manufacturing": {
+          "CHUA_XAC_MINH": 33
+        },
+        "Cold": {
+          "MeanVisibleMs": 3383.0436,
+          "MinimumVisibleMs": 2097.3654,
+          "MaximumVisibleMs": 4771.8201,
+          "Captures": 33,
+          "CaptureHits": 0,
+          "NumericQueries": 0
+        },
+        "Warm": {
+          "MeanVisibleMs": 985.7270121212122,
+          "MinimumVisibleMs": 660.3101,
+          "MaximumVisibleMs": 1681.1209000000001,
+          "Captures": 0,
+          "CaptureHits": 33,
+          "NumericQueries": 0
+        },
+        "ComparisonResult": "PASS"
+      }
+    }
+  }
+}

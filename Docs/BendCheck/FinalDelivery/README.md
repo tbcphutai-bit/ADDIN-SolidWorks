@@ -1,5 +1,7 @@
 # FINAL CHECK CHẤN — Codex research and implementation packet
 
+Current PR #37 evidence: [consolidated fix and acceptance](FINAL_CONSOLIDATED_ACCEPTANCE.md). It records the final source checkpoint, isolated native lifecycle, 18-Holder readiness, 33-Part replay, retained failures and remaining production gates. The earlier validation below is historical.
+
 Implementation follow-up: [architecture](IMPLEMENTED_ARCHITECTURE.md), [private review input workflow](REVIEW_INPUT_WORKFLOW.md), and [executed validation / unresolved acceptance gates](VALIDATION_IMPLEMENTATION.md). The packet below remains the original design handoff; its reference classes are not a manufacturing authority.
 
 **Branch built on PR #35; planning/reference commit only. Not production code, not independently native tested.**

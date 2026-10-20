@@ -1,5 +1,7 @@
 # Executed final-delivery validation — 2026-10-20
 
+> Historical checkpoint. See [the consolidated PR #37 report](FINAL_CONSOLIDATED_ACCEPTANCE.md) for later fixes, exact source/binary identity, owned-session A/B isolation and final replay results. Failures recorded here are retained; they are not rewritten as PASS.
+
 **Verdict: NOT ACCEPTED for production / keep Draft.** The implementation, input workflow and functional tests are delivered. Real-company mounting/process evidence is absent, and native clean shutdown still fails its original gate. No manufacturing PASS, approved company datum or replacement CAD was generated.
 
 ## Source and architecture

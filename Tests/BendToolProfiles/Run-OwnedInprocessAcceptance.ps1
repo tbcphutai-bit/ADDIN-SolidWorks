@@ -42,6 +42,11 @@ try {
 }
 if($before -ne $after){throw 'Startup settings changed during controlled test; investigate instead of claiming PASS'}
 $report=Get-Content -LiteralPath (Join-Path $OutputDirectory 'PRIVATE-inprocess-audit.json') -Raw | ConvertFrom-Json
+if($runCode -ne 0 -or $report.Result -ne 'PASS'){
+    # Startup can fail before any target assembly is loaded. Preserve that
+    # failure instead of describing a missing observation as a SHA mismatch.
+    Write-Output "Owned in-process acceptance failed: functional=$($report.FunctionalResult), shutdown=$($report.ShutdownResult). See the private audit."
+    exit 1
+}
 if($report.InprocessResult.DllSha256 -ne (Get-FileHash -LiteralPath $ProductDll -Algorithm SHA256).Hash.ToLowerInvariant()){throw 'Actual in-process DLL SHA mismatch'}
-if($runCode -ne 0 -or $report.Result -ne 'PASS'){exit 1}
 exit 0

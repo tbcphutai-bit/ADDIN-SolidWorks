@@ -1,0 +1,67 @@
+{
+  "Cases": [
+    {
+      "Condition": "Baseline_AllInstalledLoaded",
+      "DllSha256": "d46f69f0ce58d05f32fb933dcea97556fe9198d0ab60e0c0e9cf1200fffea00e",
+      "TargetConnectReturned": true,
+      "CommandWindowOpened": true,
+      "FunctionalResult": "PASS",
+      "TargetDisconnectReturned": true,
+      "ShutdownResult": "NOT_CONFIRMED",
+      "Result": "FAIL"
+    },
+    {
+      "Condition": "PreConsolidated_AllInstalledLoaded",
+      "DllSha256": "be67816aa736a0bbaf69b4a5e4a3544856269c750c2b521cb01bce907be487c1",
+      "TargetConnectReturned": true,
+      "CommandWindowOpened": true,
+      "FunctionalResult": "PASS",
+      "TargetDisconnectReturned": true,
+      "ShutdownResult": "NOT_CONFIRMED",
+      "Result": "FAIL"
+    },
+    {
+      "Condition": "PreConsolidated_AllRegisteredUnloaded",
+      "DllSha256": "be67816aa736a0bbaf69b4a5e4a3544856269c750c2b521cb01bce907be487c1",
+      "TargetConnectReturned": true,
+      "CommandWindowOpened": true,
+      "FunctionalResult": "PASS",
+      "TargetDisconnectReturned": true,
+      "ShutdownResult": "PASS",
+      "Result": "PASS"
+    },
+    {
+      "Condition": "Baseline_OnlyXToolProUnloaded",
+      "DllSha256": "d46f69f0ce58d05f32fb933dcea97556fe9198d0ab60e0c0e9cf1200fffea00e",
+      "TargetConnectReturned": true,
+      "CommandWindowOpened": true,
+      "FunctionalResult": "PASS",
+      "TargetDisconnectReturned": true,
+      "ShutdownResult": "PASS",
+      "Result": "PASS"
+    },
+    {
+      "Condition": "PreConsolidatedRelease_OnlyXToolProUnloaded",
+      "DllSha256": "be67816aa736a0bbaf69b4a5e4a3544856269c750c2b521cb01bce907be487c1",
+      "TargetConnectReturned": true,
+      "CommandWindowOpened": true,
+      "FunctionalResult": "PASS",
+      "TargetDisconnectReturned": true,
+      "ShutdownResult": "PASS",
+      "Result": "PASS"
+    },
+    {
+      "Condition": "PreConsolidatedDebug_OnlyXToolProUnloaded",
+      "DllSha256": "857774d79e10f7e7bf4813b42c668aa72fd4bc0ac5b71adbf22ee83d80eab47f",
+      "TargetConnectReturned": true,
+      "CommandWindowOpened": true,
+      "FunctionalResult": "PASS",
+      "TargetDisconnectReturned": true,
+      "ShutdownResult": "PASS",
+      "Result": "PASS"
+    }
+  ],
+  "Crash": "0xc0000374_HEAP_DOUBLE_FREE_Taskpane_RCW_COM_shutdown",
+  "Verdict": "Reproducible coexistence condition; external add-in repair not established; no production auto-unload",
+  "RawDumpPublished": false
+}

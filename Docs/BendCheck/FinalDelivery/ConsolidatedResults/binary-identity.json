@@ -1,0 +1,21 @@
+{
+  "CurrentProductSourceCheckpoint": "7c837b96b7231ca5d689b3602a48622a52e7908b",
+  "CurrentProductSha256": {
+    "debug": "cab8a4345f3a115004c19e94e08d2f63cd85573b5e3e9b113657fc0bb9eb1252",
+    "release": "72d1fedfaf9a4577d03e2978e04c0de4cfd5938ed55f34cc1b816ce8af56c0c3"
+  },
+  "NativeHarnessSha256": {
+    "debug": "fb4cd2fbb4277a4ed31e4e47a327a89fb03257d88f53cd66c7b7461589f050f6",
+    "release": "2c4f6ebee3c01e3b6335fe9476429d250251bd3628f6e383bf5a6d92fbb2bc87"
+  },
+  "TestBridgeSha256": "a6605597d68216b2712d48f68b899ce3eb68241abcf9920f16ce5eab7ddaae42",
+  "RetainedNativeCheckpoint": "60aa31d762d4f2f0d4cf7b24bae5082be545d2d8",
+  "RetainedProductSha256": {
+    "debug": "b4fa22ad7ffe3e5fdae03773df0242f33d138aa6b2fc396cb9a8fc6858493bcd",
+    "release": "029b3df3ae9229575e031ded6e2eace1ac892a064db67d98b087df0553542720"
+  },
+  "Native33Checkpoint": "60aa31d762d4f2f0d4cf7b24bae5082be545d2d8",
+  "FinalCheckpointNative33": "NOT_RUN after owned startup failure; retained earlier binary results are not relabeled",
+  "ActivationScope": "Actual target lifecycle and command on host STA through explicit temporary test control; production registered callback/cookie deployment NOT_RUN",
+  "Isolation": "Only installed XToolPro unloaded inside exact owned test PID; original startup flags unchanged"
+}

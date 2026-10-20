@@ -1,0 +1,59 @@
+{
+  "2D": {
+    "Passed": true,
+    "Cases": 552,
+    "Counts": {
+      "CLEAR": 346,
+      "COLLISION": 201,
+      "UNKNOWN": 5
+    },
+    "Shapely": "2.2.0",
+    "GEOS": "3.14.1",
+    "ArcSagittaAllowanceMm": 1e-07,
+    "FalseClear": 0,
+    "FalseCollision": 0,
+    "MaximumLowerCertificateExcessMm": 0.0
+  },
+  "Axial": {
+    "Passed": true,
+    "Cases": 426,
+    "Counts": {
+      "COLLISION": 196,
+      "CLEAR": 229,
+      "UNKNOWN": 1
+    },
+    "FalseClear": 0,
+    "FalseCollision": 0,
+    "Reference": "Independent analytic source cell union and box-minus-cylinder, no sampled proof"
+  },
+  "NativeFamily": {
+    "Passed": true,
+    "Cases": 480,
+    "Counts": {
+      "COLLISION": 297,
+      "CLEAR": 182,
+      "UNKNOWN": 1
+    },
+    "FalseClear": 0,
+    "FalseCollision": 0,
+    "Reference": "Independent exact box-minus-cylinder and quarter-annular extrusion source volumes"
+  },
+  "Motion": {
+    "cases": 182,
+    "statuses": {
+      "CLEAR": 32,
+      "COLLISION": 148,
+      "UNKNOWN": 2
+    },
+    "sparse_three_angles_miss": 103,
+    "errors": [],
+    "method": "ClosedFormRotatingRectangleVsDiskContinuousAngleV1"
+  },
+  "NumericReference": {
+    "ExactRecordsEqual": 1620,
+    "Queries": 13932,
+    "Intervals": 2268,
+    "Refinements": 540
+  },
+  "Scope": "Numeric/geometry code unchanged by later legacy timer guard; company physical numeric queries remain zero"
+}
