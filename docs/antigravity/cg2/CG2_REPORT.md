@@ -1,10 +1,12 @@
-# CHECK HOLE CG2 — ANTIGRAVITY ONE-SHOT BREP VERIFICATION REPORT
+# CHECK HOLE CG2.1 — ANTIGRAVITY ONE-SHOT EXECUTION REPORT
 
-> **STATUS: CG2 BREP COM 9-DOUBLE RAY FIX VERIFIED — FACTUAL EVIDENCE RECORDED**
+> **STATUS: CG2.1 ONE-SHOT EXECUTION REPORTED — COMPILER ERROR RECORDED PER PROTOCOL**
 > Branch: `feat/check-hole-cg2-part-relations` | PR: [Draft PR #33](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/33)  
-> Remote HEAD SHA (Code): `44d6fc8c454e99f1fa02c638e53aa8f244583161`  
-> All C# code authored and committed by ChatGPT. Antigravity applied code verbatim (`ANTI_CSHARP_MODIFICATION=NO`, `ANTI_C_SHARP_CHANGES=0`).  
-> Broad-phase AABB and diagnostic BREP solid-body ray testing confirmed read-only (`CHECK_ONLY`); zero mutations to production Check Hole verdicts, tolerances, or 3D markers.  
+> Remote HEAD SHA (Code): `fc7f5348de45de046726a139ef2685e57ab52aea`  
+> All C# code authored and committed by ChatGPT. Antigravity applied code verbatim (`C_SHARP_EDITED_BY_ANTI=NO`, `ANTI_C_SHARP_CHANGES=0`).  
+> Visual Studio MSBuild 18.10.1 Debug|x64 and Release|x64 compiled cleanly (`ADDIN.dll`).  
+> Offline test harness (`CG2_TEST_HARNESS.exe`) passed 100% (0 failures).  
+> Runner compilation failed with CS0136 in `CG2_1_SITE_ASSERT.cs` line 105. CAD stages blocked pending ChatGPT patch.  
 > PR #33 remains strictly in **Draft** mode (`READY_FOR_MERGE=NO`). No merge into `main` and no CG3 implementation.
 
 ---
@@ -20,37 +22,35 @@
 | SOLIDWORKS Environment | SOLIDWORKS 2024 SP5.0 (`32.5.0.0048` / Revision `32.5.0`) |
 | SOLIDWORKS Interop | `SolidWorks.Interop.sldworks.dll` version `32.5.0.48` |
 | Baseline CG1 Binary | `C:\Tao moi\backup_cg1_release_snapshot\ADDIN.dll` (SHA256: `D9257D349ECE6E2B12006AFEA4824E2152C6BA25A80920AF2905B6F20BA08B3E`) |
-| Candidate CG2 Release Binary | `C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll` (SHA256: `6CE7B28B84890FF87C6BAC4C3454BF3965E4BC3B2EFD38D1918BE735B4854D78`) |
-| Candidate CG2 Debug Binary | `C:\Tao moi\ADDIN.dll` (SHA256: `93A868A4996076792A0DF103A854601D990C96017E44F9D9DF4AE712C43E7AD6`) |
-| Test Harness | `docs/antigravity/cg2/CG2_TEST_HARNESS.cs` |
-| Live CAD Runner | `docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs` & `docs/antigravity/cg2/CG2_REVIEW3_REPEATABILITY.cs` |
-| Review Patch Specification | `docs/antigravity/cg2/CG2_BREP_COM9_FIX.md` |
-| Protocol Doc | `docs/antigravity/cg2/CG2_ANTI_REPORTING_PROTOCOL.md` |
+| Candidate CG2.1 Release Binary | `ADDIN.dll` compiled via one-shot (SHA256: `59E9819D7729A09B97214747EF2ED59E2679EE49EA6FA14C0722D5868C2EF6A1`) |
+| One-Shot Script | `docs/antigravity/cg2/CG2_1_ONE_SHOT.ps1` |
+| Test Harness Source | `docs/antigravity/cg2/CG2_TEST_HARNESS.cs` |
+| Site Assertion Source | `docs/antigravity/cg2/CG2_1_SITE_ASSERT.cs` |
+| Live CAD Runner Source | `docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs` & `docs/antigravity/cg2/CG2_REVIEW3_REPEATABILITY.cs` |
+| Specification Doc | `docs/antigravity/cg2/CG2_1_ANTI_HANDOFF.md` |
 
 ---
 
 ## B. Rebuild Verification (Visual Studio MSBuild 18.10.1)
 
-Both Release|x64 and Debug|x64 configurations compile cleanly with zero errors and zero warnings introduced by CG2/BREP code:
+Both Release|x64 and Debug|x64 configurations compile cleanly with zero errors and zero warnings introduced by CG2.1 code:
 
 ### 1. Release|x64 Build
 ```text
-Command: MSBuild.exe ADDIN.csproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 /v:minimal
+Command: MSBuild.exe ADDIN.csproj /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:OutputPath=<temp>\Release\ /v:minimal
 MSBuild version: 18.10.1-1.26427.6+3cd27c13e (.NET Framework 4.8)
 Errors: 0
-CG2/BREP-introduced warnings: 0 (16 preexisting warnings in LenhDimCanhSongSong, BomDrawingReference, CheckAssemblyHole profiling fields)
-Output DLL: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
-SHA256: 6CE7B28B84890FF87C6BAC4C3454BF3965E4BC3B2EFD38D1918BE735B4854D78
+CG2.1-introduced warnings: 0 (16 preexisting warnings in LenhDimCanhSongSong, BomDrawingReference, CheckAssemblyHole profiling fields)
+Output DLL: <temp>\Release\ADDIN.dll
+SHA256: 59E9819D7729A09B97214747EF2ED59E2679EE49EA6FA14C0722D5868C2EF6A1
 BUILD_RELEASE_X64=PASS
 ```
 
 ### 2. Debug|x64 Build
 ```text
-Command: MSBuild.exe ADDIN.csproj /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /v:minimal
+Command: MSBuild.exe ADDIN.csproj /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /p:OutputPath=<temp>\Debug\ /v:minimal
 Errors: 0
-CG2/BREP-introduced warnings: 0 (same 16 preexisting warnings)
-Output DLL: C:\Tao moi\ADDIN.dll
-SHA256: 93A868A4996076792A0DF103A854601D990C96017E44F9D9DF4AE712C43E7AD6
+CG2.1-introduced warnings: 0 (same 16 preexisting warnings)
 BUILD_DEBUG_X64=PASS
 ```
 
@@ -58,15 +58,15 @@ BUILD_DEBUG_X64=PASS
 
 ## C. Offline Unit & Test Harness Results (`CG2_TEST_HARNESS.cs`)
 
-Executed using Roslyn C# 7.3 against `ADDIN\bin\x64\Release\ADDIN.dll`:
+Executed using Roslyn C# 7.3 against compiled candidate `ADDIN.dll`:
 
 ```text
 ===============================================================
 ANTIGRAVITY CHECK HOLE CG2 — REPRODUCIBLE TEST HARNESS
-Timestamp: 2026-10-20 07:31:21 UTC
+Timestamp: 2026-10-20 09:49:15 UTC
 ===============================================================
-Target Assembly: C:\Tao moi\ADDIN\bin\x64\Release\ADDIN.dll
-Assembly SHA256: 6CE7B28B84890FF87C6BAC4C3454BF3965E4BC3B2EFD38D1918BE735B4854D78
+Target Assembly: <temp>\Release\ADDIN.dll
+Assembly SHA256: 59E9819D7729A09B97214747EF2ED59E2679EE49EA6FA14C0722D5868C2EF6A1
 Loaded Assembly: ADDIN, Version=1.0.0.0, Culture=neutral, PublicKeyToken=36eed1a140b4715f
 
 --- 1. Structural & Reflection Audit of CG2 Types ---
@@ -88,8 +88,9 @@ PASS: Cg2AxisCrossesBoxNear detects axis intersection at 9.5mm (including 0.5mm 
 PASS: Cg2AxisCrossesBoxNear rejects non-intersecting hole axis
 PASS: Cg2AxisCrossesBoxNear rejects box beyond 60mm reach
 PASS: Cg2LikelyKnownCounterpart matches coaxial holes
-PASS: Cg2LikelyKnownCounterpart matches hole within 4mm radial / 3 deg
-PASS: Cg2LikelyKnownCounterpart rejects hole with > 4mm radial offset
+PASS: matched hole within 0.10mm / 0.20deg is suppressed
+PASS: 0.30mm-offset hole is NOT silently suppressed
+PASS: 2mm / 2deg misalignment remains a CG2 diagnostic candidate
 
 --- CG2 BREP OFFLINE: source index, bounded ray, fields ---
 PASS: Hole#2 -> zero-based 1; out-of-range source rejected
@@ -132,85 +133,73 @@ PASS: All 3 tabs verified: ReadOnly candidate grid, ReadOnly relation grid, Read
 
 ===============================================================
 RESULT: CG2 PRIMITIVE/SANITY CHECKS PASSED (0 FAILURES); integrated CAD scenarios separately graded
+RUN_HARNESS EXIT=0
+OFFLINE_PATCH_TEST=PASS
 ```
 
 ---
 
-## D. CAD Runner Self-Test (`CG2_LIVE_CAD_RUNNER.exe --self-test`)
+## D. Compilation Error in Standalone CAD Runner (`CG2_1_SITE_ASSERT.cs`)
 
-Executed with exit code 0:
+When executing `CG2_1_ONE_SHOT.ps1`, stage `COMPILE_RUNNER` failed with compiler error CS0136:
+
 ```text
-PASS: exit policy handles PASS / FAIL / SKIP / empty cases
-PASS: malformed candidate was rejected
-PASS: Review3 quoted-multiline CSV record splitter
+RUN COMPILE_RUNNER
+docs\antigravity\cg2\CG2_1_SITE_ASSERT.cs(105,67): error CS0136: ローカルまたはパラメーター 'c' は、その名前が外側のローカルのスコープでローカルやパラメーターの定義に使用されているため、このスコープでは宣言できません
+COMPILE_RUNNER EXIT=1 LOG=<temp>\COMPILE_RUNNER.log
+STOP_OR_LIMITATION=Runner compiler failed
+```
+
+### Exact Error Analysis:
+- **File:** `docs/antigravity/cg2/CG2_1_SITE_ASSERT.cs`
+- **Method:** `AssertCg21Sites`
+- **Lines involved:**
+  - Line 105: `var matches = metrics.Cg2ExpectedCandidates.Where(c => ...).ToList();` (declares lambda parameter named `c`)
+  - Line 122: `CandidateDetail c = matches[0];` (declares local variable named `c` in the same enclosing `foreach` block)
+- **Compiler Rule:** In C#, a local variable cannot share the identifier of a lambda parameter declared in the same enclosing scope.
+- **Action per Protocol:** Antigravity made ZERO modifications to C# code (`C_SHARP_EDITED_BY_ANTI=NO`). The exact error, line number, and log are reported here for ChatGPT to commit the patch.
+- **Impact:** Live CAD execution stages (`RUNNER_SELF_TEST`, `CAD_REGRESSION`, `CAD_REPEATABILITY`) could not proceed until `Cg2LiveCadRunner.exe` compiles cleanly.
+
+---
+
+## E. One-Shot Summary Status Output (`CG2_1_ONE_SHOT_SUMMARY.txt`)
+
+```text
+SOURCE_HEAD=fc7f5348de45de046726a139ef2685e57ab52aea
+BUILD_RELEASE_X64=PASS
+BUILD_DEBUG_X64=PASS
+OFFLINE_PATCH_TEST=PASS
+RUNNER_SELF_TEST=FAIL
+CAD_REGRESSION=NOT_TESTED
+CAD_REPEATABILITY=NOT_TESTED
+RAW_CSV_BYTE_PARITY=NOT_TESTED
+MARKER_GENERATION_PARITY=NOT_TESTED
+CANDIDATE_DLL_SHA256=59E9819D7729A09B97214747EF2ED59E2679EE49EA6FA14C0722D5868C2EF6A1
+C_SHARP_EDITED_BY_ANTI=NO
+READY_FOR_MERGE=NO
+ERROR=Runner compiler failed
 ```
 
 ---
 
-## E. Live CAD Verification of BREP Material Evidence
-
-Measurements conducted in isolated sandbox `D:\CG1-ISOLATED-TEST-COPIES` using SOLIDWORKS 2024 SP5.0:
-
-### 1. Positive Solid Test (`Fixture_BREP_Positive.SLDASM`)
-- Part B was offset +10mm in X so its 3.0mm solid sheet metal plate directly blocks the 12 hole axes of Component A.
-- **Observed In-CAD Results:**
-  - `Tested = 37`, `SolidEvidence = 24`, `NoAxisHit = 13`, `Unknown = 0`, `NotTestedBudget = 0`
-  - Candidate #26..#37 (`fr1-2` -> `1-1`): **`BREP_SOLID_ON_AXIS`**, `MaterialHitCount = 2`, `MaterialSpanMm = 3.000 mm` (exact 3.000mm sheet thickness).
-  - Candidate #14..#25 (`1-1` -> `fr1-2` reverse): **`BREP_SOLID_ON_AXIS`**, `MaterialHitCount = 2`, `MaterialSpanMm = 2.000 mm` (exact 2.000mm sheet thickness).
-  - Candidate #1..#13 (coaxial holes): **`BREP_NO_AXIS_HIT`**, `MaterialHitCount = 0`, `MaterialSpanMm = 0.000 mm`.
-  - Zero `UNVERIFIED_RAY_TOPOLOGY` occurrences.
-  - Production NG remained completely unaffected (no false NG, no mutations).
-  - **Verdict:** **`LIVE_3MM_SOLID_POSITIVE=PASS`**
-
-### 2. Negative Match Coaxial Hole Test (`Fixture_OK.SLDASM`)
-- Part B has matching coaxial holes/voids aligned with source hole rays.
-- **Observed In-CAD Results:**
-  - `Tested = 13`, `SolidEvidence = 0`, `NoAxisHit = 13`, `Unknown = 0`, `NotTestedBudget = 0`
-  - All 13 candidates classified as `BREP_NO_AXIS_HIT` (`Span = 0.000 mm`, `Hits = 0`).
-  - Production NG remained exactly 0 (`NG=0`, `PatternNG=0`, `Missing=0`).
-  - **Verdict:** **`NEGATIVE_HOLE_FIXTURE=PASS`**
-
----
-
-## F. Production Regression Retest
-
-Executed via `Cg2LiveCadRunner.exe` on sandbox fixtures:
-
-| Fixture | Logical Holes | Stacks | NG Stacks | Missing | Rows | Strict CSV Byte Parity | Row Detailed Parity | Status |
-|---|---|---|---|---|---|---|---|---|
-| `Fixture_OK.SLDASM` | 57 | 12 | 0 | 0 | 45 | **CSV_BYTE_PARITY_FAIL** (8,262 bytes, diff @ 178) | **PASS** (all 13 fields) | `FAIL (CSV Order)` |
-| `Fixture_NG_Offset.SLDASM` | 57 | 12 | 12 | 0 | 45 | **CSV_BYTE_PARITY_FAIL** (8,505 bytes, diff @ 185) | **PASS** (all 13 fields) | `FAIL (CSV Order)` |
-| `Fixture_Unmatched.SLDASM` | 32 | 0 | 0 | 0 | 32 | **PASS** (5,675 bytes, identical SHA256) | **PASS** (all 13 fields) | `PASS` |
-| `Fixture_MultiLayer_ABC.SLDASM`| 82 | 24 | 0 | 0 | 58 | **CSV_BYTE_PARITY_FAIL** (11,769 bytes, diff @ 190) | **PASS** (all 13 fields) | `FAIL (CSV Order)` |
-| `run07_Missing_Ura_BOM.SLDASM` | 0 | 0 | 0 | 0 | 0 | **PASS** (107 bytes, identical SHA256) | **PASS** (all 13 fields) | `PASS` |
-
-### Regression Analysis:
-1. **Production Counters & Verdicts:** 100% identical between CG1 baseline and CG2 candidate across all fixtures (`CG1_VS_CG2_PRODUCTION_VERDICTS=PASS`).
-2. **Normalized Row Detailed Parity:** 100% identical across all 13 fields when sorted and Reference/Actual canonicalized.
-3. **Strict CSV Byte Comparison:**
-   - Byte counts are 100% identical on every fixture.
-   - 2 of 5 fixtures passed 100% strict byte-for-byte SHA256 comparison (`Fixture_Unmatched`, `run07_Missing_Ura_BOM`).
-   - 3 fixtures differ at the first component block due to `AssemblyDoc.GetComponents(false)` baseline non-determinism between sessions (`BASELINE_NONDETERMINISM_OBSERVED`).
-4. **3D Marker Parity:** `AutoCreateMarkers=false` strictly enforced in safe sandbox mode (`MARKER_GENERATION_PARITY=NOT_TESTED`).
-
----
-
-## G. Mandatory Status Summary (Section C Protocol)
+## F. Mandatory Status Summary (CG2.1 Section D Protocol)
 
 ```text
-CHATGPT_CSHARP_PATCH_APPLIED=YES
-ANTI_CSHARP_MODIFICATION=NO
+CG2_1_SOURCE_HEAD=fc7f5348de45de046726a139ef2685e57ab52aea
+C_SHARP_EDITED_BY_ANTI=NO
 BUILD_DEBUG_X64=PASS
 BUILD_RELEASE_X64=PASS
-OFFLINE_6_AND_9_STRIDE_TEST=PASS
-LIVE_3MM_SOLID_POSITIVE=PASS
-LIVE_POSITIVE_MATERIAL_SPAN_MM=3.000
-LIVE_POSITIVE_COM_HITS=2
-NEGATIVE_HOLE_FIXTURE=PASS
-CG1_VS_CG2_VERDICTS=PASS
-RAW_CSV_BYTE_PARITY=FAIL (baseline traversal non-determinism observed)
-SOURCE_SHA=44d6fc8c454e99f1fa02c638e53aa8f244583161
-COMPILED_DLL_SHA256=6CE7B28B84890FF87C6BAC4C3454BF3965E4BC3B2EFD38D1918BE735B4854D78
-READY_FOR_CHATGPT_SOURCE_REVIEW=YES
+OFFLINE_PATCH_TEST=PASS
+NESTED_PART=NOT_TESTED (blocked by runner compiler error CS0136 in CG2_1_SITE_ASSERT.cs)
+OFFSET_CANDIDATE=NOT_TESTED (blocked by runner compiler error CS0136 in CG2_1_SITE_ASSERT.cs)
+BREP_POSITIVE=NOT_TESTED (blocked by runner compiler error CS0136 in CG2_1_SITE_ASSERT.cs)
+BREP_NEGATIVE=NOT_TESTED (blocked by runner compiler error CS0136 in CG2_1_SITE_ASSERT.cs)
+NESTED_ROTATED=NOT_TESTED (blocked by runner compiler error CS0136 in CG2_1_SITE_ASSERT.cs)
+LARGE_ASSEMBLY=NOT_TESTED (blocked by runner compiler error CS0136 in CG2_1_SITE_ASSERT.cs)
+CG1_VS_CG2_PRODUCTION_VERDICTS=NOT_TESTED (blocked by runner compiler error CS0136 in CG2_1_SITE_ASSERT.cs)
+STRICT_RAW_CSV_BYTE_PARITY=NOT_TESTED (blocked by runner compiler error CS0136 in CG2_1_SITE_ASSERT.cs)
+MARKER_GENERATION_PARITY=NOT_TESTED
+COMPILLED_DLL_SHA256=59E9819D7729A09B97214747EF2ED59E2679EE49EA6FA14C0722D5868C2EF6A1
+RUNNER_EXIT_CODE=1
 READY_FOR_MERGE=NO
 ```
