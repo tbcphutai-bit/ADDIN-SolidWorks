@@ -293,6 +293,38 @@ namespace ADDIN.Tests
             Console.WriteLine(ok
                 ? "PASS: exit policy handles PASS / FAIL / SKIP / empty cases"
                 : "FAIL: exit policy test");
+
+            // Regression guard test: malformed candidate data MUST be rejected.
+            var synthetic = new Metrics { HasCg2 = true, Cg2Candidates = 1 };
+            synthetic.Cg2ExpectedCandidates.Add(new CandidateDetail
+            {
+                Id = 1, SourceOccurrence = "A-1", TargetOccurrence = "B-1",
+                SourceHoleLabel = "Hole#1", Classification = "CHECK_ONLY",
+                BoxSeparationMm = 0, AxisToBoxMm = 0
+            });
+            try
+            {
+                ValidateCg2ExpectedCandidates("unit-fixture.SLDASM", synthetic);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("FAIL: valid candidate incorrectly rejected: " + ex.Message);
+                ok = false;
+            }
+            synthetic.Cg2ExpectedCandidates[0].Classification = "NG";
+            bool invalidRejected = false;
+            try
+            {
+                ValidateCg2ExpectedCandidates("unit-fixture.SLDASM", synthetic);
+            }
+            catch (InvalidOperationException) { invalidRejected = true; }
+            if (!invalidRejected)
+            {
+                Console.WriteLine("FAIL: invalid NG candidate was accepted");
+                ok = false;
+            }
+            else Console.WriteLine("PASS: malformed candidate was rejected");
+
             return ok ? 0 : 1;
         }
 
