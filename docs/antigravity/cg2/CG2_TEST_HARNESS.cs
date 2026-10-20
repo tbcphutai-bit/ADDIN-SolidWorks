@@ -70,6 +70,7 @@ namespace ADDIN.Tests
 
             failures += RunStructuralAudit(asm);
             failures += RunGeometryBroadPhaseTests(asm);
+            failures += RunBrepScreeningOfflineTests(asm);
             failures += RunScenarioTestsT01ToT12(asm);
             failures += RunWinFormsUITests(asm);
 
@@ -616,6 +617,83 @@ namespace ADDIN.Tests
             return errors;
         }
 
+        // CG2 BREP source contracts and axis range ONLY; this is NOT a COM/CAD
+        // material-hit test. Actual GetBodies3+RayIntersections needs fixtures.
+        private static int RunBrepScreeningOfflineTests(Assembly asm)
+        {
+            Console.WriteLine("\n--- CG2 BREP OFFLINE: source index, bounded ray, fields ---");
+            int errors = 0;
+            Type checker = asm.GetType("ADDIN.Commands.CheckAssemblyHole");
+            Type row = asm.GetType("ADDIN.Commands.CheckHoleCg2ExpectedHoleRow");
+            Type report = asm.GetType("ADDIN.Commands.CheckHoleCg2Report");
+            if (checker == null || row == null || report == null)
+            {
+                Console.WriteLine("FAIL: BREP-related types missing");
+                return 1;
+            }
+            foreach (string field in new[] {
+                "BrepRayTestedCount", "BrepSolidEvidenceCount",
+                "BrepNoAxisHitCount", "BrepUnknownCount", "BrepNotTestedCount" })
+            {
+                if (report.GetField(field) == null) { errors++; Console.WriteLine("FAIL: " + field); }
+            }
+            foreach (string field in new[] {
+                "MaterialEvidence", "MaterialSpanMm", "MaterialHitCount" })
+            {
+                if (row.GetProperty(field) == null) { errors++; Console.WriteLine("FAIL: " + field); }
+            }
+
+            MethodInfo source = checker.GetMethod(
+                "Cg2TryGetSourceIndex", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo prep = checker.GetMethod(
+                "Cg2PrepareBoundedRay", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo boxMaker = checker.GetMethod(
+                "Cg2ReadBox", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo enrich = checker.GetMethod(
+                "EnrichCg2BrepMaterialEvidence", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (source == null || prep == null || boxMaker == null || enrich == null)
+            {
+                Console.WriteLine("FAIL: material screening methods missing");
+                return errors + 1;
+            }
+
+            object[] testIndex = { "Hole#2", 3, -1 };
+            bool validIndex = (bool)source.Invoke(null, testIndex);
+            object[] invalidIndex = { "Hole#4", 3, -1 };
+            bool invalidAccepted = (bool)source.Invoke(null, invalidIndex);
+            if (!validIndex || (int)testIndex[2] != 1 || invalidAccepted)
+            {
+                Console.WriteLine("FAIL: CG2 source Hole# index mapping");
+                errors++;
+            }
+            else Console.WriteLine("PASS: Hole#2 -> zero-based 1; out-of-range source rejected");
+
+            object b = boxMaker.Invoke(null, new object[] {
+                "B-1", new[] { 0.04, -0.01, -0.01, 0.055, 0.01, 0.01 } });
+            object[] args = {
+                new[] { 0.0, 0.0, 0.0 }, new[] { 1.0, 0.0, 0.0 },
+                b, null, null, 0.0
+            };
+            bool intersects = (bool)prep.Invoke(null, args);
+            double[] start = args[3] as double[];
+            double[] unit = args[4] as double[];
+            double length = (double)args[5];
+            if (!intersects || start == null || unit == null
+                || Math.Abs(start[0] - 0.03) > 1e-9
+                || Math.Abs(unit[0] - 1.0) > 1e-9
+                || length <= 0 || length > 0.060001)
+            {
+                Console.WriteLine("FAIL: bounded ray clipping");
+                errors++;
+            }
+            else Console.WriteLine("PASS: bounded source axis clipped to near-target range");
+
+            if (errors == 0)
+                Console.WriteLine("UNIT_OFFLINE_PASS: BREP field contracts & bounded source ray; "
+                    + "real SOLIDWORKS material intersection NOT_TESTED in this harness");
+            return errors;
+        }
+
         private static int RunWinFormsUITests(Assembly asm)
         {
             Console.WriteLine("\n--- 4. Testing CheckHoleResultsForm & CG2 WinForms Integration ---");
@@ -638,7 +716,7 @@ namespace ADDIN.Tests
 
             PropertyInfo summaryProp = reportType.GetProperty("Summary");
             string summary = (string)summaryProp.GetValue(report, null);
-            if (summary.Contains("CG2 / Quan hệ Part (AABB chẩn đoán): 5 cặp gần | Ứng viên cần xem: 2 | Part không phát hiện lỗ: 1 | BBOX_SCREENED_NOT_MATERIAL_VERIFIED"))
+            if (summary.Contains("CG2 / Quan hệ Part (AABB chẩn đoán): 5 cặp gần | Ứng viên cần xem: 2 | Part không phát hiện lỗ: 1 | BREP có vật liệu: 0 | BREP không giao trục: 0 | Chưa xác minh: 0 | BBOX_SCREENED_NOT_MATERIAL_VERIFIED"))
                 Console.WriteLine("PASS: CheckHoleReport.Summary correctly formats CG2 diagnostic line");
             else
             {
