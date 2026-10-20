@@ -23,6 +23,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private const int BoxFrameB = 102;
         private const int ButtonAnalyze = 103;
         private const int LabelStatus = 104;
+        private const int ButtonShowBodies = 105; // Explicit ghost preview; no real cut.
         private const int GroupInformation = 110;
         private const int LabelInformation = 111;
 
@@ -33,6 +34,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private readonly ISldWorks app;
         private readonly ModelDoc2 assembly;
         private readonly Func<Component2, Component2, string> onAnalyze;
+        private readonly Func<Component2, Component2, string> onShowBodies;
         private readonly Action onClearPreview;
         private readonly Action<AutoFrameJointSelectionPage> onClosed;
 
@@ -40,11 +42,13 @@ namespace ADDIN.UI.AutoFrameJoint
         private PropertyManagerPageSelectionbox selectionA;
         private PropertyManagerPageSelectionbox selectionB;
         private PropertyManagerPageControl analyzeButtonControl;
+        private PropertyManagerPageControl showBodiesButtonControl;
         private PropertyManagerPageLabel statusLabel;
 
         private bool shown;
         private bool closing;
         private bool handlingAnalyze;
+        private bool handlingShowBodies;
         private bool updatingReadyState;
 
         // Keep analysis output while the same two component occurrences remain
@@ -57,17 +61,21 @@ namespace ADDIN.UI.AutoFrameJoint
         /// onAnalyze is an injected BACKEND callback. It receives A and B
         /// explicitly (not unmarked global selection order) and may optionally
         /// return a short read-only analysis summary.
+        /// onShowBodies is invoked only by the explicit View A/B button.
+        /// It never changes geometry and does not render proposed cut results.
         /// onClearPreview belongs to backend and is called AFTER page closes.
         /// Caller must retain this Page instance while SOLIDWORKS displays it.
         /// </summary>
         public AutoFrameJointSelectionPage(
             ISldWorks app,
             Func<Component2, Component2, string> onAnalyze,
+            Func<Component2, Component2, string> onShowBodies,
             Action onClearPreview,
             Action<AutoFrameJointSelectionPage> onClosed)
         {
             this.app = app;
             this.onAnalyze = onAnalyze;
+            this.onShowBodies = onShowBodies;
             this.onClearPreview = onClearPreview;
             this.onClosed = onClosed;
             this.assembly = app == null ? null : app.ActiveDoc as ModelDoc2;
@@ -146,6 +154,13 @@ namespace ADDIN.UI.AutoFrameJoint
                 "Đọc hai Frame. Không cắt hoặc thay đổi Part.")
                 as PropertyManagerPageControl;
 
+            showBodiesButtonControl = group.AddControl2(
+                ButtonShowBodies,
+                (short)swPropertyManagerPageControlType_e.swControlType_Button,
+                "Xem trạng thái A/B", align, controlOptions,
+                "Xem bản sao hình học hiện tại của Frame A/B. Chưa mô phỏng vết cắt.")
+                as PropertyManagerPageControl;
+
             statusLabel = group.AddControl2(
                 LabelStatus,
                 (short)swPropertyManagerPageControlType_e.swControlType_Label,
@@ -154,7 +169,8 @@ namespace ADDIN.UI.AutoFrameJoint
                 as PropertyManagerPageLabel;
 
             if (selectionA == null || selectionB == null ||
-                analyzeButtonControl == null || statusLabel == null)
+                analyzeButtonControl == null || showBodiesButtonControl == null ||
+                statusLabel == null)
                 throw new InvalidOperationException(
                     "Thiếu một hoặc nhiều điều khiển của PropertyManager.");
 
@@ -169,6 +185,7 @@ namespace ADDIN.UI.AutoFrameJoint
             selectionA.SetSelectionFilters(filter);
             selectionB.SetSelectionFilters(filter);
             analyzeButtonControl.Enabled = false;
+            showBodiesButtonControl.Enabled = false;
 
             var detailsGroup = page.AddGroupBox(
                 GroupInformation, "Thông tin", groupOptions)
@@ -178,7 +195,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 detailsGroup.AddControl2(
                     LabelInformation,
                     (short)swPropertyManagerPageControlType_e.swControlType_Label,
-                    "Preview cắt: chưa hỗ trợ. Chỉ đọc Assembly.",
+                    "Xem trạng thái A/B: hình học hiện tại, chưa có vết cắt mới.",
                     align, controlOptions,
                     "Phần hiển thị body tạm do backend quản lý.");
             }
@@ -334,7 +351,11 @@ namespace ADDIN.UI.AutoFrameJoint
                     ClearAnalysisResult();
 
                 if (analyzeButtonControl != null)
-                    analyzeButtonControl.Enabled = ready && !handlingAnalyze;
+                    analyzeButtonControl.Enabled = ready && !handlingAnalyze &&
+                                                   !handlingShowBodies;
+                if (showBodiesButtonControl != null)
+                    showBodiesButtonControl.Enabled = ready && !handlingAnalyze &&
+                                                    !handlingShowBodies;
                 if (statusLabel != null)
                     statusLabel.Caption = ready &&
                         !String.IsNullOrEmpty(lastAnalysisMessage)
@@ -346,6 +367,8 @@ namespace ADDIN.UI.AutoFrameJoint
                 Trace.WriteLine("[AFJ-PMP] Ready state error: " + ex);
                 if (analyzeButtonControl != null)
                     analyzeButtonControl.Enabled = false;
+                if (showBodiesButtonControl != null)
+                    showBodiesButtonControl.Enabled = false;
                 if (statusLabel != null)
                     statusLabel.Caption = "Lỗi chọn Frame — xem Output.";
             }
@@ -357,7 +380,7 @@ namespace ADDIN.UI.AutoFrameJoint
 
         private void PerformAnalyze()
         {
-            if (closing || handlingAnalyze) return;
+            if (closing || handlingAnalyze || handlingShowBodies) return;
 
             Component2 a = null, b = null;
             string reason;
@@ -409,6 +432,65 @@ namespace ADDIN.UI.AutoFrameJoint
             }
         }
 
+        /// <summary>
+        /// Explicit user-triggered read-only ghost overlay. Never called by
+        /// selection-list events because SOLIDWORKS is updating its selection.
+        /// Uses the same pair validation as Analyze. The backend owns all COM
+        /// body references and performs cleanup on AfterClose.
+        /// </summary>
+        private void PerformShowBodies()
+        {
+            if (closing || handlingAnalyze || handlingShowBodies) return;
+
+            Component2 a = null, b = null;
+            string reason;
+            handlingShowBodies = true;
+            if (showBodiesButtonControl != null)
+                showBodiesButtonControl.Enabled = false;
+
+            try
+            {
+                if (!TryReadSelection(out a, out b, out reason, true))
+                {
+                    if (a != null && b != null && DefinitelyDifferent(a, b))
+                        StoreAnalysisResult(a, b, reason);
+                    else
+                    {
+                        ClearAnalysisResult();
+                        if (statusLabel != null) statusLabel.Caption = reason;
+                    }
+                    return;
+                }
+
+                if (onShowBodies == null)
+                {
+                    StoreAnalysisResult(a, b, "Chưa kết nối bộ hiển thị A/B.");
+                    return;
+                }
+
+                string result = onShowBodies(a, b);
+                // Reuse pair-scoped status cache; old messages are invalidated
+                // automatically if the user changes either selected occurrence.
+                StoreAnalysisResult(a, b,
+                    String.IsNullOrWhiteSpace(result)
+                        ? "Không nhận được trạng thái Preview."
+                        : result.Replace("\r", " ").Replace("\n", " "));
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-PMP] Show bodies error: " + ex);
+                if (a != null && b != null && DefinitelyDifferent(a, b))
+                    StoreAnalysisResult(a, b, "Lỗi hiển thị A/B — xem Output.");
+                else
+                    ClearAnalysisResult();
+            }
+            finally
+            {
+                handlingShowBodies = false;
+                UpdateReadyState();
+            }
+        }
+
         // ---------------- Native PMP callback methods ----------------
         public void AfterActivation() { }
 
@@ -427,6 +509,7 @@ namespace ADDIN.UI.AutoFrameJoint
             selectionA = null;
             selectionB = null;
             analyzeButtonControl = null;
+            showBodiesButtonControl = null;
             statusLabel = null;
             try
             {
@@ -463,7 +546,10 @@ namespace ADDIN.UI.AutoFrameJoint
         public void OnOptionCheck(int id) { }
         public void OnButtonPress(int id)
         {
-            if (id == ButtonAnalyze) PerformAnalyze();
+            if (id == ButtonAnalyze)
+                PerformAnalyze();
+            else if (id == ButtonShowBodies)
+                PerformShowBodies();
         }
         public void OnTextboxChanged(int id, string value) { }
         public void OnNumberboxChanged(int id, double value) { }

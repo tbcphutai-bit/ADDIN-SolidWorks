@@ -7,9 +7,9 @@ using ADDIN.UI.AutoFrameJoint;
 namespace ADDIN.Commands.AutoFrameJoint
 {
     /// <summary>
-    /// One safe entry point to open native PMP from a future TaskPane button.
-    /// Command lifecycle stays alive while the SOLIDWORKS PropertyManager is visible.
-    /// UI selection and read-only analysis only; no Cut, Save or Preview mutation.
+    /// Native PropertyManager entry for exactly two Part occurrences.
+    /// Read-only Analyze and user-triggered Temporary Body overlay only.
+    /// Does NOT compute or apply any cut, mate, feature or Save.
     /// </summary>
     public static class AutoFrameJointCommandEntry
     {
@@ -24,16 +24,33 @@ namespace ADDIN.Commands.AutoFrameJoint
                 return;
 
             opening = true;
+            var manager = AutoFrameJointGhostSessionManager.Shared;
+            Guid pageToken = Guid.Empty;
+            bool sessionStarted = false;
+            bool cleanupNotifiedByPage = false;
+
             try
             {
-                // Capture the exact host Assembly before SOLIDWORKS opens PMP.
-                // Never accept another active document in the callback.
+                // Capture the source Assembly BEFORE creating the PMP.
                 ModelDoc2 sourceAssembly = app.ActiveDoc as ModelDoc2;
                 if (sourceAssembly == null ||
                     sourceAssembly.GetType() !=
                         (int)swDocumentTypes_e.swDocASSEMBLY)
                     throw new InvalidOperationException(
                         "Hãy mở Assembly trước khi chạy Auto Frame Joint.");
+
+                string beginMessage;
+                if (!manager.TryBegin(app, sourceAssembly, out pageToken,
+                                      out beginMessage))
+                {
+                    string recovery;
+                    if (manager.TryDescribeRecovery(out recovery) &&
+                        !String.IsNullOrWhiteSpace(recovery))
+                        beginMessage += " " + recovery;
+
+                    throw new InvalidOperationException(beginMessage);
+                }
+                sessionStarted = true;
 
                 AutoFrameJointSelectionPage page =
                     new AutoFrameJointSelectionPage(
@@ -57,13 +74,29 @@ namespace ADDIN.Commands.AutoFrameJoint
                             if (report.Contains("ROLE: A = LONG / B = SHORT") ||
                                 report.Contains("ROLE: B = LONG / A = SHORT"))
                                 return "Đã ước lượng dài/ngắn – chưa có vết cắt.";
-                            // Unrecognized reports must not be misread as success.
                             return "Chưa xác nhận kết quả – xem Output.";
+                        },
+                        (frameA, frameB) =>
+                        {
+                            // Called ONLY when the user clicks Xem trạng thái A/B.
+                            // Do not call this from selection-change callbacks.
+                            string status;
+                            bool ok = manager.TryShow(pageToken, frameA,
+                                                      frameB, out status);
+                            Trace.WriteLine("[AFJ-GHOST] " +
+                                            (ok ? "SHOW " : "ERROR ") + status);
+                            return status;
                         },
                         () =>
                         {
-                            // No ghost bodies are created in this stage.
-                            // A later read-only preview manager will own Hide()/cleanup.
+                            // PropertyManager.AfterClose calls this BEFORE
+                            // onClosed; leave the stable Shared manager alive
+                            // if Hide fails or the source Assembly is inactive.
+                            cleanupNotifiedByPage = true;
+                            string status;
+                            bool ok = manager.CloseFromPage(pageToken, out status);
+                            Trace.WriteLine("[AFJ-GHOST] AfterClose " +
+                                            (ok ? "CLEAN " : "PENDING ") + status);
                         },
                         p =>
                         {
@@ -72,16 +105,32 @@ namespace ADDIN.Commands.AutoFrameJoint
                         });
 
                 activePage = page;
-                try
+                page.Show();
+            }
+            catch
+            {
+                // Page creation/Show may throw before AfterClose is invoked.
+                // Never abandon a registered Session in this case.
+                if (sessionStarted && !cleanupNotifiedByPage)
                 {
-                    page.Show();
+                    try
+                    {
+                        string status;
+                        bool ok = manager.CloseFromPage(pageToken, out status);
+                        Trace.WriteLine("[AFJ-GHOST] Open rollback " +
+                                        (ok ? "CLEAN " : "PENDING ") + status);
+                    }
+                    catch (Exception cleanupError)
+                    {
+                        Trace.WriteLine("[AFJ-GHOST] Open rollback failed: " +
+                                        cleanupError);
+                    }
                 }
-                catch
-                {
-                    if (Object.ReferenceEquals(activePage, page))
-                        activePage = null;
-                    throw;
-                }
+
+                if (activePage != null && !activePage.IsOpen)
+                    activePage = null;
+
+                throw;
             }
             finally
             {
