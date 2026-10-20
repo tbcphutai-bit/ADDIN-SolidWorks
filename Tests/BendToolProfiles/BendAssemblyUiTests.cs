@@ -270,8 +270,9 @@ internal static class BendAssemblyUiTests
         internal AssemblyCheckScope Scope;
         internal int Captures, Invalidations, Disposals;
         internal bool RejectBegin, RejectInvalidate;
+        internal TaskCompletionSource<BendToolCatalogReadResult> MinimumGate;
         public async Task<BendToolCatalogReadResult> ReadMinimumAsync(CancellationToken token)
-        { Operation = null; await Task.Delay(10,token).ConfigureAwait(false); return null; }
+        { Operation = null; if(MinimumGate!=null)return await MinimumGate.Task.ConfigureAwait(false); await Task.Delay(10,token).ConfigureAwait(false); return null; }
         public IBendAssemblyBatchOperation BeginAssemblyBatch(AssemblyCheckScope scope, BendToolCatalogReadResult minimum,
             CancellationToken token, IProgress<AssemblyBatchProgress> progress)
         { if(RejectBegin)throw new InvalidOperationException("No selected components"); Scope = scope; Progress = progress; return Operation = new FakeOperation(); }
@@ -449,6 +450,49 @@ internal static class BendAssemblyUiTests
             }
         });
     }
+    private static void CloseBoundaryTests()
+    {
+        Test("close idle after completed Run disposes the backend once",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend();using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Spin(()=>backend.Operation!=null);
+                    backend.Operation.Done.SetResult(Snapshot(Part(0)));Spin(()=>!controller.Running);
+                    form.Close();Check(form.IsDisposed&&backend.Disposals==1,"Idle close completes one disposal without Cancel wait");
+                }
+            }
+        });
+        Test("close during minimum read awaits STA continuation before backend disposal",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend {MinimumGate=new TaskCompletionSource<BendToolCatalogReadResult>()};
+                using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Check(controller.Running&&backend.Operation==null,"Exact pre-operation close condition");
+                    form.Close();Check(!form.IsDisposed&&backend.Disposals==0,"Form and backend retained while ReadMinimum is pending");
+                    backend.MinimumGate.SetResult(null);Spin(()=>form.IsDisposed);
+                    Check(!controller.Running&&backend.Operation==null&&backend.Disposals==1,"Cancelled read never begins native work and disposes after continuation");
+                }
+            }
+        });
+        Test("close during reentrant native Pump cannot dispose inside the native stack",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend();using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Spin(()=>backend.Operation!=null);
+                    backend.Operation.PumpAction=()=>{
+                        backend.Operation.PumpAction=null;form.Close();
+                        Check(!form.IsDisposed&&backend.Disposals==0,"Close is deferred while native Pump is active");
+                        backend.Operation.Done.SetResult(Snapshot(Part(0)));Application.DoEvents();
+                        Check(backend.Disposals==0,"Inline completion and nested STA messages still retain native owner");
+                    };
+                    Spin(()=>form.IsDisposed);Check(backend.Disposals==1,"Native owner disposed once after Pump returns");
+                }
+            }
+        });
+    }
     private static void Render(string output)
     {
         Directory.CreateDirectory(output);
@@ -590,8 +634,9 @@ internal static class BendAssemblyUiTests
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             if(args.Length==2&&args[0]=="--benchmark-ui")return ToolProfileTests.UiReadBenchmark(args[1]);
-            if(args.Length==1&&args[0]=="--controller-tests")FormTests();
-            else { ConverterTests(); FormTests(); UnifiedNavigationTests(); }
+            if(args.Length==1&&args[0]=="--close-tests")CloseBoundaryTests();
+            else if(args.Length==1&&args[0]=="--controller-tests")FormTests();
+            else { ConverterTests(); FormTests(); CloseBoundaryTests(); UnifiedNavigationTests(); }
             if(args.Length==2 && args[0]=="--render") { Render(args[1]); RenderPlanner(args[1]); RenderHolder(args[1]); }
             Console.WriteLine("RESULT " + groups + " groups; " + assertions + " assertions; 0 failures"); return 0;
         }

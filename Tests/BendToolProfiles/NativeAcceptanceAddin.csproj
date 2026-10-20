@@ -5,6 +5,7 @@
     <Reference Include="SolidWorks.Interop.sldworks"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.sldworks.dll</HintPath></Reference>
     <Reference Include="SolidWorks.Interop.swpublished"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.swpublished.dll</HintPath></Reference>
     <Compile Include="NativeAcceptanceAddin.cs"/>
+    <Compile Include="AcceptanceEventFile.cs"/>
     <Compile Include="NativeRepresentativeAcceptance.cs"/>
     <Compile Include="RepresentativeAcceptanceInput.cs"/>
     <Compile Include="ExcelNativeMatrixInput.cs"/>

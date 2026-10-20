@@ -20,6 +20,16 @@ namespace CheckChan.NativeAcceptance
         private object representativeController;
         private string representativeColdFacts;
         private readonly Stopwatch representativeRunClock=new Stopwatch();
+        private bool CloseProbeOnly => System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_CLOSE_REPRO")=="1";
+        private void MarkCloseProbe(string stage)
+        {
+            state["CloseProbeStage"]=stage;
+            state["CloseProbeController"]=new {Running=Value(representativeController,"running"),Pumping=Value(representativeController,"pumping"),
+                Closing=Value(representativeController,"closing"),Disposed=Value(representativeController,"disposed"),BackendDisposed=Value(representativeController,"backendDisposed"),
+                FormDisposed=window?.IsDisposed};
+            Trace.WriteLine("[BEND CLOSE PROBE] "+stage+" "+Serialize(state["CloseProbeController"]));
+            Write("CLOSE_PROBE_RUNNING");
+        }
         private static readonly BindingFlags Members=BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic;
         private static object Value(object source,string name)=>source==null?null:Field(source,name)??Property(source,name);
         private static object[] List(object source)=>source==null?new object[0]:((IEnumerable)source).Cast<object>().ToArray();
@@ -151,11 +161,20 @@ namespace CheckChan.NativeAcceptance
             }
             else if(Equals(Value(representativeController,"Running"),true)){timer.Start();return;}
             else if(representativeStage==1)
-            { representativeColdFacts=Serialize(ValidateRepresentativeResult("Cold"));StartRepresentativeRun("btnRunBatch");representativeStage=2; }
+            {
+                representativeColdFacts=Serialize(ValidateRepresentativeResult("Cold"));
+                if(CloseProbeOnly)
+                {
+                    MarkCloseProbe("IDLE_CLOSE_BEGIN");window.Close();MarkCloseProbe("IDLE_CLOSE_RETURN");
+                    Assert(window.IsDisposed&&Equals(Value(representativeController,"backendDisposed"),true),"IDLE_CLOSE_AND_BACKEND_DISPOSE_REQUIRED");
+                    representativeResults[representativeIndex]["IdleClose"]="PASS";OpenRepresentativeWindow();
+                }
+                StartRepresentativeRun("btnRunBatch");representativeStage=2;
+            }
             else if(representativeStage==2)
             {
                 Assert(NativeMatrix.MatrixInput.SameJsonFacts(Serialize(ValidateRepresentativeResult("Warm")),representativeColdFacts),"COLD_WARM_FACTS_CHANGED");
-                Assert(Convert.ToInt32(Value(Value(representativeController,"displayed"),"Captures"))==0,"WARM_NATIVE_CAPTURE_REPEATED");
+                if(!CloseProbeOnly)Assert(Convert.ToInt32(Value(Value(representativeController,"displayed"),"Captures"))==0,"WARM_NATIVE_CAPTURE_REPEATED");
                 StartRepresentativeRun("btnRefresh");representativeStage=3;
             }
             else if(representativeStage==3)
@@ -179,7 +198,7 @@ namespace CheckChan.NativeAcceptance
                     var method=window.GetType().GetMethod("SetScope",Members);method.Invoke(window,new[]{Enum.Parse(method.GetParameters()[0].ParameterType,"SelectedComponents")});
                     StartRepresentativeRun("btnRunBatch");representativeStage=6;
                 }
-                else {StartRepresentativeRun("btnRunBatch");window.Close();representativeStage=8;}
+                else {StartRepresentativeRun("btnRunBatch");if(CloseProbeOnly)MarkCloseProbe("RUNNING_CLOSE_BEGIN");window.Close();if(CloseProbeOnly)MarkCloseProbe("RUNNING_CLOSE_RETURN");representativeStage=8;}
             }
             else if(representativeStage==6)
             { ValidateRepresentativeResult("Selected",true);representativeModel.ClearSelection2(true);StartRepresentativeRun("btnRefresh");representativeStage=7; }
@@ -188,13 +207,14 @@ namespace CheckChan.NativeAcceptance
             else if(representativeStage==8)
             {
                 if(!window.IsDisposed){timer.Start();return;}
+                if(CloseProbeOnly)MarkCloseProbe("RUNNING_CLOSE_COMPLETED");
                 representativeResults[representativeIndex]["CloseDuringRun"]="PASS";
                 foreach(var source in representativeStates)Assert(ModelState(source.Key)==source.Value,"ORIGINAL_DOCUMENT_STATE_CHANGED");
                 representativeCases.CheckSources();OpenRepresentativeWindow();window.Close();Assert(window.IsDisposed,"REOPEN_CLOSE_FAILED");
                 representativeResults[representativeIndex]["OpenClose"]="PASS";representativeResults[representativeIndex]["Execution"]="PASS";
                 representativeResults[representativeIndex]["TotalMilliseconds"]=clock.Elapsed.TotalMilliseconds;
                 app.CloseDoc(representativeModel.GetTitle());representativeModel=null;representativeIndex++;representativeStage=0;clock.Restart();
-                if(representativeIndex==representativeCases.Cases.Length)
+                if(CloseProbeOnly||representativeIndex==representativeCases.Cases.Length)
                 { state["Assertions"]=representativeAssertions;state["FunctionalResult"]="PASS";state["ProtectedSourcesUnchanged"]=true;Write("COMMAND_COMPLETED");return; }
             }
             timer.Start();

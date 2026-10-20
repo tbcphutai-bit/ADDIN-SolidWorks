@@ -42,6 +42,10 @@ try {
     $env:ADDIN_NATIVE_EXCLUDE_ADDIN=$oldExclude
     $after=Read-StartupState
     if(Test-Path -LiteralPath $OutputDirectory) {
+        # Keep the exact inputs to the protection verdict. A mismatch without
+        # these snapshots cannot identify which key changed or who changed it.
+        $before | Set-Content -LiteralPath (Join-Path $OutputDirectory 'PRIVATE-startup-before.json') -Encoding UTF8
+        $after | Set-Content -LiteralPath (Join-Path $OutputDirectory 'PRIVATE-startup-after.json') -Encoding UTF8
         @{StartupSettingsUnchanged=($before -eq $after);FixtureBytesUnchanged=($fixtureSha -eq (Get-FileHash -LiteralPath $ReadOnlyFixture -Algorithm SHA256).Hash)} |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'PRIVATE-protection-audit.json') -Encoding UTF8
     }

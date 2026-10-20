@@ -1,5 +1,7 @@
 # Check Chấn — consolidated fix and acceptance
 
+**Focused close-crash investigation:** [latest technical report](CLOSE_CRASH_INVESTIGATION_20261020.md). Root cause of PID 73032 heap corruption remains unidentified. Exactly one new controlled probe was interrupted by a diagnosed harness log-sharing race; shutdown cleanup exited 0, but running-close and four subsequent cases remain NOT RUN. Only opt-in tracing and diagnostic/test repairs were added; no production lifetime repair is claimed. **BLOCKED.**
+
 **Latest bounded delivery (2026-10-20):** see [the five-case acceptance report](BOUNDED_ACCEPTANCE_20261020.md). It supersedes the current readiness verdict: final Release has a native `0xc0000374` failure during close-while-running; XL-02 is FAIL overall and four other representative cases are NOT RUN. Earlier isolation PASS results below remain historical evidence, not a stability guarantee. Production and native acceptance remain **BLOCKED**.
 
 This report supersedes the acceptance verdict in [the earlier validation](VALIDATION_IMPLEMENTATION.md). Compiled source checkpoint: `7c837b96b7231ca5d689b3602a48622a52e7908b`; later documentation/evidence commits do not change its compiled code. It continues PR #37 from `0bb92687b4235cb09b69af95c3fb0609a3c80f20`; no other PR or main branch is merged. Public evidence contains counts and controlled fixture measurements, not company CAD, coordinates, source handles, review keys or raw dumps.

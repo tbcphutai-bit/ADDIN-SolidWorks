@@ -44,6 +44,15 @@ namespace ADDIN.UI
         private int generation;
         internal bool Running => running;
         internal BendAssemblyBatchTimings LastRunTimings { get; private set; }
+        private readonly bool traceClose = Environment.GetEnvironmentVariable("ADDIN_BEND_CLOSE_TRACE") == "1";
+        private void TraceClose(string stage)
+        {
+            if (traceClose) Trace.WriteLine("[BEND CLOSE] " + stage + " controller=" + GetHashCode() +
+                " thread=" + Thread.CurrentThread.ManagedThreadId + " generation=" + generation +
+                " running=" + running + " pumping=" + pumping + " closing=" + closing +
+                " disposed=" + disposed + " backendDisposed=" + backendDisposed +
+                " formDisposed=" + form.IsDisposed + " operation=" + (operation == null ? "null" : operation.Completion.Status.ToString()));
+        }
 
         internal BendAssemblyBatchController(BendAssemblyBatchForm form, IBendAssemblyBatchBackend backend)
         {
@@ -107,6 +116,7 @@ namespace ADDIN.UI
             cancellation = new CancellationTokenSource();
             var token = cancellation.Token;
             elapsed.Restart();
+            TraceClose("RunAsync.begin");
             form.ClearLive("Đọc nguồn dữ liệu; chưa có kết quả CAD.");
             form.SetRunningState(true);
             try
@@ -114,6 +124,7 @@ namespace ADDIN.UI
                 var minimum = await backend.ReadMinimumAsync(token).ConfigureAwait(false);
                 await OnSta();
                 RequireSta();
+                TraceClose("RunAsync.minimum.ready");
                 token.ThrowIfCancellationRequested();
                 if (disposed) return;
                 // Construct on STA. Late progress from previous generations is
@@ -129,6 +140,7 @@ namespace ADDIN.UI
                 // for native work while closing the owner window.
                 var ended = await Task.WhenAny(completion, disposedSignal.Task).ConfigureAwait(false);
                 await OnSta();
+                TraceClose("RunAsync.completion.resumed");
                 if (ended != completion)
                 {
                     ObserveFault(completion);
@@ -172,6 +184,7 @@ namespace ADDIN.UI
             finally
             {
                 await OnSta();
+                TraceClose("RunAsync.finally.begin");
                 elapsed.Stop(); running = false;
                 cancellation.Dispose(); cancellation = null;
                 if (disposed && !pumping) dispatcher.Dispose();
@@ -180,6 +193,7 @@ namespace ADDIN.UI
                     form.SetRunningState(false);
                     CloseWhenSafe();
                 }
+                TraceClose("RunAsync.finally.end");
             }
         }
         private StaContinuation OnSta() => new StaContinuation(this);
@@ -212,12 +226,15 @@ namespace ADDIN.UI
         internal void Cancel()
         {
             RequireSta();
+            TraceClose("Cancel.begin");
             if (disposed) return;
             cancellation?.Cancel();
             operation?.Cancel();
+            TraceClose("Cancel.operation.cancelled");
             displayed = null;
             form.ShowStopped("Đang hủy; chờ xác nhận dừng...", elapsed.Elapsed.TotalSeconds);
             if (running) form.SetRunMessage("Đang hủy; chờ xác nhận dừng...", true);
+            TraceClose("Cancel.end");
         }
         private void PreviewRequested(object sender, EventArgs args)
         {
@@ -271,23 +288,26 @@ namespace ADDIN.UI
         }
         private void FormClosing(object sender, FormClosingEventArgs args)
         {
+            TraceClose("FormClosing.begin");
             if (running || pumping)
             {
                 args.Cancel = true; closing = true;
                 Cancel();
             }
+            TraceClose("FormClosing.end cancel=" + args.Cancel);
         }
         private void CloseWhenSafe()
         {
             if (closing && !running && !pumping && !form.IsDisposed)
-            { closing = false; form.BeginInvoke(new Action(form.Close)); }
+            { closing = false; TraceClose("CloseWhenSafe.post"); form.BeginInvoke(new Action(() => { TraceClose("CloseWhenSafe.callback"); form.Close(); TraceClose("CloseWhenSafe.callback.return"); })); }
         }
         private void FormDisposed(object sender, EventArgs args) { Dispose(); }
         private void DisposeBackend()
-        { if (!backendDisposed) { backendDisposed = true; backend.Dispose(); } }
+        { if (!backendDisposed) { TraceClose("DisposeBackend.begin"); backendDisposed = true; backend.Dispose(); TraceClose("DisposeBackend.end"); } }
         public void Dispose()
         {
             RequireSta();
+            TraceClose("Dispose.begin");
             if (disposed) return;
             disposed = true; ++generation;
             cancellation?.Cancel(); operation?.Cancel();
@@ -302,6 +322,7 @@ namespace ADDIN.UI
             form.FormClosing -= FormClosing;
             form.Disposed -= FormDisposed;
             if (!pumping) { DisposeBackend(); if (!running) dispatcher.Dispose(); }
+            TraceClose("Dispose.end");
         }
     }
 }

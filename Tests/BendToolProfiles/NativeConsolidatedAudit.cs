@@ -21,7 +21,8 @@ internal static partial class NativeAssemblyBatchValidation
         try
         {
             var cases=args.Length==6?CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.Read(args[5]):null;
-            report["RequestedCases"]=cases==null?1:cases.Cases.Length;
+            int requested=System.Environment.GetEnvironmentVariable("ADDIN_ACCEPTANCE_CLOSE_REPRO")=="1"?1:cases==null?1:cases.Cases.Length;
+            report["RequestedCases"]=requested;
             if(cases!=null)report["RepresentativeCases"]=cases.Cases.Select(c=>new {c.CaseId,c.Path,Execution="NOT_RUN"}).ToArray();
             using(var existing=Registry.CurrentUser.OpenSubKey(keyPath))if(existing!=null)throw new InvalidOperationException("Refuse to replace any existing COM registration");
             using(var existing=Registry.CurrentUser.OpenSubKey(progKey))if(existing!=null)throw new InvalidOperationException("Refuse to replace any existing ProgID registration");
@@ -68,11 +69,11 @@ internal static partial class NativeAssemblyBatchValidation
                 report["BridgeConnectReturned"]=activation.GetType().InvokeMember("ConnectToSW",BindingFlags.InvokeMethod,null,activation,new object[]{app,0});
             }
             // Same 60 s diagnostic limit per case, not a larger solver budget.
-            while(watch.ElapsedMilliseconds<65000*(cases==null?1:cases.Cases.Length))
+            while(watch.ElapsedMilliseconds<65000*requested)
             {
                 if(File.Exists(events))
                 {
-                    try{state=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(events));}catch(IOException){}
+                    try{state=Json.Deserialize<Dictionary<string,object>>(CheckChan.NativeAcceptance.AcceptanceEventFile.Read(events));}catch(IOException){}
                     if(state!=null&&(Convert.ToString(state["Stage"])=="COMMAND_COMPLETED"||Convert.ToString(state["Stage"])=="FAIL"))break;
                 }
                 // A dead owned server cannot complete the remaining cases.
@@ -91,7 +92,7 @@ internal static partial class NativeAssemblyBatchValidation
             if(bridgeView!=null){bridgeView.DeleteView();bridgeView=null;}activation=null;
             if(File.Exists(events))
             {
-                var disconnected=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(events));report["DisconnectResult"]=disconnected;
+                var disconnected=Json.Deserialize<Dictionary<string,object>>(CheckChan.NativeAcceptance.AcceptanceEventFile.Read(events));report["DisconnectResult"]=disconnected;
                 if(!disconnected.ContainsKey("TargetDisconnectReturned")||!Equals(disconnected["TargetDisconnectReturned"],true)||Convert.ToString(disconnected["Stage"])!="TARGET_DISCONNECTED")
                 {report["FunctionalResult"]="FAIL";code=1;}
             }

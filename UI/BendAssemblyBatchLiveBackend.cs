@@ -29,7 +29,13 @@ namespace ADDIN.UI
             session.IsAssembly ? (IBendAssemblyBatchOperation)new NativeOperation(session.BeginAssemblyBatch(scope, source, new AssemblyBatchOptions(), token, progress)) :
             new PartOperation(session.BeginPartBatch(source, token, progress));
         public bool Locate(AssemblyBatchSnapshot snapshot, string source, int feature) => session.LocateBatchBend(snapshot, source, feature);
-        public void Dispose() => session.Dispose();
+        public void Dispose()
+        {
+            bool trace=System.Environment.GetEnvironmentVariable("ADDIN_BEND_CLOSE_TRACE")=="1";
+            if(trace)System.Diagnostics.Trace.WriteLine("[BEND CLOSE BACKEND] session.Dispose.begin");
+            session.Dispose();
+            if(trace)System.Diagnostics.Trace.WriteLine("[BEND CLOSE BACKEND] session.Dispose.end");
+        }
         private sealed class NativeOperation : IBendAssemblyBatchOperation
         {
             private readonly BendCheckSession.AssemblyNativeBatchOperation operation;

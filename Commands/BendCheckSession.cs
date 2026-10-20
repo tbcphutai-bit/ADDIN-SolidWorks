@@ -264,7 +264,18 @@ namespace ADDIN.Commands
             if (!IsAssembly || !IsHostActive || item == null) return;
             try { Host.ClearSelection2(true); item.Instances.FirstOrDefault()?.Select4(false, null, false); Host.GraphicsRedraw2(); } catch { }
         }
-        public void Dispose() { if (disposed) return; DisposeAssemblyBackend(); disposed = true; toolLibrary.Dispose(); foreach (var item in Items) item.Dispose(); }
+        public void Dispose()
+        {
+            bool trace=System.Environment.GetEnvironmentVariable("ADDIN_BEND_CLOSE_TRACE")=="1";
+            if(trace)Trace.WriteLine("[BEND CLOSE SESSION] Dispose.begin disposed="+disposed+" items="+Items.Count);
+            if (disposed) return;
+            DisposeAssemblyBackend();
+            if(trace)Trace.WriteLine("[BEND CLOSE SESSION] AssemblyBackend.disposed");
+            disposed = true; toolLibrary.Dispose();
+            if(trace)Trace.WriteLine("[BEND CLOSE SESSION] ToolLibrary.disposed");
+            foreach (var item in Items) {if(trace)Trace.WriteLine("[BEND CLOSE SESSION] Item.Dispose.begin copy="+(item.Copy!=null));item.Dispose();}
+            if(trace)Trace.WriteLine("[BEND CLOSE SESSION] Dispose.end");
+        }
     }
 
     internal sealed partial class VCutPropertySetupCommand

@@ -1,0 +1,136 @@
+{
+  "SchemaVersion": 1,
+  "Baseline": "e0adf89195f8d2daf15984814270aa226b0d307a",
+  "Scope": "PR37 close-while-running crash only",
+  "Verdict": "BLOCKED",
+  "ProductionRootCause": "NOT IDENTIFIED",
+  "ProductionLifetimeFixApplied": false,
+  "Original": {
+    "Pid": 73032,
+    "ExitHex": "0xC0000374",
+    "ExactPidEventAndWerAvailable": true,
+    "FatalDumpAvailable": false,
+    "ForeignPidDumpsUsed": false
+  },
+  "Native": {
+    "ControlledReproductionAttempts": 1,
+    "Pid": 16928,
+    "SolidWorks": "2024 SP5 32.5.0.48",
+    "Configuration": "Release/x64",
+    "DllSha256": "94e1b6099090abfa4c5e34bfb9a65a5585f5c2ca534e8c1628ec14f585b01aa0",
+    "Mvid": "0fa55476-65f6-429e-801d-c452a5a9bd12",
+    "TargetConnect": true,
+    "Run": {
+      "FeatureIds": [
+        53,
+        59
+      ],
+      "Bends": 2,
+      "StaticCandidates": 36,
+      "ProcessCandidates": 36,
+      "Minimum": "2/2 MeetsMinimum; matches legacy",
+      "CompanyNumericQueries": 0,
+      "ObservedMilliseconds": 2690.1452
+    },
+    "ProbeResult": "FAIL: harness log sharing violation before explicit idle-close action",
+    "ProbeError": "IOException in AcceptanceAddin.Write from MarkCloseProbe(IDLE_CLOSE_BEGIN); writer File.WriteAllText conflicts with parent File.ReadAllText",
+    "IdleClose": "Observed only during cleanup, not a completed paired control",
+    "RunningClose": "NOT RUN",
+    "TargetDisconnect": true,
+    "TargetDetached": true,
+    "BorrowedHostUsable": true,
+    "ShutdownResult": "PASS",
+    "ExitCode": 0,
+    "HeapDumpsCaptured": 0,
+    "HeapReproduced": false,
+    "MaxReproductionReached": true,
+    "NativeAfterHarnessRepair": "NOT RUN; no second attempt"
+  },
+  "Cases": [
+    {
+      "Reason": "Diagnostic interrupted; close-while-running not exercised",
+      "Id": "XL-02",
+      "Execution": "FAIL"
+    },
+    {
+      "Reason": "XL-02 gate not satisfied",
+      "Id": "XL-17",
+      "Execution": "NOT RUN"
+    },
+    {
+      "Reason": "XL-02 gate not satisfied",
+      "Id": "XL-19",
+      "Execution": "NOT RUN"
+    },
+    {
+      "Reason": "XL-02 gate not satisfied",
+      "Id": "XL-32",
+      "Execution": "NOT RUN"
+    },
+    {
+      "Reason": "XL-02 gate not satisfied",
+      "Id": "ASM-SMALL",
+      "Execution": "NOT RUN"
+    }
+  ],
+  "Builds": {
+    "ProductDelta": "Opt-in trace only; no disposal/cancellation/timer/COM ownership policy change",
+    "DebugSha256": "a677b3b752da62ac653c540b19c7094e4796ab0c0af62da3cc539e366743e936",
+    "ReleaseSha256": "94e1b6099090abfa4c5e34bfb9a65a5585f5c2ca534e8c1628ec14f585b01aa0",
+    "DebugX64": "PASS",
+    "ReleaseX64": "PASS"
+  },
+  "Managed": {
+    "DiscardedAtomicFilePrototypes": "FAIL in managed filesystem tests; discarded before final coordinated implementation",
+    "ControllerRelease": {
+      "Failures": 0,
+      "Assertions": 79,
+      "Groups": 7
+    },
+    "ControllerDebug": {
+      "Failures": 0,
+      "Assertions": 78,
+      "Groups": 7
+    },
+    "FinalEventProtocol": {
+      "Assertions": 348,
+      "Result": "PASS",
+      "Publications": 250,
+      "CompleteReads": 344,
+      "NativeReplay": "NOT RUN"
+    },
+    "WrapperCases": 3,
+    "CloseDebug": {
+      "Failures": 0,
+      "Assertions": 18,
+      "Groups": 3
+    },
+    "CloseRelease": {
+      "Failures": 0,
+      "Assertions": 18,
+      "Groups": 3
+    },
+    "InputAssertions": 11
+  },
+  "Protection": {
+    "StartupDifferenceCause": "UNKNOWN: original wrapper did not retain before/after snapshots; no speculative restore performed",
+    "TemporaryComRegistrationRemoved": true,
+    "StartupSettingsUnchanged": false,
+    "NewPartFixtures": 0,
+    "Changed": 0,
+    "CadExcelFixtureFilesChecked": 15,
+    "ForeignUserSessionAccessed": false
+  },
+  "RemainingEvidenceNeeded": [
+    "A fatal heap stack from PID 73032 or a newly authorized controlled reproduction",
+    "Complete native idle versus running-close comparison after diagnostic IO repair",
+    "Identify exact startup registry difference using before/after snapshots"
+  ],
+  "NotRun": [
+    "XL-17, XL-19, XL-32 and small Assembly",
+    "Full 33 Parts or 120/25 Assembly",
+    "Native verification of final event protocol and new startup snapshot logging",
+    "Production COM registration/deployment lifecycle"
+  ],
+  "NoNativeRetryAfterLimit": true
+}

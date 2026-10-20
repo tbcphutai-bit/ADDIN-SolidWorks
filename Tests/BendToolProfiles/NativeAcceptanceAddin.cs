@@ -29,7 +29,7 @@ namespace CheckChan.NativeAcceptance
         private void Write(string stage)
         {
             state["Stage"]=stage;state["Pid"]=Process.GetCurrentProcess().Id;state["Apartment"]=Thread.CurrentThread.GetApartmentState().ToString();
-            File.WriteAllText(Path.Combine(root,"PRIVATE-inprocess-events.json"),new JavaScriptSerializer().Serialize(state));
+            AcceptanceEventFile.Publish(Path.Combine(root,"PRIVATE-inprocess-events.json"),new JavaScriptSerializer().Serialize(state));
         }
         public bool ConnectToSW(object host,int cookie)
         {

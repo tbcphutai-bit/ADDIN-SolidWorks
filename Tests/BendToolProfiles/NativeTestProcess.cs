@@ -52,7 +52,11 @@ internal static class NativeTestProcess
         {
             if(!File.Exists(collector)||!Path.IsPathRooted(collector))throw new FileNotFoundException("Explicit native dump collector missing");
             string dumpRoot=Path.Combine(output,"PRIVATE-dumps");Directory.CreateDirectory(dumpRoot);
-            var monitor=Process.Start(new ProcessStartInfo(collector,"-accepteula -ma -e 1 -f C0000374,C0000005 -g -t -n 2 "+process.Id+" \""+dumpRoot+"\"")
+            // A focused heap investigation must not exhaust its dump count
+            // on unrelated first-chance AVs before the fatal heap exception.
+            bool heapOnly=Environment.GetEnvironmentVariable("ADDIN_NATIVE_HEAP_DUMP_ONLY")=="1";
+            string dumpOptions=heapOnly?"-accepteula -ma -e 1 -f C0000374 -g -n 1 ":"-accepteula -ma -e 1 -f C0000374,C0000005 -g -t -n 2 ";
+            var monitor=Process.Start(new ProcessStartInfo(collector,dumpOptions+process.Id+" \""+dumpRoot+"\"")
                 {UseShellExecute=false,WindowStyle=ProcessWindowStyle.Hidden,RedirectStandardOutput=true,RedirectStandardError=true,
                     StandardOutputEncoding=System.Text.Encoding.Unicode,StandardErrorEncoding=System.Text.Encoding.Unicode});
             DataReceivedEventHandler log=(s,e)=>{if(e.Data!=null)lock(dumpLogGate)File.AppendAllText(Path.Combine(output,"PRIVATE-procdump.log"),e.Data+"\r\n");};
