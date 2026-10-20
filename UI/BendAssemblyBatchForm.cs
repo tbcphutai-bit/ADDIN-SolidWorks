@@ -68,6 +68,7 @@ namespace ADDIN.UI
         private bool isMockupMode;
         private bool bindingParts, bindingTools;
         private readonly BendSequencePlanningControl sequenceView = new BendSequencePlanningControl();
+        private readonly BendToolEvidenceControl toolEvidence = new BendToolEvidenceControl();
         private string preservePart, preserveTool;
         private int? preserveFeature;
         private readonly DataGridView phaseEvidence = new DataGridView();
@@ -142,7 +143,8 @@ namespace ADDIN.UI
             { int column = phaseEvidence.Columns.Add("p" + phaseEvidence.Columns.Count, heading); phaseEvidence.Columns[column].MinimumWidth = 90; }
             phaseEvidence.CellToolTipTextNeeded += (s, e) => { if (e.RowIndex >= 0 && e.ColumnIndex >= 0) e.ToolTipText = Convert.ToString(phaseEvidence[e.ColumnIndex, e.RowIndex].Value); };
             splitDetails.Panel2.Controls.Add(phaseEvidence); phaseEvidence.BringToFront();
-            plan.Controls.Add(sequenceView); tabs.TabPages.AddRange(new[] { bends, plan, diagnostic, minimum }); splitMain.Panel2.Controls.Add(tabs);
+            var review = new TabPage("Hồ sơ dao"); review.Controls.Add(toolEvidence);
+            plan.Controls.Add(sequenceView); tabs.TabPages.AddRange(new[] { bends, plan, diagnostic, minimum, review }); splitMain.Panel2.Controls.Add(tabs);
             sequenceView.FeatureSelected += (s, feature) => { if (!isMockupMode && selectedPart?.RawPartResult?.Current == true) BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SelectionKey, feature)); };
             var pager = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false };
             var previous = new Button { Name = "partsPagePrevious", Text = "‹", Width = 30 }; var next = new Button { Name = "partsPageNext", Text = "›", Width = 30 };
@@ -939,6 +941,8 @@ namespace ADDIN.UI
 
         private void RenderToolCallout(BatchToolCandidateViewModel tool)
         {
+            var partForReview=selectedPart?.RawPartResult;
+            toolEvidence.ShowTool(tool.CadAssembly,tool.NativeEnvelope,()=>!isMockupMode&&partForReview?.Current==true);
             phaseEvidence.Rows.Clear();
             var cad=tool.CadAssembly?.CadPair;
             if(cad!=null)
@@ -947,10 +951,14 @@ namespace ADDIN.UI
                 phaseEvidence.Rows.Add("CAD / Holder",cad.Status,cad.HolderBlock+" · INSERT "+cad.HolderInsert+" · "+string.Join(", ",cad.HolderLayers));
                 phaseEvidence.Rows.Add("CAD / Gá", "UNKNOWN", "Tọa độ trình bày; datum, seating và chiều dài làm việc cần bằng chứng riêng.");
             }
+            phaseEvidence.Rows.Add("Static / Punch",tool.PunchStatusDisplay,(tool.StaticSimulationOnly?"SIMULATION · ":"")+tool.PunchReason+
+                " · clearance ≥ "+tool.PunchClearanceMm+" mm");
+            phaseEvidence.Rows.Add("Static / Holder",tool.HolderStatusDisplay,(tool.StaticSimulationOnly?"SIMULATION · ":"")+tool.HolderReason+
+                " · clearance ≥ "+tool.HolderClearanceMm+" mm");
             foreach (var segment in tool.MotionSegments)
                 phaseEvidence.Rows.Add(segment.Phase + " / " + (segment.Pair == CollisionPairKind.WorkpiecePunch ? "Punch" : "Holder"), segment.Status,
-                    segment.Witness == null ? segment.Reason : "u=" + segment.Witness.Parameter.ToString("0.######") + " · " + segment.Witness.PartId +
-                    " · margin>" + segment.Witness.Geometry.CrossSectionInteriorMarginLowerMm.ToString("0.######") + " mm");
+                    (tool.ProcessSimulationOnly?"SIMULATION · ":"")+(segment.Witness == null ? segment.Reason : "u=" + segment.Witness.Parameter.ToString("0.######") + " · " + segment.Witness.PartId +
+                    " · margin>" + segment.Witness.Geometry.CrossSectionInteriorMarginLowerMm.ToString("0.######") + " mm"));
             lblCalloutTitle.Text = $"Chi tiết dao — {tool.ToolId}";
             lblCalloutPunch.Text = $"Punch – {tool.ToolId} : {tool.PunchStatusDisplay}";
             lblCalloutHolder.Text = $"Upper Holder : {tool.HolderStatusDisplay}"+(cad?.Matched==true?" · CAD reference":"");
@@ -974,6 +982,7 @@ namespace ADDIN.UI
 
         private void ClearDetailSection()
         {
+            toolEvidence.ShowTool(null,null,null);
             selectedPart = null; selectedBend = null; selectedTool = null;
             lblDetailBendTitle.Text = "Chi tiết nếp chấn — Chưa chọn Part";
             toolTips.SetToolTip(lblDetailBendTitle, "Chọn một chi tiết bên trên để xem các nếp chấn.");

@@ -19,6 +19,7 @@ namespace ADDIN.Commands
     // runs ONLY during Pump on STA; no callback/owner/COM enters the coordinator.
     internal sealed class AssemblyProgramData
     {
+        internal IReadOnlyList<string> ReadinessDiagnostics {get;set;} = PlacementLists.Copy<string>(null);
         internal IEnumerable<SheetEnvelopeCapture> Envelopes { get; }
         internal IEnumerable<ToolAxialSetupEvidence> Setups { get; }
         internal IEnumerable<BendProcessPlan> Plans { get; }
@@ -40,10 +41,16 @@ namespace ADDIN.Commands
             ToolProfileLibrarySnapshot library, CancellationToken token)
         {
             var imported = await provider.ReadAsync(source, path, model, library, token).ConfigureAwait(false);
+            var finalStatic = await provider.ReadFinalStaticAsync(source,path,model,library,token).ConfigureAwait(false);
             // Alternative process states belong to the sequence graph. They
             // are not the one observed final sheet envelope or a single plan
             // for the legacy per-bend static/process comparison.
-            return new AssemblyProgramData(use: imported.Use, revision: imported.Revision, sequence: imported.Sequence);
+            return new AssemblyProgramData(envelopes:finalStatic.Envelopes,setups:finalStatic.Setups,use: imported.Use,
+                // Preserve the existing signed process-only PartLocal payload
+                // when no final-static setup was supplied. Adding a new setup
+                // deliberately cannot borrow approval of the narrower program.
+                revision:finalStatic.Setups.Count==0?imported.Revision:ToolEvidenceCanonical.Hash(imported.Revision,finalStatic.Revision),sequence:imported.Sequence)
+                {ReadinessDiagnostics=finalStatic.Reasons};
         }
         private AssemblyNativeBatchOperation assemblyOperation;
         private PlacementLease assemblySceneLease;
@@ -251,8 +258,10 @@ namespace ADDIN.Commands
                             string sourceReason=item.Error??(model==null&&hasEligible?item.PlacementDiagnosticError??"MISSING_NATIVE_CAPTURE":null);
                             // Min preserves its file/config grouping; Batch separates
                             // healthy occurrences and individual unsupported instances.
-                            sources.AddRange(AssemblyOccurrenceEligibility.Partition(key,model,item.AssemblyOccurrences,
-                                data?.Envelopes,data?.Setups,data?.Plans,data?.Use,sourceReason,data?.ConditionsRevision,data?.Sequence,ReadMinimumMetadata(item)));
+                            var partition=AssemblyOccurrenceEligibility.Partition(key,model,item.AssemblyOccurrences,
+                                data?.Envelopes,data?.Setups,data?.Plans,data?.Use,sourceReason,data?.ConditionsRevision,data?.Sequence,ReadMinimumMetadata(item));
+                            foreach(var input in partition)input.ReadinessDiagnostics=data?.ReadinessDiagnostics??PlacementLists.Copy<string>(null);
+                            sources.AddRange(partition);
                             index++; captured++;
                         }
                         if (index<owner.Items.Count) return;

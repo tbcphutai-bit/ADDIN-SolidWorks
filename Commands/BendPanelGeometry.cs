@@ -36,6 +36,8 @@ namespace ADDIN.Commands
     {
         private static long Key(object value)
         {var key=Marshal.GetIUnknownForObject(value);try{return key.ToInt64();}finally{Marshal.Release(key);}}
+        internal static string PersistentKey(ModelDoc2 model,object entity)
+        {var bytes=model.Extension.GetPersistReference3(entity) as byte[];return bytes==null||bytes.Length==0?null:Convert.ToBase64String(bytes);}
         internal static List<BendPanelBody> Read(ISldWorks app,ModelDoc2 model,string config,IList<VCutPropertySetupCommand.BendRow> rows)
         {
             var result=new List<BendPanelBody>();
@@ -59,8 +61,10 @@ namespace ADDIN.Commands
                 var nativeFaces=(body.GetFaces() as object[])?.Cast<Face2>().ToArray();
                 var nativeEdges=(body.GetEdges() as object[])?.Cast<Edge>().ToArray();
                 if(nativeFaces==null||nativeEdges==null||nativeFaces.Length>12000)throw new InvalidOperationException("Không đọc được topology body hoặc số mặt vượt giới hạn kiểm tra.");
-                var faceIds=nativeFaces.Select((f,i)=>new{key=Key(f),id=i}).ToDictionary(p=>p.key,p=>p.id);
-                var edgeIds=nativeEdges.Select((e,i)=>new{key=Key(e),id=i}).ToDictionary(p=>p.key,p=>p.id);
+                var faceIds=new NativeEntityReferenceIndex<Face2>(nativeFaces,f=>Key(f),f=>PersistentKey(model,f),
+                    (a,b)=>app.IsSame(a,b)==(int)swObjectEquality.swObjectSame);
+                var edgeIds=new NativeEntityReferenceIndex<Edge>(nativeEdges,e=>Key(e),e=>PersistentKey(model,e),
+                    (a,b)=>app.IsSame(a,b)==(int)swObjectEquality.swObjectSame);
                 var data=new BendPanelBody{Name=body.Name,NativeBody=body};var material=materials.Read(app,model,body,config);
                 data.MaterialName=material.Name;data.MaterialCode=material.Code;
                 for(int i=0;i<nativeEdges.Length;i++) {
@@ -69,7 +73,7 @@ namespace ADDIN.Commands
                     var value=new BendPanelEdge{Id=i,Kind=curve.IsLine()?1:curve.IsCircle()?2:0,A=BendVector.From((double[])p.StartPoint),B=BendVector.From((double[])p.EndPoint)};
                     if(value.Kind==2)value.PlacementArc=BendPlacement.BendPlacementNativeCapture.TryReadArc(edge,curve,p);
                     foreach(var face in edge.GetTwoAdjacentFaces2() as object[]??new object[0]) {
-                        int index;if(face!=null&&faceIds.TryGetValue(Key(face),out index))value.Faces.Add(index);
+                        if(face!=null)value.Faces.Add(faceIds.Resolve((Face2)face));
                     }
                     data.Edges.Add(value);
                 }
@@ -85,12 +89,14 @@ namespace ADDIN.Commands
                     } else if(surface!=null&&surface.IsCylinder()) {
                         var p=(double[])surface.CylinderParams;value.Kind=2;value.Point=BendVector.From(p);value.Axis=new BendVector(p[3],p[4],p[5]).Unit;value.Radius=p[6];
                     }
-                    foreach(var edge in face.GetEdges() as object[]??new object[0])value.Edges.Add(edgeIds[Key(edge)]);
+                    foreach(var edge in face.GetEdges() as object[]??new object[0])value.Edges.Add(edgeIds.Resolve((Edge)edge));
                     foreach(var loop in (face.GetLoops() as object[]??new object[0]).Cast<Loop2>())
-                        if(loop.IsOuter())foreach(var edge in loop.GetEdges() as object[]??new object[0])value.OuterEdges.Add(edgeIds[Key(edge)]);
+                        if(loop.IsOuter())foreach(var edge in loop.GetEdges() as object[]??new object[0])value.OuterEdges.Add(edgeIds.Resolve((Edge)edge));
                     data.Faces.Add(value);data.NativeFaces.Add(i,face);
                 }
                 result.Add(data);
+                BendNativeCaptureDiagnostics.Stage("BendPanelIdentity persistent="+(edgeIds.PersistentResolutions+faceIds.PersistentResolutions)+
+                    " kernel="+(edgeIds.KernelResolutions+faceIds.KernelResolutions));
             }
             return result;
         }

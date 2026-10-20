@@ -25,6 +25,8 @@ namespace ADDIN.Commands.BendPlacement
     }
     internal sealed class CadPairBinding
     {
+        public string LabelHandle { get; }
+        public string ExpectedLabel { get; }
         public string ToolId { get; }
         public string SlotId { get; }
         public string SourceSha256 { get; }
@@ -46,6 +48,7 @@ namespace ADDIN.Commands.BendPlacement
         internal CadPairBinding(string id,string sha,string manifest,MasterToolSelection definition,bool matched,IEnumerable<string> reasons)
         {
             ToolId=id;SourceSha256=sha;ManifestSha256=manifest;Matched=matched;
+            LabelHandle=definition?.LabelHandle;ExpectedLabel=definition?.ExpectedLabel;
             SlotId=definition?.PresentationPair?.SlotId;EvidenceReference=definition?.PresentationPair?.EvidenceReference;
             PunchBlock=definition?.PunchBlock;PunchInsert=definition?.PunchRootInsert;
             HolderBlock=definition?.HolderBlock;HolderInsert=definition?.HolderRootInsert;

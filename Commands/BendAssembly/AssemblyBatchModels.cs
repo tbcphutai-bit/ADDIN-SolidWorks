@@ -105,6 +105,7 @@ namespace ADDIN.Commands.BendAssembly
 
     internal sealed class AssemblySourceInput
     {
+        internal IReadOnlyList<string> ReadinessDiagnostics {get;set;} = PlacementLists.Copy<string>(null);
         public string SourceKey { get; }
         public PlacementModelCapture Model { get; }
         public IReadOnlyList<AssemblyOccurrence> Occurrences { get; }
@@ -185,6 +186,7 @@ namespace ADDIN.Commands.BendAssembly
     }
     internal sealed class AssemblyPartResult
     {
+        internal IReadOnlyList<string> ReadinessDiagnostics {get;set;} = PlacementLists.Copy<string>(null);
         private readonly Func<string> invalid;
         public string SourceKey { get; }
         public string OccurrenceSetKey => ToolEvidenceCanonical.Hash(SourceKey,
@@ -200,6 +202,9 @@ namespace ADDIN.Commands.BendAssembly
         public PartPlanningResult Planning { get; }
         public IReadOnlyList<AssemblyBendMetadata> BendMetadata { get; }
         public string ManufacturingStatus => "CHUA_XAC_MINH";
+        // Managed provenance for the unsigned evidence editor. Not a new
+        // certificate and never substituted into a collision query.
+        internal IReadOnlyList<SheetEnvelopeCapture> ReviewEnvelopes { get; } = PlacementLists.Copy<SheetEnvelopeCapture>(null);
         public string WinnerToolId => null;
         public CollisionStatus GeometricStatus => !Current ? CollisionStatus.UNKNOWN :
             StaticCandidates.Any(r => r.CombinedResult == CollisionStatus.COLLISION) || ProcessCandidates.Any(r => r.ProcessResult == CollisionStatus.COLLISION) ? CollisionStatus.COLLISION :
@@ -214,5 +219,10 @@ namespace ADDIN.Commands.BendAssembly
             IEnumerable<ProcessCandidateResult> processes, int bends, bool simulation, Func<string> invalid, PartPlanningResult planning = null, IEnumerable<AssemblyBendMetadata> metadata = null)
         { SourceKey = source; Occurrences = PlacementLists.Copy(occurrences); Reason = reason; StaticCandidates = PlacementLists.Copy(statics);
             ProcessCandidates = PlacementLists.Copy(processes); BendCount = bends; SimulationOnly = simulation; this.invalid = invalid; Planning = planning; BendMetadata = PlacementLists.Copy(metadata); }
+        internal AssemblyPartResult(string source, IEnumerable<AssemblyOccurrence> occurrences, string reason, IEnumerable<VolumeCandidateCollisionResult> statics,
+            IEnumerable<ProcessCandidateResult> processes, int bends, bool simulation, Func<string> invalid, PartPlanningResult planning,
+            IEnumerable<AssemblyBendMetadata> metadata, IEnumerable<SheetEnvelopeCapture> reviewEnvelopes)
+            : this(source,occurrences,reason,statics,processes,bends,simulation,invalid,planning,metadata)
+        {ReviewEnvelopes=PlacementLists.Copy(reviewEnvelopes);}
     }
 }

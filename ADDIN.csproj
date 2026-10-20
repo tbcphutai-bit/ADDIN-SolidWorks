@@ -230,6 +230,10 @@
     <Compile Include="Commands\BendToolProfiles\ToolNurbsGeometry.cs" />
     <Compile Include="Commands\BendPlacement\ToolReviewEvidence.cs" />
     <Compile Include="Commands\BendPlacement\HolderObstacleGeometry.cs" />
+    <Compile Include="Commands\BendPlacement\HolderMaterialReviewDraft.cs" />
+    <Compile Include="Commands\NativeEntityReferenceIndex.cs" />
+    <Compile Include="Commands\BendPlacement\ToolEvidenceReviewWorkspace.cs" />
+    <Compile Include="UI\BendToolEvidenceControl.cs" />
     <Compile Include="Commands\BendPlacement\HolderObstaclePlacement2D.cs" />
     <Compile Include="Commands\BendPlacement\ToolPairSeatingEvidence.cs" />
     <Compile Include="Commands\BendPlacement\ToolHolderEvidenceReader.cs" />
@@ -265,6 +269,7 @@
     <Compile Include="Commands\BendPlanning\CadReferenceSimulation.cs" />
     <Compile Include="Commands\BendPlanning\ProcessPackageImporter.cs" />
     <Compile Include="Commands\BendPlanning\ProcessProgramProvider.cs" />
+    <Compile Include="Commands\BendPlanning\FinalStaticSetupProvider.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileModels.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolDxfReader.cs" />
     <Compile Include="Commands\BendToolProfiles\ToolProfileLibrary.cs" />

@@ -93,6 +93,9 @@ namespace ADDIN.UI
     internal sealed class BatchToolCandidateViewModel
     {
         public ToolAssemblyProfile CadAssembly { get; set; }
+        public SheetEnvelopeCapture NativeEnvelope { get; set; }
+        public bool StaticSimulationOnly { get; set; }
+        public bool ProcessSimulationOnly { get; set; }
         public string ToolId { get; set; }
         public int FeatureId { get; set; }
         public CollisionStatus PunchStatus { get; set; }
@@ -354,8 +357,11 @@ namespace ADDIN.UI
                         var toolVm = new BatchToolCandidateViewModel
                         {
                             CadAssembly = read.ToolPairs.SingleOrDefault(p=>p.Id==toolId),
+                            NativeEnvelope = part.Source.ReviewEnvelopes.SingleOrDefault(e=>e.Binding.FeatureId==featureId),
                             ToolId = toolId,
                             FeatureId = featureId,
+                            StaticSimulationOnly = part.SimulationOnly || staticCand?.SimulationOnly==true,
+                            ProcessSimulationOnly = part.SimulationOnly || procCand?.SimulationOnly==true,
                             PunchStatus = punch,
                             HolderStatus = holder,
                             GeometricStatus = geom,
@@ -368,6 +374,7 @@ namespace ADDIN.UI
                                 "AMBIGUOUS_CANDIDATE_BINDING" : string.Join("; ",
                                 (staticCand?.Reasons ?? new[] { "MISSING_STATIC_CANDIDATE" })
                                 .Concat(procCand?.PairSegments.SelectMany(s => s.Reasons) ?? new[] { "MISSING_PROCESS_CANDIDATE" })
+                                .Concat(part.Source.ReadinessDiagnostics)
                                 .Concat(part.Reason == null ? new string[0] : new[] { part.Reason }).Distinct()),
                             MotionSegments = procCand?.PairSegments.Select(s => new BatchMotionSegmentViewModel
                             {

@@ -46,7 +46,7 @@ internal static partial class NativePlanningValidation
             Environment.SetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE",null);
             Environment.SetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG",args.Length>5?Path.GetFullPath(args[5]):null);
             app=NativeTestProcess.StartOwned(output); int pid=app.GetProcessID();
-            owned=true; Check(owned,"Explicit owned API process required"); app.Visible=false; app.UserControl=false;
+            owned=true; Check(owned,"Explicit owned API process required"); NativeTestProcess.KeepOwnedBackgroundSession(app);
             File.WriteAllText(Path.Combine(output,"ownership.json"),Json.Serialize(new {pid,owned,startUtc=Process.GetProcessById(pid).StartTime.ToUniversalTime().ToString("o")}));
             Console.WriteLine("Owned library test SW process "+pid);
             int errors=0,warnings=0; var model=app.OpenDoc6(copy,1,1,"",ref errors,ref warnings) as ModelDoc2; Check(model!=null,"Open private Part copy "+errors);

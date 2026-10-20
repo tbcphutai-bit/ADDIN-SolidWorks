@@ -43,7 +43,7 @@ namespace ADDIN.Commands.BendPlacement
         public string Fingerprint => ToolEvidenceCanonical.Hash(fileFingerprint,verifier.ObservationFingerprint);
         public string HolderError { get; }
         public string SeatingError { get; }
-        internal ToolHolderEvidenceReader(string holderPath,string seatingPath,string authorities,CancellationToken token)
+        internal ToolHolderEvidenceReader(string holderPath,string seatingPath,string authorities,CancellationToken token,string reviewWorkspacePath=null,string masterSha=null,string manifestSha=null)
         {
             verifier=ToolReviewVerifier.Load(authorities,token);string hsha=null,ssha=null;
             try
@@ -71,7 +71,30 @@ namespace ADDIN.Commands.BendPlacement
             }
             catch(OperationCanceledException){throw;}
             catch(Exception ex) when(ex is InvalidDataException||ex is IOException||ex is ArgumentException||ex is InvalidOperationException||ex is UnauthorizedAccessException){seating=null;SeatingError="INVALID_PAIR_SEATING_SOURCE";}
-            fileFingerprint=ToolEvidenceCanonical.Hash("HolderEvidenceFilesV1",hsha,ssha,verifier.Fingerprint,HolderError,SeatingError);
+            string workspaceSha=null;
+            if(!string.IsNullOrWhiteSpace(reviewWorkspacePath))
+            {
+                try
+                {
+                    if(!string.IsNullOrWhiteSpace(holderPath)||!string.IsNullOrWhiteSpace(seatingPath))throw new InvalidDataException("AMBIGUOUS_REVIEW_INPUTS");
+                    var bytes=PlacementSourceIo.Read(reviewWorkspacePath,4*1024*1024,token);workspaceSha=PlacementSourceIo.Hash(bytes);
+                    var proposals=ToolEvidenceReviewWorkspace.ReadDocument(bytes);
+                    if(proposals.Any(p=>p.MasterSha256!=masterSha||p.ManifestSha256!=manifestSha||
+                        p.Mapping?.ToolId!=p.ToolId||p.Material?.ToolId!=p.ToolId||p.Seating?.ToolId!=p.ToolId||
+                        p.Material.BindingSha256!=p.BindingSha256||p.Mapping.BindingSha256!=p.BindingSha256||
+                        p.Mapping.PunchRootInsert!=p.PunchInsert||p.Mapping.HolderRootInsert!=p.HolderInsert))
+                        throw new InvalidDataException("STALE_REVIEW_WORKSPACE_SOURCE");
+                    holderRoot=Root(reviewWorkspacePath);seatingRoot=holderRoot;
+                    // These are still untrusted DTOs. Material/Mapping/Seating
+                    // below MUST pass their existing independent verifiers.
+                    holder=new HolderEvidenceDocument {Version=1,Materials=proposals.Select(p=>p.Material).ToList(),Mappings=proposals.Select(p=>p.Mapping).ToList()};
+                    seating=new PairSeatingDocument {Version=1,Pairs=proposals.Select(p=>p.Seating).ToList()};
+                }
+                catch(OperationCanceledException){throw;}
+                catch(Exception ex) when(ex is InvalidDataException||ex is IOException||ex is ArgumentException||ex is InvalidOperationException||ex is UnauthorizedAccessException)
+                {holder=null;seating=null;HolderError="INVALID_REVIEW_WORKSPACE_SOURCE";SeatingError=HolderError;}
+            }
+            fileFingerprint=ToolEvidenceCanonical.Hash("HolderEvidenceFilesV2",hsha,ssha,workspaceSha,verifier.Fingerprint,HolderError,SeatingError);
         }
         private static string Root(string path)=>string.IsNullOrWhiteSpace(path)?Directory.GetCurrentDirectory():Path.GetDirectoryName(Path.GetFullPath(path));
         private static void ValidateIds(IEnumerable<string> ids)

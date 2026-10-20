@@ -58,6 +58,24 @@ internal static class BendAssemblyUiTests
             .Single().Bends.Single().ToolCandidates[0];
     private static void ConverterTests()
     {
+        Test("final evidence UX: source preview, explicit unsigned roles and stale export barrier",()=>{
+            bool current=true;var source=ToolProfileTests.CadPairUiLibrary().PlacementSources.Tools[0];
+            using(var pane=new BendToolEvidenceControl())
+            {
+                pane.ShowTool(source,null,()=>current);
+                Check(pane.Draft.Rows.Count==source.Holder.SourceEntities.Count&&!pane.Draft.MaterialReviewed,"Every original entity visible without material approval");
+                var grid=(DataGridView)pane.Controls.Find("holderRoleEntities",true).Single();
+                foreach(DataGridViewRow row in grid.Rows){bool solid=Convert.ToString(row.Cells[0].Value)=="H";
+                    row.Cells[5].Value=solid?"Solid":"Reference";if(solid)row.Cells[6].Value="REVIEWER_SELECTED_CONTOUR";}
+                pane.ApplyRoles();
+                var p=ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Read(pane.ProposalText,pane.Draft);
+                Check(p.Material.Review==null&&p.Material.Contours.Count==1&&!source.ClampVerified,"Unsigned proposal is not installed evidence");
+                Check(p.Seating.TipPointMm.X==null&&p.Seating.HolderSourceToPunchSource.A==null,"No guessed pose from viewer fit");
+                current=false;bool refused=false;try{pane.ApplyRoles();}catch(InvalidOperationException){refused=true;}catch(InvalidDataException){refused=true;}
+                Check(refused,"Source revocation blocks held editor");
+                pane.ShowTool(null,null,null);Check(pane.Draft==null&&grid.Rows.Count==0&&pane.ProposalText.Length==0,"Refresh clears source-bound review pane");
+            }
+        });
         Test("18 fixed CAD pair identities reach every UI bend without promotion",()=>{
             var library=ToolProfileTests.CadPairUiLibrary();var snapshot=Snapshot(Part(3,new[]{Geometry(7),Geometry(42),Geometry(314)}),library:library);
             var part=BatchViewModelConverter.PartsFromSnapshot(snapshot).Single();

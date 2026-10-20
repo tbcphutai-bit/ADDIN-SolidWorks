@@ -21,6 +21,10 @@
     <Compile Include="..\..\Commands\BendPlacement\ToolHolderEvidenceReader.cs"><Link>ToolHolderEvidenceReader.cs</Link></Compile>
     <Compile Include="..\..\Commands\BendPlacement\SheetEnvelopeReadiness.cs"><Link>SheetEnvelopeReadiness.cs</Link></Compile>
     <Compile Include="HolderTests.cs"/>
+    <Compile Include="FinalEvidenceReviewTests.cs"/>
+    <Compile Include="..\..\Commands\NativeEntityReferenceIndex.cs" />
+    <Compile Include="..\..\Commands\BendPlacement\HolderMaterialReviewDraft.cs" />
+    <Compile Include="..\..\Commands\BendPlacement\ToolEvidenceReviewWorkspace.cs" />
     <Compile Include="CollisionTests.cs"/>
     <Compile Include="CollisionPlacementTests.cs"/>
     <Compile Include="CollisionCompanyIntegration.cs"/>

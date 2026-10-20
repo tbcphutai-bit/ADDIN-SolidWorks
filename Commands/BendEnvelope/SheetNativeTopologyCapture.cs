@@ -39,12 +39,12 @@ namespace ADDIN.Commands.BendEnvelope
                 if (old.SnapshotKey == snapshotKey) return old;
                 Cache.Remove(item.Context);
             }
-            var result = new NativeEnvelopeCaptureBundle(snapshotKey, bodies.Select((b, i) => Copy(b, "body:" + i)));
+            var result = new NativeEnvelopeCaptureBundle(snapshotKey, bodies.Select((b, i) => Copy(b, "body:" + i,item.Model)));
             Cache.Add(item.Context, result); return result;
         }
         private static PlacementVector3 V(double[] a, int start = 0, bool metres = false) => metres ?
             PlacementVector3.Metres(a[start], a[start + 1], a[start + 2]) : new PlacementVector3(a[start], a[start + 1], a[start + 2]);
-        private static NativeEnvelopeBody Copy(BendPanelBody body, string id)
+        private static NativeEnvelopeBody Copy(BendPanelBody body, string id,ModelDoc2 model)
         {
             Interlocked.Increment(ref captures);
             var timer=Stopwatch.StartNew();
@@ -55,8 +55,8 @@ namespace ADDIN.Commands.BendEnvelope
                 var edges = native.GetEdges() as object[];
                 if (faces == null || edges == null || faces.Length > 12000 || edges.Length > 24000)
                     return new NativeEnvelopeBody(id, false, 0, 0, null, null, "INCOMPLETE_NATIVE_BREP_CAPTURE");
-                var faceIds = faces.Select((f, i) => new { key = Key(f), i }).ToDictionary(v => v.key, v => v.i);
-                var edgeIds = edges.Select((e, i) => new { key = Key(e), i }).ToDictionary(v => v.key, v => v.i);
+                var faceIds = new NativeEntityReferenceIndex<object>(faces,Key,f=>BendPanelGeometryReader.PersistentKey(model,f));
+                var edgeIds = new NativeEntityReferenceIndex<object>(edges,Key,e=>BendPanelGeometryReader.PersistentKey(model,e));
                 var edgeData = new List<PlacementEdgeSnapshot>(); var faceData = new List<NativeEnvelopeFace>();var circles=new List<NativeCircleDefinition>();
                 for (int i = 0; i < edges.Length; i++)
                 {
@@ -69,7 +69,7 @@ namespace ADDIN.Commands.BendEnvelope
                         circles.Add(new NativeCircleDefinition(i,V(circle,3).Unit,p.Sense));
                     }
                     var endpoints=NativeEnvelopeEdgePolicy.EdgeEndpoints(V((double[])p.StartPoint,metres:true),V((double[])p.EndPoint,metres:true),p.Sense);
-                    var adjacent = (edge.GetTwoAdjacentFaces2() as object[] ?? new object[0]).Where(f => f != null).Select(f => faceIds[Key(f)]).ToArray();
+                    var adjacent = (edge.GetTwoAdjacentFaces2() as object[] ?? new object[0]).Where(f => f != null).Select(faceIds.Resolve).ToArray();
                     edgeData.Add(new PlacementEdgeSnapshot(i, kind, endpoints.Item1, endpoints.Item2, adjacent,
                         kind == 2 ? BendPlacementNativeCapture.TryReadArc(edge, curve, p) : null));
                 }
@@ -85,7 +85,7 @@ namespace ADDIN.Commands.BendEnvelope
                     foreach (Loop2 loop in face.GetLoops() as object[] ?? new object[0])
                     {
                         var directed = (loop.GetEdges() as object[] ?? new object[0]).Cast<Edge>().Select(e =>
-                            new NativeLoopEdge(edgeIds[Key(e)], e.EdgeInFaceSense(face))).ToArray();
+                            new NativeLoopEdge(edgeIds.Resolve(e), e.EdgeInFaceSense(face))).ToArray();
                         loops.Add(new NativeFaceLoop(loop.IsOuter(), loop.IsSingular(), directed));
                     }
                     faceData.Add(new NativeEnvelopeFace(i, kind, normal, point, axis, radius, face.FaceInSurfaceSense(), loops));

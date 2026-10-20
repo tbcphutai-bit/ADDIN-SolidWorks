@@ -61,6 +61,11 @@ namespace ADDIN.Commands.BendEnvelope
             return new EnvelopeBinding(model, bend, source, frame, review.PayloadSha256,
                 () => current() && review.RecordVerified);
         }
+        internal EnvelopeBinding WithAdditionalFreshness(Func<bool> current)
+        {
+            if(current==null)throw new ArgumentNullException(nameof(current));
+            return new EnvelopeBinding(Model,Model.Bends.Single(b=>b.FeatureId==FeatureId),SourceSha256,WorkFrame,registrationPayload,()=>Current&&current());
+        }
         private string NativeCanonical => ToolEvidenceCanonical.Hash("SheetEnvelopeBindingV1", ModelSnapshotId,
             UpdateStamp.ToString(System.Globalization.CultureInfo.InvariantCulture), Configuration, BodyId,
             FeatureId.ToString(System.Globalization.CultureInfo.InvariantCulture), FrameId, SourceSha256,
@@ -113,6 +118,8 @@ namespace ADDIN.Commands.BendEnvelope
         public bool SimulationOnly { get; }
         public bool Current => Binding.Current;
         public AxialInterval Domain { get; }
+        internal SheetEnvelopeCapture WithAdditionalFreshness(Func<bool> current) => new SheetEnvelopeCapture(Binding.WithAdditionalFreshness(current),
+            primitives,Certificate.Tier,Certificate.Method,SimulationOnly,Certificate.SolidToleranceMm,Reasons,ObservedSlices);
         internal SheetEnvelopeCapture(EnvelopeBinding binding, IEnumerable<AxialSolidPrimitive> solids,
             EnvelopeCoverageTier tier, string method, bool simulation, double tolerance, IEnumerable<string> reasons,
             IEnumerable<AxialSlice2D> observations = null)

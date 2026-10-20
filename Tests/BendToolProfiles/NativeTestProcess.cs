@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
@@ -56,10 +58,11 @@ internal static class NativeTestProcess
             DataReceivedEventHandler log=(s,e)=>{if(e.Data!=null)lock(dumpLogGate)File.AppendAllText(Path.Combine(output,"PRIVATE-procdump.log"),e.Data+"\r\n");};
             monitor.OutputDataReceived+=log;monitor.ErrorDataReceived+=log;monitor.BeginOutputReadLine();monitor.BeginErrorReadLine();
         }
-        var clock=Stopwatch.StartNew();
+        var clock=Stopwatch.StartNew();bool rotSeen=false;
         while(clock.ElapsedMilliseconds<60000&&!process.HasExited)
         {
             var app=Find(process.Id);
+            if(app!=null)rotSeen=true;
             if(app!=null&&app.GetProcessID()==process.Id&&process.StartTime.ToUniversalTime()==start&&
                 (Environment.GetEnvironmentVariable("ADDIN_NATIVE_SKIP_STARTUP_READY")=="1"||app.StartupProcessCompleted))
             {
@@ -76,11 +79,45 @@ internal static class NativeTestProcess
                     File.WriteAllText(Path.Combine(output,"PRIVATE-addin-isolation.json"),new JavaScriptSerializer().Serialize(new {Pid=process.Id,Path=excluded,Unloaded=unloaded}));
                     if(!unloaded)throw new InvalidOperationException("Owned-session add-in isolation was not applied");
                 }
+                RecordLoadedBinaries(output,"startup");
                 return app;
             }
             PumpMessages();Thread.Sleep(50);
         }
-        throw new InvalidOperationException("Owned SOLIDWORKS PID did not register; no fallback to another session");
+        File.WriteAllText(Path.Combine(output,"PRIVATE-startup-failure.json"),new JavaScriptSerializer().Serialize(new {
+            Pid=process.Id,ElapsedMilliseconds=clock.Elapsed.TotalMilliseconds,RotSeen=rotSeen,Exited=process.HasExited,
+            ExitCode=process.HasExited?(int?)process.ExitCode:null,StartUtc=start.ToString("o")}));
+        throw new InvalidOperationException("Owned SOLIDWORKS PID did not register; no fallback to another session"+
+            (process.HasExited?"; owned exit code="+process.ExitCode:"; original startup deadline expired"));
+    }
+    internal static void RecordLoadedBinaries(string output,string phase)
+    {
+        if(ownedServer==null||ownedServer.HasExited)throw new InvalidOperationException("Owned process unavailable for binary audit");
+        var modules=new List<object>();
+        ownedServer.Refresh();
+        foreach(ProcessModule module in ownedServer.Modules)
+        {
+            if(module.ModuleName.IndexOf("ADDIN",StringComparison.OrdinalIgnoreCase)<0&&module.ModuleName.IndexOf("XTool",StringComparison.OrdinalIgnoreCase)<0&&
+                module.ModuleName.IndexOf("KIKUKAWA",StringComparison.OrdinalIgnoreCase)<0)continue;
+            string sha;
+            using(var file=new FileStream(module.FileName,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
+            using(var hash=SHA256.Create())sha=BitConverter.ToString(hash.ComputeHash(file)).Replace("-","").ToLowerInvariant();
+            modules.Add(new {module.ModuleName,Path=module.FileName,Sha256=sha,BaseAddress=module.BaseAddress.ToInt64(),ImageBytes=module.ModuleMemorySize});
+        }
+        File.WriteAllText(Path.Combine(output,"PRIVATE-loaded-binaries-"+phase+".json"),new JavaScriptSerializer().Serialize(new {Pid=ownedServer.Id,Modules=modules,
+            Contract="Observed mapped module path and on-disk SHA; not a claim a different harness DLL was loaded in-process"}));
+    }
+    internal static void KeepOwnedBackgroundSession(ISldWorks app)
+    {
+        if(ownedServer==null||ownedServer.HasExited||app.GetProcessID()!=ownedServer.Id)
+            throw new InvalidOperationException("Lifetime policy applies only to the explicitly owned PID");
+        // ISldWorks.CloseDoc closes a background UserControl=false session
+        // when its last document is closed. The next OpenDoc6/Name2 then races
+        // an already exiting server. UserControlBackground retains a controlled
+        // invisible session until this harness explicitly calls ExitApp.
+        // No timeout, registry, installed add-in or original CAD is changed.
+        app.UserControlBackground=true;app.Visible=false;
+        if(!app.UserControlBackground)throw new InvalidOperationException("Owned background lifetime was not acquired");
     }
     // Keep the original Process handle: never inspect/close an unrelated PID
     // that Windows might reuse. A successful assertion run is not evidence of

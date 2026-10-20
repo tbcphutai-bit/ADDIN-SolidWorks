@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Drawing;
@@ -269,6 +269,17 @@ namespace ADDIN
                 }
                 finally { Trace.Listeners.Remove(listener); Trace.AutoFlush = previousAutoFlush; }
             }
+        }
+        // Read-only native A/B identity. A harness loading another DLL into its
+        // own process must never be mistaken for the host's active add-in.
+        public string GetBendCheckBinaryIdentity()
+        {
+            string path=typeof(SwAddin).Assembly.Location;
+            using(var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
+            using(var hash=System.Security.Cryptography.SHA256.Create())
+                return new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new {Path=path,
+                    Sha256=BitConverter.ToString(hash.ComputeHash(file)).Replace("-","").ToLowerInvariant(),
+                    Mvid=typeof(SwAddin).Module.ModuleVersionId,Pid=Process.GetCurrentProcess().Id});
         }
     }
 }

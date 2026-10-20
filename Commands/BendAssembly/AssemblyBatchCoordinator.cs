@@ -280,7 +280,7 @@ namespace ADDIN.Commands.BendAssembly
                                     sharedInvalid: invalid, externalConsume: consume, progress: progress==null?null:new PlannerProgress(p=>{
                                         lock(progressGate) progress.Report(new AssemblyBatchProgress(done,jobs.Count,bends,candidates,null,p)); }));
                             output[index]=new AssemblyPartResult(source.SourceKey,occurrences,null,restoredStatic,restoredProcess,source.Model.Bends.Count,
-                                source.Model.SimulationOnly||source.ProgramUse.SimulationOnly,readGuard.Check,planning,source.BendMetadata);
+                                source.Model.SimulationOnly||source.ProgramUse.SimulationOnly,readGuard.Check,planning,source.BendMetadata,bundle.Envelopes) {ReadinessDiagnostics=source.ReadinessDiagnostics};
                         }
                     }
                     catch(OperationCanceledException){state.Stop("CANCELLED");output[index]=Unknown(source,occurrences,"CANCELLED",readGuard.Check);}
@@ -311,7 +311,7 @@ namespace ADDIN.Commands.BendAssembly
                 processes.Add(new ProcessCandidateResult(id,bend.FeatureId,Enum.GetValues(typeof(BendProcessPhase)).Cast<BendProcessPhase>().SelectMany(phase=>
                     Enum.GetValues(typeof(CollisionPairKind)).Cast<CollisionPairKind>().Select(p=>new ProcessPairResult(p,"UNKNOWN:"+phase,phase,CollisionStatus.UNKNOWN,new[]{reason},invalid,null,0,0,0,0,0))),source.Model.SimulationOnly));
             }
-            return new AssemblyPartResult(source.SourceKey,occurrences,reason,statics,processes,source.Model?.Bends.Count??0,source.Model?.SimulationOnly==true||source.ProgramUse.SimulationOnly,invalid,null,source.BendMetadata);
+            return new AssemblyPartResult(source.SourceKey,occurrences,reason,statics,processes,source.Model?.Bends.Count??0,source.Model?.SimulationOnly==true||source.ProgramUse.SimulationOnly,invalid,null,source.BendMetadata) {ReadinessDiagnostics=source.ReadinessDiagnostics};
         }
         internal void Cancel()
         {lock(gate){activeState?.Stop("CANCELLED");published?.State.Stop("CANCELLED");active?.Cancel();statics.Clear();processes.Clear();}}

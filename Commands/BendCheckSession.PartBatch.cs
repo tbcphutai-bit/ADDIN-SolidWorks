@@ -131,7 +131,7 @@ namespace ADDIN.Commands
                         var occurrence = new AssemblyOccurrence("PART:" + item.Key, null, item.Name, item.Path, item.Configuration,
                             new double[] { 1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0 }, AssemblyOccurrenceKind.SheetMetal, true);
                         var source = new AssemblySourceInput(item.Key, model, new[] { occurrence }, data.Envelopes, data.Setups, data.Plans, data.Use,
-                            item.Error, data.ConditionsRevision, data.Sequence, ReadMinimumMetadata(item));
+                            item.Error, data.ConditionsRevision, data.Sequence, ReadMinimumMetadata(item)) {ReadinessDiagnostics=data.ReadinessDiagnostics};
                         var request = new AssemblyBatchRequest(item.Key, item.Configuration, AssemblyCheckScope.EntireAssembly, lease, owner.ToolLibrary,
                             new[] { source }, new[] { occurrence }, 0, captureMs, model == null || reused ? 0 : 1, reused ? 1 : 0);
                         work = owner.assemblyCoordinator.RunAsync(request, token: token, progress: progress); return;

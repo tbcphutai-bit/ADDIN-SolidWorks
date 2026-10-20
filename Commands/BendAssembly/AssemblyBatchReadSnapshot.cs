@@ -71,6 +71,7 @@ namespace ADDIN.Commands.BendAssembly
     }
     internal sealed class AssemblyStaticCandidateRead
     {
+        internal bool SimulationOnly { get; }
         internal string ToolId { get; }
         internal int FeatureId { get; }
         internal AssemblyStaticPairRead PunchResult { get; }
@@ -78,7 +79,7 @@ namespace ADDIN.Commands.BendAssembly
         internal CollisionStatus CombinedResult => BendStateCollisionResult.Combine(PunchResult.Status, HolderResult.Status);
         internal IReadOnlyList<string> Reasons => PlacementLists.Reasons(PunchResult.Reasons.Concat(HolderResult.Reasons));
         internal AssemblyStaticCandidateRead(VolumeCandidateCollisionResult source)
-        { ToolId = source.ToolId; FeatureId = source.FeatureId; PunchResult = new AssemblyStaticPairRead(source.PunchResult); HolderResult = new AssemblyStaticPairRead(source.HolderResult); }
+        { ToolId = source.ToolId; FeatureId = source.FeatureId; SimulationOnly=source.SimulationOnly; PunchResult = new AssemblyStaticPairRead(source.PunchResult); HolderResult = new AssemblyStaticPairRead(source.HolderResult); }
     }
     internal sealed class AssemblyStaticPairRead
     {
@@ -91,11 +92,12 @@ namespace ADDIN.Commands.BendAssembly
     }
     internal sealed class AssemblyProcessCandidateRead
     {
+        internal bool SimulationOnly { get; }
         internal string ToolId { get; }
         internal int FeatureId { get; }
         internal IReadOnlyList<AssemblyProcessPairRead> PairSegments { get; }
         internal AssemblyProcessCandidateRead(ProcessCandidateResult source)
-        { ToolId = source.ToolId; FeatureId = source.FeatureId; PairSegments = PlacementLists.Copy(source.PairSegments.Select(p => new AssemblyProcessPairRead(p))); }
+        { ToolId = source.ToolId; FeatureId = source.FeatureId; SimulationOnly=source.SimulationOnly; PairSegments = PlacementLists.Copy(source.PairSegments.Select(p => new AssemblyProcessPairRead(p))); }
     }
     internal sealed class AssemblyProcessPairRead
     {

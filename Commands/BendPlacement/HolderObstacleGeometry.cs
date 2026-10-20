@@ -127,6 +127,7 @@ namespace ADDIN.Commands.BendPlacement
         public IReadOnlyList<HolderMaterialRegion> Regions { get; }
         public ToolReviewValidation Review { get; }
         public IReadOnlyList<string> Reasons { get; }
+        public IReadOnlyDictionary<string,string> ReviewedRoles { get; }
         public bool GeometrySupportedForCollision => Current&&Review.RecordVerified&&Regions.Count>0&&Reasons.Count==0;
         public bool PhysicalHolderVerified => false; // seating evidence owns this separate assertion
         public bool RequiresConservativeBoundaryBand => Contours.Any(c=>c.BoundaryUncertaintyMm>0);
@@ -135,8 +136,17 @@ namespace ADDIN.Commands.BendPlacement
         public int SplineCount => Inventory.Count(e=>e.SourceType=="SPLINE");
         public int SupportedSplineCount => Inventory.Count(e=>e.SourceType=="SPLINE"&&e.Supported);
         private HolderObstacleSet(string binding,string definition,IEnumerable<HolderEntityGeometry> inventory,HolderTopologyInventory topology,IEnumerable<HolderContourRegion> contours,
-            IEnumerable<HolderMaterialRegion> regions,ToolReviewValidation review,IEnumerable<string> reasons)
-        {BindingSha256=binding;DefinitionSha256=definition;Inventory=PlacementLists.Copy(inventory);Topology=topology;Contours=PlacementLists.Copy(contours);Regions=PlacementLists.Copy(regions);Review=review;Reasons=PlacementLists.Reasons(reasons);}
+            IEnumerable<HolderMaterialRegion> regions,ToolReviewValidation review,IEnumerable<string> reasons,HolderMaterialDefinition reviewedDefinition)
+        {
+            BindingSha256=binding;DefinitionSha256=definition;Inventory=PlacementLists.Copy(inventory);Topology=topology;Contours=PlacementLists.Copy(contours);Regions=PlacementLists.Copy(regions);Review=review;Reasons=PlacementLists.Reasons(reasons);
+            var roles=new Dictionary<string,string>(StringComparer.Ordinal);
+            if(review.RecordVerified&&Regions.Count>0&&Reasons.Count==0&&reviewedDefinition!=null)
+            {
+                foreach(var c in reviewedDefinition.Contours)foreach(string key in c.EntityKeys)roles.Add(key,c.MaterialKind+" / "+c.Id);
+                foreach(var x in reviewedDefinition.Excluded??new List<HolderExcludedEntity>())roles.Add(x.EntityKey,x.Role);
+            }
+            ReviewedRoles=new System.Collections.ObjectModel.ReadOnlyDictionary<string,string>(roles);
+        }
         internal void Invalidate(){lease.Invalidate();Review.Invalidate();}
         internal static string Binding(string id,GeometrySelection2D punch,GeometrySelection2D holder,string manifest)=>ToolEvidenceCanonical.Hash(
             "HolderBindingV1",id,punch?.SourceSha256,holder?.SourceSha256,manifest,punch?.GeometrySha256,holder?.GeometrySha256,punch?.FrameId,holder?.FrameId,SplineApproximation.PolicyVersion,PolicyVersion);
@@ -209,7 +219,7 @@ namespace ADDIN.Commands.BendPlacement
             catch(Exception ex) when(ex is InvalidDataException||ex is ArgumentException||ex is InvalidOperationException)
             {reasons.Add(ex is InvalidDataException?ex.Message:"INVALID_HOLDER_DEFINITION");regions.Clear();}
             if(!review.RecordVerified&&definition!=null)reasons.Add(review.Reason);
-            return new HolderObstacleSet(binding,payload,inventory,topology,contours,regions,review,reasons);
+            return new HolderObstacleSet(binding,payload,inventory,topology,contours,regions,review,reasons,definition);
         }
         private static bool Ancestor(HolderContourRegion parent,HolderContourRegion child,IEnumerable<HolderContourRegion> contours)
         {string at=child.ParentId;while(!string.IsNullOrEmpty(at)){if(at==parent.Id)return true;at=contours.Single(c=>c.Id==at).ParentId;}return false;}
