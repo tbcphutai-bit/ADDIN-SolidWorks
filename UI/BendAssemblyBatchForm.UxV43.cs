@@ -45,7 +45,7 @@ namespace ADDIN.UI
                     Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
                     Padding = new Padding(0), Margin = Padding.Empty
                 };
-                sectionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 51));
+                sectionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
                 sectionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
                 var excelBar = new TableLayoutPanel {
                     Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
@@ -58,7 +58,7 @@ namespace ADDIN.UI
                     DropDownStyle = ComboBoxStyle.DropDownList,
                     Margin = new Padding(5, 9, 5, 8)
                 };
-                uxV44ExcelCase.Items.Add("Tự dò Excel (chưa xác minh)");
+                uxV44ExcelCase.Items.Add("Mẫu Excel: chưa xác định");
                 foreach (var item in BendExcelReferenceV4.KnownFamilies)
                     uxV44ExcelCase.Items.Add(item.Family + " · " +
                         item.ReferenceLengthMm.ToString("0") + " mm");
@@ -71,6 +71,7 @@ namespace ADDIN.UI
                 };
                 excelBar.Controls.Add(uxV44ExcelCase, 0, 0);
                 excelBar.Controls.Add(uxV44EvidenceLabel, 1, 0);
+                excelBar.Visible = false; // An unverified Excel case selector must not distract from actual results.
                 uxV43Section = new BendSection2DCanvas();
                 sectionLayout.Controls.Add(excelBar, 0, 0);
                 sectionLayout.Controls.Add(uxV43Section, 0, 1);
