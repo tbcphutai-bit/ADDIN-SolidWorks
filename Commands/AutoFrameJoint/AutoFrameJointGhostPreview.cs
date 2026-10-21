@@ -205,6 +205,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 MathTransform transformA, transformB;
                 Body2 baseA = GetSingleWorldSolid(frameA, out partA, out transformA);
                 Body2 baseB = GetSingleWorldSolid(frameB, out partB, out transformB);
+                double originalVolumeA = VolumeTotal(new List<Body2> { baseA });
+                double originalVolumeB = VolumeTotal(new List<Body2> { baseB });
 
                 // The Operations2 operands are invalidated by SOLIDWORKS.
                 // Always Boolean fresh temporary copies, never original B-rep.
@@ -265,9 +267,13 @@ namespace ADDIN.Commands.AutoFrameJoint
                 List<Body2> keptB = SubtractMaterial(baseB, removedB, "Frame B");
                 double keptVolumeA = VolumeTotal(keptA);
                 double keptVolumeB = VolumeTotal(keptB);
-                if (!(keptVolumeA > 0) || !(keptVolumeB > 0))
+                if (!(keptVolumeA > 0) || !(keptVolumeB > 0) ||
+                    Math.Abs(keptVolumeA + removedVolumeA - originalVolumeA) >
+                        Math.Max(1e-11, originalVolumeA * 0.0001) ||
+                    Math.Abs(keptVolumeB + removedVolumeB - originalVolumeB) >
+                        Math.Max(1e-11, originalVolumeB * 0.0001))
                 {
-                    message = "Kết quả sau cắt bị rỗng. Preview bị từ chối.";
+                    message = "Kết quả Boolean không bảo toàn thể tích cả 2 Frame.";
                     return false;
                 }
 
