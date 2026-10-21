@@ -11,8 +11,8 @@ namespace ADDIN.UI.AutoFrameJoint
     /// Native SOLIDWORKS PropertyManager Page for selecting EXACTLY two distinct
     /// Part component occurrences. This class is intentionally UI-only.
     ///
-    /// No cut features, geometry edits, configuration switching or saves.
-    /// The read-only analyzer and 3D temporary-body preview belong to backend.
+    /// No Part cut features, geometry edits, configuration switching or saves.
+    /// Read-only analyzer and temporary P1/P2 Boolean previews belong to backend.
     /// </summary>
     [ComVisible(true)]
     [ClassInterface(ClassInterfaceType.AutoDispatch)]
