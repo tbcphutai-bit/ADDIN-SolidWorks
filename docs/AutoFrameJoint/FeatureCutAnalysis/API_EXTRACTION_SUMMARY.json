@@ -1,0 +1,39 @@
+{
+  "schema_version": "2.0",
+  "status": "API_EXTRACTION_SUCCEEDED_WITH_EXPLICIT_SEMANTIC_GAPS",
+  "parts_opened_successfully": 15,
+  "parts_with_feature_tree": 15,
+  "parts_with_explicit_cuts": 12,
+  "top_level_feature_records": 503,
+  "cut_features_api_verified": 43,
+  "cut_type_name2": 28,
+  "ice_legacy_cut": 15,
+  "cut_scalar_and_sketch_parameter_sets_complete": 43,
+  "cut_all_parameters_strictly_complete": 0,
+  "cuts_with_selection_access_on_analysis_copies": 43,
+  "up_to_vertex_references_retrieved": 3,
+  "cut_feature_existence_unverified": 0,
+  "direction_reference_semantics_unverified": 43,
+  "end_conditions_forward_counts": {
+    "swEndCondBlind": 17,
+    "swEndCondThroughAllBoth": 22,
+    "swEndCondUpToVertex": 3,
+    "swEndCondThroughAll": 1
+  },
+  "normal_cut_true": 33,
+  "source_files_all_readonly": true,
+  "source_hashes_all_unchanged": true,
+  "saved_flat_configuration_parts_reopened_folded": [
+    "3615-04-bh-T1-fr1.SLDPRT",
+    "3615-04-bh-T1-fr2.SLDPRT",
+    "3615-04-bh-T1-fr3.SLDPRT",
+    "3615-04-bh-T1-fr4.SLDPRT"
+  ],
+  "solidworks_revision": "32.5.0",
+  "com_activation_used": false,
+  "copy_selection_source_safety": "AccessSelections only on separately named byte-identical copies; no save, rebuild, suppression setter on original or copy",
+  "root_cause_correction": "Sandbox hid running processes/ROT. Outside sandbox existing SOLIDWORKS session was accessible; prior session-isolation hypothesis is superseded.",
+  "before_after_volume_differences": "NOT_PERFORMED",
+  "assembly_occurrence_mapping": "UNVERIFIED",
+  "winner_loser_assignment": "UNVERIFIED"
+}

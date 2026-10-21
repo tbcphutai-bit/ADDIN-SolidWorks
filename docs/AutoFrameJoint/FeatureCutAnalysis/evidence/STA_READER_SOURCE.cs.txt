@@ -1,0 +1,151 @@
+using System;
+using System.IO;
+using System.Text;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Security.Cryptography;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+
+// Independent STA reader. Original files: read-only getters only.
+// copyrefs mode permits temporary AccessSelections ONLY on guarded analysis copies,
+// paired with ReleaseSelectionAccess in finally. Never calls save/rebuild/suppression setters.
+class AfjReader {
+  static bool supplement = false;
+  static bool copyrefs = false;
+  static IModelDoc2 currentModel;
+  [DllImport("ole32.dll")] static extern int GetRunningObjectTable(int reserved, out IRunningObjectTable rot);
+  [DllImport("ole32.dll")] static extern int CreateBindCtx(int reserved, out IBindCtx context);
+  static JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue, RecursionLimit = 200 };
+  static Dictionary<string,object> D(params object[] a) { var d = new Dictionary<string,object>(); for(int i=0;i<a.Length;i+=2)d[(string)a[i]]=a[i+1]; return d; }
+  static object Err(Exception e) { while(e is TargetInvocationException && e.InnerException!=null)e=e.InnerException; return D("error",e.Message,"hresult",String.Format("0x{0:X8}",e.HResult),"stack",e.StackTrace); }
+  static object Try(Func<object> f) { try { return f(); } catch(Exception e){return Err(e);} }
+  static object[] Arr(object o) { if(o==null)return new object[0]; var a=o as Array; return a==null?new object[0]:a.Cast<object>().ToArray(); }
+  static string Hash(string p) { using(var s=File.OpenRead(p)) using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(s)).Replace("-","").ToLowerInvariant(); }
+  static void Save(string p,object o) { File.WriteAllText(p,json.Serialize(o),new UTF8Encoding(false)); }
+  static List<ISldWorks> Sessions() {
+    var list=new List<ISldWorks>();
+    Action<object> add=o=>{try { var sw=o as ISldWorks; if(sw!=null && !list.Any(x=>x.GetProcessID()==sw.GetProcessID()))list.Add(sw); } catch{} };
+    try { add(Marshal.GetActiveObject("SldWorks.Application")); }catch(Exception e){Console.WriteLine("ROT default: "+json.Serialize(Err(e)));}
+    IRunningObjectTable rot; IBindCtx bc; GetRunningObjectTable(0,out rot); CreateBindCtx(0,out bc);
+    IEnumMoniker en; rot.EnumRunning(out en); var ms=new IMoniker[1];
+    while(en.Next(1,ms,IntPtr.Zero)==0) { string name=null; try {ms[0].GetDisplayName(bc,null,out name); if(name.IndexOf("SolidWorks",StringComparison.OrdinalIgnoreCase)>=0 || name.IndexOf("SldWorks",StringComparison.OrdinalIgnoreCase)>=0) {object o;rot.GetObject(ms[0],out o); add(o);} }catch{} }
+    return list;
+  }
+  static object Describe(object o) {
+    if(o==null)return null;
+    var f=o as IFeature; if(f!=null)return D("feature_name",f.Name,"type",f.GetTypeName2());
+    var b=o as IBody2; if(b!=null)return D("body_name",b.Name);
+    var face=o as IFace2; if(face!=null)return Face(face);
+    var vertex=o as IVertex; if(vertex!=null)return D("vertex_point_m",vertex.GetPoint());
+    var rp=o as IRefPoint; if(rp!=null)return D("reference_point_m",rp.GetRefPoint().ArrayData);
+    var contour=o as ISketchContour; if(contour!=null)return D("kind","sketch_contour","closed",contour.IsClosed(),"segment_count",contour.GetSketchSegmentsCount());
+    var region=o as ISketchRegion; if(region!=null)return D("kind","sketch_region","edge_count",region.GetEdgesCount());
+    var edge=o as IEdge; if(edge!=null)return D("edge_start_m",Try(()=>((IVertex)edge.GetStartVertex()).GetPoint()),"edge_end_m",Try(()=>((IVertex)edge.GetEndVertex()).GetPoint()));
+    return D("com_type","NOT_AVAILABLE_WITHOUT_SELECTION_ACCESS");
+  }
+  static object Point(object p) { var s=p as ISketchPoint; return s==null?null:new double[]{s.X,s.Y,s.Z}; }
+  static object Face(IFace2 f) {
+    return D("area_m2",Try(()=>f.GetArea()),"box_m",Try(()=>f.GetBox()),"surface",Try(()=>{
+      var s=(ISurface)f.GetSurface(); if(s.IsPlane())return D("kind","plane","parameters",s.PlaneParams);
+      if(s.IsCylinder())return D("kind","cylinder","parameters",s.CylinderParams); return D("kind","other");
+    }));
+  }
+  static object Sketch(ISketch s) {
+    var segs=new List<object>();
+    foreach(var o in Arr(s.GetSketchSegments())) {
+      var g=(ISketchSegment)o; var d=D("type_code",g.GetType(),"construction",g.ConstructionGeometry,"length_m",Try(()=>g.GetLength()));
+      var l=o as ISketchLine; if(l!=null){d["start_m"]=Point(l.GetStartPoint2());d["end_m"]=Point(l.GetEndPoint2());}
+      var a=o as ISketchArc; if(a!=null){d["start_m"]=Point(a.GetStartPoint2());d["end_m"]=Point(a.GetEndPoint2());d["center_m"]=Point(a.GetCenterPoint2());d["radius_m"]=a.GetRadius();}
+      segs.Add(d);
+    }
+    return D("units","m, sketch coordinates","model_to_sketch",Try(()=>s.ModelToSketchTransform.ArrayData),
+      "sketch_to_model",Try(()=>((IMathTransform)s.ModelToSketchTransform.Inverse()).ArrayData),
+      "reference",Try(()=>{int t=0;var o=s.GetReferenceEntity(ref t);return D("type_code",t,"entity",Describe(o));}),
+      "contour_count",Try(()=>s.GetSketchContourCount()),"region_count",Try(()=>s.GetSketchRegionCount()),"segments",segs);
+  }
+  static Dictionary<string,object> Definition(object o,bool isCut) {
+    var d=D(); if(o==null)return d;
+    var accessExtrude=o as IExtrudeFeatureData2;bool access=false;
+    if(copyrefs && isCut && accessExtrude!=null) {access=accessExtrude.AccessSelections(currentModel,null);d["analysis_copy_selection_access"]=access;}
+    try {
+    var names=new[]{"IExtrudeFeatureData2","IRevolveFeatureData2","ISweepFeatureData","ILoftFeatureData","ISheetMetalFeatureData","IEdgeFlangeFeatureData","IBaseFlangeFeatureData","IBendsFeatureData","ISimpleFilletFeatureData2","IMiterFlangeFeatureData","ICombineBodiesFeatureData","IMirrorSolidFeatureData","ILinearPatternFeatureData","IWizardHoleFeatureData2","ICurveDrivenPatternFeatureData","ILibraryFeatureData"};
+    foreach(var n in names) {
+      var t=typeof(ISldWorks).Assembly.GetType("SolidWorks.Interop.sldworks."+n);
+      if(t==null||!t.IsInstanceOfType(o))continue;
+      var props=D(); foreach(var p in t.GetProperties()) {if(p.GetIndexParameters().Length!=0)continue;var pt=p.PropertyType;
+        if(pt.IsPrimitive||pt.IsEnum||pt==typeof(string))props[p.Name]=Try(()=>p.GetValue(o,null));
+      } d[n]=props;
+    }
+    var e=o as IExtrudeFeatureData2;
+    if(e!=null){
+      d["extrude"]=D("end_condition_forward",Try(()=>e.GetEndCondition(true)),"end_condition_reverse",Try(()=>e.GetEndCondition(false)),
+        "depth_forward_m",Try(()=>e.GetDepth(true)),"depth_reverse_m",Try(()=>e.GetDepth(false)),
+        "draft_forward_enabled",Try(()=>e.GetDraftWhileExtruding(true)),"draft_reverse_enabled",Try(()=>e.GetDraftWhileExtruding(false)),
+        "draft_forward_rad",Try(()=>e.GetDraftAngle(true)),"draft_reverse_rad",Try(()=>e.GetDraftAngle(false)),
+        "draft_outward_forward",Try(()=>e.GetDraftOutward(true)),"draft_outward_reverse",Try(()=>e.GetDraftOutward(false)),
+        "reverse_offset_forward",Try(()=>e.GetReverseOffset(true)),"reverse_offset_reverse",Try(()=>e.GetReverseOffset(false)),
+        "is_thin",Try(()=>e.IsThinFeature()),"scope_body_count",Try(()=>e.GetFeatureScopeBodiesCount()));
+      {
+        d["reference_getters_without_rollback"]=D(
+          "forward_end",Try(()=>{int t;object r=e.GetEndConditionReference(true,out t);return D("type_code",t,"entity",Describe(r));}),
+          "reverse_end",Try(()=>{int t;object r=e.GetEndConditionReference(false,out t);return D("type_code",t,"entity",Describe(r));}),
+          "direction",Try(()=>{object r1,r2;int t1,t2;int n=e.GetDirectionReference(out r1,out t1,out r2,out t2);return D("count",n,"type1",t1,"entity1",Describe(r1),"type2",t2,"entity2",Describe(r2));}),
+          "scope_bodies",Try(()=>Arr(e.FeatureScopeBodies).Select(Describe).ToArray()),
+          "selected_contours",Try(()=>Arr(e.Contours).Select(Describe).ToArray()));
+      }
+    }
+    return d;
+    } finally {if(access)accessExtrude.ReleaseSelectionAccess();}
+  }
+  static object Feature(IFeature f,int index,string relation,string[] configs,int level) {
+    var d=D("index",index,"relation",relation,"name",f.Name,"type",f.GetTypeName2(),"legacy_type",f.GetTypeName(),"evidence","API_VERIFIED");
+    d["suppressed_active"]=Try(()=>f.IsSuppressed()); var suppress=D(); foreach(var c in configs)suppress[c]=Try(()=>f.IsSuppressed2(3,new string[]{c}));d["suppressed_by_config"]=suppress;
+    d["parents"]=Try(()=>Arr(f.GetParents()).Select(Describe).ToArray());
+    d["children"]=Try(()=>Arr(f.GetChildren()).Select(Describe).ToArray());
+    var def=Try(()=>Definition(f.GetDefinition(),f.GetTypeName()=="Cut"||f.GetTypeName2()=="Cut"));d["definition"]=def;
+    if(!supplement) {var sk=Try(()=>{var s=f.GetSpecificFeature2() as ISketch;return s==null?null:Sketch(s);});if(sk!=null)d["sketch"]=sk;
+      d["final_feature_faces"]=Try(()=>Arr(f.GetFaces()).Select(o=>Face((IFace2)o)).ToArray());}
+    var subs=new List<object>(); if(level<4){var seen=new HashSet<string>();IFeature s=f.GetFirstSubFeature() as IFeature;int i=0;while(s!=null&&i<500){string k=s.Name+"|"+s.GetTypeName2();if(!seen.Add(k))break;subs.Add(Feature(s,++i,"subfeature",configs,level+1));s=s.GetNextSubFeature() as IFeature;}}
+    d["subfeatures"]=subs;return d;
+  }
+  static object Bodies(IModelDoc2 m) {
+    var part=m as IPartDoc;if(part==null)return null;
+    return Arr(part.GetBodies2(0,false)).Select(o=>{var b=(IBody2)o;return D("name",b.Name,"box_m",Try(()=>b.GetBodyBox()),"mass_properties_density1",Try(()=>b.GetMassProperties(1.0)),"face_count",b.GetFaceCount(),"faces",Try(()=>Arr(b.GetFaces()).Select(x=>Face((IFace2)x)).ToArray()));}).ToArray();
+  }
+  [STAThread] static int Main(string[] args) {
+    copyrefs=args.Length>2 && args[2]=="copyrefs";
+    supplement=copyrefs || (args.Length>2 && args[2]=="supplement");
+    string requestedConfig=args.Length>3?args[3]:"";
+    string manifest=args[0], output=args[1];Directory.CreateDirectory(output);
+    var paths=File.ReadAllLines(manifest).Where(x=>!String.IsNullOrWhiteSpace(x)).ToArray();
+    var sessions=Sessions();var ss=sessions.Select(x=>D("pid",x.GetProcessID(),"revision",x.RevisionNumber())).ToArray();Save(Path.Combine(output,"sessions.json"),ss);Console.WriteLine("SESSIONS "+json.Serialize(ss));
+    if(sessions.Count==0)return 2;
+    var sw=sessions.OrderByDescending(x=>Int32.Parse(x.RevisionNumber().Split('.')[0])).First();
+    Console.WriteLine("USING_PID "+sw.GetProcessID());var summary=new List<object>();int success=0;
+    foreach(var path in paths) {
+      if(copyrefs && (!Path.GetFileName(path).StartsWith("AFJ_READCOPY_") || !Path.GetFullPath(path).Contains("AFJ_API_Retry_20261021")))throw new InvalidOperationException("Copy-only rollback guard rejected path");
+      string name=Path.GetFileName(path), before=Hash(path);IModelDoc2 model=null;bool owned=false;
+      var d=D("file",name,"sha256_before",before,"sw_pid",sw.GetProcessID(),"sw_revision",sw.RevisionNumber(),"read_only_requested",true,"requested_configuration",requestedConfig,"open_options",3,"opened",false);
+      Console.WriteLine("READ "+name);
+      try {
+        model=sw.GetOpenDocumentByName(path) as IModelDoc2;
+        if(model!=null && !model.IsOpenedReadOnly())throw new InvalidOperationException("ALREADY_OPEN_NOT_READONLY: source not touched");
+        if(model==null){int err=0,warn=0;model=sw.OpenDoc6(path,1,3,requestedConfig,ref err,ref warn) as IModelDoc2;d["open_errors"]=err;d["open_warnings"]=warn;owned=model!=null;}
+        if(model==null)throw new InvalidOperationException("OpenDoc6 returned null");
+        currentModel=model;d["analysis_copy"]=copyrefs;d["opened"]=true;d["title"]=model.GetTitle();d["document_type"]=model.GetType();d["path_matches_request"]=String.Equals(model.GetPathName(),path,StringComparison.OrdinalIgnoreCase);
+        d["is_opened_readonly"]=model.IsOpenedReadOnly();d["save_flag_before_read"]=model.GetSaveFlag();
+        var configs=Arr(model.GetConfigurationNames()).Select(x=>(string)x).ToArray();d["configurations"]=configs;d["active_configuration"]=model.ConfigurationManager.ActiveConfiguration.Name;
+        var features=new List<object>();var f=model.FirstFeature() as IFeature;int i=0;
+        while(f!=null&&i<5000){features.Add(Feature(f,++i,"top_level",configs,0));f=f.GetNextFeature() as IFeature;}
+        d["feature_tree"]=features;d["top_level_feature_count"]=features.Count;if(!supplement)d["bodies"]=Try(()=>Bodies(model));d["save_flag_after_read"]=model.GetSaveFlag();success++;
+      } catch(Exception e){d["exception"]=Err(e);Console.WriteLine(json.Serialize(Err(e)));}
+      finally{if(owned&&model!=null){string title=model.GetTitle();sw.CloseDoc(title);}d["sha256_after"]=Hash(path);d["source_hash_unchanged"]=before==(string)d["sha256_after"];Save(Path.Combine(output,name+".json"),d);summary.Add(d);Save(Path.Combine(output,"all_parts.json"),summary);}
+      if(success==0){Console.WriteLine("SAMPLE_FAILED_STOP");return 3;}
+    }
+    Console.WriteLine("OPENED "+success+" / "+paths.Length);return 0;
+  }
+}

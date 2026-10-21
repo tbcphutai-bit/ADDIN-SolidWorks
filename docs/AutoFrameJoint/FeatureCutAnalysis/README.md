@@ -1,22 +1,37 @@
-# Auto Frame Joint Feature Cut Analysis
+# Auto Frame Joint — Native Feature Cut Analysis
 
-## Status
+Đã kết nối phiên SOLIDWORKS hiện có qua COM ngoài sandbox và đọc thành công **15/15 Part**, **503 mục top-level**, **43 Cut-Extrude thật**. Trong 43 Cut có 28 `Cut` và 15 `ICE` có legacy type `Cut`; không dùng tên hiển thị để đoán loại lệnh. Không có Part thiếu Feature Tree trong 15 nguồn này.
 
-This report package is incomplete for native Cut-feature study. The SOLIDWORKS FeatureManager API did not return a model for any of the seven handoff Parts attempted. Eight additional 3615a Parts were found and inventoried locally but not opened through the API. No actual Cut feature is claimed as read.
+| Chỉ số | Kết quả |
+|---|---:|
+| Part mở Read-Only / có Feature Tree | 15 / 15 |
+| Cut được xác minh qua API | 43 |
+| Bộ scalar + Sketch hình học đã đọc | 43 |
+| Cut có selection access trên bản sao | 43 |
+| Up To Vertex có tọa độ reference | 3 / 3 |
+| Toàn bộ tham số hoàn chỉnh theo tiêu chí nghiêm ngặt | 0 — xem giới hạn hướng/contour dưới đây |
+| Cut chưa xác minh sự tồn tại | 0 trong 15 Part |
 
-## Findings
+Lỗi truy cập COM trước đó xuất phát từ ngữ cảnh sandbox: cùng máy có tiến trình SOLIDWORKS và ROT truy cập được khi chạy ngoài sandbox. Nhận định trước về khác phiên đăng nhập là giả thuyết đã được thay thế. Log cũ được giữ để truy vết.
 
-- `API_VERIFIED`: 0 Cut Features; 0 Parts successfully opened and read.
-- `GEOMETRY_VERIFIED`: the supplied-derived 1618a STEP table reports six valid B-rep solids and metrics, not independently recomputed here; no Cut geometry was verified.
-- `INFERRED`: reference images suggest profiles and pair-specific projected boundary variation but do not prove operation type or removed material.
-- KCC 26003 defines the winner by hiding the opposing thickness end. Short-side precedence applies only to specified four-side bent-panel and cut-plate-panel classes, subject to drawing override.
+Các Cut dùng 17 Blind, 22 Through All Both, 3 Up To Vertex và 1 Through All. Số depth trả về cho Through All là giá trị lưu thô, không được dùng làm giới hạn cắt hữu hạn. Hai phía Frame đều có lịch sử Cut; chưa có drawing/Assembly mapping để gán thắng/thua cho từng góc. Một số Sketch đầu thanh gãy khúc, một Cut fr1 nằm trên mặt nghiêng riêng.
 
-See the eight numbered reports and the CSV/JSON inventory in this folder.
+**Giới hạn còn lại:** `GetDirectionReference` trả -1/null ngay cả khi AccessSelections trên bản sao; vector mặc định suy ra từ sketch normal và quy ước API được đánh dấu `INFERRED`. `Contours` không trả lựa chọn riêng. Vì vậy 43 bộ scalar/Sketch được xác minh không đồng nghĩa 43 định nghĩa đã đủ để replay tuyệt đối. Chưa dựng chênh B-rep trước/sau hoặc mask Web/Wall/Lip/Bend; không gọi suppress/rebuild/save. Bốn Part T1 được đọc thêm folded `Default` vì trạng thái lưu là flat. `4114` đổi dirty flag trong bộ nhớ khi đọc, đã đóng không lưu và hash file không đổi.
 
-## Public-data boundary
+## Đọc báo cáo
 
-No SLDPRT, SLDASM, STEP, source ZIP, machine-specific absolute path, or unapproved source image is included. Missing data is marked `NOT_AVAILABLE` or `UNVERIFIED`.
+- [01 — Inventory và bằng chứng bảo toàn nguồn](01_INPUT_INVENTORY.md)
+- [02 — Tree theo thứ tự API, gồm subfeatures](02_FEATURE_TREE_REPORT.md)
+- [03 — Chi tiết từng Cut, Sketch, End Condition, scope](03_CUT_FEATURE_DETAILS.md)
+- [04 — Web, Wall, Lip, Bend và geometry](04_FRAME_GEOMETRY_ANALYSIS.md)
+- [05 — So sánh quy tắc và phạm vi KCC](05_JOINT_RULE_COMPARISON.md)
+- [06 — Native metrics đối chiếu STEP](06_STEP_VS_SLDPRT.md)
+- [07 — Các điểm còn UNVERIFIED](07_UNVERIFIED_FINDINGS.md)
+- [08 — Khuyến nghị Code Owner](08_SOLVER_RECOMMENDATIONS.md)
+- [09 — Chẩn đoán cũ và đính chính](09_API_ACCESS_DIAGNOSTICS.md)
+- [10 — Phương pháp STA, bản sao và nguồn API](10_API_METHOD_AND_PROVENANCE.md)
+- [CSV Cut](FEATURE_CUT_INVENTORY.csv), [JSON Cut](FEATURE_CUT_INVENTORY.json), [CSV mọi Feature](AFJ_FEATURE_INVENTORY.csv), [Case matrix](AFJ_CASE_MATRIX.csv), [Summary JSON](API_EXTRACTION_SUMMARY.json)
 
-## Follow-up API access attempt
+`API_VERIFIED` là đọc thật từ native API. `GEOMETRY_VERIFIED` là metrics B-rep cuối, không tự động chứng minh vùng bị bỏ. `INFERRED` là phân loại/logic chưa có before-after hoặc Assembly proof. Dữ liệu STEP có sẵn giữ provenance cũ và snapshot trong `history/`. Chỉ xuất tài liệu và dữ liệu trích xuất cần thiết; không chứa CAD gốc, DLL, source ZIP hoặc đường dẫn cá nhân.
 
-The user confirmed SOLIDWORKS was open, but the Codex command executor could not see its process or Running Object Table entry (MK_E_UNAVAILABLE, 0x800401E3). No new instance was started and no feature data was extracted. See [09_API_ACCESS_DIAGNOSTICS.md](09_API_ACCESS_DIAGNOSTICS.md) and [API_ACCESS_DIAGNOSTICS.json](API_ACCESS_DIAGNOSTICS.json) for sanitized evidence and the minimal next action.
+REPORT_MANIFEST.csv ghi SHA256 của nội dung Git chuẩn hóa newline LF; gói ZIP báo cáo dùng cùng nội dung chuẩn hóa để kiểm tra nhất quán.

@@ -17,7 +17,10 @@
     "prog_id": "SldWorks.Application",
     "clsid": "{AFBEC3B2-B1A6-4908-B608-D97D2AAB5498}",
     "registered_local_server_file_version": "32.5.0.0048",
-    "registry_release_keys_seen": ["SOLIDWORKS 2024", "SOLIDWORKS 2025"],
+    "registry_release_keys_seen": [
+      "SOLIDWORKS 2024",
+      "SOLIDWORKS 2025"
+    ],
     "running_object_table_connection": "FAILED_MK_E_UNAVAILABLE",
     "new_instance_started": false
   },
@@ -45,8 +48,16 @@
       "warnings": 0
     },
     "previous_com_activation_errors": [
-      {"hresult": "0x80070005", "symbol": "E_ACCESSDENIED", "provenance": "prior handoff diagnostics; not reproduced in this attempt"},
-      {"hresult": "0x8002802B", "symbol": "TYPE_E_ELEMENTNOTFOUND", "provenance": "prior handoff diagnostics; not reproduced in this attempt"}
+      {
+        "hresult": "0x80070005",
+        "symbol": "E_ACCESSDENIED",
+        "provenance": "prior handoff diagnostics; not reproduced in this attempt"
+      },
+      {
+        "hresult": "0x8002802B",
+        "symbol": "TYPE_E_ELEMENTNOTFOUND",
+        "provenance": "prior handoff diagnostics; not reproduced in this attempt"
+      }
     ]
   },
   "counts": {
@@ -60,12 +71,16 @@
   "evidence": {
     "API_VERIFIED": 0,
     "GEOMETRY_VERIFIED_new": 0,
-    "INFERRED": ["The visible SOLIDWORKS session is likely outside the COM/session context available to the Codex command executor; not yet confirmed."]
+    "INFERRED": [
+      "The visible SOLIDWORKS session is likely outside the COM/session context available to the Codex command executor; not yet confirmed."
+    ]
   },
   "limitations": [
     "No FeatureManager result was fabricated.",
     "Filesystem read permission does not establish that SOLIDWORKS can open the Part.",
     "The exact cause cannot be narrowed to elevation versus Windows session isolation because the executor cannot inspect the user's process/session.",
     "OpenDoc6 returning null with zero errors and warnings is not evidence that the Part file is corrupt."
-  ]
+  ],
+  "superseded_by": "API_EXTRACTION_SUMMARY.json",
+  "current_status": "COM_ACCESS_SUCCEEDED_OUTSIDE_SANDBOX"
 }

@@ -1,3 +1,5 @@
+> **Correction after successful retry:** the earlier report below describes an in-sandbox probe. Outside sandbox the same machine exposed running SOLIDWORKS processes and an existing COM session (revision 32.5.0); all 15 Parts and 43 Cut-Extrude nodes were read. The prior different-session hypothesis is superseded by the observed sandbox restriction. Current status and remaining semantic gaps are in API_EXTRACTION_SUMMARY.json and 07_UNVERIFIED_FINDINGS.md.
+
 # SOLIDWORKS API Access Diagnostics
 
 **Status: blocked at COM session discovery; no FeatureManager extraction was performed.** This is an environment/session access failure, not evidence that any Part is corrupt.
