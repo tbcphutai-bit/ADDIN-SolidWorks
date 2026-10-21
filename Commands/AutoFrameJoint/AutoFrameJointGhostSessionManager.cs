@@ -224,6 +224,51 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
 
         /// <summary>
+        /// Explicit user-requested P1/P2 real B-rep temporary cut candidate.
+        /// Reuses the ORIGINAL ghost session for safe Hide() on Page close.
+        /// Never modifies Part or Assembly.
+        /// </summary>
+        public bool TryShowCutCandidate(Guid token, Component2 frameA,
+                                        Component2 frameB, int candidate,
+                                        out string message)
+        {
+            Session session;
+            if (!FindOwnedSession(token, out session, out message))
+                return false;
+            if (session.CloseRequested ||
+                session.State == SessionState.PendingCleanup ||
+                session.State == SessionState.DeferredDocument)
+            {
+                message = "Ghost pending cleanup or page closing.";
+                return false;
+            }
+            if (!IsBoundAssemblyActive(session.App, session.Assembly))
+            {
+                session.State = SessionState.DeferredDocument;
+                message = "Assembly thay đổi; không tạo Preview.";
+                return false;
+            }
+
+            bool success;
+            try
+            {
+                success = session.Ghost.TryShowCutCandidate(
+                    frameA, frameB, candidate, out message);
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-SESSION] Cut candidate error: " + ex);
+                message = "Lỗi temporary geometry; xem Output.";
+                success = false;
+            }
+            session.State = success
+                ? SessionState.Showing
+                : (session.Ghost.IsShowing ? SessionState.PendingCleanup
+                                          : SessionState.Ready);
+            return success;
+        }
+
+        /// <summary>
         /// Explicit reset while the PMP remains open. Also handles pending
         /// Hide failures after returning to the original Assembly.
         /// </summary>
