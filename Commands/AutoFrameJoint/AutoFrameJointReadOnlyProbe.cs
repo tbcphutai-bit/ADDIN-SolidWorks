@@ -140,7 +140,61 @@ namespace ADDIN.Commands.AutoFrameJoint
                 }
 
                 sb.AppendLine();
-                sb.AppendLine("Winner/Loser: UNDETERMINED. KCC 26003 applicability and drawing overrides are NOT inspected.");
+                // These are ESTIMATED geometric references based on transformed
+                // B-rep vertices, NOT final toolpaths nor proof of solid overlap.
+                var joint = AutoFrameJointGeometryMath.Solve(
+                    fa.GeometryAxis, fb.GeometryAxis);
+                if (joint.Valid)
+                {
+                    string angle = F(joint.AngleDegrees);
+                    sb.AppendLine("JOINT_STATUS: " + joint.Status);
+                    sb.AppendLine("JOINT_ANGLE_DEG: " + angle);
+                    sb.AppendLine("JOINT_XYZ_MM: " + PointMm(joint.Midpoint));
+                    sb.AppendLine("JOINT_NEAREST_A_MM: " + PointMm(joint.NearestA));
+                    sb.AppendLine("JOINT_NEAREST_B_MM: " + PointMm(joint.NearestB));
+                    sb.AppendLine("JOINT_FINITE_AXIS_GAP_MM: " + F(joint.FiniteAxisGapMm));
+                    sb.AppendLine("JOINT_INFINITE_AXIS_GAP_MM: " + F(joint.InfiniteAxisGapMm));
+                    sb.AppendLine("JOINT_NEAR_POINTS_INSIDE_SPANS: " +
+                                  (joint.InfiniteNearestWithinFinite ? "YES" : "NO"));
+                    double lx = Math.Max(fa.SampleEnvelopeMin.X, fb.SampleEnvelopeMin.X);
+                    double ly = Math.Max(fa.SampleEnvelopeMin.Y, fb.SampleEnvelopeMin.Y);
+                    double lz = Math.Max(fa.SampleEnvelopeMin.Z, fb.SampleEnvelopeMin.Z);
+                    double hx = Math.Min(fa.SampleEnvelopeMax.X, fb.SampleEnvelopeMax.X);
+                    double hy = Math.Min(fa.SampleEnvelopeMax.Y, fb.SampleEnvelopeMax.Y);
+                    double hz = Math.Min(fa.SampleEnvelopeMax.Z, fb.SampleEnvelopeMax.Z);
+                    bool envelopeOverlap = hx >= lx && hy >= ly && hz >= lz;
+                    sb.AppendLine("JOINT_VERTEX_ENVELOPE_OVERLAP_CANDIDATE: " +
+                                  (envelopeOverlap ? "YES" : "NO"));
+                    if (envelopeOverlap)
+                    {
+                        sb.AppendLine("JOINT_VERTEX_ENVELOPE_SIZE_MM: (" +
+                            F((hx - lx) * 1000.0) + ", " +
+                            F((hy - ly) * 1000.0) + ", " +
+                            F((hz - lz) * 1000.0) + ")");
+                    }
+                    if (!joint.NearParallel)
+                    {
+                        sb.AppendLine("JOINT_BISECTOR_NORMAL_CANDIDATE_1: " +
+                                      VFormat(joint.Bisector1));
+                        sb.AppendLine("JOINT_BISECTOR_NORMAL_CANDIDATE_2: " +
+                                      VFormat(joint.Bisector2));
+                    }
+                    sb.AppendLine("JOINT_GEOMETRY_NOTE: Estimated centroid axes " +
+                                  "and vertex envelopes, NOT exact solid intersection.");
+                    sb.AppendLine("JOINT_GEOMETRY_REASON: " + joint.Reason);
+                }
+                else
+                {
+                    sb.AppendLine("JOINT_STATUS: UNAVAILABLE");
+                    sb.AppendLine("JOINT_GEOMETRY_REASON: " + joint.Reason);
+                }
+
+                // KCC26003 rule: short edge/member wins over long when applicable,
+                // subject to drawing override. Do not equate LONG/SHORT to a
+                // complete Web/Wall/Lip cutting solution.
+                sb.AppendLine("JOINT_KCC26003: SHORT_WINS_LONG_IF_APPLICABLE; " +
+                    "DRAWING_OVERRIDE_FIRST; APPLICABILITY_NOT_VERIFIED.");
+                sb.AppendLine("Winner/Loser: UNCONFIRMED for this Assembly.");
                 sb.AppendLine("Profile Web/Wall/Lip: NOT YET ANALYZED.");
                 sb.AppendLine("Cut geometry: NOT GENERATED. No SolidWorks document was changed.");
                 return sb.ToString();
@@ -300,19 +354,60 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 // Project vertices onto estimated axis to measure the span along it.
                 double min = double.PositiveInfinity, max = double.NegativeInfinity;
+                double minX = double.PositiveInfinity, minY = double.PositiveInfinity;
+                double minZ = double.PositiveInfinity, maxX = double.NegativeInfinity;
+                double maxY = double.NegativeInfinity, maxZ = double.NegativeInfinity;
+                double sumX = 0.0, sumY = 0.0, sumZ = 0.0;
+                int validPointCount = 0;
                 foreach (Vec3 p in allPoints)
                 {
+                    if (!p.IsFinite) continue;
                     double t = Vec3.Dot(p, bestAxis);
                     if (!Finite(t)) continue;
                     min = Math.Min(min, t);
                     max = Math.Max(max, t);
+                    minX = Math.Min(minX, p.X);
+                    minY = Math.Min(minY, p.Y);
+                    minZ = Math.Min(minZ, p.Z);
+                    maxX = Math.Max(maxX, p.X);
+                    maxY = Math.Max(maxY, p.Y);
+                    maxZ = Math.Max(maxZ, p.Z);
+                    sumX += p.X;
+                    sumY += p.Y;
+                    sumZ += p.Z;
+                    validPointCount++;
                 }
                 double lengthMm = (max - min) * MToMm;
-                if (!Finite(lengthMm) || lengthMm <= 0.0)
+                if (!Finite(lengthMm) || lengthMm <= 0.0 ||
+                    validPointCount < 4)
                 {
-                    scan.Reason = "Projected span is invalid.";
+                    scan.Reason = "Projected span or centroid is invalid.";
                     return scan;
                 }
+
+                var origin = new AutoFrameJointGeometryMath.V(
+                    sumX / validPointCount,
+                    sumY / validPointCount,
+                    sumZ / validPointCount);
+                var direction = new AutoFrameJointGeometryMath.V(
+                    bestAxis.X, bestAxis.Y, bestAxis.Z);
+                if (!origin.Finite || !direction.Finite)
+                {
+                    scan.Reason = "Transformed axis has nonfinite sample data.";
+                    return scan;
+                }
+                double originT = AutoFrameJointGeometryMath.V.Dot(origin, direction);
+                scan.GeometryAxis = new AutoFrameJointGeometryMath.Axis
+                {
+                    Origin = origin,
+                    Direction = direction,
+                    MinT = min - originT,
+                    MaxT = max - originT
+                };
+                scan.SampleEnvelopeMin =
+                    new AutoFrameJointGeometryMath.V(minX, minY, minZ);
+                scan.SampleEnvelopeMax =
+                    new AutoFrameJointGeometryMath.V(maxX, maxY, maxZ);
 
                 scan.Axis = bestAxis;
                 scan.LengthMm = lengthMm;
@@ -352,6 +447,18 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             return value.ToString("0.###", CultureInfo.InvariantCulture);
         }
+
+        private static string VFormat(AutoFrameJointGeometryMath.V v)
+        {
+            return "(" + F(v.X) + ", " + F(v.Y) + ", " + F(v.Z) + ")";
+        }
+
+        private static string PointMm(AutoFrameJointGeometryMath.V point)
+        {
+            return "(" + F(point.X * MToMm) + ", " +
+                         F(point.Y * MToMm) + ", " +
+                         F(point.Z * MToMm) + ")";
+        }
         private static void WriteFrame(StringBuilder sb, string label, FrameScan f)
         {
             sb.AppendLine("Frame " + label + ": " + f.Name);
@@ -376,6 +483,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             public int LineEdges, SampledPoints;
             public double LengthMm, AxisConfidence;
             public Vec3 Axis;
+            public AutoFrameJointGeometryMath.Axis GeometryAxis;
+            public AutoFrameJointGeometryMath.V SampleEnvelopeMin, SampleEnvelopeMax;
         }
         private struct Segment
         {

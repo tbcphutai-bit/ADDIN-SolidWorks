@@ -126,6 +126,7 @@
     <Compile Include="UI\AutoFrameJoint\AutoFrameJointSelectionPage.cs" />
     <Compile Include="Commands\AutoFrameJoint\AutoFrameJointCommandEntry.cs" />
     <Compile Include="Commands\AutoFrameJoint\AutoFrameJointReadOnlyProbe.cs" />
+    <Compile Include="Commands\AutoFrameJoint\AutoFrameJointGeometryMath.cs" />
     <Compile Include="Commands\AutoFrameJoint\AutoFrameJointGhostPreview.cs" />
     <Compile Include="Commands\AutoFrameJoint\AutoFrameJointGhostSessionManager.cs" />
     <Compile Include="UI\VCutBendAssignmentControl.cs">

@@ -13,6 +13,22 @@ namespace ADDIN.Commands.AutoFrameJoint
     /// </summary>
     public static class AutoFrameJointCommandEntry
     {
+        // Parse only explicit field prefixes from the already-computed report.
+        // Never repeat B-rep analysis simply to display PMP summary.
+        private static string ReportField(string report, string prefix)
+        {
+            if (String.IsNullOrEmpty(report)) return String.Empty;
+            string[] lines = report.Split(new[] { '\r', '\n' },
+                                         StringSplitOptions.RemoveEmptyEntries);
+            foreach (string line in lines)
+            {
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith(prefix, StringComparison.Ordinal))
+                    return trimmed.Substring(prefix.Length).Trim();
+            }
+            return String.Empty;
+        }
+
         private static AutoFrameJointSelectionPage activePage;
         private static bool opening;
 
@@ -71,9 +87,26 @@ namespace ADDIN.Commands.AutoFrameJoint
                                 report.Contains("ROLE: NEEDS_REVIEW") ||
                                 report.Contains("ROLE: EQUAL_OR_AMBIGUOUS"))
                                 return "Chưa xác định rõ trục / chiều dài – xem Output.";
+                            string jointState = ReportField(report, "JOINT_STATUS:");
+                            if (!String.IsNullOrEmpty(jointState))
+                            {
+                                string angle = ReportField(report, "JOINT_ANGLE_DEG:");
+                                string xyz = ReportField(report, "JOINT_XYZ_MM:");
+                                string gap = ReportField(report, "JOINT_FINITE_AXIS_GAP_MM:");
+                                string inside = ReportField(report,
+                                    "JOINT_NEAR_POINTS_INSIDE_SPANS:");
+                                string role = ReportField(report, "ROLE:");
+                                return "Đã tính giao góc 3D – CHƯA CẮT PART." + "\n" +
+                                    "Góc 2 trục: " + angle + "°" + "\n" +
+                                    "Điểm gần nhất XYZ: " + xyz + " mm" + "\n" +
+                                    "Độ lệch 2 trục: " + gap + " mm" + "\n" +
+                                    "Trong chiều dài: " + inside +
+                                    " | " + jointState + "\n" +
+                                    "Dài/ngắn: " + role;
+                            }
                             if (report.Contains("ROLE: A = LONG / B = SHORT") ||
                                 report.Contains("ROLE: B = LONG / A = SHORT"))
-                                return "Đã ước lượng dài/ngắn – chưa có vết cắt.";
+                                return "Đã ước lượng dài/ngắn; chưa tính được giao điểm.";
                             return "Chưa xác nhận kết quả – xem Output.";
                         },
                         (frameA, frameB) =>

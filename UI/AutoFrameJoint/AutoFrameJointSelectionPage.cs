@@ -26,6 +26,12 @@ namespace ADDIN.UI.AutoFrameJoint
         private const int ButtonShowBodies = 105; // Explicit ghost preview; no real cut.
         private const int GroupInformation = 110;
         private const int LabelInformation = 111;
+        private const int GroupGeometry = 120;
+        private const int LabelAngle = 121;
+        private const int LabelPoint = 122;
+        private const int LabelGap = 123;
+        private const int LabelJointStatus = 124;
+        private const int LabelRole = 125;
 
         // Distinct powers of two; do not use 0 or the same mark for both boxes.
         private const int MarkFrameA = 1;
@@ -44,6 +50,11 @@ namespace ADDIN.UI.AutoFrameJoint
         private PropertyManagerPageControl analyzeButtonControl;
         private PropertyManagerPageControl showBodiesButtonControl;
         private PropertyManagerPageLabel statusLabel;
+        private PropertyManagerPageLabel geometryAngleLabel;
+        private PropertyManagerPageLabel geometryPointLabel;
+        private PropertyManagerPageLabel geometryGapLabel;
+        private PropertyManagerPageLabel geometryStatusLabel;
+        private PropertyManagerPageLabel geometryRoleLabel;
 
         private bool shown;
         private bool closing;
@@ -63,6 +74,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private Component2 analyzedA;
         private Component2 analyzedB;
         private string lastAnalysisMessage;
+        private string[] lastGeometryLines;
 
         /// <summary>
         /// onAnalyze is an injected BACKEND callback. It receives A and B
@@ -400,6 +412,43 @@ namespace ADDIN.UI.AutoFrameJoint
                     align, controlOptions,
                     "Phần hiển thị body tạm do backend quản lý.");
             }
+
+            PropertyManagerPageGroup geometryGroup = page.AddGroupBox(
+                GroupGeometry, "Tính giao góc 3D (ước lượng)", groupOptions)
+                as PropertyManagerPageGroup;
+            if (geometryGroup != null)
+            {
+                geometryAngleLabel = geometryGroup.AddControl2(
+                    LabelAngle,
+                    (short)swPropertyManagerPageControlType_e.swControlType_Label,
+                    "Góc hai trục: chưa tính", align, controlOptions,
+                    "Góc NHỌN giữa 2 trục vô hướng, không phải góc trong.")
+                    as PropertyManagerPageLabel;
+                geometryPointLabel = geometryGroup.AddControl2(
+                    LabelPoint,
+                    (short)swPropertyManagerPageControlType_e.swControlType_Label,
+                    "XYZ gần nhất: chưa tính", align, controlOptions,
+                    "Trung điểm giữa hai trục được ước lượng trong Assembly.")
+                    as PropertyManagerPageLabel;
+                geometryGapLabel = geometryGroup.AddControl2(
+                    LabelGap,
+                    (short)swPropertyManagerPageControlType_e.swControlType_Label,
+                    "Khoảng cách trục: chưa tính", align, controlOptions,
+                    "Không phải khe hở vật liệu; Web/Wall/Lip chưa được xử lý.")
+                    as PropertyManagerPageLabel;
+                geometryStatusLabel = geometryGroup.AddControl2(
+                    LabelJointStatus,
+                    (short)swPropertyManagerPageControlType_e.swControlType_Label,
+                    "Trạng thái: chưa tính", align, controlOptions,
+                    "Chỉ tính toán hình học tham chiếu.")
+                    as PropertyManagerPageLabel;
+                geometryRoleLabel = geometryGroup.AddControl2(
+                    LabelRole,
+                    (short)swPropertyManagerPageControlType_e.swControlType_Label,
+                    "Dài/ngắn: chưa tính", align, controlOptions,
+                    "KCC 26003 chỉ áp dụng khi được xác minh; bản vẽ riêng ưu tiên.")
+                    as PropertyManagerPageLabel;
+            }
         }
 
         private bool IsSameDocumentActive()
@@ -547,13 +596,42 @@ namespace ADDIN.UI.AutoFrameJoint
             analyzedA = null;
             analyzedB = null;
             lastAnalysisMessage = null;
+            lastGeometryLines = null;
         }
 
         private void StoreAnalysisResult(Component2 a, Component2 b, string message)
         {
             analyzedA = a;
             analyzedB = b;
-            lastAnalysisMessage = message;
+            if (String.IsNullOrEmpty(message))
+            {
+                lastAnalysisMessage = message;
+                return;
+            }
+
+            // ANALYZE callback supplies a short status + five geometric
+            // information lines. Keep these details visible even after
+            // an explicit Ghost preview updates the main status text.
+            string[] lines = message.Replace("\r", "").Split('\n');
+            lastAnalysisMessage = lines[0];
+            if (lines.Length >= 6 &&
+                lines[0].StartsWith("Đã tính giao góc", StringComparison.Ordinal))
+                lastGeometryLines = lines;
+        }
+
+        private void UpdateGeometryLabels()
+        {
+            string[] x = lastGeometryLines;
+            if (geometryAngleLabel != null)
+                geometryAngleLabel.Caption = x == null ? "Góc hai trục: chưa tính" : x[1];
+            if (geometryPointLabel != null)
+                geometryPointLabel.Caption = x == null ? "XYZ gần nhất: chưa tính" : x[2];
+            if (geometryGapLabel != null)
+                geometryGapLabel.Caption = x == null ? "Khoảng cách trục: chưa tính" : x[3];
+            if (geometryStatusLabel != null)
+                geometryStatusLabel.Caption = x == null ? "Trạng thái: chưa tính" : x[4];
+            if (geometryRoleLabel != null)
+                geometryRoleLabel.Caption = x == null ? "Dài/ngắn: chưa tính" : x[5];
         }
 
         private bool IsPreviousPair(Component2 a, Component2 b)
@@ -604,6 +682,7 @@ namespace ADDIN.UI.AutoFrameJoint
                     statusLabel.Caption = ready &&
                         !String.IsNullOrEmpty(lastAnalysisMessage)
                         ? lastAnalysisMessage : reason;
+                UpdateGeometryLabels();
             }
             catch (Exception ex)
             {
@@ -629,6 +708,8 @@ namespace ADDIN.UI.AutoFrameJoint
             Component2 a = null, b = null;
             string reason;
             handlingAnalyze = true;
+            if (statusLabel != null)
+                statusLabel.Caption = "Đang tính trục và giao góc 3D...";
             if (analyzeButtonControl != null)
                 analyzeButtonControl.Enabled = false;
 
@@ -656,10 +737,12 @@ namespace ADDIN.UI.AutoFrameJoint
                 }
 
                 string result = onAnalyze(a, b);
+                // Preserve multiline geometric fields for the dedicated
+                // compact PropertyManager labels. Do not flatten lines.
                 StoreAnalysisResult(a, b,
                     String.IsNullOrWhiteSpace(result)
                         ? "Không nhận được kết quả phân tích."
-                        : result.Replace("\r", " ").Replace("\n", " "));
+                        : result);
             }
             catch (Exception ex)
             {
@@ -758,6 +841,11 @@ namespace ADDIN.UI.AutoFrameJoint
             analyzeButtonControl = null;
             showBodiesButtonControl = null;
             statusLabel = null;
+            geometryAngleLabel = null;
+            geometryPointLabel = null;
+            geometryGapLabel = null;
+            geometryStatusLabel = null;
+            geometryRoleLabel = null;
             try
             {
                 if (onClearPreview != null) onClearPreview();
