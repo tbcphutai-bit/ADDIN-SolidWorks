@@ -211,7 +211,7 @@ namespace ADDIN.UI
             else if (collision)
                 uxV45Collision.Text = "Va chạm: có ứng viên báo đụng";
             else if (clearCandidate)
-                uxV45Collision.Text = "Va chạm: có ứng viên CLEAR*";
+                uxV45Collision.Text = "Va chạm: có dao báo không đụng";
             else
                 uxV45Collision.Text = "Va chạm: chưa đủ dữ liệu";
 
@@ -223,7 +223,7 @@ namespace ADDIN.UI
             }
             else if (collision)
             {
-                uxV45Decision.Text = "ỨNG VIÊN BÁO VA CHẠM";
+                uxV45Decision.Text = "CÓ DAO BỊ ĐỤNG";
                 uxV45Reason.Text = "Có ứng viên báo đụng; không suy ra toàn Part không chấn được.";
                 uxV45Decision.ForeColor = Color.FromArgb(170, 48, 48);
             }
