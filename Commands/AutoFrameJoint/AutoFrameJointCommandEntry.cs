@@ -8,8 +8,9 @@ namespace ADDIN.Commands.AutoFrameJoint
 {
     /// <summary>
     /// Native PropertyManager entry for exactly two Part occurrences.
-    /// Read-only Analyze and user-triggered Temporary Body overlay only.
-    /// Does NOT compute or apply any cut, mate, feature or Save.
+    /// Read-only Analyze, original Ghost, and user-triggered P1/P2 TEMPORARY
+    /// Boolean both-frame cut candidates. Does NOT apply any cut to Part,
+    /// mate, feature or Save. Candidate trim rules are UNVERIFIED.
     /// </summary>
     public static class AutoFrameJointCommandEntry
     {
