@@ -120,6 +120,17 @@ namespace ADDIN.Commands.AutoFrameJoint
                                             (ok ? "SHOW " : "ERROR ") + status);
                             return status;
                         },
+                        (frameA, frameB, candidate) =>
+                        {
+                            // Explicit button only. Boolean construction and
+                            // Display3 are on SOLIDWORKS UI STA via Ghost owner.
+                            string status;
+                            bool ok = manager.TryShowCutCandidate(
+                                pageToken, frameA, frameB, candidate, out status);
+                            Trace.WriteLine("[AFJ-CUT-CANDIDATE] " +
+                                (ok ? "SHOW " : "ERROR ") + status);
+                            return status;
+                        },
                         () =>
                         {
                             // PropertyManager.AfterClose calls this BEFORE
