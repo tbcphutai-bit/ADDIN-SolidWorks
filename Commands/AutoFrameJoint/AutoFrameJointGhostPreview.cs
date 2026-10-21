@@ -8,11 +8,10 @@ using SolidWorks.Interop.swconst;
 namespace ADDIN.Commands.AutoFrameJoint
 {
     /// <summary>
-    /// Read-only visual overlay of EXISTING Frame geometry.
-    /// No miter/cut computation occurs here. Call only on the SOLIDWORKS UI
-    /// thread from a future explicitly approved PropertyManager button.
-    ///
-    /// Intentionally NOT connected to AutoFrameJointCommandEntry yet.
+    /// Temporary original-body overlay and temporary Boolean P1/P2 candidate.
+    /// All preview cut operations are on disposable B-rep copies ONLY;
+    /// no production cut or Part/Assembly feature is ever written.
+    /// Runs on the SOLIDWORKS UI thread from explicit PMP buttons.
     /// The native A/B selector must pass its host smoke test first.
     /// </summary>
     public sealed class AutoFrameJointGhostPreview
