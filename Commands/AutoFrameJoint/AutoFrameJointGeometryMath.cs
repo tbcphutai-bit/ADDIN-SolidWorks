@@ -13,13 +13,13 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             internal readonly double X, Y, Z;
             internal V(double x, double y, double z) { X = x; Y = y; Z = z; }
-            internal static V operator +(V a, V b)
+            public static V operator +(V a, V b)
             { return new V(a.X + b.X, a.Y + b.Y, a.Z + b.Z); }
-            internal static V operator -(V a, V b)
+            public static V operator -(V a, V b)
             { return new V(a.X - b.X, a.Y - b.Y, a.Z - b.Z); }
-            internal static V operator *(V a, double t)
+            public static V operator *(V a, double t)
             { return new V(a.X * t, a.Y * t, a.Z * t); }
-            internal static V operator /(V a, double t)
+            public static V operator /(V a, double t)
             { return new V(a.X / t, a.Y / t, a.Z / t); }
             internal static double Dot(V a, V b)
             { return a.X * b.X + a.Y * b.Y + a.Z * b.Z; }
