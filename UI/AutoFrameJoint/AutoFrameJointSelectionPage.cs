@@ -53,7 +53,8 @@ namespace ADDIN.UI.AutoFrameJoint
         // A lightweight WinForms HWND schedules focus AFTER the native selection callback.
         // OnSelectionboxListChanged must never change SOLIDWORKS selection/focus inline.
         private System.Windows.Forms.Control deferredFocusWindow;
-        private bool focusBQueued;
+        private bool selectionRefreshQueued;
+        private bool requestFocusB;
 
         // Keep analysis output while the same two component occurrences remain
         // selected. Do not use Name2 as an occurrence identity.
@@ -148,51 +149,72 @@ namespace ADDIN.UI.AutoFrameJoint
         }
 
         /// <summary>
-        /// Do not move focus from inside OnSelectionboxListChanged:
-        /// it is an in-progress SOLIDWORKS selection callback.
-        /// Schedule on the SAME STA UI message loop; no Task, Timer, ThreadPool,
-        /// document activation or changes to the global selection list.
+        /// Coalesce native selection notifications, then refresh the PMP and
+        /// optionally advance A to B AFTER SOLIDWORKS returns from selection.
+        /// Only a WinForms UI-thread message is posted here. No background COM.
         /// </summary>
-        private void QueueFocusB()
+        private void QueueSelectionRefresh(bool advanceFromA)
         {
-            if (!shown || closing || focusBQueued || deferredFocusWindow == null)
-                return;
+            if (!shown || closing) return;
 
-            focusBQueued = true;
+            if (advanceFromA)
+                requestFocusB = true;
+
+            // If the WinForms dispatcher cannot initialize, preserve legacy
+            // manual-selection behavior and avoid losing the ready-state UI.
+            if (deferredFocusWindow == null)
+            {
+                requestFocusB = false;
+                UpdateReadyState();
+                return;
+            }
+
+            if (selectionRefreshQueued) return;
+            selectionRefreshQueued = true;
             try
             {
                 deferredFocusWindow.BeginInvoke(
                     (System.Windows.Forms.MethodInvoker)delegate
                     {
-                        focusBQueued = false;
-                        if (!shown || closing || selectionB == null ||
-                            !IsSameDocumentActive())
+                        selectionRefreshQueued = false;
+                        if (!shown || closing) return;
+
+                        // Keep all selection/identity COM checks OUT of
+                        // the in-progress OnSelectionboxListChanged callback.
+                        UpdateReadyState();
+
+                        bool tryAdvance = requestFocusB;
+                        requestFocusB = false;
+                        if (!tryAdvance || selectionA == null ||
+                            selectionB == null)
                             return;
 
                         try
                         {
-                            // User may have clicked elsewhere before the deferred
-                            // handler runs. Only advance when A is selected and B
-                            // is not selected. Never clear/reselect a component.
-                            if (selectionA != null &&
-                                selectionA.GetSelectionFocus() &&
+                            // Never steal focus if user manually chose B
+                            // or changed the current Assembly in the meantime.
+                            if (selectionA.GetSelectionFocus() &&
+                                IsSameDocumentActive() &&
                                 Selected(MarkFrameA) != null &&
                                 Selected(MarkFrameB) == null)
                             {
                                 selectionB.SetSelectionFocus();
-                                Trace.WriteLine("[AFJ-SEL] Advanced focus A -> B");
+                                Trace.WriteLine("[AFJ-SEL] A->B AUTO FOCUS");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Trace.WriteLine("[AFJ-SEL] Focus advance failed: " + ex);
+                            Trace.WriteLine("[AFJ-SEL] Auto focus unavailable: " + ex);
                         }
                     });
             }
             catch (Exception ex)
             {
-                focusBQueued = false;
-                Trace.WriteLine("[AFJ-SEL] Cannot schedule focus: " + ex);
+                selectionRefreshQueued = false;
+                requestFocusB = false;
+                Trace.WriteLine("[AFJ-SEL] Defer UI failed: " + ex);
+                // Selection continues to work even if BeginInvoke is unavailable.
+                UpdateReadyState();
             }
         }
 
@@ -200,7 +222,8 @@ namespace ADDIN.UI.AutoFrameJoint
         {
             System.Windows.Forms.Control deferred = deferredFocusWindow;
             deferredFocusWindow = null;
-            focusBQueued = false;
+            selectionRefreshQueued = false;
+            requestFocusB = false;
             if (deferred == null) return;
             try { deferred.Dispose(); }
             catch (Exception ex)
@@ -229,13 +252,15 @@ namespace ADDIN.UI.AutoFrameJoint
             selectionA = group.AddControl2(
                 BoxFrameA,
                 (short)swPropertyManagerPageControlType_e.swControlType_Selectionbox,
-                "Frame A", align, controlOptions, "Chọn Part thứ nhất.")
+                "1. Frame A", align, controlOptions,
+                "Click vào mặt, cạnh hoặc tên Component của Frame A.")
                 as PropertyManagerPageSelectionbox;
 
             selectionB = group.AddControl2(
                 BoxFrameB,
                 (short)swPropertyManagerPageControlType_e.swControlType_Selectionbox,
-                "Frame B", align, controlOptions, "Chọn Part thứ hai.")
+                "2. Frame B", align, controlOptions,
+                "Click vào mặt, cạnh hoặc tên Component của Frame B.")
                 as PropertyManagerPageSelectionbox;
 
             analyzeButtonControl = group.AddControl2(
@@ -272,7 +297,16 @@ namespace ADDIN.UI.AutoFrameJoint
             selectionA.Height = 42;
             selectionB.Height = 42;
 
-            int[] filter = { (int)swSelectType_e.swSelCOMPONENTS };
+            // SOLIDWORKS selection rules:
+            // FACES + EDGES + COMPONENTS => prefer the owning COMPONENT,
+            // so one click on a frame surface/edge selects its Part occurrence.
+            // Do NOT add swSelCOMPSDONTOVERRIDE; that forces a Face/Edge item.
+            int[] filter =
+            {
+                (int)swSelectType_e.swSelFACES,
+                (int)swSelectType_e.swSelEDGES,
+                (int)swSelectType_e.swSelCOMPONENTS
+            };
             selectionA.SetSelectionFilters(filter);
             selectionB.SetSelectionFilters(filter);
             analyzeButtonControl.Enabled = false;
@@ -662,38 +696,78 @@ namespace ADDIN.UI.AutoFrameJoint
         {
             if (id != BoxFrameA && id != BoxFrameB) return;
 
-            // Called DURING native SOLIDWORKS selection processing. Only
-            // query state / update PMP messages here. No SetSelectionFocus,
-            // ClearSelection2, Select4, Display3 or model geometry calls.
+            // This callback runs DURING the SOLIDWORKS selection process.
+            // Don't read selection COM state or change focus/selection here.
+            // Multiple events are coalesced into one deferred UI refresh.
             Trace.WriteLine("[AFJ-SEL] List box=" + id + " count=" + count);
-            UpdateReadyState();
-
-            // A -> B on the UI message loop AFTER the current callback returns.
-            if (id == BoxFrameA && count == 1)
-                QueueFocusB();
+            QueueSelectionRefresh(id == BoxFrameA && count == 1);
         }
         public void OnSelectionboxCalloutCreated(int id) { }
         public void OnSelectionboxCalloutDestroyed(int id) { }
 
+        /// <summary>
+        /// Accept the owning Part occurrence from a face, edge, or direct
+        /// component pick. SOLIDWORKS normally promotes combined filters to
+        /// a Component; IEntity.GetComponent is a defensive fallback when it
+        /// reports a Face/Edge in assembly context.
+        /// </summary>
         public bool OnSubmitSelection(int id, object selection, int type,
                                       ref string itemText)
         {
-            if (id != BoxFrameA && id != BoxFrameB)
-                return false;
-            if (type != (int)swSelectType_e.swSelCOMPONENTS)
-                return false;
-            if (!IsSameDocumentActive())
-                return false;
+            long started = Stopwatch.GetTimestamp();
+            try
+            {
+                if (id != BoxFrameA && id != BoxFrameB)
+                    return false;
 
-            Component2 candidate = selection as Component2;
-            if (candidate == null) return false;
+                if (type != (int)swSelectType_e.swSelCOMPONENTS &&
+                    type != (int)swSelectType_e.swSelFACES &&
+                    type != (int)swSelectType_e.swSelEDGES)
+                    return false;
 
-            Component2 other = Selected(id == BoxFrameA ? MarkFrameB : MarkFrameA);
-            if (other != null && !DefinitelyDifferent(candidate, other))
+                if (!IsSameDocumentActive())
+                    return false;
+
+                Component2 candidate = selection as Component2;
+                if (candidate == null &&
+                    (type == (int)swSelectType_e.swSelFACES ||
+                     type == (int)swSelectType_e.swSelEDGES))
+                {
+                    IEntity entity = selection as IEntity;
+                    if (entity != null)
+                        candidate = entity.GetComponent() as Component2;
+                }
+                if (candidate == null)
+                {
+                    Trace.WriteLine("[AFJ-SEL] No owning Component for type=" + type);
+                    return false;
+                }
+
+                Component2 other = Selected(
+                    id == BoxFrameA ? MarkFrameB : MarkFrameA);
+                if (other != null && !DefinitelyDifferent(candidate, other))
+                {
+                    Trace.WriteLine("[AFJ-SEL] Rejected duplicate A/B");
+                    return false;
+                }
+
+                itemText = candidate.Name2;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-SEL] Selection rejected: " + ex.Message);
                 return false;
-
-            itemText = candidate.Name2;
-            return true;
+            }
+            finally
+            {
+                double elapsedMs = (Stopwatch.GetTimestamp() - started) *
+                                   1000.0 / Stopwatch.Frequency;
+                if (elapsedMs >= 50.0)
+                    Trace.WriteLine("[AFJ-SEL] SLOW OnSubmitSelection " +
+                                    elapsedMs.ToString("F1") + "ms type=" +
+                                    type + " box=" + id);
+            }
         }
 
         public int OnActiveXControlCreated(int id, bool status) { return 0; }
