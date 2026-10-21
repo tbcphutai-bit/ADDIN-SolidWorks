@@ -80,7 +80,12 @@ namespace ADDIN.Commands
             RequireAssemblySta();
             BendNativeCaptureDiagnostics.Stage("Assembly.Begin.entry");
             if (!IsAssembly) throw new InvalidOperationException("Assembly batch requires an Assembly document");
-            if (!IsHostActive || IsAssemblyBackendEditing) throw new InvalidOperationException("Assembly must be active, rebuilt and outside component/sketch edit mode");
+            BendCheckRunDiagnostics.Write("Assembly.Preflight",new {HostActive=IsHostActive,Editing=IsEditing,
+                HasActiveSketch=Host.GetActiveSketch2()!=null,NeedsRebuild=Host.Extension.NeedsRebuild2,
+                ComponentEdit=IsAssemblyBackendEditing},token:token);
+            if (!IsHostActive) throw new InvalidOperationException("Quay lại đúng Assembly và configuration đã mở Check chấn.");
+            if (IsEditing) throw new InvalidOperationException("Assembly hoặc chi tiết đang chỉnh sửa cần thoát sketch và Rebuild trước khi kiểm tra.");
+            if (IsAssemblyBackendEditing) throw new InvalidOperationException("Thoát chế độ chỉnh sửa component trong Assembly rồi kiểm tra lại.");
             PollAssemblyBackendCore(true);
             BendNativeCaptureDiagnostics.Stage("Assembly.Begin.polled");
             bool selectedOnly = scope == AssemblyCheckScope.SelectedComponents;
@@ -262,12 +267,14 @@ namespace ADDIN.Commands
                                 data?.Envelopes,data?.Setups,data?.Plans,data?.Use,sourceReason,data?.ConditionsRevision,data?.Sequence,ReadMinimumMetadata(item));
                             foreach(var input in partition)input.ReadinessDiagnostics=data?.ReadinessDiagnostics??PlacementLists.Copy<string>(null);
                             sources.AddRange(partition);
+                            BendCheckRunDiagnostics.Write("Assembly.Pump.capture.end",new {index,Rows=item.Rows.Count,item.Error,item.PlacementDiagnosticError,sourceReason},token:token);
                             index++; captured++;
                         }
                         if (index<owner.Items.Count) return;
                         owner.PollAssemblyBackendCore(true);
                         var request=new AssemblyBatchRequest(ToolEvidenceCanonical.Hash(owner.Host.GetPathName(),owner.hostConfiguration,owner.hostStamp.ToString(),owner.assemblyPoseState),
                             owner.hostConfiguration,scope,lease,owner.ToolLibrary,sources,owner.InventoryOccurrences,inventoryMs,captureMs,captures,hits);
+                        BendCheckRunDiagnostics.Write("Assembly.Pump.worker.begin",new {Parts=sources.Count},token:token);
                         work=owner.assemblyCoordinator.RunAsync(request,options,token,progress); return;
                     }
                     if (!work.IsCompleted) return;
@@ -281,7 +288,7 @@ namespace ADDIN.Commands
                     {lease.Invalidate();Diagnostic="TOOL_SOURCES_CHANGED_BEFORE_PUBLICATION";}
                     owner.PollAssemblyBackendCore(true); Result=work.GetAwaiter().GetResult(); completion.TrySetResult(Result);
                 }
-                catch(Exception ex) { BendNativeCaptureDiagnostics.Failure(ex,"Assembly.NativePump"); lease.Invalidate(); Diagnostic="ASSEMBLY_NATIVE_CAPTURE_FAILED:"+ex.GetType().Name; completion.TrySetException(ex); }
+                catch(Exception ex) { BendCheckRunDiagnostics.Write("Assembly.Pump.error",error:ex,token:token);BendNativeCaptureDiagnostics.Failure(ex,"Assembly.NativePump"); lease.Invalidate(); Diagnostic="ASSEMBLY_NATIVE_CAPTURE_FAILED:"+ex.GetType().Name; completion.TrySetException(ex); }
             }
             internal void Invalidate() { lease.Invalidate(); }
             internal void Cancel() { lease.Invalidate();owner.assemblyCoordinator.Cancel();Diagnostic="CANCELLED"; }

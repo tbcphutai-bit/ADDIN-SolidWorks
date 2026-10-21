@@ -85,6 +85,7 @@ namespace CheckChan.NativeAcceptance
             timer.Stop();
             try
             {
+                if(System.Environment.GetEnvironmentVariable("ADDIN_LIVE_DEBUG")=="1"){LiveDebugTick();return;}
                 if(representativeCases!=null){RepresentativeTick();return;}
                 if(clock.ElapsedMilliseconds>60000)throw new TimeoutException("Original 60s command diagnostic deadline expired");
                 if(!started)

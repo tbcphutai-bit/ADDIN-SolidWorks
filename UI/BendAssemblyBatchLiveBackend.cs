@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ADDIN.Commands;
 using ADDIN.Commands.BendAssembly;
+using ADDIN.Commands.BendTools;
 using SolidWorks.Interop.sldworks;
 
 namespace ADDIN.UI
@@ -25,9 +26,12 @@ namespace ADDIN.UI
         public void CaptureSelection() => session.CaptureSelection();
         public void Invalidate() => session.Invalidate();
         public IBendAssemblyBatchOperation BeginAssemblyBatch(AssemblyCheckScope scope, BendToolCatalogReadResult source,
-            CancellationToken token, IProgress<AssemblyBatchProgress> progress) =>
-            session.IsAssembly ? (IBendAssemblyBatchOperation)new NativeOperation(session.BeginAssemblyBatch(scope, source, new AssemblyBatchOptions(), token, progress)) :
-            new PartOperation(session.BeginPartBatch(source, token, progress));
+            CancellationToken token, IProgress<AssemblyBatchProgress> progress)
+        {
+            BendCheckRunDiagnostics.Write("LiveBackend.Begin",new {session.IsAssembly,Scope=scope.ToString()},token:token);
+            return session.IsAssembly ? (IBendAssemblyBatchOperation)new NativeOperation(session.BeginAssemblyBatch(scope, source, new AssemblyBatchOptions(), token, progress)) :
+                new PartOperation(session.BeginPartBatch(source, token, progress));
+        }
         public bool Locate(AssemblyBatchSnapshot snapshot, string source, int feature) => session.LocateBatchBend(snapshot, source, feature);
         public void Dispose()
         {

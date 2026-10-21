@@ -56,6 +56,50 @@ internal static class BendAssemblyUiTests
     private static BatchToolCandidateViewModel ConvertTool(IEnumerable<ProcessPairResult> pairs) =>
         BatchViewModelConverter.PartsFromSnapshot(Snapshot(Part(1, new[] { Geometry(42) }, new[] { Process(42, pairs) })))
             .Single().Bends.Single().ToolCandidates[0];
+
+    private static void LiveSourceDiagnosticsTests()
+    {
+        Test("live source: settings override is observable without environment secrets",()=>{
+            string root=Path.Combine(Path.GetTempPath(),"ADDIN-SourceDiagnostic-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+            string path=Path.Combine(root,"settings.json"),log=Path.Combine(root,"events.jsonl");
+            string[] keys={"ADDIN_BEND_DIAGNOSTIC_FILE","ADDIN_BEND_TOOL_DXF_DIRECTORY","ADDIN_BEND_PLACEMENT_CONFIG","ADDIN_BEND_USE_MASTER_PAIRS","ADDIN_PRIVATE_TEST_SECRET"};
+            var old=keys.ToDictionary(k=>k,k=>Environment.GetEnvironmentVariable(k));
+            try {
+                Environment.SetEnvironmentVariable(keys[0],log);Environment.SetEnvironmentVariable(keys[1],null);Environment.SetEnvironmentVariable(keys[2],null);Environment.SetEnvironmentVariable(keys[3],null);
+                Environment.SetEnvironmentVariable(keys[4],"DO_NOT_LOG_THIS_TEST_SECRET");
+                File.WriteAllText(path,new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new ToolProfileSourceConfiguration {UseMasterPairsAsLibrary=true,PlacementConfigurationPath=Path.Combine(root,"placement.json")}));
+                var settings=new ToolProfileSourceSettings(path);
+                Check(settings.Load().UseMasterPairsAsLibrary,"Explicit master mode preserved");
+                Environment.SetEnvironmentVariable(keys[3],"0");Check(!settings.Load().UseMasterPairsAsLibrary,"Explicit override is not silently discarded");
+                string trace=File.ReadAllText(log);
+                Check(trace.Contains("ToolSourceSettings.Load.begin")&&trace.Contains("ToolSourceSettings.Load.end")&&trace.Contains("MasterMode"),"Both source stages and selected override recorded");
+                Check(!trace.Contains("DO_NOT_LOG_THIS_TEST_SECRET")&&!trace.Contains(keys[4]),"Only whitelisted environment variables recorded");
+            } finally {foreach(var key in keys)Environment.SetEnvironmentVariable(key,old[key]);}
+        });
+        Test("live source: failed run keeps its real error visible outside technical mode",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                form.Show();form.ShowStopped("Không hoàn tất kiểm tra — SOURCE_MALFORMED",.1);
+                typeof(BendAssemblyBatchForm).GetMethod("RenderSummary",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form,null);
+                Check(Control(form,"txtDiagnostics").Text.Contains("SOURCE_MALFORMED"),"Operational failure cannot be replaced by generic missing evidence");
+                Check(RowCount(form)==0,"A failed run does not fabricate a Part result");
+                form.Close();
+            }
+        });
+        Test("live source: missing tool geometry retains Part and independent Check Min",()=>{
+            var missing=ToolProfileLibraryProvider.Failure("DXF source directory is not configured.");
+            var metadata=new[]{new AssemblyBendMetadata(42,"PERSISTENT","Native bend",90,.1,"MeetsMinimum","Existing Min","Existing Min",null)};
+            var raw=new AssemblyPartResult("S",new[]{Occ()},null,new[]{Geometry(42)},null,1,false,()=>null,null,metadata);
+            using(var form=new BendAssemblyBatchForm()){
+                form.Show();form.BindSnapshot(Snapshot(raw,library:missing));
+                Check(RowCount(form)==1,"Recognized Part remains visible when library source is missing");
+                Check(((DataGridView)Control(form,"dgvTools")).Rows.Count==18,"All 18 candidates remain visible");
+                Check(((DataGridView)Control(form,"dgvTools")).Rows.Cast<DataGridViewRow>().All(r=>((BatchToolCandidateViewModel)r.Tag).GeometricStatus==CollisionStatus.UNKNOWN),"Missing source cannot become CLEAR");
+                form.Close();
+            }
+        });
+    }
+
     private static void ConverterTests()
     {
         Test("editor: host close and repeated Dispose preserve drafts and cancel preparation once",()=>{
@@ -636,7 +680,7 @@ internal static class BendAssemblyUiTests
             if(args.Length==2&&args[0]=="--benchmark-ui")return ToolProfileTests.UiReadBenchmark(args[1]);
             if(args.Length==1&&args[0]=="--close-tests")CloseBoundaryTests();
             else if(args.Length==1&&args[0]=="--controller-tests")FormTests();
-            else { ConverterTests(); FormTests(); CloseBoundaryTests(); UnifiedNavigationTests(); }
+            else { LiveSourceDiagnosticsTests(); ConverterTests(); FormTests(); CloseBoundaryTests(); UnifiedNavigationTests(); }
             if(args.Length==2 && args[0]=="--render") { Render(args[1]); RenderPlanner(args[1]); RenderHolder(args[1]); }
             Console.WriteLine("RESULT " + groups + " groups; " + assertions + " assertions; 0 failures"); return 0;
         }

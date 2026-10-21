@@ -6,6 +6,7 @@
     <Reference Include="SolidWorks.Interop.swpublished"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.swpublished.dll</HintPath></Reference>
     <Reference Include="SolidWorks.Interop.swconst"><HintPath>$(SolidWorksInteropDirectory)\SolidWorks.Interop.swconst.dll</HintPath></Reference>
     <Compile Include="NativeAcceptanceAddin.cs"/>
+    <Compile Include="NativeLiveDebugAcceptance.cs"/>
     <Compile Include="AcceptanceEventFile.cs"/>
     <Compile Include="NativeRepresentativeAcceptance.cs"/>
     <Compile Include="NativeComFeatureControl.cs"/>

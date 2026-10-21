@@ -138,6 +138,14 @@ namespace ADDIN.UI
             value==Commands.BendPlanning.SequenceEvidenceLevel.ReviewedSourceGraph?"Đã kiểm tra nguồn quy trình":"Chưa đủ dữ liệu";
 
         private static readonly Dictionary<string,string> additionalReasons=new Dictionary<string,string>(StringComparer.Ordinal) {
+            {"DXF source directory is not configured.","Chưa nhận cấu hình nguồn thư viện dao DXF"},
+            {"PLACEMENT_SOURCE_NOT_CONFIGURED","Chưa cấu hình nguồn cặp chày–đầu kẹp và mốc gá"},
+            {"MISSING_MASTER_MAPPING","Chưa đọc được ánh xạ cặp chày–đầu kẹp từ CAD"},
+            {"MISSING_DATUM_EVIDENCE","Chưa có bằng chứng xác minh mốc dao"},
+            {"UNVERIFIED_HOLDER","Chưa xác minh đầu kẹp và điều kiện gá"},
+            {"MISSING_WORK_CONTACT_AND_APPROACH_EVIDENCE","Chưa có vị trí tiếp xúc và hướng đưa phôi đã xác minh"},
+            {"UNKNOWN_BEFORE_DURING_AFTER_STATES","Thiếu trạng thái phôi trước, trong và sau khi chấn"},
+            {"UNMAPPED_LIMIT_RULE","Chưa xác minh nhóm dao tương ứng với giới hạn Excel"},
             {"HOLDER_MATERIAL_SOLID_HOLE_REFERENCE_ROLES_UNREVIEWED","Chưa phân loại vật liệu, lỗ và đường tham khảo của đầu kẹp chày"},
             {"PHYSICAL_SEATING_DATUM_UNVERIFIED","Chưa xác minh mốc và vị trí gá thực tế"},
             {"MISSING_PROCESS_STATE_GRAPH_AND_KINEMATIC_SOURCE","Thiếu hình dạng phôi trung gian và dữ liệu chuyển động"},

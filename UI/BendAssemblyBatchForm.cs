@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Windows.Forms;
 using ADDIN.Commands.BendAssembly;
 using ADDIN.Commands.BendCollision;
+using ADDIN.Commands.BendTools;
 
 namespace ADDIN.UI
 {
@@ -477,9 +478,11 @@ namespace ADDIN.UI
 
         private void OnRunBatchClicked(object sender, EventArgs e)
         {
+            BendCheckRunDiagnostics.Write("OnRunBatchClicked.begin",new {Form=GetHashCode(),Scope=currentScope.ToString(),isRunning,Handlers=RunBatchRequested?.GetInvocationList().Length??0});
             if (RunBatchRequested != null)
             {
                 RunBatchRequested.Invoke(this, currentScope);
+                BendCheckRunDiagnostics.Write("OnRunBatchClicked.dispatched",new {Form=GetHashCode()});
             }
             else
             {
@@ -556,6 +559,7 @@ namespace ADDIN.UI
 
         internal void ShowStopped(string message, double totalSeconds, AssemblyBatchSnapshot snapshot = null)
         {
+            BendCheckRunDiagnostics.Write("UI.ShowStopped",new {Form=GetHashCode(),message,totalSeconds,Parts=snapshot?.Parts.Count});
             ClearLive(message);
             currentSummary.ElapsedSeconds = totalSeconds;
             currentSummary.StageTimingsAvailable = snapshot != null;
@@ -581,6 +585,7 @@ namespace ADDIN.UI
                 return;
             }
 
+            BendCheckRunDiagnostics.Write("BindSnapshot.begin",new {Form=GetHashCode(),Current=snapshot?.Current,Parts=snapshot?.Parts.Count,Reason=snapshot?.InvalidReason});
             ClearLive("Đang kiểm tra hiệu lực kết quả...");
             var projection = BatchViewModelConverter.Convert(snapshot, elapsedSeconds);
             if (!projection.Current)
@@ -611,6 +616,8 @@ namespace ADDIN.UI
             // Complete pending grid paints before recording first visible output.
             Update(); dgvParts.Update(); dgvTools.Update();
             LastBindingTimings.GridRenderingMilliseconds = render.Elapsed.TotalMilliseconds;
+            BendCheckRunDiagnostics.Write("BindSnapshot.end",new {Form=GetHashCode(),Parts=allParts.Count,
+                ToolPairs=snapshot.ToolPairs.Count,MatchedPairs=snapshot.ToolPairs.Count(p=>p.CadPair?.Matched==true),currentSummary.NumericQueries});
         }
 
         internal void RecordVisibleTime(double runMilliseconds)
@@ -710,7 +717,12 @@ namespace ADDIN.UI
             else txtDiagnostics.Text = "Chưa có dữ liệu kiểm tra.";
             if(!technicalDetails)
             {
-                txtDiagnostics.Text=currentSummary.NumericQueries==0&&currentSummary.ClearParts+currentSummary.CollisionParts==0?
+                // An empty/failed run must keep its operational error or
+                // instruction visible. Generic missing-evidence text cannot
+                // replace the reason the task produced no Part results.
+                txtDiagnostics.Text=allParts.Count==0&&currentSummary.Diagnostics?.Count>0?
+                    string.Join("\r\n",currentSummary.Diagnostics):
+                    currentSummary.NumericQueries==0&&currentSummary.ClearParts+currentSummary.CollisionParts==0?
                     "Chưa thực hiện phép tính va chạm vì chưa đủ dữ liệu. Xem hồ sơ gá, chiều dài dao và trạng thái phôi trung gian.":
                     "Lượt tính va chạm trong lần kiểm tra: "+currentSummary.NumericQueries+". Kết quả dùng lại phải còn hiệu lực.";
                 txtDiagnostics.AppendText("\r\nChưa xác minh điều kiện sản xuất. Không kiểm tra cối V. Bật Chi tiết kỹ thuật để xem mã gốc và số liệu kiểm thử.");

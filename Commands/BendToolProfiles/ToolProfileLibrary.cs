@@ -9,6 +9,42 @@ using System.Web.Script.Serialization;
 
 namespace ADDIN.Commands.BendTools
 {
+    // Local operational diagnostics: no CAD coordinates or arbitrary environment dump.
+    // Kept with the library boundary so the managed/UI test projects use the same logger.
+    internal static class BendCheckRunDiagnostics
+    {
+        private static readonly object Gate=new object();
+        private static readonly int Pid=System.Diagnostics.Process.GetCurrentProcess().Id;
+        internal static string LogPath => Environment.GetEnvironmentVariable("ADDIN_BEND_DIAGNOSTIC_FILE") ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ADDIN","Logs","CheckChan-"+Pid+".jsonl");
+        internal static void Write(string stage,object data=null,Exception error=null,CancellationToken token=default(CancellationToken))
+        {
+            try
+            {
+                string line=new JavaScriptSerializer().Serialize(new {Utc=DateTimeOffset.UtcNow.ToString("o"),Pid,
+                    Thread=Thread.CurrentThread.ManagedThreadId,Apartment=Thread.CurrentThread.GetApartmentState().ToString(),
+                    Mvid=typeof(BendCheckRunDiagnostics).Assembly.ManifestModule.ModuleVersionId.ToString(),Stage=stage,
+                    Cancelled=token.IsCancellationRequested,Data=data,
+                    Exception=error==null?null:new {Type=error.GetType().FullName,error.Message,Stack=error.ToString()}});
+                System.Diagnostics.Trace.WriteLine("[CHECK CHAN] "+line);
+                lock(Gate)
+                {
+                    string path=LogPath;
+                    if(!Path.IsPathRooted(path))return;
+                    Directory.CreateDirectory(Path.GetDirectoryName(path));
+                    if(!File.Exists(path)||new FileInfo(path).Length<8*1024*1024)File.AppendAllText(path,line+Environment.NewLine,Encoding.UTF8);
+                }
+            }
+            catch(Exception diagnostic){System.Diagnostics.Trace.WriteLine("[CHECK CHAN] Log unavailable: "+diagnostic.GetType().Name);}
+        }
+        internal static object Overrides() => new {
+            Directory=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY"),
+            Manifest=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST"),
+            Datum=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE"),
+            Placement=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG"),
+            MasterMode=Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")};
+    }
+
     internal sealed class ToolProfileSourceConfiguration
     {
         public int Version { get; set; } = 1;
@@ -24,6 +60,19 @@ namespace ADDIN.Commands.BendTools
         internal ToolProfileSourceSettings() : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ADDIN","bend-tool-dxf-source.json")) { }
         internal ToolProfileSourceSettings(string path) { this.path=Path.GetFullPath(path); }
         internal ToolProfileSourceConfiguration Load()
+        {
+            BendCheckRunDiagnostics.Write("ToolSourceSettings.Load.begin",new {SettingsPath=path,FileExists=File.Exists(path),
+                LocalApplicationData=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),Overrides=BendCheckRunDiagnostics.Overrides()});
+            try
+            {
+                var loaded=LoadCore();
+                BendCheckRunDiagnostics.Write("ToolSourceSettings.Load.end",new {SettingsPath=path,FileExists=File.Exists(path),
+                    loaded.Version,loaded.DirectoryPath,loaded.ManifestPath,loaded.DatumEvidencePath,loaded.PlacementConfigurationPath,loaded.UseMasterPairsAsLibrary});
+                return loaded;
+            }
+            catch(Exception ex){BendCheckRunDiagnostics.Write("ToolSourceSettings.Load.error",new {SettingsPath=path},ex);throw;}
+        }
+        private ToolProfileSourceConfiguration LoadCore()
         {
             string directory=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY");
             if (!string.IsNullOrWhiteSpace(directory)) return new ToolProfileSourceConfiguration { DirectoryPath=directory,
@@ -90,6 +139,7 @@ namespace ADDIN.Commands.BendTools
         {
             lock (gate)
             {
+                BendCheckRunDiagnostics.Write("ToolLibrary.Read.begin",token:cancellation);
                 bool fixedCadMode=previous?.UsesFixedCadPairs==true;
                 try
                 {
@@ -140,8 +190,8 @@ namespace ADDIN.Commands.BendTools
                     string fingerprint=HashText(configSha+"\n"+string.Join("\n",provenance.Select(p=>p.Path+":"+p.Sha256+":"+p.Error)));
                     return Publish(new ToolProfileLibrarySnapshot { ConfigurationSha256=configSha,Fingerprint=fingerprint,Tools=tools.AsReadOnly(),Sources=provenance.AsReadOnly(),PlacementSources=placement });
                 }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { var failure=Failure(ex.Message);return Publish(fixedCadMode?FixedCadMode(failure):failure); }
+                catch (OperationCanceledException ex) { BendCheckRunDiagnostics.Write("ToolLibrary.Read.cancelled",error:ex,token:cancellation);throw; }
+                catch (Exception ex) { BendCheckRunDiagnostics.Write("ToolLibrary.Read.error",error:ex,token:cancellation);var failure=Failure(ex.Message);return Publish(fixedCadMode?FixedCadMode(failure):failure); }
             }
         }
         private static ToolProfileLibrarySnapshot FixedCadMode(ToolProfileLibrarySnapshot snapshot)
@@ -152,6 +202,13 @@ namespace ADDIN.Commands.BendTools
         }
         private ToolProfileLibrarySnapshot Publish(ToolProfileLibrarySnapshot snapshot)
         {
+            BendCheckRunDiagnostics.Write("ToolLibrary.Read.end",new {snapshot.Error,snapshot.UsesFixedCadPairs,
+                SourceState=snapshot.Error=="DXF source directory is not configured."?"MISSING_SOURCE_CONFIGURATION":
+                    snapshot.Error!=null?"INVALID_OR_UNAVAILABLE_SOURCE":"SOURCE_READ_COMPLETED",
+                ToolCount=snapshot.Tools.Count,DataCount=snapshot.Tools.Count(t=>t.Validation.PunchGeometryReadComplete),
+                MatchedPairs=snapshot.PlacementSources.Tools.Count(t=>t.CadPair?.Matched==true),
+                ClampVerified=snapshot.PlacementSources.Tools.Count(t=>t.ClampVerified),snapshot.ConfigurationSha256,
+                PlacementReasons=snapshot.PlacementSources.Reasons});
             if (previous!=null && previous.Current && previous.Fingerprint==snapshot.Fingerprint) return previous;
             previous?.Invalidate(); previous=snapshot; return snapshot;
         }

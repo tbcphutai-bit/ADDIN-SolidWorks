@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using ADDIN.Commands;
 using ADDIN.Commands.BendAssembly;
+using ADDIN.Commands.BendTools;
 
 namespace ADDIN.UI
 {
@@ -41,6 +42,7 @@ namespace ADDIN.UI
         private IBendAssemblyBatchOperation operation;
         private AssemblyBatchSnapshot displayed;
         private bool running, pumping, closing, disposed, backendDisposed;
+        private bool pumpReported;
         private int generation;
         internal bool Running => running;
         internal BendAssemblyBatchTimings LastRunTimings { get; private set; }
@@ -72,6 +74,7 @@ namespace ADDIN.UI
             timer = new System.Windows.Forms.Timer { Interval = 50 };
             timer.Tick += Tick;
             timer.Start();
+            BendCheckRunDiagnostics.Write("Controller.connected",new {Controller=GetHashCode(),Form=form.GetHashCode(),StaThread=staThread});
         }
         private void RequireSta()
         {
@@ -84,7 +87,8 @@ namespace ADDIN.UI
             try { (backend as IBendBatchLocator)?.Locate(displayed, target.Item1, target.Item2); }
             catch (Exception ex) { form.RecordDiagnostic("Lỗi làm sáng vị trí trên CAD: " + ex.GetType().Name + " — " + ex.Message); }
         }
-        private async void RunRequested(object sender, AssemblyCheckScope scope) { await RunAsync(scope); }
+        private async void RunRequested(object sender, AssemblyCheckScope scope)
+        { BendCheckRunDiagnostics.Write("RunBatchRequested",new {Controller=GetHashCode(),Scope=scope.ToString()});await RunAsync(scope); }
         private async void RefreshRequested(object sender, EventArgs args)
         {
             if (running || disposed) return;
@@ -109,9 +113,10 @@ namespace ADDIN.UI
         internal async Task RunAsync(AssemblyCheckScope scope)
         {
             RequireSta();
-            if (running || disposed || closing) return;
+            if (running || disposed || closing) { BendCheckRunDiagnostics.Write("RunAsync.ignored",new {running,disposed,closing});return; }
+            BendCheckRunDiagnostics.Write("RunAsync.begin",new {Controller=GetHashCode(),Scope=scope.ToString()});
             int run = ++generation;
-            running = true; displayed = null; operation = null;
+            running = true; displayed = null; operation = null; pumpReported=false;
             LastRunTimings = null;
             cancellation = new CancellationTokenSource();
             var token = cancellation.Token;
@@ -121,7 +126,9 @@ namespace ADDIN.UI
             form.SetRunningState(true);
             try
             {
+                BendCheckRunDiagnostics.Write("ReadMinimumAsync.begin",token:token);
                 var minimum = await backend.ReadMinimumAsync(token).ConfigureAwait(false);
+                BendCheckRunDiagnostics.Write("ReadMinimumAsync.end",new {Returned=minimum!=null},token:token);
                 await OnSta();
                 RequireSta();
                 TraceClose("RunAsync.minimum.ready");
@@ -134,7 +141,9 @@ namespace ADDIN.UI
                     if (!disposed && running && run == generation && !token.IsCancellationRequested)
                         form.UpdateProgress(p, elapsed.Elapsed.TotalSeconds);
                 });
+                BendCheckRunDiagnostics.Write("BeginAssemblyBatch.begin",token:token);
                 operation = backend.BeginAssemblyBatch(scope, minimum, token, progress);
+                BendCheckRunDiagnostics.Write("BeginAssemblyBatch.end",new {Completion=operation.Completion.Status.ToString()},token:token);
                 var completion = operation.Completion;
                 // Direct Dispose is also supported; never wait synchronously
                 // for native work while closing the owner window.
@@ -147,6 +156,7 @@ namespace ADDIN.UI
                     return;
                 }
                 var snapshot = await completion;
+                BendCheckRunDiagnostics.Write("Completion",new {Current=snapshot?.Current,Parts=snapshot?.Parts.Count,Reason=snapshot?.InvalidReason},token:token);
                 if (disposed) return;
                 if (token.IsCancellationRequested)
                     form.ShowStopped("Đã dừng kiểm tra. Không có kết quả hiện hành.", elapsed.Elapsed.TotalSeconds, snapshot);
@@ -170,21 +180,28 @@ namespace ADDIN.UI
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+                BendCheckRunDiagnostics.Write("RunAsync.cancelled",error:ex,token:token);
                 await OnSta();
                 if (!disposed) form.ShowStopped("Đã hủy tác vụ. Không có kết quả hiện hành.", elapsed.Elapsed.TotalSeconds);
             }
             catch (Exception ex)
             {
+                BendCheckRunDiagnostics.Write("RunAsync.error",error:ex,token:token);
                 await OnSta();
                 operation?.Cancel();
-                if (!disposed) form.ShowStopped("Không hoàn tất kiểm tra — " + ex.Message, elapsed.Elapsed.TotalSeconds);
+                if (!disposed)
+                {
+                    form.ShowStopped("Không hoàn tất kiểm tra — " + ex.Message, elapsed.Elapsed.TotalSeconds);
+                    form.RecordDiagnostic(ex.ToString()+"\r\nLog: "+BendCheckRunDiagnostics.LogPath);
+                }
             }
             finally
             {
                 await OnSta();
                 TraceClose("RunAsync.finally.begin");
+                BendCheckRunDiagnostics.Write("RunAsync.end",new {ElapsedMs=elapsed.Elapsed.TotalMilliseconds,Completion=operation?.Completion.Status.ToString()},token:token);
                 elapsed.Stop(); running = false;
                 cancellation.Dispose(); cancellation = null;
                 if (disposed && !pumping) dispatcher.Dispose();
@@ -258,6 +275,7 @@ namespace ADDIN.UI
             RequireSta(); timer.Stop(); pumping = true;
             try
             {
+                if(operation!=null&&!pumpReported){pumpReported=true;BendCheckRunDiagnostics.Write("Pump.begin",new {Controller=GetHashCode()},token:cancellation?.Token??default(CancellationToken));}
                 operation?.Pump();
                 if (displayed != null && !displayed.Current)
                 {
@@ -269,6 +287,7 @@ namespace ADDIN.UI
             }
             catch (Exception ex)
             {
+                BendCheckRunDiagnostics.Write("Pump.error",error:ex,token:cancellation?.Token??default(CancellationToken));
                 cancellation?.Cancel(); operation?.Cancel(); displayed = null;
                 form.ClearLive("Không kiểm tra được hiệu lực dữ liệu — " + ex.Message);
                 if (running) form.SetRunMessage("Đang dừng sau lỗi kiểm tra; chờ xác nhận...", true);
