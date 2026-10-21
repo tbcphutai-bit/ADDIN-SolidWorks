@@ -110,6 +110,13 @@ internal static partial class NativeAssemblyBatchValidation
 
     [STAThread] private static int Main(string[] args)
     {
+        if(args.Length>0 && args[0]=="--shutdown-audit") return ShutdownAuditMain(args.Skip(1).ToArray());
+        if(args.Length>0 && args[0]=="--inprocess-addin") return InprocessAddinMain(args.Skip(1).ToArray());
+        if(args.Length==1 && args[0]=="--representative-input-tests") return CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.Tests();
+        if(args.Length==1 && args[0]=="--acceptance-event-tests") return CheckChan.NativeAcceptance.AcceptanceEventFile.Tests();
+        if(args.Length==1 && args[0]=="--com-control-tests") return CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.ComControlTests();
+        if(args.Length==3 && args[0]=="--prior-xl02-gate-tests") return CheckChan.NativeAcceptance.RepresentativeAcceptanceInput.GateTests(args[1],args[2]);
+        if(args.Length>0 && args[0]=="--excel-existing") return ExcelMatrixMain(args.Skip(1).ToArray(),true);
         if(args.Length>0 && args[0]=="--excel-matrix") return ExcelMatrixMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--create-seed") return SeedMain(args.Skip(1).ToArray());
         if(args.Length>0 && args[0]=="--part-ui") return UnifiedPartMain(args.Skip(1).ToArray());
@@ -142,7 +149,7 @@ internal static partial class NativeAssemblyBatchValidation
                 };
             }
             string seedHash=Sha(args[2]);
-            app=NativeTestProcess.StartOwned(output);owned=true;Check(owned,"Own explicit native test process");app.Visible=false;app.UserControl=false;
+            app=NativeTestProcess.StartOwned(output);owned=true;Check(owned,"Own explicit native test process");NativeTestProcess.KeepOwnedBackgroundSession(app);
             File.WriteAllText(Path.Combine(output,"ownership.json"),Json.Serialize(new {Owned=owned,Pid=app.GetProcessID(),StartUtc=Process.GetProcessById(app.GetProcessID()).StartTime.ToUniversalTime().ToString("o")}));
             string rootPath=Path.Combine(output,"GENERATED-120.SLDASM");
             string existing=System.Environment.GetEnvironmentVariable("ADDIN_NATIVE_FIXTURE_SOURCE");

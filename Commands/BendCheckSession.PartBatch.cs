@@ -117,6 +117,8 @@ namespace ADDIN.Commands
                         reused = owner.Items[0].Done && owner.Items[0].PlacementCapture != null;
                         var capture = Stopwatch.StartNew(); owner.Capture(owner.Items[0], minimum); owner.Items[0].Context?.SetSource(minimum);
                         captureMs = capture.Elapsed.TotalMilliseconds; captured = true;
+                        BendCheckRunDiagnostics.Write("Part.Pump.capture.end",new {Rows=owner.Items[0].Rows.Count,owner.Items[0].Error,
+                            owner.Items[0].PlacementDiagnosticError,ToolError=owner.ToolLibrary.Error,ElapsedMs=captureMs},token:token);
                         var item = owner.Items[0]; model = item.PlacementCapture;
                         // A 0-bend/non-sheet Part has no inferred bending data.
                         if (model == null && item.Rows.Count == 0) model = new PlacementModelCapture(item.Key, item.Stamp,
@@ -131,9 +133,10 @@ namespace ADDIN.Commands
                         var occurrence = new AssemblyOccurrence("PART:" + item.Key, null, item.Name, item.Path, item.Configuration,
                             new double[] { 1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0 }, AssemblyOccurrenceKind.SheetMetal, true);
                         var source = new AssemblySourceInput(item.Key, model, new[] { occurrence }, data.Envelopes, data.Setups, data.Plans, data.Use,
-                            item.Error, data.ConditionsRevision, data.Sequence, ReadMinimumMetadata(item));
+                            item.Error, data.ConditionsRevision, data.Sequence, ReadMinimumMetadata(item)) {ReadinessDiagnostics=data.ReadinessDiagnostics};
                         var request = new AssemblyBatchRequest(item.Key, item.Configuration, AssemblyCheckScope.EntireAssembly, lease, owner.ToolLibrary,
                             new[] { source }, new[] { occurrence }, 0, captureMs, model == null || reused ? 0 : 1, reused ? 1 : 0);
+                        BendCheckRunDiagnostics.Write("Part.Pump.worker.begin",new {Parts=1,Bends=model?.Bends.Count},token:token);
                         work = owner.assemblyCoordinator.RunAsync(request, token: token, progress: progress); return;
                     }
                     if (!work.IsCompleted) return;
@@ -142,9 +145,11 @@ namespace ADDIN.Commands
                     processVerification.GetAwaiter().GetResult();
                     CheckFiles(files.GetAwaiter().GetResult()); files = null;
                     if (!ReferenceEquals(tools.GetAwaiter().GetResult(), owner.ToolLibrary) || !owner.ToolLibrary.Current) lease.Invalidate();
-                    completion.TrySetResult(work.GetAwaiter().GetResult());
+                    var result=work.GetAwaiter().GetResult();
+                    BendCheckRunDiagnostics.Write("Part.Pump.end",new {result.Current,Parts=result.Parts.Count,result.InvalidReason},token:token);
+                    completion.TrySetResult(result);
                 }
-                catch (Exception ex) { lease.Invalidate(); owner.assemblyCoordinator.Cancel(); completion.TrySetException(ex); }
+                catch (Exception ex) { BendCheckRunDiagnostics.Write("Part.Pump.error",error:ex,token:token);lease.Invalidate(); owner.assemblyCoordinator.Cancel(); completion.TrySetException(ex); }
             }
             private void CheckFiles(Dictionary<string, string> now)
             { if (revisions.Any(p => !now.ContainsKey(p.Key) || now[p.Key] != p.Value)) lease.Invalidate(); }

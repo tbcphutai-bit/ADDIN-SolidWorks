@@ -1,0 +1,196 @@
+{
+  "SchemaVersion": 1,
+  "Purpose": "Bounded PR37 acceptance; no new phase or PR",
+  "Baseline": "54ccb90729f3a227261a107e4114e1c29572814f",
+  "Verdict": "BLOCKED",
+  "ProductionVerified": false,
+  "CompanyNumericQueries": 0,
+  "Builds": {
+    "DebugSha256": "237c923d601f78f88f823a7a44372b5a502f816a9470dfcbbda0cd265e0b63e0",
+    "ReleaseX64": "PASS",
+    "ReleaseObservedInProcess": true,
+    "BridgeObservedSha256": "c3651b39e1ce4a6ae4544524e289363a0d23462fb475bef6d0901c3c957fde52",
+    "DebugX64": "PASS",
+    "ReleaseObservedMvid": "16a49831-ecc0-4ea3-b683-adc5d05feb47",
+    "ReleaseSha256": "e92205b52856caf53a305f2f7396ea01f72551d9527f303756c6e332faf3ceae"
+  },
+  "Managed": {
+    "DebugController": {
+      "Assertions": 78,
+      "Groups": 7,
+      "Failures": 0
+    },
+    "WrapperResultCases": 3,
+    "ReleaseController": {
+      "Assertions": 80,
+      "Groups": 7,
+      "Failures": 0
+    },
+    "ManifestAssertions": 11
+  },
+  "Cases": [
+    {
+      "CaseId": "XL-02",
+      "Execution": "FAIL",
+      "Reason": "Native heap corruption during close while Run active; process exited before case completed",
+      "ObservedFeatureIds": [
+        53,
+        59
+      ],
+      "ObservedMin": [
+        "MeetsMinimum",
+        "MeetsMinimum"
+      ],
+      "NativeLifecycleComplete": false
+    },
+    {
+      "CaseId": "XL-17",
+      "Execution": "NOT RUN",
+      "Reason": "Stopped after native failure; not retried",
+      "ObservedFeatureIds": null,
+      "ObservedMin": null,
+      "NativeLifecycleComplete": false
+    },
+    {
+      "CaseId": "XL-19",
+      "Execution": "NOT RUN",
+      "Reason": "Stopped after native failure; not retried",
+      "ObservedFeatureIds": null,
+      "ObservedMin": null,
+      "NativeLifecycleComplete": false
+    },
+    {
+      "CaseId": "PART-3",
+      "Execution": "NOT RUN",
+      "Reason": "Stopped after native failure; not retried",
+      "ObservedFeatureIds": null,
+      "ObservedMin": null,
+      "NativeLifecycleComplete": false
+    },
+    {
+      "CaseId": "ASM-SMALL",
+      "Execution": "NOT RUN",
+      "Reason": "Stopped after native failure; not retried",
+      "ObservedFeatureIds": null,
+      "ObservedMin": null,
+      "NativeLifecycleComplete": false
+    }
+  ],
+  "XL02ObservedCheckpoints": [
+    {
+      "Action": "Cold",
+      "RunToObservedMilliseconds": 2725.9441,
+      "NativeCaptureMilliseconds": 429.19550000000004,
+      "Captures": 1,
+      "CaptureHits": 0,
+      "NumericQueries": 0,
+      "Bends": 2,
+      "ActualStaticCandidates": 36,
+      "ActualProcessCandidates": 36,
+      "Result": "PASS for this checkpoint only"
+    },
+    {
+      "Action": "Warm",
+      "RunToObservedMilliseconds": 1021.2858,
+      "NativeCaptureMilliseconds": 0.0047,
+      "Captures": 0,
+      "CaptureHits": 1,
+      "NumericQueries": 0,
+      "Bends": 2,
+      "ActualStaticCandidates": 36,
+      "ActualProcessCandidates": 36,
+      "Result": "PASS for this checkpoint only"
+    },
+    {
+      "Action": "Refresh",
+      "RunToObservedMilliseconds": 1210.9999,
+      "NativeCaptureMilliseconds": 97.6747,
+      "Captures": 1,
+      "CaptureHits": 0,
+      "NumericQueries": 0,
+      "Bends": 2,
+      "ActualStaticCandidates": 36,
+      "ActualProcessCandidates": 36,
+      "Result": "PASS for this checkpoint only"
+    },
+    {
+      "Action": "AfterCancel",
+      "RunToObservedMilliseconds": 1086.2115000000001,
+      "NativeCaptureMilliseconds": 0.0067,
+      "Captures": 0,
+      "CaptureHits": 1,
+      "NumericQueries": 0,
+      "Bends": 2,
+      "ActualStaticCandidates": 36,
+      "ActualProcessCandidates": 36,
+      "Result": "PASS for this checkpoint only"
+    }
+  ],
+  "Native": {
+    "Configuration": "Release/x64",
+    "SolidWorks": "2024 SP5 32.5.0.48",
+    "OwnedPid": 73032,
+    "FinalExitCode": -1073740940,
+    "FinalExitHex": "0xC0000374",
+    "FunctionalResult": "FAIL",
+    "ShutdownResult": "FAIL",
+    "TargetConnectObserved": true,
+    "TargetDisconnect": "NOT RUN: process already dead",
+    "ExitApp": "NOT RUN: process already dead",
+    "ReportedAssertionsBeforeNativeFailure": 160,
+    "Activation": "Temporary in-process taskpane bridge; actual target lifecycle and actual command, test cookie 0; production COM deployment NOT RUN",
+    "TestConditions": [
+      "Exact new owned PID; no fallback to user session",
+      "StartupProcessCompleted required; original 60-second per-case diagnostic limit",
+      "CommandInProgress true for owned out-of-process harness",
+      "XToolPro unloaded only inside owned test PID; startup settings unchanged"
+    ],
+    "EarlyDiagnostic": {
+      "Result": "FAIL",
+      "Reason": "Harness compared JSON property order; corrected with existing exact MatrixInput.SameJsonFacts",
+      "DumpEvidence": "Two first-chance 0xC0000005 dumps: clr SafeReleasePreemp -> RCW ReleaseAllInterfaces; not a proven owner or production root cause",
+      "ShutdownResult": "PASS",
+      "OwnedPid": 11408
+    },
+    "FinalWindowsEvent": {
+      "Exception": "0xC0000374",
+      "FaultModule": "ntdll.dll",
+      "TimeLocal": "2026-10-20T20:30:10+07:00",
+      "Offset": "0x118095",
+      "FaultingPidHex": "0x11D48",
+      "Id": 1000
+    },
+    "RepeatPolicy": "One diagnostic attempt plus one corrective replay for a proved harness comparison defect. No further native attempt after heap failure."
+  },
+  "Protection": {
+    "NewNativePartFixtures": 0,
+    "TemporaryComRegistrationRemoved": true,
+    "StartupSettingsUnchanged": true,
+    "OtherUserSessionModified": false,
+    "FilesChecked": 15,
+    "FilesChanged": 0
+  },
+  "HolderEvidence": {
+    "ClampVerified": 0,
+    "OpenKikPunch": "Unmodified; region validity and manufacturing use still UNKNOWN",
+    "UsableSpanVerified": 0,
+    "InventoryBasis": "Retained baseline inventory; full inventory/regression not rerun because library code and source unchanged",
+    "Needs": [
+      "Authority-reviewed material contours and reference exclusions",
+      "Physical Punch-Holder seating, tip and mounting datums",
+      "Verified useful axial spans and machine/tool mapping",
+      "Registered before/after states, kinematics and process graph"
+    ],
+    "ExternallyReviewedHolderRoles": 0,
+    "PairsRetained": 18
+  },
+  "NotRun": [
+    "Full 33 native Parts",
+    "Assembly 120/25",
+    "Native Debug representative suite",
+    "Other native Part/Assembly/legacy stress regressions unchanged by this patch",
+    "Company static/process numeric collision: insufficient mounting/material/axial/process proof",
+    "Production registered deployment lifecycle"
+  ],
+  "RunnerFinalNote": "After server death, added early owned-process liveness stop. Final runner builds and its 11 input/exact-fact assertions pass; its new early-exit branch was not replayed natively. Product DLL was unchanged after the observed run."
+}

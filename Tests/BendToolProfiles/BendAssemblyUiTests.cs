@@ -56,17 +56,163 @@ internal static class BendAssemblyUiTests
     private static BatchToolCandidateViewModel ConvertTool(IEnumerable<ProcessPairResult> pairs) =>
         BatchViewModelConverter.PartsFromSnapshot(Snapshot(Part(1, new[] { Geometry(42) }, new[] { Process(42, pairs) })))
             .Single().Bends.Single().ToolCandidates[0];
+
+    private static void LiveSourceDiagnosticsTests()
+    {
+        Test("live source: settings override is observable without environment secrets",()=>{
+            string root=Path.Combine(Path.GetTempPath(),"ADDIN-SourceDiagnostic-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+            string path=Path.Combine(root,"settings.json"),log=Path.Combine(root,"events.jsonl");
+            string[] keys={"ADDIN_BEND_DIAGNOSTIC_FILE","ADDIN_BEND_TOOL_DXF_DIRECTORY","ADDIN_BEND_PLACEMENT_CONFIG","ADDIN_BEND_USE_MASTER_PAIRS","ADDIN_PRIVATE_TEST_SECRET"};
+            var old=keys.ToDictionary(k=>k,k=>Environment.GetEnvironmentVariable(k));
+            try {
+                Environment.SetEnvironmentVariable(keys[0],log);Environment.SetEnvironmentVariable(keys[1],null);Environment.SetEnvironmentVariable(keys[2],null);Environment.SetEnvironmentVariable(keys[3],null);
+                Environment.SetEnvironmentVariable(keys[4],"DO_NOT_LOG_THIS_TEST_SECRET");
+                File.WriteAllText(path,new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new ToolProfileSourceConfiguration {UseMasterPairsAsLibrary=true,PlacementConfigurationPath=Path.Combine(root,"placement.json")}));
+                var settings=new ToolProfileSourceSettings(path);
+                Check(settings.Load().UseMasterPairsAsLibrary,"Explicit master mode preserved");
+                Environment.SetEnvironmentVariable(keys[3],"0");Check(!settings.Load().UseMasterPairsAsLibrary,"Explicit override is not silently discarded");
+                string trace=File.ReadAllText(log);
+                Check(trace.Contains("ToolSourceSettings.Load.begin")&&trace.Contains("ToolSourceSettings.Load.end")&&trace.Contains("MasterMode"),"Both source stages and selected override recorded");
+                Check(!trace.Contains("DO_NOT_LOG_THIS_TEST_SECRET")&&!trace.Contains(keys[4]),"Only whitelisted environment variables recorded");
+            } finally {foreach(var key in keys)Environment.SetEnvironmentVariable(key,old[key]);}
+        });
+        Test("live source: failed run keeps its real error visible outside technical mode",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                form.Show();form.ShowStopped("Không hoàn tất kiểm tra — SOURCE_MALFORMED",.1);
+                typeof(BendAssemblyBatchForm).GetMethod("RenderSummary",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form,null);
+                Check(Control(form,"txtDiagnostics").Text.Contains("SOURCE_MALFORMED"),"Operational failure cannot be replaced by generic missing evidence");
+                Check(RowCount(form)==0,"A failed run does not fabricate a Part result");
+                form.Close();
+            }
+        });
+        Test("live source: missing tool geometry retains Part and independent Check Min",()=>{
+            var missing=ToolProfileLibraryProvider.Failure("DXF source directory is not configured.");
+            var metadata=new[]{new AssemblyBendMetadata(42,"PERSISTENT","Native bend",90,.1,"MeetsMinimum","Existing Min","Existing Min",null)};
+            var raw=new AssemblyPartResult("S",new[]{Occ()},null,new[]{Geometry(42)},null,1,false,()=>null,null,metadata);
+            using(var form=new BendAssemblyBatchForm()){
+                form.Show();form.BindSnapshot(Snapshot(raw,library:missing));
+                Check(RowCount(form)==1,"Recognized Part remains visible when library source is missing");
+                Check(((DataGridView)Control(form,"dgvTools")).Rows.Count==18,"All 18 candidates remain visible");
+                Check(((DataGridView)Control(form,"dgvTools")).Rows.Cast<DataGridViewRow>().All(r=>((BatchToolCandidateViewModel)r.Tag).GeometricStatus==CollisionStatus.UNKNOWN),"Missing source cannot become CLEAR");
+                form.Close();
+            }
+        });
+    }
+
     private static void ConverterTests()
     {
+        Test("editor: host close and repeated Dispose preserve drafts and cancel preparation once",()=>{
+            string root=Path.Combine(Path.GetTempPath(),"ADDIN-EditorDispose-"+Guid.NewGuid().ToString("N"));
+            using(var host=new Form())
+            using(var pane=new BendToolEvidenceControl(root))
+            {
+                host.Controls.Add(pane);host.Show();pane.ShowTool(ToolProfileTests.CadPairUiLibrary().PlacementSources.Tools[0],null,()=>true);
+                pane.ProposalText="{ unfinished private input";host.Close();
+                Check(pane.IsDisposed&&File.Exists(pane.LastRecoveryPath),"Host close first saves incomplete authoring input");
+                pane.Dispose();pane.Dispose();Check(pane.IsDisposed,"Repeated cleanup has no ObjectDisposedException from cancellation source");
+            }
+        });
+        Test("editor: import edit export round-trip restores every role and parent; bad input is atomic",()=>{
+            var source=ToolProfileTests.CadPairUiLibrary().PlacementSources.Tools[0];bool current=true;
+            using(var pane=new BendToolEvidenceControl(Path.Combine(Path.GetTempPath(),"ADDIN-EditorRoundtrip-"+Guid.NewGuid().ToString("N"))))
+            {
+                pane.ShowTool(source,null,()=>current);var d=pane.Draft;var keys=d.Rows.Select(r=>r.EntityKey).ToArray();
+                var p=ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Create(d);
+                p.Material.Contours=new List<ADDIN.Commands.BendPlacement.HolderContourDefinition> {
+                    new ADDIN.Commands.BendPlacement.HolderContourDefinition {Id="outside",MaterialKind="Solid",EntityKeys=new[]{keys[0]}},
+                    new ADDIN.Commands.BendPlacement.HolderContourDefinition {Id="inside",MaterialKind="Hole",ParentId="outside",EntityKeys=new[]{keys[1]}},
+                    new ADDIN.Commands.BendPlacement.HolderContourDefinition {Id="island",MaterialKind="Island",ParentId="inside",EntityKeys=new[]{keys[2]}}};
+                p.Material.Excluded=new List<ADDIN.Commands.BendPlacement.HolderExcludedEntity> {new ADDIN.Commands.BendPlacement.HolderExcludedEntity {EntityKey=keys[3],Role="Annotation"}};
+                pane.ImportProposal(ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Serialize(p),null);
+                var grid=(DataGridView)pane.Controls.Find("holderRoleEntities",true).Single();
+                Check(Convert.ToString(grid.Rows[1].Cells[5].Value)=="Hole"&&Convert.ToString(grid.Rows[1].Cells[6].Value)=="inside"&&Convert.ToString(grid.Rows[2].Cells[7].Value)=="inside","Actual imported assignments, IDs and parent are in grid");
+                grid.Rows[1].Cells[6].Value="edited-hole";grid.Rows[2].Cells[7].Value="edited-hole";
+                var edited=pane.PrepareUnsignedExport();Check(edited.Material.Contours.Single(c=>c.Id=="island").ParentId=="edited-hole"&&edited.Material.Excluded.Single().Role=="Annotation","Edited imported table exports losslessly");
+                var changedText=ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Read(ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Serialize(edited),d);
+                changedText.Material.Excluded.Single().Role="Reference";pane.ProposalText=ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Serialize(changedText);
+                grid.Rows[3].Cells[5].Value="Decorative";pane.ConfirmAction=m=>false;
+                bool conflict=false;try{pane.PrepareUnsignedExport();}catch(InvalidDataException){conflict=true;}
+                Check(conflict&&pane.ProposalText.Contains("Reference")&&Convert.ToString(grid.Rows[3].Cells[5].Value)=="Decorative","Conflicting grid/document edits cannot silently discard either buffer");
+                pane.ConfirmAction=m=>true;var chosen=pane.PrepareUnsignedExport();
+                Check(chosen.Material.Excluded.Single().Role=="Decorative"&&File.Exists(pane.LastRecoveryPath),"Explicit choice archives both buffers before applying table roles");
+                pane.ImportProposal(ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Serialize(edited),null);
+                pane.ProposalText=ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Serialize(changedText);
+                Check(pane.PrepareUnsignedExport().Material.Excluded.Single().Role=="Reference"&&Convert.ToString(grid.Rows[3].Cells[5].Value)=="Reference","Direct document edit exports and refreshes the role grid without using stale rows");
+                pane.ImportProposal(ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Serialize(edited),null);
+                Check(Convert.ToString(grid.Rows[1].Cells[6].Value)=="edited-hole"&&Convert.ToString(grid.Rows[2].Cells[7].Value)=="edited-hole","Second import is a true round-trip");
+                string before=pane.ProposalText;p.MasterSha256=new string('a',64);bool rejected=false;
+                try{pane.ImportProposal(ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Serialize(p),null);}catch(InvalidDataException){rejected=true;}
+                Check(rejected&&pane.ProposalText==before&&Convert.ToString(grid.Rows[1].Cells[6].Value)=="edited-hole","Wrong revision cannot silently replace editor state");
+                current=false;rejected=false;try{pane.PrepareUnsignedExport();}catch(InvalidDataException){rejected=true;}Check(rejected,"Stale editor cannot export native-bound data");
+            }
+        });
+        Test("editor: unsaved grid and partial text survive tool/Part/bend changes in private source-bound recovery",()=>{
+            string root=Path.Combine(Path.GetTempPath(),"ADDIN-EditorRecovery-"+Guid.NewGuid().ToString("N"));var library=ToolProfileTests.CadPairUiLibrary();var sheets=ToolProfileTests.EditorContextUiFixtures();
+            using(var pane=new BendToolEvidenceControl(root))
+            {
+                pane.ShowTool(library.PlacementSources.Tools[0],sheets[0],()=>true);var grid=(DataGridView)pane.Controls.Find("holderRoleEntities",true).Single();
+                grid.Rows[0].Cells[5].Value="Reference";pane.ProposalText="{ incomplete editing buffer";
+                pane.ShowTool(library.PlacementSources.Tools[1],sheets[0],()=>true);
+                Check(File.Exists(pane.LastRecoveryPath)&&Directory.GetFiles(root).Length==1,"Unsaved grid and incomplete JSON are privately archived before switching");
+                Check(grid.Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[5].Value)=="NeedsReview"),"Other ToolId does not inherit role edits");
+                pane.ShowTool(library.PlacementSources.Tools[0],sheets[1],()=>true);
+                Check(grid.Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[5].Value)=="NeedsReview"),"Other native bend does not inherit context");
+                pane.ShowTool(library.PlacementSources.Tools[0],sheets[0],()=>true);
+                Check(pane.ProposalText=="{ incomplete editing buffer"&&Convert.ToString(grid.Rows[0].Cells[5].Value)=="Reference","Exact context restores both uncommitted buffers without parsing away incomplete text");
+                pane.ImportProposal(File.ReadAllText(pane.LastRecoveryPath),null);
+                Check(pane.ProposalText=="{ incomplete editing buffer"&&Convert.ToString(grid.Rows[0].Cells[5].Value)=="Reference","Explicit recovery import preserves incomplete text as non-evidence");
+            }
+        });
+        Test("editor: bulk roles require confirmation; groups do not infer material; approved input needs unsigned fork",()=>{
+            var source=ToolProfileTests.CadPairUiLibrary().PlacementSources.Tools[0];
+            using(var host=new Form())
+            using(var pane=new BendToolEvidenceControl(Path.Combine(Path.GetTempPath(),"ADDIN-EditorBulk-"+Guid.NewGuid().ToString("N"))))
+            {
+                host.ClientSize=new Size(1000,780);host.Controls.Add(pane);host.Show();Application.DoEvents();
+                Check(Convert.ToString(((ComboBox)pane.Controls.Find("holderBulkRole",true).Single()).SelectedValue)=="","Binding never preselects Solid on behalf of the reviewer");
+                Check(ToolReferenceCanvas.ProposalColor("NeedsReview")!=ToolReferenceCanvas.ProposalColor("Solid"),"Unassigned CAD cannot appear as proposed solid material");
+                pane.ShowTool(source,null,()=>true);var grid=(DataGridView)pane.Controls.Find("holderRoleEntities",true).Single();
+                ((Button)pane.Controls.Find("selectHolderConnectedGroup",true).Single()).PerformClick();Check(grid.SelectedRows.Count>0&&grid.Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[5].Value)=="NeedsReview"),"Connected selection cannot classify material");
+                foreach(DataGridViewRow row in grid.Rows)row.Selected=true;int confirmations=0;pane.ConfirmAction=m=>{confirmations++;return false;};
+                Check(!pane.ApplySelectionRoles("Reference",null,null)&&grid.Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[5].Value)=="NeedsReview"),"Denied confirmation changes nothing");
+                pane.ConfirmAction=m=>{confirmations++;return true;};Check(pane.ApplySelectionRoles("Reference",null,null)&&confirmations==2,"Explicit mass classification confirmed exactly once per attempt");
+                var outer=grid.Rows.Cast<DataGridViewRow>().Single(r=>Convert.ToString(r.Cells[0].Value)=="H");outer.Cells[5].Value="Solid";outer.Cells[6].Value="source-outer";
+                var p=pane.PrepareUnsignedExport();Check(p.Material.Excluded.Count==grid.Rows.Count-1&&p.Material.Review==null,"Whole entity assignment is complete and unsigned");
+                p.Material.Review=new ADDIN.Commands.BendPlacement.ToolReviewProof();pane.ImportProposal(ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Serialize(p),null);
+                Check(grid.Columns[5].ReadOnly,"Imported attestations never silently stripped for editing");
+                bool rejected=false;try{pane.ApplyRoles();}catch(InvalidDataException){rejected=true;}Check(rejected,"Approved-input fork is explicit, not implicit on Apply");
+                ((Button)pane.Controls.Find("forkToolProposal",true).Single()).PerformClick();Check(!grid.Columns[5].ReadOnly&&pane.PrepareUnsignedExport().Material.Review==null&&p.Material.Review!=null,"Confirmed fork leaves original signed input intact");
+                Check(source.HolderObstacles.Topology.SourceEntityGroups.SelectMany(g=>g).Distinct().Count()==source.Holder.EntityKeys.Count,"Selection groups preserve all source entities");
+            }
+        });
+        Test("final evidence UX: source preview, explicit unsigned roles and stale export barrier",()=>{
+            bool current=true;var source=ToolProfileTests.CadPairUiLibrary().PlacementSources.Tools[0];
+            using(var pane=new BendToolEvidenceControl(Path.Combine(Path.GetTempPath(),"ADDIN-EditorTest-"+Guid.NewGuid().ToString("N"))))
+            {
+                pane.ShowTool(source,null,()=>current);
+                Check(pane.Draft.Rows.Count==source.Holder.SourceEntities.Count&&!pane.Draft.MaterialReviewed,"Every original entity visible without material approval");
+                var grid=(DataGridView)pane.Controls.Find("holderRoleEntities",true).Single();
+                foreach(DataGridViewRow row in grid.Rows){bool solid=Convert.ToString(row.Cells[0].Value)=="H";
+                    row.Cells[5].Value=solid?"Solid":"Reference";if(solid)row.Cells[6].Value="REVIEWER_SELECTED_CONTOUR";}
+                pane.ApplyRoles();
+                var p=ADDIN.Commands.BendPlacement.ToolEvidenceReviewWorkspace.Read(pane.ProposalText,pane.Draft);
+                Check(p.Material.Review==null&&p.Material.Contours.Count==1&&!source.ClampVerified,"Unsigned proposal is not installed evidence");
+                Check(p.Seating.TipPointMm.X==null&&p.Seating.HolderSourceToPunchSource.A==null,"No guessed pose from viewer fit");
+                current=false;bool refused=false;try{pane.ApplyRoles();}catch(InvalidOperationException){refused=true;}catch(InvalidDataException){refused=true;}
+                Check(refused,"Source revocation blocks held editor");
+                pane.ShowTool(null,null,null);Check(pane.Draft==null&&grid.Rows.Count==0&&pane.ProposalText.Length==0,"Refresh clears source-bound review pane");
+            }
+        });
         Test("18 fixed CAD pair identities reach every UI bend without promotion",()=>{
             var library=ToolProfileTests.CadPairUiLibrary();var snapshot=Snapshot(Part(3,new[]{Geometry(7),Geometry(42),Geometry(314)}),library:library);
             var part=BatchViewModelConverter.PartsFromSnapshot(snapshot).Single();
             foreach(var bend in part.Bends){Check(bend.ToolCandidates.Count==18,"18 fixed pair candidates");
                 Check(bend.ToolCandidates.All(t=>t.CadAssembly?.CadPair?.Matched==true&&t.CadAssembly.Id==t.ToolId&&!t.CadAssembly.ClampVerified),"Source identities stay with their ToolId");}
             using(var form=new BendAssemblyBatchForm()){form.Show();form.BindSnapshot(snapshot);Application.DoEvents();
-                Check(Control(form,"lblCalloutHolder").Text.Contains("CAD reference"),"Reference status visible");
+                Check(Control(form,"lblCalloutHolder").Text.Contains("CAD tham khảo"),"Reference status visible");
                 var evidence=(DataGridView)typeof(BendAssemblyBatchForm).GetField("phaseEvidence",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(form);
-                Check(evidence.Rows.Cast<DataGridViewRow>().Any(r=>Convert.ToString(r.Cells[0].Value)=="CAD / Holder"),"Exact Holder identity visible in existing evidence area");form.Close();}
+                Check(evidence.Rows.Cast<DataGridViewRow>().Any(r=>Convert.ToString(r.Cells[0].Value)=="CAD / Đầu kẹp chày"),"Exact Holder identity visible in existing evidence area");form.Close();}
         });
         Test("native nonconsecutive FeatureIds and 18 independent slots; no angle/radius inference", () =>
         {
@@ -121,7 +267,7 @@ internal static class BendAssemblyUiTests
         Test("one colliding tool is not a whole-Part manufacturing verdict", () =>
         {
             var vm = BatchViewModelConverter.PartsFromSnapshot(Snapshot(Part(1, new[] { Geometry(42, CollisionStatus.COLLISION) }))).Single();
-            Check(vm.StatusDisplay == "Có dao COLLISION*" && vm.ManufacturingStatus == "CHƯA XÁC MINH", "Candidate conflict label");
+            Check(vm.StatusDisplay == "Có phương án va chạm*" && vm.ManufacturingStatus == "CHƯA XÁC MINH", "Candidate conflict label");
             Check(vm.Bends[0].ToolCandidates.Skip(1).All(t => t.GeometricStatus == CollisionStatus.UNKNOWN), "Other tools unaffected");
         });
         Test("invalidated source removes results and phase evidence expires", () =>
@@ -167,14 +313,15 @@ internal static class BendAssemblyUiTests
         internal IProgress<AssemblyBatchProgress> Progress;
         internal AssemblyCheckScope Scope;
         internal int Captures, Invalidations, Disposals;
-        internal bool RejectBegin;
+        internal bool RejectBegin, RejectInvalidate;
+        internal TaskCompletionSource<BendToolCatalogReadResult> MinimumGate;
         public async Task<BendToolCatalogReadResult> ReadMinimumAsync(CancellationToken token)
-        { Operation = null; await Task.Delay(10,token).ConfigureAwait(false); return null; }
+        { Operation = null; if(MinimumGate!=null)return await MinimumGate.Task.ConfigureAwait(false); await Task.Delay(10,token).ConfigureAwait(false); return null; }
         public IBendAssemblyBatchOperation BeginAssemblyBatch(AssemblyCheckScope scope, BendToolCatalogReadResult minimum,
             CancellationToken token, IProgress<AssemblyBatchProgress> progress)
         { if(RejectBegin)throw new InvalidOperationException("No selected components"); Scope = scope; Progress = progress; return Operation = new FakeOperation(); }
         public void CaptureSelection() { Captures++; }
-        public void Invalidate() { Invalidations++; }
+        public void Invalidate() { Invalidations++; if(RejectInvalidate)throw new System.Runtime.InteropServices.COMException("CAD disconnected",unchecked((int)0x800706BE)); }
         public void Dispose() { Check(Operation?.InsidePump!=true,"Never dispose native owner during reentrant Pump"); Disposals++; }
     }
     private static Control Control(Form form, string name) => form.Controls.Find(name, true).Single();
@@ -188,6 +335,72 @@ internal static class BendAssemblyUiTests
     }
     private static void FormTests()
     {
+        Test("failed CAD invalidation withdraws live results; Refresh, scope and Preview recover",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend();
+                using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Spin(()=>backend.Operation!=null);
+                    backend.Operation.Done.SetResult(Snapshot(Part(1,new[]{Geometry(42)})));Spin(()=>!controller.Running);
+                    Check(RowCount(form)==1,"A live result exists before CAD disconnect");
+                    backend.RejectInvalidate=true;
+                    Click(form,"btnRefresh");Application.DoEvents();
+                    Check(!controller.Running&&RowCount(form)==0&&Control(form,"btnRunBatch").Enabled,"Refresh RPC cannot publish old success or escape async-void handler");
+                    Check(Control(form,"txtDiagnostics").Text.Contains("COMException"),"Technical failure remains available");
+                    form.SetScope(AssemblyCheckScope.SelectedComponents);
+                    Check(backend.Captures==0&&RowCount(form)==0,"Failed scope change cannot capture a misleading selection");
+                    Click(form,"btnToggleMockup");Check(!form.IsPreview,"Failed invalidation cannot switch to illustrative success");
+                    Check(backend.Invalidations==3,"Each explicit action makes one bounded attempt");
+                    backend.RejectInvalidate=false;Click(form,"btnRefresh");Spin(()=>backend.Operation!=null&&controller.Running);
+                    backend.Operation.Done.SetResult(Snapshot(Part(1,new[]{Geometry(42)})));Spin(()=>!controller.Running);
+                    Check(RowCount(form)==1&&backend.Scope==AssemblyCheckScope.SelectedComponents,"User can retry after restoring CAD without reopening the Form");
+                    form.Close();Check(backend.Disposals==1,"Error and retry preserve one native owner disposal");
+                }
+            }
+        });
+        Test("Vietnamese vocabulary preserves codes, phase meaning and missing clearance",()=>{
+            foreach(var value in Enum.GetValues(typeof(CollisionStatus)).Cast<CollisionStatus>())
+                Check(BendCheckDisplayText.Collision(value.ToString()).OriginalCode==value.ToString(),"Raw collision enum unchanged");
+            foreach(var value in Enum.GetValues(typeof(BendProcessPhase)).Cast<BendProcessPhase>())
+                Check(BendCheckDisplayText.ProcessPhase(value.ToString()).OriginalCode==value.ToString()&&!BendCheckDisplayText.Phase(value).Contains(value.ToString()),"Five phases localized without changing identity");
+            Check(BendCheckDisplayText.CheckMin("BelowMinimum").Caption=="Cạnh chấn không đạt tối thiểu","Real Min NG remains NG");
+            Check(BendCheckDisplayText.Collision("UNRECOGNIZED").Caption.StartsWith("Trạng thái chưa được hỗ trợ"),"Unknown code cannot become CLEAR");
+            Check(BendCheckDisplayText.Clearance(null)=="Chưa tính được"&&BendCheckDisplayText.Clearance(0)=="0 mm","Missing clearance differs from measured zero");
+            var unmapped=BendCheckDisplayText.Reason("A_NEW_PROVEN_CLEAR_REASON");
+            Check(!unmapped.Caption.Contains("Chưa đủ dữ liệu")&&unmapped.OriginalCode=="A_NEW_PROVEN_CLEAR_REASON"&&unmapped.Explanation.Contains("không"),"Untranslated reason remains neutral and retains exact code");
+            Check(BendCheckDisplayText.Reasons("TOOL_AXIAL_EXTENT_UNVERIFIED",true)=="TOOL_AXIAL_EXTENT_UNVERIFIED"&&
+                BendCheckDisplayText.Reasons("TOOL_AXIAL_EXTENT_UNVERIFIED").Contains("chiều dài"),"Exact raw recovery plus useful explanation");
+            Check(!BendCheckDisplayText.Reasons("CERTIFIED_WHOLE_SEGMENT_SEPARATED").Contains("Chưa đủ dữ liệu")&&
+                BendCheckDisplayText.Reasons("WHOLE_SUPPLIED_SEQUENCE_CLEAR_IN_CHECKED_SCOPE").Contains("phạm vi"),"Proven numeric evidence has an accurate scope explanation");
+        });
+        Test("Vietnamese live view keeps 18 UNKNOWN candidates and technical recovery without rebinding review",()=>{
+            var numeric=new VolumeCandidateCollisionResult(CompanyToolIds.All[0],42,
+                Static(Pairs[0],CollisionStatus.UNKNOWN,"TOOL_AXIAL_EXTENT_UNVERIFIED"),
+                Static(Pairs[1],CollisionStatus.UNKNOWN,"HOLDER_MATERIAL_ROLES_UNREVIEWED"),true);
+            using(var form=new BendAssemblyBatchForm())
+            {
+                form.Show();form.BindSnapshot(Snapshot(Part(1,new[]{numeric})));
+                var grid=(DataGridView)Control(form,"dgvTools");
+                Check(grid.Rows.Count==18&&grid.Rows.Cast<DataGridViewRow>().All(r=>((BatchToolCandidateViewModel)r.Tag).GeometricStatus==CollisionStatus.UNKNOWN),"No numeric work cannot become success");
+                var parts=(DataGridView)Control(form,"dgvParts");
+                var part=(BatchPartViewModel)parts.Rows[0].Tag;
+                string common=BendCheckDisplayText.PartReason(part);
+                Check(common.StartsWith("18 bộ dao chưa có kết luận")&&common.Contains("chiều dài"),"Common missing input summarized once at Part level");
+                var tips=(ToolTip)typeof(BendAssemblyBatchForm).GetField("toolTips",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(form);
+                string punchTip=tips.GetToolTip(Control(form,"lblCalloutPunch")),holderTip=tips.GetToolTip(Control(form,"lblCalloutHolder"));
+                Check(punchTip.Contains("Chưa tính được")&&holderTip.Contains("Chưa tính được")&&!punchTip.Contains("≥  mm")&&!holderTip.Contains("0 mm"),"Actual callouts never invent null clearance");
+                Check(Control(form,"txtDiagnostics").Text.Contains("Chưa thực hiện phép tính va chạm"),"Zero queries are visible");
+                string nativeSource=((BatchToolCandidateViewModel)grid.Rows[0].Tag).ToolId;
+                Check(Convert.ToString(grid.Rows[0].Cells[7].Value).Contains("chiều dài"),"Missing axial input explained");
+                ((CheckBox)Control(form,"checkChanTechnical")).Checked=true;
+                Check(Convert.ToString(grid.Rows[0].Cells[7].Value).Contains("TOOL_AXIAL_EXTENT_UNVERIFIED")&&
+                    ((BatchToolCandidateViewModel)grid.Rows[0].Tag).ToolId==nativeSource&&((BatchToolCandidateViewModel)grid.Rows[0].Tag).FeatureId==42,"Technical view recovers exact code without changing native identity");
+                form.LoadMockupData();Check(Control(form,"badgeConcept").Text=="DỮ LIỆU MINH HỌA","Synthetic illustration cannot masquerade as live CAD");
+                form.ClearLive("STALE");Check(RowCount(form)==0,"Stale results withdrawn regardless of display language");
+                form.Close();
+            }
+        });
         Test("Form converts a guarded snapshot once and reuses its Part models for summary", () =>
         {
             int reads=0;
@@ -246,7 +459,7 @@ internal static class BendAssemblyUiTests
                     backend.Operation.Done.SetResult(Snapshot(Part(1,new[] { Geometry(42) }), () => stale)); Spin(() => !controller.Running);
                     Check(RowCount(form)==1 && Control(form,"lblProgressPercent").Text=="100%", "Backend completion publishes live inventory");
                     Check(((DataGridView)Control(form,"dgvTools")).Rows.Count==18, "Initial row automatically opens real bend detail");
-                    Check(((DataGridView)Control(form,"dgvParts")).Columns[1].HeaderText=="Configuration", "Designer schema retained");
+                    Check(((DataGridView)Control(form,"dgvParts")).Columns[1].HeaderText=="Cấu hình", "Localized header retains the same configuration column");
                     stale="STALE_SOURCE"; Spin(() => RowCount(form)==0);
                     Click(form,"btnRefresh"); Check(controller.Running && backend.Captures==1,"Refresh retains captured selection");
                     Spin(() => backend.Operation != null);
@@ -281,6 +494,49 @@ internal static class BendAssemblyUiTests
             }
         });
     }
+    private static void CloseBoundaryTests()
+    {
+        Test("close idle after completed Run disposes the backend once",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend();using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Spin(()=>backend.Operation!=null);
+                    backend.Operation.Done.SetResult(Snapshot(Part(0)));Spin(()=>!controller.Running);
+                    form.Close();Check(form.IsDisposed&&backend.Disposals==1,"Idle close completes one disposal without Cancel wait");
+                }
+            }
+        });
+        Test("close during minimum read awaits STA continuation before backend disposal",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend {MinimumGate=new TaskCompletionSource<BendToolCatalogReadResult>()};
+                using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Check(controller.Running&&backend.Operation==null,"Exact pre-operation close condition");
+                    form.Close();Check(!form.IsDisposed&&backend.Disposals==0,"Form and backend retained while ReadMinimum is pending");
+                    backend.MinimumGate.SetResult(null);Spin(()=>form.IsDisposed);
+                    Check(!controller.Running&&backend.Operation==null&&backend.Disposals==1,"Cancelled read never begins native work and disposes after continuation");
+                }
+            }
+        });
+        Test("close during reentrant native Pump cannot dispose inside the native stack",()=>{
+            using(var form=new BendAssemblyBatchForm())
+            {
+                var backend=new FakeBackend();using(var controller=new BendAssemblyBatchController(form,backend))
+                {
+                    form.Show();Click(form,"btnRunBatch");Spin(()=>backend.Operation!=null);
+                    backend.Operation.PumpAction=()=>{
+                        backend.Operation.PumpAction=null;form.Close();
+                        Check(!form.IsDisposed&&backend.Disposals==0,"Close is deferred while native Pump is active");
+                        backend.Operation.Done.SetResult(Snapshot(Part(0)));Application.DoEvents();
+                        Check(backend.Disposals==0,"Inline completion and nested STA messages still retain native owner");
+                    };
+                    Spin(()=>form.IsDisposed);Check(backend.Disposals==1,"Native owner disposed once after Pump returns");
+                }
+            }
+        });
+    }
     private static void Render(string output)
     {
         Directory.CreateDirectory(output);
@@ -295,6 +551,9 @@ internal static class BendAssemblyUiTests
             { form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size)); bitmap.Save(Path.Combine(output,"form-"+size.Width+"-scale-"+(int)(factor*100)+".png")); }
             Console.WriteLine("LAYOUT_SCALE " + factor + " deviceDpi=" + form.DeviceDpi + " client=" + form.ClientSize);
             Check(Control(form,"btnRunBatch").Visible && Control(form,"dgvParts").Width>0 && Control(form,"dgvTools").Height>0,"Usable scaled controls");
+            var scope=Control(form,"btnScopeEntire");
+            Check(scope.Width>=TextRenderer.MeasureText(scope.Text,scope.Font).Width+scope.Padding.Horizontal,"Full Vietnamese scope caption fits");
+            Check(Control(form,"badgeConcept").Width>=TextRenderer.MeasureText(Control(form,"badgeConcept").Text,Control(form,"badgeConcept").Font).Width,"Evidence source badge fits");
             var tabs=(TabControl)Control(form,"checkChanDetailTabs");
             for(int tab=0;tab<tabs.TabPages.Count;tab++)
             {
@@ -313,7 +572,7 @@ internal static class BendAssemblyUiTests
             {
                 form.Show();form.BindSnapshot(Snapshot(raw));((TabControl)Control(form,"checkChanDetailTabs")).SelectedIndex=1;Application.DoEvents();
                 Check(((DataGridView)Control(form,"sequenceTools")).Rows.Count==18&&((DataGridView)Control(form,"sequenceOptions")).Rows.Count==2,"File-import planner is rendered, not placeholder rows");
-                Check(Control(form,"sequenceSummary").Text.StartsWith("SIMULATION")&&Control(form,"sequenceEvidence").Text.Contains("SimulationOnly"),"Simulation and reviewed evidence are direct labels");
+                ((CheckBox)Control(form,"checkChanTechnical")).Checked=true; Check(Control(form,"sequenceSummary").Text.StartsWith("Dữ liệu mô phỏng")&&Control(form,"sequenceEvidence").Text.Contains("SimulationOnly"),"Simulation and reviewed evidence are direct labels");
                 imported.Item2.Lease.Invalidate();form.ClearLive("STALE_PROCESS_ARTIFACT");Check(((DataGridView)Control(form,"sequenceOptions")).Rows.Count==0,"Stale imported proof is removed");form.Close();
             }
         });
@@ -331,9 +590,9 @@ internal static class BendAssemblyUiTests
                     ((BendSequenceResult)options.CurrentRow.Tag).ToolTypeCount==1&&((BendSequenceResult)options.CurrentRow.Tag).ToolChangeCount==0,
                     "Default selection prefers a proven one-tool route with zero changes; simulation label remains");
                 tools.CurrentCell=tools.Rows[0].Cells[0];Application.DoEvents();
-                Check(options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "COLLISION") &&
-                    options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == "CLEAR"), "Different orders and actual numeric statuses visible");
-                var clear = options.Rows.Cast<DataGridViewRow>().First(r => Convert.ToString(r.Cells[1].Value) == "CLEAR");
+                Check(options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == BendCheckDisplayText.Collision(CollisionStatus.COLLISION)) &&
+                    options.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[1].Value) == BendCheckDisplayText.Collision(CollisionStatus.CLEAR)), "Different orders and actual numeric statuses visible");
+                var clear = options.Rows.Cast<DataGridViewRow>().First(r => Convert.ToString(r.Cells[1].Value) == BendCheckDisplayText.Collision(CollisionStatus.CLEAR));
                 options.CurrentCell = clear.Cells[0];
                 Check(timeline.Rows.Count == 2 && Convert.ToInt32(timeline.Rows[0].Cells[1].Value) == 42 && phases.Rows.Count == 10, "Native timeline + five Punch/Holder phase pairs");
                 tabs.SelectedIndex = 0;
@@ -350,7 +609,7 @@ internal static class BendAssemblyUiTests
             using (var form = new BendAssemblyBatchForm())
             {
                 form.Show(); form.SetPartMode();
-                Check(Control(form, "btnScopeEntire").Text == "Part hiện tại" && !Control(form, "btnScopeSelected").Visible, "Single Part uses same window");
+                Check(Control(form, "btnScopeEntire").Text == "Chi tiết đang mở" && !Control(form, "btnScopeSelected").Visible, "Single Part uses same window");
                 var parts = Enumerable.Range(0, 2000).Select(i => new BatchPartViewModel { SourceKey = "SOURCE" + i, PartName = "SAMPLE " + i,
                     Configuration = "Default", Quantity = 1, Reason = "Missing data", Status = CollisionStatus.UNKNOWN }).ToList();
                 typeof(BendAssemblyBatchForm).GetField("allParts",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).SetValue(form,parts);
@@ -370,9 +629,9 @@ internal static class BendAssemblyUiTests
             {
                 form.Show(); form.BindSnapshot(Snapshot(raw));
                 var grid = (DataGridView)Control(form,"batchMinimumEvidence");
-                Check(grid.Rows.Count==2 && Convert.ToString(grid.Rows[0].Cells[1].Value)=="NG Min" && Convert.ToDouble(grid.Rows[0].Cells[4].Value)==10,
+                Check(grid.Rows.Count==2 && Convert.ToString(grid.Rows[0].Cells[1].Value)=="Không đạt tối thiểu" && Convert.ToDouble(grid.Rows[0].Cells[4].Value)==10,
                     "Exact Min result/outer dimension projected without recalculation");
-                Check(((DataGridView)Control(form,"dgvTools")).Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[4].Value).Contains("UNKNOWN")),
+                Check(((DataGridView)Control(form,"dgvTools")).Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[4].Value).Contains("Chưa đủ dữ liệu")),
                     "Min NG cannot invent a Max manufacturing verdict");
                 var unsupported = new AssemblyPartResult("S",new[]{Occ()},"MISSING_NATIVE_MAX_CAPTURE",null,null,0,false,()=>null,null,metadata);
                 form.BindSnapshot(Snapshot(unsupported));Check(grid.Rows.Count==2,"Optional Max capture failure does not hide existing Check Min dimensions");
@@ -389,13 +648,27 @@ internal static class BendAssemblyUiTests
             form.Show();var watch=Stopwatch.StartNew();form.BindSnapshot(Snapshot(raw));
             var tabs=(TabControl)Control(form,"checkChanDetailTabs");tabs.SelectedIndex=1;Application.DoEvents();form.Update();
             double visible=watch.Elapsed.TotalMilliseconds;var options=(DataGridView)Control(form,"sequenceOptions");
-            var clear=options.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Convert.ToString(r.Cells[1].Value)=="CLEAR");
+            var clear=options.Rows.Cast<DataGridViewRow>().FirstOrDefault(r=>Convert.ToString(r.Cells[1].Value)==BendCheckDisplayText.Collision(CollisionStatus.CLEAR));
             if(clear!=null)options.CurrentCell=clear.Cells[0];
             using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"simulation-sequence.png"));}
             File.WriteAllText(Path.Combine(output,"planner-ui-timing.json"),new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new{
                 SimulationOnly=true,Bends=6,Tools=planner.Tools.Count,PlannerMilliseconds=planner.ElapsedMilliseconds,RenderToVisibleMilliseconds=visible,
                 NativeCaptureMilliseconds=0,KernelQueries=planner.KernelQueries,DeviceDpi=form.DeviceDpi}));
             Console.WriteLine("PLANNER_UI 18x6 numeric; planner ms="+planner.ElapsedMilliseconds+" render ms="+visible);form.Close();
+        }
+    }
+    private static void RenderHolder(string output)
+    {
+        using(var host=new Form())
+        using(var pane=new BendToolEvidenceControl(Path.Combine(output,"PRIVATE-editor-recovery")))
+        {
+            host.ClientSize=new Size(1024,680);host.Controls.Add(pane);host.Show();
+            pane.ShowTool(ToolProfileTests.CadPairUiLibrary().PlacementSources.Tools[0],null,()=>true);Application.DoEvents();
+            var grid=(DataGridView)pane.Controls.Find("holderRoleEntities",true).Single();
+            Check(grid.ClientSize.Width>300&&grid.ClientSize.Height>100,"Holder roles and original CAD have usable 1024x680 viewport");
+            Check(pane.Controls.Find("applySelectedHolderRoles",true).Single().Visible&&pane.Controls.Find("saveHolderEditorDraft",true).Single().Visible,"Bulk confirmation and private recovery actions remain visible");
+            using(var bitmap=new Bitmap(host.Width,host.Height)){host.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"holder-editor-controlled-1024.png"));}
+            host.Close();
         }
     }
     [STAThread]
@@ -405,8 +678,10 @@ internal static class BendAssemblyUiTests
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             if(args.Length==2&&args[0]=="--benchmark-ui")return ToolProfileTests.UiReadBenchmark(args[1]);
-            ConverterTests(); FormTests(); UnifiedNavigationTests();
-            if(args.Length==2 && args[0]=="--render") { Render(args[1]); RenderPlanner(args[1]); }
+            if(args.Length==1&&args[0]=="--close-tests")CloseBoundaryTests();
+            else if(args.Length==1&&args[0]=="--controller-tests")FormTests();
+            else { LiveSourceDiagnosticsTests(); ConverterTests(); FormTests(); CloseBoundaryTests(); UnifiedNavigationTests(); }
+            if(args.Length==2 && args[0]=="--render") { Render(args[1]); RenderPlanner(args[1]); RenderHolder(args[1]); }
             Console.WriteLine("RESULT " + groups + " groups; " + assertions + " assertions; 0 failures"); return 0;
         }
         catch(Exception ex) { Console.WriteLine("FAIL " + ex); return 1; }

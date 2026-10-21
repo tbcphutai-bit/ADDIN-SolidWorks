@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Windows.Forms;
 using ADDIN.Commands.BendAssembly;
 using ADDIN.Commands.BendCollision;
+using ADDIN.Commands.BendTools;
 
 namespace ADDIN.UI
 {
@@ -66,8 +67,11 @@ namespace ADDIN.UI
         private AssemblyCheckScope currentScope = AssemblyCheckScope.EntireAssembly;
         private bool isRunning;
         private bool isMockupMode;
+        private bool technicalDetails;
+        private string Explain(string reason) => BendCheckDisplayText.Reasons(reason,technicalDetails);
         private bool bindingParts, bindingTools;
         private readonly BendSequencePlanningControl sequenceView = new BendSequencePlanningControl();
+        private readonly BendToolEvidenceControl toolEvidence = new BendToolEvidenceControl();
         private string preservePart, preserveTool;
         private int? preserveFeature;
         private readonly DataGridView phaseEvidence = new DataGridView();
@@ -94,8 +98,9 @@ namespace ADDIN.UI
             Disposed += (s, e) => { bendActiveFont?.Dispose(); bendNormalFont?.Dispose(); };
             AddPlanningNavigation();
             WireInternalEvents();
+            InstallUxV4(); // new UI shell, reuses original controllers and controls
             toolTips.SetToolTip(lblHeaderSub, lblHeaderSub.Text);
-            ClearLive("Chưa chạy. Chọn phạm vi rồi bấm Run Batch Check.");
+            ClearLive("Chọn phạm vi rồi bấm Bắt đầu kiểm tra.");
         }
 
         public BendAssemblyBatchForm(string hostTitle, string configurationName)
@@ -116,12 +121,12 @@ namespace ADDIN.UI
             // Keep Antigravity's controls/layout intact within the existing
             // window; add functional navigation around those controls.
             var tabs = new TabControl { Name = "checkChanDetailTabs", Dock = DockStyle.Fill };
-            var bends = new TabPage("Nếp & 18 dao"); var plan = new TabPage("Dao & thứ tự"); var diagnostic = new TabPage("Chẩn đoán");
-            var minimum = new TabPage("Check Min");
+            var bends = new TabPage("Nếp chấn & 18 bộ dao"); var plan = new TabPage("Chọn dao & thứ tự chấn"); var diagnostic = new TabPage("Lý do / Chi tiết kỹ thuật");
+            var minimum = new TabPage("Cạnh chấn tối thiểu");
             minimumEvidence.Name = "batchMinimumEvidence"; minimumEvidence.Dock = DockStyle.Fill; minimumEvidence.ReadOnly = true;
             minimumEvidence.AllowUserToAddRows = false; minimumEvidence.RowHeadersVisible = false; minimumEvidence.MultiSelect = false;
             minimumEvidence.SelectionMode = DataGridViewSelectionMode.FullRowSelect; minimumEvidence.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            foreach (string heading in new[] { "FeatureId", "Kết quả Min", "Phía", "Dạng / mốc", "Phủ bì mm", "Min mm" })
+            foreach (string heading in new[] { "Mã nếp", "Kết quả cạnh chấn", "Phía", "Dạng / mốc", "Phủ bì (mm)", "Tối thiểu (mm)" })
             { int i = minimumEvidence.Columns.Add("min" + minimumEvidence.Columns.Count, heading); minimumEvidence.Columns[i].MinimumWidth = 85; }
             minimumDescription.Name = "batchMinimumDescription"; minimumDescription.Dock = DockStyle.Bottom; minimumDescription.Height = 95;
             minimumDescription.Multiline = true; minimumDescription.ReadOnly = true; minimumDescription.ScrollBars = ScrollBars.Vertical;
@@ -135,14 +140,16 @@ namespace ADDIN.UI
             splitDetails.Panel2.Controls.Remove(pnlDiagnosticsCard); diagnostic.Controls.Add(pnlDiagnosticsCard);
             pnlToolCallout.Dock = DockStyle.Top; pnlToolCallout.Height = 145;
             colToolId.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; colToolId.MinimumWidth = 165;
-            colPunch.HeaderText = "Punch"; colHolder.HeaderText = "Holder"; colMotion.HeaderText = "Process"; colGeomStatus.HeaderText = "Static";
+            colPunch.HeaderText = "Chày chấn"; colHolder.HeaderText = "Đầu kẹp chày"; colMotion.HeaderText = "Quá trình chấn"; colGeomStatus.HeaderText = "Vị trí đang xét";
             phaseEvidence.Name = "candidatePhaseEvidence"; phaseEvidence.Dock = DockStyle.Fill; phaseEvidence.ReadOnly = true;
             phaseEvidence.AllowUserToAddRows = false; phaseEvidence.RowHeadersVisible = false; phaseEvidence.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            foreach (string heading in new[] { "Phase / cặp", "Kết quả", "Witness / lý do" })
+            phaseEvidence.DefaultCellStyle.WrapMode=DataGridViewTriState.True;phaseEvidence.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.DisplayedCells;
+            foreach (string heading in new[] { "Giai đoạn / cặp", "Kết quả", "Bằng chứng / lý do" })
             { int column = phaseEvidence.Columns.Add("p" + phaseEvidence.Columns.Count, heading); phaseEvidence.Columns[column].MinimumWidth = 90; }
             phaseEvidence.CellToolTipTextNeeded += (s, e) => { if (e.RowIndex >= 0 && e.ColumnIndex >= 0) e.ToolTipText = Convert.ToString(phaseEvidence[e.ColumnIndex, e.RowIndex].Value); };
             splitDetails.Panel2.Controls.Add(phaseEvidence); phaseEvidence.BringToFront();
-            plan.Controls.Add(sequenceView); tabs.TabPages.AddRange(new[] { bends, plan, diagnostic, minimum }); splitMain.Panel2.Controls.Add(tabs);
+            var review = new TabPage("Hồ sơ dao"); review.Controls.Add(toolEvidence);
+            plan.Controls.Add(sequenceView); tabs.TabPages.AddRange(new[] { bends, plan, diagnostic, minimum, review }); splitMain.Panel2.Controls.Add(tabs);
             sequenceView.FeatureSelected += (s, feature) => { if (!isMockupMode && selectedPart?.RawPartResult?.Current == true) BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SelectionKey, feature)); };
             var pager = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, WrapContents = false };
             var previous = new Button { Name = "partsPagePrevious", Text = "‹", Width = 30 }; var next = new Button { Name = "partsPageNext", Text = "›", Width = 30 };
@@ -150,13 +157,24 @@ namespace ADDIN.UI
             next.Click += (s, e) => { if ((partPage + 1) * PartsPerPage < displayedParts.Count) { partPage++; PopulatePartsGrid(); } };
             pager.Controls.AddRange(new Control[] { previous, pageLabel, next }); pnlPartsHeader.Controls.Add(pager);
             pnlPartsHeader.Controls.Remove(btnToggleOccurrences); btnToggleOccurrences.Anchor = AnchorStyles.None;
-            btnToggleOccurrences.AutoSize = true; btnToggleOccurrences.Text = "Component"; pager.Controls.Add(btnToggleOccurrences);
+            btnToggleOccurrences.AutoSize = true; btnToggleOccurrences.Text = "Vị trí lắp"; pager.Controls.Add(btnToggleOccurrences);
+            var technical=new CheckBox {Name="checkChanTechnical",Text="Chi tiết kỹ thuật",AutoSize=true};
+            pager.Controls.Add(technical);
+            technical.CheckedChanged+=(s,e)=>{
+                technicalDetails=technical.Checked;sequenceView.SetTechnicalDetails(technicalDetails);
+                if(!isRunning)RenderSummary();
+                foreach(DataGridViewRow row in dgvParts.Rows)if(row.Tag is BatchPartViewModel part)row.Cells[5].Value=BendCheckDisplayText.PartReason(part,technicalDetails);
+                foreach(DataGridViewRow row in dgvTools.Rows)if(row.Tag is BatchToolCandidateViewModel tool)row.Cells[7].Value=Explain(tool.CombinedReason);
+                if(selectedTool!=null)RenderToolCallout(selectedTool,false);
+            };
+            toolTips.SetToolTip(technical,"Hiện nguyên mã lý do, mã nếp và bằng chứng nguồn. Không thay đổi kết quả kiểm tra.");
+            toolTips.SetToolTip(colClearance.DataGridView,"Khoảng hở chỉ có khi đã chứng minh được; thiếu dữ liệu không được coi là 0 mm.");
         }
         internal void RecordDiagnostic(string message) => txtDiagnostics.AppendText("\r\n" + message);
         internal void SetPartMode()
         {
-            btnScopeEntire.Text = "Part hiện tại"; btnScopeSelected.Visible = false;
-            lblHeaderTitle.Text = "CHECK CHẤN · PART"; LayoutControlBar();
+            btnScopeEntire.Text = "Chi tiết đang mở"; btnScopeSelected.Visible = false;
+            lblHeaderTitle.Text = "CHECK CHẤN · CHI TIẾT"; LayoutControlBar();
         }
 
         #region DPI & Responsive Scaling
@@ -196,6 +214,8 @@ namespace ADDIN.UI
                 int padLeft = TaiTheme.Px(this, 16);
                 int padRight = TaiTheme.Px(this, 16);
                 int gap = TaiTheme.Px(this, 8);
+                foreach(var button in new[]{btnScopeEntire,btnScopeSelected})
+                    button.MinimumSize=new Size(TextRenderer.MeasureText(button.Text,button.Font).Width+button.Padding.Horizontal+TaiTheme.Px(this,16),TaiTheme.Px(this,32));
 
                 int scopeW = pnlScope.PreferredSize.Width;
                 int scopeH = pnlScope.PreferredSize.Height;
@@ -273,7 +293,7 @@ namespace ADDIN.UI
 
         private void RescaleDpiElements()
         {
-            int partRowH = TaiTheme.Px(this, 34);
+            int partRowH = TaiTheme.Px(this, 40);
             dgvParts.RowTemplate.Height = partRowH;
             foreach (DataGridViewRow row in dgvParts.Rows)
             {
@@ -281,7 +301,7 @@ namespace ADDIN.UI
             }
             dgvParts.ColumnHeadersHeight = TaiTheme.Px(this, 32);
 
-            int toolRowH = TaiTheme.Px(this, 30);
+            int toolRowH = TaiTheme.Px(this, 42);
             dgvTools.RowTemplate.Height = toolRowH;
             foreach (DataGridViewRow row in dgvTools.Rows)
             {
@@ -294,7 +314,7 @@ namespace ADDIN.UI
             colPartConfig.Width = TaiTheme.Px(this, 130);
             colPartQty.Width = TaiTheme.Px(this, 70);
             colPartBends.Width = TaiTheme.Px(this, 70);
-            colPartStatus.Width = TaiTheme.Px(this, 140);
+            colPartStatus.Width = TaiTheme.Px(this, 200);
 
             // Rescale Tool grid columns
             colToolId.Width = TaiTheme.Px(this, 125);
@@ -309,7 +329,8 @@ namespace ADDIN.UI
             if (pnlRoot != null && pnlRoot.RowStyles.Count >= 5)
             {
                 pnlRoot.RowStyles[0].Height = TaiTheme.Px(this, 52);
-                pnlRoot.RowStyles[2].Height = TaiTheme.Px(this, 126);
+                // V4 removed the overview panel. Keep its row at zero on resize/DPI.
+                pnlRoot.RowStyles[2].Height = uxV4Tabs == null ? TaiTheme.Px(this, 126) : 0;
                 pnlRoot.RowStyles[4].Height = TaiTheme.Px(this, 46);
             }
 
@@ -337,10 +358,12 @@ namespace ADDIN.UI
             // Header styling
             badgeConcept.BackColor = Color.FromArgb(241, 245, 249);
             badgeConcept.ForeColor = Color.FromArgb(71, 85, 105);
+            badgeConcept.AutoSize=true;badgeConcept.Padding=new Padding(8,5,8,5);
 
             // Grids modern styling
             GridStyler.ApplyModernStyle(dgvParts, false);
             GridStyler.ApplyModernStyle(dgvTools, false);
+            dgvTools.DefaultCellStyle.WrapMode=DataGridViewTriState.True;
             dgvParts.MultiSelect = dgvTools.MultiSelect = false;
 
             // Scaled elements & DPI
@@ -375,10 +398,10 @@ namespace ADDIN.UI
 
             // Search box placeholder / default styling
             txtSearch.ForeColor = TaiTheme.TextMuted;
-            txtSearch.Text = "Tìm Part / cấu hình...";
+            txtSearch.Text = "Tìm chi tiết / cấu hình...";
             txtSearch.GotFocus += (s, e) =>
             {
-                if (txtSearch.Text == "Tìm Part / cấu hình...")
+                if (txtSearch.Text == "Tìm chi tiết / cấu hình...")
                 {
                     txtSearch.Text = string.Empty;
                     txtSearch.ForeColor = TaiTheme.Text;
@@ -389,7 +412,7 @@ namespace ADDIN.UI
                 if (string.IsNullOrWhiteSpace(txtSearch.Text))
                 {
                     txtSearch.ForeColor = TaiTheme.TextMuted;
-                    txtSearch.Text = "Tìm Part / cấu hình...";
+                    txtSearch.Text = "Tìm chi tiết / cấu hình...";
                 }
             };
 
@@ -408,7 +431,7 @@ namespace ADDIN.UI
             btnCancel.Click += OnCancelClicked;
             btnRefresh.Click += OnRefreshClicked;
             btnClose.Click += (s, e) => Close();
-            btnToggleMockup.Text = "Preview (dữ liệu mẫu)";
+            btnToggleMockup.Text = "Dữ liệu minh họa";
             btnToggleMockup.Click += (s, e) =>
             {
                 if (isRunning) return;
@@ -457,13 +480,15 @@ namespace ADDIN.UI
 
         private void OnRunBatchClicked(object sender, EventArgs e)
         {
+            BendCheckRunDiagnostics.Write("OnRunBatchClicked.begin",new {Form=GetHashCode(),Scope=currentScope.ToString(),isRunning,Handlers=RunBatchRequested?.GetInvocationList().Length??0});
             if (RunBatchRequested != null)
             {
                 RunBatchRequested.Invoke(this, currentScope);
+                BendCheckRunDiagnostics.Write("OnRunBatchClicked.dispatched",new {Form=GetHashCode()});
             }
             else
             {
-                ClearLive("Backend chưa được kết nối. Chưa có kết quả CAD.");
+                ClearLive("Chưa kết nối bộ kiểm tra. Chưa có kết quả CAD.");
             }
         }
 
@@ -507,12 +532,15 @@ namespace ADDIN.UI
             {
                 lblProgressTitle.Text = "Đang kiểm tra chấn hàng loạt...";
             }
+            UxV4SyncRunning(running);
+            if (running) UxV4SyncStatus(lblProgressTitle.Text);
         }
 
         internal void SetRunMessage(string message, bool cancelling = false)
         {
             lblProgressTitle.Text = message;
             if (cancelling) btnCancel.Enabled = false;
+            UxV4SyncStatus(message);
         }
 
         internal void ClearLive(string message)
@@ -520,7 +548,7 @@ namespace ADDIN.UI
             if (selectedPart != null) { preservePart = selectedPart.SelectionKey; preserveFeature = selectedBend?.FeatureId; preserveTool = selectedTool?.ToolId; }
             LastBindingTimings = null;
             isMockupMode = false;
-            badgeConcept.Text = "LIVE";
+            badgeConcept.Text = "CAD đang mở";
             badgeConcept.BackColor = Color.FromArgb(241, 245, 249);
             badgeConcept.ForeColor = Color.FromArgb(71, 85, 105);
             lblDisclaimer.Text = "*Kết quả hình học theo ứng viên, không kết luận khả năng chấn toàn Part. Quá trình cần bằng chứng riêng. Sản xuất: CHƯA XÁC MINH.";
@@ -536,6 +564,7 @@ namespace ADDIN.UI
 
         internal void ShowStopped(string message, double totalSeconds, AssemblyBatchSnapshot snapshot = null)
         {
+            BendCheckRunDiagnostics.Write("UI.ShowStopped",new {Form=GetHashCode(),message,totalSeconds,Parts=snapshot?.Parts.Count});
             ClearLive(message);
             currentSummary.ElapsedSeconds = totalSeconds;
             currentSummary.StageTimingsAvailable = snapshot != null;
@@ -561,6 +590,7 @@ namespace ADDIN.UI
                 return;
             }
 
+            BendCheckRunDiagnostics.Write("BindSnapshot.begin",new {Form=GetHashCode(),Current=snapshot?.Current,Parts=snapshot?.Parts.Count,Reason=snapshot?.InvalidReason});
             ClearLive("Đang kiểm tra hiệu lực kết quả...");
             var projection = BatchViewModelConverter.Convert(snapshot, elapsedSeconds);
             if (!projection.Current)
@@ -571,7 +601,7 @@ namespace ADDIN.UI
 
             currentSummary = projection.Summary;
             allParts = projection.Parts;
-            if (allParts.Count > 0 && allParts.All(p => p.RawPartResult?.SimulationOnly == true)) badgeConcept.Text = "SIMULATION";
+            if (allParts.Count > 0 && allParts.All(p => p.RawPartResult?.SimulationOnly == true)) badgeConcept.Text = "Dữ liệu mô phỏng";
             LastBindingTimings = new BendAssemblyBatchTimings
             {
                 NativeCaptureMilliseconds = snapshot.CaptureMilliseconds,
@@ -586,11 +616,13 @@ namespace ADDIN.UI
             var render = Stopwatch.StartNew();
             RenderSummary();
             ApplyPartFilters();
-            SetRunMessage(currentSummary.CompletionConfirmed ? "Backend đã hoàn tất kiểm tra. Sản xuất: CHƯA XÁC MINH." :
+            SetRunMessage(currentSummary.CompletionConfirmed ? "Đã hoàn tất kiểm tra. Sản xuất: CHƯA XÁC MINH." :
                 "Tác vụ chưa hoàn tất đầy đủ; xem chẩn đoán.");
             // Complete pending grid paints before recording first visible output.
             Update(); dgvParts.Update(); dgvTools.Update();
             LastBindingTimings.GridRenderingMilliseconds = render.Elapsed.TotalMilliseconds;
+            BendCheckRunDiagnostics.Write("BindSnapshot.end",new {Form=GetHashCode(),Parts=allParts.Count,
+                ToolPairs=snapshot.ToolPairs.Count,MatchedPairs=snapshot.ToolPairs.Count(p=>p.CadPair?.Matched==true),currentSummary.NumericQueries});
         }
 
         internal void RecordVisibleTime(double runMilliseconds)
@@ -624,10 +656,11 @@ namespace ADDIN.UI
             currentSummary.ElapsedSeconds = Math.Round(elapsedSeconds, 1);
             currentSummary.CompletionConfirmed = false;
 
-            lblProgressTitle.Text = $"Đã xử lý {done} / {total} lượt ({progress.CompletedBends} nếp, {progress.Candidates} ứng viên); chờ backend xác nhận · {elapsedSeconds:0.0}s";
-            if (progress.PlanningToolId != null) lblProgressTitle.Text = $"Planning · {progress.PlanningToolId} · {progress.PlanningNodes} nodes · {progress.PlanningQueries} queries · {done}/{total} Part · {elapsedSeconds:0.0}s";
+            lblProgressTitle.Text = $"Đã xử lý {done} / {total} lượt ({progress.CompletedBends} nếp, {progress.Candidates} ứng viên); chờ xác nhận · {elapsedSeconds:0.0}s";
+            if (progress.PlanningToolId != null) lblProgressTitle.Text = $"Thử thứ tự · {progress.PlanningToolId} · {progress.PlanningNodes} bước tìm · {progress.PlanningQueries} lượt tính · {done}/{total} chi tiết · {elapsedSeconds:0.0}s";
             lblProgressPercent.Text = $"{percent}%";
             pnlProgressBar.Invalidate();
+            UxV4SyncStatus(lblProgressTitle.Text);
         }
 
         /// <summary>
@@ -637,8 +670,8 @@ namespace ADDIN.UI
         {
             if (isRunning) return;
             isMockupMode = true;
-            badgeConcept.Text = "PREVIEW";
-            lblDisclaimer.Text = "PREVIEW — DỮ LIỆU MẪU, không phải kết quả CAD. Chọn Run để kiểm tra Live.";
+            badgeConcept.Text = "DỮ LIỆU MINH HỌA";
+            lblDisclaimer.Text = "DỮ LIỆU MINH HỌA — không phải kết quả CAD. Bấm Bắt đầu kiểm tra để đọc chi tiết đang mở.";
             badgeConcept.BackColor = Color.FromArgb(241, 245, 249);
             badgeConcept.ForeColor = Color.FromArgb(71, 85, 105);
 
@@ -647,7 +680,7 @@ namespace ADDIN.UI
             allParts = mockup.Item2;
 
             RenderSummary();
-            SetRunMessage("PREVIEW — DỮ LIỆU MẪU, không phải kết quả CAD.");
+            SetRunMessage("DỮ LIỆU MINH HỌA — không phải kết quả CAD.");
             ApplyPartFilters();
 
             // Select Frame-A by default to match the concept image
@@ -668,7 +701,7 @@ namespace ADDIN.UI
         private void RenderSummary()
         {
             // Progress
-            lblProgressTitle.Text = $"Đã xử lý {currentSummary.CheckedParts} lượt kiểm tra · {currentSummary.UniqueParts} nguồn Part/cấu hình";
+            lblProgressTitle.Text = $"Đã xử lý {currentSummary.CheckedParts} lượt kiểm tra · {currentSummary.UniqueParts} mẫu chi tiết/cấu hình";
             lblProgressPercent.Text = $"{currentSummary.ProgressPercent}%";
             pnlProgressBar.Invalidate();
 
@@ -676,7 +709,8 @@ namespace ADDIN.UI
             lblMetrics1Val.Text = currentSummary.TotalComponents.ToString();
             lblMetrics2Val.Text = currentSummary.UniqueParts.ToString();
             lblMetrics3Val.Text = currentSummary.UnknownParts.ToString();
-            lblMetrics4Val.Text = $"{currentSummary.ClearParts} CLEAR • {currentSummary.CollisionParts} COLLISION";
+            lblMetrics4Val.Text = $"{currentSummary.ClearParts} chưa thấy • {currentSummary.CollisionParts} có*";
+            toolTips.SetToolTip(lblMetrics4Val,"Va chạm theo phương án dao trong phạm vi đã kiểm tra; chưa xác minh khả năng sản xuất.");
             lblMetrics5Val.Text = currentSummary.SkippedComponents.ToString();
 
             // Diagnostics Text
@@ -686,20 +720,29 @@ namespace ADDIN.UI
                 txtDiagnostics.Text = string.Join("\r\n\r\n• ", currentSummary.Diagnostics);
                 if (!txtDiagnostics.Text.StartsWith("• ")) txtDiagnostics.Text = "• " + txtDiagnostics.Text;
             }
-            else
+            else txtDiagnostics.Text = "Chưa có dữ liệu kiểm tra.";
+            if(!technicalDetails)
             {
-                txtDiagnostics.Text = "Chưa có dữ liệu kiểm tra.";
+                // An empty/failed run must keep its operational error or
+                // instruction visible. Generic missing-evidence text cannot
+                // replace the reason the task produced no Part results.
+                txtDiagnostics.Text=allParts.Count==0&&currentSummary.Diagnostics?.Count>0?
+                    string.Join("\r\n",currentSummary.Diagnostics):
+                    currentSummary.NumericQueries==0&&currentSummary.ClearParts+currentSummary.CollisionParts==0?
+                    "Chưa thực hiện phép tính va chạm vì chưa đủ dữ liệu. Xem hồ sơ gá, chiều dài dao và trạng thái phôi trung gian.":
+                    "Lượt tính va chạm trong lần kiểm tra: "+currentSummary.NumericQueries+". Kết quả dùng lại phải còn hiệu lực.";
+                txtDiagnostics.AppendText("\r\nChưa xác minh điều kiện sản xuất. Không kiểm tra cối V. Bật Chi tiết kỹ thuật để xem mã gốc và số liệu kiểm thử.");
             }
             string stages = currentSummary.StageTimingsAvailable ?
-                $"Native capture: {currentSummary.NativeCaptureSeconds:0.000}s | Worker: {currentSummary.WorkerSeconds:0.000}s" :
-                "Native capture / Worker: Chưa có dữ liệu";
+                $"Đọc hình học: {currentSummary.NativeCaptureSeconds:0.000} s | Tính toán: {currentSummary.WorkerSeconds:0.000} s" :
+                "Đọc hình học / Tính toán: Chưa có dữ liệu";
             txtDiagnostics.AppendText($"\r\n\r\nTổng: {currentSummary.ElapsedSeconds:0.000}s | {stages}");
         }
 
         private void ApplyPartFilters()
         {
             string search = txtSearch.Text;
-            if (search == "Tìm Part / cấu hình...") search = string.Empty;
+            if (search == "Tìm chi tiết / cấu hình...") search = string.Empty;
             search = (search ?? string.Empty).Trim().ToLowerInvariant();
 
             int filterIndex = cboStatusFilter.SelectedIndex;
@@ -728,6 +771,7 @@ namespace ADDIN.UI
             if (previousIndex >= 0) partPage = previousIndex / PartsPerPage;
 
             PopulatePartsGrid();
+            UxV4RefreshParts();
         }
 
         private void PopulatePartsGrid()
@@ -746,7 +790,7 @@ namespace ADDIN.UI
                     part.Quantity,
                     part.BendCount,
                     part.StatusDisplay,
-                    part.Reason
+                    BendCheckDisplayText.PartReason(part,technicalDetails)
                 );
                 dgvParts.Rows[rowIndex].Tag = part;
             }
@@ -832,11 +876,11 @@ namespace ADDIN.UI
 
         private void RenderMinimum(BatchPartViewModel part)
         {
-            minimumEvidence.Rows.Clear(); minimumDescription.Text = "Chưa có kết quả Check Min của capture hiện tại.";
+            minimumEvidence.Rows.Clear(); minimumDescription.Text = "Chưa có kết quả cạnh chấn tối thiểu của lần đọc hiện tại.";
             if (isMockupMode || part?.RawPartResult?.Current != true) return;
             foreach (var bend in part.RawPartResult.BendMetadata)
             {
-                string status = bend.MinimumStatus == "MeetsMinimum" ? "Đạt Min" : bend.MinimumStatus == "BelowMinimum" ? "NG Min" :
+                string status = bend.MinimumStatus == "MeetsMinimum" ? "Đạt Min" : bend.MinimumStatus == "BelowMinimum" ? "Không đạt tối thiểu" :
                     bend.MinimumStatus == "GroovedAccepted" ? "Cạnh bào" : "Cần xác minh";
                 int sides = Math.Max(1, bend.Sides.Count);
                 for (int side = 0; side < sides; side++)
@@ -848,7 +892,7 @@ namespace ADDIN.UI
                     foreach (DataGridViewCell cell in minimumEvidence.Rows[row].Cells) cell.ToolTipText = bend.Name + "\n" + bend.MinimumSummary;
                 }
             }
-            minimumDescription.Text = "Kết quả từ Check Min hiện có · kích thước phủ bì · L→A, Z→B, C(U)→C. Chọn dòng để xem lý do và sáng nếp trên CAD.\r\n" +
+            minimumDescription.Text = "Kết quả cạnh chấn tối thiểu hiện có · kích thước phủ bì · L→A, Z→B, C(U)→C. Chọn dòng để xem lý do và sáng nếp trên CAD.\r\n" +
                 string.Join("\r\n", part.RawPartResult.BendMetadata.Select(b => b.FeatureId + ": " + b.MinimumSummary));
         }
 
@@ -859,7 +903,7 @@ namespace ADDIN.UI
             preserveFeature = bend.FeatureId; preservePart = selectedPart.SelectionKey;
 
             lblDetailBendTitle.Text = $"{selectedPart.PartName} / {bend.BendName} · Góc: {bend.AngleDisplay} · R: {bend.RadiusDisplay}";
-            toolTips.SetToolTip(lblDetailBendTitle, $"{selectedPart.PartName} / {bend.BendName} (FeatureId {bend.FeatureId})\nGóc chấn: {bend.AngleDisplay}\nBán kính: {bend.RadiusDisplay}\nTrạng thái: {bend.StatusDisplay}");
+            toolTips.SetToolTip(lblDetailBendTitle, $"{selectedPart.PartName} / {bend.BendName} (Mã nếp SOLIDWORKS {bend.FeatureId})\nGóc chấn: {bend.AngleDisplay}\nBán kính: {bend.RadiusDisplay}\nTrạng thái: {bend.StatusDisplay}");
 
             // Highlight active bend button
             foreach (Control ctrl in pnlBendPills.Controls)
@@ -875,6 +919,7 @@ namespace ADDIN.UI
 
             if (!isMockupMode) BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SelectionKey, bend.FeatureId));
             PopulateToolsGrid(bend);
+            UxV4RefreshSelection();
         }
 
         private void PopulateToolsGrid(BatchBendViewModel bend)
@@ -897,7 +942,7 @@ namespace ADDIN.UI
                     tool.GeometricStatusDisplay,
                     tool.ManufacturingStatus,
                     clearanceText,
-                    tool.CombinedReason
+                    Explain(tool.CombinedReason)
                 );
                 dgvTools.Rows[rowIndex].Tag = tool;
                 dgvTools.Rows[rowIndex].Cells[3].ToolTipText = tool.MotionDetail;
@@ -937,24 +982,30 @@ namespace ADDIN.UI
             RenderToolCallout(tool);
         }
 
-        private void RenderToolCallout(BatchToolCandidateViewModel tool)
+        private void RenderToolCallout(BatchToolCandidateViewModel tool,bool updateReview=true)
         {
+            var partForReview=selectedPart?.RawPartResult;
+            if(updateReview)toolEvidence.ShowTool(tool.CadAssembly,tool.NativeEnvelope,()=>!isMockupMode&&partForReview?.Current==true);
             phaseEvidence.Rows.Clear();
             var cad=tool.CadAssembly?.CadPair;
             if(cad!=null)
             {
-                phaseEvidence.Rows.Add("CAD / Punch",cad.Status,cad.PunchBlock+" · INSERT "+cad.PunchInsert+" · "+string.Join(", ",cad.PunchLayers));
-                phaseEvidence.Rows.Add("CAD / Holder",cad.Status,cad.HolderBlock+" · INSERT "+cad.HolderInsert+" · "+string.Join(", ",cad.HolderLayers));
-                phaseEvidence.Rows.Add("CAD / Gá", "UNKNOWN", "Tọa độ trình bày; datum, seating và chiều dài làm việc cần bằng chứng riêng.");
+                phaseEvidence.Rows.Add("CAD / Chày chấn",cad.Matched?"Đã nhận đúng nguồn":"Chưa xác nhận",technicalDetails?cad.PunchBlock+" · INSERT "+cad.PunchInsert+" · "+string.Join(", ",cad.PunchLayers):"Cặp chày–đầu kẹp cố định theo CAD; xem mã nguồn ở chi tiết kỹ thuật.");
+                phaseEvidence.Rows.Add("CAD / Đầu kẹp chày",cad.Matched?"Đã nhận đúng nguồn":"Chưa xác nhận",technicalDetails?cad.HolderBlock+" · INSERT "+cad.HolderInsert+" · "+string.Join(", ",cad.HolderLayers):"Hình học tham khảo; chưa xác nhận gá thực tế.");
+                phaseEvidence.Rows.Add("CAD / Gá",tool.CadAssembly.ClampVerified?"Đã kiểm tra hồ sơ gá":tool.CadAssembly.SeatingEvidence.CoordinateRecordReady?"Có tọa độ được kiểm tra":"Chưa đủ dữ liệu",
+                    tool.CadAssembly.ClampVerified?"Phạm vi hồ sơ gá đã xác minh; chiều dài và quá trình vẫn được kiểm tra riêng.":"Chưa xác minh đầy đủ mốc gá và gá thực tế; chiều dài làm việc cần hồ sơ riêng.");
             }
+            phaseEvidence.Rows.Add("Vị trí tĩnh / Chày chấn",tool.PunchStatusDisplay,(tool.StaticSimulationOnly?"Dữ liệu mô phỏng · ":"")+Explain(tool.PunchReason)+
+                " · khoảng hở: "+BendCheckDisplayText.Clearance(tool.PunchClearanceMm));
+            phaseEvidence.Rows.Add("Vị trí tĩnh / Đầu kẹp chày",tool.HolderStatusDisplay,(tool.StaticSimulationOnly?"Dữ liệu mô phỏng · ":"")+Explain(tool.HolderReason)+
+                " · khoảng hở: "+BendCheckDisplayText.Clearance(tool.HolderClearanceMm));
             foreach (var segment in tool.MotionSegments)
-                phaseEvidence.Rows.Add(segment.Phase + " / " + (segment.Pair == CollisionPairKind.WorkpiecePunch ? "Punch" : "Holder"), segment.Status,
-                    segment.Witness == null ? segment.Reason : "u=" + segment.Witness.Parameter.ToString("0.######") + " · " + segment.Witness.PartId +
-                    " · margin>" + segment.Witness.Geometry.CrossSectionInteriorMarginLowerMm.ToString("0.######") + " mm");
+                phaseEvidence.Rows.Add(BendCheckDisplayText.Phase(segment.Phase) + " / " + (segment.Pair == CollisionPairKind.WorkpiecePunch ? "Chày chấn" : "Đầu kẹp chày"), BendCheckDisplayText.Collision(segment.Status),
+                    (tool.ProcessSimulationOnly?"Dữ liệu mô phỏng · ":"")+(segment.Witness == null ? Explain(segment.Reason) : "Bằng chứng tại " + (segment.Witness.Parameter*100).ToString("0.####") + "% chuyển động · độ dự phòng >" + segment.Witness.Geometry.CrossSectionInteriorMarginLowerMm.ToString("0.######") + " mm"));
             lblCalloutTitle.Text = $"Chi tiết dao — {tool.ToolId}";
-            lblCalloutPunch.Text = $"Punch – {tool.ToolId} : {tool.PunchStatusDisplay}";
-            lblCalloutHolder.Text = $"Upper Holder : {tool.HolderStatusDisplay}"+(cad?.Matched==true?" · CAD reference":"");
-            lblCalloutReason.Text = $"Lý do: {tool.CombinedReason}";
+            lblCalloutPunch.Text = $"Chày chấn – {tool.ToolId}: {tool.PunchStatusDisplay}";
+            lblCalloutHolder.Text = $"Đầu kẹp chày: {tool.HolderStatusDisplay}"+(cad?.Matched==true?" · CAD tham khảo":"");
+            lblCalloutReason.Text = "Lý do: "+Explain(tool.CombinedReason);
 
             // Color coding
             lblCalloutPunch.ForeColor = tool.PunchStatus == CollisionStatus.COLLISION ? TaiTheme.Danger :
@@ -963,27 +1014,31 @@ namespace ADDIN.UI
             lblCalloutHolder.ForeColor = tool.HolderStatus == CollisionStatus.COLLISION ? TaiTheme.Danger :
                                         tool.HolderStatus == CollisionStatus.CLEAR ? TaiTheme.Success : Color.FromArgb(51, 65, 85);
 
-            toolTips.SetToolTip(lblCalloutTitle, $"Ứng viên: {tool.ToolId} (FeatureId {tool.FeatureId})");
+            toolTips.SetToolTip(lblCalloutTitle, $"Ứng viên: {tool.ToolId} (Mã nếp SOLIDWORKS {tool.FeatureId})");
             if(cad!=null)toolTips.SetToolTip(lblCalloutTitle, $"{tool.ToolId} · ô {cad.SlotId} · {cad.Status}\nDXF SHA256: {cad.SourceSha256}\n{cad.CoordinateSystem}\n{cad.EvidenceReference}");
             toolTips.SetToolTip(lblCalloutPunch, $"Punch ({tool.ToolId}): {tool.PunchStatusDisplay}");
-            toolTips.SetToolTip(lblCalloutHolder, $"Upper Holder: {tool.HolderStatusDisplay}");
-            toolTips.SetToolTip(lblCalloutPunch, $"Punch: {tool.PunchStatusDisplay} · clearance ≥ {tool.PunchClearanceMm} mm\n{tool.PunchReason}\nWitness: {tool.PunchWitness?.PointMm}");
-            toolTips.SetToolTip(lblCalloutHolder, $"Holder: {tool.HolderStatusDisplay} · clearance ≥ {tool.HolderClearanceMm} mm\n{tool.HolderReason}\nWitness: {tool.HolderWitness?.PointMm}");
+            toolTips.SetToolTip(lblCalloutHolder, $"Đầu kẹp chày: {tool.HolderStatusDisplay}");
+            toolTips.SetToolTip(lblCalloutPunch, "Chày chấn: "+tool.PunchStatusDisplay+" · Khoảng hở: "+BendCheckDisplayText.Clearance(tool.PunchClearanceMm)+"\n"+Explain(tool.PunchReason)+"\nChi tiết kỹ thuật: "+tool.PunchReason+
+                (technicalDetails&&tool.PunchWitness!=null?"\nVị trí bằng chứng va chạm: "+tool.PunchWitness.PointMm:""));
+            toolTips.SetToolTip(lblCalloutHolder, "Đầu kẹp chày: "+tool.HolderStatusDisplay+" · Khoảng hở: "+BendCheckDisplayText.Clearance(tool.HolderClearanceMm)+"\n"+Explain(tool.HolderReason)+"\nChi tiết kỹ thuật: "+tool.HolderReason+
+                (technicalDetails&&tool.HolderWitness!=null?"\nVị trí bằng chứng va chạm: "+tool.HolderWitness.PointMm:""));
             toolTips.SetToolTip(lblCalloutReason, $"Lý do / Bằng chứng:\n{tool.CombinedReason}");
+            UxV4RefreshToolStatus();
         }
 
         private void ClearDetailSection()
         {
+            toolEvidence.ShowTool(null,null,null);
             selectedPart = null; selectedBend = null; selectedTool = null;
-            lblDetailBendTitle.Text = "Chi tiết nếp chấn — Chưa chọn Part";
+            lblDetailBendTitle.Text = "Chi tiết nếp chấn — Chưa chọn chi tiết";
             toolTips.SetToolTip(lblDetailBendTitle, "Chọn một chi tiết bên trên để xem các nếp chấn.");
             ClearBendPills();
             dgvTools.Rows.Clear();
             phaseEvidence.Rows.Clear();
             minimumEvidence.Rows.Clear(); minimumDescription.Clear();
             lblCalloutTitle.Text = "Chi tiết dao đang chọn";
-            lblCalloutPunch.Text = "Punch : —";
-            lblCalloutHolder.Text = "Upper Holder : —";
+            lblCalloutPunch.Text = "Chày chấn: —";
+            lblCalloutHolder.Text = "Đầu kẹp chày: —";
             lblCalloutReason.Text = "Chọn một chi tiết bên trên để xem đánh giá 18 bộ dao.";
             toolTips.SetToolTip(lblCalloutPunch, null);
             toolTips.SetToolTip(lblCalloutHolder, null);
@@ -1005,7 +1060,7 @@ namespace ADDIN.UI
             switch (e.ColumnIndex)
             {
                 case 0:
-                    e.ToolTipText = $"{part.PartName}\nSource: {part.SourceKey}\nSố lượng: {part.Quantity}\nSố nếp chấn: {part.BendCount}";
+                    e.ToolTipText = $"{part.PartName}\nMã liên kết nguồn: {part.SourceKey}\nSố lượng: {part.Quantity}\nSố nếp chấn: {part.BendCount}";
                     break;
                 case 1:
                     e.ToolTipText = $"Cấu hình Part: {part.Configuration}";
@@ -1030,7 +1085,7 @@ namespace ADDIN.UI
             switch (e.ColumnIndex)
             {
                 case 0:
-                    e.ToolTipText = $"Bộ dao: {tool.ToolId} (FeatureId {tool.FeatureId})";
+                    e.ToolTipText = $"Bộ dao: {tool.ToolId} (Mã nếp SOLIDWORKS {tool.FeatureId})";
                     break;
                 case 1:
                     e.ToolTipText = $"Chày (Punch): {tool.PunchStatusDisplay}\nTrạng thái tĩnh: {tool.PunchStatus}";
@@ -1184,7 +1239,7 @@ namespace ADDIN.UI
                 var lblStatus = new Label
                 {
                     Dock = DockStyle.Fill,
-                    Text = $"Tổng số: {selectedPart.Occurrences.Count} occurrence(s) · Nhấp đúp vào dòng để highlight trên viewport SolidWorks",
+                    Text = $"Tổng số: {selectedPart.Occurrences.Count} vị trí lắp · Nhấp đúp vào dòng để làm sáng trên SOLIDWORKS",
                     TextAlign = ContentAlignment.MiddleLeft,
                     Font = TaiTheme.Small,
                     ForeColor = TaiTheme.TextMuted
@@ -1275,13 +1330,14 @@ namespace ADDIN.UI
 
                 string statusText = e.Value?.ToString() ?? string.Empty;
                 Color textColor, bgColor;
+                var status=(dgvParts.Rows[e.RowIndex].Tag as BatchPartViewModel)?.Status??CollisionStatus.UNKNOWN;
 
-                if (statusText.Contains("COLLISION"))
+                if (status==CollisionStatus.COLLISION)
                 {
                     textColor = Color.FromArgb(220, 38, 38);
                     bgColor = Color.FromArgb(254, 226, 226);
                 }
-                else if (statusText.Contains("CLEAR"))
+                else if (status==CollisionStatus.CLEAR)
                 {
                     textColor = Color.FromArgb(22, 101, 52);
                     bgColor = Color.FromArgb(220, 252, 231);
@@ -1295,8 +1351,8 @@ namespace ADDIN.UI
                 Graphics g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
 
-                int pillH = TaiTheme.Px(this, 22);
-                int pillW = Math.Min(e.CellBounds.Width - 10, TaiTheme.Px(this, 100));
+                int pillH = TaiTheme.Px(this, 34);
+                int pillW = e.CellBounds.Width - 8;
                 int pillX = e.CellBounds.X + (e.CellBounds.Width - pillW) / 2;
                 int pillY = e.CellBounds.Y + (e.CellBounds.Height - pillH) / 2;
                 var pillRect = new Rectangle(pillX, pillY, pillW, pillH);
@@ -1327,13 +1383,15 @@ namespace ADDIN.UI
 
                 string statusText = e.Value?.ToString() ?? string.Empty;
                 Color textColor, bgColor;
+                var item=dgvTools.Rows[e.RowIndex].Tag as BatchToolCandidateViewModel;
+                var status=item==null?CollisionStatus.UNKNOWN:e.ColumnIndex==1?item.PunchStatus:e.ColumnIndex==2?item.HolderStatus:item.GeometricStatus;
 
-                if (statusText.Contains("COLLISION"))
+                if (status==CollisionStatus.COLLISION)
                 {
                     textColor = Color.FromArgb(220, 38, 38);
                     bgColor = Color.FromArgb(254, 226, 226);
                 }
-                else if (statusText.Contains("CLEAR"))
+                else if (status==CollisionStatus.CLEAR)
                 {
                     textColor = Color.FromArgb(22, 101, 52);
                     bgColor = Color.FromArgb(220, 252, 231);
@@ -1347,8 +1405,8 @@ namespace ADDIN.UI
                 Graphics g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
 
-                int pillH = TaiTheme.Px(this, 20);
-                int pillW = Math.Min(e.CellBounds.Width - 10, TaiTheme.Px(this, 88));
+                int pillH = TaiTheme.Px(this, 34);
+                int pillW = e.CellBounds.Width - 8;
                 int pillX = e.CellBounds.X + (e.CellBounds.Width - pillW) / 2;
                 int pillY = e.CellBounds.Y + (e.CellBounds.Height - pillH) / 2;
                 var pillRect = new Rectangle(pillX, pillY, pillW, pillH);

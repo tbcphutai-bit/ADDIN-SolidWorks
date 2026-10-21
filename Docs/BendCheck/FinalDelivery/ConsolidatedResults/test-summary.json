@@ -1,0 +1,71 @@
+{
+  "CurrentProductSourceCheckpoint": "7c837b96b7231ca5d689b3602a48622a52e7908b",
+  "Build": {
+    "build-debug": "PASS",
+    "tests-debug": "PASS",
+    "ui-debug": "PASS",
+    "native-debug": "PASS",
+    "build-release": "PASS",
+    "tests-release": "PASS",
+    "ui-release": "PASS",
+    "native-release": "PASS"
+  },
+  "Managed": {
+    "debug": {
+      "Result": "PASS",
+      "Groups": 321,
+      "Failures": 0,
+      "Assertions": 9186
+    },
+    "release": {
+      "Result": "PASS",
+      "Groups": 321,
+      "Failures": 0,
+      "Assertions": 9186
+    }
+  },
+  "GUI": {
+    "debug": {
+      "Result": "PASS",
+      "Groups": 23,
+      "Failures": 0,
+      "Assertions": 232,
+      "DeviceDpi": 96,
+      "ActualOS125Or150Dpi": "NOT_RUN"
+    },
+    "release": {
+      "Result": "PASS",
+      "Groups": 23,
+      "Failures": 0,
+      "Assertions": 231,
+      "DeviceDpi": 96,
+      "ActualOS125Or150Dpi": "NOT_RUN"
+    }
+  },
+  "Planning": {
+    "debug": {
+      "Result": "PASS",
+      "Groups": 24,
+      "Failures": 0,
+      "Assertions": 609
+    },
+    "release": {
+      "Result": "PASS",
+      "Groups": 24,
+      "Failures": 0,
+      "Assertions": 609
+    }
+  },
+  "WrapperResultRegression": {
+    "Result": "PASS",
+    "Cases": 3,
+    "Scope": "Actual wrapper result gate, no SOLIDWORKS"
+  },
+  "CompanyCAD": {
+    "Pairs": 18,
+    "Assertions": 16977,
+    "HolderInventoryAssertions": 37,
+    "ReviewedHolders": 0,
+    "CompanyNumericQueries": 0
+  }
+}

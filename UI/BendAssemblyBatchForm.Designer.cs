@@ -295,7 +295,7 @@ namespace ADDIN.UI
             this.btnRunBatch.Padding = new System.Windows.Forms.Padding(12, 0, 12, 0);
             this.btnRunBatch.Size = new System.Drawing.Size(160, 34);
             this.btnRunBatch.TabIndex = 1;
-            this.btnRunBatch.Text = "Run Batch Check";
+            this.btnRunBatch.Text = "Bắt đầu kiểm tra";
             this.btnRunBatch.Tone = ADDIN.UI.ModernButtonTone.Success;
             this.toolTips.SetToolTip(this.btnRunBatch, "Bắt đầu chạy kiểm tra chấn hàng loạt cho các chi tiết");
             // 
@@ -356,7 +356,7 @@ namespace ADDIN.UI
             this.btnScopeEntire.Selected = true;
             this.btnScopeEntire.Size = new System.Drawing.Size(145, 32);
             this.btnScopeEntire.TabIndex = 0;
-            this.btnScopeEntire.Text = "Entire Assembly";
+            this.btnScopeEntire.Text = "Toàn bộ cụm lắp ráp";
             this.btnScopeEntire.Tone = ADDIN.UI.ModernButtonTone.Accent;
             this.toolTips.SetToolTip(this.btnScopeEntire, "Kiểm tra toàn bộ các chi tiết kim loại tấm trong cụm lắp ráp");
             // 
@@ -371,7 +371,7 @@ namespace ADDIN.UI
             this.btnScopeSelected.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
             this.btnScopeSelected.Size = new System.Drawing.Size(175, 32);
             this.btnScopeSelected.TabIndex = 1;
-            this.btnScopeSelected.Text = "Selected Components";
+            this.btnScopeSelected.Text = "Các chi tiết đã chọn";
             this.btnScopeSelected.Tone = ADDIN.UI.ModernButtonTone.Neutral;
             this.toolTips.SetToolTip(this.btnScopeSelected, "Chỉ kiểm tra các component đang được chọn trong cây FeatureTree");
             // 
@@ -382,9 +382,9 @@ namespace ADDIN.UI
             this.cboStatusFilter.FormattingEnabled = true;
             this.cboStatusFilter.Items.AddRange(new object[] {
             "Tất cả trạng thái",
-            "Chỉ lỗi (COLLISION*)",
-            "Chưa xác minh (UNKNOWN)",
-            "Đạt hình học (CLEAR*)"});
+            "Có phương án va chạm",
+            "Chưa đủ dữ liệu",
+            "Chưa phát hiện va chạm"});
             this.cboStatusFilter.Location = new System.Drawing.Point(352, 10);
             this.cboStatusFilter.Margin = new System.Windows.Forms.Padding(8, 4, 8, 4);
             this.cboStatusFilter.Name = "cboStatusFilter";
@@ -504,7 +504,7 @@ namespace ADDIN.UI
             this.lblMetrics1Title.Name = "lblMetrics1Title";
             this.lblMetrics1Title.Size = new System.Drawing.Size(75, 15);
             this.lblMetrics1Title.TabIndex = 0;
-            this.lblMetrics1Title.Text = "Components";
+            this.lblMetrics1Title.Text = "Chi tiết trong cụm";
             // 
             // cardMetrics2
             // 
@@ -539,7 +539,7 @@ namespace ADDIN.UI
             this.lblMetrics2Title.Name = "lblMetrics2Title";
             this.lblMetrics2Title.Size = new System.Drawing.Size(73, 15);
             this.lblMetrics2Title.TabIndex = 0;
-            this.lblMetrics2Title.Text = "Unique Parts";
+            this.lblMetrics2Title.Text = "Mẫu chi tiết khác nhau";
             // 
             // cardMetrics3
             // 
@@ -700,7 +700,7 @@ namespace ADDIN.UI
             this.lblPartsTitle.Name = "lblPartsTitle";
             this.lblPartsTitle.Size = new System.Drawing.Size(107, 19);
             this.lblPartsTitle.TabIndex = 0;
-            this.lblPartsTitle.Text = "Danh sách Part";
+            this.lblPartsTitle.Text = "Danh sách chi tiết";
             // 
             // btnToggleOccurrences
             // 
@@ -741,14 +741,14 @@ namespace ADDIN.UI
             // 
             // colPartName
             // 
-            this.colPartName.HeaderText = "Part";
+            this.colPartName.HeaderText = "Chi tiết";
             this.colPartName.Name = "colPartName";
             this.colPartName.ReadOnly = true;
             this.colPartName.Width = 240;
             // 
             // colPartConfig
             // 
-            this.colPartConfig.HeaderText = "Configuration";
+            this.colPartConfig.HeaderText = "Cấu hình";
             this.colPartConfig.Name = "colPartConfig";
             this.colPartConfig.ReadOnly = true;
             this.colPartConfig.Width = 140;
@@ -892,14 +892,14 @@ namespace ADDIN.UI
             // 
             // colPunch
             // 
-            this.colPunch.HeaderText = "Chày (Punch)";
+            this.colPunch.HeaderText = "Chày chấn";
             this.colPunch.Name = "colPunch";
             this.colPunch.ReadOnly = true;
             this.colPunch.Width = 110;
             // 
             // colHolder
             // 
-            this.colHolder.HeaderText = "Cối kẹp trên (Holder)";
+            this.colHolder.HeaderText = "Đầu kẹp chày";
             this.colHolder.Name = "colHolder";
             this.colHolder.ReadOnly = true;
             this.colHolder.Width = 135;
@@ -927,7 +927,7 @@ namespace ADDIN.UI
             // 
             // colClearance
             // 
-            this.colClearance.HeaderText = "Clearance";
+            this.colClearance.HeaderText = "Khoảng hở (mm)";
             this.colClearance.Name = "colClearance";
             this.colClearance.ReadOnly = true;
             this.colClearance.Width = 90;
@@ -976,7 +976,7 @@ namespace ADDIN.UI
             this.lblCalloutPunch.Name = "lblCalloutPunch";
             this.lblCalloutPunch.Size = new System.Drawing.Size(366, 22);
             this.lblCalloutPunch.TabIndex = 1;
-            this.lblCalloutPunch.Text = "Punch – AMD-STD-004 : UNKNOWN";
+            this.lblCalloutPunch.Text = "Chày chấn: Chưa đủ dữ liệu";
             this.lblCalloutPunch.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // lblCalloutHolder
@@ -989,7 +989,7 @@ namespace ADDIN.UI
             this.lblCalloutHolder.Name = "lblCalloutHolder";
             this.lblCalloutHolder.Size = new System.Drawing.Size(366, 22);
             this.lblCalloutHolder.TabIndex = 2;
-            this.lblCalloutHolder.Text = "Upper Holder : Chưa xác minh";
+            this.lblCalloutHolder.Text = "Đầu kẹp chày: Chưa đủ dữ liệu";
             this.lblCalloutHolder.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // lblCalloutReason
@@ -1095,7 +1095,7 @@ namespace ADDIN.UI
             this.MinimumSize = new System.Drawing.Size(1024, 680);
             this.Name = "BendAssemblyBatchForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "CHECK CHẤN — Assembly Batch Inspection";
+            this.Text = "CHECK CHẤN — Chi tiết và cụm lắp ráp";
             this.pnlRoot.ResumeLayout(false);
             this.pnlHeader.ResumeLayout(false);
             this.pnlHeader.PerformLayout();

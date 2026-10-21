@@ -58,7 +58,7 @@ namespace ADDIN.Commands.BendPlacement
             internal IReadOnlyList<string> Reasons;
             internal ToolProfileProvenance Source;
         }
-        internal static Result Read(string source,string manifestPath,string datumPath,CancellationToken token,string holderEvidencePath=null,string seatingEvidencePath=null,string authoritiesPath=null)
+        internal static Result Read(string source,string manifestPath,string datumPath,CancellationToken token,string holderEvidencePath=null,string seatingEvidencePath=null,string authoritiesPath=null,string reviewWorkspacePath=null)
         {
             string sha=null,manifestSha=null;var reasons=new List<string>();var profiles=new List<ToolAssemblyProfile>();
             try
@@ -77,7 +77,7 @@ namespace ADDIN.Commands.BendPlacement
                 var doc=ToolDxfReader.Read(bytes,provenance,token);
                 if(doc.Source.Error!=null)throw new InvalidDataException("UNSUPPORTED_MASTER_SOURCE");
                 var labels=Labels(bytes);var evidence=ToolDatumEvidence.Load(datumPath,token);
-                var holderEvidence=new ToolHolderEvidenceReader(holderEvidencePath,seatingEvidencePath,authoritiesPath,token);
+                var holderEvidence=new ToolHolderEvidenceReader(holderEvidencePath,seatingEvidencePath,authoritiesPath,token,reviewWorkspacePath,sha,manifestSha);
                 if(holderEvidence.HolderError!=null)reasons.Add(holderEvidence.HolderError);
                 if(holderEvidence.SeatingError!=null)reasons.Add(holderEvidence.SeatingError);
                 foreach(string id in CompanyToolIds.All)

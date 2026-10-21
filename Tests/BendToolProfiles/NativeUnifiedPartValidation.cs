@@ -50,7 +50,7 @@ internal static partial class NativeAssemblyBatchValidation
         if(args.Length!=2)return 2;string output=Path.GetFullPath(args[0]);Directory.CreateDirectory(output);ISldWorks app=null;
         try
         {
-            app=NativeTestProcess.StartOwned(output);app.Visible=false;app.UserControl=false;
+            app=NativeTestProcess.StartOwned(output);NativeTestProcess.KeepOwnedBackgroundSession(app);
             var doc=UiSheet(app,args[1],Path.Combine(output,"PARAMETRIC-THREE.SLDPRT"),3,true);
             var chosen=doc.Parameter(generatedSeedDimension) as Dimension;
             Check(chosen!=null,"Fresh native fixture has a real editable length parameter");
@@ -74,7 +74,7 @@ internal static partial class NativeAssemblyBatchValidation
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             product = Assembly.LoadFrom(args[0]); string hash = Sha(args[3]);
             report["Result"] = "RUNNING"; report["OriginalSeedSha256"] = hash;
-            app = NativeTestProcess.StartOwned(output); app.Visible = false; app.UserControl = false;
+            app = NativeTestProcess.StartOwned(output); NativeTestProcess.KeepOwnedBackgroundSession(app);
             foreach (int bends in new[] { 0, 3, 6 })
             {
                 ModelDoc2 part;

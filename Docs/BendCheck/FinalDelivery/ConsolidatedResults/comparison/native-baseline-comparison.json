@@ -1,0 +1,80 @@
+{
+  "debug": {
+    "FunctionalResult": "PASS",
+    "OverallResult": "PASS",
+    "ShutdownResult": "PASS",
+    "Assertions": 3879,
+    "Execution": {
+      "PASS": 33
+    },
+    "NativeGeometryExactlyEqualToPr35": true,
+    "ColdOutputExactlyEqualToPr35": true,
+    "ProtectedSourcesUnchanged": true,
+    "NativeBends": 72,
+    "StaticRows": 1296,
+    "ProcessRows": 1296,
+    "Minimum": {
+      "MeetsMinimum": 69,
+      "BelowMinimum": 3
+    },
+    "Manufacturing": {
+      "CHUA_XAC_MINH": 33
+    },
+    "Cold": {
+      "MeanVisibleMs": 3897.9171060606063,
+      "MinimumVisibleMs": 3370.8652,
+      "MaximumVisibleMs": 5185.4791000000005,
+      "Captures": 33,
+      "CaptureHits": 0,
+      "NumericQueries": 0
+    },
+    "Warm": {
+      "MeanVisibleMs": 1187.4517545454546,
+      "MinimumVisibleMs": 998.3886,
+      "MaximumVisibleMs": 1793.8654000000001,
+      "Captures": 0,
+      "CaptureHits": 33,
+      "NumericQueries": 0
+    },
+    "ComparisonResult": "PASS"
+  },
+  "release": {
+    "FunctionalResult": "PASS",
+    "OverallResult": "PASS",
+    "ShutdownResult": "PASS",
+    "Assertions": 3879,
+    "Execution": {
+      "PASS": 33
+    },
+    "NativeGeometryExactlyEqualToPr35": true,
+    "ColdOutputExactlyEqualToPr35": true,
+    "ProtectedSourcesUnchanged": true,
+    "NativeBends": 72,
+    "StaticRows": 1296,
+    "ProcessRows": 1296,
+    "Minimum": {
+      "MeetsMinimum": 69,
+      "BelowMinimum": 3
+    },
+    "Manufacturing": {
+      "CHUA_XAC_MINH": 33
+    },
+    "Cold": {
+      "MeanVisibleMs": 3383.0436,
+      "MinimumVisibleMs": 2097.3654,
+      "MaximumVisibleMs": 4771.8201,
+      "Captures": 33,
+      "CaptureHits": 0,
+      "NumericQueries": 0
+    },
+    "Warm": {
+      "MeanVisibleMs": 985.7270121212122,
+      "MinimumVisibleMs": 660.3101,
+      "MaximumVisibleMs": 1681.1209000000001,
+      "Captures": 0,
+      "CaptureHits": 33,
+      "NumericQueries": 0
+    },
+    "ComparisonResult": "PASS"
+  }
+}

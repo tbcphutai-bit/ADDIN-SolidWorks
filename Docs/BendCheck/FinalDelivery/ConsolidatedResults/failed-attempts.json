@@ -1,0 +1,81 @@
+{
+  "StartupAttempts": [
+    {
+      "Attempt": "inprocess-release",
+      "NativeVersion": "32.5",
+      "OwnedPid": 59136,
+      "ElapsedMs": 60014.491200000004,
+      "RotSeen": true,
+      "ExitedAtDeadline": false,
+      "Result": "FAIL",
+      "Stage": "STARTUP before target DLL load",
+      "ShutdownResult": "NOT_CONFIRMED",
+      "ActualTargetDllObserved": false,
+      "Cleanup": "Only identity-checked owned failed startup terminated; not clean-shutdown PASS",
+      "Protection": {
+        "FixtureBytesUnchanged": true,
+        "StartupSettingsUnchanged": true
+      }
+    },
+    {
+      "Attempt": "inprocess-release-retry",
+      "NativeVersion": "32.5",
+      "OwnedPid": 71108,
+      "ElapsedMs": 60038.474200000004,
+      "RotSeen": true,
+      "ExitedAtDeadline": false,
+      "Result": "FAIL",
+      "Stage": "STARTUP before target DLL load",
+      "ShutdownResult": "NOT_CONFIRMED",
+      "ActualTargetDllObserved": false,
+      "Cleanup": "Only identity-checked owned failed startup terminated; not clean-shutdown PASS",
+      "Protection": {
+        "FixtureBytesUnchanged": true,
+        "StartupSettingsUnchanged": true
+      }
+    },
+    {
+      "Attempt": "sw2025-inprocess-release",
+      "NativeVersion": "33.5",
+      "OwnedPid": 1272,
+      "ElapsedMs": 60025.737,
+      "RotSeen": true,
+      "ExitedAtDeadline": false,
+      "Result": "FAIL",
+      "Stage": "STARTUP before target DLL load",
+      "ShutdownResult": "NOT_CONFIRMED",
+      "ActualTargetDllObserved": false,
+      "Cleanup": "Only identity-checked owned failed startup terminated; not clean-shutdown PASS",
+      "Protection": {
+        "StartupSettingsUnchanged": true,
+        "FixtureBytesUnchanged": true
+      }
+    }
+  ],
+  "DefaultAssembly": {
+    "Result": "FAIL",
+    "Assertions": 56,
+    "Reason": "RPC_0x800706BE_IComponent2_GetParent_before_numeric_and_late_timer_test",
+    "ShutdownExitCode": -1
+  },
+  "EarlyFixtureCreation": {
+    "Result": "FAIL",
+    "Assertions": 1,
+    "Api": "NewDocument returned null",
+    "Shutdown": "PASS",
+    "RetainedAs": "Observed ledger; raw early output was overwritten by duplicate private orchestration replay"
+  },
+  "FailedConcurrentRelease33Series": {
+    "PASS": 25,
+    "FAIL": 8,
+    "IncludedInSuccessful33Tables": false,
+    "Cause": "Overlap with another COM automation was observed; same-PID causal proof not established"
+  },
+  "OldUiLauncherSelector": {
+    "Debug": "FAIL at 174 assertions",
+    "Release": "FAIL at 174 assertions",
+    "Fix": "Test accepts current Vietnamese button label; product command unchanged"
+  },
+  "StartupDumpAnalysis": "Inconclusive: debugger could not initialize captured manual dump; no native root-cause stack claimed",
+  "OwnedStartupProbe": "No usable state returned; diagnostic failure is not acceptance PASS"
+}

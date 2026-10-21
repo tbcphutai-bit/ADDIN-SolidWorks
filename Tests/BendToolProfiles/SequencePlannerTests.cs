@@ -230,6 +230,11 @@ internal static partial class ToolProfileTests
                 var result = coordinator.RunAsync(AssemblyRequest(partition, f.Library), new AssemblyBatchOptions()).Result;
                 var valid = result.Parts.Single(p => p.Reason == null); var invalid = result.Parts.Single(p => p.Reason != null);
                 var direct = planner.Run("S", f.Model, f.Library, f.Space);
+                if(valid.Quantity!=2||valid.Planning==null||!valid.Planning.CommonToolIds.SequenceEqual(direct.CommonToolIds))
+                    Console.WriteLine("SEQUENCE_BATCH_COMPARISON_DIAGNOSTIC "+Json.Serialize(new {
+                        valid.Quantity,Batch=valid.Planning==null?null:new {valid.Planning.StopReason,valid.Planning.ElapsedMilliseconds,valid.Planning.KernelQueries,
+                            Common=valid.Planning.CommonToolIds,Reasons=valid.Planning.Tools.SelectMany(t=>t.Reasons).Distinct().ToArray()},
+                        Direct=new {direct.StopReason,direct.ElapsedMilliseconds,direct.KernelQueries,Common=direct.CommonToolIds,Reasons=direct.Tools.SelectMany(t=>t.Reasons).Distinct().ToArray()}}));
                 Check(valid.Quantity == 2 && valid.Planning != null && valid.Planning.CommonToolIds.SequenceEqual(direct.CommonToolIds), "Eligible twins actually execute planner, independent Part agrees");
                 Check(valid.Planning.Tools.SelectMany(t => t.Sequences).Select(s => s.Status).SequenceEqual(direct.Tools.SelectMany(t => t.Sequences).Select(s => s.Status)), "Exact branch statuses agree");
                 Check(invalid.Quantity == 1 && invalid.Planning == null && invalid.ProcessCandidates.All(p => p.ProcessResult == CollisionStatus.UNKNOWN), "Mirrored sibling never inherits normal proof");

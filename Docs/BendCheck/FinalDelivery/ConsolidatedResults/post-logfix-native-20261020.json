@@ -1,0 +1,95 @@
+{
+  "schema": "check-chan-bounded-native-acceptance-v1",
+  "baseline": "68049e1e3ed420954bba7aa693ecba910fd6733b",
+  "pr": 37,
+  "date": "2026-10-20",
+  "result": "BLOCKED",
+  "heapCrashResolved": false,
+  "productionSourceChanged": false,
+  "numericQueries": 0,
+  "product": {
+    "configuration": "Release/x64",
+    "sha256": "ef78be68e8bc66294f1e794562ccf18ced48ebac4b55d6df1fda6aae04b80722",
+    "mvid": "4dff6174-11ad-4576-ae03-d6e10b0f22f6",
+    "observedInPids": [34396, 24660],
+    "solidworksVersion": "2024 SP5 / 32.5.0.48"
+  },
+  "execution": {
+    "ownedSessions": 2,
+    "xl02Runs": 1,
+    "remainingFourSessionsAfterPassedGate": 1,
+    "retriesAfterFatal": 0,
+    "full33Run": "NOT_RUN",
+    "assembly120x25Run": "NOT_RUN",
+    "newCadFixtures": 0,
+    "productionComDeployment": "NOT_VERIFIED",
+    "closeDuringActiveNativePump": "NOT_VERIFIED: trace shows running true with operation null at close",
+    "conditions": ["owned isolated process", "CommandInProgress", "session-only XToolPro unload", "in-process target lifecycle and existing command", "AcceptanceEventFile coordinated reader/writer"]
+  },
+  "tests": {
+    "productReleaseBuild": "PASS",
+    "nativeAndBridgeReleaseBuild": "PASS",
+    "debugThisRun": "NOT_RUN",
+    "priorXl02Gate": { "result": "PASS", "assertions": 7 },
+    "acceptanceEventFile": { "result": "PASS", "publications": 250, "completeReads": 250, "assertions": 254 }
+  },
+  "cases": [
+    {
+      "id": "XL-02", "functional": "PASS", "idleClose": "PASS", "runningClose": "PASS", "cancel": "PASS", "openClose": "PASS",
+      "disconnect": "PASS", "exitApp": "PASS", "processExit": 0, "pid": 34396, "assertions": 168,
+      "nativeFeatureIds": [53, 59], "min": ["MeetsMinimum", "MeetsMinimum"], "candidatesPerBend": 18,
+      "punch": "UNKNOWN", "holder": "UNKNOWN", "process": "UNKNOWN", "numericQueries": 0,
+      "coldMs": 1557.7296, "warmMs": 966.6638, "coldNativeCaptureMs": 295.0863, "warmCaptureHits": 0, "totalMs": 7654.9446
+    },
+    {
+      "id": "XL-17", "functional": "PASS", "runningClose": "PASS", "cancel": "PASS", "openClose": "PASS",
+      "sessionShutdown": "FAIL", "pid": 24660,
+      "completedCaseEvidence": "Exact PID dump: XL-17 result dictionary Execution/Cancel/CloseDuringRun/OpenClose PASS; current case XL-19 index 2 stage 0. Disk progress checkpoint predates case completion and is retained unchanged.",
+      "nativeFeatureIds": [53, 59], "min": ["MeetsMinimum", "MeetsMinimum"], "candidatesPerBend": 18,
+      "punch": "UNKNOWN", "holder": "UNKNOWN", "process": "UNKNOWN", "numericQueries": 0,
+      "coldMs": 1616.9621, "warmMs": 594.7414, "coldNativeCaptureMs": 299.8951, "warmCaptureHits": 1, "totalMs": 7111.6515
+    },
+    {
+      "id": "XL-19", "functional": "FAIL_NATIVE", "pid": 24660, "stage": "independent native audit before Check Chan window/Run", "checkMinNgExecution": "NOT_RUN", "sessionShutdown": "FAIL"
+    },
+    { "id": "XL-32", "functional": "NOT_RUN", "reason": "Stopped after fatal heap; no retry" },
+    { "id": "ASM-SMALL", "selected": "NOT_RUN", "entire": "NOT_RUN", "functional": "NOT_RUN", "reason": "Stopped after fatal heap; no retry" }
+  ],
+  "fatal": {
+    "pid": 24660,
+    "creationUtc": "2026-10-20T15:18:25.0858814Z",
+    "dumpTimeLocal": "2026-10-20T22:18:39+07:00",
+    "exception": "0xC0000374",
+    "exitCode": -1073740940,
+    "exactPidDumpCaptured": true,
+    "dumpUploaded": false,
+    "dumpBytes": 3982759335,
+    "dumpSha256": "9428349f6906dfa2669ea8426f5f8e6f78260e6f8bbab36f2d344cbe38ee0853",
+    "managedAssertionsAtDump": 167,
+    "lastDiskCheckpointAssertions": 160,
+    "detectionSource": "Tests/BendToolProfiles/NativeRepresentativeAcceptance.cs:76",
+    "detectionOperation": "cast face.GetFeature() result to Feature; JIT return offset IndependentBendIds+0x1bf",
+    "stack": ["ntdll!RtlFreeHeap", "ucrtbase!free_base", "sldappu!auCmdTarget_c destructor", "mfc140u!CCmdTarget::InternalRelease", "slduiu!auFacet_c::GetThisClass", "clr!SafeRelease", "clr!ComObject::SupportsInterface", "clr!ObjIsInstanceOf", "clr!JIT_ChkCastAny", "AcceptanceAddin.IndependentBendIds", "AcceptanceAddin.AuditRepresentativePart", "AcceptanceAddin.RepresentativeTick", "WinForms Timer on STA"],
+    "initialCorruptingOperation": "NOT_IDENTIFIED",
+    "rpcCleanup": "0x800706BE / 0x800706BA after server death; not root cause",
+    "oldPid73032Cause": "NOT_IDENTIFIED; do not substitute this different PID dump"
+  },
+  "registry": {
+    "scope": ["HKCU/Software/SolidWorks/AddInsStartup", "HKLM/Software/SolidWorks/Addins"],
+    "sessionsCompared": 2,
+    "keysPerSnapshot": 57,
+    "valuesPerSnapshot": 88,
+    "changedKeysOrValues": 0,
+    "beforeAndAfterSha256": "f7e4b4093f4a112a26ec2cc78fda154a32b84b74e641076b1386e1d141a18887",
+    "privateComRegistrationRemovedBothSessions": true,
+    "oldPid16928MismatchCause": "UNKNOWN: old snapshots unavailable; no speculative registry restore"
+  },
+  "protection": { "filesChecked": 15, "changed": 0, "cadOrExcelUploaded": false },
+  "readiness": {
+    "ordinaryNativeTrial": "BLOCKED",
+    "productionAcceptance": "BLOCKED",
+    "allFivePassed": false,
+    "holderEvidenceVerifiedThisRun": false,
+    "unknownPreserved": true
+  }
+}

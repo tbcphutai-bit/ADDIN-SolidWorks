@@ -15,7 +15,7 @@ internal static partial class NativeAssemblyBatchValidation
 {
     // --excel-matrix product.dll NEW-output part-template min-xlsx reviewed-sidecar
     // No generated CAD, section sidecars or private CSV/Excel is checked in.
-    private static int ExcelMatrixMain(string[] args)
+    private static int ExcelMatrixMain(string[] args,bool existing=false)
     {
         if(args.Length!=5&&args.Length!=6){Console.WriteLine("--excel-matrix dll NEW-output part-template min-xlsx reviewed-sidecar.json [comma-separated-case-ids]");return 2;}
         string output=Path.GetFullPath(args[1]);
@@ -26,6 +26,15 @@ internal static partial class NativeAssemblyBatchValidation
         {
             // Validate ALL sources/rows/interpretations before creating native CAD.
             var input=MatrixInput.Read(args[4]);
+            Dictionary<string,object> existingCases=null;
+            if(existing)
+            {
+                var baseline=Json.DeserializeObject(File.ReadAllText(args[2])) as Dictionary<string,object>;
+                Check(baseline!=null&&Convert.ToString(baseline["SidecarSha256"])==input.SidecarSha256,"Existing 33 fixtures belong to exact immutable source matrix");
+                existingCases=((object[])baseline["Cases"]).Cast<Dictionary<string,object>>().ToDictionary(r=>Convert.ToString(r["CaseId"]),r=>(object)r,StringComparer.Ordinal);
+                Check(existingCases.Count==33,"Reuse exact 33 Parts; no replacement fixture series");
+                report["FixtureMode"]="REUSE_EXISTING_33_READ_ONLY";
+            }
             var selected=input.Cases;
             if(args.Length==6)
             {
@@ -42,7 +51,7 @@ internal static partial class NativeAssemblyBatchValidation
             Check(Thread.CurrentThread.GetApartmentState()==ApartmentState.STA,"Native fixture generator/capture is STA");
             product=Assembly.LoadFrom(args[0]);
             Check(System.Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")=="1","Explicit company Master-pair mode required");
-            app=NativeTestProcess.StartOwned(output);app.Visible=false;app.UserControl=false;
+            app=NativeTestProcess.StartOwned(output);NativeTestProcess.KeepOwnedBackgroundSession(app);
             foreach(var item in selected)
             {
                 var row=new Dictionary<string,object> {{"CaseId",item.CaseId},{"CsvRecord",item.CsvRecord},{"Shape",item.Shape},
@@ -54,9 +63,16 @@ internal static partial class NativeAssemblyBatchValidation
                 try
                 {
                     input.CheckSourcesCurrent();var creation=Stopwatch.StartNew();string path=Path.Combine(output,item.CaseId+".SLDPRT");
-                    part=MatrixSheet(app,args[2],path,item);row["FixturePath"]=path;row["GenerationMilliseconds"]=creation.Elapsed.TotalMilliseconds;
+                    if(existing)
+                    {
+                        var previous=(Dictionary<string,object>)existingCases[item.CaseId];path=Convert.ToString(previous["FixturePath"]);
+                        int e=0,w=0;part=app.OpenDoc6(path,1,3,"",ref e,ref w) as ModelDoc2;
+                        Check(part!=null,"Read-only existing native fixture "+item.CaseId+" / "+e);
+                    }
+                    else part=MatrixSheet(app,args[2],path,item);
+                    row["FixturePath"]=path;row["GenerationMilliseconds"]=creation.Elapsed.TotalMilliseconds;
                     Activate(app,part);
-                    MatrixSettleGeneratedFixture(part);
+                    MatrixSettleGeneratedFixture(part,!existing);
                     var measured=MatrixNativeGeometry(part,item);
                     row["NativeGeometry"]=measured;
                     MatrixAuditGeometry(measured,item);
@@ -72,6 +88,17 @@ internal static partial class NativeAssemblyBatchValidation
                     controllerDisposable=(IDisposable)controller;
                     Call(form,"SetPartMode");form.Show();
                     var cold=MatrixRun(form,controller,item);CheckCompanyCadPairs(cold);UiCheckBindings(form,cold);CheckMinimumProjection(backend,cold);
+                    var review=UiControl(form,"bendToolEvidence");var holderGrid=(DataGridView)UiControl(form,"holderRoleEntities");
+                    var reviewDraft=Get(review,"Draft");Check(reviewDraft!=null&&(bool)Get(reviewDraft,"FixedPairMatched"),"Live Check Chấn source-bound review pane");
+                    Check(holderGrid.Rows.Count==Items(Get(Get(Get(reviewDraft,"Source"),"Holder"),"SourceEntities")).Length,"Live preview retains every Holder entity");
+                    var reviewProposal=Json.DeserializeObject(Convert.ToString(Get(review,"ProposalText"))) as Dictionary<string,object>;
+                    Check(reviewProposal!=null&&((object[])reviewProposal["Axial"]).Length==2,"Live unsigned axial templates preserve separate Punch/Holder");
+                    if(ReferenceEquals(item,selected[0]))
+                    {
+                        var tabs=(TabControl)UiControl(form,"checkChanDetailTabs");tabs.SelectedIndex=4;Application.DoEvents();
+                        using(var bitmap=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new System.Drawing.Rectangle(System.Drawing.Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"PRIVATE-native-holder-review.png"));}
+                        tabs.SelectedIndex=0;
+                    }
                     var coldPart=Items(Get(cold,"Parts")).Single();
                     var nativeIds=(int[])measured["FeatureIds"];
                     Check(Items(Get(coldPart,"BendMetadata")).Select(m=>(int)Get(m,"FeatureId")).OrderBy(id=>id).SequenceEqual(nativeIds),"Captured native FeatureIds equal independent cylindrical-face owners");
@@ -135,10 +162,18 @@ internal static partial class NativeAssemblyBatchValidation
     {
         UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));var snapshot=Get(controller,"displayed");
         Check(snapshot!=null&&(bool)Get(snapshot,"Current"),"Real UI run current: "+UiControl(form,"lblProgressTitle").Text);
-        var parts=Items(Get(snapshot,"Parts"));Check(parts.Length==1&&(int)Get(parts[0],"BendCount")==item.ExpectedBends,"Native bend count matches source interpretation");
+        var parts=Items(Get(snapshot,"Parts"));
+        if(parts.Length!=1||parts.Any(p=>(int)Get(p,"BendCount")!=item.ExpectedBends))
+        {
+            var backend=Get(controller,"backend");var session=Get(backend,"session");
+            Console.WriteLine("NATIVE_BEND_COUNT_DIAGNOSTIC "+Json.Serialize(new {item.CaseId,Expected=item.ExpectedBends,
+                Parts=parts.Select(p=>new {Bends=Get(p,"BendCount"),Reason=Get(p,"Reason")}),
+                Items=Items(Get(session,"Items")).Select(i=>new {Error=Get(i,"Error"),Rows=Items(Get(i,"Rows")).Length,Placement=Get(i,"PlacementDiagnosticError")})}));
+        }
+        Check(parts.Length==1&&(int)Get(parts[0],"BendCount")==item.ExpectedBends,"Native bend count matches source interpretation");
         return snapshot;
     }
-    private static void MatrixSettleGeneratedFixture(ModelDoc2 part)
+    private static void MatrixSettleGeneratedFixture(ModelDoc2 part,bool savePrepared=true)
     {
         // Creating a new sketch/material/configuration posts native rebuild
         // notifications. Finish fixture preparation BEFORE observing the live
@@ -150,7 +185,7 @@ internal static partial class NativeAssemblyBatchValidation
             if(next!=stamp||part.Extension.NeedsRebuild2!=0){stamp=next;stable.Restart();}
         }
         Check(stable.ElapsedMilliseconds>=250&&part.Extension.NeedsRebuild2==0,"New native fixture reaches a stable rebuilt revision before capture");
-        if(part.GetSaveFlag())Save(part);
+        if(savePrepared&&part.GetSaveFlag())Save(part);
     }
     private static object MatrixMetrics(object snapshot)=>new {Captures=Get(snapshot,"Captures"),CaptureHits=Get(snapshot,"CaptureHits"),
         CaptureMilliseconds=Get(snapshot,"CaptureMilliseconds"),KernelQueries=Get(snapshot,"KernelQueries"),PeakWorkers=Get(snapshot,"PeakWorkers"),

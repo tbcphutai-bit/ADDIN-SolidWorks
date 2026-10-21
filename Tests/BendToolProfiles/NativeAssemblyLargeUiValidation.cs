@@ -13,8 +13,14 @@ internal static partial class NativeAssemblyBatchValidation
         Activate(app,root);root.ClearSelection2(true);
         using(var owner=(Form)Activator.CreateInstance(product.GetType("ADDIN.UI.BendCheckForm",true),All,null,new object[]{app,root,null},null))
         {
-            owner.Show();UiControls(owner).OfType<Button>().Single(b=>b.Text=="Assembly Batch").PerformClick();
+            owner.Show();LegacyBatchButton(owner).PerformClick();
             var form=(Form)Get(owner,"batchForm");var controller=Get(owner,"batchController");
+            // Reproduce a late Shown/timer restart after the launcher stopped
+            // the legacy timer. Both existing scan entries must refuse COM.
+            var legacyTimer=(System.Windows.Forms.Timer)Get(owner,"timer");legacyTimer.Start();
+            Call(owner,"RequestScan");Call(owner,"Tick");
+            Check(!legacyTimer.Enabled&&!(bool)Get(owner,"capturing"),"Late legacy timer cannot take native capture ownership from Batch");
+            report["LegacyLateShownOwnershipGuard"]="PASS";
             foreach(string stage in new[]{"cold","warm"})
             {
                 UiClick(form,"btnRunBatch");UiSpin(()=>!(bool)Get(controller,"Running"));
@@ -27,7 +33,12 @@ internal static partial class NativeAssemblyBatchValidation
                 {form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(output,"PRIVATE-live-120-"+stage+".png"));}
                 Console.WriteLine("LIVE_UI_120 "+stage+" "+Json.Serialize(report["Ui120-"+stage]));
             }
-            form.Close();owner.Close();
+            form.Close();
+            Check(legacyTimer.Enabled,"Closing Batch resumes the original Min freshness timer");
+            Call(owner,"RequestScan");
+            Check(legacyTimer.Enabled&&(bool)Get(owner,"pendingStart"),"Original Min scan entry resumes after Batch closes");
+            report["LegacyMinResumesAfterBatch"]="PASS";
+            owner.Close();
         }
     }
 }

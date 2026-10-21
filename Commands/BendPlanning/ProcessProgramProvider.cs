@@ -16,6 +16,7 @@ namespace ADDIN.Commands.BendPlanning
         public string TrustedAuthoritiesPath { get; set; }
         public string AuthoritySha256 { get; set; }
         public List<ProcessProviderSource> Sources { get; set; }
+        public List<ProcessProviderSource> FinalStaticSources { get; set; }
     }
     internal sealed class ProcessProviderSource
     {
@@ -27,7 +28,7 @@ namespace ADDIN.Commands.BendPlanning
     }
     // Owns managed DTOs and immutable file observations only. The owning STA
     // periodically requests managed verification and a publication barrier.
-    internal sealed class ProcessProgramProvider : IDisposable
+    internal sealed partial class ProcessProgramProvider : IDisposable
     {
         private sealed class Entry
         {
@@ -118,7 +119,8 @@ namespace ADDIN.Commands.BendPlanning
             string configured;
             try {configured=configuration();configured=string.IsNullOrWhiteSpace(configured)?null:Path.GetFullPath(configured);}
             catch(Exception ex) when(ex is ArgumentException||ex is IOException||ex is UnauthorizedAccessException||ex is InvalidOperationException)
-            {foreach(var entry in snapshot)entry.Result.Invalidate();return;}
+            {foreach(var entry in snapshot)entry.Result.Invalidate();AuditFinalStatics(null,token);return;}
+            AuditFinalStatics(configured,token);
             foreach(var entry in snapshot)
             {token.ThrowIfCancellationRequested();if(entry.Result.Current&&(configured==null||
                 !string.Equals(configured,entry.ConfigurationPath,StringComparison.OrdinalIgnoreCase)||!FilesCurrent(entry.Files,token)))entry.Result.Invalidate();}
@@ -137,6 +139,7 @@ namespace ADDIN.Commands.BendPlanning
         public void Dispose()
         {
             lock(gate){if(disposed)return;disposed=true;lifetime.Cancel();foreach(var entry in entries)entry.Result.Invalidate();entries.Clear();
+                foreach(var entry in finalStatics)entry.Invalidate();finalStatics.Clear();
                 if(audit==null||audit.IsCompleted)lifetime.Dispose();else audit.ContinueWith(t=>{var ignored=t.Exception;lifetime.Dispose();},TaskScheduler.Default);}
         }
     }

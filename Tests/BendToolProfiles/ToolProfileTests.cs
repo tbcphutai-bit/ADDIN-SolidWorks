@@ -56,6 +56,12 @@ internal static partial class ToolProfileTests
     }
     private static int Main(string[] args)
     {
+        if(args.Length>0&&args[0]=="--final-review-company")return FinalReviewCompany(args);
+        if(args.Length>0&&args[0]=="--final-review-tests")
+        {
+            temporary=Path.Combine(Path.GetTempPath(),"ADDIN-FinalReview-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(temporary);
+            FinalEvidenceReviewTests();Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions");return failed==0?0:1;
+        }
         if (args.Length>0 && args[0]=="--cad-pair-inventory") return CadPairInventory(args);
         if (args.Length>0 && args[0]=="--cad-pairs-company") return CadPairCompany(args);
         if (args.Length>0 && args[0]=="--cad-pair-tests")
@@ -93,6 +99,7 @@ internal static partial class ToolProfileTests
         }
         if (args.Length>0 && args[0]=="--workbook-objects") return WorkbookObjectInventory(args);
         temporary=Path.Combine(Path.GetTempPath(),"ADDIN-ToolProfileTests-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temporary);
+        FinalEvidenceReviewTests();
         Test("LINE retains coordinates and INSBASE; no tip recentering",()=> {
             var doc=Parse(Dxf(Line(20,-5,30,-5),header:Tags(9,"$INSBASE",10,7,20,8,30,9)));
             var e=One(doc); Point(e.Curves[0].Start,20,-5); Point(e.Curves[0].End,30,-5); Near(doc.Source.InsBaseX,7,"INSBASE"); Near(doc.Source.InsBaseZ,9,"INSBASE Z"); Check(e.Handle=="L","Handle retained");
