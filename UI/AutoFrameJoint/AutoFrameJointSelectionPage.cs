@@ -68,6 +68,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool handlingAnalyze;
         private bool handlingShowBodies;
         private bool handlingCutPreview;
+        private bool cutPreviewQueued;
         private bool updatingReadyState;
         // A lightweight WinForms HWND schedules focus AFTER the native selection callback.
         // OnSelectionboxListChanged must never change SOLIDWORKS selection/focus inline.
@@ -83,6 +84,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private Component2 analyzedA;
         private Component2 analyzedB;
         private string lastAnalysisMessage;
+        private string lastPreviewMessage;
         private string[] lastGeometryLines;
 
         /// <summary>
@@ -136,6 +138,7 @@ namespace ADDIN.UI.AutoFrameJoint
 
             BuildControls();
             InitializeDeferredFocusWindow();
+            Trace.WriteLine("[AFJ-R49] PMP UI loaded: P1=107 P2=108, deferred preview enabled");
             shown = true;
             try
             {
@@ -375,6 +378,7 @@ namespace ADDIN.UI.AutoFrameJoint
             requestFocusB = false;
             requestAutoAnalysis = false;
             autoAnalysisQueued = false;
+            cutPreviewQueued = false;
             finishQueued = false;
             if (deferred == null) return;
             try { deferred.Dispose(); }
@@ -683,11 +687,13 @@ namespace ADDIN.UI.AutoFrameJoint
             analyzedA = null;
             analyzedB = null;
             lastAnalysisMessage = null;
+            lastPreviewMessage = null;
             lastGeometryLines = null;
         }
 
         private void StoreAnalysisResult(Component2 a, Component2 b, string message)
         {
+            lastPreviewMessage = null;
             analyzedA = a;
             analyzedB = b;
             if (String.IsNullOrEmpty(message))
@@ -773,8 +779,10 @@ namespace ADDIN.UI.AutoFrameJoint
                                                  !handlingShowBodies && !handlingCutPreview;
                 if (statusLabel != null)
                     statusLabel.Caption = ready &&
-                        !String.IsNullOrEmpty(lastAnalysisMessage)
-                        ? lastAnalysisMessage : reason;
+                        !String.IsNullOrEmpty(lastPreviewMessage)
+                        ? lastPreviewMessage :
+                        (ready && !String.IsNullOrEmpty(lastAnalysisMessage)
+                            ? lastAnalysisMessage : reason);
                 UpdateGeometryLabels();
             }
             catch (Exception ex)
@@ -914,13 +922,84 @@ namespace ADDIN.UI.AutoFrameJoint
         }
 
         /// <summary>
+        /// Post explicit PMP P1/P2 button work to the NEXT UI message.
+        /// Never run potentially expensive B-rep COM Boolean INSIDE
+        /// native SOLIDWORKS OnButtonPress. Same owner UI/STA thread.
+        /// Logging precedes EVERY UI or backend gate so we can distinguish
+        /// missing button callback, rejected selection, and Boolean errors.
+        /// </summary>
+        private void QueueCutCandidate(int candidate)
+        {
+            Trace.WriteLine("[AFJ-R49] QUEUE P" + candidate +
+                            " shown=" + shown + " closing=" + closing +
+                            " queued=" + cutPreviewQueued);
+            if (!shown || closing) return;
+            if (cutPreviewQueued || handlingCutPreview)
+            {
+                Trace.WriteLine("[AFJ-R49] QUEUE REJECT busy");
+                if (statusLabel != null)
+                    statusLabel.Caption = "Đang xử lý Preview trước. Vui lòng chờ.";
+                return;
+            }
+            if (deferredFocusWindow == null ||
+                !deferredFocusWindow.IsHandleCreated)
+            {
+                Trace.WriteLine("[AFJ-R49] QUEUE REJECT dispatcher unavailable");
+                lastPreviewMessage = "Không có UI dispatcher để chạy Preview. Xem Output.";
+                if (statusLabel != null) statusLabel.Caption = lastPreviewMessage;
+                return;
+            }
+
+            cutPreviewQueued = true;
+            lastPreviewMessage = "Đã nhận P" + candidate +
+                                 " — đang chờ SOLIDWORKS xử lý Preview...";
+            if (statusLabel != null)
+                statusLabel.Caption = lastPreviewMessage;
+            try
+            {
+                deferredFocusWindow.BeginInvoke(
+                    (System.Windows.Forms.MethodInvoker)delegate
+                    {
+                        cutPreviewQueued = false;
+                        Trace.WriteLine("[AFJ-R49] DISPATCH P" + candidate +
+                                        " shown=" + shown + " closing=" + closing);
+                        if (!shown || closing) return;
+                        try
+                        {
+                            PerformCutCandidate(candidate);
+                        }
+                        catch (Exception ex)
+                        {
+                            Trace.WriteLine("[AFJ-R49] DISPATCH EXCEPTION " + ex);
+                            lastPreviewMessage = "Không thực hiện được Preview: " +
+                                                 ex.Message;
+                            if (statusLabel != null)
+                                statusLabel.Caption = lastPreviewMessage;
+                        }
+                    });
+            }
+            catch (Exception ex)
+            {
+                cutPreviewQueued = false;
+                Trace.WriteLine("[AFJ-R49] QUEUE EXCEPTION " + ex);
+                lastPreviewMessage = "Không lên lịch được Preview: " + ex.Message;
+                if (statusLabel != null)
+                    statusLabel.Caption = lastPreviewMessage;
+            }
+        }
+
+        /// <summary>
         /// Explicit P1/P2 temporary candidate on actual 3D B-rep.
         /// Does NOT imply production-approved Web/Wall/Lip trim.
         /// </summary>
         private void PerformCutCandidate(int candidate)
         {
+            Trace.WriteLine("[AFJ-R49] PERFORM ENTER P" + candidate);
             if (closing || handlingAnalyze || handlingShowBodies || handlingCutPreview)
+            {
+                Trace.WriteLine("[AFJ-R49] PERFORM REJECT busy/closing");
                 return;
+            }
             Component2 a = null, b = null;
             string reason;
             handlingCutPreview = true;
@@ -928,28 +1007,34 @@ namespace ADDIN.UI.AutoFrameJoint
             {
                 if (!TryReadSelection(out a, out b, out reason, true))
                 {
+                    Trace.WriteLine("[AFJ-R49] PERFORM REJECT selection: " + reason);
+                    lastPreviewMessage = reason;
                     if (statusLabel != null) statusLabel.Caption = reason;
                     return;
                 }
+                Trace.WriteLine("[AFJ-R49] PERFORM selection valid P" + candidate);
                 if (onPreviewCut == null)
                 {
                     if (statusLabel != null)
                         statusLabel.Caption = "Chưa nối backend preview.";
+                    Trace.WriteLine("[AFJ-R49] PERFORM REJECT callback null");
                     return;
                 }
                 if (statusLabel != null)
                     statusLabel.Caption = "Đang tạo Boolean B-rep tạm cho hai Frame...";
+                Trace.WriteLine("[AFJ-R49] BACKEND CALL P" + candidate);
                 string result = onPreviewCut(a, b, candidate);
-                if (statusLabel != null)
-                    statusLabel.Caption = String.IsNullOrWhiteSpace(result)
-                        ? "Không nhận được kết quả preview." : result;
+                Trace.WriteLine("[AFJ-R49] BACKEND RETURN P" + candidate + " " + result);
+                lastPreviewMessage = String.IsNullOrWhiteSpace(result)
+                    ? "Không nhận được kết quả preview." : result;
+                if (statusLabel != null) statusLabel.Caption = lastPreviewMessage;
                 Trace.WriteLine("[AFJ-PMP] CUT P" + candidate + " " + result);
             }
             catch (Exception ex)
             {
                 Trace.WriteLine("[AFJ-PMP] Cut preview error: " + ex);
-                if (statusLabel != null)
-                    statusLabel.Caption = "Lỗi xem trước vết cắt — xem Output.";
+                lastPreviewMessage = "Lỗi Preview: " + ex.Message;
+                if (statusLabel != null) statusLabel.Caption = lastPreviewMessage;
             }
             finally
             {
@@ -959,6 +1044,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 if (showBodiesButtonControl != null) showBodiesButtonControl.Enabled = !closing;
                 if (cutP1ButtonControl != null) cutP1ButtonControl.Enabled = !closing;
                 if (cutP2ButtonControl != null) cutP2ButtonControl.Enabled = !closing;
+                Trace.WriteLine("[AFJ-R49] PERFORM EXIT P" + candidate);
             }
         }
 
@@ -1030,6 +1116,8 @@ namespace ADDIN.UI.AutoFrameJoint
         public void OnOptionCheck(int id) { }
         public void OnButtonPress(int id)
         {
+            Trace.WriteLine("[AFJ-R49] OnButtonPress id=" + id +
+                            " shown=" + shown + " closing=" + closing);
             if (id == ButtonAnalyze)
                 PerformAnalyze();
             else if (id == ButtonShowBodies)
@@ -1037,9 +1125,9 @@ namespace ADDIN.UI.AutoFrameJoint
             else if (id == ButtonFinish)
                 QueueFinishPage();
             else if (id == ButtonCutP1)
-                PerformCutCandidate(1);
+                QueueCutCandidate(1);
             else if (id == ButtonCutP2)
-                PerformCutCandidate(2);
+                QueueCutCandidate(2);
         }
         public void OnTextboxChanged(int id, string value) { }
         public void OnNumberboxChanged(int id, double value) { }
