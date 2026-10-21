@@ -1,0 +1,450 @@
+{
+  "report_status": "INCOMPLETE_NATIVE_FEATURE_EXTRACTION",
+  "evidence_levels": {
+    "API_VERIFIED": 0,
+    "GEOMETRY_VERIFIED_CUT_FEATURES": 0,
+    "INFERRED_CASE_ACTIONS": 0
+  },
+  "summary": "No actual Cut Feature was read from FeatureManager. 7 handoff Part files were attempted read-only via API and OpenDoc6 returned null; 8 additional 3615a Part files were inventoried but not opened via API. All per-feature details are NOT_AVAILABLE.",
+  "features": [],
+  "part_inventory": [
+    {
+      "dataset": "HANDOFF_ZIP",
+      "part_file": "4114-04-HN-C07-12_New.SLDPRT",
+      "source_reference": "HANDOFF_ZIP::4114-04-HN-C07-12_New.SLDPRT",
+      "sha256": "126a7a288bab23a18389157ca4da405b1163ec5e10c8f7b12106d4bfef3006e2",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_OPEN_RETURNED_NULL",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "HANDOFF_ZIP",
+      "part_file": "1618-04-bh-A6-1.SLDPRT",
+      "source_reference": "HANDOFF_ZIP::1618-04-bh-A6-1.SLDPRT",
+      "sha256": "93eb041958540e6d3d98054f252d2782b7e6333e5b5456447633b15d02c5e528",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_OPEN_RETURNED_NULL",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "HANDOFF_ZIP",
+      "part_file": "1618-04-bh-A6-fr1.SLDPRT",
+      "source_reference": "HANDOFF_ZIP::1618-04-bh-A6-fr1.SLDPRT",
+      "sha256": "2bd2094b6e5a76b9da194516269d29b86a96a1ad57b7745e03327b40d5da2133",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_OPEN_RETURNED_NULL",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "HANDOFF_ZIP",
+      "part_file": "1618-04-bh-A6-fr2.SLDPRT",
+      "source_reference": "HANDOFF_ZIP::1618-04-bh-A6-fr2.SLDPRT",
+      "sha256": "4103cb31b9dd7a32863020e7405fc676f788d9e71b14f786021ec07962e31e17",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_OPEN_RETURNED_NULL",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "HANDOFF_ZIP",
+      "part_file": "1618-04-bh-A6-fr3.SLDPRT",
+      "source_reference": "HANDOFF_ZIP::1618-04-bh-A6-fr3.SLDPRT",
+      "sha256": "462e585d0ae539305ce33d49718d24776e5b354f521ac04585377637eae66b8c",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_OPEN_RETURNED_NULL",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "HANDOFF_ZIP",
+      "part_file": "1618-04-bh-A6-fr4.SLDPRT",
+      "source_reference": "HANDOFF_ZIP::1618-04-bh-A6-fr4.SLDPRT",
+      "sha256": "fe61216b8caa96f6f5169d34e72c2fcc4244750ed5fca21be8c98e6ef681b070",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_OPEN_RETURNED_NULL",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "HANDOFF_ZIP",
+      "part_file": "1618-04-bh-A6-中骨1.SLDPRT",
+      "source_reference": "HANDOFF_ZIP::1618-04-bh-A6-中骨1.SLDPRT",
+      "sha256": "375ecfa994c9a6447ef4bf77f973021eeeab250570b3e9989d638e9c8d5d8dfe",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_OPEN_RETURNED_NULL",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "LOCAL_RELATED_CAD",
+      "part_file": "3615-04-bh-T1-1.SLDPRT",
+      "source_reference": "LOCAL_RELATED_CAD_ARCHIVE::3615-04-bh-T1-1.SLDPRT",
+      "sha256": "917ff98ffa3b4f46cd96d4d83993bec35c95025ffd12c01603238646b44d6cac",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_NOT_READ",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "LOCAL_RELATED_CAD",
+      "part_file": "3615-04-bh-T1-fr1.SLDPRT",
+      "source_reference": "LOCAL_RELATED_CAD_ARCHIVE::3615-04-bh-T1-fr1.SLDPRT",
+      "sha256": "5cfbc53f38748af670094e8964d090daa4a5ea2f0bbb88ba5394ce63ada6926c",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_NOT_READ",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "LOCAL_RELATED_CAD",
+      "part_file": "3615-04-bh-T1-fr2.SLDPRT",
+      "source_reference": "LOCAL_RELATED_CAD_ARCHIVE::3615-04-bh-T1-fr2.SLDPRT",
+      "sha256": "faa80073631ca9b3ef1879e24fe4c4664156d82b45d5a600e60f33fbfe143208",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_NOT_READ",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "LOCAL_RELATED_CAD",
+      "part_file": "3615-04-bh-T1-fr3.SLDPRT",
+      "source_reference": "LOCAL_RELATED_CAD_ARCHIVE::3615-04-bh-T1-fr3.SLDPRT",
+      "sha256": "1799d1e2cb5c67eff3569863ab32b1a45a7daf49cf74d6956685fa66bddd5ec1",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_NOT_READ",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "LOCAL_RELATED_CAD",
+      "part_file": "3615-04-bh-T1-fr4.SLDPRT",
+      "source_reference": "LOCAL_RELATED_CAD_ARCHIVE::3615-04-bh-T1-fr4.SLDPRT",
+      "sha256": "f8be37cb822c1e2d2e120ec08b9341407c1c8d25cf9def69eadbe2e2529b21d8",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_NOT_READ",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "LOCAL_RELATED_CAD",
+      "part_file": "3615-04-bh-T2-1.SLDPRT",
+      "source_reference": "LOCAL_RELATED_CAD_ARCHIVE::3615-04-bh-T2-1.SLDPRT",
+      "sha256": "3acaa0b157c8f336ec4ba23ba7805b285a8cc4292987c30d07029b508882a047",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_NOT_READ",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "LOCAL_RELATED_CAD",
+      "part_file": "3615-04-bh-T2-fr1.SLDPRT",
+      "source_reference": "LOCAL_RELATED_CAD_ARCHIVE::3615-04-bh-T2-fr1.SLDPRT",
+      "sha256": "79f91b1ed43b99a9b93ba7ae2327115e4eac927a39e9f3d12342a37d37310a82",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_NOT_READ",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    },
+    {
+      "dataset": "LOCAL_RELATED_CAD",
+      "part_file": "3615-04-bh-T2-fr2.SLDPRT",
+      "source_reference": "LOCAL_RELATED_CAD_ARCHIVE::3615-04-bh-T2-fr2.SLDPRT",
+      "sha256": "dc326ff6e051a79c70a27b295f1da957fa705c232045fc9c4fc66b146d943465",
+      "configuration": "NOT_AVAILABLE",
+      "feature_count": "NOT_AVAILABLE",
+      "feature_cut_count": "NOT_AVAILABLE",
+      "api_status": "API_NOT_READ",
+      "evidence_level": "UNVERIFIED",
+      "notes": "No FeatureManager tree or ModelDoc2 was obtained; no cut feature data fabricated."
+    }
+  ],
+  "case_actions": [
+    {
+      "case_id": "1618a-A6",
+      "frame_pair": "fr1 × fr2",
+      "region": "Web",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] lower-left projection; figure colors show frame profiles but not feature operations"
+    },
+    {
+      "case_id": "1618a-A6",
+      "frame_pair": "fr1 × fr2",
+      "region": "Wall",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] lower-left projection; figure colors show frame profiles but not feature operations"
+    },
+    {
+      "case_id": "1618a-A6",
+      "frame_pair": "fr1 × fr2",
+      "region": "Lip",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] lower-left projection; figure colors show frame profiles but not feature operations"
+    },
+    {
+      "case_id": "1618a-A6",
+      "frame_pair": "fr1 × fr2",
+      "region": "Bend R",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] lower-left projection; figure colors show frame profiles but not feature operations"
+    },
+    {
+      "case_id": "1618a-A6",
+      "frame_pair": "fr3 × fr4",
+      "region": "Web",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] upper-right projection; diagonal/straight bounds are shown but no feature history"
+    },
+    {
+      "case_id": "1618a-A6",
+      "frame_pair": "fr3 × fr4",
+      "region": "Wall",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] upper-right projection; diagonal/straight bounds are shown but no feature history"
+    },
+    {
+      "case_id": "1618a-A6",
+      "frame_pair": "fr3 × fr4",
+      "region": "Lip",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] upper-right projection; diagonal/straight bounds are shown but no feature history"
+    },
+    {
+      "case_id": "1618a-A6",
+      "frame_pair": "fr3 × fr4",
+      "region": "Bend R",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] upper-right projection; diagonal/straight bounds are shown but no feature history"
+    },
+    {
+      "case_id": "3615a-T1",
+      "frame_pair": "T1 corner candidates",
+      "region": "Web",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] comparison chart includes 4/18/34 mm sections; map from image to assembly occurrence not proven"
+    },
+    {
+      "case_id": "3615a-T1",
+      "frame_pair": "T1 corner candidates",
+      "region": "Wall",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] comparison chart includes 4/18/34 mm sections; map from image to assembly occurrence not proven"
+    },
+    {
+      "case_id": "3615a-T1",
+      "frame_pair": "T1 corner candidates",
+      "region": "Lip",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] comparison chart includes 4/18/34 mm sections; map from image to assembly occurrence not proven"
+    },
+    {
+      "case_id": "3615a-T1",
+      "frame_pair": "T1 corner candidates",
+      "region": "Bend R",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] comparison chart includes 4/18/34 mm sections; map from image to assembly occurrence not proven"
+    },
+    {
+      "case_id": "3615a-T2",
+      "frame_pair": "T2 corner candidates",
+      "region": "Web",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] comparison chart includes 4/18/34 mm sections; map from image to assembly occurrence not proven"
+    },
+    {
+      "case_id": "3615a-T2",
+      "frame_pair": "T2 corner candidates",
+      "region": "Wall",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] comparison chart includes 4/18/34 mm sections; map from image to assembly occurrence not proven"
+    },
+    {
+      "case_id": "3615a-T2",
+      "frame_pair": "T2 corner candidates",
+      "region": "Lip",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] comparison chart includes 4/18/34 mm sections; map from image to assembly occurrence not proven"
+    },
+    {
+      "case_id": "3615a-T2",
+      "frame_pair": "T2 corner candidates",
+      "region": "Bend R",
+      "frame_a_action": "NOT_AVAILABLE",
+      "frame_b_action": "NOT_AVAILABLE",
+      "evidence_level": "UNVERIFIED",
+      "evidence": "[REFERENCE_IMAGE] comparison chart includes 4/18/34 mm sections; map from image to assembly occurrence not proven"
+    }
+  ],
+  "step_structure": [
+    {
+      "path": "HANDOFF_ZIP::1618-02-bh-A6.STEP",
+      "schema": "AUTOMOTIVE_DESIGN",
+      "MANIFOLD_SOLID_BREP": "6",
+      "PRODUCT": "7",
+      "PRODUCT_DEFINITION": "7",
+      "NEXT_ASSEMBLY_USAGE_OCCURRENCE": "6",
+      "ADVANCED_FACE": "553",
+      "EDGE_CURVE": "1311",
+      "geometry_engine": "NOT_RUN",
+      "note": "Text-structure scan only; counts do not establish feature history or assembly transforms."
+    },
+    {
+      "path": "LOCAL_RELATED_CAD_ARCHIVE::3615-02-bh-T1.STEP",
+      "schema": "AUTOMOTIVE_DESIGN",
+      "MANIFOLD_SOLID_BREP": "5",
+      "PRODUCT": "6",
+      "PRODUCT_DEFINITION": "6",
+      "NEXT_ASSEMBLY_USAGE_OCCURRENCE": "5",
+      "ADVANCED_FACE": "233",
+      "EDGE_CURVE": "587",
+      "geometry_engine": "NOT_RUN",
+      "note": "Text-structure scan only; counts do not establish feature history or assembly transforms."
+    },
+    {
+      "path": "LOCAL_RELATED_CAD_ARCHIVE::3615-02-bh-T2.STEP",
+      "schema": "AUTOMOTIVE_DESIGN",
+      "MANIFOLD_SOLID_BREP": "3",
+      "PRODUCT": "4",
+      "PRODUCT_DEFINITION": "4",
+      "NEXT_ASSEMBLY_USAGE_OCCURRENCE": "5",
+      "ADVANCED_FACE": "115",
+      "EDGE_CURVE": "285",
+      "geometry_engine": "NOT_RUN",
+      "note": "Text-structure scan only; counts do not establish feature history or assembly transforms."
+    }
+  ],
+  "provided_1618a_step_solid_inventory": [
+    {
+      "SolidIndex": "1",
+      "Volume_mm3": "12388528.372",
+      "BBox_X_mm": "3592.5",
+      "BBox_Y_mm": "18.1",
+      "BBox_Z_mm": "1147.5",
+      "Center_X_mm": "1796.25",
+      "Center_Y_mm": "1.515",
+      "Center_Z_mm": "-573.734",
+      "Valid_BRep": "True"
+    },
+    {
+      "SolidIndex": "2",
+      "Volume_mm3": "841441.673",
+      "BBox_X_mm": "3586.3",
+      "BBox_Y_mm": "17.633",
+      "BBox_Z_mm": "95.667",
+      "Center_X_mm": "1796.424",
+      "Center_Y_mm": "8.029",
+      "Center_Z_mm": "-1085.845",
+      "Valid_BRep": "True"
+    },
+    {
+      "SolidIndex": "3",
+      "Volume_mm3": "189468.111",
+      "BBox_X_mm": "65.0",
+      "BBox_Y_mm": "17.0",
+      "BBox_Z_mm": "1130.833",
+      "Center_X_mm": "33.815",
+      "Center_Y_mm": "6.191",
+      "Center_Z_mm": "-563.861",
+      "Valid_BRep": "True"
+    },
+    {
+      "SolidIndex": "4",
+      "Volume_mm3": "1170179.378",
+      "BBox_X_mm": "3600.4",
+      "BBox_Y_mm": "28.6",
+      "BBox_Z_mm": "90.0",
+      "Center_X_mm": "1800.718",
+      "Center_Y_mm": "15.381",
+      "Center_Z_mm": "-20.882",
+      "Valid_BRep": "True"
+    },
+    {
+      "SolidIndex": "5",
+      "Volume_mm3": "224057.615",
+      "BBox_X_mm": "77.0",
+      "BBox_Y_mm": "17.0",
+      "BBox_Z_mm": "1131.467",
+      "Center_X_mm": "3564.432",
+      "Center_Y_mm": "8.126",
+      "Center_Z_mm": "-565.552",
+      "Valid_BRep": "True"
+    },
+    {
+      "SolidIndex": "6",
+      "Volume_mm3": "884097.488",
+      "BBox_X_mm": "3450.5",
+      "BBox_Y_mm": "27.0",
+      "BBox_Z_mm": "80.0",
+      "Center_X_mm": "1796.25",
+      "Center_Y_mm": "16.89",
+      "Center_Z_mm": "-559.25",
+      "Valid_BRep": "True"
+    }
+  ],
+  "api_attempt_summary": {
+    "unprivileged_com_activation": "E_ACCESSDENIED (80070005)",
+    "read_only_open_doc6": "returned null for all 7 handoff Parts; error and warning out values 0/0",
+    "version_specific_com": "TYPE_E_ELEMENTNOTFOUND",
+    "source_changes": "No source Part/Assembly save, SaveAs, suppress, rebuild, or feature edit."
+  }
+}
