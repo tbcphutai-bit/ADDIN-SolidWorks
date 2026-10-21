@@ -62,6 +62,7 @@ namespace ADDIN.UI
                     if (batchForm != null && !batchForm.IsDisposed) { batchForm.Activate(); return; }
                     if (capturing) return;
                     batchForm = new BendAssemblyBatchForm(model.GetTitle(), model.ConfigurationManager?.ActiveConfiguration?.Name);
+                    batchForm.UxV4SetSolidWorksApp(app); // UI-only read-only saved-Part thumbnails
                     batchController = new BendAssemblyBatchController(batchForm, new BendAssemblyBatchLiveBackend(app, model));
                     // Both windows use the same SOLIDWORKS STA. Pause the Min
                     // timer while Batch owns native capture; resume its normal

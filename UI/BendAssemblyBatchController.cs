@@ -60,6 +60,14 @@ namespace ADDIN.UI
         {
             if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA) throw new InvalidOperationException("Batch UI requires STA");
             this.form = form; this.backend = backend;
+            // One path for BOTH the main TaskPane command and legacy launcher.
+            // No COM work here; only install borrowed host and read-only resolver.
+            var livePreviewBackend = backend as BendAssemblyBatchLiveBackend;
+            if (livePreviewBackend != null)
+            {
+                form.UxV4SetSolidWorksApp(livePreviewBackend.UxV4PreviewApp);
+                form.UxV4SetSavedPartPathResolver(livePreviewBackend.UxV4ResolveSavedPartPath);
+            }
             // SOLIDWORKS/COM message pumping may replace the ambient context.
             // Keep our own STA handle instead of trusting await's context.
             var handle = dispatcher.Handle;

@@ -98,6 +98,7 @@ namespace ADDIN.UI
             Disposed += (s, e) => { bendActiveFont?.Dispose(); bendNormalFont?.Dispose(); };
             AddPlanningNavigation();
             WireInternalEvents();
+            InstallUxV4(); // new UI shell, reuses original controllers and controls
             toolTips.SetToolTip(lblHeaderSub, lblHeaderSub.Text);
             ClearLive("Chọn phạm vi rồi bấm Bắt đầu kiểm tra.");
         }
@@ -328,7 +329,8 @@ namespace ADDIN.UI
             if (pnlRoot != null && pnlRoot.RowStyles.Count >= 5)
             {
                 pnlRoot.RowStyles[0].Height = TaiTheme.Px(this, 52);
-                pnlRoot.RowStyles[2].Height = TaiTheme.Px(this, 126);
+                // V4 removed the overview panel. Keep its row at zero on resize/DPI.
+                pnlRoot.RowStyles[2].Height = uxV4Tabs == null ? TaiTheme.Px(this, 126) : 0;
                 pnlRoot.RowStyles[4].Height = TaiTheme.Px(this, 46);
             }
 
@@ -530,12 +532,15 @@ namespace ADDIN.UI
             {
                 lblProgressTitle.Text = "Đang kiểm tra chấn hàng loạt...";
             }
+            UxV4SyncRunning(running);
+            if (running) UxV4SyncStatus(lblProgressTitle.Text);
         }
 
         internal void SetRunMessage(string message, bool cancelling = false)
         {
             lblProgressTitle.Text = message;
             if (cancelling) btnCancel.Enabled = false;
+            UxV4SyncStatus(message);
         }
 
         internal void ClearLive(string message)
@@ -655,6 +660,7 @@ namespace ADDIN.UI
             if (progress.PlanningToolId != null) lblProgressTitle.Text = $"Thử thứ tự · {progress.PlanningToolId} · {progress.PlanningNodes} bước tìm · {progress.PlanningQueries} lượt tính · {done}/{total} chi tiết · {elapsedSeconds:0.0}s";
             lblProgressPercent.Text = $"{percent}%";
             pnlProgressBar.Invalidate();
+            UxV4SyncStatus(lblProgressTitle.Text);
         }
 
         /// <summary>
@@ -765,6 +771,7 @@ namespace ADDIN.UI
             if (previousIndex >= 0) partPage = previousIndex / PartsPerPage;
 
             PopulatePartsGrid();
+            UxV4RefreshParts();
         }
 
         private void PopulatePartsGrid()
@@ -912,6 +919,7 @@ namespace ADDIN.UI
 
             if (!isMockupMode) BendLocateRequested?.Invoke(this, Tuple.Create(selectedPart.SelectionKey, bend.FeatureId));
             PopulateToolsGrid(bend);
+            UxV4RefreshSelection();
         }
 
         private void PopulateToolsGrid(BatchBendViewModel bend)
@@ -1015,6 +1023,7 @@ namespace ADDIN.UI
             toolTips.SetToolTip(lblCalloutHolder, "Đầu kẹp chày: "+tool.HolderStatusDisplay+" · Khoảng hở: "+BendCheckDisplayText.Clearance(tool.HolderClearanceMm)+"\n"+Explain(tool.HolderReason)+"\nChi tiết kỹ thuật: "+tool.HolderReason+
                 (technicalDetails&&tool.HolderWitness!=null?"\nVị trí bằng chứng va chạm: "+tool.HolderWitness.PointMm:""));
             toolTips.SetToolTip(lblCalloutReason, $"Lý do / Bằng chứng:\n{tool.CombinedReason}");
+            UxV4RefreshToolStatus();
         }
 
         private void ClearDetailSection()
