@@ -50,6 +50,10 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool handlingAnalyze;
         private bool handlingShowBodies;
         private bool updatingReadyState;
+        // A lightweight WinForms HWND schedules focus AFTER the native selection callback.
+        // OnSelectionboxListChanged must never change SOLIDWORKS selection/focus inline.
+        private System.Windows.Forms.Control deferredFocusWindow;
+        private bool focusBQueued;
 
         // Keep analysis output while the same two component occurrences remain
         // selected. Do not use Name2 as an occurrence identity.
@@ -104,6 +108,7 @@ namespace ADDIN.UI.AutoFrameJoint
                     "Không tạo được PropertyManager Page. Mã lỗi: " + error);
 
             BuildControls();
+            InitializeDeferredFocusWindow();
             shown = true;
             try
             {
@@ -114,7 +119,93 @@ namespace ADDIN.UI.AutoFrameJoint
             catch
             {
                 shown = false;
+                DisposeDeferredFocusWindow();
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Creates a handle on the CURRENT SOLIDWORKS UI thread, so BeginInvoke
+        /// runs later on the same UI thread after SOLIDWORKS has finished the
+        /// in-progress selection callback. If handle setup fails, manual selection
+        /// remains fully usable.
+        /// </summary>
+        private void InitializeDeferredFocusWindow()
+        {
+            System.Windows.Forms.Control dispatcher = null;
+            try
+            {
+                dispatcher = new System.Windows.Forms.Control();
+                IntPtr handle = dispatcher.Handle;
+                deferredFocusWindow = dispatcher;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-SEL] Deferred focus unavailable: " + ex);
+                if (dispatcher != null) dispatcher.Dispose();
+                deferredFocusWindow = null;
+            }
+        }
+
+        /// <summary>
+        /// Do not move focus from inside OnSelectionboxListChanged:
+        /// it is an in-progress SOLIDWORKS selection callback.
+        /// Schedule on the SAME STA UI message loop; no Task, Timer, ThreadPool,
+        /// document activation or changes to the global selection list.
+        /// </summary>
+        private void QueueFocusB()
+        {
+            if (!shown || closing || focusBQueued || deferredFocusWindow == null)
+                return;
+
+            focusBQueued = true;
+            try
+            {
+                deferredFocusWindow.BeginInvoke(
+                    (System.Windows.Forms.MethodInvoker)delegate
+                    {
+                        focusBQueued = false;
+                        if (!shown || closing || selectionB == null ||
+                            !IsSameDocumentActive())
+                            return;
+
+                        try
+                        {
+                            // User may have clicked elsewhere before the deferred
+                            // handler runs. Only advance when A is selected and B
+                            // is not selected. Never clear/reselect a component.
+                            if (selectionA != null &&
+                                selectionA.GetSelectionFocus() &&
+                                Selected(MarkFrameA) != null &&
+                                Selected(MarkFrameB) == null)
+                            {
+                                selectionB.SetSelectionFocus();
+                                Trace.WriteLine("[AFJ-SEL] Advanced focus A -> B");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Trace.WriteLine("[AFJ-SEL] Focus advance failed: " + ex);
+                        }
+                    });
+            }
+            catch (Exception ex)
+            {
+                focusBQueued = false;
+                Trace.WriteLine("[AFJ-SEL] Cannot schedule focus: " + ex);
+            }
+        }
+
+        private void DisposeDeferredFocusWindow()
+        {
+            System.Windows.Forms.Control deferred = deferredFocusWindow;
+            deferredFocusWindow = null;
+            focusBQueued = false;
+            if (deferred == null) return;
+            try { deferred.Dispose(); }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-SEL] Deferred focus dispose: " + ex);
             }
         }
 
@@ -265,7 +356,9 @@ namespace ADDIN.UI.AutoFrameJoint
             b = Selected(MarkFrameB);
             if (a == null || b == null)
             {
-                reason = "Chọn đủ Frame A và Frame B.";
+                reason = a == null
+                    ? "Bước 1: Chọn Frame A trong Assembly."
+                    : "Đã chọn Frame A — tiếp tục chọn Frame B.";
                 return false;
             }
 
@@ -505,6 +598,9 @@ namespace ADDIN.UI.AutoFrameJoint
             closing = true;
             shown = false;
             ClearAnalysisResult();
+            // Cancel queued UI work before releasing native PMP controls.
+            DisposeDeferredFocusWindow();
+
             page = null;
             selectionA = null;
             selectionB = null;
@@ -556,13 +652,25 @@ namespace ADDIN.UI.AutoFrameJoint
         public void OnComboboxEditChanged(int id, string value) { }
         public void OnComboboxSelectionChanged(int id, int item) { }
         public void OnListboxSelectionChanged(int id, int item) { }
-        public void OnSelectionboxFocusChanged(int id) { }
+        public void OnSelectionboxFocusChanged(int id)
+        {
+            if (id == BoxFrameA || id == BoxFrameB)
+                Trace.WriteLine("[AFJ-SEL] Focus box=" + id);
+        }
+
         public void OnSelectionboxListChanged(int id, int count)
         {
-            // Allowed: query state and update PMP controls ONLY.
-            // No ClearSelection2, Select4, boolean operation or Display3 here.
-            if (id == BoxFrameA || id == BoxFrameB)
-                UpdateReadyState();
+            if (id != BoxFrameA && id != BoxFrameB) return;
+
+            // Called DURING native SOLIDWORKS selection processing. Only
+            // query state / update PMP messages here. No SetSelectionFocus,
+            // ClearSelection2, Select4, Display3 or model geometry calls.
+            Trace.WriteLine("[AFJ-SEL] List box=" + id + " count=" + count);
+            UpdateReadyState();
+
+            // A -> B on the UI message loop AFTER the current callback returns.
+            if (id == BoxFrameA && count == 1)
+                QueueFocusB();
         }
         public void OnSelectionboxCalloutCreated(int id) { }
         public void OnSelectionboxCalloutDestroyed(int id) { }
