@@ -16,3 +16,7 @@ See the eight numbered reports and the CSV/JSON inventory in this folder.
 ## Public-data boundary
 
 No SLDPRT, SLDASM, STEP, source ZIP, machine-specific absolute path, or unapproved source image is included. Missing data is marked `NOT_AVAILABLE` or `UNVERIFIED`.
+
+## Follow-up API access attempt
+
+The user confirmed SOLIDWORKS was open, but the Codex command executor could not see its process or Running Object Table entry (MK_E_UNAVAILABLE, 0x800401E3). No new instance was started and no feature data was extracted. See [09_API_ACCESS_DIAGNOSTICS.md](09_API_ACCESS_DIAGNOSTICS.md) and [API_ACCESS_DIAGNOSTICS.json](API_ACCESS_DIAGNOSTICS.json) for sanitized evidence and the minimal next action.
