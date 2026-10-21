@@ -24,6 +24,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private const int ButtonAnalyze = 103;
         private const int LabelStatus = 104;
         private const int ButtonShowBodies = 105; // Explicit ghost preview; no real cut.
+        private const int ButtonFinish = 106; // Explicit exit; does NOT apply a cut.
         private const int GroupInformation = 110;
         private const int LabelInformation = 111;
         private const int GroupGeometry = 120;
@@ -49,6 +50,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private PropertyManagerPageSelectionbox selectionB;
         private PropertyManagerPageControl analyzeButtonControl;
         private PropertyManagerPageControl showBodiesButtonControl;
+        private PropertyManagerPageControl finishButtonControl;
         private PropertyManagerPageLabel statusLabel;
         private PropertyManagerPageLabel geometryAngleLabel;
         private PropertyManagerPageLabel geometryPointLabel;
@@ -68,6 +70,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool requestFocusB;
         private bool requestAutoAnalysis;
         private bool autoAnalysisQueued;
+        private bool finishQueued;
 
         // Keep analysis output while the same two component occurrences remain
         // selected. Do not use Name2 as an occurrence identity.
@@ -112,6 +115,7 @@ namespace ADDIN.UI.AutoFrameJoint
 
             int error = 0;
             const int options =
+                (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_OkayButton |
                 (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_CancelButton;
             page = app.CreatePropertyManagerPage(
                 "AUTO FRAME JOINT", options, this, ref error)
@@ -304,6 +308,57 @@ namespace ADDIN.UI.AutoFrameJoint
             }
         }
 
+        /// <summary>
+        /// Finish from a PropertyManager button without closing the native page
+        /// synchronously inside SOLIDWORKS OnButtonPress. The standard green
+        /// OK and red Cancel corner buttons remain usable if posting fails.
+        /// Both paths close READ ONLY; OnClose/AfterClose owns cleanup.
+        /// </summary>
+        private void QueueFinishPage()
+        {
+            if (!shown || closing || finishQueued) return;
+            if (deferredFocusWindow == null)
+            {
+                Trace.WriteLine("[AFJ-PMP] Finish dispatcher unavailable; use green OK.");
+                if (statusLabel != null)
+                    statusLabel.Caption = "Nhấn dấu tích xanh ở đầu bảng để kết thúc.";
+                return;
+            }
+
+            finishQueued = true;
+            try
+            {
+                deferredFocusWindow.BeginInvoke(
+                    (System.Windows.Forms.MethodInvoker)delegate
+                    {
+                        finishQueued = false;
+                        if (!shown || closing) return;
+                        try
+                        {
+                            PropertyManagerPage2 current = page;
+                            if (current != null)
+                            {
+                                Trace.WriteLine("[AFJ-PMP] FINISH CLICK: close only, no cut");
+                                current.Close(true);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Trace.WriteLine("[AFJ-PMP] Finish close failed: " + ex);
+                            if (statusLabel != null && !closing)
+                                statusLabel.Caption = "Không đóng được; hãy dùng dấu X đỏ.";
+                        }
+                    });
+            }
+            catch (Exception ex)
+            {
+                finishQueued = false;
+                Trace.WriteLine("[AFJ-PMP] Finish queue failed: " + ex);
+                if (statusLabel != null && !closing)
+                    statusLabel.Caption = "Nhấn dấu tích xanh để kết thúc.";
+            }
+        }
+
         private void DisposeDeferredFocusWindow()
         {
             System.Windows.Forms.Control deferred = deferredFocusWindow;
@@ -312,6 +367,7 @@ namespace ADDIN.UI.AutoFrameJoint
             requestFocusB = false;
             requestAutoAnalysis = false;
             autoAnalysisQueued = false;
+            finishQueued = false;
             if (deferred == null) return;
             try { deferred.Dispose(); }
             catch (Exception ex)
@@ -365,6 +421,13 @@ namespace ADDIN.UI.AutoFrameJoint
                 "Xem bản sao hình học hiện tại của Frame A/B. Chưa mô phỏng vết cắt.")
                 as PropertyManagerPageControl;
 
+            finishButtonControl = group.AddControl2(
+                ButtonFinish,
+                (short)swPropertyManagerPageControlType_e.swControlType_Button,
+                "Kết thúc (không cắt Part)", align, controlOptions,
+                "Đóng Auto Frame Joint và dọn Preview. Không lưu, không sửa Part.")
+                as PropertyManagerPageControl;
+
             statusLabel = group.AddControl2(
                 LabelStatus,
                 (short)swPropertyManagerPageControlType_e.swControlType_Label,
@@ -374,7 +437,7 @@ namespace ADDIN.UI.AutoFrameJoint
 
             if (selectionA == null || selectionB == null ||
                 analyzeButtonControl == null || showBodiesButtonControl == null ||
-                statusLabel == null)
+                finishButtonControl == null || statusLabel == null)
                 throw new InvalidOperationException(
                     "Thiếu một hoặc nhiều điều khiển của PropertyManager.");
 
@@ -824,7 +887,9 @@ namespace ADDIN.UI.AutoFrameJoint
         public void OnClose(int reason)
         {
             closing = true;
-            // Native page has Cancel only; there is no Apply Cut here.
+            // Native OK and Cancel only finish/cancel this read-only session.
+            // Neither invokes a Part cut; cleanup is performed by AfterClose.
+            Trace.WriteLine("[AFJ-PMP] OnClose reason=" + reason + "; no cut");
         }
 
         public void AfterClose()
@@ -840,6 +905,7 @@ namespace ADDIN.UI.AutoFrameJoint
             selectionB = null;
             analyzeButtonControl = null;
             showBodiesButtonControl = null;
+            finishButtonControl = null;
             statusLabel = null;
             geometryAngleLabel = null;
             geometryPointLabel = null;
@@ -885,6 +951,8 @@ namespace ADDIN.UI.AutoFrameJoint
                 PerformAnalyze();
             else if (id == ButtonShowBodies)
                 PerformShowBodies();
+            else if (id == ButtonFinish)
+                QueueFinishPage();
         }
         public void OnTextboxChanged(int id, string value) { }
         public void OnNumberboxChanged(int id, double value) { }
