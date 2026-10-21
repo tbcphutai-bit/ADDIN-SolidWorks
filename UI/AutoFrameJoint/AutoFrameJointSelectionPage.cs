@@ -55,6 +55,8 @@ namespace ADDIN.UI.AutoFrameJoint
         private System.Windows.Forms.Control deferredFocusWindow;
         private bool selectionRefreshQueued;
         private bool requestFocusB;
+        private bool requestAutoAnalysis;
+        private bool autoAnalysisQueued;
 
         // Keep analysis output while the same two component occurrences remain
         // selected. Do not use Name2 as an occurrence identity.
@@ -153,18 +155,22 @@ namespace ADDIN.UI.AutoFrameJoint
         /// optionally advance A to B AFTER SOLIDWORKS returns from selection.
         /// Only a WinForms UI-thread message is posted here. No background COM.
         /// </summary>
-        private void QueueSelectionRefresh(bool advanceFromA)
+        private void QueueSelectionRefresh(bool advanceFromA,
+                                           bool analyzeAfterB)
         {
             if (!shown || closing) return;
 
             if (advanceFromA)
                 requestFocusB = true;
+            if (analyzeAfterB)
+                requestAutoAnalysis = true;
 
             // If the WinForms dispatcher cannot initialize, preserve legacy
             // manual-selection behavior and avoid losing the ready-state UI.
             if (deferredFocusWindow == null)
             {
                 requestFocusB = false;
+                requestAutoAnalysis = false;
                 UpdateReadyState();
                 return;
             }
@@ -182,6 +188,14 @@ namespace ADDIN.UI.AutoFrameJoint
                         // Keep all selection/identity COM checks OUT of
                         // the in-progress OnSelectionboxListChanged callback.
                         UpdateReadyState();
+
+                        // This is already after the native selection callback.
+                        // Queue ANALYZE to a SECOND UI message, so button/status
+                        // can repaint before the read-only geometry probe runs.
+                        bool runAnalysis = requestAutoAnalysis;
+                        requestAutoAnalysis = false;
+                        if (runAnalysis)
+                            QueueAutoAnalysis();
 
                         bool tryAdvance = requestFocusB;
                         requestFocusB = false;
@@ -212,9 +226,69 @@ namespace ADDIN.UI.AutoFrameJoint
             {
                 selectionRefreshQueued = false;
                 requestFocusB = false;
+                requestAutoAnalysis = false;
                 Trace.WriteLine("[AFJ-SEL] Defer UI failed: " + ex);
                 // Selection continues to work even if BeginInvoke is unavailable.
                 UpdateReadyState();
+            }
+        }
+
+        /// <summary>
+        /// Automatic read-only analysis after both selections are committed.
+        /// No background COM and no call inside OnSelectionboxListChanged.
+        /// The user can still press Analyze manually to repeat the probe.
+        /// </summary>
+        private void QueueAutoAnalysis()
+        {
+            if (!shown || closing || autoAnalysisQueued ||
+                deferredFocusWindow == null)
+                return;
+            autoAnalysisQueued = true;
+
+            try
+            {
+                deferredFocusWindow.BeginInvoke(
+                    (System.Windows.Forms.MethodInvoker)delegate
+                    {
+                        autoAnalysisQueued = false;
+                        if (!shown || closing || handlingAnalyze ||
+                            handlingShowBodies || !IsSameDocumentActive())
+                            return;
+
+                        try
+                        {
+                            Component2 a, b;
+                            string reason;
+                            if (!TryReadSelection(out a, out b, out reason, false))
+                            {
+                                Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE NOT READY: " +
+                                                reason);
+                                UpdateReadyState();
+                                return;
+                            }
+
+                            // Prevent duplicate heavy B-rep scans if the user
+                            // has already run Analyze for the exact same pair.
+                            if (IsPreviousPair(a, b) &&
+                                !String.IsNullOrEmpty(lastAnalysisMessage))
+                                return;
+
+                            Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE START");
+                            PerformAnalyze();
+                            Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE END");
+                        }
+                        catch (Exception ex)
+                        {
+                            Trace.WriteLine("[AFJ-SEL] Auto analyze error: " + ex);
+                            UpdateReadyState();
+                        }
+                    });
+            }
+            catch (Exception ex)
+            {
+                autoAnalysisQueued = false;
+                Trace.WriteLine("[AFJ-SEL] Auto analyze queue failed: " + ex);
+                // Manual Analyze remains available.
             }
         }
 
@@ -224,6 +298,8 @@ namespace ADDIN.UI.AutoFrameJoint
             deferredFocusWindow = null;
             selectionRefreshQueued = false;
             requestFocusB = false;
+            requestAutoAnalysis = false;
+            autoAnalysisQueued = false;
             if (deferred == null) return;
             try { deferred.Dispose(); }
             catch (Exception ex)
@@ -359,15 +435,55 @@ namespace ADDIN.UI.AutoFrameJoint
             }
         }
 
+        /// <summary>
+        /// SelectionBoxes prefer Component2, but an Assembly Face/Edge can
+        /// also be present in SelectionMgr on some SOLIDWORKS versions.
+        /// Always resolve its owning Component occurrence, never its Part
+        /// document or an unmarked selection from another box.
+        /// </summary>
         private Component2 Selected(int mark)
         {
             if (assembly == null) return null;
             SelectionMgr mgr = assembly.SelectionManager as SelectionMgr;
-            if (mgr == null || mgr.GetSelectedObjectCount2(mark) != 1)
-                return null;
+            if (mgr == null) return null;
 
-            return mgr.GetSelectedObjectsComponent4(1, mark) as Component2
-                ?? mgr.GetSelectedObject6(1, mark) as Component2;
+            int count = mgr.GetSelectedObjectCount2(mark);
+            if (count != 1) return null;
+
+            Component2 component =
+                mgr.GetSelectedObjectsComponent4(1, mark) as Component2;
+            if (component != null) return component;
+
+            object selected = mgr.GetSelectedObject6(1, mark);
+            component = selected as Component2;
+            if (component != null) return component;
+
+            IEntity entity = selected as IEntity;
+            if (entity != null)
+                component = entity.GetComponent() as Component2;
+
+            return component;
+        }
+
+        private void TraceSelectionState(bool ready, string reason)
+        {
+            try
+            {
+                SelectionMgr mgr = assembly.SelectionManager as SelectionMgr;
+                if (mgr == null) return;
+
+                int aCount = mgr.GetSelectedObjectCount2(MarkFrameA);
+                int bCount = mgr.GetSelectedObjectCount2(MarkFrameB);
+                Trace.WriteLine("[AFJ-SEL] READY=" + ready +
+                    " A-count=" + aCount +
+                    " B-count=" + bCount +
+                    " reason=" + reason);
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-SEL] Ready trace unavailable: " +
+                                ex.Message);
+            }
         }
 
         /// <summary>
@@ -473,6 +589,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 Component2 a, b;
                 string reason;
                 bool ready = TryReadSelection(out a, out b, out reason, false);
+                TraceSelectionState(ready, reason);
 
                 if (!ready || !IsPreviousPair(a, b))
                     ClearAnalysisResult();
@@ -700,7 +817,9 @@ namespace ADDIN.UI.AutoFrameJoint
             // Don't read selection COM state or change focus/selection here.
             // Multiple events are coalesced into one deferred UI refresh.
             Trace.WriteLine("[AFJ-SEL] List box=" + id + " count=" + count);
-            QueueSelectionRefresh(id == BoxFrameA && count == 1);
+            QueueSelectionRefresh(
+                id == BoxFrameA && count == 1,
+                id == BoxFrameB && count == 1);
         }
         public void OnSelectionboxCalloutCreated(int id) { }
         public void OnSelectionboxCalloutDestroyed(int id) { }
