@@ -25,6 +25,8 @@ namespace ADDIN.UI.AutoFrameJoint
         private const int LabelStatus = 104;
         private const int ButtonShowBodies = 105; // Explicit ghost preview; no real cut.
         private const int ButtonFinish = 106; // Explicit exit; does NOT apply a cut.
+        private const int ButtonCutP1 = 107;
+        private const int ButtonCutP2 = 108;
         private const int GroupInformation = 110;
         private const int LabelInformation = 111;
         private const int GroupGeometry = 120;
@@ -42,6 +44,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private readonly ModelDoc2 assembly;
         private readonly Func<Component2, Component2, string> onAnalyze;
         private readonly Func<Component2, Component2, string> onShowBodies;
+        private readonly Func<Component2, Component2, int, string> onPreviewCut;
         private readonly Action onClearPreview;
         private readonly Action<AutoFrameJointSelectionPage> onClosed;
 
@@ -51,6 +54,8 @@ namespace ADDIN.UI.AutoFrameJoint
         private PropertyManagerPageControl analyzeButtonControl;
         private PropertyManagerPageControl showBodiesButtonControl;
         private PropertyManagerPageControl finishButtonControl;
+        private PropertyManagerPageControl cutP1ButtonControl;
+        private PropertyManagerPageControl cutP2ButtonControl;
         private PropertyManagerPageLabel statusLabel;
         private PropertyManagerPageLabel geometryAngleLabel;
         private PropertyManagerPageLabel geometryPointLabel;
@@ -62,6 +67,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool closing;
         private bool handlingAnalyze;
         private bool handlingShowBodies;
+        private bool handlingCutPreview;
         private bool updatingReadyState;
         // A lightweight WinForms HWND schedules focus AFTER the native selection callback.
         // OnSelectionboxListChanged must never change SOLIDWORKS selection/focus inline.
@@ -92,12 +98,14 @@ namespace ADDIN.UI.AutoFrameJoint
             ISldWorks app,
             Func<Component2, Component2, string> onAnalyze,
             Func<Component2, Component2, string> onShowBodies,
+            Func<Component2, Component2, int, string> onPreviewCut,
             Action onClearPreview,
             Action<AutoFrameJointSelectionPage> onClosed)
         {
             this.app = app;
             this.onAnalyze = onAnalyze;
             this.onShowBodies = onShowBodies;
+            this.onPreviewCut = onPreviewCut;
             this.onClearPreview = onClearPreview;
             this.onClosed = onClosed;
             this.assembly = app == null ? null : app.ActiveDoc as ModelDoc2;
@@ -421,6 +429,19 @@ namespace ADDIN.UI.AutoFrameJoint
                 "Xem bản sao hình học hiện tại của Frame A/B. Chưa mô phỏng vết cắt.")
                 as PropertyManagerPageControl;
 
+            cutP1ButtonControl = group.AddControl2(
+                ButtonCutP1,
+                (short)swPropertyManagerPageControlType_e.swControlType_Button,
+                "Preview cắt thử A+B — P1", align, controlOptions,
+                "B-rep thực; P1 chưa phải quy tắc cắt sản xuất được duyệt.")
+                as PropertyManagerPageControl;
+            cutP2ButtonControl = group.AddControl2(
+                ButtonCutP2,
+                (short)swPropertyManagerPageControlType_e.swControlType_Button,
+                "Preview cắt thử A+B — P2", align, controlOptions,
+                "B-rep thực; P2 chưa phải quy tắc cắt sản xuất được duyệt.")
+                as PropertyManagerPageControl;
+
             finishButtonControl = group.AddControl2(
                 ButtonFinish,
                 (short)swPropertyManagerPageControlType_e.swControlType_Button,
@@ -437,7 +458,8 @@ namespace ADDIN.UI.AutoFrameJoint
 
             if (selectionA == null || selectionB == null ||
                 analyzeButtonControl == null || showBodiesButtonControl == null ||
-                finishButtonControl == null || statusLabel == null)
+                finishButtonControl == null || cutP1ButtonControl == null ||
+                cutP2ButtonControl == null || statusLabel == null)
                 throw new InvalidOperationException(
                     "Thiếu một hoặc nhiều điều khiển của PropertyManager.");
 
@@ -462,6 +484,8 @@ namespace ADDIN.UI.AutoFrameJoint
             selectionB.SetSelectionFilters(filter);
             analyzeButtonControl.Enabled = false;
             showBodiesButtonControl.Enabled = false;
+            cutP1ButtonControl.Enabled = false;
+            cutP2ButtonControl.Enabled = false;
 
             var detailsGroup = page.AddGroupBox(
                 GroupInformation, "Thông tin", groupOptions)
@@ -741,6 +765,12 @@ namespace ADDIN.UI.AutoFrameJoint
                 if (showBodiesButtonControl != null)
                     showBodiesButtonControl.Enabled = ready && !handlingAnalyze &&
                                                     !handlingShowBodies;
+                if (cutP1ButtonControl != null)
+                    cutP1ButtonControl.Enabled = ready && !handlingAnalyze &&
+                                                 !handlingShowBodies && !handlingCutPreview;
+                if (cutP2ButtonControl != null)
+                    cutP2ButtonControl.Enabled = ready && !handlingAnalyze &&
+                                                 !handlingShowBodies && !handlingCutPreview;
                 if (statusLabel != null)
                     statusLabel.Caption = ready &&
                         !String.IsNullOrEmpty(lastAnalysisMessage)
@@ -755,6 +785,8 @@ namespace ADDIN.UI.AutoFrameJoint
                     analyzeButtonControl.Enabled = false;
                 if (showBodiesButtonControl != null)
                     showBodiesButtonControl.Enabled = false;
+                if (cutP1ButtonControl != null) cutP1ButtonControl.Enabled = false;
+                if (cutP2ButtonControl != null) cutP2ButtonControl.Enabled = false;
                 if (statusLabel != null)
                     statusLabel.Caption = "Lỗi chọn Frame — xem Output.";
             }
@@ -881,6 +913,55 @@ namespace ADDIN.UI.AutoFrameJoint
             }
         }
 
+        /// <summary>
+        /// Explicit P1/P2 temporary candidate on actual 3D B-rep.
+        /// Does NOT imply production-approved Web/Wall/Lip trim.
+        /// </summary>
+        private void PerformCutCandidate(int candidate)
+        {
+            if (closing || handlingAnalyze || handlingShowBodies || handlingCutPreview)
+                return;
+            Component2 a = null, b = null;
+            string reason;
+            handlingCutPreview = true;
+            try
+            {
+                if (!TryReadSelection(out a, out b, out reason, true))
+                {
+                    if (statusLabel != null) statusLabel.Caption = reason;
+                    return;
+                }
+                if (onPreviewCut == null)
+                {
+                    if (statusLabel != null)
+                        statusLabel.Caption = "Chưa nối backend preview.";
+                    return;
+                }
+                if (statusLabel != null)
+                    statusLabel.Caption = "Đang tạo Boolean B-rep tạm cho hai Frame...";
+                string result = onPreviewCut(a, b, candidate);
+                if (statusLabel != null)
+                    statusLabel.Caption = String.IsNullOrWhiteSpace(result)
+                        ? "Không nhận được kết quả preview." : result;
+                Trace.WriteLine("[AFJ-PMP] CUT P" + candidate + " " + result);
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-PMP] Cut preview error: " + ex);
+                if (statusLabel != null)
+                    statusLabel.Caption = "Lỗi xem trước vết cắt — xem Output.";
+            }
+            finally
+            {
+                handlingCutPreview = false;
+                // Preserve preview message and restore button availability.
+                if (analyzeButtonControl != null) analyzeButtonControl.Enabled = !closing;
+                if (showBodiesButtonControl != null) showBodiesButtonControl.Enabled = !closing;
+                if (cutP1ButtonControl != null) cutP1ButtonControl.Enabled = !closing;
+                if (cutP2ButtonControl != null) cutP2ButtonControl.Enabled = !closing;
+            }
+        }
+
         // ---------------- Native PMP callback methods ----------------
         public void AfterActivation() { }
 
@@ -906,6 +987,8 @@ namespace ADDIN.UI.AutoFrameJoint
             analyzeButtonControl = null;
             showBodiesButtonControl = null;
             finishButtonControl = null;
+            cutP1ButtonControl = null;
+            cutP2ButtonControl = null;
             statusLabel = null;
             geometryAngleLabel = null;
             geometryPointLabel = null;
@@ -953,6 +1036,10 @@ namespace ADDIN.UI.AutoFrameJoint
                 PerformShowBodies();
             else if (id == ButtonFinish)
                 QueueFinishPage();
+            else if (id == ButtonCutP1)
+                PerformCutCandidate(1);
+            else if (id == ButtonCutP2)
+                PerformCutCandidate(2);
         }
         public void OnTextboxChanged(int id, string value) { }
         public void OnNumberboxChanged(int id, double value) { }
