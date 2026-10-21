@@ -176,25 +176,17 @@ namespace ADDIN.UI
             if (Width < 190 || Height < 180) return;
 
             int pad = 14;
-            var top = new Rectangle(pad, 8, Math.Max(1, Width - pad * 2), 35);
-            var source = new Rectangle(pad, 45, Math.Max(1, Width - pad * 2), 47);
-            var drawing = new Rectangle(pad, 99, Math.Max(1, Width - pad * 2), Math.Max(40, Height - 184));
-            var bottom = new Rectangle(pad, drawing.Bottom + 5, Math.Max(1, Width - pad * 2), 65);
+            var top = new Rectangle(pad, 5, Math.Max(1, Width - pad * 2), 28);
+            var drawing = new Rectangle(pad, 37, Math.Max(1, Width - pad * 2), Math.Max(40, Height - 81));
+            var bottom = new Rectangle(pad, drawing.Bottom + 5, Math.Max(1, Width - pad * 2), 28);
 
-            TextRenderer.DrawText(g, "MẶT CẮT PART + VÙNG GIỚI HẠN CHẤN", headerFont, top,
-                Color.FromArgb(29, 49, 75), TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-            using (var b = new SolidBrush(Color.FromArgb(244, 248, 253))) g.FillRectangle(b, source);
-            using (var p = new Pen(Color.FromArgb(221, 231, 244))) g.DrawRectangle(p, source);
-            string excelLine = Trim(scene.ExcelCaseCaption, 115);
-            string sourceLine = "EXCEL TRƯỚC · " + Trim(scene.ExcelCaseSource, 115);
-            TextRenderer.DrawText(g, sourceLine, statusFont,
-                new Rectangle(source.Left + 9, source.Top + 5, source.Width - 18, 18),
-                Color.FromArgb(31, 80, 153), TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
-            TextRenderer.DrawText(g, excelLine, smallFont,
-                new Rectangle(source.Left + 9, source.Top + 25, source.Width - 18, 17),
-                Color.FromArgb(74, 89, 110), TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
-            using (var b = new SolidBrush(Color.FromArgb(251, 252, 254))) g.FillRectangle(b, drawing);
-            using (var p = new Pen(Color.FromArgb(217, 225, 237))) g.DrawRectangle(p, drawing);
+            TextRenderer.DrawText(g, "MẶT CẮT 2D", headerFont, top,
+                Color.FromArgb(29, 49, 75), TextFormatFlags.Left |
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            using (var fill = new SolidBrush(Color.FromArgb(251, 252, 254)))
+                g.FillRectangle(fill, drawing);
+            using (var border = new Pen(Color.FromArgb(217, 225, 237)))
+                g.DrawRectangle(border, drawing);
 
             var registered = scene.PlacementRegistered && scene.RegisteredPunch != null &&
                 scene.RegisteredHolder != null &&
@@ -235,28 +227,15 @@ namespace ADDIN.UI
                     Color.FromArgb(100, 116, 139), TextFormatFlags.HorizontalCenter |
                     TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
             }
-            string warning = registered ? "Hình học dao đã đặt theo hệ tọa độ được cung cấp" :
-                "Chưa có tọa độ gá đã duyệt: KHÔNG chồng CAD nguồn lên Part";
-            TextRenderer.DrawText(g, warning, smallFont,
-                new Rectangle(drawing.Left + 12, drawing.Bottom - 29, drawing.Width - 24, 20),
-                registered ? Color.FromArgb(36, 88, 142) : Color.FromArgb(133, 96, 34),
-                TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
-
-            using (var b = new SolidBrush(Color.FromArgb(252, 247, 231))) g.FillRectangle(b, bottom);
-            using (var p = new Pen(Color.FromArgb(231, 213, 166))) g.DrawRectangle(p, bottom);
-            var claim = (scene.ViolationProven || scene.CollisionProven) && !string.IsNullOrWhiteSpace(scene.ProofReference) ?
-                "CẠNH VI PHẠM ĐÃ CÓ BẰNG CHỨNG · " + scene.ProofReference :
-                Trim(scene.DecisionText, 130);
-            TextRenderer.DrawText(g, claim, statusFont,
-                new Rectangle(bottom.Left + 9, bottom.Top + 5, bottom.Width - 18, 22),
-                (scene.ViolationProven || scene.CollisionProven) ? ContactRed : Color.FromArgb(141, 95, 35),
-                TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
-            TextRenderer.DrawText(g, Trim(scene.PartTitle + " · " + scene.ToolTitle, 140), smallFont,
-                new Rectangle(bottom.Left + 9, bottom.Top + 30, bottom.Width - 18, 19),
-                Color.FromArgb(88, 101, 119), TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
-            TextRenderer.DrawText(g, "2D là hình học cuối; không chứng minh thứ tự chấn hoặc va chạm suốt hành trình.", smallFont,
-                new Rectangle(bottom.Left + 9, bottom.Bottom - 17, bottom.Width - 18, 16),
-                Color.FromArgb(104, 114, 129), TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
+            string message = (scene.ViolationProven || scene.CollisionProven) &&
+                !string.IsNullOrWhiteSpace(scene.ProofReference) ?
+                "Đã xác minh vùng vi phạm · " + scene.ProofReference :
+                registered ? "Đã ghép dao theo tọa độ gá được cung cấp" :
+                box.HasValue ? "Mặt cắt Part · chưa xác minh vị trí gá dao" :
+                "Chưa có mặt cắt CAD cho nếp này";
+            TextRenderer.DrawText(g, Trim(message, 140), smallFont, bottom,
+                Color.FromArgb(89, 102, 119), TextFormatFlags.Left |
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }
 
         private static void Draw(Graphics g, IReadOnlyList<PointF[]> curves, Color color, float width,
