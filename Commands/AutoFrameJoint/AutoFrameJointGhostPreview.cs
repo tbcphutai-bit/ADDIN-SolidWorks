@@ -151,7 +151,9 @@ namespace ADDIN.Commands.AutoFrameJoint
         public bool TryShowCutCandidate(Component2 frameA, Component2 frameB,
                                         int candidate, out string message)
         {
+            Trace.WriteLine("[AFJ-R49] ENGINE ENTER P" + candidate);
             message = "Chưa tạo preview vết cắt.";
+            bool previewSucceeded = false;
             if (busy) { message = "Preview đang xử lý."; return false; }
             if (candidate != 1 && candidate != 2)
             { message = "Chỉ có phương án P1 hoặc P2."; return false; }
@@ -159,6 +161,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             busy = true;
             try
             {
+                Trace.WriteLine("[AFJ-R49] STAGE CLEAN_PREVIOUS");
                 string previousError;
                 if (!ClearInternal(out previousError))
                 {
@@ -179,6 +182,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     return false;
                 }
 
+                Trace.WriteLine("[AFJ-R49] STAGE ANALYZE_PAIR");
                 // Re-evaluate at the USER'S explicit Preview click, not during
                 // Selectionbox events. The analysis yields only provisional
                 // bisector normals: neither is automatically a final trim rule.
@@ -200,6 +204,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     return false;
                 }
 
+                Trace.WriteLine("[AFJ-R49] STAGE SOLID_COPY_WORLD");
                 ModelDoc2 partA, partB;
                 MathTransform transformA, transformB;
                 Body2 baseA = GetSingleWorldSolid(frameA, out partA, out transformA);
@@ -209,6 +214,7 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 // The Operations2 operands are invalidated by SOLIDWORKS.
                 // Always Boolean fresh temporary copies, never original B-rep.
+                Trace.WriteLine("[AFJ-R49] STAGE INTERSECT_BEGIN");
                 List<Body2> overlap = BooleanParts(
                     CopyBody(baseA), CopyBody(baseB),
                     (int)swBodyOperationType_e.SWBODYINTERSECT, "solid overlap");
@@ -219,6 +225,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                 }
 
                 double overlapVolume = VolumeTotal(overlap);
+                Trace.WriteLine("[AFJ-R49] STAGE INTERSECT_RESULT bodies=" +
+                                overlap.Count + " volume_m3=" +
+                                overlapVolume.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
                 if (!(overlapVolume > 1e-12))
                 {
                     message = "Thể tích giao thoa quá nhỏ hoặc không hợp lệ.";
@@ -231,6 +240,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 if (inverseA == null || inverseB == null)
                     throw new InvalidOperationException("Không đảo được hệ tọa độ Part.");
 
+                Trace.WriteLine("[AFJ-R49] STAGE BISECTOR_PARTITION_BEGIN");
                 var removedA = new List<Body2>();
                 var removedB = new List<Body2>();
                 foreach (Body2 shared in overlap)
@@ -249,6 +259,9 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 double removedVolumeA = VolumeTotal(removedA);
                 double removedVolumeB = VolumeTotal(removedB);
+                Trace.WriteLine("[AFJ-R49] STAGE BISECTOR_PARTITION_RESULT A=" +
+                    removedVolumeA.ToString("R", System.Globalization.CultureInfo.InvariantCulture) +
+                    " B=" + removedVolumeB.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
                 double minMeaningful = Math.Max(1e-12, overlapVolume * 0.00001);
                 if (removedVolumeA <= minMeaningful ||
                     removedVolumeB <= minMeaningful ||
@@ -262,6 +275,7 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 // Generate ACTUAL candidate after-cut 3D solids from two real
                 // B-reps. CUT operates only on disposable world-space copies.
+                Trace.WriteLine("[AFJ-R49] STAGE CUT_TEMP_COPIES_BEGIN");
                 List<Body2> keptA = SubtractMaterial(baseA, removedA, "Frame A");
                 List<Body2> keptB = SubtractMaterial(baseB, removedB, "Frame B");
                 double keptVolumeA = VolumeTotal(keptA);
@@ -279,6 +293,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 // Candidate preview displaced in WORLD Z, not document edits.
                 // Color-code the new temporary after-cut bodies and red/orange
                 // removed pieces. Original Assembly stays exactly in place.
+                Trace.WriteLine("[AFJ-R49] STAGE DISPLAY_GHOST_BEGIN");
                 DisplayCandidateBodies(keptA, frameA, partA, inverseA, shift,
                     ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235)), 0.33);
                 DisplayCandidateBodies(keptB, frameB, partB, inverseB, shift,
@@ -297,6 +312,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     "CHƯA XÁC NHẬN quy tắc Web/Wall/Lip, không cắt Part.",
                     candidate, removedVolumeA * 1e9, removedVolumeB * 1e9);
                 Trace.WriteLine("[AFJ-CUT-CANDIDATE] " + message);
+                previewSucceeded = true;
                 return true;
             }
             catch (Exception ex)
@@ -308,7 +324,13 @@ namespace ADDIN.Commands.AutoFrameJoint
                           (cleared ? "" : " | CLEANUP PENDING: " + cleanupError);
                 return false;
             }
-            finally { busy = false; }
+            finally
+            {
+                Trace.WriteLine("[AFJ-R49] ENGINE EXIT P" + candidate +
+                                " success=" + previewSucceeded +
+                                " msg=" + message);
+                busy = false;
+            }
         }
 
         private static string ReportValue(string report, string prefix)
