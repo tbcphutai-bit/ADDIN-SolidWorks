@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0",
+  "status": "SOURCE_APPLIED_AND_DETACHED_VERIFIED_MAIN_DLL_NOT_REBUILT",
+  "repository": "tbcphutai-bit/ADDIN-SolidWorks",
+  "branch": "feat/afj-multi-profile-cut-preview-20261022",
+  "source_commit_sha": "90876693d34fbaf6b13f0570b548ba7f6b946547",
+  "source_base_commit_sha": "5a3a2b51ffe3f5d04c2c24fd364489d7ca827dba",
+  "source_applied_to_existing_checkout": true,
+  "full_class_replacement_from_other_baseline": false,
+  "selection_page_modified": false,
+  "project_modified": false,
+  "output_path_modified": false,
+  "main_addin_build_or_deploy_by_agent": false,
+  "main_addin_dll_contains_new_rule": false,
+  "last_observed_dll": {
+    "file_name": "ADDIN.dll",
+    "mvid": "7b2281d4-7e60-4636-b312-d3dabcd5b3df",
+    "sha256": "b8cf3d12c0a8021341cbd20fa9cb09c95493d4e8aaa269093a66099d2397c000",
+    "new_rule_string_present": false
+  },
+  "source_install": [
+    {
+      "variant": "branch",
+      "file": "AutoFrameJointCommandEntry.cs",
+      "before_sha256": "029f280f0dc44506442dac7bf447eb004830f69fda18110cbb45a93c0db95a99",
+      "after_sha256": "35d5078fc2cc2c2db63237cddd5dec1e7a02496e1e1fa8099f6efcbcc2aa98c0"
+    },
+    {
+      "variant": "branch",
+      "file": "AutoFrameJointGhostSessionManager.cs",
+      "before_sha256": "b8a4c55260c02ecff8f66302dc1869b611fa740813bdfc1b102a41e6a069df12",
+      "after_sha256": "85d6e38e8459a706bb1bec7d7e058e10e5eef0075173270ee204991a0b79b8f4"
+    },
+    {
+      "variant": "branch",
+      "file": "AutoFrameJointGhostPreview.cs",
+      "before_sha256": "9dd634f2d865dea38a0e4ba17f7957ee7847660f9eb734d7f6fdb3ebe2cc239d",
+      "after_sha256": "8308ee163f03c89d59f53c48b2db11bccd56c29b0683c736dd7327fe41ddc657"
+    },
+    {
+      "variant": "local",
+      "file": "AutoFrameJointCommandEntry.cs",
+      "before_sha256": "fe853fe4e53c38143c8713b3e96c26d3f63d9a713f841a6251b9f549aeb374e3",
+      "after_sha256": "4795f987af95740776f834cc454419bb50d557ab681f989452d6f2e35cdd3002"
+    },
+    {
+      "variant": "local",
+      "file": "AutoFrameJointGhostSessionManager.cs",
+      "before_sha256": "a5b825c59258b5e54ea809201350e12a067730b48e63001c39632bc18d9dc0c7",
+      "after_sha256": "b505ce2611affaaa795d2246c8dd19560ee197dae8e7d79035bb89fc26d01fa1"
+    },
+    {
+      "variant": "local",
+      "file": "AutoFrameJointGhostPreview.cs",
+      "before_sha256": "45ac41caa1d97bb0f5868956c4bc2cb78e08ebfd51e61467d3f9ba395e06b52f",
+      "after_sha256": "8ba673a608bf6dd2b9899429ae479dd5e23469b376cb1591668ca2b598cbdd06"
+    }
+  ],
+  "protected_files": [
+    {
+      "file": "AutoFrameJointGeometryMath.cs",
+      "variant": "branch",
+      "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointReadOnlyProbe.cs",
+      "variant": "branch",
+      "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointSelectionPage.cs",
+      "variant": "branch",
+      "sha256": "3a5116f16031d98d221a5cdb7cdfbcf52788a06ef227bf3025689f0b94c74d78",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointGeometryMath.cs",
+      "variant": "local",
+      "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointReadOnlyProbe.cs",
+      "variant": "local",
+      "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointSelectionPage.cs",
+      "variant": "local",
+      "sha256": "8f9c358eabfc2b67cd4a32e1b032493a5a4c6916876d43e0ee8a3acf167dccc2",
+      "unchanged": true
+    },
+    {
+      "file": "ADDIN.csproj",
+      "variant": "local",
+      "sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+      "unchanged": true
+    },
+    {
+      "file": "ADDIN.dll",
+      "variant": "local",
+      "sha256": "b8cf3d12c0a8021341cbd20fa9cb09c95493d4e8aaa269093a66099d2397c000",
+      "unchanged": true
+    },
+    {
+      "file": "ADDIN.pdb",
+      "variant": "local",
+      "sha256": "3f77d59bb5f1dc373c956f00f9b16cca6dcd2c3d900e839c1a1e05f9f366ee34",
+      "unchanged": true
+    }
+  ],
+  "integration_branch": "integrate/check-chan-pr37-vs-20261021",
+  "integration_head_expected": "66d12511f24c35b560d699228109857058ad66cb",
+  "integration_head_final": "66d12511f24c35b560d699228109857058ad66cb",
+  "integration_branch_preserved": true,
+  "detached_actual_source_controls": [
+    {
+      "variant": "branch",
+      "status": "PASS_MANAGED_CONTRACT",
+      "tests": 89,
+      "result_sha256": "0b7de1228788944b31c5d8ee38a6a491ecb1397912544ef4a4e38d42a5ba06e2",
+      "compiled_actual_source": true,
+      "main_addin_build": false
+    },
+    {
+      "variant": "local",
+      "status": "PASS_MANAGED_CONTRACT",
+      "tests": 89,
+      "result_sha256": "0b7de1228788944b31c5d8ee38a6a491ecb1397912544ef4a4e38d42a5ba06e2",
+      "compiled_actual_source": true,
+      "main_addin_build": false
+    }
+  ],
+  "new_installed_addin_ok_test": "NOT_RUN",
+  "visible_preview_confirmation": "UNVERIFIED",
+  "cross_end_adapter_in_candidate": false,
+  "cross_end_undo_qualification": "FAILED_NO_UNDO_ATTEMPTED",
+  "legacy_u_writer_direct_relation_rewrite": "NOT_DONE",
+  "source_dll_match": "NO_NEW_SOURCE_NOT_BUILT_INTO_INSTALLED_MAIN_DLL"
+}

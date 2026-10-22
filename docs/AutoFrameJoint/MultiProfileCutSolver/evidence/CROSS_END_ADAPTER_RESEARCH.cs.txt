@@ -1,0 +1,68 @@
+// Private helper candidate. Compile with AFJ source; no caller/native execution here.
+// Preconditions: a disposable-copy assembly is active, target is its exact current
+// EditPart2 component, and `cut` is an owned, B-rep-verified Blind Cut in target.
+// The reference must be an original/base native Face of other; never a newly Cut face.
+// A return value is not a geometry pass: caller must compare Body2 to reviewed plan,
+// then re-check BOTH Parts after BOTH references to detect dependency/cycle faults.
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+
+internal static class GeometryEndReferenceAdapter
+{
+ internal static Dictionary<string,object> Apply(ISldWorks app,ModelDoc2 assembly,
+   Component2 target,Component2 other,Feature cut,Face2 originalOtherFace,double gap)
+ {
+  if(app==null||assembly==null||target==null||other==null||cut==null||originalOtherFace==null||gap<0)
+   throw new InvalidOperationException("END_REF: missing verified reference arguments");
+  var assy=assembly as AssemblyDoc;
+  if(assy==null||app.IsSame(app.ActiveDoc,assembly)!=1||app.IsSame(assy.GetEditTargetComponent(),target)!=1)
+   throw new InvalidOperationException("END_REF: exact target Assembly EditPart2 context required");
+  var native=(Surface)originalOtherFace.GetSurface();
+  if(native==null||!native.IsPlane())throw new InvalidOperationException("END_REF: this qualified adapter only accepts an original planar face");
+  object contextFace=other.GetCorrespondingEntity(originalOtherFace);
+  if(!(contextFace is Face2))throw new InvalidOperationException("END_REF: assembly-context other-Frame Face unavailable");
+  var data=cut.GetDefinition() as ExtrudeFeatureData2;
+  if(data==null||data.GetEndCondition(true)!=(int)swEndConditions_e.swEndCondBlind)
+   throw new InvalidOperationException("END_REF: expected already verified owned Blind cut");
+  bool access=false,modified=false;
+  try{
+   access=data.AccessSelections(assembly,target);
+   if(!access)throw new InvalidOperationException("END_REF: cannot access exact Cut selections in Assembly/component context");
+   data.SetEndCondition(true,gap>0?(int)swEndConditions_e.swEndCondOffsetFromSurface:(int)swEndConditions_e.swEndCondUpToSurface);
+   data.SetEndConditionReference(true,contextFace);
+   if(gap>0){data.SetDepth(true,gap);data.SetReverseOffset(true,true);data.SetTranslateSurface(true,true);}
+   modified=cut.ModifyDefinition(data,assembly,target);
+   if(!modified)throw new InvalidOperationException("END_REF: ModifyDefinition refused the cross-Frame end reference");
+   access=false; // successful ModifyDefinition releases rollback selection access
+  }finally{if(access)data.ReleaseSelectionAccess();}
+  var actual=cut.GetDefinition() as ExtrudeFeatureData2;
+  bool warning;int error=cut.GetErrorCode2(out warning);
+  if(actual==null||error!=0||actual.GetEndCondition(true)!=(gap>0?(int)swEndConditions_e.swEndCondOffsetFromSurface:(int)swEndConditions_e.swEndCondUpToSurface))
+   throw new InvalidOperationException("END_REF: native feature/end-condition readback failed");
+  int referenceType=0;object reference=null;bool readAccess=false;
+  try {
+   readAccess=actual.AccessSelections(assembly,target);
+   if(!readAccess)throw new InvalidOperationException("END_REF: persisted selection access is unavailable");
+   reference=actual.GetEndConditionReference(true,out referenceType);
+  } finally { if(readAccess)actual.ReleaseSelectionAccess(); }
+  if(reference==null)throw new InvalidOperationException("END_REF: persisted other-Frame reference readback is null");
+  // COM identity may be assembly/native context-specific; caller must compare
+  // persistent reference/component ownership, not claim exact identity from type alone.
+  var row=new Dictionary<string,object>{
+    {"feature",cut.Name},{"end_condition",actual.GetEndCondition(true)},
+    {"reference_type",referenceType},{"reference_nonnull",true},
+    {"reference_face_type",reference is Face2},{"gap_m",gap},
+    {"native_offset_m",gap>0?actual.GetDepth(true):0},
+    {"reverse_offset",gap>0&&actual.GetReverseOffset(true)},
+    {"translate_surface",gap>0&&actual.GetTranslateSurface(true)},
+    {"native_error",error},{"geometry_equivalence","CALLER_MUST_VERIFY"},
+    {"parameter_follow_test","NOT_RUN"},{"two_part_cycle_test","NOT_RUN"}
+  };
+  if(gap>0&&(Math.Abs(actual.GetDepth(true)-gap)>1e-8||!actual.GetReverseOffset(true)||!actual.GetTranslateSurface(true)))
+   throw new InvalidOperationException("END_REF: gap/direction readback differs from policy");
+  return row;
+ }
+}
