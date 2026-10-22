@@ -136,6 +136,9 @@ namespace ADDIN.UI
             }
             if (uxV44EvidenceLabel != null && !uxV44EvidenceLabel.IsDisposed)
                 uxV44EvidenceLabel.Text = "Chưa duyệt Excel → ToolId/W-L · CAD fallback chưa có chứng cứ";
+            // Only uniform, original final-Part geometry can share an exact
+            // work frame with a static axial contact witness.
+            string verifiedFrame=null, verifiedSource=null;
             try
             {
                 // These envelopes are from THIS snapshot, not a file-name lookup.
@@ -155,6 +158,8 @@ namespace ADDIN.UI
                         sections[0].Boundary != null && sections[0].Boundary.Count > 0)
                     {
                         data.Part = BendSection2DScene.CopyCurves(sections[0].Boundary);
+                        verifiedFrame = env.Binding.FrameId;
+                        verifiedSource = env.Binding.SourceSha256;
                         data.PartEvidence = "Mặt cắt hình học cuối · " + sections[0].Frame.FrameId;
                     }
                     else
@@ -207,6 +212,31 @@ namespace ADDIN.UI
                     data.Holder = new System.Drawing.PointF[0][];
                     data.ToolEvidence = "Lỗi đọc đường bao dao: " + ex.GetType().Name;
                     System.Diagnostics.Trace.WriteLine("[CHECK CHAN TOOL SECTION 2D] " + ex);
+                }
+            }
+            // Static collision witnesses are observed numeric points in the
+            // same final-material work frame. A witness is NOT a curve/segment
+            // identifier, so only show red dots, never guessed red line segments.
+            if(tool!=null && tool.CadAssembly?.ClampVerified==true &&
+                !tool.StaticSimulationOnly && tool.GeometricStatus==CollisionStatus.COLLISION &&
+                verifiedFrame!=null && verifiedSource!=null && data.Part.Count>0)
+            {
+                var points=new List<System.Drawing.PointF>();
+                Action<ADDIN.Commands.BendEnvelope.AxialCollisionWitness,string,string> add=(w,frame,sha)=>{
+                    if(w==null || w.ObservedSliceOnly || !string.Equals(frame,verifiedFrame,StringComparison.Ordinal) ||
+                        !string.Equals(sha,verifiedSource,StringComparison.Ordinal) ||
+                        !ToolPoint.Finite(w.PointMm.X) || !ToolPoint.Finite(w.PointMm.Y) ||
+                        Math.Abs(w.PointMm.X)>1e7 || Math.Abs(w.PointMm.Y)>1e7)return;
+                    points.Add(new System.Drawing.PointF((float)w.PointMm.X,(float)w.PointMm.Y));
+                };
+                add(tool.PunchWitness,tool.PunchWitnessFrameId,tool.PunchWitnessSourceSha256);
+                add(tool.HolderWitness,tool.HolderWitnessFrameId,tool.HolderWitnessSourceSha256);
+                if(points.Count>0)
+                {
+                    data.VerifiedContactPoints=points.AsReadOnly();
+                    data.ContactPointProven=true;
+                    data.ProofReference="FeatureId "+bend.FeatureId+" / "+tool.ToolId+" / numeric axial";
+                    data.ToolEvidence="Có điểm va chạm số; chưa có danh tính cạnh/đường gá đã duyệt để tô đỏ cạnh.";
                 }
             }
             uxV43SelectionKey = data.SourceKey;

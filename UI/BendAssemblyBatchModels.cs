@@ -145,6 +145,10 @@ namespace ADDIN.UI
         public string CombinedReason { get; set; }
         public AxialCollisionWitness PunchWitness { get; set; }
         public AxialCollisionWitness HolderWitness { get; set; }
+        public string PunchWitnessFrameId { get; set; }
+        public string HolderWitnessFrameId { get; set; }
+        public string PunchWitnessSourceSha256 { get; set; }
+        public string HolderWitnessSourceSha256 { get; set; }
 
         public override string ToString() => $"{ToolId} - Punch: {PunchStatusDisplay}, Holder: {HolderStatusDisplay}, Geom: {GeometricStatusDisplay}";
     }
@@ -393,6 +397,10 @@ namespace ADDIN.UI
                             PunchClearanceMm = staticCand?.PunchResult?.CertifiedClearanceLowerMm,
                             HolderClearanceMm = staticCand?.HolderResult?.CertifiedClearanceLowerMm,
                             PunchWitness = staticCand?.PunchResult?.Witness, HolderWitness = staticCand?.HolderResult?.Witness,
+                            PunchWitnessFrameId = staticCand?.PunchResult?.FrameId,
+                            HolderWitnessFrameId = staticCand?.HolderResult?.FrameId,
+                            PunchWitnessSourceSha256 = staticCand?.PunchResult?.SourceSha256,
+                            HolderWitnessSourceSha256 = staticCand?.HolderResult?.SourceSha256,
                             PunchReason = staticCand?.PunchResult?.Reasons?.FirstOrDefault() ?? "chưa đủ bằng chứng mapping",
                             HolderReason = staticCand?.HolderResult?.Reasons?.FirstOrDefault() ?? "vị trí gá Holder chưa xác minh",
                             CombinedReason = !part.Current ? "SOURCE_INVALIDATED" : statics.Length > 1 || processes.Length > 1 ?

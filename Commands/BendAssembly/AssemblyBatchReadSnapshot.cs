@@ -107,8 +107,11 @@ namespace ADDIN.Commands.BendAssembly
         internal IReadOnlyList<string> Reasons { get; }
         internal double? CertifiedClearanceLowerMm { get; }
         internal AxialCollisionWitness Witness { get; }
+        internal string FrameId { get; }
+        internal string SourceSha256 { get; }
         internal AssemblyStaticPairRead(AxialPairResult source)
-        { Status = source.Status; Reasons = source.Reasons; CertifiedClearanceLowerMm = source.CertifiedClearanceLowerMm; Witness = source.Witness; }
+        { Status = source.Status; Reasons = source.Reasons; CertifiedClearanceLowerMm = source.CertifiedClearanceLowerMm;
+            Witness = source.Witness; FrameId = source.FrameId; SourceSha256 = source.SourceSha256; }
     }
     internal sealed class AssemblyProcessCandidateRead
     {

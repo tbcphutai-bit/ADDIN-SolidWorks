@@ -27,6 +27,10 @@ namespace ADDIN.UI
         internal IReadOnlyList<PointF[]> RegisteredHolder = new PointF[0][];
         internal IReadOnlyList<PointF[]> VerifiedPartContact = new PointF[0][];
         internal IReadOnlyList<PointF[]> VerifiedToolContact = new PointF[0][];
+        // Numeric solid/axial witness POINTS are not proof of which polygon
+        // EDGE was hit. Render a point marker, NEVER invent a red edge.
+        internal IReadOnlyList<PointF> VerifiedContactPoints = new PointF[0];
+        internal bool ContactPointProven;
         internal bool PlacementRegistered;
         internal bool ViolationProven;
         internal bool CollisionProven;
@@ -137,6 +141,8 @@ namespace ADDIN.UI
                 next.CollisionProven = false;
                 next.VerifiedPartContact = new PointF[0][];
                 next.VerifiedToolContact = new PointF[0][];
+                next.VerifiedContactPoints = new PointF[0];
+                next.ContactPointProven = false;
             }
             scene = next;
             if (!sameBend) { zoom = 1f; pan = PointF.Empty; }
@@ -218,6 +224,18 @@ namespace ADDIN.UI
                     Draw(g, scene.VerifiedPartContact, ContactRed, 5.2f, map);
                     if (registered) Draw(g, scene.VerifiedToolContact, ContactRed, 4.5f, map);
                 }
+                if(scene.ContactPointProven && !string.IsNullOrWhiteSpace(scene.ProofReference) &&
+                    scene.VerifiedContactPoints!=null)
+                {
+                    using(var outer=new Pen(ContactRed,2.5f))
+                    using(var fill=new SolidBrush(Color.FromArgb(250,232,232)))
+                        foreach(var witness in scene.VerifiedContactPoints)
+                        {
+                            var q=map(witness);
+                            g.FillEllipse(fill,q.X-5,q.Y-5,10,10);
+                            g.DrawEllipse(outer,q.X-5,q.Y-5,10,10);
+                        }
+                }
                 g.Restore(old);
                 DrawLegend(g, drawing);
             }
@@ -227,7 +245,9 @@ namespace ADDIN.UI
                     Color.FromArgb(100, 116, 139), TextFormatFlags.HorizontalCenter |
                     TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
             }
-            string message = (scene.ViolationProven || scene.CollisionProven) &&
+            string message = scene.ContactPointProven && !string.IsNullOrWhiteSpace(scene.ProofReference) ?
+                "Điểm va chạm xác minh bằng số · chưa xác định cạnh · " + scene.ProofReference :
+                (scene.ViolationProven || scene.CollisionProven) &&
                 !string.IsNullOrWhiteSpace(scene.ProofReference) ?
                 "Đã xác minh vùng vi phạm · " + scene.ProofReference :
                 registered ? "Đã ghép dao theo tọa độ gá được cung cấp" :
