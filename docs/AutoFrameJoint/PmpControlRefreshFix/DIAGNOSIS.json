@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-22",
+  "evidence_type": "USER_SUPPLIED_DEBUG_LOG_AND_SCREENSHOT_PLUS_SOURCE_INSPECTION",
+  "not_a_new_solidworks_api_run": true,
+  "private_original_log_sha256": "63ba320851c1d0b1a584e62bc6da0c1a437b2ac213e0bdeaddc0b9b9d17393c3",
+  "screenshot_statement": "AccessViolation at UpdateReadyState analyzeButtonControl.Enabled; original local source line 763",
+  "sequence": [
+    "A/B READY",
+    "AUTO ANALYZE START",
+    "read-only report returned; Cut geometry NOT GENERATED",
+    "READY",
+    "AccessViolationException",
+    "SOLIDWORKS exit code 1"
+  ],
+  "auto_analyze_end_before_failure": false,
+  "close_callback_logged_before_failure": false,
+  "native_root_cause": "UNVERIFIED",
+  "observed_failing_call_removed_from_source": true,
+  "runtime_crash_elimination": "UNVERIFIED",
+  "interop_comparison": {
+    "version": "32.5.0.48",
+    "installed_and_checkout_hashes_match": true,
+    "sldworks_sha256": "fa85c4e9b26d0ba996c53362e95afe42ab563c96f27d87cd6809d262f3d3c4cb",
+    "swpublished_sha256": "bf6e6ceff4db585a2f9e0de9034f93a7f6e2307632cb1f1155554f9854a78962"
+  },
+  "repair_scope": [
+    "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs"
+  ],
+  "not_run": [
+    "main Add-in build/rebuild",
+    "compile",
+    "tests",
+    "F5",
+    "deploy",
+    "post-patch SOLIDWORKS UI run"
+  ],
+  "code_owner_manual_verification": "See ../50_PMP_CONTROL_REFRESH_ACCESS_VIOLATION_FIX.md",
+  "private_information_policy": "Original paths, CAD, source backups and full debug log omitted"
+}

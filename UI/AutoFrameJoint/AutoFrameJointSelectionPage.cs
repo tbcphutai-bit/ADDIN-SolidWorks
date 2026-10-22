@@ -63,12 +63,24 @@ namespace ADDIN.UI.AutoFrameJoint
         private PropertyManagerPageLabel geometryStatusLabel;
         private PropertyManagerPageLabel geometryRoleLabel;
 
-        private bool shown;
-        private bool closing;
+        // R50: native UI work requires activation, the owner thread and a live epoch.
+        private readonly int ownerThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+        private int pageEpoch;
+        private volatile bool nativeActivated;
+        private volatile bool controlsFaulted;
+        private bool showInProgress;
+        private bool readyRefreshQueued;
+        private bool backendActionQueued;
+        private bool initialFocusApplied;
+        private bool closeNotified;
+        private readonly System.Collections.Generic.Dictionary<int, string> displayedCaptions =
+            new System.Collections.Generic.Dictionary<int, string>();
+
+        private volatile bool shown;
+        private volatile bool closing;
         private bool handlingAnalyze;
         private bool handlingShowBodies;
         private bool handlingCutPreview;
-        private bool cutPreviewQueued;
         private bool updatingReadyState;
         // A lightweight WinForms HWND schedules focus AFTER the native selection callback.
         // OnSelectionboxListChanged must never change SOLIDWORKS selection/focus inline.
@@ -76,7 +88,6 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool selectionRefreshQueued;
         private bool requestFocusB;
         private bool requestAutoAnalysis;
-        private bool autoAnalysisQueued;
         private bool finishQueued;
 
         // Keep analysis output while the same two component occurrences remain
@@ -118,37 +129,49 @@ namespace ADDIN.UI.AutoFrameJoint
         public void Show()
         {
             if (shown) return;
-            if (assembly == null ||
-                assembly.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
-                throw new InvalidOperationException(
-                    "Hãy mở Assembly trước khi dùng Auto Frame Joint.");
+            if (closing)
+                throw new InvalidOperationException("Trang đã đóng; hãy tạo phiên Auto Frame Joint mới.");
+            if (System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThreadId)
+                throw new InvalidOperationException("Auto Frame Joint phải mở trên thread UI đã tạo trang.");
+            if (assembly == null || assembly.GetType() != (int)swDocumentTypes_e.swDocASSEMBLY)
+                throw new InvalidOperationException("Hãy mở Assembly trước khi dùng Auto Frame Joint.");
 
+            System.Threading.Interlocked.Increment(ref pageEpoch);
+            nativeActivated = false;
+            controlsFaulted = false;
+            displayedCaptions.Clear();
             int error = 0;
             const int options =
                 (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_OkayButton |
                 (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_CancelButton;
-            page = app.CreatePropertyManagerPage(
-                "AUTO FRAME JOINT", options, this, ref error)
-                as PropertyManagerPage2;
-
-            if (page == null ||
-                error != (int)swPropertyManagerPageStatus_e.swPropertyManagerPage_Okay)
-                throw new InvalidOperationException(
-                    "Không tạo được PropertyManager Page. Mã lỗi: " + error);
-
-            BuildControls();
-            InitializeDeferredFocusWindow();
-            Trace.WriteLine("[AFJ-R49] PMP UI loaded: P1=107 P2=108, deferred preview enabled");
-            shown = true;
             try
             {
-                page.Show2(0);
+                page = app.CreatePropertyManagerPage("AUTO FRAME JOINT", options, this, ref error)
+                    as PropertyManagerPage2;
+                if (page == null || error != (int)swPropertyManagerPageStatus_e.swPropertyManagerPage_Okay)
+                    throw new InvalidOperationException("Không tạo được PropertyManager Page. Mã lỗi: " + error);
+                BuildControls();
+                InitializeDeferredFocusWindow();
+                if (deferredFocusWindow == null)
+                    throw new InvalidOperationException("Không tạo được bộ điều phối UI. Hãy mở lại lệnh.");
+                shown = true;
+                showInProgress = true;
+                int status;
+                try { status = page.Show2(0); }
+                finally { showInProgress = false; }
+                if (status != (int)swPropertyManagerPageStatus_e.swPropertyManagerPage_Okay)
+                    throw new InvalidOperationException("Không hiển thị được PropertyManager. Mã lỗi: " + status);
+                Trace.WriteLine("[AFJ-R50] SHOW epoch=" + pageEpoch + " owner=" + ownerThreadId);
                 UpdateReadyState();
-                selectionA.SetSelectionFocus();
+                QueueInitialFocus();
             }
             catch
             {
+                closing = true;
                 shown = false;
+                nativeActivated = false;
+                showInProgress = false;
+                System.Threading.Interlocked.Increment(ref pageEpoch);
                 DisposeDeferredFocusWindow();
                 throw;
             }
@@ -156,9 +179,8 @@ namespace ADDIN.UI.AutoFrameJoint
 
         /// <summary>
         /// Creates a handle on the CURRENT SOLIDWORKS UI thread, so BeginInvoke
-        /// runs later on the same UI thread after SOLIDWORKS has finished the
-        /// in-progress selection callback. If handle setup fails, manual selection
-        /// remains fully usable.
+        /// posts work to the same UI thread. If setup fails, Show aborts
+        /// instead of running backend work inside a native callback.
         /// </summary>
         private void InitializeDeferredFocusWindow()
         {
@@ -182,82 +204,34 @@ namespace ADDIN.UI.AutoFrameJoint
         /// optionally advance A to B AFTER SOLIDWORKS returns from selection.
         /// Only a WinForms UI-thread message is posted here. No background COM.
         /// </summary>
-        private void QueueSelectionRefresh(bool advanceFromA,
-                                           bool analyzeAfterB)
+        private void QueueSelectionRefresh(bool advanceFromA, bool analyzeAfterB)
         {
-            if (!shown || closing) return;
-
-            if (advanceFromA)
-                requestFocusB = true;
-            if (analyzeAfterB)
-                requestAutoAnalysis = true;
-
-            // If the WinForms dispatcher cannot initialize, preserve legacy
-            // manual-selection behavior and avoid losing the ready-state UI.
-            if (deferredFocusWindow == null)
-            {
-                requestFocusB = false;
-                requestAutoAnalysis = false;
-                UpdateReadyState();
-                return;
-            }
-
+            if (!IsUiLive(pageEpoch)) return;
+            requestFocusB |= advanceFromA;
+            requestAutoAnalysis |= analyzeAfterB;
             if (selectionRefreshQueued) return;
             selectionRefreshQueued = true;
-            try
-            {
-                deferredFocusWindow.BeginInvoke(
-                    (System.Windows.Forms.MethodInvoker)delegate
-                    {
-                        selectionRefreshQueued = false;
-                        if (!shown || closing) return;
-
-                        // Keep all selection/identity COM checks OUT of
-                        // the in-progress OnSelectionboxListChanged callback.
-                        UpdateReadyState();
-
-                        // This is already after the native selection callback.
-                        // Queue ANALYZE to a SECOND UI message, so button/status
-                        // can repaint before the read-only geometry probe runs.
-                        bool runAnalysis = requestAutoAnalysis;
-                        requestAutoAnalysis = false;
-                        if (runAnalysis)
-                            QueueAutoAnalysis();
-
-                        bool tryAdvance = requestFocusB;
-                        requestFocusB = false;
-                        if (!tryAdvance || selectionA == null ||
-                            selectionB == null)
-                            return;
-
-                        try
-                        {
-                            // Never steal focus if user manually chose B
-                            // or changed the current Assembly in the meantime.
-                            if (selectionA.GetSelectionFocus() &&
-                                IsSameDocumentActive() &&
-                                Selected(MarkFrameA) != null &&
-                                Selected(MarkFrameB) == null)
-                            {
-                                selectionB.SetSelectionFocus();
-                                Trace.WriteLine("[AFJ-SEL] A->B AUTO FOCUS");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Trace.WriteLine("[AFJ-SEL] Auto focus unavailable: " + ex);
-                        }
-                    });
-            }
-            catch (Exception ex)
+            if (!PostUi("selection refresh", delegate
             {
                 selectionRefreshQueued = false;
-                requestFocusB = false;
-                requestAutoAnalysis = false;
-                Trace.WriteLine("[AFJ-SEL] Defer UI failed: " + ex);
-                // Selection continues to work even if BeginInvoke is unavailable.
+                if (IsBackendBusy()) return; // Requests drain after the current action.
                 UpdateReadyState();
-            }
+                bool analyze = requestAutoAnalysis;
+                bool advance = requestFocusB;
+                requestAutoAnalysis = false;
+                requestFocusB = false;
+                if (analyze) QueueAutoAnalysis();
+                if (!advance || selectionA == null || selectionB == null) return;
+                int epoch = pageEpoch;
+                if (selectionA.GetSelectionFocus() && IsUiLive(epoch) &&
+                    IsSameDocumentActive() && IsUiLive(epoch) &&
+                    Selected(MarkFrameA) != null && IsUiLive(epoch) &&
+                    Selected(MarkFrameB) == null && IsUiLive(epoch))
+                {
+                    selectionB.SetSelectionFocus();
+                    Trace.WriteLine("[AFJ-SEL] A->B AUTO FOCUS");
+                }
+            })) selectionRefreshQueued = false;
         }
 
         /// <summary>
@@ -267,56 +241,13 @@ namespace ADDIN.UI.AutoFrameJoint
         /// </summary>
         private void QueueAutoAnalysis()
         {
-            if (!shown || closing || autoAnalysisQueued ||
-                deferredFocusWindow == null)
+            if (!IsUiLive(pageEpoch)) return;
+            if (IsBackendBusy() || backendActionQueued)
+            {
+                requestAutoAnalysis = true;
                 return;
-            autoAnalysisQueued = true;
-
-            try
-            {
-                deferredFocusWindow.BeginInvoke(
-                    (System.Windows.Forms.MethodInvoker)delegate
-                    {
-                        autoAnalysisQueued = false;
-                        if (!shown || closing || handlingAnalyze ||
-                            handlingShowBodies || !IsSameDocumentActive())
-                            return;
-
-                        try
-                        {
-                            Component2 a, b;
-                            string reason;
-                            if (!TryReadSelection(out a, out b, out reason, false))
-                            {
-                                Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE NOT READY: " +
-                                                reason);
-                                UpdateReadyState();
-                                return;
-                            }
-
-                            // Prevent duplicate heavy B-rep scans if the user
-                            // has already run Analyze for the exact same pair.
-                            if (IsPreviousPair(a, b) &&
-                                !String.IsNullOrEmpty(lastAnalysisMessage))
-                                return;
-
-                            Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE START");
-                            PerformAnalyze();
-                            Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE END");
-                        }
-                        catch (Exception ex)
-                        {
-                            Trace.WriteLine("[AFJ-SEL] Auto analyze error: " + ex);
-                            UpdateReadyState();
-                        }
-                    });
             }
-            catch (Exception ex)
-            {
-                autoAnalysisQueued = false;
-                Trace.WriteLine("[AFJ-SEL] Auto analyze queue failed: " + ex);
-                // Manual Analyze remains available.
-            }
+            QueueBackendAction(0, 0, true);
         }
 
         /// <summary>
@@ -327,65 +258,35 @@ namespace ADDIN.UI.AutoFrameJoint
         /// </summary>
         private void QueueFinishPage()
         {
-            if (!shown || closing || finishQueued) return;
-            if (deferredFocusWindow == null)
+            if (!IsUiLive(pageEpoch) || finishQueued) return;
+            if (IsBackendBusy() || backendActionQueued)
             {
-                Trace.WriteLine("[AFJ-PMP] Finish dispatcher unavailable; use green OK.");
-                if (statusLabel != null)
-                    statusLabel.Caption = "Nhấn dấu tích xanh ở đầu bảng để kết thúc.";
+                Trace.WriteLine("[AFJ-R50] FINISH deferred action busy; no native close");
                 return;
             }
-
             finishQueued = true;
-            try
-            {
-                deferredFocusWindow.BeginInvoke(
-                    (System.Windows.Forms.MethodInvoker)delegate
-                    {
-                        finishQueued = false;
-                        if (!shown || closing) return;
-                        try
-                        {
-                            PropertyManagerPage2 current = page;
-                            if (current != null)
-                            {
-                                Trace.WriteLine("[AFJ-PMP] FINISH CLICK: close only, no cut");
-                                current.Close(true);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Trace.WriteLine("[AFJ-PMP] Finish close failed: " + ex);
-                            if (statusLabel != null && !closing)
-                                statusLabel.Caption = "Không đóng được; hãy dùng dấu X đỏ.";
-                        }
-                    });
-            }
-            catch (Exception ex)
+            if (!PostUi("finish", delegate
             {
                 finishQueued = false;
-                Trace.WriteLine("[AFJ-PMP] Finish queue failed: " + ex);
-                if (statusLabel != null && !closing)
-                    statusLabel.Caption = "Nhấn dấu tích xanh để kết thúc.";
-            }
+                if (IsBackendBusy() || backendActionQueued || page == null) return;
+                Trace.WriteLine("[AFJ-PMP] FINISH CLICK: close only, no cut");
+                page.Close(true);
+            })) finishQueued = false;
         }
 
         private void DisposeDeferredFocusWindow()
         {
-            System.Windows.Forms.Control deferred = deferredFocusWindow;
+            System.Windows.Forms.Control dispatcher = deferredFocusWindow;
             deferredFocusWindow = null;
+            readyRefreshQueued = false;
+            backendActionQueued = false;
             selectionRefreshQueued = false;
             requestFocusB = false;
             requestAutoAnalysis = false;
-            autoAnalysisQueued = false;
-            cutPreviewQueued = false;
             finishQueued = false;
-            if (deferred == null) return;
-            try { deferred.Dispose(); }
-            catch (Exception ex)
-            {
-                Trace.WriteLine("[AFJ-SEL] Deferred focus dispose: " + ex);
-            }
+            if (dispatcher == null) return;
+            try { dispatcher.Dispose(); }
+            catch (Exception ex) { TraceUiFault("dispatcher dispose", ex, false); }
         }
 
         private void BuildControls()
@@ -486,10 +387,6 @@ namespace ADDIN.UI.AutoFrameJoint
             };
             selectionA.SetSelectionFilters(filter);
             selectionB.SetSelectionFilters(filter);
-            analyzeButtonControl.Enabled = false;
-            showBodiesButtonControl.Enabled = false;
-            cutP1ButtonControl.Enabled = false;
-            cutP2ButtonControl.Enabled = false;
 
             var detailsGroup = page.AddGroupBox(
                 GroupInformation, "Thông tin", groupOptions)
@@ -714,17 +611,14 @@ namespace ADDIN.UI.AutoFrameJoint
 
         private void UpdateGeometryLabels()
         {
-            string[] x = lastGeometryLines;
-            if (geometryAngleLabel != null)
-                geometryAngleLabel.Caption = x == null ? "Góc hai trục: chưa tính" : x[1];
-            if (geometryPointLabel != null)
-                geometryPointLabel.Caption = x == null ? "XYZ gần nhất: chưa tính" : x[2];
-            if (geometryGapLabel != null)
-                geometryGapLabel.Caption = x == null ? "Khoảng cách trục: chưa tính" : x[3];
-            if (geometryStatusLabel != null)
-                geometryStatusLabel.Caption = x == null ? "Trạng thái: chưa tính" : x[4];
-            if (geometryRoleLabel != null)
-                geometryRoleLabel.Caption = x == null ? "Dài/ngắn: chưa tính" : x[5];
+            int epoch = pageEpoch;
+            string[] lines = lastGeometryLines;
+            if (lines != null && lines.Length < 6) lines = null;
+            if (!SetCaption(geometryAngleLabel, LabelAngle, lines == null ? "Góc hai trục: chưa tính" : lines[1], epoch)) return;
+            if (!SetCaption(geometryPointLabel, LabelPoint, lines == null ? "XYZ gần nhất: chưa tính" : lines[2], epoch)) return;
+            if (!SetCaption(geometryGapLabel, LabelGap, lines == null ? "Khoảng cách trục: chưa tính" : lines[3], epoch)) return;
+            if (!SetCaption(geometryStatusLabel, LabelJointStatus, lines == null ? "Trạng thái: chưa tính" : lines[4], epoch)) return;
+            SetCaption(geometryRoleLabel, LabelRole, lines == null ? "Dài/ngắn: chưa tính" : lines[5], epoch);
         }
 
         private bool IsPreviousPair(Component2 a, Component2 b)
@@ -753,112 +647,59 @@ namespace ADDIN.UI.AutoFrameJoint
 
         private void UpdateReadyState()
         {
-            if (!shown || closing || updatingReadyState) return;
-            updatingReadyState = true;
-            try
+            // Queue only. Never mutate native controls in a backend finally
+            // or inside a SOLIDWORKS selection/button callback.
+            if (!IsUiLive(pageEpoch) || readyRefreshQueued) return;
+            readyRefreshQueued = true;
+            if (!PostUi("ready refresh", delegate
             {
-                Component2 a, b;
-                string reason;
-                bool ready = TryReadSelection(out a, out b, out reason, false);
-                TraceSelectionState(ready, reason);
-
-                if (!ready || !IsPreviousPair(a, b))
-                    ClearAnalysisResult();
-
-                if (analyzeButtonControl != null)
-                    analyzeButtonControl.Enabled = ready && !handlingAnalyze &&
-                                                   !handlingShowBodies;
-                if (showBodiesButtonControl != null)
-                    showBodiesButtonControl.Enabled = ready && !handlingAnalyze &&
-                                                    !handlingShowBodies;
-                if (cutP1ButtonControl != null)
-                    cutP1ButtonControl.Enabled = ready && !handlingAnalyze &&
-                                                 !handlingShowBodies && !handlingCutPreview;
-                if (cutP2ButtonControl != null)
-                    cutP2ButtonControl.Enabled = ready && !handlingAnalyze &&
-                                                 !handlingShowBodies && !handlingCutPreview;
-                if (statusLabel != null)
-                    statusLabel.Caption = ready &&
-                        !String.IsNullOrEmpty(lastPreviewMessage)
-                        ? lastPreviewMessage :
-                        (ready && !String.IsNullOrEmpty(lastAnalysisMessage)
-                            ? lastAnalysisMessage : reason);
-                UpdateGeometryLabels();
-            }
-            catch (Exception ex)
-            {
-                ClearAnalysisResult();
-                Trace.WriteLine("[AFJ-PMP] Ready state error: " + ex);
-                if (analyzeButtonControl != null)
-                    analyzeButtonControl.Enabled = false;
-                if (showBodiesButtonControl != null)
-                    showBodiesButtonControl.Enabled = false;
-                if (cutP1ButtonControl != null) cutP1ButtonControl.Enabled = false;
-                if (cutP2ButtonControl != null) cutP2ButtonControl.Enabled = false;
-                if (statusLabel != null)
-                    statusLabel.Caption = "Lỗi chọn Frame — xem Output.";
-            }
-            finally
-            {
-                updatingReadyState = false;
-            }
+                readyRefreshQueued = false;
+                if (!IsBackendBusy()) ApplyReadyState();
+            })) readyRefreshQueued = false;
         }
 
         private void PerformAnalyze()
         {
-            if (closing || handlingAnalyze || handlingShowBodies) return;
-
+            int epoch = pageEpoch;
+            if (!IsUiLive(epoch) || IsBackendBusy()) return;
             Component2 a = null, b = null;
-            string reason;
             handlingAnalyze = true;
-            if (statusLabel != null)
-                statusLabel.Caption = "Đang tính trục và giao góc 3D...";
-            if (analyzeButtonControl != null)
-                analyzeButtonControl.Enabled = false;
-
             try
             {
-                // Read the selected pair with the same shallow constraints as
-                // readiness, then validate component documents only here.
+                string reason;
                 if (!TryReadSelection(out a, out b, out reason, true))
                 {
-                    if (a != null && b != null && DefinitelyDifferent(a, b))
-                        StoreAnalysisResult(a, b, reason);
-                    else
-                    {
-                        ClearAnalysisResult();
-                        if (statusLabel != null) statusLabel.Caption = reason;
-                    }
+                    if (IsUiLive(epoch)) { ClearAnalysisResult(); lastAnalysisMessage = reason; }
                     return;
                 }
-
-                if (onAnalyze == null)
-                {
-                    StoreAnalysisResult(a, b,
-                        "Đã chọn 2 Frame. Chưa nối bộ phân tích.");
-                    return;
-                }
-
-                string result = onAnalyze(a, b);
-                // Preserve multiline geometric fields for the dedicated
-                // compact PropertyManager labels. Do not flatten lines.
-                StoreAnalysisResult(a, b,
-                    String.IsNullOrWhiteSpace(result)
-                        ? "Không nhận được kết quả phân tích."
-                        : result);
+                if (!IsUiLive(epoch)) return;
+                bool previousPair = IsPreviousPair(a, b);
+                if (!IsUiLive(epoch)) return;
+                if (!previousPair) ClearAnalysisResult();
+                lastPreviewMessage = null;
+                if (!SetCaption(statusLabel, LabelStatus, "Đang tính trục và giao góc 3D...", epoch)) return;
+                if (!IsUiLive(epoch)) return;
+                Trace.WriteLine("[AFJ-R50] BACKEND BEGIN Analyze epoch=" + epoch);
+                string result = onAnalyze == null ? "Đã chọn 2 Frame. Chưa nối bộ phân tích." : onAnalyze(a, b);
+                Trace.WriteLine("[AFJ-R50] BACKEND END Analyze epoch=" + epoch);
+                if (!IsActionPairCurrent(a, b, epoch)) return;
+                StoreAnalysisResult(a, b, String.IsNullOrWhiteSpace(result) ? "Không nhận được kết quả phân tích." : result);
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("[AFJ-PMP] Analyze error: " + ex);
-                if (a != null && b != null && DefinitelyDifferent(a, b))
-                    StoreAnalysisResult(a, b, "Lỗi phân tích — xem Output.");
-                else
-                    ClearAnalysisResult();
+                // Logging and managed state only. Do not retry a native UI
+                // object here, and do not opt into corrupted-state recovery.
+                TraceUiFault("Analyze", ex, false);
+                if (IsUiLive(epoch))
+                {
+                    if (a != null && b != null) StoreAnalysisResult(a, b, "Lỗi phân tích — xem Output.");
+                    else ClearAnalysisResult();
+                }
             }
             finally
             {
                 handlingAnalyze = false;
-                UpdateReadyState(); // preserves message for same A/B pair
+                QueueAfterAction(epoch);
             }
         }
 
@@ -870,54 +711,44 @@ namespace ADDIN.UI.AutoFrameJoint
         /// </summary>
         private void PerformShowBodies()
         {
-            if (closing || handlingAnalyze || handlingShowBodies) return;
-
+            int epoch = pageEpoch;
+            if (!IsUiLive(epoch) || IsBackendBusy()) return;
             Component2 a = null, b = null;
-            string reason;
             handlingShowBodies = true;
-            if (showBodiesButtonControl != null)
-                showBodiesButtonControl.Enabled = false;
-
             try
             {
+                string reason;
                 if (!TryReadSelection(out a, out b, out reason, true))
                 {
-                    if (a != null && b != null && DefinitelyDifferent(a, b))
-                        StoreAnalysisResult(a, b, reason);
-                    else
-                    {
-                        ClearAnalysisResult();
-                        if (statusLabel != null) statusLabel.Caption = reason;
-                    }
+                    if (IsUiLive(epoch)) { ClearAnalysisResult(); lastAnalysisMessage = reason; }
                     return;
                 }
-
-                if (onShowBodies == null)
-                {
-                    StoreAnalysisResult(a, b, "Chưa kết nối bộ hiển thị A/B.");
-                    return;
-                }
-
-                string result = onShowBodies(a, b);
-                // Reuse pair-scoped status cache; old messages are invalidated
-                // automatically if the user changes either selected occurrence.
-                StoreAnalysisResult(a, b,
-                    String.IsNullOrWhiteSpace(result)
-                        ? "Không nhận được trạng thái Preview."
-                        : result.Replace("\r", " ").Replace("\n", " "));
+                if (!IsUiLive(epoch)) return;
+                bool previousPair = IsPreviousPair(a, b);
+                if (!IsUiLive(epoch)) return;
+                if (!previousPair) ClearAnalysisResult();
+                lastPreviewMessage = null;
+                if (!SetCaption(statusLabel, LabelStatus, "Đang tạo bản xem Frame A/B...", epoch)) return;
+                if (!IsUiLive(epoch)) return;
+                Trace.WriteLine("[AFJ-R50] BACKEND BEGIN Show A/B epoch=" + epoch);
+                string result = onShowBodies == null ? "Chưa kết nối bộ hiển thị A/B." : onShowBodies(a, b);
+                Trace.WriteLine("[AFJ-R50] BACKEND END Show A/B epoch=" + epoch);
+                if (!IsActionPairCurrent(a, b, epoch)) return;
+                StoreAnalysisResult(a, b, String.IsNullOrWhiteSpace(result) ? "Không nhận được trạng thái Preview." : result.Replace("\r", " ").Replace("\n", " "));
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("[AFJ-PMP] Show bodies error: " + ex);
-                if (a != null && b != null && DefinitelyDifferent(a, b))
-                    StoreAnalysisResult(a, b, "Lỗi hiển thị A/B — xem Output.");
-                else
-                    ClearAnalysisResult();
+                TraceUiFault("Show A/B", ex, false);
+                if (IsUiLive(epoch))
+                {
+                    if (a != null && b != null) StoreAnalysisResult(a, b, "Lỗi hiển thị A/B — xem Output.");
+                    else ClearAnalysisResult();
+                }
             }
             finally
             {
                 handlingShowBodies = false;
-                UpdateReadyState();
+                QueueAfterAction(epoch);
             }
         }
 
@@ -930,62 +761,8 @@ namespace ADDIN.UI.AutoFrameJoint
         /// </summary>
         private void QueueCutCandidate(int candidate)
         {
-            Trace.WriteLine("[AFJ-R49] QUEUE P" + candidate +
-                            " shown=" + shown + " closing=" + closing +
-                            " queued=" + cutPreviewQueued);
-            if (!shown || closing) return;
-            if (cutPreviewQueued || handlingCutPreview)
-            {
-                Trace.WriteLine("[AFJ-R49] QUEUE REJECT busy");
-                if (statusLabel != null)
-                    statusLabel.Caption = "Đang xử lý Preview trước. Vui lòng chờ.";
-                return;
-            }
-            if (deferredFocusWindow == null ||
-                !deferredFocusWindow.IsHandleCreated)
-            {
-                Trace.WriteLine("[AFJ-R49] QUEUE REJECT dispatcher unavailable");
-                lastPreviewMessage = "Không có UI dispatcher để chạy Preview. Xem Output.";
-                if (statusLabel != null) statusLabel.Caption = lastPreviewMessage;
-                return;
-            }
-
-            cutPreviewQueued = true;
-            lastPreviewMessage = "Đã nhận chế độ " + candidate +
-                                 " — đang chờ SOLIDWORKS xử lý Preview...";
-            if (statusLabel != null)
-                statusLabel.Caption = lastPreviewMessage;
-            try
-            {
-                deferredFocusWindow.BeginInvoke(
-                    (System.Windows.Forms.MethodInvoker)delegate
-                    {
-                        cutPreviewQueued = false;
-                        Trace.WriteLine("[AFJ-R49] DISPATCH P" + candidate +
-                                        " shown=" + shown + " closing=" + closing);
-                        if (!shown || closing) return;
-                        try
-                        {
-                            PerformCutCandidate(candidate);
-                        }
-                        catch (Exception ex)
-                        {
-                            Trace.WriteLine("[AFJ-R49] DISPATCH EXCEPTION " + ex);
-                            lastPreviewMessage = "Không thực hiện được Preview: " +
-                                                 ex.Message;
-                            if (statusLabel != null)
-                                statusLabel.Caption = lastPreviewMessage;
-                        }
-                    });
-            }
-            catch (Exception ex)
-            {
-                cutPreviewQueued = false;
-                Trace.WriteLine("[AFJ-R49] QUEUE EXCEPTION " + ex);
-                lastPreviewMessage = "Không lên lịch được Preview: " + ex.Message;
-                if (statusLabel != null)
-                    statusLabel.Caption = lastPreviewMessage;
-            }
+            if (candidate != 1 && candidate != 2) return;
+            QueueBackendAction(2, candidate, false);
         }
 
         /// <summary>
@@ -994,79 +771,87 @@ namespace ADDIN.UI.AutoFrameJoint
         /// </summary>
         private void PerformCutCandidate(int candidate)
         {
-            Trace.WriteLine("[AFJ-R49] PERFORM ENTER P" + candidate);
-            if (closing || handlingAnalyze || handlingShowBodies || handlingCutPreview)
-            {
-                Trace.WriteLine("[AFJ-R49] PERFORM REJECT busy/closing");
-                return;
-            }
+            int epoch = pageEpoch;
+            if (!IsUiLive(epoch) || IsBackendBusy()) return;
             Component2 a = null, b = null;
-            string reason;
             handlingCutPreview = true;
             try
             {
+                string reason;
                 if (!TryReadSelection(out a, out b, out reason, true))
                 {
-                    Trace.WriteLine("[AFJ-R49] PERFORM REJECT selection: " + reason);
-                    lastPreviewMessage = reason;
-                    if (statusLabel != null) statusLabel.Caption = reason;
+                    if (IsUiLive(epoch)) { ClearAnalysisResult(); lastPreviewMessage = reason; }
                     return;
                 }
-                Trace.WriteLine("[AFJ-R49] PERFORM selection valid P" + candidate);
-                if (onPreviewCut == null)
-                {
-                    if (statusLabel != null)
-                        statusLabel.Caption = "Chưa nối backend preview.";
-                    Trace.WriteLine("[AFJ-R49] PERFORM REJECT callback null");
-                    return;
-                }
-                if (statusLabel != null)
-                    statusLabel.Caption = "Đang tạo Boolean B-rep tạm cho hai Frame...";
-                Trace.WriteLine("[AFJ-R49] BACKEND CALL P" + candidate);
-                string result = onPreviewCut(a, b, candidate);
-                Trace.WriteLine("[AFJ-R49] BACKEND RETURN P" + candidate + " " + result);
-                lastPreviewMessage = String.IsNullOrWhiteSpace(result)
-                    ? "Không nhận được kết quả preview." : result;
-                if (statusLabel != null) statusLabel.Caption = lastPreviewMessage;
-                Trace.WriteLine("[AFJ-PMP] CUT P" + candidate + " " + result);
+                if (!IsUiLive(epoch)) return;
+                bool previousPair = IsPreviousPair(a, b);
+                if (!IsUiLive(epoch)) return;
+                if (!previousPair) ClearAnalysisResult();
+                if (!SetCaption(statusLabel, LabelStatus, "Đang tạo Preview cho hai Frame...", epoch)) return;
+                if (!IsUiLive(epoch)) return;
+                Trace.WriteLine("[AFJ-R50] BACKEND BEGIN Preview P" + candidate + " epoch=" + epoch);
+                string result = onPreviewCut == null ? "Chưa nối backend Preview." : onPreviewCut(a, b, candidate);
+                Trace.WriteLine("[AFJ-R50] BACKEND END Preview P" + candidate + " epoch=" + epoch);
+                if (!IsActionPairCurrent(a, b, epoch)) return;
+                // Preserve the pair and geometric fields without flattening
+                // a preview result into the analysis geometry cache.
+                analyzedA = a;
+                analyzedB = b;
+                lastPreviewMessage = String.IsNullOrWhiteSpace(result) ? "Không nhận được kết quả Preview." : result;
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("[AFJ-PMP] Cut preview error: " + ex);
-                lastPreviewMessage = "Lỗi Preview: " + ex.Message;
-                if (statusLabel != null) statusLabel.Caption = lastPreviewMessage;
+                TraceUiFault("Preview P" + candidate, ex, false);
+                if (IsUiLive(epoch))
+                {
+                    analyzedA = a;
+                    analyzedB = b;
+                    lastPreviewMessage = "Lỗi Preview — xem Output.";
+                }
             }
             finally
             {
                 handlingCutPreview = false;
-                // Preserve preview message and restore button availability.
-                if (analyzeButtonControl != null) analyzeButtonControl.Enabled = !closing;
-                if (showBodiesButtonControl != null) showBodiesButtonControl.Enabled = !closing;
-                if (cutP1ButtonControl != null) cutP1ButtonControl.Enabled = !closing;
-                if (cutP2ButtonControl != null) cutP2ButtonControl.Enabled = !closing;
-                Trace.WriteLine("[AFJ-R49] PERFORM EXIT P" + candidate);
+                QueueAfterAction(epoch);
             }
         }
 
         // ---------------- Native PMP callback methods ----------------
-        public void AfterActivation() { }
+        public void AfterActivation()
+        {
+            if (!shown || closing || controlsFaulted) return;
+            if (System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThreadId)
+            {
+                controlsFaulted = true;
+                Trace.WriteLine("[AFJ-R50] ACTIVATION rejected: owner thread mismatch");
+                return;
+            }
+            nativeActivated = true;
+            Trace.WriteLine("[AFJ-R50] ACTIVATED epoch=" + pageEpoch);
+            UpdateReadyState();
+            QueueInitialFocus();
+        }
 
         public void OnClose(int reason)
         {
+            // Invalidate queued work BEFORE any native controls are released.
             closing = true;
-            // Native OK and Cancel only finish/cancel this read-only session.
-            // Neither invokes a Part cut; cleanup is performed by AfterClose.
-            Trace.WriteLine("[AFJ-PMP] OnClose reason=" + reason + "; no cut");
+            nativeActivated = false;
+            System.Threading.Interlocked.Increment(ref pageEpoch);
+            Trace.WriteLine("[AFJ-R50] CLOSING reason=" + reason + " epoch=" + pageEpoch + "; no cut");
         }
 
         public void AfterClose()
         {
+            if (closeNotified) return;
+            closeNotified = true;
             closing = true;
             shown = false;
+            nativeActivated = false;
+            System.Threading.Interlocked.Increment(ref pageEpoch);
             ClearAnalysisResult();
-            // Cancel queued UI work before releasing native PMP controls.
+            displayedCaptions.Clear();
             DisposeDeferredFocusWindow();
-
             page = null;
             selectionA = null;
             selectionB = null;
@@ -1081,24 +866,12 @@ namespace ADDIN.UI.AutoFrameJoint
             geometryGapLabel = null;
             geometryStatusLabel = null;
             geometryRoleLabel = null;
-            try
-            {
-                if (onClearPreview != null) onClearPreview();
-            }
-            catch (Exception ex)
-            {
-                Trace.WriteLine("[AFJ-PMP] Preview cleanup failed: " + ex);
-            }
+            try { if (onClearPreview != null) onClearPreview(); }
+            catch (Exception ex) { TraceUiFault("preview cleanup", ex, false); }
             finally
             {
-                try
-                {
-                    if (onClosed != null) onClosed(this);
-                }
-                catch (Exception ex)
-                {
-                    Trace.WriteLine("[AFJ-PMP] Page-close callback failed: " + ex);
-                }
+                try { if (onClosed != null) onClosed(this); }
+                catch (Exception ex) { TraceUiFault("page closed callback", ex, false); }
             }
         }
 
@@ -1116,18 +889,12 @@ namespace ADDIN.UI.AutoFrameJoint
         public void OnOptionCheck(int id) { }
         public void OnButtonPress(int id)
         {
-            Trace.WriteLine("[AFJ-R49] OnButtonPress id=" + id +
-                            " shown=" + shown + " closing=" + closing);
-            if (id == ButtonAnalyze)
-                PerformAnalyze();
-            else if (id == ButtonShowBodies)
-                PerformShowBodies();
-            else if (id == ButtonFinish)
-                QueueFinishPage();
-            else if (id == ButtonCutP1)
-                QueueCutCandidate(1);
-            else if (id == ButtonCutP2)
-                QueueCutCandidate(2);
+            Trace.WriteLine("[AFJ-R50] BUTTON id=" + id + " epoch=" + pageEpoch);
+            if (id == ButtonAnalyze) QueueBackendAction(0, 0, false);
+            else if (id == ButtonShowBodies) QueueBackendAction(1, 0, false);
+            else if (id == ButtonFinish) QueueFinishPage();
+            else if (id == ButtonCutP1) QueueCutCandidate(1);
+            else if (id == ButtonCutP2) QueueCutCandidate(2);
         }
         public void OnTextboxChanged(int id, string value) { }
         public void OnNumberboxChanged(int id, double value) { }
@@ -1237,5 +1004,192 @@ namespace ADDIN.UI.AutoFrameJoint
         }
         public void OnListboxRMBUp(int id, int x, int y) { }
         public void OnNumberBoxTrackingCompleted(int id, double value) { }
+
+        private bool IsBackendBusy()
+        {
+            return handlingAnalyze || handlingShowBodies || handlingCutPreview;
+        }
+
+        private bool IsUiLive(int epoch)
+        {
+            return epoch == System.Threading.Volatile.Read(ref pageEpoch) &&
+                shown && !closing && nativeActivated && !showInProgress && !controlsFaulted &&
+                System.Threading.Thread.CurrentThread.ManagedThreadId == ownerThreadId;
+        }
+
+        private bool PostUi(string operation, Action action)
+        {
+            int epoch = pageEpoch;
+            if (!IsUiLive(epoch)) return false;
+            System.Windows.Forms.Control dispatcher = deferredFocusWindow;
+            if (dispatcher == null || dispatcher.IsDisposed || !dispatcher.IsHandleCreated)
+            {
+                Trace.WriteLine("[AFJ-R50] POST rejected: dispatcher unavailable " + operation);
+                return false;
+            }
+            try
+            {
+                dispatcher.BeginInvoke((System.Windows.Forms.MethodInvoker)delegate
+                {
+                    if (!IsUiLive(epoch))
+                    {
+                        Trace.WriteLine("[AFJ-R50] DROP stale/inactive UI work " + operation + " epoch=" + epoch);
+                        return;
+                    }
+                    try { action(); }
+                    catch (Exception ex) { TraceUiFault(operation, ex, true); }
+                });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                TraceUiFault("post " + operation, ex, true);
+                return false;
+            }
+        }
+
+        private void TraceUiFault(string operation, Exception ex, bool blockControls)
+        {
+            // No COM calls, captions, Enabled writes or ReleaseComObject here.
+            // This does not catch/recover native corrupted-state exceptions.
+            if (blockControls)
+            {
+                controlsFaulted = true;
+                readyRefreshQueued = false;
+                requestAutoAnalysis = false;
+                requestFocusB = false;
+            }
+            Trace.WriteLine("[AFJ-R50] FAULT " + operation + " epoch=" + pageEpoch +
+                " owner=" + ownerThreadId + " thread=" + System.Threading.Thread.CurrentThread.ManagedThreadId +
+                " HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex.GetType().FullName + " " + ex.Message);
+            Trace.WriteLine(ex.StackTrace);
+        }
+
+        private bool SetCaption(PropertyManagerPageLabel label, int id, string text, int epoch)
+        {
+            if (!IsUiLive(epoch)) return false;
+            if (label == null) return true; // Optional geometry group.
+            string previous;
+            if (displayedCaptions.TryGetValue(id, out previous) && previous == text) return true;
+            Trace.WriteLine("[AFJ-R50] CAPTION BEGIN id=" + id + " epoch=" + epoch);
+            try
+            {
+                label.Caption = text;
+                if (!IsUiLive(epoch)) return false;
+                displayedCaptions[id] = text;
+                Trace.WriteLine("[AFJ-R50] CAPTION END id=" + id + " epoch=" + epoch);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                TraceUiFault("caption id=" + id, ex, true);
+                return false;
+            }
+        }
+
+        private void ApplyReadyState()
+        {
+            int epoch = pageEpoch;
+            if (!IsUiLive(epoch) || IsBackendBusy() || updatingReadyState) return;
+            updatingReadyState = true;
+            try
+            {
+                // Buttons remain enabled from AddControl2. Do not call the
+                // native IPropertyManagerPageControl.Enabled setter: it is the
+                // crashing call in the supplied log/screenshot. Validate the
+                // current selection again in every action instead.
+                Component2 a, b;
+                string reason;
+                bool ready = TryReadSelection(out a, out b, out reason, false);
+                if (!IsUiLive(epoch)) return;
+                if (!IsSameDocumentActive()) return;
+                if (!IsUiLive(epoch)) return;
+                TraceSelectionState(ready, reason);
+                if (!IsUiLive(epoch)) return;
+                bool previousPair = ready && IsPreviousPair(a, b);
+                if (!IsUiLive(epoch)) return;
+                if (!previousPair) ClearAnalysisResult();
+                string status = ready && !String.IsNullOrEmpty(lastPreviewMessage) ? lastPreviewMessage :
+                    (ready && !String.IsNullOrEmpty(lastAnalysisMessage) ? lastAnalysisMessage : reason);
+                if (!SetCaption(statusLabel, LabelStatus, status, epoch)) return;
+                UpdateGeometryLabels();
+            }
+            catch (Exception ex) { TraceUiFault("ready refresh", ex, true); }
+            finally { updatingReadyState = false; }
+        }
+
+        private bool IsActionPairCurrent(Component2 a, Component2 b, int epoch)
+        {
+            if (!IsUiLive(epoch)) return false;
+            Component2 currentA, currentB;
+            string reason;
+            bool ready = TryReadSelection(out currentA, out currentB, out reason, false);
+            if (!IsUiLive(epoch) || !ready) return false;
+            bool sameA = ConclusivelySame(a, currentA);
+            if (!IsUiLive(epoch) || !sameA) return false;
+            bool sameB = ConclusivelySame(b, currentB);
+            return IsUiLive(epoch) && sameB;
+        }
+
+        private void QueueAfterAction(int epoch)
+        {
+            // Managed gates only: posted refresh runs after the backend and
+            // this finally block have returned. Closing invalidates the token.
+            if (!IsUiLive(epoch)) return;
+            UpdateReadyState();
+            if (requestAutoAnalysis || requestFocusB) QueueSelectionRefresh(false, false);
+        }
+
+        private void QueueBackendAction(int kind, int candidate, bool automatic)
+        {
+            if (!IsUiLive(pageEpoch) || IsBackendBusy() || backendActionQueued || finishQueued)
+            {
+                Trace.WriteLine("[AFJ-R50] ACTION rejected busy/inactive kind=" + kind);
+                return;
+            }
+            backendActionQueued = true;
+            Trace.WriteLine("[AFJ-R50] ACTION QUEUED kind=" + kind +
+                " candidate=" + candidate + " automatic=" + automatic + " epoch=" + pageEpoch);
+            if (!PostUi("backend kind=" + kind, delegate
+            {
+                backendActionQueued = false;
+                if (IsBackendBusy() || finishQueued) return;
+                int epoch = pageEpoch;
+                if (automatic)
+                {
+                    Component2 a, b;
+                    string reason;
+                    bool ready = TryReadSelection(out a, out b, out reason, false);
+                    if (!IsUiLive(epoch) || !ready) return;
+                    bool previous = IsPreviousPair(a, b);
+                    if (!IsUiLive(epoch)) return;
+                    if (previous && !String.IsNullOrEmpty(lastAnalysisMessage)) return;
+                    Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE START");
+                }
+                if (kind == 0) PerformAnalyze();
+                else if (kind == 1) PerformShowBodies();
+                else if (kind == 2) PerformCutCandidate(candidate);
+                if (automatic) Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE END");
+            }))
+            {
+                backendActionQueued = false;
+            }
+        }
+
+        private void QueueInitialFocus()
+        {
+            if (!IsUiLive(pageEpoch) || initialFocusApplied) return;
+            PostUi("initial focus", delegate
+            {
+                if (initialFocusApplied || selectionA == null) return;
+                initialFocusApplied = true;
+                int epoch = pageEpoch;
+                if (IsSameDocumentActive() && IsUiLive(epoch) &&
+                    Selected(MarkFrameA) == null && IsUiLive(epoch) &&
+                    Selected(MarkFrameB) == null && IsUiLive(epoch))
+                    selectionA.SetSelectionFocus();
+            });
+        }
+
     }
 }
