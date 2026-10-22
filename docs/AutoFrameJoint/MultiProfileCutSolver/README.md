@@ -43,3 +43,7 @@ A T2 positive attempt still refused shared-Part scope after duplicate occurrence
 - [SOURCE_VERIFICATION.json](SOURCE_VERIFICATION.json): completed source/protected-binary audit; main DLL not rebuilt.
 
 No original CAD, B-rep serialization, DLL/PDB, persistence-reference token or private machine path is included. `API_VERIFIED` means observed API parameters; `GEOMETRY_VERIFIED` means native B-rep checks. Derived profile graphs and manufacturing interpretation are identified separately.
+
+## Post-load DLL and legacy U audit (2026-10-22)
+
+[The post-load audit](PostLoadAudit20261022/README.md) confirms that the user manually built and loaded the newer AFJ DLL (MVID `420dfcfc-a6ee-4861-ae82-f54d916e32e4`). The fr03/fr04 run selected the legacy U writer: four actual Cuts matched the target bodies, but four new planes and four unconstrained Sketches violate the requested modeling intent. Copy activation/rebuild and saved-copy Read-Only reopen completed without reproducing the reported hang; its installed cause remains unverified. Separate face/start-offset and direct seam-relation experiments are reported as bounded research, not an enabled U repair. Earlier binary/source snapshots above remain historical evidence.

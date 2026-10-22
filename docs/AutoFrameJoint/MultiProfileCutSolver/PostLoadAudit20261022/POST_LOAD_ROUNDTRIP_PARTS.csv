@@ -1,0 +1,3 @@
+frame,open_error,open_warning,read_only_requested,body_check2,body_type,solid_body,faces,edges,before_save_volume_m3,reopened_volume_m3,volume_delta_m3,area_delta_m2,mass_property_density1_delta_kg,new_refplanes,new_sketches,new_underconstrained_sketches,native_sketch_relation_count_total,new_native_feature_errors,full_brep_equivalence_after_reopen,status,evidence_level
+A,0,0,True,0,0,True,23,51,0.0010980635066544949,0.001098063506654495,2.168404344971009e-19,0,2.168404344971009e-19,2,2,2,0,0,NOT_RUN_VOLUME_AREA_CHECK2_ONLY,PASS_COPY_READONLY_REOPEN_BODY,API_VERIFIED
+B,0,0,True,0,0,True,22,46,0.000542650915127981,0.000542650915127981,0,0,0.0,2,2,2,0,0,NOT_RUN_VOLUME_AREA_CHECK2_ONLY,PASS_COPY_READONLY_REOPEN_BODY,API_VERIFIED
