@@ -45,10 +45,30 @@ namespace ADDIN.Commands.BendAssembly
         internal AssemblyBatchSnapshot Source => source;
         internal IReadOnlyList<AssemblyPartRead> Parts { get; }
         internal IReadOnlyList<ToolAssemblyProfile> ToolPairs { get; }
+        internal string ToolSourceError { get; }
+        internal string ToolSourceFingerprint { get; }
+        internal int CatalogCount { get; }
+        internal int LoadedPunchCount { get; }
+        internal int GeometryPairCount { get; }
+        internal int VerifiedMountingPairCount { get; }
+        internal int ExcelRuleCount { get; }
         internal double ValidationMilliseconds { get; set; }
         internal double CopyMilliseconds { get; set; }
         internal AssemblyBatchReadSnapshot(AssemblyBatchSnapshot source)
-        { this.source = source; Parts = PlacementLists.Copy(source.Parts.Select(p => new AssemblyPartRead(p))); ToolPairs=PlacementLists.Copy(source.ToolPairs); }
+        {
+            this.source = source;
+            Parts = PlacementLists.Copy(source.Parts.Select(p => new AssemblyPartRead(p)));
+            ToolPairs = PlacementLists.Copy(source.ToolPairs);
+            var library = source.ToolCatalogForDisplay;
+            ToolSourceError = library?.Error;
+            ToolSourceFingerprint = library?.Fingerprint;
+            CatalogCount = library?.Tools?.Count ?? 0;
+            LoadedPunchCount = library?.Tools?.Count(t=>t?.Validation?.PunchGeometryReadComplete==true) ?? 0;
+            GeometryPairCount = ToolPairs.Count(t=>t!=null && t.MappingIdentified &&
+                t.Punch?.Curves?.Count>0 && t.Holder?.Curves?.Count>0);
+            VerifiedMountingPairCount = ToolPairs.Count(t=>t?.ClampVerified==true);
+            ExcelRuleCount = library?.PlacementSources?.LimitRules?.Count ?? 0;
+        }
     }
     internal sealed class AssemblyPartRead
     {

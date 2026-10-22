@@ -129,7 +129,7 @@ namespace ADDIN.Commands.BendPlanning
         // an unprovided inter-tool changeover movement to produce a fallback.
         public BendSequenceResult PreferredCheckedSequence => !Current ? null : Tools.SelectMany(t=>t.Sequences)
             .Where(s=>s.ReachesAllBends&&s.Status==CollisionStatus.CLEAR)
-            .OrderBy(s=>s.ToolTypeCount).ThenBy(s=>s.ToolChangeCount)
+            .OrderBy(s=>s.ToolChangeCount).ThenBy(s=>s.ToolTypeCount)
             .ThenBy(s=>s.ToolId,StringComparer.Ordinal)
             .ThenBy(s=>string.Join(",",s.Steps.Select(step=>step.FeatureId)),StringComparer.Ordinal).FirstOrDefault();
         public int VisitedNodes { get; }

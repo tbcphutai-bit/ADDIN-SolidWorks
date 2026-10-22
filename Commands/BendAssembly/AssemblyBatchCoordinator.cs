@@ -108,6 +108,8 @@ namespace ADDIN.Commands.BendAssembly
         public string ManufacturingStatus => "CHUA_XAC_MINH";
         public string WinnerToolId => null;
         internal IReadOnlyList<ToolAssemblyProfile> ToolPairs => request.Library?.PlacementSources?.Tools??new ToolAssemblyProfile[0];
+        // Read only inside the same audited AssemblyBatchReadSnapshot copy.
+        internal ToolProfileLibrarySnapshot ToolCatalogForDisplay => request.Library;
         internal AssemblyBatchReadSnapshot ReadSnapshot()
         {
             var clock = Stopwatch.StartNew();

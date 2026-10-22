@@ -60,7 +60,8 @@ namespace ADDIN.Commands.BendTools
             if (pending!=null && pending.IsCompleted)
             {
                 var task=pending; pending=null;
-                bool changedDuringRead=!string.Equals(pendingConfigurationStamp,observed,StringComparison.Ordinal);
+                bool changedDuringRead=!string.Equals(pendingConfigurationStamp,observed,StringComparison.Ordinal) ||
+                    !string.Equals(pendingConfigurationStamp,ToolProfileSourceSettings.QuickConfigurationStamp(),StringComparison.Ordinal);
                 string error=null;
                 if(!task.IsCanceled && !changedDuringRead)
                 {

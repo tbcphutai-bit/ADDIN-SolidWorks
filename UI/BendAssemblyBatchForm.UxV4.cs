@@ -203,29 +203,40 @@ namespace ADDIN.UI
                 return;
             }
             var candidates = selectedBend.ToolCandidates ?? new List<BatchToolCandidateViewModel>();
-            Func<BatchToolCandidateViewModel, bool> hasGeometry = t => t != null &&
-                t.CadAssembly?.Punch?.Curves != null && t.CadAssembly.Punch.Curves.Count > 0 &&
-                t.CadAssembly.Holder?.Curves != null && t.CadAssembly.Holder.Curves.Count > 0;
-            int loaded = candidates.Count(hasGeometry);
-            uxV45ToolData.Text = "Hình học dao: " + loaded + "/" + candidates.Count;
-            UxV45ShowSourceRecovery(loaded == 0);
-            bool collision = candidates.Any(t => hasGeometry(t) &&
-                (t.GeometricStatus == CollisionStatus.COLLISION ||
-                 t.ProcessStatus == CollisionStatus.COLLISION));
-            bool clearCandidate = candidates.Any(t => hasGeometry(t) &&
-                t.GeometricStatus == CollisionStatus.CLEAR &&
-                t.ProcessStatus == CollisionStatus.CLEAR);
+            Func<BatchToolCandidateViewModel, bool> hasGeometry = t => t?.CadAssembly?.MappingIdentified==true &&
+                t.CadAssembly.Punch?.Curves?.Count>0 && t.CadAssembly.Holder?.Curves?.Count>0;
+            int loaded = selectedPart.ReadyGeometryPairs;
+            uxV45ToolData.Text = "Dao: " + selectedPart.LoadedPunchCount + "/" + selectedPart.ToolCatalogCount +
+                " Punch · " + loaded + " cặp · gá xác minh " + selectedPart.VerifiedMountingPairs;
+            bool missingConfiguration = !string.IsNullOrWhiteSpace(selectedPart.ToolSourceError);
+            UxV45ShowSourceRecovery(missingConfiguration);
+            // A red result requires a *real numeric witness* and a reviewed
+            // physical pair. Candidate-only collisions are not Part-wide NG.
+            bool collision = candidates.Any(t => hasGeometry(t) && t.CadAssembly.ClampVerified &&
+                ((!t.StaticSimulationOnly && t.GeometricStatus==CollisionStatus.COLLISION &&
+                    (t.PunchWitness!=null || t.HolderWitness!=null)) ||
+                 (!t.ProcessSimulationOnly && t.ProcessStatus==CollisionStatus.COLLISION &&
+                    t.MotionSegments.Any(s=>s.Status==CollisionStatus.COLLISION && s.Witness!=null))));
+            bool reportedCandidateCollision = candidates.Any(t=>t!=null &&
+                (t.GeometricStatus==CollisionStatus.COLLISION || t.ProcessStatus==CollisionStatus.COLLISION));
+            bool clearCandidate = candidates.Any(t => hasGeometry(t) && t.CadAssembly.ClampVerified &&
+                !t.StaticSimulationOnly && !t.ProcessSimulationOnly &&
+                t.GeometricStatus==CollisionStatus.CLEAR && t.ProcessStatus==CollisionStatus.CLEAR);
             var meta = selectedPart.RawPartResult.BendMetadata?
                 .FirstOrDefault(m => m.FeatureId == selectedBend.FeatureId);
             bool belowMin = meta != null && meta.MinimumStatus == "BelowMinimum";
-            if (loaded == 0)
-                uxV45Collision.Text = "Va chạm: chưa kiểm tra (thiếu dao)";
+            if (missingConfiguration)
+                uxV45Collision.Text = "Va chạm: chưa kiểm tra (lỗi nguồn dao)";
+            else if (loaded == 0)
+                uxV45Collision.Text = "Va chạm: chưa có cặp Punch + Holder";
             else if (collision)
-                uxV45Collision.Text = "Va chạm: có ứng viên báo đụng";
+                uxV45Collision.Text = "Va chạm: một ứng viên có bằng chứng số";
+            else if (reportedCandidateCollision)
+                uxV45Collision.Text = "Va chạm: ứng viên báo đụng, chưa đủ chứng cứ";
             else if (clearCandidate)
-                uxV45Collision.Text = "Va chạm: có dao báo không đụng";
+                uxV45Collision.Text = "Va chạm: ứng viên không đụng; chưa chứng nhận Part";
             else
-                uxV45Collision.Text = "Va chạm: chưa đủ dữ liệu";
+                uxV45Collision.Text = "Va chạm: chưa đủ dữ liệu gá và trạng thái";
 
             if (belowMin)
             {
@@ -235,16 +246,18 @@ namespace ADDIN.UI
             }
             else if (collision)
             {
-                uxV45Decision.Text = "CÓ DAO BỊ ĐỤNG";
-                uxV45Reason.Text = "Có ứng viên báo đụng; không suy ra toàn Part không chấn được.";
+                uxV45Decision.Text = "ỨNG VIÊN VA CHẠM";
+                uxV45Reason.Text = "Có bằng chứng số cho một bộ dao, không kết luận toàn Part.";
                 uxV45Decision.ForeColor = Color.FromArgb(170, 48, 48);
             }
             else
             {
                 uxV45Decision.Text = "CHƯA XÁC MINH CHẤN";
-                uxV45Reason.Text = loaded == 0 ?
-                    "Chưa nạp hình học dao. MAX/va chạm chưa có kết quả." :
-                    "Chưa đủ chứng cứ Excel, gá dao và quá trình chấn.";
+                uxV45Reason.Text = missingConfiguration ?
+                    "Nguồn dao: " + selectedPart.ToolSourceError :
+                    loaded == 0 ? "Chưa đọc đủ Punch + Holder để kiểm tra." :
+                    selectedPart.VerifiedMountingPairs==0 ? "Đã có CAD dao, nhưng chưa xác minh vị trí gá." :
+                    "Chưa đủ chứng cứ Excel MAX và toàn bộ quá trình chấn.";
                 uxV45Decision.ForeColor = Color.FromArgb(141, 98, 40);
             }
         }
@@ -301,10 +314,10 @@ namespace ADDIN.UI
                 if(mode==DialogResult.Yes)proposed.UseMasterPairsAsLibrary=false;
             }
             var manifestChoice=MessageBox.Show(this,
-                "Có manifest JSON đã duyệt cho Punch và Holder không?\nYes: chọn file. No: dùng quy ước mặc định, có thể thiếu Holder.",
+                "Yes: chọn manifest Punch + Holder mới.\nNo: giữ nguyên manifest hiện tại ("+
+                (string.IsNullOrWhiteSpace(proposed.ManifestPath)?"chưa có":proposed.ManifestPath)+").",
                 "Chọn nguồn dao",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question);
             if(manifestChoice==DialogResult.Cancel)return;
-            proposed.ManifestPath=null;
             if(manifestChoice==DialogResult.Yes)
                 using(var picker=new OpenFileDialog {Title="Chọn manifest DXF",Filter="JSON (*.json)|*.json",CheckFileExists=true,Multiselect=false})
                 {
@@ -326,6 +339,8 @@ namespace ADDIN.UI
             {
                 var inspected=await Task.Run(()=>new ToolProfileLibraryProvider(()=>proposed).Read(CancellationToken.None));
                 if(IsDisposed||uxV45RecoverSource.IsDisposed)return;
+                if(!string.IsNullOrWhiteSpace(inspected.Error))
+                    throw new InvalidOperationException("Nguồn đã chọn chưa hợp lệ: "+inspected.Error);
                 int profiles=inspected.Tools.Count(t=>t.Validation?.PunchGeometryReadComplete==true);
                 int matched=inspected.PlacementSources?.Tools?.Count(t=>t.CadPair?.Matched==true)??0;
                 int clamped=inspected.PlacementSources?.Tools?.Count(t=>t.ClampVerified)??0;
