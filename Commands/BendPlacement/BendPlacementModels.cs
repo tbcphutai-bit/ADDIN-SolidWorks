@@ -199,7 +199,9 @@ namespace ADDIN.Commands.BendPlacement
     internal sealed class PlacementSourceSnapshot
     {
         private readonly PlacementLease lease=new PlacementLease();
-        public bool Current => lease.Current;
+        // A once-signed Excel rule expires dynamically, not only when a JSON
+        // file is reloaded. Invalidate the whole held source snapshot on expiry.
+        public bool Current => lease.Current && LimitRules.All(r=>r.ApplicabilityReview?.Status!=ToolReviewStatus.Stale);
         public string Status => "CHUA_XAC_MINH";
         public string Fingerprint { get; }
         public IReadOnlyList<ToolAssemblyProfile> Tools { get; }

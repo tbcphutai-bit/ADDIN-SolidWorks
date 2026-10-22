@@ -104,11 +104,21 @@ namespace ADDIN.Commands.BendTools
             {
                 if(string.IsNullOrWhiteSpace(selected.DirectoryPath)||!Path.IsPathRooted(selected.DirectoryPath)||
                    !Directory.Exists(selected.DirectoryPath))throw new InvalidDataException("Choose an existing absolute DXF folder.");
-                if(!string.IsNullOrWhiteSpace(selected.ManifestPath)&&!File.Exists(selected.ManifestPath))
-                    throw new FileNotFoundException("Selected DXF manifest is missing.",selected.ManifestPath);
+                if(!string.IsNullOrWhiteSpace(selected.ManifestPath))
+                {
+                    string manifest=Path.IsPathRooted(selected.ManifestPath) ? selected.ManifestPath :
+                        Path.Combine(selected.DirectoryPath,selected.ManifestPath);
+                    if(!File.Exists(manifest))throw new FileNotFoundException("Selected DXF manifest is missing.",manifest);
+                }
             }
-            if(!string.IsNullOrWhiteSpace(selected.PlacementConfigurationPath)&&!File.Exists(selected.PlacementConfigurationPath))
-                throw new FileNotFoundException("Selected placement configuration is missing.",selected.PlacementConfigurationPath);
+            if(!string.IsNullOrWhiteSpace(selected.PlacementConfigurationPath))
+            {
+                string placement=Path.IsPathRooted(selected.PlacementConfigurationPath) ?
+                    selected.PlacementConfigurationPath :
+                    (string.IsNullOrWhiteSpace(selected.DirectoryPath) ? null : Path.Combine(selected.DirectoryPath,selected.PlacementConfigurationPath));
+                if(string.IsNullOrWhiteSpace(placement)||!File.Exists(placement))
+                    throw new FileNotFoundException("Selected placement configuration is missing.",placement);
+            }
             if(selected.UseMasterPairsAsLibrary&&string.IsNullOrWhiteSpace(selected.PlacementConfigurationPath))
                 throw new InvalidDataException("Fixed CAD pairs require an explicit placement configuration.");
             Directory.CreateDirectory(Path.GetDirectoryName(path));

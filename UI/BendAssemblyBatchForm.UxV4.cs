@@ -211,7 +211,9 @@ namespace ADDIN.UI
             uxV45Max.Text = "Check MAX: " + selectedPart.ExcelRuleCount +
                 " tham chiếu Excel; chưa xác minh điều kiện áp dụng cho nếp này";
             bool missingConfiguration = !string.IsNullOrWhiteSpace(selectedPart.ToolSourceError);
-            UxV45ShowSourceRecovery(missingConfiguration);
+            bool sourceNeedsReview = missingConfiguration ||
+                (selectedPart.ToolCatalogCount>0 && selectedPart.ReadyGeometryPairs==0);
+            UxV45ShowSourceRecovery(sourceNeedsReview);
             // A red result requires a *real numeric witness* and a reviewed
             // physical pair. Candidate-only collisions are not Part-wide NG.
             bool collision = candidates.Any(t => hasGeometry(t) && t.CadAssembly.ClampVerified &&

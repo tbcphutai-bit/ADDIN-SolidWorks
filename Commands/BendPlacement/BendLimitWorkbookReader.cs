@@ -71,7 +71,8 @@ namespace ADDIN.Commands.BendPlacement
         }
         internal static Result Read(string workbookPath,string manifestPath,CancellationToken token,string reviewAuthoritiesPath=null)
         {
-            string sha=null,mappingSha=null;var objects=new List<WorkbookSourceObject>();var rules=new List<BendLimitRuleDraft>();var reasons=new List<string>();
+            string sha=null,mappingSha=null,reviewSha=null,reviewObservations=null;
+            var objects=new List<WorkbookSourceObject>();var rules=new List<BendLimitRuleDraft>();var reasons=new List<string>();
             try
             {
                 byte[] bytes=PlacementSourceIo.Read(workbookPath,32*1024*1024,token);sha=PlacementSourceIo.Hash(bytes);
@@ -82,6 +83,7 @@ namespace ADDIN.Commands.BendPlacement
                     manifest.Rules.GroupBy(r=>r.Id,StringComparer.OrdinalIgnoreCase).Any(g=>g.Count()>1))throw new InvalidDataException("Invalid limit mapping.");
                 if(!ToolDatumEvidence.IsSha256(manifest.WorkbookSha256)||!string.Equals(sha,manifest.WorkbookSha256,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("STALE_LIMIT_MAPPING");
                 var verifier=ToolReviewVerifier.Load(reviewAuthoritiesPath,token);
+                reviewSha=verifier.Fingerprint;
                 foreach(var r in manifest.Rules)
                 {
                     token.ThrowIfCancellationRequested();var problems=new List<string>();BendLimitKind kind;
@@ -133,11 +135,13 @@ namespace ADDIN.Commands.BendPlacement
                     if(!conditions.Complete)problems.Add("MISSING_SIGNED_EXCEL_CASE_CONDITIONS");
                     rules.Add(new BendLimitRuleDraft(r.Id,r.FamilyId,kind,sha,r.Sheet,r.Locator,obj?.Sha256,r.Unit,value,r.ToolIds??new string[0],problems,approval,conditions));
                 }
+                reviewObservations=verifier.ObservationFingerprint;
             }
             catch(OperationCanceledException){throw;}
             catch(Exception ex){rules.Clear();reasons.Add(ex is InvalidDataException&&ex.Message=="STALE_LIMIT_MAPPING"?"STALE_LIMIT_MAPPING":"MISSING_OR_INVALID_LIMIT_SOURCE");reasons.Add("UNMAPPED_LIMIT_RULE");}
             return new Result {WorkbookSha256=sha,Objects=PlacementLists.Copy(objects),Rules=PlacementLists.Copy(rules),Reasons=PlacementLists.Reasons(reasons),
-                Fingerprint=PlacementSourceIo.Hash((workbookPath??"")+sha+mappingSha+string.Join("|",reasons))};
+                Fingerprint=PlacementSourceIo.Hash((workbookPath??"")+sha+mappingSha+reviewSha+reviewObservations+
+                    string.Join("|",reasons)+string.Join("|",rules.Select(r=>r.ApplicabilityReview.Status.ToString()))) };
         }
         internal static IReadOnlyList<WorkbookSourceObject> ReadObjects(byte[] bytes,CancellationToken token)
         {
