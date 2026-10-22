@@ -1,5 +1,7 @@
 # Source, DLL và project output
 
+> **Lịch sử snapshot đầu R52:** Báo cáo này giữ kết quả tại thời điểm trước khi người dùng Build/test. Log native mới và bản sửa Caption được đối chiếu tại [follow-up](07_NATIVE_LOG_AND_CAPTION_FIX.md); dùng follow-up để đọc trạng thái hiện tại.
+
 ## DLL được kiểm tra
 
 DLL và PDB ở output mà log người dùng nêu được đọc trực tiếp bằng Mono.Cecil và parser PE/MSF, không load/thực thi Add-in, không mở project build.

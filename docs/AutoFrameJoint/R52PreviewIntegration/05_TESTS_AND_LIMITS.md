@@ -1,5 +1,7 @@
 # Test matrix và giới hạn
 
+> **Lịch sử snapshot đầu R52:** Báo cáo này giữ kết quả tại thời điểm trước khi người dùng Build/test. Log native mới và bản sửa Caption được đối chiếu tại [follow-up](07_NATIVE_LOG_AND_CAPTION_FIX.md); dùng follow-up để đọc trạng thái hiện tại.
+
 ## Đã thực hiện
 
 - Đọc source local và project XML, MVID/IL DLL, PE CodeView/PDB MSF, COM registration và Windows events. Không thực thi DLL khi đọc IL.

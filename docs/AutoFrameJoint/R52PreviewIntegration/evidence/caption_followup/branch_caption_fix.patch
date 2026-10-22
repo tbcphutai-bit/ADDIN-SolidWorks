@@ -1,0 +1,131 @@
+--- a/UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs
++++ b/UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs
+@@ -76 +76 @@
+-        private readonly System.Collections.Generic.Dictionary<int, string> displayedCaptions =
++        private readonly System.Collections.Generic.Dictionary<int, string> cachedStatusText =
+@@ -77,0 +78,3 @@
++
++        private bool messageUpdatesUnavailable;
++        private string lastPublishedMessage;
+@@ -146 +149,3 @@
+-            displayedCaptions.Clear();
++            cachedStatusText.Clear();
++            messageUpdatesUnavailable = false;
++            lastPublishedMessage = null;
+@@ -167,0 +173 @@
++                Trace.WriteLine("[AFJ-R52-CAPTION] status_channel=PAGE_MESSAGE no_runtime_label_writes=True");
+@@ -367 +373 @@
+-                "Chọn Frame A và Frame B", align, controlOptions,
++                "Chọn Frame A/B; xem kết quả trong Thông báo.", align, controlOptions,
+@@ -419 +425 @@
+-                    "Góc hai trục: chưa tính", align, controlOptions,
++                    "Góc hai trục: xem Thông báo", align, controlOptions,
+@@ -425 +431 @@
+-                    "XYZ gần nhất: chưa tính", align, controlOptions,
++                    "XYZ gần nhất: xem Thông báo", align, controlOptions,
+@@ -431 +437 @@
+-                    "Khoảng cách trục: chưa tính", align, controlOptions,
++                    "Khoảng cách trục: xem Thông báo", align, controlOptions,
+@@ -437 +443 @@
+-                    "Trạng thái: chưa tính", align, controlOptions,
++                    "Trạng thái: xem Thông báo", align, controlOptions,
+@@ -443 +449 @@
+-                    "Dài/ngắn: chưa tính", align, controlOptions,
++                    "Dài/ngắn: xem Thông báo", align, controlOptions,
+@@ -621,5 +627,5 @@
+-            if (!SetCaption(geometryAngleLabel, LabelAngle, lines == null ? "Góc hai trục: chưa tính" : lines[1], epoch)) return;
+-            if (!SetCaption(geometryPointLabel, LabelPoint, lines == null ? "XYZ gần nhất: chưa tính" : lines[2], epoch)) return;
+-            if (!SetCaption(geometryGapLabel, LabelGap, lines == null ? "Khoảng cách trục: chưa tính" : lines[3], epoch)) return;
+-            if (!SetCaption(geometryStatusLabel, LabelJointStatus, lines == null ? "Trạng thái: chưa tính" : lines[4], epoch)) return;
+-            SetCaption(geometryRoleLabel, LabelRole, lines == null ? "Dài/ngắn: chưa tính" : lines[5], epoch);
++            if (!CacheStatusText(LabelAngle, lines == null ? "Góc hai trục: chưa tính" : lines[1], epoch)) return;
++            if (!CacheStatusText(LabelPoint, lines == null ? "XYZ gần nhất: chưa tính" : lines[2], epoch)) return;
++            if (!CacheStatusText(LabelGap, lines == null ? "Khoảng cách trục: chưa tính" : lines[3], epoch)) return;
++            if (!CacheStatusText(LabelJointStatus, lines == null ? "Trạng thái: chưa tính" : lines[4], epoch)) return;
++            CacheStatusText(LabelRole, lines == null ? "Dài/ngắn: chưa tính" : lines[5], epoch);
+@@ -684 +690 @@
+-                if (!SetCaption(statusLabel, LabelStatus, "Đang tính trục và giao góc 3D...", epoch)) return;
++                if (!CacheStatusText(LabelStatus, "Đang tính trục và giao góc 3D...", epoch)) return;
+@@ -735 +741 @@
+-                if (!SetCaption(statusLabel, LabelStatus, "Đang tạo bản xem Frame A/B...", epoch)) return;
++                if (!CacheStatusText(LabelStatus, "Đang tạo bản xem Frame A/B...", epoch)) return;
+@@ -796 +802 @@
+-                if (!SetCaption(statusLabel, LabelStatus, "Đang tạo Preview cho hai Frame...", epoch)) return;
++                if (!CacheStatusText(LabelStatus, "Đang tạo Preview cho hai Frame...", epoch)) return;
+@@ -864 +870 @@
+-            displayedCaptions.Clear();
++            cachedStatusText.Clear();
+@@ -1101,4 +1107,4 @@
+-        private bool SetCaption(PropertyManagerPageLabel label, int id, string text, int epoch)
+-        {
+-            if (!IsUiLive(epoch)) return false;
+-            if (label == null) return true; // Optional geometry group.
++        private bool CacheStatusText(int id, string text, int epoch)
++        {
++            if (!IsUiLive(epoch) || selectionCallbackDepth != 0) return false;
++            text = text ?? String.Empty;
+@@ -1106,9 +1112,38 @@
+-            if (displayedCaptions.TryGetValue(id, out previous) && previous == text) return true;
+-            Trace.WriteLine("[AFJ-R50] CAPTION BEGIN id=" + id + " epoch=" + epoch);
+-            try
+-            {
+-                label.Caption = text;
+-                if (!IsUiLive(epoch)) return false;
+-                displayedCaptions[id] = text;
+-                Trace.WriteLine("[AFJ-R50] CAPTION END id=" + id + " epoch=" + epoch);
+-                return true;
++            if (cachedStatusText.TryGetValue(id, out previous) && previous == text) return true;
++            // Managed snapshot only. Never dereference a native label RCW.
++            cachedStatusText[id] = text;
++            Trace.WriteLine("[AFJ-R52-CAPTION] STATUS_CACHE id=" + id + " epoch=" + epoch + " text=" + text.Replace("\r", " ").Replace("\n", " | "));
++            return true;
++        }
++
++        private string StatusMessageText()
++        {
++            string status;
++            if (!cachedStatusText.TryGetValue(LabelStatus, out status)) return String.Empty;
++            var text = new System.Text.StringBuilder(status);
++            string[] geometry = lastGeometryLines;
++            if (geometry != null && geometry.Length >= 6)
++                for (int i = 1; i < 6; i++) text.AppendLine().Append(geometry[i]);
++            return text.ToString();
++        }
++
++        private void PublishStatusMessage()
++        {
++            int epoch = pageEpoch;
++            if (!IsUiLive(epoch) || selectionCallbackDepth != 0 || IsBackendBusy() ||
++                page == null || messageUpdatesUnavailable) return;
++            string text = StatusMessageText();
++            if (String.IsNullOrEmpty(text) || text == lastPublishedMessage) return;
++            try
++            {
++                Trace.WriteLine("[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=" + epoch + " chars=" + text.Length);
++                bool accepted = page.SetMessage3(text,
++                    (int)swPropertyManagerPageMessageVisibility.swMessageBoxVisible,
++                    lastPublishedMessage == null
++                        ? (int)swPropertyManagerPageMessageExpanded.swMessageBoxExpand
++                        : (int)swPropertyManagerPageMessageExpanded.swMessageBoxMaintainExpandState,
++                    "Auto Frame Joint — Trạng thái");
++                Trace.WriteLine("[AFJ-R52-CAPTION] MESSAGE_END epoch=" + epoch + " accepted=" + accepted);
++                if (!IsUiLive(epoch)) return;
++                if (accepted) lastPublishedMessage = text;
++                else messageUpdatesUnavailable = true;
+@@ -1118,4 +1153,7 @@
+-                TraceUiFault("caption id=" + id, ex, true);
+-                return false;
+-            }
+-        }
++                // A normal COM failure disables only this optional channel.
++                // No native-label fallback, retry or corrupted-state recovery.
++                messageUpdatesUnavailable = true;
++                Trace.WriteLine("[AFJ-R52-CAPTION] MESSAGE_UNAVAILABLE HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex.GetType().FullName + " " + ex.Message);
++            }
++        }
++
+@@ -1147 +1185 @@
+-                if (!SetCaption(statusLabel, LabelStatus, status, epoch)) return;
++                if (!CacheStatusText(LabelStatus, status, epoch)) return;
+@@ -1148,0 +1187 @@
++                PublishStatusMessage();

@@ -1,0 +1,424 @@
+81: [TAI STARTUP] Begin 2026-10-22T12:10:31.7968916+07:00; Assembly=<LOCAL_PATH_REDACTED>
+212: [AFJ-R52] stage=COMMAND_OPEN MVID=ae27a276-be1d-4959-8391-1b3d60f3b997
+213: [AFJ-R50] ACTIVATED epoch=1
+214: [AFJ-R52] stage=SHOW seq=1 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False source=R52 MVID=ae27a276-be1d-4959-8391-1b3d60f3b997 preview_callback=True
+215: [AFJ-R50] SHOW epoch=1 owner=1
+216: [AFJ-R52] stage=POST_REQUEST seq=2 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+217: [AFJ-R52] stage=POST_REQUEST seq=3 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False initial focus
+218: [AFJ-R52] stage=POST_RUN seq=4 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+219: [AFJ-R52] stage=SELECTION_READ seq=5 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=0 resolved=False route=COUNT_NOT_ONE component=NONE
+220: [AFJ-R52] stage=SELECTION_READ seq=6 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=0 resolved=False route=COUNT_NOT_ONE component=NONE
+221: [AFJ-SEL] READY=False A-count=0 B-count=0 reason=Bước 1: Chọn Frame A trong Assembly.
+222: [AFJ-R52] stage=READY seq=7 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready=False deferredCounts=0/0 A=NONE B=NONE reason=Bước 1: Chọn Frame A trong Assembly.
+223: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+224: [AFJ-R50] CAPTION END id=104 epoch=1
+225: [AFJ-R50] CAPTION BEGIN id=121 epoch=1
+226: [AFJ-R50] CAPTION END id=121 epoch=1
+227: [AFJ-R50] CAPTION BEGIN id=122 epoch=1
+228: [AFJ-R50] CAPTION END id=122 epoch=1
+229: [AFJ-R50] CAPTION BEGIN id=123 epoch=1
+230: [AFJ-R50] CAPTION END id=123 epoch=1
+231: [AFJ-R50] CAPTION BEGIN id=124 epoch=1
+232: [AFJ-R50] CAPTION END id=124 epoch=1
+233: [AFJ-R50] CAPTION BEGIN id=125 epoch=1
+234: [AFJ-R50] CAPTION END id=125 epoch=1
+235: [AFJ-R52] stage=POST_END seq=8 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+236: [AFJ-R52] stage=POST_RUN seq=9 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False initial focus
+237: [AFJ-R52] stage=SELECTION_READ seq=10 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=0 resolved=False route=COUNT_NOT_ONE component=NONE
+238: [AFJ-R52] stage=SELECTION_READ seq=11 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=0 resolved=False route=COUNT_NOT_ONE component=NONE
+239: [AFJ-R52] stage=POST_END seq=12 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False initial focus
+241: [AFJ-R52] stage=SUBMIT_ENTER seq=13 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False box=101 type=20
+242: [AFJ-R52] stage=SUBMIT_EXIT seq=14 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False box=101 type=20 accepted=True reason=ACCEPT_FILTERED_PENDING_DEFERRED_IDENTITY ms=0.806
+243: [AFJ-R52] stage=LIST_ENTER seq=15 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False box=101 count=1
+244: [AFJ-R52] stage=SELECTION_REFRESH_REQUEST seq=16 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False advance=True analyze=False
+245: [AFJ-R52] stage=POST_REQUEST seq=17 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False selection refresh
+246: [AFJ-R52] stage=LIST_EXIT seq=18 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False queued only; no COM selection read
+247: [AFJ-R52] stage=POST_RUN seq=19 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False selection refresh
+248: [AFJ-R52] stage=SELECTION_REFRESH_RUN seq=20 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False deferred
+249: [AFJ-R52] stage=POST_REQUEST seq=21 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False ready refresh
+250: [AFJ-R52] stage=SELECTION_READ seq=22 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+251: [AFJ-R52] stage=SELECTION_READ seq=23 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False mark=2 count=0 resolved=False route=COUNT_NOT_ONE component=NONE
+252: [AFJ-R52] stage=AUTO_FOCUS_BEGIN seq=24 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False A->B; this does not select Frame B
+253: [AFJ-R52] stage=AUTO_FOCUS_END seq=25 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False B_focus=True; awaiting B submit/list callback
+254: [AFJ-R52] stage=POST_END seq=26 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False selection refresh
+255: [AFJ-R52] stage=POST_RUN seq=27 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False ready refresh
+256: [AFJ-R52] stage=SELECTION_READ seq=28 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+257: [AFJ-R52] stage=SELECTION_READ seq=29 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False mark=2 count=0 resolved=False route=COUNT_NOT_ONE component=NONE
+258: [AFJ-SEL] READY=False A-count=1 B-count=0 reason=Đã chọn Frame A — tiếp tục chọn Frame B.
+259: [AFJ-R52] stage=READY seq=30 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False ready=False deferredCounts=1/0 A=2354-04-lc-B11-fr04-1 B=NONE reason=Đã chọn Frame A — tiếp tục chọn Frame B.
+260: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+261: [AFJ-R50] CAPTION END id=104 epoch=1
+262: [AFJ-R52] stage=POST_END seq=31 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False ready refresh
+263: [AFJ-R52] stage=SUBMIT_ENTER seq=32 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False box=102 type=20
+264: [AFJ-R52] stage=SUBMIT_EXIT seq=33 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False box=102 type=20 accepted=True reason=ACCEPT_FILTERED_PENDING_DEFERRED_IDENTITY ms=0.707
+265: [AFJ-R52] stage=LIST_ENTER seq=34 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False box=102 count=1
+266: [AFJ-R52] stage=SELECTION_REFRESH_REQUEST seq=35 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False advance=False analyze=True
+267: [AFJ-R52] stage=POST_REQUEST seq=36 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+268: [AFJ-R52] stage=LIST_EXIT seq=37 epoch=1 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False queued only; no COM selection read
+269: [AFJ-R52] stage=POST_RUN seq=38 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+270: [AFJ-R52] stage=SELECTION_REFRESH_RUN seq=39 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False deferred
+271: [AFJ-R52] stage=POST_REQUEST seq=40 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+272: [AFJ-R52] stage=ACTION_REQUEST seq=41 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0 automatic=True
+273: [AFJ-R52] stage=POST_REQUEST seq=42 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+274: [AFJ-R52] stage=AUTO_FOCUS_SKIP seq=43 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False not requested or no controls
+275: [AFJ-R52] stage=POST_END seq=44 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+276: [AFJ-R52] stage=POST_RUN seq=45 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+277: [AFJ-R52] stage=SELECTION_READ seq=46 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+278: [AFJ-R52] stage=SELECTION_READ seq=47 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+279: [AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+280: [AFJ-R52] stage=READY seq=48 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1 reason=Đã chọn 2 Component — nhấn Phân tích.
+281: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+282: [AFJ-R50] CAPTION END id=104 epoch=1
+283: [AFJ-R52] stage=POST_END seq=49 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+284: [AFJ-R52] stage=POST_RUN seq=50 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+285: [AFJ-R52] stage=ACTION_RUN seq=51 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0
+286: [AFJ-R52] stage=SELECTION_READ seq=52 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+287: [AFJ-R52] stage=SELECTION_READ seq=53 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+288: [AFJ-R52] stage=SELECTION_READ seq=54 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+289: [AFJ-R52] stage=SELECTION_READ seq=55 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+290: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+291: [AFJ-R50] CAPTION END id=104 epoch=1
+292: [AFJ-R50] BACKEND BEGIN Analyze epoch=1
+293: [AFJ-READONLY] AUTO FRAME JOINT - READ ONLY
+338: [AFJ-R50] BACKEND END Analyze epoch=1
+339: [AFJ-R52] stage=SELECTION_READ seq=56 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+340: [AFJ-R52] stage=SELECTION_READ seq=57 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+341: [AFJ-R52] stage=POST_REQUEST seq=58 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+342: [AFJ-R52] stage=ACTION_END seq=59 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0
+343: [AFJ-R52] stage=POST_END seq=60 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+344: [AFJ-R52] stage=POST_RUN seq=61 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+345: [AFJ-R52] stage=SELECTION_READ seq=62 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+346: [AFJ-R52] stage=SELECTION_READ seq=63 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+347: [AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+348: [AFJ-R52] stage=READY seq=64 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1 reason=Đã chọn 2 Component — nhấn Phân tích.
+349: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+350: [AFJ-R50] CAPTION END id=104 epoch=1
+351: [AFJ-R50] CAPTION BEGIN id=121 epoch=1
+352: [AFJ-R50] CAPTION END id=121 epoch=1
+353: [AFJ-R50] CAPTION BEGIN id=122 epoch=1
+354: [AFJ-R50] CAPTION END id=122 epoch=1
+355: [AFJ-R50] CAPTION BEGIN id=123 epoch=1
+356: [AFJ-R50] CAPTION END id=123 epoch=1
+357: [AFJ-R50] CAPTION BEGIN id=124 epoch=1
+358: [AFJ-R50] CAPTION END id=124 epoch=1
+359: [AFJ-R50] CAPTION BEGIN id=125 epoch=1
+360: [AFJ-R50] CAPTION END id=125 epoch=1
+361: [AFJ-R52] stage=POST_END seq=65 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+375: [AFJ-R52] stage=CLOSE seq=66 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False reason=1
+376: [AFJ-R50] CLOSING reason=1 epoch=2; no cut
+377: [AFJ-R52] stage=AFTER_CLOSE seq=67 epoch=2 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=True activated=False faulted=False cleanup callback=True
+378: [AFJ-GHOST] AfterClose CLEAN Không có Temporary Body còn chờ dọn.
+380: [AFJ-R52] stage=COMMAND_OPEN MVID=ae27a276-be1d-4959-8391-1b3d60f3b997
+381: [AFJ-R50] ACTIVATED epoch=1
+382: [AFJ-R52] stage=SHOW seq=1 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False source=R52 MVID=ae27a276-be1d-4959-8391-1b3d60f3b997 preview_callback=True
+383: [AFJ-R50] SHOW epoch=1 owner=1
+384: [AFJ-R52] stage=POST_REQUEST seq=2 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+385: [AFJ-R52] stage=POST_REQUEST seq=3 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False initial focus
+386: [AFJ-R52] stage=POST_RUN seq=4 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+387: [AFJ-R52] stage=SELECTION_READ seq=5 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+388: [AFJ-R52] stage=SELECTION_READ seq=6 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+389: [AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+390: [AFJ-R52] stage=READY seq=7 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1 reason=Đã chọn 2 Component — nhấn Phân tích.
+391: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+392: [AFJ-R50] CAPTION END id=104 epoch=1
+393: [AFJ-R50] CAPTION BEGIN id=121 epoch=1
+394: [AFJ-R50] CAPTION END id=121 epoch=1
+395: [AFJ-R50] CAPTION BEGIN id=122 epoch=1
+396: [AFJ-R50] CAPTION END id=122 epoch=1
+397: [AFJ-R50] CAPTION BEGIN id=123 epoch=1
+398: [AFJ-R50] CAPTION END id=123 epoch=1
+399: [AFJ-R50] CAPTION BEGIN id=124 epoch=1
+400: [AFJ-R50] CAPTION END id=124 epoch=1
+401: [AFJ-R50] CAPTION BEGIN id=125 epoch=1
+402: [AFJ-R50] CAPTION END id=125 epoch=1
+403: [AFJ-R52] stage=POST_END seq=8 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+404: [AFJ-R52] stage=POST_RUN seq=9 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False initial focus
+405: [AFJ-R52] stage=SELECTION_READ seq=10 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+406: [AFJ-R52] stage=POST_END seq=11 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False initial focus
+409: [AFJ-R52] stage=BUTTON seq=12 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+410: [AFJ-R50] BUTTON id=107 epoch=1
+411: [AFJ-R52] stage=ACTION_REQUEST seq=13 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=1 automatic=False
+412: [AFJ-R52] stage=POST_REQUEST seq=14 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+413: [AFJ-R52] stage=POST_RUN seq=15 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+414: [AFJ-R52] stage=ACTION_RUN seq=16 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=1
+415: [AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=17 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=1
+416: [AFJ-R52] stage=SELECTION_READ seq=18 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+417: [AFJ-R52] stage=SELECTION_READ seq=19 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+418: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+419: [AFJ-R50] CAPTION END id=104 epoch=1
+420: [AFJ-R50] BACKEND BEGIN Preview P1 epoch=1
+421: [AFJ-R52] stage=PREVIEW_CALLBACK_BEGIN seq=20 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=1 bound=True
+422: [AFJ-R52] stage=ENTRY_PREVIEW_BEGIN token=449b921630b74d5296017ff2df4bc182 candidate=1
+423: [AFJ-R52] stage=SESSION_PREVIEW_ENTER token=449b921630b74d5296017ff2df4bc182 candidate=1
+424: [AFJ-R52] stage=SESSION_GHOST_CALL token=449b921630b74d5296017ff2df4bc182
+425: [AFJ-R52] stage=GHOST_ENTER candidate=1 busy=False
+426: [AFJ-R51] source=profile-skin-cutter; MVID=ae27a276-be1d-4959-8391-1b3d60f3b997
+427: [AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION
+428: [AFJ-R52] stage=SOLVER_BEGIN
+429: [AFJ-R52] stage=PAIR_CONTEXT assembly=2354-02-lc-B11 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1
+430: [AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+431: [AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+432: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+433: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+434: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+435: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+436: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+437: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+438: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+439: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+440: [AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+441: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+442: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+443: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+444: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+445: [AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+446: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+447: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+448: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+449: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+450: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+451: [AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+452: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+453: [AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+454: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+455: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+456: [AFJ-R52] stage=SOLVER_END keptA=1 keptB=1 removedA_m3=7.1753397680816191E-05 removedB_m3=6.8665694004274154E-05
+457: [AFJ-R52] stage=DISPLAY_CONTEXT shift_world_m=0;0;0.12 transformA=1;0;0;0;1;0;0;0;1;-1;2.947000000000001;-0.0030000000000000443;1;0;0;0 transformB=0;1;-1.3877787807814457E-17;-1;0;0;-4.622231866529366E-33;1.3877787807814466E-17;0.99999999999999989;-0.855;-0.10000000000000007;-0.0030000000000000027;1;0;0;0 partA=2354-04-lc-B11-fr04 partB=2354-04-lc-B11-fr03
+458: [AFJ-R52] stage=VIEW_STATE group=A_KEEP world_box_m=-0.8550001;2.8769999750000008;0.056999974999999953;0.50000002500000007;2.9470000250000008;0.11700010000000004 visible_box_px=477;149;1465;1015 transform=-0.9833496671451849;-0.0043180809637167724;-0.18167219463155362;-0.079569957626686671;-0.888556793921391;0.45181350778769974;-0.16337703011360444;0.45874631132351273;0.873418438022881;127.30009561055942;3474.6639420114639;-3425.4210272834562;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+459: [AFJ-R52] stage=VIEWPORT group=A_KEEP projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=-766.552786544451;362.85204328080772;849.94151402524164;477.4795074588169 actual_visibility=UNVERIFIED
+460: [AFJ-R52] stage=DISPLAY3_BEGIN group=A_KEEP temporary=True context=selected_component
+461: [AFJ-R52] stage=DISPLAY3_END group=A_KEEP status=0 tracked=1 actual_visibility=UNVERIFIED
+462: [AFJ-R52] stage=VIEW_STATE group=B_KEEP world_box_m=-0.85500002499999994;-0.10000002500000008;0.074999999999999956;-0.784999975;2.9444000000000012;0.11700009999999995 visible_box_px=477;149;1465;1015 transform=-0.9833496671451849;-0.0043180809637167724;-0.18167219463155362;-0.079569957626686671;-0.888556793921391;0.45181350778769974;-0.16337703011360444;0.45874631132351273;0.873418438022881;127.30009561055942;3474.6639420114639;-3425.4210272834562;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+463: [AFJ-R52] stage=VIEWPORT group=B_KEEP projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=749.19601407873927;382.1812659576276;1130.5155464224708;3650.0337619253874 actual_visibility=UNVERIFIED
+464: [AFJ-R52] stage=DISPLAY3_BEGIN group=B_KEEP temporary=True context=selected_component
+465: [AFJ-R52] stage=DISPLAY3_END group=B_KEEP status=0 tracked=2 actual_visibility=UNVERIFIED
+466: [AFJ-R52] stage=REDRAW_BEGIN bound_active=True tracked=2
+467: [AFJ-R52] stage=REDRAW_END actual_visibility=UNVERIFIED
+468: [AFJ-SOLVER] ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.
+469: [AFJ-R52] stage=SESSION_PREVIEW_END success=True state=Showing tracked=True actual_visibility=UNVERIFIED
+470: [AFJ-R52] stage=ENTRY_PREVIEW_END token=449b921630b74d5296017ff2df4bc182 success=True status=ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.
+471: [AFJ-CUT-CANDIDATE] SHOW ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.
+472: [AFJ-R52] stage=PREVIEW_CALLBACK_END seq=21 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=1
+473: [AFJ-R50] BACKEND END Preview P1 epoch=1
+474: [AFJ-R52] stage=SELECTION_READ seq=22 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+475: [AFJ-R52] stage=SELECTION_READ seq=23 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+476: [AFJ-R52] stage=POST_REQUEST seq=24 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+477: [AFJ-R52] stage=ACTION_END seq=25 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=1
+478: [AFJ-R52] stage=POST_END seq=26 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+479: [AFJ-R52] stage=POST_RUN seq=27 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+480: [AFJ-R52] stage=SELECTION_READ seq=28 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+481: [AFJ-R52] stage=SELECTION_READ seq=29 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+482: [AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+483: [AFJ-R52] stage=READY seq=30 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1 reason=Đã chọn 2 Component — nhấn Phân tích.
+484: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+485: [AFJ-R50] CAPTION END id=104 epoch=1
+486: [AFJ-R52] stage=POST_END seq=31 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+487: [AFJ-R52] stage=BUTTON seq=32 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False id=108 onPreviewCut_bound=True
+488: [AFJ-R50] BUTTON id=108 epoch=1
+489: [AFJ-R52] stage=ACTION_REQUEST seq=33 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=2 automatic=False
+490: [AFJ-R52] stage=POST_REQUEST seq=34 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+491: [AFJ-R52] stage=POST_RUN seq=35 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+492: [AFJ-R52] stage=ACTION_RUN seq=36 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+493: [AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=37 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=2
+494: [AFJ-R52] stage=SELECTION_READ seq=38 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+495: [AFJ-R52] stage=SELECTION_READ seq=39 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+496: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+497: [AFJ-R50] CAPTION END id=104 epoch=1
+498: [AFJ-R50] BACKEND BEGIN Preview P2 epoch=1
+499: [AFJ-R52] stage=PREVIEW_CALLBACK_BEGIN seq=40 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=2 bound=True
+500: [AFJ-R52] stage=ENTRY_PREVIEW_BEGIN token=449b921630b74d5296017ff2df4bc182 candidate=2
+501: [AFJ-R52] stage=SESSION_PREVIEW_ENTER token=449b921630b74d5296017ff2df4bc182 candidate=2
+502: [AFJ-R52] stage=SESSION_GHOST_CALL token=449b921630b74d5296017ff2df4bc182
+503: [AFJ-R52] stage=GHOST_ENTER candidate=2 busy=False
+504: [AFJ-R52] stage=HIDE_BEGIN tracked_index=1
+505: [AFJ-R52] stage=HIDE_END tracked_index=1
+506: [AFJ-R52] stage=HIDE_BEGIN tracked_index=0
+507: [AFJ-R52] stage=HIDE_END tracked_index=0
+508: [AFJ-R52] stage=REDRAW_BEGIN bound_active=True tracked=0
+509: [AFJ-R52] stage=REDRAW_END actual_visibility=UNVERIFIED
+510: [AFJ-R51] source=profile-skin-cutter; MVID=ae27a276-be1d-4959-8391-1b3d60f3b997
+511: [AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION
+512: [AFJ-R52] stage=SOLVER_BEGIN
+513: [AFJ-R52] stage=PAIR_CONTEXT assembly=2354-02-lc-B11 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1
+514: [AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+515: [AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+516: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+517: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+518: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+519: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+520: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+521: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+522: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+523: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+524: [AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+525: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+526: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+527: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+528: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+529: [AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+530: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+531: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+532: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+533: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+534: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+535: [AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+536: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+537: [AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+538: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+539: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+540: [AFJ-R52] stage=SOLVER_END keptA=1 keptB=1 removedA_m3=7.1753397680816218E-05 removedB_m3=6.8665694004274168E-05
+541: [AFJ-R52] stage=DISPLAY_CONTEXT shift_world_m=0;0;0.12 transformA=1;0;0;0;1;0;0;0;1;-1;2.947000000000001;-0.0030000000000000443;1;0;0;0 transformB=0;1;-1.3877787807814457E-17;-1;0;0;-4.622231866529366E-33;1.3877787807814466E-17;0.99999999999999989;-0.855;-0.10000000000000007;-0.0030000000000000027;1;0;0;0 partA=2354-04-lc-B11-fr04 partB=2354-04-lc-B11-fr03
+542: [AFJ-R52] stage=VIEW_STATE group=A_KEEP world_box_m=-0.8550001;2.8769999750000008;0.056999974999999953;0.50000002500000007;2.9470000250000008;0.11700010000000004 visible_box_px=477;149;1465;1015 transform=-0.9833496671451849;-0.0043180809637167724;-0.18167219463155362;-0.079569957626686671;-0.888556793921391;0.45181350778769974;-0.16337703011360444;0.45874631132351273;0.873418438022881;127.30009561055942;3474.6639420114639;-3425.4210272834562;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+543: [AFJ-R52] stage=VIEWPORT group=A_KEEP projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=-766.552786544451;362.85204328080772;849.94151402524164;477.4795074588169 actual_visibility=UNVERIFIED
+544: [AFJ-R52] stage=DISPLAY3_BEGIN group=A_KEEP temporary=True context=selected_component
+545: [AFJ-R52] stage=DISPLAY3_END group=A_KEEP status=0 tracked=1 actual_visibility=UNVERIFIED
+546: [AFJ-R52] stage=VIEW_STATE group=B_KEEP world_box_m=-0.85500002499999994;-0.10000002500000008;0.074999999999999956;-0.784999975;2.9444000000000012;0.11700009999999995 visible_box_px=477;149;1465;1015 transform=-0.9833496671451849;-0.0043180809637167724;-0.18167219463155362;-0.079569957626686671;-0.888556793921391;0.45181350778769974;-0.16337703011360444;0.45874631132351273;0.873418438022881;127.30009561055942;3474.6639420114639;-3425.4210272834562;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+547: [AFJ-R52] stage=VIEWPORT group=B_KEEP projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=749.19601407873927;382.1812659576276;1130.5155464224708;3650.0337619253874 actual_visibility=UNVERIFIED
+548: [AFJ-R52] stage=DISPLAY3_BEGIN group=B_KEEP temporary=True context=selected_component
+549: [AFJ-R52] stage=DISPLAY3_END group=B_KEEP status=0 tracked=2 actual_visibility=UNVERIFIED
+550: [AFJ-R52] stage=VIEW_STATE group=A_CUT world_box_m=-1.000000025;2.8769999750000008;0.056999974999999953;-0.78749989999999981;2.9470000250000008;0.11700010000000004 visible_box_px=477;149;1465;1015 transform=-0.9833496671451849;-0.0043180809637167724;-0.18167219463155362;-0.079569957626686671;-0.888556793921391;0.45181350778769974;-0.16337703011360444;0.45874631132351273;0.873418438022881;127.30009561055942;3474.6639420114639;-3425.4210272834562;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+551: [AFJ-R52] stage=VIEWPORT group=A_CUT projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=751.89624485678087;369.5198503447009;1020.9512293613426;478.23044460871961 actual_visibility=UNVERIFIED
+552: [AFJ-R52] stage=DISPLAY3_BEGIN group=A_CUT temporary=True context=selected_component
+553: [AFJ-R52] stage=DISPLAY3_END group=A_CUT status=0 tracked=3 actual_visibility=UNVERIFIED
+554: [AFJ-R52] stage=VIEW_STATE group=A_CUT world_box_m=-0.855;2.944500000000001;0.11439999999999995;-0.85239999999999982;2.947000000000001;0.11699807621135326 visible_box_px=477;149;1465;1015 transform=-0.9833496671451849;-0.0043180809637167724;-0.18167219463155362;-0.079569957626686671;-0.888556793921391;0.45181350778769974;-0.16337703011360444;0.45874631132351273;0.873418438022881;127.30009561055942;3474.6639420114639;-3425.4210272834562;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+555: [AFJ-R52] stage=VIEWPORT group=A_CUT projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=828.43839115356866;401.43726460561857;832.252436118137;405.54440235604261 actual_visibility=UNVERIFIED
+556: [AFJ-R52] stage=DISPLAY3_BEGIN group=A_CUT temporary=True context=selected_component
+557: [AFJ-R52] stage=DISPLAY3_END group=A_CUT status=0 tracked=4 actual_visibility=UNVERIFIED
+558: [AFJ-R52] stage=VIEW_STATE group=B_CUT world_box_m=-0.85500002499999994;2.8768999000000011;0.074999999999999956;-0.784999975;3.100000025;0.11700009999999995 visible_box_px=477;149;1465;1015 transform=-0.9833496671451849;-0.0043180809637167724;-0.18167219463155362;-0.079569957626686671;-0.888556793921391;0.45181350778769974;-0.16337703011360444;0.45874631132351273;0.873418438022881;127.30009561055942;3474.6639420114639;-3425.4210272834562;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+559: [AFJ-R52] stage=VIEWPORT group=B_CUT projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=734.34678796066214;216.36013012649255;846.42394606949915;477.58615583326764 actual_visibility=UNVERIFIED
+560: [AFJ-R52] stage=DISPLAY3_BEGIN group=B_CUT temporary=True context=selected_component
+561: [AFJ-R52] stage=DISPLAY3_END group=B_CUT status=0 tracked=5 actual_visibility=UNVERIFIED
+562: [AFJ-R52] stage=VIEW_STATE group=B_CUT world_box_m=-0.85500002499999994;2.9442586625550411;0.11429999999999996;-0.8523999;2.9444001000000011;0.11700009999999995 visible_box_px=477;149;1465;1015 transform=-0.9833496671451849;-0.0043180809637167724;-0.18167219463155362;-0.079569957626686671;-0.888556793921391;0.45181350778769974;-0.16337703011360444;0.45874631132351273;0.873418438022881;127.30009561055942;3474.6639420114639;-3425.4210272834562;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+563: [AFJ-R52] stage=VIEWPORT group=B_CUT projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=828.68599039535354;404.15292763732486;832.29509150779666;405.80270647291854 actual_visibility=UNVERIFIED
+564: [AFJ-R52] stage=DISPLAY3_BEGIN group=B_CUT temporary=True context=selected_component
+565: [AFJ-R52] stage=DISPLAY3_END group=B_CUT status=0 tracked=6 actual_visibility=UNVERIFIED
+566: [AFJ-R52] stage=REDRAW_BEGIN bound_active=True tracked=6
+567: [AFJ-R52] stage=REDRAW_END actual_visibility=UNVERIFIED
+568: [AFJ-SOLVER] ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+569: [AFJ-R52] stage=SESSION_PREVIEW_END success=True state=Showing tracked=True actual_visibility=UNVERIFIED
+570: [AFJ-R52] stage=ENTRY_PREVIEW_END token=449b921630b74d5296017ff2df4bc182 success=True status=ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+571: [AFJ-CUT-CANDIDATE] SHOW ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+572: [AFJ-R52] stage=PREVIEW_CALLBACK_END seq=41 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=2
+573: [AFJ-R50] BACKEND END Preview P2 epoch=1
+574: [AFJ-R52] stage=SELECTION_READ seq=42 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+575: [AFJ-R52] stage=SELECTION_READ seq=43 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+576: [AFJ-R52] stage=POST_REQUEST seq=44 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+577: [AFJ-R52] stage=ACTION_END seq=45 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+578: [AFJ-R52] stage=POST_END seq=46 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+579: [AFJ-R52] stage=POST_RUN seq=47 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+580: [AFJ-R52] stage=SELECTION_READ seq=48 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+581: [AFJ-R52] stage=SELECTION_READ seq=49 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+582: [AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+583: [AFJ-R52] stage=READY seq=50 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1 reason=Đã chọn 2 Component — nhấn Phân tích.
+584: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+585: [AFJ-R50] CAPTION END id=104 epoch=1
+586: [AFJ-R52] stage=POST_END seq=51 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+589: [AFJ-R52] stage=BUTTON seq=52 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False id=108 onPreviewCut_bound=True
+590: [AFJ-R50] BUTTON id=108 epoch=1
+591: [AFJ-R52] stage=ACTION_REQUEST seq=53 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=2 automatic=False
+592: [AFJ-R52] stage=POST_REQUEST seq=54 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+593: [AFJ-R52] stage=POST_RUN seq=55 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+594: [AFJ-R52] stage=ACTION_RUN seq=56 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+595: [AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=57 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=2
+596: [AFJ-R52] stage=SELECTION_READ seq=58 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+597: [AFJ-R52] stage=SELECTION_READ seq=59 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+598: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+599: [AFJ-R50] CAPTION END id=104 epoch=1
+600: [AFJ-R50] BACKEND BEGIN Preview P2 epoch=1
+601: [AFJ-R52] stage=PREVIEW_CALLBACK_BEGIN seq=60 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=2 bound=True
+602: [AFJ-R52] stage=ENTRY_PREVIEW_BEGIN token=449b921630b74d5296017ff2df4bc182 candidate=2
+603: [AFJ-R52] stage=SESSION_PREVIEW_ENTER token=449b921630b74d5296017ff2df4bc182 candidate=2
+604: [AFJ-R52] stage=SESSION_GHOST_CALL token=449b921630b74d5296017ff2df4bc182
+605: [AFJ-R52] stage=GHOST_ENTER candidate=2 busy=False
+606: [AFJ-R52] stage=HIDE_BEGIN tracked_index=5
+607: [AFJ-R52] stage=HIDE_END tracked_index=5
+608: [AFJ-R52] stage=HIDE_BEGIN tracked_index=4
+609: [AFJ-R52] stage=HIDE_END tracked_index=4
+610: [AFJ-R52] stage=HIDE_BEGIN tracked_index=3
+611: [AFJ-R52] stage=HIDE_END tracked_index=3
+612: [AFJ-R52] stage=HIDE_BEGIN tracked_index=2
+613: [AFJ-R52] stage=HIDE_END tracked_index=2
+614: [AFJ-R52] stage=HIDE_BEGIN tracked_index=1
+615: [AFJ-R52] stage=HIDE_END tracked_index=1
+616: [AFJ-R52] stage=HIDE_BEGIN tracked_index=0
+617: [AFJ-R52] stage=HIDE_END tracked_index=0
+618: [AFJ-R52] stage=REDRAW_BEGIN bound_active=True tracked=0
+619: [AFJ-R52] stage=REDRAW_END actual_visibility=UNVERIFIED
+620: [AFJ-R51] source=profile-skin-cutter; MVID=ae27a276-be1d-4959-8391-1b3d60f3b997
+621: [AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION
+622: [AFJ-R52] stage=SOLVER_BEGIN
+623: [AFJ-R52] stage=PAIR_CONTEXT assembly=2354-02-lc-B11 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1
+624: [AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+625: [AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+626: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+627: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+628: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+629: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+630: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+631: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+632: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+633: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+634: [AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+635: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+636: [AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+637: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+638: [AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+639: [AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+640: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+641: [AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+642: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+643: [AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+644: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+645: [AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+646: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+647: [AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+648: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+649: [AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+650: [AFJ-R52] stage=SOLVER_END keptA=1 keptB=1 removedA_m3=7.1753397680816231E-05 removedB_m3=6.8665694004274168E-05
+651: [AFJ-R52] stage=DISPLAY_CONTEXT shift_world_m=0;0;0.12 transformA=1;0;0;0;1;0;0;0;1;-1;2.947000000000001;-0.0030000000000000443;1;0;0;0 transformB=0;1;-1.3877787807814457E-17;-1;0;0;-4.622231866529366E-33;1.3877787807814466E-17;0.99999999999999989;-0.855;-0.10000000000000007;-0.0030000000000000027;1;0;0;0 partA=2354-04-lc-B11-fr04 partB=2354-04-lc-B11-fr03
+652: [AFJ-R52] stage=VIEW_STATE group=A_KEEP world_box_m=-0.8550001;2.8769999750000008;0.056999974999999953;0.50000002500000007;2.9470000250000008;0.11700010000000004 visible_box_px=477;149;1465;1015 transform=-0.84764545644312883;-0.14882207378335002;-0.509263360675145;-0.35612848250704171;-0.55190042278651241;0.75404139626104116;-0.39328066837635367;0.82052295134438;0.41481610648401362;1150.9426972698193;2250.2897654087046;-4732.2281736607129;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+653: [AFJ-R52] stage=VIEWPORT group=A_KEEP projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=-671.282645213824;266.45889817139346;764.43896733700888;613.6921435899651 actual_visibility=UNVERIFIED
+654: [AFJ-R52] stage=DISPLAY3_BEGIN group=A_KEEP temporary=True context=selected_component
+655: [AFJ-R52] stage=DISPLAY3_END group=A_KEEP status=0 tracked=1 actual_visibility=UNVERIFIED
+656: [AFJ-R52] stage=VIEW_STATE group=B_KEEP world_box_m=-0.85500002499999994;-0.10000002500000008;0.074999999999999956;-0.784999975;2.9444000000000012;0.11700009999999995 visible_box_px=477;149;1465;1015 transform=-0.84764545644312883;-0.14882207378335002;-0.509263360675145;-0.35612848250704171;-0.55190042278651241;0.75404139626104116;-0.39328066837635367;0.82052295134438;0.41481610648401362;1150.9426972698193;2250.2897654087046;-4732.2281736607129;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+657: [AFJ-R52] stage=VIEWPORT group=B_KEEP projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=636.18644847516759;515.25244546017075;2027.4902416472771;2584.2291251885449 actual_visibility=UNVERIFIED
+658: [AFJ-R52] stage=DISPLAY3_BEGIN group=B_KEEP temporary=True context=selected_component
+659: [AFJ-R52] stage=DISPLAY3_END group=B_KEEP status=0 tracked=2 actual_visibility=UNVERIFIED
+660: [AFJ-R52] stage=VIEW_STATE group=A_CUT world_box_m=-1.000000025;2.8769999750000008;0.056999974999999953;-0.78749989999999981;2.9470000250000008;0.11700010000000004 visible_box_px=477;149;1465;1015 transform=-0.84764545644312883;-0.14882207378335002;-0.509263360675145;-0.35612848250704171;-0.55190042278651241;0.75404139626104116;-0.39328066837635367;0.82052295134438;0.41481610648401362;1150.9426972698193;2250.2897654087046;-4732.2281736607129;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+661: [AFJ-R52] stage=VIEWPORT group=A_CUT projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=637.61739849533978;496.26396277623712;911.84900168736078;639.57309044308636 actual_visibility=UNVERIFIED
+662: [AFJ-R52] stage=DISPLAY3_BEGIN group=A_CUT temporary=True context=selected_component
+663: [AFJ-R52] stage=DISPLAY3_END group=A_CUT status=0 tracked=3 actual_visibility=UNVERIFIED
+664: [AFJ-R52] stage=VIEW_STATE group=A_CUT world_box_m=-0.855;2.944500000000001;0.11439999999999995;-0.85239999999999982;2.947000000000001;0.11699807621135326 visible_box_px=477;149;1465;1015 transform=-0.84764545644312883;-0.14882207378335002;-0.509263360675145;-0.35612848250704171;-0.55190042278651241;0.75404139626104116;-0.39328066837635367;0.82052295134438;0.41481610648401362;1150.9426972698193;2250.2897654087046;-4732.2281736607129;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+665: [AFJ-R52] stage=VIEWPORT group=A_CUT projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=703.597197676825;564.33487166122973;708.53367902260777;569.01049141056592 actual_visibility=UNVERIFIED
+666: [AFJ-R52] stage=DISPLAY3_BEGIN group=A_CUT temporary=True context=selected_component
+667: [AFJ-R52] stage=DISPLAY3_END group=A_CUT status=0 tracked=4 actual_visibility=UNVERIFIED
+668: [AFJ-R52] stage=VIEW_STATE group=B_CUT world_box_m=-0.85500002499999994;2.8768999000000011;0.074999999999999956;-0.784999975;3.100000025;0.11700009999999995 visible_box_px=477;149;1465;1015 transform=-0.84764545644312883;-0.14882207378335002;-0.509263360675145;-0.35612848250704171;-0.55190042278651241;0.75404139626104116;-0.39328066837635367;0.82052295134438;0.41481610648401362;1150.9426972698193;2250.2897654087046;-4732.2281736607129;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+669: [AFJ-R52] stage=VIEWPORT group=B_CUT projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=569.72628534871194;412.25761654410371;755.99138021306351;613.75837188608739 actual_visibility=UNVERIFIED
+670: [AFJ-R52] stage=DISPLAY3_BEGIN group=B_CUT temporary=True context=selected_component
+671: [AFJ-R52] stage=DISPLAY3_END group=B_CUT status=0 tracked=5 actual_visibility=UNVERIFIED
+672: [AFJ-R52] stage=VIEW_STATE group=B_CUT world_box_m=-0.85500002499999994;2.9442586625550411;0.11429999999999996;-0.8523999;2.9444001000000011;0.11700009999999995 visible_box_px=477;149;1465;1015 transform=-0.84764545644312883;-0.14882207378335002;-0.509263360675145;-0.35612848250704171;-0.55190042278651241;0.75404139626104116;-0.39328066837635367;0.82052295134438;0.41481610648401362;1150.9426972698193;2250.2897654087046;-4732.2281736607129;1199.3474921210075;0;0;0 scale=0.29900591633825119 graphics_update=True
+673: [AFJ-R52] stage=VIEWPORT group=B_CUT projection_estimate=OVERLAPS_WINDOW_ESTIMATE projected_box_px=704.70661540765582;565.95737141458153;708.683952940946;569.17223364250776 actual_visibility=UNVERIFIED
+674: [AFJ-R52] stage=DISPLAY3_BEGIN group=B_CUT temporary=True context=selected_component
+675: [AFJ-R52] stage=DISPLAY3_END group=B_CUT status=0 tracked=6 actual_visibility=UNVERIFIED
+676: [AFJ-R52] stage=REDRAW_BEGIN bound_active=True tracked=6
+677: [AFJ-R52] stage=REDRAW_END actual_visibility=UNVERIFIED
+678: [AFJ-SOLVER] ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+679: [AFJ-R52] stage=SESSION_PREVIEW_END success=True state=Showing tracked=True actual_visibility=UNVERIFIED
+680: [AFJ-R52] stage=ENTRY_PREVIEW_END token=449b921630b74d5296017ff2df4bc182 success=True status=ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+681: [AFJ-CUT-CANDIDATE] SHOW ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+682: [AFJ-R52] stage=PREVIEW_CALLBACK_END seq=61 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False candidate=2
+683: [AFJ-R50] BACKEND END Preview P2 epoch=1
+684: [AFJ-R52] stage=SELECTION_READ seq=62 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+685: [AFJ-R52] stage=SELECTION_READ seq=63 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+686: [AFJ-R52] stage=POST_REQUEST seq=64 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+687: [AFJ-R52] stage=ACTION_END seq=65 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+688: [AFJ-R52] stage=POST_END seq=66 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False backend kind=2
+689: [AFJ-R52] stage=POST_RUN seq=67 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready refresh
+690: [AFJ-R52] stage=SELECTION_READ seq=68 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+691: [AFJ-R52] stage=SELECTION_READ seq=69 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+692: [AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+693: [AFJ-R52] stage=READY seq=70 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=2354-04-lc-B11-fr04-1 B=2354-04-lc-B11-fr03-1 reason=Đã chọn 2 Component — nhấn Phân tích.
+694: [AFJ-R50] CAPTION BEGIN id=104 epoch=1
+695: Exception thrown: 'System.AccessViolationException' in ADDIN.dll
+696: An unhandled exception of type 'System.AccessViolationException' occurred in ADDIN.dll
+700: The program '[39072] SLDWORKS.exe' has exited with code 4294967295 (0xffffffff).

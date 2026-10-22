@@ -1,5 +1,7 @@
 # Display3 và khả năng nhìn thấy Preview
 
+> **Lịch sử snapshot đầu R52:** Báo cáo này giữ kết quả tại thời điểm trước khi người dùng Build/test. Log native mới và bản sửa Caption được đối chiếu tại [follow-up](07_NATIVE_LOG_AND_CAPTION_FIX.md); dùng follow-up để đọc trạng thái hiện tại.
+
 ## Trạng thái kiểm tra
 
 **R52 chưa gọi solver/Body2/Display3 trong SOLIDWORKS thực và chưa đo viewport thực.** Người dùng chọn tiếp tục source/DLL trước. Không tự khởi tạo SOLIDWORKS, tự load Add-in hoặc dùng computer use. Các kết quả R51 ở PR #42 là lần chạy harness trước, không được đổi nhãn thành R52 PASS.

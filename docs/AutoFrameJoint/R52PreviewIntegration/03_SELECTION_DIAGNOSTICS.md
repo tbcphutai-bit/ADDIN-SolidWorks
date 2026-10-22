@@ -1,5 +1,7 @@
 # Frame B và chẩn đoán callback
 
+> **Lịch sử snapshot đầu R52:** Báo cáo này giữ kết quả tại thời điểm trước khi người dùng Build/test. Log native mới và bản sửa Caption được đối chiếu tại [follow-up](07_NATIVE_LOG_AND_CAPTION_FIX.md); dùng follow-up để đọc trạng thái hiện tại.
+
 ## Kết luận từ log được cung cấp
 
 Người dùng cung cấp tóm tắt: MVID đúng R51, R50 ACTIVATED/SHOW, A count=1, A→B AUTO FOCUS, READY=False A-count=1 B-count=0; không có BUTTON 107/108, BACKEND BEGIN Preview hoặc AFJ-R51. Đây là `USER_LOG`, không phải log native R52 do harness tạo.

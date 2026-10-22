@@ -28,5 +28,7 @@
   "r51_core_geometry_unchanged": true,
   "current_dll_source_relationship": "Installed DLL contains pre-R52 R51 logic; R52 source instrumentation pending owner build",
   "cause_b_missing": "UNVERIFIED_NOT_REPRODUCED_NATIVELY",
-  "exit_cause": "UNVERIFIED_NO_UNIQUE_CALLBACK_MAPPING"
+  "exit_cause": "UNVERIFIED_NO_UNIQUE_CALLBACK_MAPPING",
+  "snapshot_scope": "INITIAL_R52_AUDIT_BEFORE_USER_NATIVE_TEST",
+  "newer_evidence": "CAPTION_FOLLOWUP_SUMMARY.json"
 }

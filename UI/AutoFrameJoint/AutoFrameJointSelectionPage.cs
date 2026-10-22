@@ -73,8 +73,11 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool backendActionQueued;
         private bool initialFocusApplied;
         private bool closeNotified;
-        private readonly System.Collections.Generic.Dictionary<int, string> displayedCaptions =
+        private readonly System.Collections.Generic.Dictionary<int, string> cachedStatusText =
             new System.Collections.Generic.Dictionary<int, string>();
+
+        private bool messageUpdatesUnavailable;
+        private string lastPublishedMessage;
 
         private volatile bool shown;
         private volatile bool closing;
@@ -143,7 +146,9 @@ namespace ADDIN.UI.AutoFrameJoint
             System.Threading.Interlocked.Increment(ref pageEpoch);
             nativeActivated = false;
             controlsFaulted = false;
-            displayedCaptions.Clear();
+            cachedStatusText.Clear();
+            messageUpdatesUnavailable = false;
+            lastPublishedMessage = null;
             int error = 0;
             const int options =
                 (int)swPropertyManagerPageOptions_e.swPropertyManagerOptions_OkayButton |
@@ -165,6 +170,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 finally { showInProgress = false; }
                 if (status != (int)swPropertyManagerPageStatus_e.swPropertyManagerPage_Okay)
                     throw new InvalidOperationException("Không hiển thị được PropertyManager. Mã lỗi: " + status);
+                Trace.WriteLine("[AFJ-R52-CAPTION] status_channel=PAGE_MESSAGE no_runtime_label_writes=True");
                 TraceFlow("SHOW", "source=R52 MVID=" + typeof(AutoFrameJointSelectionPage).Assembly.ManifestModule.ModuleVersionId + " preview_callback=" + (onPreviewCut != null));
                 Trace.WriteLine("[AFJ-R50] SHOW epoch=" + pageEpoch + " owner=" + ownerThreadId);
                 UpdateReadyState();
@@ -364,7 +370,7 @@ namespace ADDIN.UI.AutoFrameJoint
             statusLabel = group.AddControl2(
                 LabelStatus,
                 (short)swPropertyManagerPageControlType_e.swControlType_Label,
-                "Chọn Frame A và Frame B", align, controlOptions,
+                "Chọn Frame A/B; xem kết quả trong Thông báo.", align, controlOptions,
                 "Trạng thái chọn Frame.")
                 as PropertyManagerPageLabel;
 
@@ -416,31 +422,31 @@ namespace ADDIN.UI.AutoFrameJoint
                 geometryAngleLabel = geometryGroup.AddControl2(
                     LabelAngle,
                     (short)swPropertyManagerPageControlType_e.swControlType_Label,
-                    "Góc hai trục: chưa tính", align, controlOptions,
+                    "Góc hai trục: xem Thông báo", align, controlOptions,
                     "Góc NHỌN giữa 2 trục vô hướng, không phải góc trong.")
                     as PropertyManagerPageLabel;
                 geometryPointLabel = geometryGroup.AddControl2(
                     LabelPoint,
                     (short)swPropertyManagerPageControlType_e.swControlType_Label,
-                    "XYZ gần nhất: chưa tính", align, controlOptions,
+                    "XYZ gần nhất: xem Thông báo", align, controlOptions,
                     "Trung điểm giữa hai trục được ước lượng trong Assembly.")
                     as PropertyManagerPageLabel;
                 geometryGapLabel = geometryGroup.AddControl2(
                     LabelGap,
                     (short)swPropertyManagerPageControlType_e.swControlType_Label,
-                    "Khoảng cách trục: chưa tính", align, controlOptions,
+                    "Khoảng cách trục: xem Thông báo", align, controlOptions,
                     "Không phải khe hở vật liệu; Web/Wall/Lip chưa được xử lý.")
                     as PropertyManagerPageLabel;
                 geometryStatusLabel = geometryGroup.AddControl2(
                     LabelJointStatus,
                     (short)swPropertyManagerPageControlType_e.swControlType_Label,
-                    "Trạng thái: chưa tính", align, controlOptions,
+                    "Trạng thái: xem Thông báo", align, controlOptions,
                     "Chỉ tính toán hình học tham chiếu.")
                     as PropertyManagerPageLabel;
                 geometryRoleLabel = geometryGroup.AddControl2(
                     LabelRole,
                     (short)swPropertyManagerPageControlType_e.swControlType_Label,
-                    "Dài/ngắn: chưa tính", align, controlOptions,
+                    "Dài/ngắn: xem Thông báo", align, controlOptions,
                     "KCC 26003 chỉ áp dụng khi được xác minh; bản vẽ riêng ưu tiên.")
                     as PropertyManagerPageLabel;
             }
@@ -618,11 +624,11 @@ namespace ADDIN.UI.AutoFrameJoint
             int epoch = pageEpoch;
             string[] lines = lastGeometryLines;
             if (lines != null && lines.Length < 6) lines = null;
-            if (!SetCaption(geometryAngleLabel, LabelAngle, lines == null ? "Góc hai trục: chưa tính" : lines[1], epoch)) return;
-            if (!SetCaption(geometryPointLabel, LabelPoint, lines == null ? "XYZ gần nhất: chưa tính" : lines[2], epoch)) return;
-            if (!SetCaption(geometryGapLabel, LabelGap, lines == null ? "Khoảng cách trục: chưa tính" : lines[3], epoch)) return;
-            if (!SetCaption(geometryStatusLabel, LabelJointStatus, lines == null ? "Trạng thái: chưa tính" : lines[4], epoch)) return;
-            SetCaption(geometryRoleLabel, LabelRole, lines == null ? "Dài/ngắn: chưa tính" : lines[5], epoch);
+            if (!CacheStatusText(LabelAngle, lines == null ? "Góc hai trục: chưa tính" : lines[1], epoch)) return;
+            if (!CacheStatusText(LabelPoint, lines == null ? "XYZ gần nhất: chưa tính" : lines[2], epoch)) return;
+            if (!CacheStatusText(LabelGap, lines == null ? "Khoảng cách trục: chưa tính" : lines[3], epoch)) return;
+            if (!CacheStatusText(LabelJointStatus, lines == null ? "Trạng thái: chưa tính" : lines[4], epoch)) return;
+            CacheStatusText(LabelRole, lines == null ? "Dài/ngắn: chưa tính" : lines[5], epoch);
         }
 
         private bool IsPreviousPair(Component2 a, Component2 b)
@@ -681,7 +687,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 if (!IsUiLive(epoch)) return;
                 if (!previousPair) ClearAnalysisResult();
                 lastPreviewMessage = null;
-                if (!SetCaption(statusLabel, LabelStatus, "Đang tính trục và giao góc 3D...", epoch)) return;
+                if (!CacheStatusText(LabelStatus, "Đang tính trục và giao góc 3D...", epoch)) return;
                 if (!IsUiLive(epoch)) return;
                 Trace.WriteLine("[AFJ-R50] BACKEND BEGIN Analyze epoch=" + epoch);
                 string result = onAnalyze == null ? "Đã chọn 2 Frame. Chưa nối bộ phân tích." : onAnalyze(a, b);
@@ -732,7 +738,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 if (!IsUiLive(epoch)) return;
                 if (!previousPair) ClearAnalysisResult();
                 lastPreviewMessage = null;
-                if (!SetCaption(statusLabel, LabelStatus, "Đang tạo bản xem Frame A/B...", epoch)) return;
+                if (!CacheStatusText(LabelStatus, "Đang tạo bản xem Frame A/B...", epoch)) return;
                 if (!IsUiLive(epoch)) return;
                 Trace.WriteLine("[AFJ-R50] BACKEND BEGIN Show A/B epoch=" + epoch);
                 string result = onShowBodies == null ? "Chưa kết nối bộ hiển thị A/B." : onShowBodies(a, b);
@@ -793,7 +799,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 bool previousPair = IsPreviousPair(a, b);
                 if (!IsUiLive(epoch)) return;
                 if (!previousPair) ClearAnalysisResult();
-                if (!SetCaption(statusLabel, LabelStatus, "Đang tạo Preview cho hai Frame...", epoch)) return;
+                if (!CacheStatusText(LabelStatus, "Đang tạo Preview cho hai Frame...", epoch)) return;
                 if (!IsUiLive(epoch)) return;
                 Trace.WriteLine("[AFJ-R50] BACKEND BEGIN Preview P" + candidate + " epoch=" + epoch);
                 TraceFlow("PREVIEW_CALLBACK_BEGIN", "candidate=" + candidate + " bound=" + (onPreviewCut != null));
@@ -861,7 +867,7 @@ namespace ADDIN.UI.AutoFrameJoint
             nativeActivated = false;
             System.Threading.Interlocked.Increment(ref pageEpoch);
             ClearAnalysisResult();
-            displayedCaptions.Clear();
+            cachedStatusText.Clear();
             DisposeDeferredFocusWindow();
             page = null;
             selectionA = null;
@@ -1098,27 +1104,59 @@ namespace ADDIN.UI.AutoFrameJoint
             Trace.WriteLine(ex.StackTrace);
         }
 
-        private bool SetCaption(PropertyManagerPageLabel label, int id, string text, int epoch)
+        private bool CacheStatusText(int id, string text, int epoch)
         {
-            if (!IsUiLive(epoch)) return false;
-            if (label == null) return true; // Optional geometry group.
+            if (!IsUiLive(epoch) || selectionCallbackDepth != 0) return false;
+            text = text ?? String.Empty;
             string previous;
-            if (displayedCaptions.TryGetValue(id, out previous) && previous == text) return true;
-            Trace.WriteLine("[AFJ-R50] CAPTION BEGIN id=" + id + " epoch=" + epoch);
+            if (cachedStatusText.TryGetValue(id, out previous) && previous == text) return true;
+            // Managed snapshot only. Never dereference a native label RCW.
+            cachedStatusText[id] = text;
+            Trace.WriteLine("[AFJ-R52-CAPTION] STATUS_CACHE id=" + id + " epoch=" + epoch + " text=" + text.Replace("\r", " ").Replace("\n", " | "));
+            return true;
+        }
+
+        private string StatusMessageText()
+        {
+            string status;
+            if (!cachedStatusText.TryGetValue(LabelStatus, out status)) return String.Empty;
+            var text = new System.Text.StringBuilder(status);
+            string[] geometry = lastGeometryLines;
+            if (geometry != null && geometry.Length >= 6)
+                for (int i = 1; i < 6; i++) text.AppendLine().Append(geometry[i]);
+            return text.ToString();
+        }
+
+        private void PublishStatusMessage()
+        {
+            int epoch = pageEpoch;
+            if (!IsUiLive(epoch) || selectionCallbackDepth != 0 || IsBackendBusy() ||
+                page == null || messageUpdatesUnavailable) return;
+            string text = StatusMessageText();
+            if (String.IsNullOrEmpty(text) || text == lastPublishedMessage) return;
             try
             {
-                label.Caption = text;
-                if (!IsUiLive(epoch)) return false;
-                displayedCaptions[id] = text;
-                Trace.WriteLine("[AFJ-R50] CAPTION END id=" + id + " epoch=" + epoch);
-                return true;
+                Trace.WriteLine("[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=" + epoch + " chars=" + text.Length);
+                bool accepted = page.SetMessage3(text,
+                    (int)swPropertyManagerPageMessageVisibility.swMessageBoxVisible,
+                    lastPublishedMessage == null
+                        ? (int)swPropertyManagerPageMessageExpanded.swMessageBoxExpand
+                        : (int)swPropertyManagerPageMessageExpanded.swMessageBoxMaintainExpandState,
+                    "Auto Frame Joint — Trạng thái");
+                Trace.WriteLine("[AFJ-R52-CAPTION] MESSAGE_END epoch=" + epoch + " accepted=" + accepted);
+                if (!IsUiLive(epoch)) return;
+                if (accepted) lastPublishedMessage = text;
+                else messageUpdatesUnavailable = true;
             }
             catch (Exception ex)
             {
-                TraceUiFault("caption id=" + id, ex, true);
-                return false;
+                // A normal COM failure disables only this optional channel.
+                // No native-label fallback, retry or corrupted-state recovery.
+                messageUpdatesUnavailable = true;
+                Trace.WriteLine("[AFJ-R52-CAPTION] MESSAGE_UNAVAILABLE HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex.GetType().FullName + " " + ex.Message);
             }
         }
+
 
         private void ApplyReadyState()
         {
@@ -1144,8 +1182,9 @@ namespace ADDIN.UI.AutoFrameJoint
                 if (!previousPair) ClearAnalysisResult();
                 string status = ready && !String.IsNullOrEmpty(lastPreviewMessage) ? lastPreviewMessage :
                     (ready && !String.IsNullOrEmpty(lastAnalysisMessage) ? lastAnalysisMessage : reason);
-                if (!SetCaption(statusLabel, LabelStatus, status, epoch)) return;
+                if (!CacheStatusText(LabelStatus, status, epoch)) return;
                 UpdateGeometryLabels();
+                PublishStatusMessage();
             }
             catch (Exception ex) { TraceUiFault("ready refresh", ex, true); }
             finally { updatingReadyState = false; }

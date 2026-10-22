@@ -1,0 +1,8 @@
+{
+  "mvid": "ae27a276-be1d-4959-8391-1b3d60f3b997",
+  "matches_new_user_log": true,
+  "normalized_il_match_count": 265,
+  "method_count": 265,
+  "comparison_baseline": "R52Managed_local.exe before Caption fix",
+  "comparison_is_source_checksum": false
+}

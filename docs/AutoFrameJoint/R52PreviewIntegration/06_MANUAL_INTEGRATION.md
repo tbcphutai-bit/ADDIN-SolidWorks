@@ -1,5 +1,7 @@
 # Tích hợp và kiểm tra thủ công
 
+> **Lịch sử snapshot đầu R52:** Báo cáo này giữ kết quả tại thời điểm trước khi người dùng Build/test. Log native mới và bản sửa Caption được đối chiếu tại [follow-up](07_NATIVE_LOG_AND_CAPTION_FIX.md); dùng follow-up để đọc trạng thái hiện tại.
+
 ## Source đã áp dụng
 
 Bản local được patch từng method, không chép toàn bộ class của branch PR #42. Baseline local có nhãn P1/P2, vị trí helper và một số chi tiết khác với branch; các khác biệt không liên quan được giữ nguyên. Bốn patch local và hash tương ứng ở `evidence/local_*.patch` / `SOURCE_PATCH_AUDIT.json`. **Đã áp dụng local, không apply lại.** Backup byte gốc giữ private.

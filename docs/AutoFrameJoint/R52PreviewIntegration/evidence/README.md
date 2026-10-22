@@ -1,5 +1,7 @@
 # Bằng chứng R52
 
+**Nguồn mới sau người dùng Build:** `caption_followup/` chứa log native AFJ đã lọc/loại đường dẫn, xác minh DLL MVID `ae27...`, bản sửa Caption, patch local và 12 managed controls. Các file ở root dưới đây giữ snapshot đầu R52. Xem [follow-up](../07_NATIVE_LOG_AND_CAPTION_FIX.md) để đọc trạng thái hiện tại.
+
 - `INSTALLED_BINARY_AUDIT.json`: MVID, danh sách AFJ method, member calls, string markers và hash IL chuẩn hóa. Đọc file, không load Add-in để thực thi.
 - `INSTALLED_IL_COMPARISON.json`: tóm tắt 251/251 method tương ứng R51 harness; không là PDB source checksum.
 - `PDB_SOURCE_VERIFICATION.json`: CodeView và native PDB GUID/age, SHA DLL/PDB; hash source từ PDB vẫn NOT_AVAILABLE.
