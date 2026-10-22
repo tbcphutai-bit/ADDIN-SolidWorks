@@ -1,0 +1,63 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Security.Cryptography;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+
+class StageStudy {
+  [DllImport("ole32.dll")] static extern int CreateStreamOnHGlobal(IntPtr p,bool delete,out IStream s);
+  static JavaScriptSerializer J=new JavaScriptSerializer{MaxJsonLength=int.MaxValue,RecursionLimit=200};
+  static Dictionary<string,object> D(params object[] a){var d=new Dictionary<string,object>();for(int i=0;i<a.Length;i+=2)d[(string)a[i]]=a[i+1];return d;}
+  static object[] A(object o){var a=o as Array;return a==null?new object[0]:a.Cast<object>().ToArray();}
+  static string H(string p){using(var s=File.OpenRead(p))using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(s)).Replace("-","").ToLowerInvariant();}
+  static IBody2 C(IBody2 b){var c=b.Copy() as IBody2;if(c==null||!c.IsTemporaryBody())throw new Exception("copy not temporary");return c;}
+  static double V(IBody2 b){return ((double[])b.GetMassProperties(1))[3];}
+  static List<IBody2> Bodies(IModelDoc2 m){return A(((IPartDoc)m).GetBodies2(0,false)).Cast<IBody2>().Select(C).ToList();}
+  static List<IBody2> Op(IBody2 a,IBody2 b,int op,out int error){return A(a.Operations2(op,b,out error)).Cast<IBody2>().ToList();}
+  static object Metric(IBody2 b){return D("volume_m3",V(b),"surface_m2",((double[])b.GetMassProperties(1))[4],"face_count",b.GetFaceCount(),"check2",b.Check2(),"box_m",b.GetBodyBox());}
+  static object Faces(IBody2 b){return A(b.GetFaces()).Select(o=>{var f=(IFace2)o;var s=(ISurface)f.GetSurface();return D("area",f.GetArea(),"box",f.GetBox(),"kind",s.IsPlane()?"plane":s.IsCylinder()?"cylinder":"other","parameters",s.IsPlane()?s.PlaneParams:s.IsCylinder()?s.CylinderParams:null);}).ToArray();}
+  static void SaveBody(string p,IBody2 b){IStream s;Marshal.ThrowExceptionForHR(CreateStreamOnHGlobal(IntPtr.Zero,true,out s));try{b.Save(s);System.Runtime.InteropServices.ComTypes.STATSTG st;s.Stat(out st,1);byte[] bytes=new byte[(int)st.cbSize];s.Seek(0,0,IntPtr.Zero);s.Read(bytes,bytes.Length,IntPtr.Zero);File.WriteAllBytes(p,bytes);}finally{Marshal.ReleaseComObject(s);}}
+  static void Json(string p,object o){File.WriteAllText(p,J.Serialize(o),new UTF8Encoding(false));}
+  [STAThread] static int Main(string[] args){
+    var sw=(ISldWorks)Marshal.GetActiveObject("SldWorks.Application");string output=args[1];Directory.CreateDirectory(output);var all=new List<object>();
+    foreach(string path in File.ReadAllLines(args[0]).Where(x=>x.Length>0)){
+      if(!path.Contains("AFJ_Solver_20261021")||!Path.GetFileName(path).StartsWith("AFJ_STUDY_"))throw new Exception("COPY GUARD");
+      string name=Path.GetFileName(path),hash=H(path),outpart=Path.Combine(output,name);Directory.CreateDirectory(outpart);IModelDoc2 m=null;
+      var d=D("file",name,"hash_before",hash,"revision",sw.RevisionNumber());var rows=new List<object>();d["features"]=rows;
+      try{
+        if(sw.GetOpenDocumentByName(path)!=null)throw new Exception("copy already open");int e=0,w=0;
+        m=sw.OpenDoc6(path,1,3,"Default",ref e,ref w);d["open_error"]=e;d["open_warning"]=w;
+        if(m==null||!m.IsOpenedReadOnly()||!String.Equals(m.GetPathName(),path,StringComparison.OrdinalIgnoreCase))throw new Exception("invalid readonly copy document");
+        d["configuration"]=m.ConfigurationManager.ActiveConfiguration.Name;
+        var names=new List<string>();var f=m.FirstFeature() as IFeature;
+        while(f!=null){if(f.GetTypeName2()=="Cut"||(f.GetTypeName2()=="ICE"&&f.GetTypeName()=="Cut"))names.Add(f.Name);f=f.GetNextFeature() as IFeature;}
+        int index=0;
+        foreach(var fn in names){index++;Console.WriteLine("STUDY "+name+" #"+index+" "+fn);var r=D("ordinal",index,"feature_name",fn);rows.Add(r);
+          try{
+            var fm=m.FeatureManager; if(!fm.EditRollback(1,""))throw new Exception("roll end rejected");
+            bool rb=fm.EditRollback(3,fn);r["rollback_before"]=rb;if(!rb)throw new Exception("before rejected");
+            var before=Bodies(m);if(before.Count!=1)throw new Exception("expected one before solid");
+            r["before"]=Metric(before[0]);SaveBody(Path.Combine(outpart,index+"_before.brep"),before[0]);
+            bool ra=fm.EditRollback(4,fn);r["rollback_after"]=ra;if(!ra)throw new Exception("after rejected");
+            var after=Bodies(m);if(after.Count!=1)throw new Exception("expected one after solid");
+            r["after"]=Metric(after[0]);SaveBody(Path.Combine(outpart,index+"_after.brep"),after[0]);
+            int err;var removed=Op(C(before[0]),C(after[0]),(int)swBodyOperationType_e.SWBODYCUT,out err);r["difference_error"]=err;
+            r["removed"]=removed.Select(Metric).ToArray();r["removed_faces"]=removed.Select(Faces).ToArray();
+            for(int j=0;j<removed.Count;j++)SaveBody(Path.Combine(outpart,index+"_removed_"+j+".brep"),removed[j]);
+            double dv=V(before[0])-V(after[0]),rv=removed.Sum(b=>V(b));r["delta_volume_m3"]=dv;r["removed_volume_m3"]=rv;r["mass_residual_m3"]=Math.Abs(dv-rv);
+            r["before_after_verified"]=err==0&&dv>1e-14&&Math.Abs(dv-rv)<Math.Max(1e-12,dv*1e-6)&&before[0].Check2()==0&&after[0].Check2()==0&&removed.All(b=>b.Check2()==0);
+          }catch(Exception ex){r["exception"]=D("hresult",String.Format("0x{0:X8}",ex.HResult),"message",ex.Message,"stack",ex.StackTrace);r["before_after_verified"]=false;}
+          Json(Path.Combine(outpart,"study.json"),d);
+        }
+      }catch(Exception ex){d["exception"]=ex.ToString();}
+      finally{if(m!=null){try{m.FeatureManager.EditRollback(1,"");}catch{}sw.CloseDoc(m.GetTitle());}d["hash_after"]=H(path);d["copy_hash_unchanged"]=hash==H(path);Json(Path.Combine(outpart,"study.json"),d);all.Add(d);Json(Path.Combine(output,"all_studies.json"),all);}
+    }
+    Console.WriteLine("FINISHED "+all.Count);return 0;
+  }
+}

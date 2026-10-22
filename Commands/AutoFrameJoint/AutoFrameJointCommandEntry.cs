@@ -8,9 +8,9 @@ namespace ADDIN.Commands.AutoFrameJoint
 {
     /// <summary>
     /// Native PropertyManager entry for exactly two Part occurrences.
-    /// Read-only Analyze, original Ghost, and user-triggered P1/P2 TEMPORARY
+    /// Read-only Analyze, original Ghost, and user-triggered KEEP / KEEP-CUT TEMPORARY
     /// Boolean both-frame cut candidates. Does NOT apply any cut to Part,
-    /// mate, feature or Save. Candidate trim rules are UNVERIFIED.
+    /// mate, feature or Save. Rules outside measured profiles/placements are refused.
     /// </summary>
     public static class AutoFrameJointCommandEntry
     {

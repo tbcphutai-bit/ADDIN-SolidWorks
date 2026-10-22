@@ -1,0 +1,947 @@
+{
+  "runtime_native_copies": [
+    {
+      "case": "1618-02-bh-A6",
+      "fixture": "AFJ-R01",
+      "a": "AFJ_PAIR_1618-04-bh-A6-fr1-2",
+      "b": "AFJ_PAIR_1618-04-bh-A6-fr2-2",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.WebLine(AfjProfile profile)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "public_preview_status": "REFUSED",
+      "public_preview_message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+      "cleanup": true,
+      "cleanup_message": null
+    },
+    {
+      "case": "1618-02-bh-A6",
+      "fixture": "AFJ-R02",
+      "a": "AFJ_PAIR_1618-04-bh-A6-fr1-2",
+      "b": "AFJ_PAIR_1618-04-bh-A6-fr4-2",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.WebLine(AfjProfile profile)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "public_preview_status": "REFUSED",
+      "public_preview_message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+      "cleanup": true,
+      "cleanup_message": null
+    },
+    {
+      "case": "1618-02-bh-A6",
+      "fixture": "AFJ-R03",
+      "a": "AFJ_PAIR_1618-04-bh-A6-fr2-2",
+      "b": "AFJ_PAIR_1618-04-bh-A6-fr3-1",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.WebLine(AfjProfile profile)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "public_preview_status": "REFUSED",
+      "public_preview_message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+      "cleanup": true,
+      "cleanup_message": null
+    },
+    {
+      "case": "1618-02-bh-A6",
+      "fixture": "AFJ-R04",
+      "a": "AFJ_PAIR_1618-04-bh-A6-fr3-1",
+      "b": "AFJ_PAIR_1618-04-bh-A6-fr4-2",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.WebLine(AfjProfile profile)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "public_preview_status": "REFUSED",
+      "public_preview_message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+      "cleanup": true,
+      "cleanup_message": null
+    },
+    {
+      "case": "3615-02-bh-T1",
+      "fixture": "AFJ-R05",
+      "a": "AFJ_PAIR_3615-04-bh-T1-fr1-1",
+      "b": "AFJ_PAIR_3615-04-bh-T1-fr2-1",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=27.708847204660252/0",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "native_before_copies": {
+        "status": "PASS_GEOMETRY",
+        "rule": "ORTHOGONAL_U_COVER",
+        "short_cover": "A",
+        "actual_length_a_m": 2,
+        "actual_length_b_m": 3,
+        "a": {
+          "before_m3": 0.0004863345115136929,
+          "after_m3": 0.0004334571998420883,
+          "removed_m3": 5.287731167160266e-05,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 1.938011383317839e-18
+        },
+        "b": {
+          "before_m3": 0.0007295017672705389,
+          "after_m3": 0.0004870282354412034,
+          "removed_m3": 0.0002424735318293358,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 2.981555974335137e-19
+        },
+        "gap_m": 9.999999999991944e-05,
+        "overlap_m3": 0
+      },
+      "private_rollback_public_preview": {
+        "rollback_a": true,
+        "rollback_b": true,
+        "preview_message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 52877.312 mm³; B bỏ 242473.532 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+        "is_showing": true,
+        "status": "PASS_DISPLAY3_API",
+        "cleanup": true,
+        "cleanup_message": null,
+        "restore_end_a": true,
+        "restore_end_b": true
+      }
+    },
+    {
+      "case": "3615-02-bh-T1",
+      "fixture": "AFJ-R06",
+      "a": "AFJ_PAIR_3615-04-bh-T1-fr1-1",
+      "b": "AFJ_PAIR_3615-04-bh-T1-fr4-2",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=28.493792724341706/258.41707902977316",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "native_before_copies": {
+        "status": "PASS_GEOMETRY",
+        "rule": "ORTHOGONAL_U_COVER",
+        "short_cover": "A",
+        "actual_length_a_m": 1.8175000000000003,
+        "actual_length_b_m": 3,
+        "a": {
+          "before_m3": 0.0004335448957058169,
+          "after_m3": 0.00038066758403421477,
+          "removed_m3": 5.28773116716028e-05,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 6.437450399132683e-19
+        },
+        "b": {
+          "before_m3": 0.0006543345115136929,
+          "after_m3": 0.0004359659027603212,
+          "removed_m3": 0.0002183686087533718,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 1.6263032587282567e-19
+        },
+        "gap_m": 0.0001000000000000495,
+        "overlap_m3": 0
+      },
+      "private_rollback_public_preview": {
+        "rollback_a": true,
+        "rollback_b": true,
+        "preview_message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 52877.312 mm³; B bỏ 218368.609 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+        "is_showing": true,
+        "status": "PASS_DISPLAY3_API",
+        "cleanup": true,
+        "cleanup_message": null,
+        "restore_end_a": true,
+        "restore_end_b": true
+      }
+    },
+    {
+      "case": "3615-02-bh-T1",
+      "fixture": "AFJ-R07",
+      "a": "AFJ_PAIR_3615-04-bh-T1-fr2-1",
+      "b": "AFJ_PAIR_3615-04-bh-T1-fr3-2",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=363.89379272438691/256.85415805955813",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "native_before_copies": {
+        "status": "PASS_GEOMETRY",
+        "rule": "ORTHOGONAL_U_COVER",
+        "short_cover": "B",
+        "actual_length_a_m": 2.0245,
+        "actual_length_b_m": 1.8045000000000004,
+        "a": {
+          "before_m3": 0.0004869539961085965,
+          "after_m3": 0.00024448046427926037,
+          "removed_m3": 0.00024247353182933607,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 8.131516293641283e-20
+        },
+        "b": {
+          "before_m3": 0.0004334571998420924,
+          "after_m3": 0.0003805798881704877,
+          "removed_m3": 5.2877311671602896e-05,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 1.8092623753351855e-18
+        },
+        "gap_m": 9.99999999995449e-05,
+        "overlap_m3": 0
+      },
+      "private_rollback_public_preview": {
+        "rollback_a": true,
+        "rollback_b": true,
+        "preview_message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 242473.532 mm³; B bỏ 52877.312 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+        "is_showing": true,
+        "status": "PASS_DISPLAY3_API",
+        "cleanup": true,
+        "cleanup_message": null,
+        "restore_end_a": true,
+        "restore_end_b": true
+      }
+    },
+    {
+      "case": "3615-02-bh-T1",
+      "fixture": "AFJ-R08",
+      "a": "AFJ_PAIR_3615-04-bh-T1-fr4-2",
+      "b": "AFJ_PAIR_3615-04-bh-T1-fr3-2",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=28.493792724329992/258.41707902979158",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "native_before_copies": {
+        "status": "PASS_GEOMETRY",
+        "rule": "ORTHOGONAL_U_COVER",
+        "short_cover": "B",
+        "actual_length_a_m": 2.0224,
+        "actual_length_b_m": 2,
+        "a": {
+          "before_m3": 0.00043597935929143744,
+          "after_m3": 0.00021761075053806762,
+          "removed_m3": 0.00021836860875337172,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 1.8973538018496328e-18
+        },
+        "b": {
+          "before_m3": 0.0004863345115136931,
+          "after_m3": 0.0004334571998420889,
+          "removed_m3": 5.287731167160257e-05,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 1.6466320494623599e-18
+        },
+        "gap_m": 9.999999999995429e-05,
+        "overlap_m3": 0
+      },
+      "private_rollback_public_preview": {
+        "rollback_a": true,
+        "rollback_b": true,
+        "preview_message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 218368.609 mm³; B bỏ 52877.312 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+        "is_showing": true,
+        "status": "PASS_DISPLAY3_API",
+        "cleanup": true,
+        "cleanup_message": null,
+        "restore_end_a": true,
+        "restore_end_b": true
+      }
+    },
+    {
+      "case": "3615-02-bh-T2",
+      "fixture": "AFJ-R09",
+      "a": "AFJ_PAIR_3615-04-bh-T2-fr1-3",
+      "b": "AFJ_PAIR_3615-04-bh-T2-fr2-4",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551942786/284.56300526426185",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "native_before_copies": {
+        "status": "PASS_GEOMETRY",
+        "rule": "ORTHOGONAL_U_COVER",
+        "short_cover": "A",
+        "actual_length_a_m": 1.58,
+        "actual_length_b_m": 2.1495,
+        "a": {
+          "before_m3": 0.0003757926724635638,
+          "after_m3": 0.00026516313754971127,
+          "removed_m3": 0.00011062953491385393,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 1.4094628242311558e-18
+        },
+        "b": {
+          "before_m3": 0.0005173499030782021,
+          "after_m3": 0.00030527227821847196,
+          "removed_m3": 0.0002120776248597301,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 8.131516293641283e-20
+        },
+        "gap_m": 0.00010000000000054323,
+        "overlap_m3": 0
+      },
+      "private_rollback_public_preview": {
+        "rollback_a": true,
+        "rollback_b": true,
+        "preview_message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+        "is_showing": true,
+        "status": "PASS_DISPLAY3_API",
+        "cleanup": true,
+        "cleanup_message": null,
+        "restore_end_a": true,
+        "restore_end_b": true
+      }
+    },
+    {
+      "case": "3615-02-bh-T2",
+      "fixture": "AFJ-R10",
+      "a": "AFJ_PAIR_3615-04-bh-T2-fr1-3",
+      "b": "AFJ_PAIR_3615-04-bh-T2-fr2-3",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551960293/284.56300526237317",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "native_before_copies": {
+        "status": "PASS_GEOMETRY",
+        "rule": "ORTHOGONAL_U_COVER",
+        "short_cover": "A",
+        "actual_length_a_m": 2,
+        "actual_length_b_m": 3,
+        "a": {
+          "before_m3": 0.00048633451151369305,
+          "after_m3": 0.0003757049765998384,
+          "removed_m3": 0.00011062953491385379,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 8.538092108323347e-19
+        },
+        "b": {
+          "before_m3": 0.0007295017672705391,
+          "after_m3": 0.0005174241424108092,
+          "removed_m3": 0.0002120776248597302,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 2.981555974335137e-19
+        },
+        "gap_m": 9.99999999999268e-05,
+        "overlap_m3": 0
+      },
+      "private_rollback_public_preview": {
+        "rollback_a": true,
+        "rollback_b": true,
+        "preview_message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+        "is_showing": true,
+        "status": "PASS_DISPLAY3_API",
+        "cleanup": true,
+        "cleanup_message": null,
+        "restore_end_a": true,
+        "restore_end_b": true
+      }
+    },
+    {
+      "case": "3615-02-bh-T2",
+      "fixture": "AFJ-R11",
+      "a": "AFJ_PAIR_3615-04-bh-T2-fr2-4",
+      "b": "AFJ_PAIR_3615-04-bh-T2-fr1-4",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551966921/284.56300526237976",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "native_before_copies": {
+        "status": "PASS_GEOMETRY",
+        "rule": "ORTHOGONAL_U_COVER",
+        "short_cover": "B",
+        "actual_length_a_m": 3,
+        "actual_length_b_m": 2,
+        "a": {
+          "before_m3": 0.0007295017672705389,
+          "after_m3": 0.0005174241424108091,
+          "removed_m3": 0.00021207762485973041,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 6.2341624917916505e-19
+        },
+        "b": {
+          "before_m3": 0.00048633451151369305,
+          "after_m3": 0.0003757049765998387,
+          "removed_m3": 0.00011062953491385379,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 5.827586677109586e-19
+        },
+        "gap_m": 9.999999999964898e-05,
+        "overlap_m3": 0
+      },
+      "private_rollback_public_preview": {
+        "rollback_a": true,
+        "rollback_b": true,
+        "preview_message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 212077.625 mm³; B bỏ 110629.535 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+        "is_showing": true,
+        "status": "PASS_DISPLAY3_API",
+        "cleanup": true,
+        "cleanup_message": null,
+        "restore_end_a": true,
+        "restore_end_b": true
+      }
+    },
+    {
+      "case": "3615-02-bh-T2",
+      "fixture": "AFJ-R12",
+      "a": "AFJ_PAIR_3615-04-bh-T2-fr1-4",
+      "b": "AFJ_PAIR_3615-04-bh-T2-fr2-3",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551969826/284.56300526423979",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "native_before_copies": {
+        "status": "PASS_GEOMETRY",
+        "rule": "ORTHOGONAL_U_COVER",
+        "short_cover": "A",
+        "actual_length_a_m": 1.58,
+        "actual_length_b_m": 2.1495,
+        "a": {
+          "before_m3": 0.0003757926724635638,
+          "after_m3": 0.00026516313754971224,
+          "removed_m3": 0.00011062953491385377,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 2.222614453595284e-18
+        },
+        "b": {
+          "before_m3": 0.0005173499030782022,
+          "after_m3": 0.00030527227821847206,
+          "removed_m3": 0.00021207762485973033,
+          "kept_count": 1,
+          "kept_check2": [
+            0
+          ],
+          "removed_check2": [
+            0,
+            0
+          ],
+          "mass_residual_m3": 1.6263032587282567e-19
+        },
+        "gap_m": 9.99999999995449e-05,
+        "overlap_m3": 0
+      },
+      "private_rollback_public_preview": {
+        "rollback_a": true,
+        "rollback_b": true,
+        "preview_message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+        "is_showing": true,
+        "status": "PASS_DISPLAY3_API",
+        "cleanup": true,
+        "cleanup_message": null,
+        "restore_end_a": true,
+        "restore_end_b": true
+      }
+    },
+    {
+      "case": "2354-02-lc-B11",
+      "fixture": "DEBUG_PAIR_1",
+      "a": "AFJ_PAIR_2354-04-lc-B11-fr03-1",
+      "b": "AFJ_PAIR_2354-04-lc-B11-fr04-1",
+      "native_final": {
+        "status": "UNVERIFIED_RULE",
+        "exception_type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: base skin/thickness side differs from verified formed family",
+        "stack_trace": "   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 ParametricRuntimeHarness.Main(String[] args)"
+      },
+      "public_preview_status": "REFUSED",
+      "public_preview_message": "UNVERIFIED_RULE: base skin/thickness side differs from verified formed family",
+      "cleanup": true,
+      "cleanup_message": null
+    },
+    {
+      "case": "DEBUG_PAIR_2",
+      "status": "NOT_IDENTIFIED",
+      "reason": "No second distinct pair in the supplied Debug logs. No PASS claimed."
+    }
+  ],
+  "independent_parametric_variants": [
+    {
+      "case": "U_VARIANT_1",
+      "dimensions_mm": [
+        50,
+        50,
+        32,
+        30,
+        13,
+        13,
+        2,
+        0.1
+      ],
+      "far_wall_height_a_m": 0.03,
+      "far_wall_height_b_m": 0.03,
+      "short_cover": "B",
+      "length_a_m": 1.1,
+      "length_b_m": 0.8,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999998899e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 2.37445852760527e-05,
+      "removed_b_m3": 2.381882460865963e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "swap_status": "PASS",
+      "equal_length_refusal": true,
+      "nonorthogonal_refusal": true,
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_2",
+      "dimensions_mm": [
+        60,
+        60,
+        35,
+        28,
+        12,
+        16,
+        2,
+        0.5
+      ],
+      "far_wall_height_a_m": 0.028,
+      "far_wall_height_b_m": 0.028,
+      "short_cover": "B",
+      "length_a_m": 1.1800000000000002,
+      "length_b_m": 0.8500000000000001,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999993189e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 3.13391782332744e-05,
+      "removed_b_m3": 3.223521889189943e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_3",
+      "dimensions_mm": [
+        75,
+        55,
+        40,
+        32,
+        18,
+        10,
+        2.5,
+        1
+      ],
+      "far_wall_height_a_m": 0.032,
+      "far_wall_height_b_m": 0.032,
+      "short_cover": "B",
+      "length_a_m": 1.26,
+      "length_b_m": 0.9,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999998899e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 6.350515018551764e-05,
+      "removed_b_m3": 4.710693829933245e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_4",
+      "dimensions_mm": [
+        45,
+        65,
+        27,
+        25,
+        8,
+        14,
+        1.5,
+        0.3
+      ],
+      "far_wall_height_a_m": 0.025,
+      "far_wall_height_b_m": 0.025,
+      "short_cover": "B",
+      "length_a_m": 1.34,
+      "length_b_m": 0.9500000000000001,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999993189e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 1.8784497719658126e-05,
+      "removed_b_m3": 2.5563524819710103e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_5",
+      "dimensions_mm": [
+        90,
+        70,
+        45,
+        38,
+        20,
+        12,
+        3,
+        0.8
+      ],
+      "far_wall_height_a_m": 0.038,
+      "far_wall_height_b_m": 0.038,
+      "short_cover": "B",
+      "length_a_m": 1.4200000000000002,
+      "length_b_m": 1,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999993348e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 0.00010385253278367136,
+      "removed_b_m3": 8.031434823006863e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_6",
+      "dimensions_mm": [
+        38,
+        38,
+        24,
+        22,
+        0,
+        0,
+        1.2,
+        0.15
+      ],
+      "far_wall_height_a_m": 0.0232,
+      "far_wall_height_b_m": 0.0232,
+      "short_cover": "B",
+      "length_a_m": 1.5,
+      "length_b_m": 1.05,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 0.00010000000000007582,
+      "overlap_m3": 0,
+      "removed_a_m3": 5.679614425126382e-06,
+      "removed_b_m3": 5.6084967606332646e-06,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_7",
+      "dimensions_mm": [
+        55,
+        55,
+        32,
+        30,
+        0,
+        13,
+        2,
+        0.2
+      ],
+      "far_wall_height_a_m": 0.032,
+      "far_wall_height_b_m": 0.03,
+      "short_cover": "B",
+      "length_a_m": 1.58,
+      "length_b_m": 1.1,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999993348e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 2.4876045387493545e-05,
+      "removed_b_m3": 2.664570751516065e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_8",
+      "dimensions_mm": [
+        65,
+        65,
+        34,
+        30,
+        15,
+        0,
+        2,
+        0.4
+      ],
+      "far_wall_height_a_m": 0.03,
+      "far_wall_height_b_m": 0.032,
+      "short_cover": "B",
+      "length_a_m": 1.6600000000000001,
+      "length_b_m": 1.1500000000000001,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999986508e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 3.507764813766594e-05,
+      "removed_b_m3": 3.210798786921767e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_9",
+      "dimensions_mm": [
+        80,
+        60,
+        40,
+        35,
+        16,
+        16,
+        2,
+        0.1
+      ],
+      "far_wall_height_a_m": 0.035,
+      "far_wall_height_b_m": 0.035,
+      "short_cover": "B",
+      "length_a_m": 1.7400000000000002,
+      "length_b_m": 1.2000000000000002,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999993348e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 5.4333120517314e-05,
+      "removed_b_m3": 4.259593837347456e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_10",
+      "dimensions_mm": [
+        50,
+        50,
+        30,
+        28,
+        10,
+        10,
+        1.5,
+        0.05
+      ],
+      "far_wall_height_a_m": 0.028,
+      "far_wall_height_b_m": 0.028,
+      "short_cover": "B",
+      "length_a_m": 1.82,
+      "length_b_m": 1.25,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999989848e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 1.604504777984103e-05,
+      "removed_b_m3": 1.60489289517396e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_11",
+      "dimensions_mm": [
+        40,
+        40,
+        65,
+        60,
+        12,
+        16,
+        2,
+        0.5
+      ],
+      "far_wall_height_a_m": 0.06,
+      "far_wall_height_b_m": 0.06,
+      "short_cover": "B",
+      "length_a_m": 1.9000000000000001,
+      "length_b_m": 1.3,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999987796e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 3.1394927686537924e-05,
+      "removed_b_m3": 3.1856227773468816e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "case": "U_VARIANT_12",
+      "dimensions_mm": [
+        42,
+        42,
+        70,
+        65,
+        0,
+        0,
+        1.5,
+        0.25
+      ],
+      "far_wall_height_a_m": 0.0665,
+      "far_wall_height_b_m": 0.0665,
+      "short_cover": "B",
+      "length_a_m": 1.98,
+      "length_b_m": 1.35,
+      "coverage_status": "PASS_REQUIRED_KEEP",
+      "gap_m": 9.999999999962093e-05,
+      "overlap_m3": 0,
+      "removed_a_m3": 1.6785221356627438e-05,
+      "removed_b_m3": 1.646812580438697e-05,
+      "kept_check2_a": [
+        0
+      ],
+      "kept_check2_b": [
+        0
+      ],
+      "status": "PASS"
+    }
+  ]
+}

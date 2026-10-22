@@ -1,0 +1,33 @@
+using System;
+using System.IO;
+using System.Text;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.Commands.AutoFrameJoint;
+class GeneralRuleProbe {
+ [DllImport("ole32.dll")]static extern int CreateStreamOnHGlobal(IntPtr p,bool delete,out IStream stream);
+ static JavaScriptSerializer J=new JavaScriptSerializer{MaxJsonLength=int.MaxValue,RecursionLimit=200};
+ static Dictionary<string,object> D(params object[] a){var d=new Dictionary<string,object>();for(int i=0;i<a.Length;i+=2)d[(string)a[i]]=a[i+1];return d;}
+ static object[] A(object a){return ((Array)a).Cast<object>().ToArray();}static Dictionary<string,object> O(object o){return (Dictionary<string,object>)o;}
+ static double[] V(object a){return A(a).Select(Convert.ToDouble).ToArray();}
+ static Body2 Restore(ISldWorks sw,string p){IStream s;Marshal.ThrowExceptionForHR(CreateStreamOnHGlobal(IntPtr.Zero,true,out s));try{byte[] b=File.ReadAllBytes(p);s.Write(b,b.Length,IntPtr.Zero);s.Seek(0,0,IntPtr.Zero);return ((IModeler)sw.GetModeler()).Restore(s) as Body2;}finally{Marshal.ReleaseComObject(s);}}
+ static AfjProfile Profile(Dictionary<string,object> p){return new AfjProfile{Lines=A(p["lines"]).Select(V).ToArray(),Axis=V(p["axis"]),Thickness=Convert.ToDouble(p["thickness_m"]),Radius=Convert.ToDouble(p["bend_radius_m"])};}
+ static double Sym(Body2 a,Body2 b){return AfjTemporaryBoolean.DifferenceVolume(a,b)+AfjTemporaryBoolean.DifferenceVolume(b,a);}
+ static void Json(string root,List<object> rows){File.WriteAllText(Path.Combine(root,"general_rule_probe.json"),J.Serialize(rows),new UTF8Encoding(false));}
+ [STAThread] static int Main(string[] args){string root=args[0];var sw=(ISldWorks)Marshal.GetActiveObject("SldWorks.Application");var math=(MathUtility)sw.GetMathUtility();var maps=A(J.DeserializeObject(File.ReadAllText(Path.Combine(root,"pair_research.json")))).Select(O).ToList();var fixtures=A(J.DeserializeObject(File.ReadAllText(Path.Combine(root,"joint_rules.json")))).Select(O).ToList();var rows=new List<object>();
+  foreach(var map in maps.Where(x=>((string)x["case"]).StartsWith("3615"))){string name=(string)map["case"];int e=0,w=0;string path=Path.Combine(root,"pair_copies",name,"AFJ_PAIR_"+name+".SLDASM");ModelDoc2 model=sw.OpenDoc6(path,2,3,"",ref e,ref w) as ModelDoc2;if(model==null)throw new Exception("private assembly missing");try{
+   foreach(var fixture in fixtures.Where(x=>(string)x["case"]==name&&(args.Length<2||(string)x["id"]==args[1]))){string id=(string)fixture["id"];var row=D("case",name,"fixture",id);rows.Add(row);try{var profiles=A(map["profiles"]).Select(O).ToList();var pa=profiles.First(p=>(string)p["occurrence"]==(string)fixture["occurrence_a"]);var pb=profiles.First(p=>(string)p["occurrence"]==(string)fixture["occurrence_b"]);var pfa=Profile(pa);var pfb=Profile(pb);var ta=(MathTransform)math.CreateTransform(V(pa["transform"]));var tb=(MathTransform)math.CreateTransform(V(pb["transform"]));int ia=Convert.ToInt32(O(A(fixture["a_operations"])[0])["native_ordinal"]),ib=Convert.ToInt32(O(A(fixture["b_operations"])[0])["native_ordinal"]);string da=Path.Combine(root,"study","AFJ_STUDY_"+(string)fixture["a"]),db=Path.Combine(root,"study","AFJ_STUDY_"+(string)fixture["b"]);Body2 ba=Restore(sw,Path.Combine(da,ia+"_before.brep")),bb=Restore(sw,Path.Combine(db,ib+"_before.brep")),aa=Restore(sw,Path.Combine(da,ia+"_after.brep")),ab=Restore(sw,Path.Combine(db,ib+"_after.brep"));
+     var attempts=new List<object>();row["cover_tests"]=attempts;double best=Double.MaxValue;bool chosen=false;
+     foreach(bool coverA in new[]{true,false}){var attempt=D("a_covers",coverA);attempts.Add(attempt);try{var gen=AfjParametricRules.Generate(pfa,pfb,ba,bb,ta,tb,coverA,0);var a=AfjTemporaryBoolean.Execute(sw,ba,gen.Plan.A);var b=AfjTemporaryBoolean.Execute(sw,bb,gen.Plan.B);double sym=Sym(a.Kept[0],aa)+Sym(b.Kept[0],ab);attempt["native_symmetric_difference_m3"]=sym;attempt["derivation"]=gen.Derivation;attempt["seam_near_m"]=gen.SeamNear;attempt["seam_far_m"]=gen.SeamFar;attempt["status"]=sym<=2e-12?"NATIVE_MATCH":"DIFF";if(sym<best){best=sym;chosen=coverA;}}catch(Exception ex){attempt["status"]="UNVERIFIED";attempt["error"]=ex.ToString();}}
+     row["best_native_symmetric_difference_m3"]=best;row["native_a_covers"]=chosen;row["native_status"]=best<=2e-12?"PASS_PARAMETRIC_NATIVE_MATCH":"FAIL";
+     var production=AfjParametricRules.Generate(pfa,pfb,ba,bb,ta,tb,chosen,AfjParametricRules.AssemblyGap);var ga=AfjTemporaryBoolean.Execute(sw,ba,production.Plan.A);var gb=AfjTemporaryBoolean.Execute(sw,bb,production.Plan.B);var wa=AfjJointSolver.World(ga.Kept,ta);var wb=AfjJointSolver.World(gb.Kept,tb);double overlap=AfjJointSolver.Overlap(wa,wb),gap=AfjJointSolver.Gap(model,wa,wb);object closestA,closestB;model.ClosestDistance(wa[0],wb[0],out closestA,out closestB);Func<object,double[]> common=p=>{var v=(double[])p;var z=AfjParametricRules.Sub(v,production.JointOrigin);return new[]{AfjParametricRules.Dot(z,production.OutLoser),AfjParametricRules.Dot(z,production.OutWinner),AfjParametricRules.Dot(z,production.Depth)};};row["closest_a_common_m"]=common(closestA);row["closest_b_common_m"]=common(closestB);row["production_gap_m"]=gap;row["production_overlap_m3"]=overlap;row["production_cut_a_m3"]=ga.RemovedVolume;row["production_cut_b_m3"]=gb.RemovedVolume;row["production_status"]=gap>=AfjParametricRules.AssemblyGap-1e-6&&overlap<=1e-12?"PASS_GAP":"UNVERIFIED_CLEARANCE";
+    }catch(Exception ex){row["status"]="UNVERIFIED";row["error"]=ex.ToString();}finally{Console.WriteLine(id+" native="+(row.ContainsKey("native_status")?row["native_status"]:row["status"])+" gap="+(row.ContainsKey("production_gap_m")?row["production_gap_m"]:"NOT_RUN"));Json(root,rows);}}
+   }finally{sw.CloseDoc(model.GetTitle());}
+  }return 0;
+ }
+}
