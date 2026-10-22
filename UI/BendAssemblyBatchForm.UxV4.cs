@@ -184,7 +184,7 @@ namespace ADDIN.UI
         {
             if (uxV45Decision == null || uxV45Decision.IsDisposed) return;
             uxV45Decision.ForeColor = uxV4Text;
-            uxV45Max.Text = "Check MAX: chưa đối chiếu Excel";
+            uxV45Max.Text = "Check MAX: chưa có trường hợp được xác minh";
             uxV45Collision.Text = "Va chạm: chưa kiểm tra";
             uxV45ToolData.Text = "Hình học dao: chưa có";
             UxV45ShowSourceRecovery(false);
@@ -208,6 +208,8 @@ namespace ADDIN.UI
             int loaded = selectedPart.ReadyGeometryPairs;
             uxV45ToolData.Text = "Dao: " + selectedPart.LoadedPunchCount + "/" + selectedPart.ToolCatalogCount +
                 " Punch · " + loaded + " cặp · gá xác minh " + selectedPart.VerifiedMountingPairs;
+            uxV45Max.Text = "Check MAX: " + selectedPart.ExcelRuleCount +
+                " tham chiếu Excel; chưa xác minh điều kiện áp dụng cho nếp này";
             bool missingConfiguration = !string.IsNullOrWhiteSpace(selectedPart.ToolSourceError);
             UxV45ShowSourceRecovery(missingConfiguration);
             // A red result requires a *real numeric witness* and a reviewed

@@ -30,6 +30,20 @@ namespace ADDIN.Commands.BendPlacement
         public string Unit { get; set; }
         public string NumberPattern { get; set; }
         public string[] ToolIds { get; set; }
+        // Optional *reviewed* numerical case conditions. Old manifests remain
+        // reference-only; unsigned conditions can NEVER certify MAX.
+        public string MachineSystem { get; set; }
+        public string MaterialCode { get; set; }
+        public string SectionKind { get; set; }
+        public double? ThicknessMinMm { get; set; }
+        public double? ThicknessMaxMm { get; set; }
+        public double? AngleMinDeg { get; set; }
+        public double? AngleMaxDeg { get; set; }
+        public double? WMinMm { get; set; }
+        public double? WMaxMm { get; set; }
+        public double? LMinMm { get; set; }
+        public double? LMaxMm { get; set; }
+        public ToolReviewProof ApplicabilityReview { get; set; }
     }
     internal sealed class WorkbookSourceObject
     {
@@ -55,7 +69,7 @@ namespace ADDIN.Commands.BendPlacement
             internal IReadOnlyList<BendLimitRuleDraft> Rules;
             internal IReadOnlyList<string> Reasons;
         }
-        internal static Result Read(string workbookPath,string manifestPath,CancellationToken token)
+        internal static Result Read(string workbookPath,string manifestPath,CancellationToken token,string reviewAuthoritiesPath=null)
         {
             string sha=null,mappingSha=null;var objects=new List<WorkbookSourceObject>();var rules=new List<BendLimitRuleDraft>();var reasons=new List<string>();
             try
@@ -67,6 +81,7 @@ namespace ADDIN.Commands.BendPlacement
                 if(manifest==null||manifest.Version!=1||manifest.Rules==null||manifest.Rules.Count>512||manifest.Rules.Any(r=>r==null||string.IsNullOrWhiteSpace(r.Id))||
                     manifest.Rules.GroupBy(r=>r.Id,StringComparer.OrdinalIgnoreCase).Any(g=>g.Count()>1))throw new InvalidDataException("Invalid limit mapping.");
                 if(!ToolDatumEvidence.IsSha256(manifest.WorkbookSha256)||!string.Equals(sha,manifest.WorkbookSha256,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("STALE_LIMIT_MAPPING");
+                var verifier=ToolReviewVerifier.Load(reviewAuthoritiesPath,token);
                 foreach(var r in manifest.Rules)
                 {
                     token.ThrowIfCancellationRequested();var problems=new List<string>();BendLimitKind kind;
@@ -97,11 +112,26 @@ namespace ADDIN.Commands.BendPlacement
                             else problems.Add("UNMAPPED_LIMIT_VALUE_OR_UNIT");
                         }
                     }
-                    // A source match is reference evidence. This phase cannot
-                    // authenticate an unreviewed family->tool applicability map.
-                    problems.Add("UNVERIFIED_TOOL_FAMILY_MAPPING");
+                    var conditions=new BendExcelCaseConditions(r);
+                    ToolReviewValidation approval=ToolReviewValidation.Missing("MISSING_EXCEL_CASE_REVIEW");
+                    if(kind==BendLimitKind.MaxBendLength && obj!=null && value.HasValue && problems.Count==0 && conditions.Complete &&
+                        r.ApplicabilityReview!=null)
+                    {
+                        // The reviewed signature binds workbook and exact cell,
+                        // numerical source limit, catalog identities and ALL W/L
+                        // and material applicability conditions. It cannot be
+                        // carried over to a changed source workbook or manifest.
+                        string payload=ToolEvidenceCanonical.Hash("BendExcelCaseNumericV1",sha,r.Id,r.FamilyId,kind.ToString(),
+                            r.Sheet,r.Locator,obj.Sha256,r.Unit,ToolEvidenceCanonical.Number(value.Value),
+                            ToolEvidenceCanonical.Hash(r.ToolIds.OrderBy(x=>x,StringComparer.Ordinal).ToArray()),conditions.Binding);
+                        approval=verifier.Verify("BendExcelCaseApplicability",payload,r.ApplicabilityReview,
+                            Path.GetDirectoryName(Path.GetFullPath(manifestPath)),token);
+                    }
+                    if(approval.Status!=ToolReviewStatus.VerifiedExternalRecord)
+                        problems.Add("UNVERIFIED_TOOL_FAMILY_MAPPING");
                     if(kind==BendLimitKind.DeepBendClearanceExample)problems.Add("REFERENCE_EXAMPLE_ONLY");
-                    rules.Add(new BendLimitRuleDraft(r.Id,r.FamilyId,kind,sha,r.Sheet,r.Locator,obj?.Sha256,r.Unit,value,r.ToolIds??new string[0],problems));
+                    if(!conditions.Complete)problems.Add("MISSING_SIGNED_EXCEL_CASE_CONDITIONS");
+                    rules.Add(new BendLimitRuleDraft(r.Id,r.FamilyId,kind,sha,r.Sheet,r.Locator,obj?.Sha256,r.Unit,value,r.ToolIds??new string[0],problems,approval,conditions));
                 }
             }
             catch(OperationCanceledException){throw;}
