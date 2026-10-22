@@ -48,3 +48,7 @@ The original 15-Part / 43-Cut inventory and 42-Cut before/after evidence above a
 See [the follow-up report](Followup20261022/README.md) for unequal-width 75/65 mm and 55/70 mm native tests, multiple bends, direct Coincident/Tangent end-Face Sketches, measured exposure, Preview cache timings, and all failed/unverified cases. The source changes are on `feat/afj-multi-profile-cut-preview-20261022`, source commit `90876693d34fbaf6b13f0570b548ba7f6b946547`. This documentation branch contains no Add-in production source changes.
 
 The main Add-in was not built/deployed. Installed UI visibility/smoothness, the legacy U Sketch rewrite and complete cross-Frame associative Cut transactions remain unverified or incomplete as explicitly recorded in that report.
+
+## Post-load DLL and legacy U audit (2026-10-22)
+
+[The post-load audit](PostLoadAudit20261022/README.md) confirms that the user manually built and loaded the newer AFJ DLL (MVID `420dfcfc-a6ee-4861-ae82-f54d916e32e4`). The fr03/fr04 run selected the legacy U writer: four actual Cuts matched the target bodies, but four new planes and four unconstrained Sketches violate the requested modeling intent. Copy activation/rebuild and saved-copy Read-Only reopen completed without reproducing the reported hang; its installed cause remains unverified. Separate face/start-offset and direct seam-relation experiments are reported as bounded research, not an enabled U repair. Earlier binary/source snapshots above remain historical evidence.
