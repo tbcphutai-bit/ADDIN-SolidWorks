@@ -1,0 +1,24 @@
+PREP AFJ_PAIR_3615-04-bh-T1-fr1.SLDPRT
+PREP OPEN
+PREP CONFIG
+PREP SAVE
+PREP RESULT cfg=True saved=True err=0 warning=0 active=Default
+PREP AFJ_PAIR_3615-04-bh-T1-fr2.SLDPRT
+PREP OPEN
+PREP CONFIG
+PREP SAVE
+PREP RESULT cfg=True saved=True err=0 warning=0 active=Default
+PREP AFJ_PAIR_3615-04-bh-T1-fr3.SLDPRT
+PREP OPEN
+PREP CONFIG
+PREP SAVE
+PREP RESULT cfg=True saved=True err=0 warning=0 active=Default
+PREP AFJ_PAIR_3615-04-bh-T1-fr4.SLDPRT
+PREP OPEN
+PREP CONFIG
+PREP SAVE
+PREP RESULT cfg=True saved=True err=0 warning=0 active=Default
+1618-02-bh-A6 finished
+3615-02-bh-T1 finished
+3615-02-bh-T2 finished
+2354-02-lc-B11 finished

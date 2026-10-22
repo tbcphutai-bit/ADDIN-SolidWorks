@@ -1,0 +1,17 @@
+{
+  "part": "1618-04-bh-A6-fr3.SLDPRT",
+  "feature_name": "ﾎﾞｽ - 押し出し1",
+  "before_m3": 0.0011689596066572945,
+  "after_m3": 0.0011705395927593515,
+  "added_m3": 1.5799861020571772e-06,
+  "before_check2": 0,
+  "after_check2": 0,
+  "added_count": 1,
+  "added_check2": [
+    0
+  ],
+  "delta_residual_m3": 3.6253010142484055e-19,
+  "status": "UNVERIFIED",
+  "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateExtrudedBody(Body2 SheetBody, MathVector Direction, Double Length)\r\n   場所 BossProbe.Main(String[] args)",
+  "restore_end": true
+}

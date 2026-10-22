@@ -1,0 +1,322 @@
+[
+  {
+    "case": "U_VARIANT_1",
+    "dimensions_mm": [
+      50,
+      50,
+      32,
+      30,
+      13,
+      13,
+      2,
+      0.1
+    ],
+    "gap_m": 9.999999999998079e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 2.374461521069321e-05,
+    "removed_b_m3": 2.3818824608659626e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0021,
+      0.002
+    ],
+    "seam_far_m": [
+      0.0479,
+      0.0479
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_2",
+    "dimensions_mm": [
+      60,
+      60,
+      35,
+      28,
+      12,
+      16,
+      2,
+      0.5
+    ],
+    "gap_m": 9.999999999993189e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 3.13392872422834e-05,
+    "removed_b_m3": 3.223521889189944e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0025,
+      0.002
+    ],
+    "seam_far_m": [
+      0.057499999999999996,
+      0.057499999999999996
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_3",
+    "dimensions_mm": [
+      75,
+      55,
+      40,
+      32,
+      18,
+      10,
+      2.5,
+      1
+    ],
+    "gap_m": 9.999999999998899e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 6.350515018551765e-05,
+    "removed_b_m3": 4.7106938299332436e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0035,
+      0.0235
+    ],
+    "seam_far_m": [
+      0.0515,
+      0.0715
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_4",
+    "dimensions_mm": [
+      45,
+      65,
+      27,
+      25,
+      8,
+      14,
+      1.5,
+      0.3
+    ],
+    "gap_m": 9.999999999989848e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 1.878457502181639e-05,
+    "removed_b_m3": 2.5563524819710096e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0018,
+      0.0015
+    ],
+    "seam_far_m": [
+      0.0632,
+      0.043199999999999995
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_5",
+    "dimensions_mm": [
+      90,
+      70,
+      45,
+      38,
+      20,
+      12,
+      3,
+      0.8
+    ],
+    "gap_m": 9.999999999993348e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 0.00010385253278367133,
+    "removed_b_m3": 8.031434823006862e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0038,
+      0.023799999999999988
+    ],
+    "seam_far_m": [
+      0.06620000000000001,
+      0.0862
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_6",
+    "dimensions_mm": [
+      38,
+      38,
+      24,
+      22,
+      0,
+      0,
+      1.2,
+      0.15
+    ],
+    "gap_m": 0.00010000000000007582,
+    "overlap_m3": 0,
+    "removed_a_m3": 5.623046323574901e-06,
+    "removed_b_m3": 5.553776760633265e-06,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0013499999999999999,
+      0.0012
+    ],
+    "seam_far_m": [
+      0.03665,
+      0.03665
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_7",
+    "dimensions_mm": [
+      55,
+      55,
+      32,
+      30,
+      0,
+      13,
+      2,
+      0.2
+    ],
+    "gap_m": 9.999999999993348e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 2.4543695190643433e-05,
+    "removed_b_m3": 2.6645707515160648e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0022,
+      0.002
+    ],
+    "seam_far_m": [
+      0.0528,
+      0.0528
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_8",
+    "dimensions_mm": [
+      65,
+      65,
+      34,
+      30,
+      15,
+      0,
+      2,
+      0.4
+    ],
+    "gap_m": 9.999999999986508e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 3.507773754360652e-05,
+    "removed_b_m3": 3.1727987869217685e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0024000000000000002,
+      0.002
+    ],
+    "seam_far_m": [
+      0.0626,
+      0.0626
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_9",
+    "dimensions_mm": [
+      80,
+      60,
+      40,
+      35,
+      16,
+      16,
+      2,
+      0.1
+    ],
+    "gap_m": 9.999999999993348e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 5.433312880158525e-05,
+    "removed_b_m3": 4.2595938373474554e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.0021,
+      0.0221
+    ],
+    "seam_far_m": [
+      0.05789999999999999,
+      0.0779
+    ],
+    "status": "PASS"
+  },
+  {
+    "case": "U_VARIANT_10",
+    "dimensions_mm": [
+      50,
+      50,
+      30,
+      28,
+      10,
+      10,
+      1.5,
+      0.05
+    ],
+    "gap_m": 4.9999999999971407e-05,
+    "overlap_m3": 0,
+    "removed_a_m3": 1.60449439958124e-05,
+    "removed_b_m3": 1.6048928951739597e-05,
+    "kept_check2_a": [
+      0
+    ],
+    "kept_check2_b": [
+      0
+    ],
+    "seam_near_m": [
+      0.00155,
+      0.0015
+    ],
+    "seam_far_m": [
+      0.04845,
+      0.04845
+    ],
+    "status": "UNVERIFIED_CLEARANCE"
+  }
+]

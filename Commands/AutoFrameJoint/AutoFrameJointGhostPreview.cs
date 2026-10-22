@@ -2,13 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Linq;
+using System.Globalization;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands.AutoFrameJoint
 {
     /// <summary>
-    /// Temporary original-body overlay and temporary Boolean P1/P2 candidate.
+    /// Temporary original-body overlay and parametric profile cut preview.
     /// All preview cut operations are on disposable B-rep copies ONLY;
     /// no production cut or Part/Assembly feature is ever written.
     /// Runs on the SOLIDWORKS UI thread from explicit PMP buttons.
@@ -138,239 +140,73 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
 
         /// <summary>
-        /// PRELIMINARY TWO-FRAME SOLID CUT CANDIDATE (P1/P2).
-        /// Computes exact overlap of the two ACTUAL transformed B-reps and
-        /// allocates that overlap across one of two estimated bisector planes.
-        /// Boolean CUT is performed ONLY on TEMPORARY COPIES of both bodies.
-        ///
-        /// Neither candidate is an approved manufacturing rule for Web/Wall/Lip.
-        /// Both after-cut temporary copies are displaced +Z in WORLD space so
-        /// the user can see their new faces beside untouched original parts.
-        /// The original Component, Part and Assembly are never modified.
+        /// Parametric section rules with the shorter Frame covering. Mode 1 shows KEEP bodies;
+        /// mode 2 also shows CUT material. Both modes use the SAME rule.
         /// </summary>
         public bool TryShowCutCandidate(Component2 frameA, Component2 frameB,
                                         int candidate, out string message)
         {
-            Trace.WriteLine("[AFJ-R49] ENGINE ENTER P" + candidate);
             message = "Chưa tạo preview vết cắt.";
-            bool previewSucceeded = false;
             if (busy) { message = "Preview đang xử lý."; return false; }
             if (candidate != 1 && candidate != 2)
-            { message = "Chỉ có phương án P1 hoặc P2."; return false; }
-
+            { message = "Chỉ có chế độ KEEP hoặc KEEP/CUT."; return false; }
             busy = true;
             try
             {
-                Trace.WriteLine("[AFJ-R49] STAGE CLEAN_PREVIOUS");
                 string previousError;
                 if (!ClearInternal(out previousError))
-                {
-                    message = "Không thể dọn preview cũ: " + previousError;
-                    return false;
-                }
+                { message = "Không thể dọn preview cũ: " + previousError; return false; }
                 if (!IsOriginalAssemblyActive() || frameA == null || frameB == null ||
                     app.IsSame(frameA, frameB) != (int)swObjectEquality.swObjectNotSame)
-                {
-                    message = "Assembly/Frame A-B không còn hợp lệ.";
-                    return false;
-                }
+                { message = "Assembly/Frame A-B không còn hợp lệ."; return false; }
                 if (frameA.GetParent() != null || frameB.GetParent() != null ||
                     frameA.IsSuppressed() || frameB.IsSuppressed() ||
                     frameA.IsHidden(false) || frameB.IsHidden(false))
-                {
-                    message = "Chỉ hỗ trợ 2 Part cấp đầu, không Hidden/Suppressed.";
-                    return false;
-                }
+                { message = "Chỉ hỗ trợ 2 Part cấp đầu, không Hidden/Suppressed."; return false; }
 
-                Trace.WriteLine("[AFJ-R49] STAGE ANALYZE_PAIR");
-                // Re-evaluate at the USER'S explicit Preview click, not during
-                // Selectionbox events. The analysis yields only provisional
-                // bisector normals: neither is automatically a final trim rule.
-                string analysis = AutoFrameJointReadOnlyProbe.AnalyzePair(
-                    app, sourceAssembly, frameA, frameB);
-                if (!analysis.Contains("JOINT_STATUS: FINITE_AXES_NEAREST") ||
-                    !analysis.Contains("JOINT_NEAR_POINTS_INSIDE_SPANS: YES"))
-                {
-                    message = "Chưa xác nhận trục giao hữu hạn. Không dựng vết cắt giả.";
-                    return false;
-                }
-                string normalLabel = "JOINT_BISECTOR_NORMAL_CANDIDATE_" +
-                                     candidate.ToString() + ":";
-                double[] origin = ReadVectorMm(analysis, "JOINT_XYZ_MM:");
-                double[] normal = ReadVector(analysis, normalLabel, 1.0);
-                if (origin == null || normal == null)
-                {
-                    message = "Thiếu điểm/normal dự đoán của mặt phân giác.";
-                    return false;
-                }
-
-                Trace.WriteLine("[AFJ-R49] STAGE SOLID_COPY_WORLD");
-                ModelDoc2 partA, partB;
-                MathTransform transformA, transformB;
-                Body2 baseA = GetSingleWorldSolid(frameA, out partA, out transformA);
-                Body2 baseB = GetSingleWorldSolid(frameB, out partB, out transformB);
-                double originalVolumeA = VolumeTotal(new List<Body2> { baseA });
-                double originalVolumeB = VolumeTotal(new List<Body2> { baseB });
-
-                // The Operations2 operands are invalidated by SOLIDWORKS.
-                // Always Boolean fresh temporary copies, never original B-rep.
-                Trace.WriteLine("[AFJ-R49] STAGE INTERSECT_BEGIN");
-                List<Body2> overlap = BooleanParts(
-                    CopyBody(baseA), CopyBody(baseB),
-                    (int)swBodyOperationType_e.SWBODYINTERSECT, "solid overlap");
-                if (overlap.Count == 0)
-                {
-                    message = "Hai solid KHÔNG có thể tích giao thoa thực. Không có preview cắt.";
-                    return false;
-                }
-
-                double overlapVolume = VolumeTotal(overlap);
-                Trace.WriteLine("[AFJ-R49] STAGE INTERSECT_RESULT bodies=" +
-                                overlap.Count + " volume_m3=" +
-                                overlapVolume.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
-                if (!(overlapVolume > 1e-12))
-                {
-                    message = "Thể tích giao thoa quá nhỏ hoặc không hợp lệ.";
-                    return false;
-                }
-                double span = Math.Max(1.0, 4.0 * GetMaxBoxDiagonal(overlap));
-                MathTransform shift = CreateWorldShift(0.12); // WORLD Z +120 mm
-                MathTransform inverseA = transformA.Inverse() as MathTransform;
-                MathTransform inverseB = transformB.Inverse() as MathTransform;
+                Trace.WriteLine("[AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION");
+                AfjJointSolution result = AfjJointSolver.Solve(app, sourceAssembly, frameA, frameB);
+                MathTransform shift = CreateWorldShift(0.12);
+                MathTransform inverseA = result.TransformA.Inverse() as MathTransform;
+                MathTransform inverseB = result.TransformB.Inverse() as MathTransform;
                 if (inverseA == null || inverseB == null)
                     throw new InvalidOperationException("Không đảo được hệ tọa độ Part.");
-
-                Trace.WriteLine("[AFJ-R49] STAGE BISECTOR_PARTITION_BEGIN");
-                var removedA = new List<Body2>();
-                var removedB = new List<Body2>();
-                foreach (Body2 shared in overlap)
-                {
-                    Body2 boxPositive = CreateBisectorHalfBox(origin, normal, span, true);
-                    Body2 boxNegative = CreateBisectorHalfBox(origin, normal, span, false);
-
-                    // Candidate P2 uses the SECOND theoretical normal.
-                    // The overlap is allocated to A on positive side and B on
-                    // negative side; this is not a user-approved Web/Wall/Lip rule.
-                    removedA.AddRange(BooleanParts(CopyBody(shared), boxPositive,
-                        (int)swBodyOperationType_e.SWBODYINTERSECT, "A material"));
-                    removedB.AddRange(BooleanParts(CopyBody(shared), boxNegative,
-                        (int)swBodyOperationType_e.SWBODYINTERSECT, "B material"));
-                }
-
-                double removedVolumeA = VolumeTotal(removedA);
-                double removedVolumeB = VolumeTotal(removedB);
-                Trace.WriteLine("[AFJ-R49] STAGE BISECTOR_PARTITION_RESULT A=" +
-                    removedVolumeA.ToString("R", System.Globalization.CultureInfo.InvariantCulture) +
-                    " B=" + removedVolumeB.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
-                double minMeaningful = Math.Max(1e-12, overlapVolume * 0.00001);
-                if (removedVolumeA <= minMeaningful ||
-                    removedVolumeB <= minMeaningful ||
-                    Math.Abs(removedVolumeA + removedVolumeB - overlapVolume) >
-                        Math.Max(1e-11, overlapVolume * 0.01))
-                {
-                    message = "Mặt phân giác P" + candidate +
-                        " không chia hợp lệ vùng giao thoa cho CẢ HAI Frame.";
-                    return false;
-                }
-
-                // Generate ACTUAL candidate after-cut 3D solids from two real
-                // B-reps. CUT operates only on disposable world-space copies.
-                Trace.WriteLine("[AFJ-R49] STAGE CUT_TEMP_COPIES_BEGIN");
-                List<Body2> keptA = SubtractMaterial(baseA, removedA, "Frame A");
-                List<Body2> keptB = SubtractMaterial(baseB, removedB, "Frame B");
-                double keptVolumeA = VolumeTotal(keptA);
-                double keptVolumeB = VolumeTotal(keptB);
-                if (!(keptVolumeA > 0) || !(keptVolumeB > 0) ||
-                    Math.Abs(keptVolumeA + removedVolumeA - originalVolumeA) >
-                        Math.Max(1e-11, originalVolumeA * 0.0001) ||
-                    Math.Abs(keptVolumeB + removedVolumeB - originalVolumeB) >
-                        Math.Max(1e-11, originalVolumeB * 0.0001))
-                {
-                    message = "Kết quả Boolean không bảo toàn thể tích cả 2 Frame.";
-                    return false;
-                }
-
-                // Candidate preview displaced in WORLD Z, not document edits.
-                // Color-code the new temporary after-cut bodies and red/orange
-                // removed pieces. Original Assembly stays exactly in place.
-                Trace.WriteLine("[AFJ-R49] STAGE DISPLAY_GHOST_BEGIN");
-                DisplayCandidateBodies(keptA, frameA, partA, inverseA, shift,
+                DisplayCandidateBodies(AfjJointSolver.World(result.A.Kept, result.TransformA),
+                    frameA, result.PartA, inverseA, shift,
                     ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235)), 0.33);
-                DisplayCandidateBodies(keptB, frameB, partB, inverseB, shift,
+                DisplayCandidateBodies(AfjJointSolver.World(result.B.Kept, result.TransformB),
+                    frameB, result.PartB, inverseB, shift,
                     ColorTranslator.ToWin32(Color.FromArgb(255, 165, 65)), 0.33);
-                DisplayCandidateBodies(removedA, frameA, partA, inverseA, shift,
-                    ColorTranslator.ToWin32(Color.FromArgb(235, 35, 85)), 0.08);
-                DisplayCandidateBodies(removedB, frameB, partB, inverseB, shift,
-                    ColorTranslator.ToWin32(Color.FromArgb(170, 35, 235)), 0.08);
+                if (candidate == 2)
+                {
+                    DisplayCandidateBodies(AfjJointSolver.World(result.A.Removed, result.TransformA),
+                        frameA, result.PartA, inverseA, shift,
+                        ColorTranslator.ToWin32(Color.FromArgb(235, 35, 85)), 0.08);
+                    DisplayCandidateBodies(AfjJointSolver.World(result.B.Removed, result.TransformB),
+                        frameB, result.PartB, inverseB, shift,
+                        ColorTranslator.ToWin32(Color.FromArgb(170, 35, 235)), 0.08);
+                }
                 RedrawSafely();
-
-                message = String.Format(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    "P{0}: PREVIEW CẮT THỬ CẢ HAI FRAME trên B-rep thực. " +
-                    "A bỏ {1:0.###} mm³; B bỏ {2:0.###} mm³. " +
-                    "BẢN SAO sau cắt nâng Z +120 mm; hồng/tím là phần bỏ. " +
-                    "CHƯA XÁC NHẬN quy tắc Web/Wall/Lip, không cắt Part.",
-                    candidate, removedVolumeA * 1e9, removedVolumeB * 1e9);
-                Trace.WriteLine("[AFJ-CUT-CANDIDATE] " + message);
-                previewSucceeded = true;
+                bool unchanged = result.A.RemovedVolume + result.B.RemovedVolume <= 1e-12;
+                message = String.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "{0}: {1} A bỏ {2:0.###} mm³; B bỏ {3:0.###} mm³. " +
+                    "Frame ngắn {5} che; khe hở {6:0.###} mm. Bản sao nâng Z +120 mm. {4}", result.Plan.RuleId,
+                    unchanged ? "ALREADY_MATCHES_RULE." : "Đã kiểm tra B-rep tạm.",
+                    result.A.RemovedVolume * 1e9, result.B.RemovedVolume * 1e9,
+                    candidate == 2 ? "Hồng/tím: CUT; xanh/cam: KEEP." : "Đang xem KEEP.",
+                    result.CoverA ? "A" : "B", result.AfterGap * 1000);
+                Trace.WriteLine("[AFJ-SOLVER] " + message);
                 return true;
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("[AFJ-CUT-CANDIDATE] Failed: " + ex);
+                Trace.WriteLine("[AFJ-SOLVER] HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex);
                 string cleanupError;
                 bool cleared = ClearInternal(out cleanupError);
-                message = "Không tạo được candidate preview: " + ex.Message +
-                          (cleared ? "" : " | CLEANUP PENDING: " + cleanupError);
+                message = ex.Message + (cleared ? "" : " | CLEANUP PENDING: " + cleanupError);
                 return false;
             }
-            finally
-            {
-                Trace.WriteLine("[AFJ-R49] ENGINE EXIT P" + candidate +
-                                " success=" + previewSucceeded +
-                                " msg=" + message);
-                busy = false;
-            }
-        }
-
-        private static string ReportValue(string report, string prefix)
-        {
-            if (String.IsNullOrEmpty(report)) return "";
-            foreach (string line in report.Split('\n'))
-            {
-                string trimmed = line.Trim();
-                if (trimmed.StartsWith(prefix, StringComparison.Ordinal))
-                    return trimmed.Substring(prefix.Length).Trim();
-            }
-            return "";
-        }
-
-        private static double[] ReadVectorMm(string report, string prefix)
-        { return ReadVector(report, prefix, 0.001); }
-
-        private static double[] ReadVector(string report, string prefix, double scale)
-        {
-            string raw = ReportValue(report, prefix).Trim('(', ')', ' ');
-            string[] tokens = raw.Split(',');
-            if (tokens.Length != 3) return null;
-            double[] v = new double[3];
-            for (int i = 0; i < 3; i++)
-            {
-                if (!Double.TryParse(tokens[i].Trim(),
-                        System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out v[i]))
-                    return null;
-                v[i] *= scale;
-                if (Double.IsNaN(v[i]) || Double.IsInfinity(v[i])) return null;
-            }
-            if (scale == 1.0)
-            {
-                double length = Math.Sqrt(v[0] * v[0] +
-                                          v[1] * v[1] + v[2] * v[2]);
-                if (length < 0.999 || length > 1.001) return null;
-                for (int i = 0; i < 3; i++) v[i] /= length;
-            }
-            return v;
+            finally { busy = false; }
         }
 
         private static Body2 CopyBody(Body2 original)
@@ -379,118 +215,6 @@ namespace ADDIN.Commands.AutoFrameJoint
             if (copy == null || !copy.IsTemporaryBody())
                 throw new InvalidOperationException("Không Copy được B-rep tạm.");
             return copy;
-        }
-
-        private Body2 GetSingleWorldSolid(Component2 component,
-                                           out ModelDoc2 part,
-                                           out MathTransform transform)
-        {
-            part = component.GetModelDoc2() as ModelDoc2;
-            if (part == null ||
-                part.GetType() != (int)swDocumentTypes_e.swDocPART)
-                throw new InvalidOperationException("Part không tải/không hợp lệ.");
-
-            var cfgMgr = part.ConfigurationManager as ConfigurationManager;
-            var cfg = cfgMgr == null ? null :
-                      cfgMgr.ActiveConfiguration as Configuration;
-            if (cfg == null ||
-                !String.Equals(cfg.Name, component.ReferencedConfiguration,
-                               StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(
-                    "Cấu hình Component/Part không khớp, không tự chuyển.");
-
-            object info;
-            Array raw = component.GetBodies3(
-                (int)swBodyType_e.swSolidBody, out info) as Array;
-            if (raw == null || raw.Length != 1)
-                throw new InvalidOperationException(
-                    "Chỉ hỗ trợ đúng 1 Solid Body trên mỗi Frame.");
-            Body2 original = raw.GetValue(0) as Body2;
-            transform = component.GetTotalTransform(false);
-            if (original == null || transform == null)
-                throw new InvalidOperationException("Body/Transform không đọc được.");
-            Body2 world = CopyBody(original);
-            if (!world.ApplyTransform(transform))
-                throw new InvalidOperationException("Không chuyển Body về Assembly XYZ.");
-            return world;
-        }
-
-        private static List<Body2> BooleanParts(Body2 target, Body2 tool,
-                                                 int operation, string label)
-        {
-            if (target == null || tool == null)
-                throw new InvalidOperationException("Thiếu B-rep: " + label);
-            int error;
-            object raw = target.Operations2(operation, tool, out error);
-            if (error != 0)
-                throw new InvalidOperationException("Boolean " + label +
-                    " thất bại, code=" + error);
-            var result = new List<Body2>();
-            Array array = raw as Array;
-            if (array == null) return result;
-            if (array.Length > MaxBodiesPerComponent)
-                throw new InvalidOperationException(
-                    "Boolean có quá nhiều kết quả: " + label);
-            foreach (object value in array)
-            {
-                Body2 body = value as Body2;
-                if (body == null || !body.IsTemporaryBody())
-                    throw new InvalidOperationException("Kết quả Boolean không hợp lệ.");
-                result.Add(body);
-            }
-            return result;
-        }
-
-        private static double VolumeTotal(List<Body2> bodies)
-        {
-            double volume = 0.0;
-            foreach (Body2 body in bodies)
-            {
-                double[] props = body.GetMassProperties(1.0) as double[];
-                if (props == null || props.Length < 4 ||
-                    Double.IsNaN(props[3]) || Double.IsInfinity(props[3]) ||
-                    props[3] <= 0.0)
-                    throw new InvalidOperationException("Không xác định được thể tích Solid.");
-                volume += props[3];
-            }
-            return volume;
-        }
-
-        private static double GetMaxBoxDiagonal(List<Body2> bodies)
-        {
-            double diagonal = 0.0;
-            foreach (Body2 body in bodies)
-            {
-                double[] box = body.GetBodyBox() as double[];
-                if (box == null || box.Length < 6)
-                    throw new InvalidOperationException("Thiếu bounding box.");
-                double dx = box[3] - box[0];
-                double dy = box[4] - box[1];
-                double dz = box[5] - box[2];
-                double length = Math.Sqrt(dx * dx + dy * dy + dz * dz);
-                if (Double.IsNaN(length) || Double.IsInfinity(length))
-                    throw new InvalidOperationException("Bounding box không hữu hạn.");
-                diagonal = Math.Max(diagonal, length);
-            }
-            return diagonal;
-        }
-
-        private Body2 CreateBisectorHalfBox(double[] p, double[] n,
-                                             double span, bool positive)
-        {
-            Modeler modeler = app.GetModeler() as Modeler;
-            if (modeler == null)
-                throw new InvalidOperationException("Không lấy được IModeler.");
-            double side = positive ? 1.0 : -1.0;
-            double[] box = new double[9] {
-                p[0], p[1], p[2],
-                side * n[0], side * n[1], side * n[2],
-                span, span, span
-            };
-            Body2 result = modeler.CreateBodyFromBox3(box);
-            if (result == null || !result.IsTemporaryBody())
-                throw new InvalidOperationException("Không tạo được nửa không gian.");
-            return result;
         }
 
         private MathTransform CreateWorldShift(double z)
@@ -506,27 +230,6 @@ namespace ADDIN.Commands.AutoFrameJoint
             if (result == null)
                 throw new InvalidOperationException("Không tạo được ghost offset.");
             return result;
-        }
-
-        private static List<Body2> SubtractMaterial(
-            Body2 original, List<Body2> removed, string label)
-        {
-            List<Body2> remain = new List<Body2> { CopyBody(original) };
-            foreach (Body2 cutter in removed)
-            {
-                var next = new List<Body2>();
-                foreach (Body2 body in remain)
-                    next.AddRange(BooleanParts(body, CopyBody(cutter),
-                        (int)swBodyOperationType_e.SWBODYCUT, label));
-                if (next.Count == 0)
-                    throw new InvalidOperationException(
-                        "Cắt tạm " + label + " tạo kết quả rỗng.");
-                if (next.Count > MaxBodiesPerComponent)
-                    throw new InvalidOperationException(
-                        label + " sinh quá nhiều mảnh solid.");
-                remain = next;
-            }
-            return remain;
         }
 
         private void DisplayCandidateBodies(List<Body2> bodies,
@@ -723,6 +426,1045 @@ namespace ADDIN.Commands.AutoFrameJoint
             if (attempted)
                 RedrawSafely();
             return failed.Count == 0;
+        }
+    }
+}
+
+
+
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    internal enum AfjOperationKind
+    {
+        Cut, Intersect
+    }
+    internal sealed class AfjToolDefinition
+    {
+        internal double[][] Polygon;
+        internal double[][] ArcCenters;
+        internal double[] Direction;
+        internal double Length;
+    }
+    internal sealed class AfjCutOperation
+    {
+        internal string EvidenceId;
+        internal AfjOperationKind Kind;
+        internal readonly List<AfjToolDefinition> Tools=new List<AfjToolDefinition>();
+        internal string RegionEvidence;
+    }
+    internal sealed class AfjCutPlan
+    {
+        internal readonly List<AfjCutOperation> Operations=new List<AfjCutOperation>();
+    }
+    internal sealed class AfjJointPlan
+    {
+        internal string RuleId;
+        internal AfjCutPlan A=new AfjCutPlan(), B=new AfjCutPlan();
+    }
+    internal sealed class AfjBooleanResult
+    {
+        internal readonly List<Body2> Kept=new List<Body2>(), Removed=new List<Body2>();
+        internal double BeforeVolume, AfterVolume, RemovedVolume;
+    }
+    internal static class AfjTemporaryBoolean
+    {
+        internal static Body2 Copy(Body2 b)
+        {
+            Body2 c=b==null?null:b.Copy() as Body2;
+            if(c==null||!c.IsTemporaryBody())throw new InvalidOperationException("AFJ: temporary copy unavailable");
+            return c;
+        }
+        internal static double Volume(Body2 b)
+        {
+            double[] p=b.GetMassProperties(1) as double[];
+            if(p==null||p.Length<4||!Finite(p[3])||p[3]<=0)throw new InvalidOperationException("AFJ: invalid solid volume");
+            return p[3];
+        }
+        internal static bool Finite(double x)
+        {
+            return !Double.IsNaN(x)&&!Double.IsInfinity(x);
+        }
+        internal static double Total(IEnumerable<Body2> bodies)
+        {
+            double v=0;
+            foreach(Body2 b in bodies)v+=Volume(b);
+            return v;
+        }
+        internal static void Validate(Body2 b)
+        {
+            if(b==null||!b.IsTemporaryBody()||b.GetType()!=(int)swBodyType_e.swSolidBody||b.Check2()!=0)throw new InvalidOperationException("AFJ: invalid temporary B-rep");
+            Volume(b);
+        }
+        internal static List<Body2> Boolean(Body2 a, Body2 b, int operation, out int code)
+        {
+            // Operations2 invalidates operands: always pass disposable copies.
+            Array raw=Copy(a).Operations2(operation, Copy(b), out code) as Array;
+            var result=new List<Body2>();
+            if(code!=0)
+            {
+                if(operation==(int)swBodyOperationType_e.SWBODYINTERSECT&&(code==5||code==6||code==1067))return result;
+                if(operation==(int)swBodyOperationType_e.SWBODYCUT&&code==6)return result;
+                throw new InvalidOperationException("AFJ: Boolean error="+code);
+            }
+            if(raw==null)return result;
+            if(raw.Length>12)throw new InvalidOperationException("AFJ: too many solid fragments");
+            foreach(object o in raw)
+            {
+                Body2 x=o as Body2;
+                Validate(x);
+                result.Add(x);
+            }
+            return result;
+        }
+        internal static double DifferenceVolume(Body2 a, Body2 b)
+        {
+            int code;
+            var common=Boolean(a, b, (int)swBodyOperationType_e.SWBODYINTERSECT, out code);
+            if(common.Count==0)return Volume(a);
+            return Total(Boolean(a, b, (int)swBodyOperationType_e.SWBODYCUT, out code));
+        }
+        internal static Body2 CreatePrism(ISldWorks app, AfjToolDefinition spec)
+        {
+            if(spec==null||spec.Polygon==null||spec.Polygon.Length<3||spec.Polygon.Length>256||!Finite(spec.Length)||spec.Length<=1e-9)throw new InvalidOperationException("AFJ: invalid prism specification");
+            if(spec.ArcCenters!=null&&spec.ArcCenters.Length!=spec.Polygon.Length)throw new InvalidOperationException("AFJ: arc/profile size mismatch");
+            double[] n=spec.Direction;
+            if(n==null||n.Length!=3||!Finite(n[0])||!Finite(n[1])||!Finite(n[2]))throw new InvalidOperationException("AFJ: missing prism direction");
+            double norm=Math.Sqrt(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]);
+            if(Math.Abs(norm-1)>1e-7)throw new InvalidOperationException("AFJ: non-unit prism direction");
+            var modeler=app.GetModeler() as Modeler;
+            var math=app.GetMathUtility() as MathUtility;
+            if(modeler==null||math==null)throw new InvalidOperationException("AFJ: modeler unavailable");
+            var curves=new List<object>();
+            double[] origin=spec.Polygon[0];
+            double[] u=null;
+            for(int i=0;i<spec.Polygon.Length;i++)
+            {
+                double[] p=spec.Polygon[i], q=spec.Polygon[(i+1)%spec.Polygon.Length];
+                if(p==null||q==null||p.Length!=3||q.Length!=3)throw new InvalidOperationException("AFJ: malformed polygon");
+                double[] d=
+                {
+                    q[0]-p[0], q[1]-p[1], q[2]-p[2]
+                }
+                ;
+                double len=Math.Sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+                if(len<1e-10)throw new InvalidOperationException("AFJ: zero polygon edge");
+                for(int j=0;j<3;j++)if(!Finite(p[j]))throw new InvalidOperationException("AFJ: nonfinite vertex");
+                if(Math.Abs((p[0]-origin[0])*n[0]+(p[1]-origin[1])*n[1]+(p[2]-origin[2])*n[2])>1e-7)throw new InvalidOperationException("AFJ: non-planar tool");
+                if(u==null)u=new double[]
+                {
+                    d[0]/len, d[1]/len, d[2]/len
+                }
+                ;
+                if(spec.ArcCenters!=null&&spec.ArcCenters[i]!=null)
+                {
+                    double[] c=spec.ArcCenters[i];
+                    if(c.Length!=3)throw new InvalidOperationException("AFJ: invalid arc center");
+                    double[] a=
+                    {
+                        p[0]-c[0], p[1]-c[1], p[2]-c[2]
+                    }
+                    , b=
+                    {
+                        q[0]-c[0], q[1]-c[1], q[2]-c[2]
+                    }
+                    ;
+                    double r=Math.Sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]), rq=Math.Sqrt(b[0]*b[0]+b[1]*b[1]+b[2]*b[2]);
+                    double[] axis=
+                    {
+                        a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]
+                    }
+                    ;
+                    double an=Math.Sqrt(axis[0]*axis[0]+axis[1]*axis[1]+axis[2]*axis[2]);
+                    if(!Finite(r)||r<1e-8||Math.Abs(r-rq)>1e-8||an<1e-14)throw new InvalidOperationException("AFJ: unsupported arc geometry");
+                    for(int j=0;j<3;j++)axis[j]/=an;
+                    Curve arc=modeler.CreateArc(c, axis, r, p, q) as Curve;
+                    if(arc==null)throw new InvalidOperationException("AFJ: analytic arc failed");
+                    Curve trimmedArc=arc.CreateTrimmedCurve2(p[0], p[1], p[2], q[0], q[1], q[2]);
+                    if(trimmedArc==null)throw new InvalidOperationException("AFJ: trimmed analytic arc failed");
+                    curves.Add(trimmedArc);
+                }
+                else
+                {
+                    Curve line=modeler.CreateLine(p, d) as Curve;
+                    if(line==null)throw new InvalidOperationException("AFJ: line failed");
+                    Curve trim=line.CreateTrimmedCurve2(p[0], p[1], p[2], q[0], q[1], q[2]);
+                    if(trim==null)throw new InvalidOperationException("AFJ: trimmed line failed");
+                    curves.Add(trim);
+                }
+            }
+            Surface plane=modeler.CreatePlanarSurface2(origin, n, u) as Surface;
+            var dispatch=new System.Runtime.InteropServices.DispatchWrapper[curves.Count];
+            for(int i=0;i<curves.Count;i++)dispatch[i]=new System.Runtime.InteropServices.DispatchWrapper(curves[i]);
+            Body2 sheet=plane==null?null:plane.CreateTrimmedSheet4(dispatch, true) as Body2;
+            if(sheet==null)throw new InvalidOperationException("AFJ: planar tool profile failed");
+            MathVector direction=math.CreateVector(n) as MathVector;
+            Body2 body=modeler.CreateExtrudedBody(sheet, direction, spec.Length);
+            Validate(body);
+            return body;
+        }
+        internal static AfjBooleanResult Execute(ISldWorks app, Body2 source, AfjCutPlan plan)
+        {
+            if(plan==null||plan.Operations.Count>64)throw new InvalidOperationException("AFJ: invalid plan");
+            Validate(source);
+            var result=new AfjBooleanResult();
+            result.BeforeVolume=Volume(source);
+            var kept=new List<Body2>
+            {
+                Copy(source)
+            }
+            ;
+            foreach(AfjCutOperation operation in plan.Operations)
+            {
+                if(String.IsNullOrEmpty(operation.EvidenceId)||operation.Tools.Count==0)throw new InvalidOperationException("UNVERIFIED_RULE: operation has no evidence/tool");
+                foreach(AfjToolDefinition spec in operation.Tools)
+                {
+                    var effectiveTools=new List<Body2>
+                    {
+                        CreatePrism(app, spec)
+                    }
+                    ;
+                    foreach(Body2 tool in effectiveTools)
+                    {
+                        var next=new List<Body2>();
+                        foreach(Body2 body in kept)
+                        {
+                            int code;
+                            var intersection=Boolean(body, tool, (int)swBodyOperationType_e.SWBODYINTERSECT, out code);
+                            if(operation.Kind==AfjOperationKind.Cut)
+                            {
+                                if(intersection.Count==0||Total(intersection)<=1e-13)
+                                {
+                                    next.Add(Copy(body));
+                                    continue;
+                                }
+                                next.AddRange(Boolean(body, tool, (int)swBodyOperationType_e.SWBODYCUT, out code));
+                                result.Removed.AddRange(intersection);
+                            }
+                            else
+                            {
+                                if(intersection.Count==0)throw new InvalidOperationException("AFJ: plan would erase entire member");
+                                next.AddRange(intersection);
+                                result.Removed.AddRange(Boolean(body, tool, (int)swBodyOperationType_e.SWBODYCUT, out code));
+                            }
+                        }
+                        if(next.Count==0||next.Count>12)throw new InvalidOperationException("AFJ: invalid remaining-body count");
+                        kept=next;
+                    }
+                }
+            }
+            result.Kept.AddRange(kept);
+            result.AfterVolume=Total(kept);
+            result.RemovedVolume=Total(result.Removed);
+            if(Math.Abs(result.BeforeVolume-result.AfterVolume-result.RemovedVolume)>Math.Max(1e-12, result.BeforeVolume*1e-8))throw new InvalidOperationException("AFJ: volume conservation failed");
+            return result;
+        }
+    }
+}
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    internal sealed class AfjProfile
+    {
+        internal string Signature;
+        internal double Thickness, Radius, StockLength;
+        internal double[][] Lines;
+        internal double[] Axis;
+        internal int BendFaceCount;
+        internal string[] Regions;
+    }
+    internal static class AfjProfileAnalyzer
+    {
+        private static string Q(double x)
+        {
+            if(!AfjTemporaryBoolean.Finite(x))throw new InvalidOperationException("UNVERIFIED_RULE: nonfinite profile");
+            return Math.Round(x/1e-7, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture);
+        }
+        internal static string Point(double[] p)
+        {
+            return String.Join(",", p.Select(Q));
+        }
+        internal static double[] Transform(double[] p, double[] m)
+        {
+            var q=new double[3];
+            for(int i=0;i<3;i++)q[i]=(p[0]*m[i]+p[1]*m[3+i]+p[2]*m[6+i])*m[12]+m[9+i];
+            return q;
+        }
+        internal static AfjProfile Analyze(ModelDoc2 model, Body2 nativeBody)
+        {
+            if(model==null||nativeBody==null)throw new InvalidOperationException("UNVERIFIED_RULE: missing Part/body");
+            Feature flange=null;
+            SheetMetalFeatureData sm=null;
+            int flangeCount=0;
+            for(Feature f=model.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature)
+            {
+                if(f.GetTypeName2()=="SMBaseFlange")
+                {
+                    flange=f;
+                    flangeCount++;
+                }
+                if(f.GetTypeName2()=="SheetMetal")sm=f.GetDefinition() as SheetMetalFeatureData;
+            }
+            if(flangeCount!=1||sm==null||flange.IsSuppressed())throw new InvalidOperationException("UNVERIFIED_RULE: requires one formed base flange and SheetMetal");
+            BaseFlangeFeatureData def=flange.GetDefinition() as BaseFlangeFeatureData;
+            if(def==null)throw new InvalidOperationException("UNVERIFIED_RULE: base flange definition unavailable");
+            if(!def.ReverseThickness)throw new InvalidOperationException("UNVERIFIED_RULE: base skin/thickness side differs from verified formed family");
+            Sketch sketch=null;
+            Array parents=flange.GetParents() as Array;
+            if(parents!=null)foreach(object p in parents)
+            {
+                var parent=p as Feature;
+                if(parent==null)continue;
+                var s=parent.GetSpecificFeature2() as Sketch;
+                if(s!=null)
+                {
+                    if(sketch!=null)throw new InvalidOperationException("UNVERIFIED_RULE: ambiguous profile Sketch");
+                    sketch=s;
+                }
+            }
+            if(sketch==null)throw new InvalidOperationException("UNVERIFIED_RULE: base profile Sketch unavailable");
+            MathTransform inverse=sketch.ModelToSketchTransform.Inverse() as MathTransform;
+            double[] matrix=inverse==null?null:inverse.ArrayData as double[];
+            if(matrix==null||matrix.Length!=16)throw new InvalidOperationException("UNVERIFIED_RULE: invalid profile transform");
+            var lines=new List<double[]>();
+            var canonical=new List<string>();
+            Array segments=sketch.GetSketchSegments() as Array;
+            if(segments!=null)foreach(object o in segments)
+            {
+                var segment=o as SketchSegment;
+                if(segment==null||segment.ConstructionGeometry)continue;
+                var line=o as SketchLine;
+                if(line==null)throw new InvalidOperationException("UNVERIFIED_RULE: curved base profile");
+                var a=line.GetStartPoint2() as SketchPoint;
+                var b=line.GetEndPoint2() as SketchPoint;
+                double[] u=Transform(new double[]
+                {
+                    a.X, a.Y, a.Z
+                }
+                , matrix), v=Transform(new double[]
+                {
+                    b.X, b.Y, b.Z
+                }
+                , matrix);
+                lines.Add(u.Concat(v).ToArray());
+                string x=Point(u), y=Point(v);
+                canonical.Add(String.CompareOrdinal(x, y)<0?x+":"+y:y+":"+x);
+            }
+            if(lines.Count<2||lines.Count>16)throw new InvalidOperationException("UNVERIFIED_RULE: unsupported base profile topology");
+            canonical.Sort(StringComparer.Ordinal);
+            var result=new AfjProfile
+            {
+                Thickness=sm.Thickness, Radius=sm.BendRadius, StockLength=def.D1OffsetDistance, Lines=lines.ToArray(), Axis=new double[]
+                {
+                    matrix[6], matrix[7], matrix[8]
+                }
+            }
+            ;
+            if(Math.Abs(def.Thickness-result.Thickness)>1e-8||Math.Abs(def.BendRadius-result.Radius)>1e-8)throw new InvalidOperationException("UNVERIFIED_RULE: overridden thickness/radius");
+            result.Signature=String.Join("|", canonical)+";t="+Q(result.Thickness)+";r="+Q(result.Radius)+";L="+Q(result.StockLength)+";ends="+def.D1OffsetType+","+def.D2OffsetType+";offset="+def.OffsetDirections+";reverse="+def.ReverseThickness+","+def.ReverseDirection+";axis="+Point(result.Axis);
+            int web=lines.IndexOf(AfjParametricRules.WebLine(result));
+            var depth=Enumerable.Repeat(99, lines.Count).ToArray();
+            depth[web]=0;
+            for(int pass=0;pass<lines.Count;pass++)for(int i=0;i<lines.Count;i++)for(int j=0;j<lines.Count;j++)if(Adjacent(lines[i], lines[j]))depth[j]=Math.Min(depth[j], depth[i]+1);
+            result.Regions=depth.Select(d=>d==0?"WEB":d==1?"WALL":"RETURN_LIP_OR_STEP").ToArray();
+            Array faces=nativeBody.GetFaces() as Array;
+            if(faces!=null)foreach(object o in faces)
+            {
+                Surface s=((Face2)o).GetSurface() as Surface;
+                if(!s.IsCylinder())continue;
+                double[] c=s.CylinderParams as double[];
+                double dot=c[3]*result.Axis[0]+c[4]*result.Axis[1]+c[5]*result.Axis[2];
+                if(Math.Abs(Math.Abs(dot)-1)<1e-7&&(Math.Abs(c[6]-result.Radius)<1e-8||Math.Abs(c[6]-result.Radius-result.Thickness)<1e-8))result.BendFaceCount++;
+            }
+            if(result.BendFaceCount<2)throw new InvalidOperationException("UNVERIFIED_RULE: formed Bend B-rep not found (flat configuration?)");
+            return result;
+        }
+        private static bool Adjacent(double[] a, double[] b)
+        {
+            for(int i=0;i<2;i++)for(int j=0;j<2;j++)
+            {
+                double d=0;
+                for(int k=0;k<3;k++)d+=(a[i*3+k]-b[j*3+k])*(a[i*3+k]-b[j*3+k]);
+                if(d<1e-14)return true;
+            }
+            return false;
+        }
+    }
+}
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    internal sealed class AfjJointSolution
+    {
+        internal AfjJointPlan Plan;
+        internal AfjBooleanResult A, B;
+        internal ModelDoc2 PartA, PartB;
+        internal MathTransform TransformA, TransformB;
+        internal double BeforeOverlap, AfterOverlap, AfterGap, LengthA, LengthB;
+        internal bool CoverA;
+    }
+    internal static class AfjJointRuleLibrary
+    {
+        internal static AfjParametricPlan Create(AfjProfile a, AfjProfile b, Body2 ba, Body2 bb, MathTransform ta, MathTransform tb, bool aCovers)
+        {
+            return AfjParametricRules.Generate(a, b, ba, bb, ta, tb, aCovers, AfjParametricRules.AssemblyGap);
+        }
+    }
+    internal static class AfjJointSolver
+    {
+        internal static Body2 NativeBody(Component2 c, out ModelDoc2 part, out MathTransform transform)
+        {
+            part=c.GetModelDoc2() as ModelDoc2;
+            transform=c.GetTotalTransform(false);
+            if(part==null||part.GetType()!=(int)swDocumentTypes_e.swDocPART||transform==null)throw new InvalidOperationException("UNVERIFIED_RULE: unresolved Part/transform");
+            var cfg=part.ConfigurationManager.ActiveConfiguration;
+            if(cfg==null||!String.Equals(cfg.Name, c.ReferencedConfiguration, StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("UNVERIFIED_RULE: Part/occurrence configuration mismatch; activate folded configuration manually");
+            Rigid(transform.ArrayData as double[]);
+            object info;
+            Array bodies=c.GetBodies3((int)swBodyType_e.swSolidBody, out info) as Array;
+            if(bodies==null||bodies.Length!=1)throw new InvalidOperationException("UNVERIFIED_RULE: requires one solid per Frame");
+            Body2 body=AfjTemporaryBoolean.Copy(bodies.GetValue(0) as Body2);
+            AfjTemporaryBoolean.Validate(body);
+            return body;
+        }
+        private static void Rigid(double[] t)
+        {
+            if(t==null||t.Length!=16||t.Any(x=>!AfjTemporaryBoolean.Finite(x))||Math.Abs(t[12]-1)>1e-8)throw new InvalidOperationException("UNVERIFIED_RULE: unsupported scaled transform");
+            for(int i=0;i<3;i++)for(int j=0;j<3;j++)
+            {
+                double dot=0;
+                for(int k=0;k<3;k++)dot+=t[i*3+k]*t[j*3+k];
+                if(Math.Abs(dot-(i==j?1:0))>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: nonrigid transform");
+            }
+            double det=t[0]*(t[4]*t[8]-t[5]*t[7])-t[1]*(t[3]*t[8]-t[5]*t[6])+t[2]*(t[3]*t[7]-t[4]*t[6]);
+            if(det<.999999)throw new InvalidOperationException("UNVERIFIED_RULE: mirrored placement");
+        }
+        internal static List<Body2> World(IEnumerable<Body2> bodies, MathTransform transform)
+        {
+            var result=new List<Body2>();
+            foreach(Body2 b in bodies)
+            {
+                Body2 c=AfjTemporaryBoolean.Copy(b);
+                if(!c.ApplyTransform(transform))throw new InvalidOperationException("AFJ: world transform failed");
+                AfjTemporaryBoolean.Validate(c);
+                result.Add(c);
+            }
+            return result;
+        }
+        internal static double Overlap(IEnumerable<Body2> a, IEnumerable<Body2> b)
+        {
+            double total=0;
+            foreach(Body2 x in a)foreach(Body2 y in b)
+            {
+                int code;
+                total+=AfjTemporaryBoolean.Total(AfjTemporaryBoolean.Boolean(x, y, (int)swBodyOperationType_e.SWBODYINTERSECT, out code));
+            }
+            return total;
+        }
+        internal static double Gap(ModelDoc2 model, IEnumerable<Body2> a, IEnumerable<Body2> b)
+        {
+            double gap=Double.MaxValue;
+            foreach(Body2 x in a)foreach(Body2 y in b)
+            {
+                object p, q;
+                double d=model.ClosestDistance(x, y, out p, out q);
+                if(d<0||!AfjTemporaryBoolean.Finite(d))throw new InvalidOperationException("AFJ: exact B-rep distance unavailable");
+                gap=Math.Min(gap, d);
+            }
+            return gap;
+        }
+        internal static double Projection(Body2 body, double[] axis)
+        {
+            double x, y, z;
+            if(!body.GetExtremePoint(axis[0], axis[1], axis[2], out x, out y, out z))throw new InvalidOperationException("UNVERIFIED_RULE: longitudinal extent unavailable");
+            return x*axis[0]+y*axis[1]+z*axis[2];
+        }
+        internal static double Length(Body2 body, double[] axis)
+        {
+            double[] n=AfjParametricRules.Unit(axis);
+            double result=Projection(body, n)+Projection(body, AfjParametricRules.Scale(n, -1));
+            if(!AfjTemporaryBoolean.Finite(result)||result<=1e-6)throw new InvalidOperationException("UNVERIFIED_RULE: invalid longitudinal span");
+            return result;
+        }
+        private static void SelectedEnd(AfjBooleanResult result, MathTransform transform, double[] origin, double[] outward)
+        {
+            double[] matrix=(double[])((MathTransform)transform.Inverse()).ArrayData;
+            double[] p=AfjProfileAnalyzer.Transform(origin, matrix), q=AfjProfileAnalyzer.Transform(AfjParametricRules.Add(origin, outward), matrix), n=AfjParametricRules.Unit(AfjParametricRules.Sub(q, p));
+            foreach(Body2 removed in result.Removed)
+            {
+                double minimum=-Projection(removed, AfjParametricRules.Scale(n, -1))-AfjParametricRules.Dot(p, n);
+                if(minimum < -AfjParametricRules.AssemblyGap-1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: removed material extends beyond selected end");
+            }
+        }
+        internal static AfjJointSolution Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)
+        {
+            ModelDoc2 pa, pb;
+            MathTransform ta, tb;
+            Body2 a=NativeBody(ca, out pa, out ta), b=NativeBody(cb, out pb, out tb);
+            AfjProfile pfa=AfjProfileAnalyzer.Analyze(pa, a), pfb=AfjProfileAnalyzer.Analyze(pb, b);
+            return SolveBodies(sw, assembly, a, b, pfa, pfb, pa, pb, ta, tb);
+        }
+        internal static AfjJointSolution SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)
+        {
+            // The current manufacturing policy is explicitly supplied by the user:
+            // the shorter actual Frame covers. Base-extrusion stock lengths, names,
+            // historical Cut tool coordinates and A/B order do not select a winner.
+            Rigid(ta.ArrayData as double[]);
+            Rigid(tb.ArrayData as double[]);
+            double la=Length(a, pfa.Axis), lb=Length(b, pfb.Axis);
+            if(Math.Abs(la-lb)<1e-6)throw new InvalidOperationException("UNVERIFIED_RULE: equal-length Frames require a consistent drawing cover side");
+            bool coverA=la<lb;
+            AfjParametricPlan generated=AfjJointRuleLibrary.Create(pfa, pfb, a, b, ta, tb, coverA);
+            var result=new AfjJointSolution
+            {
+                Plan=generated.Plan, PartA=pa, PartB=pb, TransformA=ta, TransformB=tb, LengthA=la, LengthB=lb, CoverA=coverA
+            }
+            ;
+            result.A=AfjTemporaryBoolean.Execute(sw, a, generated.Plan.A);
+            result.B=AfjTemporaryBoolean.Execute(sw, b, generated.Plan.B);
+            if(result.A.Kept.Count!=1||result.B.Kept.Count!=1)throw new InvalidOperationException("UNVERIFIED_RULE: each Frame must remain one connected solid");
+            SelectedEnd(result.A, ta, generated.JointOrigin, coverA?generated.OutWinner:generated.OutLoser);
+            SelectedEnd(result.B, tb, generated.JointOrigin, coverA?generated.OutLoser:generated.OutWinner);
+            AfjParametricRules.VerifyCoverage(sw, generated, ta, tb, coverA, result.A, result.B);
+            var wa=World(result.A.Kept, ta);
+            var wb=World(result.B.Kept, tb);
+            result.BeforeOverlap=Overlap(World(new[]
+            {
+                a
+            }
+            , ta), World(new[]
+            {
+                b
+            }
+            , tb));
+            result.AfterOverlap=Overlap(wa, wb);
+            if(result.AfterOverlap>1e-12)throw new InvalidOperationException("UNVERIFIED_RULE: remaining solids interfere");
+            result.AfterGap=Gap(assembly, wa, wb);
+            if(Math.Abs(result.AfterGap-AfjParametricRules.AssemblyGap)>1e-6)throw new InvalidOperationException("UNVERIFIED_RULE: exact minimum assembly clearance is not 0.1 mm");
+            return result;
+        }
+    }
+}
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    internal sealed class AfjUSection
+    {
+        internal double[] Origin, Axis, WidthDirection, DepthDirection;
+        internal double Width, Thickness, Radius, NearHeight, FarHeight, MinWidth, MaxWidth, MaxDepth;
+        internal double NearTangent
+        {
+            get
+            {
+                return Thickness+Radius;
+            }
+        }
+        internal double FarTangent
+        {
+            get
+            {
+                return Width-Thickness-Radius;
+            }
+        }
+        internal bool NearReturn, FarReturn;
+    }
+    internal sealed class AfjParametricPlan
+    {
+        internal AfjJointPlan Plan;
+        internal double[] JointOrigin, OutLoser, OutWinner, Depth;
+        internal AfjUSection Loser, Winner;
+        internal double[] SeamNear, SeamFar;
+        internal string Derivation;
+    }
+    internal static class AfjParametricRules
+    {
+        internal const double AssemblyGap=.0001, ToolOverrun=.0001;
+        internal static double Dot(double[] a, double[] b)
+        {
+            return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+        }
+        internal static double[] Sub(double[] a, double[] b)
+        {
+            return new[]
+            {
+                a[0]-b[0], a[1]-b[1], a[2]-b[2]
+            }
+            ;
+        }
+        internal static double[] Add(double[] a, double[] b)
+        {
+            return new[]
+            {
+                a[0]+b[0], a[1]+b[1], a[2]+b[2]
+            }
+            ;
+        }
+        internal static double[] Scale(double[] a, double s)
+        {
+            return new[]
+            {
+                a[0]*s, a[1]*s, a[2]*s
+            }
+            ;
+        }
+        internal static double[] Unit(double[] a)
+        {
+            double l=Math.Sqrt(Dot(a, a));
+            if(l<1e-9)throw new InvalidOperationException("UNVERIFIED_RULE: zero profile vector");
+            return Scale(a, 1/l);
+        }
+        internal static double[] P(double[] line, int end)
+        {
+            return line.Skip(end*3).Take(3).ToArray();
+        }
+        static bool Same(double[] a, double[] b)
+        {
+            return Dot(Sub(a, b), Sub(a, b))<1e-14;
+        }
+        static double[] WorldPoint(double[] p, MathTransform t)
+        {
+            return AfjProfileAnalyzer.Transform(p, (double[])t.ArrayData);
+        }
+        static double[] WorldVector(double[] v, MathTransform t)
+        {
+            return Sub(WorldPoint(v, t), WorldPoint(new double[3], t));
+        }
+        static double[] OtherEnd(double[] l, double[] endpoint)
+        {
+            if(Same(P(l, 0), endpoint))return P(l, 1);
+            if(Same(P(l, 1), endpoint))return P(l, 0);
+            return null;
+        }
+        internal static double[] WebLine(AfjProfile profile)
+        {
+            var candidates=new List<double[]>();
+            foreach(double[] line in profile.Lines)
+            {
+                double[] a=P(line, 0), b=P(line, 1), u=Unit(Sub(b, a));
+                var first=profile.Lines.Where(x=>x!=line&&OtherEnd(x, a)!=null).ToArray();
+                var last=profile.Lines.Where(x=>x!=line&&OtherEnd(x, b)!=null).ToArray();
+                if(first.Length!=1||last.Length!=1)continue;
+                double[] v=Unit(Sub(OtherEnd(first[0], a), a)), w=Unit(Sub(OtherEnd(last[0], b), b));
+                if(Math.Abs(Dot(u, v))<1e-7&&Dot(v, w)>.999999)candidates.Add(line);
+            }
+            if(candidates.Count!=1)throw new InvalidOperationException("UNVERIFIED_RULE: no unique Web between parallel outward Walls");
+            return candidates[0];
+        }
+        internal static AfjUSection Section(AfjProfile profile, MathTransform transform, double[] outgoingOther)
+        {
+            double[] web=WebLine(profile);
+            double[] a=P(web, 0), b=P(web, 1);
+            if(Dot(WorldVector(Sub(b, a), transform), outgoingOther)<0)
+            {
+                double[] temp=a;
+                a=b;
+                b=temp;
+            }
+            double[] width=Unit(Sub(b, a)), axis=Unit(profile.Axis);
+            double[][][] paths=new double[2][][];
+            for(int side=0;side<2;side++)
+            {
+                double[] point=side==0?a:b;
+                var path=new List<double[]>();
+                var used=new HashSet<double[]>
+                {
+                    web
+                }
+                ;
+                while(true)
+                {
+                    var options=profile.Lines.Where(l=>!used.Contains(l)&&OtherEnd(l, point)!=null).ToList();
+                    if(options.Count==0)break;
+                    if(options.Count!=1)throw new InvalidOperationException("UNVERIFIED_RULE: branched profile");
+                    double[] segment=options[0];
+                    point=OtherEnd(segment, point);
+                    path.Add(point);
+                    used.Add(segment);
+                    if(path.Count>2)throw new InvalidOperationException("UNVERIFIED_RULE: multi-step/double Lip needs separate coverage rule");
+                }
+                paths[side]=path.ToArray();
+            }
+            if(paths[0].Length<1||paths[1].Length<1)throw new InvalidOperationException("UNVERIFIED_RULE: requires two formed Walls");
+            double[] depth=Unit(Sub(paths[0][0], a));
+            if(Math.Abs(Dot(depth, width))>1e-7||Math.Abs(Dot(depth, axis))>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: inclined Wall needs surface-coverage rule");
+            double[] farWall=Sub(paths[1][0], b);
+            if(Math.Abs(Dot(Unit(farWall), depth)-1)>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: nonparallel Walls");
+            var s=new AfjUSection
+            {
+                Origin=WorldPoint(a, transform), Axis=WorldVector(axis, transform), WidthDirection=WorldVector(width, transform), DepthDirection=WorldVector(depth, transform), Width=Math.Sqrt(Dot(Sub(b, a), Sub(b, a))), Thickness=profile.Thickness, Radius=profile.Radius, NearHeight=Math.Sqrt(Dot(Sub(paths[0][0], a), Sub(paths[0][0], a))), FarHeight=Math.Sqrt(Dot(farWall, farWall)), MinWidth=0
+            }
+            ;
+            s.MaxWidth=s.Width;
+            s.MaxDepth=Math.Max(s.NearHeight, s.FarHeight);
+            for(int side=0;side<2;side++)if(paths[side].Length==2)
+            {
+                double[] lip=Sub(paths[side][1], paths[side][0]);
+                if(Math.Abs(Math.Abs(Dot(Unit(lip), width))-1)>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: inclined Return");
+                double y=Dot(Sub(paths[side][1], a), width);
+                if(side==0)
+                {
+                    s.NearReturn=true;
+                    s.MinWidth=Math.Min(s.MinWidth, y);
+                }
+                else
+                {
+                    s.FarReturn=true;
+                    s.MaxWidth=Math.Max(s.MaxWidth, y);
+                }
+                if(side==0&&y>1e-7||side==1&&y<s.Width-1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: inward Return needs collision/coverage rule");
+            }
+            s.MaxDepth=Math.Max(s.NearHeight, s.FarHeight+(s.FarReturn?s.Thickness:0));
+            if(s.Width<2*(s.Thickness+s.Radius)||s.NearHeight<2*(s.Thickness+s.Radius)||s.FarHeight<2*(s.Thickness+s.Radius))throw new InvalidOperationException("UNVERIFIED_RULE: Bend zones overlap");
+            return s;
+        }
+        static double[] ProfileCenter(AfjProfile p)
+        {
+            double[] web=WebLine(p);
+            return Scale(Add(P(web, 0), P(web, 1)), .5);
+        }
+        static double[] Outgoing(AfjProfile p, MathTransform t, AfjProfile other, MathTransform ot)
+        {
+            double[] axis=Unit(WorldVector(p.Axis, t));
+            double[] o=WorldPoint(ProfileCenter(p), t), q=WorldPoint(ProfileCenter(other), ot);
+            double distance=Dot(Sub(q, o), axis);
+            if(Math.Abs(distance)<1e-4)throw new InvalidOperationException("UNVERIFIED_RULE: T/interior joint or ambiguous end");
+            return Scale(axis, distance>0?1:-1);
+        }
+        static double[] Native(double[] p, MathTransform transform)
+        {
+            return WorldPoint(p, (MathTransform)transform.Inverse());
+        }
+        static double[] Common(double s, double q, double z, double[] o, double[] u, double[] v, double[] d)
+        {
+            return Add(o, Add(Scale(u, s), Add(Scale(v, q), Scale(d, z))));
+        }
+        static AfjToolDefinition Prism(List<double[]> polygon, double z0, double z1, MathTransform target, double[] o, double[] u, double[] v, double[] d)
+        {
+            double[][] points=polygon.Select(p=>Native(Common(p[0], p[1], z0, o, u, v, d), target)).ToArray();
+            double[] normal=Unit(Sub(Native(Add(o, d), target), Native(o, target)));
+            return new AfjToolDefinition
+            {
+                Polygon=points, Direction=normal, Length=z1-z0
+            }
+            ;
+        }
+        static AfjCutOperation Op(string id, AfjToolDefinition tool)
+        {
+            var op=new AfjCutOperation
+            {
+                EvidenceId=id, Kind=AfjOperationKind.Cut, RegionEvidence="Parametric Web tangent / Wall face / outer Return coverage derivation"
+            }
+            ;
+            op.Tools.Add(tool);
+            return op;
+        }
+        static double Extreme(Body2 body, MathTransform t, double[] worldDirection, double[] joint)
+        {
+            double[] n=Unit(Sub(Native(Add(joint, worldDirection), t), Native(joint, t)));
+            double x, y, z;
+            if(!body.GetExtremePoint(n[0], n[1], n[2], out x, out y, out z))throw new InvalidOperationException("UNVERIFIED_RULE: stock axial extent unavailable");
+            return Dot(Sub(WorldPoint(new[]
+            {
+                x, y, z
+            }
+            , t), joint), worldDirection);
+        }
+        internal static Body2 IdealJointStock(ISldWorks app, AfjUSection section, MathTransform transform, double[] joint, double[] outgoing, double end)
+        {
+            double t=section.Thickness, r=section.Radius, w=section.Width, h=section.FarHeight;
+            const double start=-.001;
+            var points=new List<double[]>();
+            var centers=new List<double[]>();
+            Func<double, double, double[]> p=(y, z)=>Native(Add(joint, Add(Scale(outgoing, start), Add(Scale(section.WidthDirection, y), Scale(section.DepthDirection, z)))), transform);
+            Action<double, double> point=(y, z)=>
+            {
+                points.Add(p(y, z));
+                centers.Add(null);
+            }
+            ;
+            Action<double, double, double, double> arc=(cy, cz, y, z)=>
+            {
+                centers[centers.Count-1]=p(cy, cz);
+                point(y, z);
+            }
+            ;
+            point(0, section.NearHeight);
+            point(0, t+r);
+            arc(t+r, t+r, t+r, 0);
+            point(w-t-r, 0);
+            arc(w-t-r, t+r, w, t+r);
+            if(section.FarReturn)
+            {
+                point(w, h-r);
+                arc(w+r, h-r, w+r, h);
+                point(section.MaxWidth, h);
+                point(section.MaxWidth, h+t);
+                point(w+r, h+t);
+                arc(w+r, h-r, w-t, h-r);
+                point(w-t, t+r);
+            }
+            else
+            {
+                point(w, h);
+                point(w-t, h);
+                point(w-t, t+r);
+            }
+            arc(w-t-r, t+r, w-t-r, t);
+            point(t+r, t);
+            arc(t+r, t+r, t, t+r);
+            point(t, section.NearHeight);
+            double[] direction=Unit(Sub(Native(Add(joint, outgoing), transform), Native(joint, transform)));
+            return AfjTemporaryBoolean.CreatePrism(app, new AfjToolDefinition
+            {
+                Polygon=points.ToArray(), ArcCenters=centers.ToArray(), Direction=direction, Length=end-start
+            }
+            );
+        }
+        internal static void VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, bool aCovers, AfjBooleanResult a, AfjBooleanResult b)
+        {
+            // Independent ideal formed stock is generated from the measured section.
+            // Only the small joint band is checked. Existing holes in that band are
+            // deliberately refused until a drawing-specific exception is verified.
+            MathTransform tl=aCovers?tb:ta, tw=aCovers?ta:tb;
+            Body2 il=IdealJointStock(app, generated.Loser, tl, generated.JointOrigin, generated.OutLoser, generated.Winner.MaxWidth+.001);
+            Body2 iw=IdealJointStock(app, generated.Winner, tw, generated.JointOrigin, generated.OutWinner, generated.Loser.MaxWidth+.001);
+            var expectedL=AfjTemporaryBoolean.Execute(app, il, aCovers?generated.Plan.B:generated.Plan.A);
+            var expectedW=AfjTemporaryBoolean.Execute(app, iw, aCovers?generated.Plan.A:generated.Plan.B);
+            AfjBooleanResult actualL=aCovers?b:a, actualW=aCovers?a:b;
+            double missingL=AfjTemporaryBoolean.DifferenceVolume(expectedL.Kept[0], actualL.Kept[0]);
+            double missingW=AfjTemporaryBoolean.DifferenceVolume(expectedW.Kept[0], actualW.Kept[0]);
+            if(missingL>2e-12||missingW>2e-12)throw new InvalidOperationException("UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3="+(missingL*1e9).ToString("R", System.Globalization.CultureInfo.InvariantCulture)+"/"+(missingW*1e9).ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        internal static AfjParametricPlan Generate(AfjProfile profileA, AfjProfile profileB, Body2 bodyA, Body2 bodyB, MathTransform ta, MathTransform tb, bool aCovers, double webGap)
+        {
+            // The cover side is a manufacturing policy. It is not inferred from filenames,
+            // fixture coordinates, stock length, A/B selection order or a universal KCC tag.
+            AfjProfile pl=aCovers?profileB:profileA, pw=aCovers?profileA:profileB;
+            Body2 bl=aCovers?bodyB:bodyA, bw=aCovers?bodyA:bodyB;
+            MathTransform tl=aCovers?tb:ta, tw=aCovers?ta:tb;
+            double[] ul=Outgoing(pl, tl, pw, tw), uw=Outgoing(pw, tw, pl, tl);
+            if(Math.Abs(Dot(ul, uw))>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: only orthogonal axes have native evidence");
+            AfjUSection l=Section(pl, tl, uw), w=Section(pw, tw, ul);
+            if(Math.Abs(l.Thickness-w.Thickness)>1e-8||Math.Abs(l.Radius-w.Radius)>1e-8)throw new InvalidOperationException("UNVERIFIED_RULE: unequal thickness/Bend R pair needs additional native evidence");
+            if(Dot(l.WidthDirection, uw)<.999999||Dot(w.WidthDirection, ul)<.999999||Dot(l.DepthDirection, w.DepthDirection)<.999999)throw new InvalidOperationException("UNVERIFIED_RULE: incompatible folded skin orientation");
+            double[] d=Unit(l.DepthDirection), o=Add(l.Origin, Scale(ul, Dot(Sub(w.Origin, l.Origin), ul)));
+            if(Math.Abs(Dot(Sub(w.Origin, o), d))>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: Web skins are not coplanar");
+            if(l.NearReturn||w.NearReturn)throw new InvalidOperationException("UNVERIFIED_RULE: near/inward Return needs a separate coverage collision rule");
+            double outerDepthL=l.FarHeight+(l.FarReturn?l.Thickness:0), outerDepthW=w.FarHeight+(w.FarReturn?w.Thickness:0);
+            if(Math.Abs(l.NearHeight-w.NearHeight)>1e-7||Math.Abs(outerDepthL-outerDepthW)>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: Wall/outer contour levels differ; height-coverage trimming is not yet verified");
+            double sf=w.FarTangent, qf=l.FarTangent, sn=w.NearTangent, qn=qf-(sf-sn);
+            if(qn<=l.NearTangent+1e-8)qn=l.Thickness;
+            // Constrain the seam to the inner near Wall when the ideal bisector enters its Bend zone.
+            if(qn>=qf-1e-6)throw new InvalidOperationException("UNVERIFIED_RULE: no positive Web seam span");
+            double ds=(sf-sn)/(qf-qn), gapShift=webGap*Math.Sqrt(1+ds*ds);
+            Func<double, double> seamS=q=>sn+(q-qn)*ds-gapShift;
+            double m=Math.Max(.01, 5*Math.Max(l.Thickness+l.Radius, w.Thickness+w.Radius));
+            double sMax=Math.Max(Extreme(bl, tl, ul, o), w.MaxWidth)+m, qMax=Math.Max(Extreme(bw, tw, uw, o), l.MaxWidth)+m;
+            double qMin=l.MinWidth-m, sMin=w.MinWidth-m, near=l.NearTangent, far=l.FarTangent;
+            double sStart=Math.Max(w.Thickness, seamS(near)), qHit=qn+(w.Thickness+gapShift-sn)/ds;
+            var loserBoundary=new List<double[]>
+            {
+                new[]
+                {
+                    -AssemblyGap, qMin
+                }
+                , new[]
+                {
+                    -AssemblyGap, near
+                }
+                , new[]
+                {
+                    sStart, near
+                }
+            }
+            ;
+            if(qHit>near+1e-8&&qHit<far-1e-8)loserBoundary.Add(new[]
+            {
+                w.Thickness, qHit
+            }
+            );
+            loserBoundary.Add(new[]
+            {
+                seamS(far), far
+            }
+            );
+            double farWall=w.Width-w.Thickness-AssemblyGap;
+            if(Math.Abs(farWall-seamS(far))>1e-9)loserBoundary.Add(new[]
+            {
+                farWall, far
+            }
+            );
+            if(l.FarReturn)
+            {
+                loserBoundary.Add(new[]
+                {
+                    farWall, l.Width+AssemblyGap
+                }
+                );
+                loserBoundary.Add(new[]
+                {
+                    w.MaxWidth, l.Width+AssemblyGap
+                }
+                );
+                loserBoundary.Add(new[]
+                {
+                    w.MaxWidth, l.MaxWidth+m
+                }
+                );
+            }
+            else loserBoundary.Add(new[]
+            {
+                farWall, l.MaxWidth+m
+            }
+            );
+            loserBoundary.Add(new[]
+            {
+                sMax, l.MaxWidth+m
+            }
+            );
+            loserBoundary.Add(new[]
+            {
+                sMax, qMin
+            }
+            );
+            var winnerBoundary=new List<double[]>
+            {
+                new[]
+                {
+                    sMin, l.Thickness
+                }
+                , new[]
+                {
+                    sn, l.Thickness
+                }
+            }
+            ;
+            if(qn>l.Thickness+1e-9)winnerBoundary.Add(new[]
+            {
+                sn, qn
+            }
+            );
+            winnerBoundary.Add(new[]
+            {
+                sf, qf
+            }
+            );
+            winnerBoundary.Add(new[]
+            {
+                w.Width-w.Thickness, qf
+            }
+            );
+            winnerBoundary.Add(new[]
+            {
+                w.Width-w.Thickness, l.Width
+            }
+            );
+            winnerBoundary.Add(new[]
+            {
+                w.MaxWidth+m, l.Width
+            }
+            );
+            winnerBoundary.Add(new[]
+            {
+                w.MaxWidth+m, qMax
+            }
+            );
+            winnerBoundary.Add(new[]
+            {
+                sMin, qMax
+            }
+            );
+            var lp=new AfjCutPlan();
+            var wp=new AfjCutPlan();
+            lp.Operations.Add(Op("U_RULE:LOSER_STEPPED_WEB_WALL_RETURN", Prism(loserBoundary, -ToolOverrun, l.MaxDepth+ToolOverrun, tl, o, ul, uw, d)));
+            wp.Operations.Add(Op("U_RULE:COVER_WEB_WALL", Prism(winnerBoundary, -ToolOverrun, w.MaxDepth+ToolOverrun, tw, o, ul, uw, d)));
+            // NormalCut correction follows the actual inner Wall plane and the Bend
+            // tangent depth. No copied relief B-rep, saved box or fixture coordinates.
+            var cap=new List<double[]>
+            {
+                new[]
+                {
+                    w.Width-w.Thickness, qf
+                }
+                , new[]
+                {
+                    w.MaxWidth+m, qf
+                }
+                , new[]
+                {
+                    w.MaxWidth+m, l.Width
+                }
+                , new[]
+                {
+                    w.Width-w.Thickness, l.Width
+                }
+            }
+            ;
+            wp.Operations.Add(Op("U_RULE:NORMAL_BEND_CAP", Prism(cap, -ToolOverrun, w.Thickness+w.Radius, tw, o, ul, uw, d)));
+            if(webGap>0)
+            {
+                // The seam endpoints are contacts between curved Bend zones. Offsetting
+                // only the straight Web line leaves a tangent-point contact at each end.
+                // Clip those end caps on the losing member through both Bend tangent
+                // depths; deeper Wall faces keep their independently defined 0.1 mm gap.
+                double capDepth=Math.Max(l.Thickness+l.Radius, w.Thickness+w.Radius)+webGap;
+                var farGuard=new List<double[]>
+                {
+                    new[]
+                    {
+                        sf-gapShift, qf-webGap
+                    }
+                    , new[]
+                    {
+                        sMax, qf-webGap
+                    }
+                    , new[]
+                    {
+                        sMax, l.MaxWidth+m
+                    }
+                    , new[]
+                    {
+                        sf-gapShift, l.MaxWidth+m
+                    }
+                }
+                ;
+                var nearGuard=new List<double[]>
+                {
+                    new[]
+                    {
+                        -AssemblyGap, qMin
+                    }
+                    , new[]
+                    {
+                        sMax, qMin
+                    }
+                    , new[]
+                    {
+                        sMax, l.Thickness+webGap
+                    }
+                    , new[]
+                    {
+                        -AssemblyGap, l.Thickness+webGap
+                    }
+                }
+                ;
+                lp.Operations.Add(Op("U_RULE:FAR_BEND_CLEARANCE", Prism(farGuard, -ToolOverrun, capDepth, tl, o, ul, uw, d)));
+                lp.Operations.Add(Op("U_RULE:NEAR_BEND_CLEARANCE", Prism(nearGuard, -ToolOverrun, capDepth, tl, o, ul, uw, d)));
+            }
+            var result=new AfjParametricPlan
+            {
+                Plan=new AfjJointPlan
+                {
+                    RuleId="ORTHOGONAL_U_COVER", A=aCovers?wp:lp, B=aCovers?lp:wp
+                }
+                , Loser=l, Winner=w, JointOrigin=o, OutLoser=ul, OutWinner=uw, Depth=d, SeamNear=new[]
+                {
+                    sn, qn
+                }
+                , SeamFar=new[]
+                {
+                    sf, qf
+                }
+                , Derivation="Common seam from Bend tangencies; near seam constrained to inner Wall; Wall assembly gap=0.1 mm; outer Return coverage; analytic NormalCut cap; web gap="+webGap.ToString("R", System.Globalization.CultureInfo.InvariantCulture)
+            }
+            ;
+            return result;
         }
     }
 }

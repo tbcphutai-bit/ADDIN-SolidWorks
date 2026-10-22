@@ -12,7 +12,7 @@ namespace ADDIN.UI.AutoFrameJoint
     /// Part component occurrences. This class is intentionally UI-only.
     ///
     /// No Part cut features, geometry edits, configuration switching or saves.
-    /// Read-only analyzer and temporary P1/P2 Boolean previews belong to backend.
+    /// Read-only analyzer and parametric KEEP / KEEP-CUT previews belong to backend.
     /// </summary>
     [ComVisible(true)]
     [ClassInterface(ClassInterfaceType.AutoDispatch)]
@@ -436,14 +436,14 @@ namespace ADDIN.UI.AutoFrameJoint
             cutP1ButtonControl = group.AddControl2(
                 ButtonCutP1,
                 (short)swPropertyManagerPageControlType_e.swControlType_Button,
-                "Preview cắt thử A+B — P1", align, controlOptions,
-                "B-rep thực; P1 chưa phải quy tắc cắt sản xuất được duyệt.")
+                "Preview A+B — KEEP", align, controlOptions,
+                "Frame ngắn che, khe hở 0,1 mm; ngoài phạm vi đã kiểm chứng sẽ dừng.")
                 as PropertyManagerPageControl;
             cutP2ButtonControl = group.AddControl2(
                 ButtonCutP2,
                 (short)swPropertyManagerPageControlType_e.swControlType_Button,
-                "Preview cắt thử A+B — P2", align, controlOptions,
-                "B-rep thực; P2 chưa phải quy tắc cắt sản xuất được duyệt.")
+                "Preview A+B — KEEP/CUT", align, controlOptions,
+                "Cùng rule KEEP, thêm phần CUT màu hồng/tím; chỉ trên Body tạm.")
                 as PropertyManagerPageControl;
 
             finishButtonControl = group.AddControl2(
@@ -951,7 +951,7 @@ namespace ADDIN.UI.AutoFrameJoint
             }
 
             cutPreviewQueued = true;
-            lastPreviewMessage = "Đã nhận P" + candidate +
+            lastPreviewMessage = "Đã nhận chế độ " + candidate +
                                  " — đang chờ SOLIDWORKS xử lý Preview...";
             if (statusLabel != null)
                 statusLabel.Caption = lastPreviewMessage;

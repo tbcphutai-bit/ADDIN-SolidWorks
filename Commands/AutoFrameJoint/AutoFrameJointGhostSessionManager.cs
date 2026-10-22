@@ -224,7 +224,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
 
         /// <summary>
-        /// Explicit user-requested P1/P2 real B-rep temporary cut candidate.
+        /// Explicit KEEP / KEEP-CUT mode for the same verified temporary cut plan.
         /// Reuses the ORIGINAL ghost session for safe Hide() on Page close.
         /// Never modifies Part or Assembly.
         /// </summary>
