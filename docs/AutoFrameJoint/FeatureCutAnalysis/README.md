@@ -39,3 +39,12 @@ Các Cut dùng 17 Blind, 22 Through All Both, 3 Up To Vertex và 1 Through All. 
 `API_VERIFIED` là đọc thật từ native API. `GEOMETRY_VERIFIED` là metrics B-rep cuối, không tự động chứng minh vùng bị bỏ. `INFERRED` là phân loại/logic chưa có before-after hoặc Assembly proof. Dữ liệu STEP có sẵn giữ provenance cũ và snapshot trong `history/`. Chỉ xuất tài liệu và dữ liệu trích xuất cần thiết; không chứa CAD gốc, DLL, source ZIP hoặc đường dẫn cá nhân.
 
 REPORT_MANIFEST.csv ghi SHA256 của nội dung Git chuẩn hóa newline LF; gói ZIP báo cáo dùng cùng nội dung chuẩn hóa để kiểm tra nhất quán.
+
+
+## Follow-up: 2026-10-22 folded profiles and geometric Sketch relations
+
+The original 15-Part / 43-Cut inventory and 42-Cut before/after evidence above are retained unchanged.
+
+See [the follow-up report](Followup20261022/README.md) for unequal-width 75/65 mm and 55/70 mm native tests, multiple bends, direct Coincident/Tangent end-Face Sketches, measured exposure, Preview cache timings, and all failed/unverified cases. The source changes are on `feat/afj-multi-profile-cut-preview-20261022`, source commit `90876693d34fbaf6b13f0570b548ba7f6b946547`. This documentation branch contains no Add-in production source changes.
+
+The main Add-in was not built/deployed. Installed UI visibility/smoothness, the legacy U Sketch rewrite and complete cross-Frame associative Cut transactions remain unverified or incomplete as explicitly recorded in that report.
