@@ -1,0 +1,15 @@
+--- a/Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs
++++ b/Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs
+@@ -234,0 +235 @@
++            Trace.WriteLine("[AFJ-R52] stage=SESSION_PREVIEW_ENTER token=" + token.ToString("N") + " candidate=" + candidate);
+@@ -237 +238 @@
+-                return false;
++            { Trace.WriteLine("[AFJ-R52] stage=SESSION_REJECT reason=" + message); return false; }
+@@ -241,0 +243 @@
++                Trace.WriteLine("[AFJ-R52] stage=SESSION_REJECT state=" + session.State + " closing=" + session.CloseRequested);
+@@ -246,0 +249 @@
++                Trace.WriteLine("[AFJ-R52] stage=SESSION_REJECT reason=BOUND_ASSEMBLY_INACTIVE");
+@@ -254,0 +258 @@
++                Trace.WriteLine("[AFJ-R52] stage=SESSION_GHOST_CALL token=" + token.ToString("N"));
+@@ -267,0 +272 @@
++            Trace.WriteLine("[AFJ-R52] stage=SESSION_PREVIEW_END success=" + success + " state=" + session.State + " tracked=" + session.Ghost.IsShowing + " actual_visibility=UNVERIFIED");

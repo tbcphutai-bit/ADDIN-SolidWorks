@@ -1,0 +1,46 @@
+﻿case,scope,status,evidence,detail
+INSTALLED_DLL_MVID,FILE_AUDIT,PASS_BINARY_VERIFIED,PE/Mono.Cecil,Matches user log 2f4e359e-bffe-4f74-9441-891bb4c77b12
+R51_SOLVER_AND_DISPLAY_CALLS_PRESENT,FILE_AUDIT,PASS_BINARY_VERIFIED,IL,Marker and existing Preview->solver->Display3 path present
+AFJ_251_METHOD_IL_COMPARISON,FILE_AUDIT,PASS_BINARY_VERIFIED,Normalized IL,251/251 method token streams match detached R51 local-source harness; not source/PDB byte proof
+PDB_DLL_GUID_AGE,FILE_AUDIT,PASS_BINARY_VERIFIED,PE CodeView / native PDB MSF,GUID and age match
+PDB_SOURCE_DOCUMENT_CHECKSUMS,FILE_AUDIT,NOT_AVAILABLE,Native PDB parser,No source hash obtained; empty entry is not a mismatch
+PROJECT_COMPILE_INCLUDES_OUTPUT_EVENTS,SOURCE_AUDIT,PASS_SOURCE_VERIFIED,XML read only,AFJ includes exist; Debug x64 existing output; pre/post-build events empty; no MSBuild evaluation
+COM_REGISTRATION_TARGET,REGISTRY_READ,PASS_REGISTRY_VERIFIED,HKLM CodeBase,Same target as DLL in user log; registration unchanged
+FRAME_B_IN_SUPPLIED_RUN,USER_LOG,NOT_OBSERVED,User summary,Last supplied ready record A=1 B=0; no native R52 test
+PREVIEW_BUTTON_IN_SUPPLIED_RUN,USER_LOG,NOT_OBSERVED,User summary,No BUTTON 107/108 in supplied summary
+BACKEND_IN_SUPPLIED_RUN,USER_LOG,NOT_OBSERVED,User summary,No BACKEND BEGIN Preview or AFJ-R51 marker
+HEAP_CORRUPTION_CAUSAL_MAPPING,EVENT_READ,UNVERIFIED,Application Error/WER,0xC0000374 events observed; no unique API callback or user-run exit mapping
+DETACHED_SIX_CLASS_COMPILE,local,PASS_COMPILE_ONLY,Explicit-source Roslyn,No main Add-in project/output/deploy
+A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+BUTTON_107_DEFERRED_PREVIEW_DELEGATE,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+BUTTON_108_DEFERRED_PREVIEW_DELEGATE,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+FOREIGN_THREAD_SUBMIT_REFUSED,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH,local,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+DETACHED_SIX_CLASS_COMPILE,branch,PASS_COMPILE_ONLY,Explicit-source Roslyn,No main Add-in project/output/deploy
+A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+BUTTON_107_DEFERRED_PREVIEW_DELEGATE,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+BUTTON_108_DEFERRED_PREVIEW_DELEGATE,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+FOREIGN_THREAD_SUBMIT_REFUSED,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH,branch,PASS_MANAGED_CONTRACT,Managed proxy harness,"No native PMP, solver, Body2 or Display3"
+"R50 control creation/marks/filters, captions, owner/epoch gates, readiness validators preserved",local,PASS_STATIC_INVARIANT,Source and SHA checks,Not a native execution test
+Selection callbacks have no selection/control/property getter calls; supplied-dispatch interface casts only,local,PASS_STATIC_INVARIANT,Source and SHA checks,Not a native execution test
+R51 classifier/rules/cutters/Boolean/validation helpers and +120 mm placement unchanged,local,PASS_STATIC_INVARIANT,Source and SHA checks,Not a native execution test
+"R50 control creation/marks/filters, captions, owner/epoch gates, readiness validators preserved",branch,PASS_STATIC_INVARIANT,Source and SHA checks,Not a native execution test
+Selection callbacks have no selection/control/property getter calls; supplied-dispatch interface casts only,branch,PASS_STATIC_INVARIANT,Source and SHA checks,Not a native execution test
+R51 classifier/rules/cutters/Boolean/validation helpers and +120 mm placement unchanged,branch,PASS_STATIC_INVARIANT,Source and SHA checks,Not a native execution test
+Current local source/DLL/project/PDB match post-apply protection snapshot; exactly four intended CS writes,local protection,PASS_STATIC_INVARIANT,Source and SHA checks,Not a native execution test
+R52_SOURCE_IN_INSTALLED_DLL,INSTALLED_ADDIN,NOT_BUILT,Before/after DLL/PDB hashes,Source R52 applied; installed DLL remains R51; task did not Build/Deploy
+NATIVE_FRAME_B_COMMIT,R52_INSTALLED_ADDIN,NOT_RUN,No native R52 execution,User chose source/DLL audit first; no live Preview initiated
+NATIVE_BUTTON_107_108,R52_INSTALLED_ADDIN,NOT_RUN,No native R52 execution,User chose source/DLL audit first; no live Preview initiated
+NATIVE_SOLVER_BODY2,R52_INSTALLED_ADDIN,NOT_RUN,No native R52 execution,User chose source/DLL audit first; no live Preview initiated
+NATIVE_DISPLAY3_HIDE,R52_INSTALLED_ADDIN,NOT_RUN,No native R52 execution,User chose source/DLL audit first; no live Preview initiated
+NATIVE_VIEWPORT_CALIBRATION,R52_INSTALLED_ADDIN,NOT_RUN,No native R52 execution,User chose source/DLL audit first; no live Preview initiated
+PREVIEW_ACTUALLY_VISIBLE,R52_INSTALLED_ADDIN,UNVERIFIED,No screen/viewport capture or user confirmation,"Display3 status, tracking or projection estimate alone would not prove visibility"

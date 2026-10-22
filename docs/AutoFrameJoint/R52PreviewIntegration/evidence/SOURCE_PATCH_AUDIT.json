@@ -1,0 +1,54 @@
+{
+  "patches": [
+    {
+      "variant": "local",
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "before_sha256": "17a7cc2e448e2d71c5fc88af19fc99f1a710773e541a1b84de0e66ca47d919fe",
+      "after_sha256": "1a4c3856cace4c7de954356900e1ced9c144594abfabde3390a6773fbabd6749"
+    },
+    {
+      "variant": "local",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "before_sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+      "after_sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09"
+    },
+    {
+      "variant": "local",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "before_sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+      "after_sha256": "ec1e7daea7989e2a8a405311f85cebd761f15ad2b87825a41a2fea95262a9af2"
+    },
+    {
+      "variant": "local",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "before_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b",
+      "after_sha256": "cafe0a13242f1b18f5d1a9d37cb9b733caf851b782a642d9dc0b7bb7061671df"
+    },
+    {
+      "variant": "branch",
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "before_sha256": "e76901e4c995773829a57a682f54f1f6bda9d8acc0c09bb0f8643b4b20b30591",
+      "after_sha256": "67da39aca6e4c43440558c5628b66c5628cee4516434843c6136796c427ec411"
+    },
+    {
+      "variant": "branch",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "before_sha256": "1b2bb88370eda26aad5e716a8ee7a08695d9f44f682260b6a05bd5419413e826",
+      "after_sha256": "8e6c35e17e100d2604a2a9c8dc9ff3fe28f60c5f5c9594554d0726696fb4d061"
+    },
+    {
+      "variant": "branch",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "before_sha256": "ab5945f1bb1664c3756180ece0198b832db1b6b418fa6fdd57c857f9e0e1fedd",
+      "after_sha256": "eccedf4edb649bf81d2d51ec4fe528e9d18d2197b5441f6055f29f340cb0b7fd"
+    },
+    {
+      "variant": "branch",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "before_sha256": "11b01b9852d70ce70373dbb4fb4c32edc0f421ab823b0e5c2652b258efca6b58",
+      "after_sha256": "4e0fd2bbc1aa1fcf03c0e4c2e6af11a282d31ff3b32d58f520270ae0a7b06c0a"
+    }
+  ],
+  "r51_geometry_helpers_unchanged": true,
+  "main_project_changed": false
+}

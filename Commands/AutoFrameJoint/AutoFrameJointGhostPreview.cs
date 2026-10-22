@@ -146,6 +146,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         public bool TryShowCutCandidate(Component2 frameA, Component2 frameB,
                                         int candidate, out string message)
         {
+            Trace.WriteLine("[AFJ-R52] stage=GHOST_ENTER candidate=" + candidate + " busy=" + busy);
             message = "Chưa tạo preview vết cắt.";
             if (busy) { message = "Preview đang xử lý."; return false; }
             if (candidate != 1 && candidate != 2)
@@ -166,7 +167,13 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 Trace.WriteLine("[AFJ-R51] source=profile-skin-cutter; MVID=" + typeof(AutoFrameJointGhostPreview).Assembly.ManifestModule.ModuleVersionId);
                 Trace.WriteLine("[AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION");
+                Trace.WriteLine("[AFJ-R52] stage=SOLVER_BEGIN");
+                try { Trace.WriteLine("[AFJ-R52] stage=PAIR_CONTEXT assembly=" + sourceAssembly.GetTitle() + " A=" + frameA.Name2 + " B=" + frameB.Name2); }
+                catch (Exception diagnosticError) { Trace.WriteLine("[AFJ-R52] stage=PAIR_CONTEXT status=UNAVAILABLE " + diagnosticError.Message); }
                 AfjJointSolution result = AfjJointSolver.Solve(app, sourceAssembly, frameA, frameB);
+                Trace.WriteLine("[AFJ-R52] stage=SOLVER_END keptA=" + result.A.Kept.Count + " keptB=" + result.B.Kept.Count + " removedA_m3=" + result.A.RemovedVolume.ToString("R", CultureInfo.InvariantCulture) + " removedB_m3=" + result.B.RemovedVolume.ToString("R", CultureInfo.InvariantCulture));
+                try { Trace.WriteLine("[AFJ-R52] stage=DISPLAY_CONTEXT shift_world_m=0;0;0.12 transformA=" + DiagnosticArray(result.TransformA.ArrayData) + " transformB=" + DiagnosticArray(result.TransformB.ArrayData) + " partA=" + result.PartA.GetTitle() + " partB=" + result.PartB.GetTitle()); }
+                catch (Exception diagnosticError) { Trace.WriteLine("[AFJ-R52] stage=DISPLAY_CONTEXT status=UNAVAILABLE " + diagnosticError.Message); }
                 if (result.A.RemovedVolume + result.B.RemovedVolume <= 1e-12)
                 { message = "NO_NEW_CUT_REQUIRED: Hai Frame đã khớp quy tắc; không dựng lại Body gốc thành Preview cắt mới."; return false; }
                 MathTransform shift = CreateWorldShift(0.12);
@@ -176,18 +183,18 @@ namespace ADDIN.Commands.AutoFrameJoint
                     throw new InvalidOperationException("Không đảo được hệ tọa độ Part.");
                 DisplayCandidateBodies(AfjJointSolver.World(result.A.Kept, result.TransformA),
                     frameA, result.PartA, inverseA, shift,
-                    ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235)), 0.33);
+                    ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235)), 0.33, "A_KEEP");
                 DisplayCandidateBodies(AfjJointSolver.World(result.B.Kept, result.TransformB),
                     frameB, result.PartB, inverseB, shift,
-                    ColorTranslator.ToWin32(Color.FromArgb(255, 165, 65)), 0.33);
+                    ColorTranslator.ToWin32(Color.FromArgb(255, 165, 65)), 0.33, "B_KEEP");
                 if (candidate == 2)
                 {
                     DisplayCandidateBodies(AfjJointSolver.World(result.A.Removed, result.TransformA),
                         frameA, result.PartA, inverseA, shift,
-                        ColorTranslator.ToWin32(Color.FromArgb(235, 35, 85)), 0.08);
+                        ColorTranslator.ToWin32(Color.FromArgb(235, 35, 85)), 0.08, "A_CUT");
                     DisplayCandidateBodies(AfjJointSolver.World(result.B.Removed, result.TransformB),
                         frameB, result.PartB, inverseB, shift,
-                        ColorTranslator.ToWin32(Color.FromArgb(170, 35, 235)), 0.08);
+                        ColorTranslator.ToWin32(Color.FromArgb(170, 35, 235)), 0.08, "B_CUT");
                 }
                 RedrawSafely();
                 bool unchanged = result.A.RemovedVolume + result.B.RemovedVolume <= 1e-12;
@@ -240,18 +247,70 @@ namespace ADDIN.Commands.AutoFrameJoint
             return result;
         }
 
+        private static string DiagnosticArray(object value)
+        {
+            Array values = value as Array;
+            return values == null ? "NOT_AVAILABLE" : String.Join(";", values.Cast<object>().Select(x => Convert.ToDouble(x).ToString("R", CultureInfo.InvariantCulture)));
+        }
+        private void TraceProjectedPreview(Body2 shiftedWorld, string group)
+        {
+            // Diagnostic only. Bounds do not define a cutter or prove pixels
+            // are visible; occlusion, clipping and transparency are not tested.
+            try
+            {
+                double[] box = shiftedWorld.GetBodyBox() as double[];
+                ModelView view = sourceAssembly.ActiveView as ModelView;
+                if (box == null || box.Length < 6 || view == null)
+                { Trace.WriteLine("[AFJ-R52] stage=VIEWPORT group=" + group + " status=UNVERIFIED no view/bounds"); return; }
+                MathTransform projection = view.Transform;
+                Array visible = view.GetVisibleBox() as Array;
+                Trace.WriteLine("[AFJ-R52] stage=VIEW_STATE group=" + group + " world_box_m=" + DiagnosticArray(box) +
+                    " visible_box_px=" + DiagnosticArray(visible) + " transform=" + DiagnosticArray(projection == null ? null : projection.ArrayData) +
+                    " scale=" + view.Scale2.ToString("R", CultureInfo.InvariantCulture) + " graphics_update=" + view.EnableGraphicsUpdate);
+                if (projection == null || visible == null || visible.Length != 4 || view.HasPerspective())
+                { Trace.WriteLine("[AFJ-R52] stage=VIEWPORT group=" + group + " status=UNVERIFIED projection/perspective"); return; }
+                MathUtility math = app.GetMathUtility() as MathUtility;
+                var points = new List<double[]>();
+                for (int mask = 0; mask < 8; mask++)
+                {
+                    double[] p = { box[(mask & 1) == 0 ? 0 : 3], box[(mask & 2) == 0 ? 1 : 4], box[(mask & 4) == 0 ? 2 : 5] };
+                    MathPoint point = math.CreatePoint(p) as MathPoint;
+                    MathPoint projected = point.MultiplyTransform(projection) as MathPoint;
+                    points.Add((double[])projected.ArrayData);
+                }
+                double[] rectangle = { points.Min(p => p[0]), points.Min(p => p[1]), points.Max(p => p[0]), points.Max(p => p[1]) };
+                double[] window = visible.Cast<object>().Select(Convert.ToDouble).ToArray();
+                Trace.WriteLine("[AFJ-R52] stage=VIEWPORT group=" + group + " projection_estimate=" + ViewportEstimate(rectangle, window) +
+                    " projected_box_px=" + DiagnosticArray(rectangle) + " actual_visibility=UNVERIFIED");
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-R52] stage=VIEWPORT group=" + group + " status=UNVERIFIED HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex.Message);
+            }
+        }
+        private static string ViewportEstimate(double[] rectangle, double[] window)
+        {
+            if (rectangle == null || window == null || rectangle.Length != 4 || window.Length != 4 ||
+                rectangle.Concat(window).Any(x => Double.IsNaN(x) || Double.IsInfinity(x)) ||
+                rectangle[0] > rectangle[2] || rectangle[1] > rectangle[3] || window[0] >= window[2] || window[1] >= window[3]) return "UNVERIFIED";
+            return rectangle[2] < window[0] || rectangle[0] > window[2] || rectangle[3] < window[1] || rectangle[1] > window[3]
+                ? "OUTSIDE_WINDOW_ESTIMATE" : "OVERLAPS_WINDOW_ESTIMATE";
+        }
+
         private void DisplayCandidateBodies(List<Body2> bodies,
                        Component2 component, ModelDoc2 part,
                        MathTransform inverse, MathTransform shift,
-                       int color, double transparency)
+                       int color, double transparency, string group)
         {
             foreach (Body2 world in bodies)
             {
                 // Display3(component) places local solid in Assembly.
                 // world+shift --> inverse component --> Display3(component).
                 Body2 local = CopyBody(world);
-                if (!local.ApplyTransform(shift) ||
-                    !local.ApplyTransform(inverse))
+                if (!local.ApplyTransform(shift))
+                    throw new InvalidOperationException("Không đặt được vị trí Preview.");
+                TraceProjectedPreview(local, group);
+                if (!local.ApplyTransform(inverse))
                     throw new InvalidOperationException(
                         "Không chuyển ghost từ World XYZ về Part XYZ.");
                 try
@@ -270,8 +329,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                 // Register first. Hide() cleanup after SOLIDWORKS may partly
                 // display an object, just like original GhostPreview.
                 shown.Add(new ShownBody(local, part));
+                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_BEGIN group=" + group + " temporary=" + local.IsTemporaryBody() + " context=selected_component");
                 int status = local.Display3(component, color,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
+                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_END group=" + group + " status=" + status + " tracked=" + shown.Count + " actual_visibility=UNVERIFIED");
                 if (status != 0)
                     throw new InvalidOperationException(
                         "Display3 lỗi=" + status + ", ghost được giữ để dọn.");
@@ -381,6 +442,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int result = copy.Display3(
                     component, colorRef,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
+                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_OVERLAY status=" + result + " actual_visibility=UNVERIFIED");
                 if (result != 0)
                     throw new InvalidOperationException(
                         "IBody2.Display3 thất bại, mã lỗi=" + result +
@@ -399,8 +461,10 @@ namespace ADDIN.Commands.AutoFrameJoint
             try
             {
                 // Do not activate an Assembly or redraw a different document.
-                if (IsOriginalAssemblyActive())
-                    sourceAssembly.GraphicsRedraw2();
+                bool active = IsOriginalAssemblyActive();
+                Trace.WriteLine("[AFJ-R52] stage=REDRAW_BEGIN bound_active=" + active + " tracked=" + shown.Count);
+                if (active) sourceAssembly.GraphicsRedraw2();
+                Trace.WriteLine("[AFJ-R52] stage=REDRAW_END actual_visibility=UNVERIFIED");
             }
             catch (Exception ex)
             {
@@ -419,7 +483,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                 try
                 {
                     // Official Hide signature accepts ModelDoc2 of the Part.
+                    Trace.WriteLine("[AFJ-R52] stage=HIDE_BEGIN tracked_index=" + i);
                     entry.Copy.Hide(entry.Part);
+                    Trace.WriteLine("[AFJ-R52] stage=HIDE_END tracked_index=" + i);
                 }
                 catch (Exception ex)
                 {
