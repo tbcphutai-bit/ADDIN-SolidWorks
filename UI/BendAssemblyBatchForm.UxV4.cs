@@ -11,6 +11,9 @@ using SolidWorks.Interop.sldworks;
 using System.Linq;
 using System.Windows.Forms;
 using ADDIN.Commands.BendCollision;
+using ADDIN.Commands.BendTools;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ADDIN.UI
 {
@@ -19,6 +22,7 @@ namespace ADDIN.UI
         private TabControl uxV4Tabs;
         private TabPage uxV45ToolDetailsTab;
         private Label uxV45Decision, uxV45Reason, uxV45Max, uxV45Collision, uxV45ToolData;
+        private Button uxV45RecoverSource;
         private TabPage uxV4MainTab, uxV4PlanningTab, uxV4EvidenceTab, uxV4ExcelTab, uxV4TechnicalTab;
         private DataGridView uxV4Parts, uxV4Tools;
         private FlowLayoutPanel uxV4Bends;
@@ -125,7 +129,7 @@ namespace ADDIN.UI
                 columns.ColumnStyles[1].Width = 51;
                 columns.ColumnStyles[2].Width = 27;
 
-                var result = UxV4Table(1, 9);
+                var result = UxV4Table(1, 10);
                 result.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
                 result.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
                 result.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
@@ -133,6 +137,7 @@ namespace ADDIN.UI
                 result.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
                 result.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
                 result.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
                 result.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
                 result.RowStyles.Add(new RowStyle(SizeType.Absolute, 43));
                 result.Controls.Add(UxV4Label("KẾT QUẢ", 10f, true, uxV4Text, 32), 0, 0);
@@ -149,10 +154,15 @@ namespace ADDIN.UI
                 result.Controls.Add(uxV45Collision, 0, 5);
                 uxV45ToolData = UxV4Label("Hình học dao: chưa có", 8.5f, false, uxV4Muted, 38);
                 result.Controls.Add(uxV45ToolData, 0, 6);
+                uxV45RecoverSource = UxV4Action("Chọn lại nguồn dao DXF");
+                uxV45RecoverSource.Dock = DockStyle.Fill;
+                uxV45RecoverSource.Visible = false;
+                uxV45RecoverSource.Click += async (sender, args) => await UxV45RecoverSourceAsync();
+                result.Controls.Add(uxV45RecoverSource, 0, 7);
                 var openDetails = UxV4Action("Xem kết quả từng dao");
                 openDetails.Dock = DockStyle.Fill;
                 openDetails.Click += (sender, args) => uxV4Tabs.SelectedTab = uxV45ToolDetailsTab;
-                result.Controls.Add(openDetails, 0, 8);
+                result.Controls.Add(openDetails, 0, 9);
                 columns.Controls.Add(UxV4Card("uxV45Results", result), 2, 0);
 
                 // Decorative explanations stay in their detail tabs instead of crowding results.
@@ -177,6 +187,7 @@ namespace ADDIN.UI
             uxV45Max.Text = "Check MAX: chưa đối chiếu Excel";
             uxV45Collision.Text = "Va chạm: chưa kiểm tra";
             uxV45ToolData.Text = "Hình học dao: chưa có";
+            UxV45ShowSourceRecovery(false);
             if (isRunning)
             {
                 uxV45Decision.Text = "ĐANG KIỂM TRA";
@@ -197,6 +208,7 @@ namespace ADDIN.UI
                 t.CadAssembly.Holder?.Curves != null && t.CadAssembly.Holder.Curves.Count > 0;
             int loaded = candidates.Count(hasGeometry);
             uxV45ToolData.Text = "Hình học dao: " + loaded + "/" + candidates.Count;
+            UxV45ShowSourceRecovery(loaded == 0);
             bool collision = candidates.Any(t => hasGeometry(t) &&
                 (t.GeometricStatus == CollisionStatus.COLLISION ||
                  t.ProcessStatus == CollisionStatus.COLLISION));
@@ -235,6 +247,99 @@ namespace ADDIN.UI
                     "Chưa đủ chứng cứ Excel, gá dao và quá trình chấn.";
                 uxV45Decision.ForeColor = Color.FromArgb(141, 98, 40);
             }
+        }
+
+
+        private void UxV45ShowSourceRecovery(bool visible)
+        {
+            if(uxV45RecoverSource==null||uxV45RecoverSource.IsDisposed)return;
+            uxV45RecoverSource.Visible=visible;
+            var grid=uxV45RecoverSource.Parent as TableLayoutPanel;
+            if(grid!=null&&grid.RowStyles.Count>7)grid.RowStyles[7].Height=visible?43:0;
+        }
+
+        // Local, opt-in source recovery. Only the settings JSON is written,
+        // after a preview and explicit Yes. Source CAD and Excel stay untouched.
+        private async Task UxV45RecoverSourceAsync()
+        {
+            if(isRunning||IsDisposed||uxV45RecoverSource==null||!uxV45RecoverSource.Enabled)return;
+            var settings=new ToolProfileSourceSettings();
+            if(!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY")))
+            {
+                MessageBox.Show(this,"Biến môi trường đang ghi đè nguồn DXF. Hãy kiểm tra biến này trong tiến trình SOLIDWORKS trước khi dùng cấu hình cục bộ.",
+                    "Nguồn dao DXF",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+                return;
+            }
+            ToolProfileSourceConfiguration current;
+            try { current=settings.Load(); }
+            catch(Exception ex)
+            {
+                MessageBox.Show(this,"Không đọc được cấu hình hiện có: "+ex.Message,
+                    "Nguồn dao DXF",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+                return;
+            }
+            var proposed=new ToolProfileSourceConfiguration {
+                Version=1, DirectoryPath=current.DirectoryPath,
+                ManifestPath=current.ManifestPath, DatumEvidencePath=current.DatumEvidencePath,
+                PlacementConfigurationPath=current.PlacementConfigurationPath,
+                UseMasterPairsAsLibrary=current.UseMasterPairsAsLibrary
+            };
+            using(var folder=new FolderBrowserDialog {Description="Chọn thư mục DXF gốc - không chỉnh sửa file CAD",
+                SelectedPath=Directory.Exists(proposed.DirectoryPath)?proposed.DirectoryPath:""})
+            {
+                if(folder.ShowDialog(this)!=DialogResult.OK)return;
+                proposed.DirectoryPath=folder.SelectedPath;
+            }
+            var manifestChoice=MessageBox.Show(this,
+                "Có manifest JSON đã duyệt cho Punch và Holder không?\nYes: chọn file. No: dùng quy ước mặc định, có thể thiếu Holder.",
+                "Chọn nguồn dao",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question);
+            if(manifestChoice==DialogResult.Cancel)return;
+            proposed.ManifestPath=null;
+            if(manifestChoice==DialogResult.Yes)
+                using(var picker=new OpenFileDialog {Title="Chọn manifest DXF",Filter="JSON (*.json)|*.json",CheckFileExists=true,Multiselect=false})
+                {
+                    if(picker.ShowDialog(this)!=DialogResult.OK)return;
+                    proposed.ManifestPath=picker.FileName;
+                }
+            var placementChoice=MessageBox.Show(this,
+                "Có cấu hình gá/Excel đã duyệt không?\nYes: chọn JSON. No: giữ đường dẫn cấu hình gá hiện tại.",
+                "Nguồn kiểm tra chấn",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question);
+            if(placementChoice==DialogResult.Cancel)return;
+            if(placementChoice==DialogResult.Yes)
+                using(var picker=new OpenFileDialog {Title="Chọn placement config JSON (không phải file Excel)",Filter="JSON (*.json)|*.json",CheckFileExists=true,Multiselect=false})
+                {
+                    if(picker.ShowDialog(this)!=DialogResult.OK)return;
+                    proposed.PlacementConfigurationPath=picker.FileName;
+                }
+            uxV45RecoverSource.Enabled=false;
+            try
+            {
+                var inspected=await Task.Run(()=>new ToolProfileLibraryProvider(()=>proposed).Read(CancellationToken.None));
+                if(IsDisposed||uxV45RecoverSource.IsDisposed)return;
+                int profiles=inspected.Tools.Count(t=>t.Validation?.PunchGeometryReadComplete==true);
+                int matched=inspected.PlacementSources?.Tools?.Count(t=>t.CadPair?.Matched==true)??0;
+                int clamped=inspected.PlacementSources?.Tools?.Count(t=>t.ClampVerified)??0;
+                string summary="Thư mục: "+proposed.DirectoryPath+
+                    "\nMã dao khai báo: "+inspected.Tools.Count+
+                    "\nHình học Punch đọc được: "+profiles+
+                    "\nCặp CAD ghép được: "+matched+
+                    "\nGá dao đã xác minh: "+clamped+
+                    "\nTrạng thái nguồn: "+(inspected.Error??"Đã đọc; chưa chứng nhận chấn")+
+                    "\n\nThiếu chứng cứ gá, Excel hoặc trạng thái chấn thì vẫn CHƯA XÁC MINH."+
+                    "\n\nLưu lựa chọn này vào thiết lập cục bộ? (có sao lưu, không sửa DXF/Excel)";
+                if(MessageBox.Show(this,summary,"Xem nguồn trước khi lưu",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
+                settings.SaveApprovedSelection(proposed);
+                uxV45ToolData.Text="Đã lưu nguồn; chạy lại kiểm tra để xác minh.";
+                MessageBox.Show(this,"Đã lưu nguồn tại "+ToolProfileSourceSettings.DefaultSettingsPath+
+                    "\nKhông tự Build/Rebuild. Chạy lại Check Chấn để lấy snapshot mới.",
+                    "Nguồn dao DXF",MessageBoxButtons.OK,MessageBoxIcon.Information);
+            }
+            catch(Exception ex)
+            {
+                if(!IsDisposed)MessageBox.Show(this,"Chưa lưu được nguồn: "+ex.Message,
+                    "Nguồn dao DXF",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+            }
+            finally { if(!IsDisposed&&uxV45RecoverSource!=null&&!uxV45RecoverSource.IsDisposed)uxV45RecoverSource.Enabled=true; }
         }
 
         private TabPage PageV4(string caption)

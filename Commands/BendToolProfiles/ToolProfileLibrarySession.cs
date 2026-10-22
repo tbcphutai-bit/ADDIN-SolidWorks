@@ -13,6 +13,8 @@ namespace ADDIN.Commands.BendTools
         private readonly CancellationTokenSource cancellation=new CancellationTokenSource();
         private Task<ToolProfileLibrarySnapshot> pending;
         private DateTime next=DateTime.MinValue;
+        private string configurationStamp=ToolProfileSourceSettings.QuickConfigurationStamp();
+        private string pendingConfigurationStamp;
         private string lastReport;
         private bool disposed;
         internal ToolProfileLibrarySnapshot Snapshot { get; private set; } = ToolProfileLibraryProvider.Failure("DXF source read pending.");
@@ -22,6 +24,7 @@ namespace ADDIN.Commands.BendTools
         internal void Refresh()
         {
             if (disposed || pending!=null) return;
+            pendingConfigurationStamp=ToolProfileSourceSettings.QuickConfigurationStamp();
             pending=Task.Run(()=>provider.Read(cancellation.Token),cancellation.Token);
         }
         // Explicit end-of-batch freshness barrier, managed I/O only. A changed
@@ -32,18 +35,38 @@ namespace ADDIN.Commands.BendTools
         {
             if(disposed)throw new ObjectDisposedException(nameof(ToolProfileLibrarySession));
             var token=cancellation.Token;
-            return Task.Run(()=>provider.Read(token),token);
+            return Task.Run(()=>{
+                string before=ToolProfileSourceSettings.QuickConfigurationStamp();
+                var verified=provider.Read(token);
+                if(!string.Equals(before,ToolProfileSourceSettings.QuickConfigurationStamp(),StringComparison.Ordinal))
+                {
+                    verified?.Invalidate();
+                    return ToolProfileLibraryProvider.Failure("DXF source configuration changed during verification.");
+                }
+                return verified;
+            },token);
         }
         internal void Poll()
         {
             if (disposed) return;
+            string observed=ToolProfileSourceSettings.QuickConfigurationStamp();
+            if(!string.Equals(observed,configurationStamp,StringComparison.Ordinal))
+            {
+                configurationStamp=observed;
+                Snapshot?.Invalidate();
+                Snapshot=ToolProfileLibraryProvider.Failure("DXF source settings changed; revalidation pending.");
+                next=DateTime.MinValue;
+            }
             if (pending!=null && pending.IsCompleted)
             {
                 var task=pending; pending=null;
-                if (!task.IsCanceled)
+                bool changedDuringRead=!string.Equals(pendingConfigurationStamp,observed,StringComparison.Ordinal);
+                string error=null;
+                if(!task.IsCanceled && !changedDuringRead)
                 {
                     var result=task.IsFaulted ? ToolProfileLibraryProvider.Failure(task.Exception.GetBaseException().Message) : task.Result;
                     if (!ReferenceEquals(Snapshot,result)) Snapshot?.Invalidate(); Snapshot=result;
+                    error=result.Error;
                     if (lastReport!=result.Fingerprint)
                     {
                         lastReport=result.Fingerprint;
@@ -51,7 +74,16 @@ namespace ADDIN.Commands.BendTools
                         catch (Exception ex) { DiagnosticError=ex.Message; }
                     }
                 }
-                next=DateTime.UtcNow.AddSeconds(2);
+                if(changedDuringRead)
+                {
+                    Snapshot?.Invalidate();
+                    Snapshot=ToolProfileLibraryProvider.Failure("DXF source settings changed during read.");
+                }
+                // No two-second rereads of a known missing/invalid source.
+                // Explicit Refresh/VerifyForPublicationAsync remain immediate.
+                next=changedDuringRead ? DateTime.MinValue :
+                    DateTime.UtcNow.AddSeconds(string.Equals(error,"DXF source directory is not configured.",StringComparison.Ordinal)
+                        ? 30 : error!=null ? 12 : 6);
             }
             if (pending==null && DateTime.UtcNow>=next) Refresh();
         }
