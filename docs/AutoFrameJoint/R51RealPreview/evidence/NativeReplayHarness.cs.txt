@@ -1,0 +1,84 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.Commands.AutoFrameJoint;
+class NativeReplayHarness {
+    [DllImport("ole32.dll")] static extern int CreateStreamOnHGlobal(IntPtr p, bool delete, out IStream stream);
+    static JavaScriptSerializer j = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 200 };
+    static Dictionary<string, object> D(params object[] a) { var r = new Dictionary<string, object>(); for (int i = 0; i < a.Length; i += 2) r[(string)a[i]] = a[i + 1]; return r; }
+    static object[] A(object a) { return ((Array)a).Cast<object>().ToArray(); } static Dictionary<string, object> O(object o) { return (Dictionary<string, object>)o; } static double[] V(object v) { return A(v).Select(Convert.ToDouble).ToArray(); }
+    static Body2 Restore(ISldWorks sw, string path) { IStream s; Marshal.ThrowExceptionForHR(CreateStreamOnHGlobal(IntPtr.Zero, true, out s)); try { byte[] b = File.ReadAllBytes(path); s.Write(b, b.Length, IntPtr.Zero); s.Seek(0, 0, IntPtr.Zero); Body2 result = ((Modeler)sw.GetModeler()).Restore(s) as Body2; AfjTemporaryBoolean.Validate(result); return result; } finally { Marshal.ReleaseComObject(s); } }
+    static object Metric(Body2 b) { var f = b.Check3; return D("volume_m3", AfjTemporaryBoolean.Volume(b), "check2", b.Check2(), "check3_faults", f == null ? 0 : f.Count); }
+    static double Symmetric(Body2 a, Body2 b) { return AfjTemporaryBoolean.DifferenceVolume(a, b) + AfjTemporaryBoolean.DifferenceVolume(b, a); }
+    static Body2 Box(ISldWorks sw, double[] center, double[] axis, double width, double length, double height) {
+        double[] u = Math.Abs(axis[2]) < .9 ? new[] { -axis[1], axis[0], 0 } : new[] { axis[2], 0, -axis[0] }; u = AfjParametricRules.Unit(u);
+        double[] v = { axis[1] * u[2] - axis[2] * u[1], axis[2] * u[0] - axis[0] * u[2], axis[0] * u[1] - axis[1] * u[0] };
+        int[] signs = { -1, -1, 1, -1, 1, 1, -1, 1 }; var polygon = new double[4][];
+        for (int i = 0; i < 4; i++) { polygon[i] = new double[3]; for (int k = 0; k < 3; k++) polygon[i][k] = center[k] + signs[2 * i] * width / 2 * u[k] + signs[2 * i + 1] * length / 2 * v[k]; }
+        return AfjTemporaryBoolean.CreatePrism(sw, new AfjToolDefinition { Polygon = polygon, Direction = axis, Length = height });
+    }
+    static Body2 Tool(ISldWorks sw, Dictionary<string, object> spec) {
+        if (!spec.ContainsKey("seed_box_m")) return AfjTemporaryBoolean.CreatePrism(sw, new AfjToolDefinition { Polygon = A(spec["polygon_m"]).Select(V).ToArray(), Direction = V(spec["direction"]), Length = Convert.ToDouble(spec["length_m"]) });
+        // Research oracle only. Measured native correction cells never enter
+        // production profile classification, rule selection or tool generation.
+        double[] b = V(spec["seed_box_m"]), center = { (b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 };
+        Body2 cell = Box(sw, new[] { center[0], center[1], b[2] }, new[] { 0d, 0, 1 }, b[3] - b[0], b[4] - b[1], b[5] - b[2]);
+        double span = Math.Max(.1, 10 * Math.Sqrt(Enumerable.Range(0, 3).Sum(i => Math.Pow(b[i + 3] - b[i], 2))));
+        foreach (double[] h in A(spec["halfspaces"]).Select(V)) {
+            double signed = h[0] * center[0] + h[1] * center[1] + h[2] * center[2] - h[3];
+            Body2 half = Box(sw, new[] { center[0] - h[0] * signed, center[1] - h[1] * signed, center[2] - h[2] * signed }, new[] { -h[0], -h[1], -h[2] }, span, span, span);
+            int code; cell = AfjTemporaryBoolean.Boolean(cell, half, (int)swBodyOperationType_e.SWBODYINTERSECT, out code, "native_oracle:relief_cell").Single();
+        }
+        return cell;
+    }
+    [STAThread] static int Main(string[] args) {
+        string root = Path.GetFullPath(args[0]), prior = Path.GetFullPath(args[1]); string output = Path.Combine(root, "native_replay_results.json"); var rows = new List<object>();
+        Trace.Listeners.Add(new TextWriterTraceListener(Path.Combine(root, "native_replay_api.log"))); Trace.AutoFlush = true;
+        try {
+            var sw = HarnessConnection.AttachVisible();
+            var templates = A(j.DeserializeObject(File.ReadAllText(Path.Combine(prior, "verified_cut_templates.json")))).Select(O);
+            foreach (var template in templates) {
+                string part = (string)template["part"]; int ordinal = Convert.ToInt32(template["ordinal"]); var r = D("part", part, "ordinal", ordinal, "feature_name", template["feature_name"]); rows.Add(r);
+                if ((string)template["status"] != "VERIFIED_TOOL_SEQUENCE") { r["status"] = "NOT_APPLICABLE_CORNER_REPLAY"; r["reason"] = "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"; File.WriteAllText(output, j.Serialize(rows)); continue; }
+                try {
+                    string folder = Path.Combine(prior, "study", "AFJ_STUDY_" + part); Body2 before = Restore(sw, Path.Combine(folder, ordinal + "_before.brep")), nativeAfter = Restore(sw, Path.Combine(folder, ordinal + "_after.brep"));
+                    Body2 current = AfjTemporaryBoolean.Copy(before); double firstDifference = -1; var tools = A(template["tools"]).Select(O).ToArray(); var stages = new List<object>(); r["stages"] = stages;
+                    for (int i = 0; i < tools.Length; i++) {
+                        int code; var result = AfjTemporaryBoolean.Boolean(current, Tool(sw, tools[i]), (int)swBodyOperationType_e.SWBODYCUT, out code, part + "#" + ordinal + ":oracle_tool" + i);
+                        current = result.Single(); stages.Add(D("tool", i, "result", Metric(current))); if (i == 0) firstDifference = Symmetric(current, nativeAfter);
+                    }
+                    double symmetric = Symmetric(current, nativeAfter), tol = Convert.ToDouble(template["tolerance_m3"]); r["native_after"] = Metric(nativeAfter); r["replay_after"] = Metric(current); r["plain_prism_difference_m3"] = firstDifference; r["symmetric_difference_m3"] = symmetric; r["match_tolerance_m3"] = tol; r["extra_tool_count"] = tools.Length - 1; r["normal_correction_tool_count"] = Convert.ToInt32(template["relief_count"]);
+                    r["status"] = symmetric <= tol ? "PASS_GEOMETRY" : "FAIL";
+                    r["bend_residue_vs_native_after"] = symmetric <= tol ? "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER" : "UNVERIFIED";
+                } catch (Exception e) { r["status"] = "FAIL"; r["exception"] = D("type", e.GetType().FullName, "hresult", "0x" + e.HResult.ToString("X8"), "message", e.Message, "stack", e.StackTrace); }
+                Console.WriteLine(part + " #" + ordinal + " " + r["status"]); File.WriteAllText(output, j.Serialize(rows));
+            }
+            // Generic one-layer policy on independently constructed material.
+            // This does not stand in for a native NormalCut across a Bend.
+            foreach (double thickness in new[] { .002, .0025 }) {
+                var r = D("fixture", "SINGLE_PLANAR_SHEET", "api_reference_thickness_m", thickness); rows.Add(r);
+                try {
+                    var panel = Box(sw, new[] { .05, .05, 0 }, new[] { 0d, 0, 1 }, .1, .1, thickness);
+                    var polygon = new[] { new[] { .03, .03, thickness }, new[] { .07, .03, thickness }, new[] { .07, .07, thickness }, new[] { .03, .07, thickness } };
+                    var op = AfjSheetCutTools.BlindBetweenSkins("SINGLE_PLANAR_SHEET:API_THICKNESS_DIMENSION", polygon, new[] { .03, .03, thickness }, new[] { .03, .03, 0 }, new[] { 0d, 0, -1 }, thickness, false, false);
+                    var plan = new AfjCutPlan(); plan.Operations.Add(op); var result = AfjTemporaryBoolean.Execute(sw, panel, plan); double expected = .04 * .04 * thickness;
+                    r["nominal_depth_m"] = op.Tools[0].NominalSheetDepth; r["tool_length_with_entry_m"] = op.Tools[0].Length; r["sheet_overrun_m"] = AfjManufacturingConventions.SheetCutOverrun; r["assembly_fit_gap_m"] = AfjManufacturingConventions.AssemblyFitGap;
+                    r["removed_m3"] = result.RemovedVolume; r["expected_removed_m3"] = expected; r["kept"] = result.Kept.Select(Metric).ToArray();
+                    bool bendDenied = false, reverseDenied = false;
+                    try { AfjSheetCutTools.BlindBetweenSkins("NEGATIVE_BEND", polygon, new[] { .03, .03, thickness }, new[] { .03, .03, 0 }, new[] { 0d, 0, -1 }, thickness, true, true); } catch (InvalidOperationException e) { bendDenied = e.Message.StartsWith("UNVERIFIED_RULE"); }
+                    try { AfjSheetCutTools.BlindBetweenSkins("NEGATIVE_DIRECTION", polygon, new[] { .03, .03, thickness }, new[] { .03, .03, 0 }, new[] { 0d, 0, 1 }, thickness, false, false); } catch (InvalidOperationException e) { reverseDenied = e.Message.StartsWith("UNVERIFIED_RULE"); }
+                    r["bend_guard"] = bendDenied; r["reverse_skin_guard"] = reverseDenied; r["status"] = Math.Abs(result.RemovedVolume - expected) < 1e-12 && bendDenied && reverseDenied ? "PASS_GEOMETRY" : "FAIL";
+                } catch (Exception e) { r["status"] = "FAIL"; r["error"] = e.ToString(); }
+                File.WriteAllText(output, j.Serialize(rows));
+            }
+            return 0;
+        } catch (Exception e) { rows.Add(D("status", "HARNESS_FAIL", "error", e.ToString())); File.WriteAllText(output, j.Serialize(rows)); return 1; }
+    }
+}

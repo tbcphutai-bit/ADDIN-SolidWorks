@@ -1,0 +1,111 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Security.Cryptography;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.Commands.AutoFrameJoint;
+class NativeCutStudy {
+    [DllImport("ole32.dll")] static extern int CreateStreamOnHGlobal(IntPtr p, bool delete, out IStream stream);
+    static JavaScriptSerializer j = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 200 };
+    static Dictionary<string, object> D(params object[] a) { var d = new Dictionary<string, object>(); for (int i = 0; i < a.Length; i += 2) d[(string)a[i]] = a[i + 1]; return d; }
+    static object Try(Func<object> f) { try { return f(); } catch (Exception e) { if (e is TargetInvocationException && e.InnerException != null) e = e.InnerException; return D("error", e.Message, "hresult", "0x" + e.HResult.ToString("X8")); } }
+    static object[] ArrayOf(object o) { var a = o as Array; return a == null ? new object[0] : a.Cast<object>().ToArray(); }
+    static string Hash(string path) { using (var s = File.OpenRead(path)) using (var h = SHA256.Create()) return BitConverter.ToString(h.ComputeHash(s)).Replace("-", "").ToLowerInvariant(); }
+    static object Metric(Body2 b) { return D("volume_m3", AfjTemporaryBoolean.Volume(b), "check2", b.Check2(), "faces", b.GetFaceCount(), "box_m", b.GetBodyBox()); }
+    static Body2 SingleBody(ModelDoc2 m) { return AfjTemporaryBoolean.Copy(ArrayOf(((PartDoc)m).GetBodies2(0, false)).Cast<Body2>().Single()); }
+    static void SaveBody(Body2 b, string path) { IStream s; Marshal.ThrowExceptionForHR(CreateStreamOnHGlobal(IntPtr.Zero, true, out s)); try { b.Save(s); System.Runtime.InteropServices.ComTypes.STATSTG stat; s.Stat(out stat, 1); var bytes = new byte[(int)stat.cbSize]; s.Seek(0, 0, IntPtr.Zero); s.Read(bytes, bytes.Length, IntPtr.Zero); File.WriteAllBytes(path, bytes); } finally { Marshal.ReleaseComObject(s); } }
+    static object SketchData(Sketch sketch) {
+        MathTransform inverse = (MathTransform)sketch.ModelToSketchTransform.Inverse(); double[] matrix = (double[])inverse.ArrayData;
+        var segments = new List<object>();
+        foreach (SketchSegment segment in ArrayOf(sketch.GetSketchSegments())) {
+            var r = D("type", segment.GetType(), "construction", segment.ConstructionGeometry, "length_m", segment.GetLength()); segments.Add(r);
+            SketchLine line = segment as SketchLine; SketchArc arc = segment as SketchArc;
+            SketchPoint a = line != null ? line.GetStartPoint2() as SketchPoint : arc != null ? arc.GetStartPoint2() as SketchPoint : null;
+            SketchPoint b = line != null ? line.GetEndPoint2() as SketchPoint : arc != null ? arc.GetEndPoint2() as SketchPoint : null;
+            if (a != null) r["start_model_m"] = AfjProfileAnalyzer.Transform(new[] { a.X, a.Y, a.Z }, matrix);
+            if (b != null) r["end_model_m"] = AfjProfileAnalyzer.Transform(new[] { b.X, b.Y, b.Z }, matrix);
+            if (arc != null) { var c = (SketchPoint)arc.GetCenterPoint2(); r["center_model_m"] = AfjProfileAnalyzer.Transform(new[] { c.X, c.Y, c.Z }, matrix); r["radius_m"] = arc.GetRadius(); }
+        }
+        return D("sketch_to_model", matrix, "segments", segments, "contours", ArrayOf(sketch.GetSketchContours()).Cast<SketchContour>().Select(c => D("closed", c.IsClosed(), "segment_count", c.GetSketchSegmentsCount())).ToArray());
+    }
+    static object Metadata(Feature f) {
+        var d = D("name", f.Name, "type", f.GetTypeName2(), "legacy_type", f.GetTypeName(), "suppressed", f.IsSuppressed(), "evidence", "API_VERIFIED");
+        var e = f.GetDefinition() as ExtrudeFeatureData2;
+        if (e == null) { d["definition"] = "NOT_AVAILABLE"; return d; }
+        var props = D(); foreach (var p in typeof(IExtrudeFeatureData2).GetProperties()) if (p.GetIndexParameters().Length == 0 && (p.PropertyType.IsPrimitive || p.PropertyType == typeof(string) || p.PropertyType.IsEnum)) props[p.Name] = Try(() => p.GetValue(e, null));
+        d["scalar_properties"] = props;
+        d["end_forward"] = Try(() => e.GetEndCondition(true)); d["end_reverse"] = Try(() => e.GetEndCondition(false));
+        d["depth_forward_m"] = Try(() => e.GetDepth(true)); d["depth_reverse_m"] = Try(() => e.GetDepth(false));
+        d["end_forward_name"] = Try(() => ((swEndConditions_e)e.GetEndCondition(true)).ToString());
+        d["end_reverse_name"] = Try(() => ((swEndConditions_e)e.GetEndCondition(false)).ToString());
+        d["direction_references"] = Try(() => { object r1, r2; int t1, t2; int n = e.GetDirectionReference(out r1, out t1, out r2, out t2); return D("count", n, "type1", t1, "type2", t2, "entity1_present", r1 != null, "entity2_present", r2 != null); });
+        var sketches = new List<object>();
+        foreach (Feature parent in ArrayOf(f.GetParents())) { Sketch sketch = parent.GetSpecificFeature2() as Sketch; if (sketch != null) sketches.Add(D("name", parent.Name, "geometry", Try(() => SketchData(sketch)))); }
+        d["sketches"] = sketches; return d;
+    }
+    static object Faces(Body2 b) { return ArrayOf(b.GetFaces()).Cast<Face2>().Select(f => { var s = (Surface)f.GetSurface(); return D("area_m2", f.GetArea(), "box_m", f.GetBox(), "kind", s.IsPlane() ? "plane" : s.IsCylinder() ? "cylinder" : "other", "parameters", s.IsPlane() ? s.PlaneParams : s.IsCylinder() ? s.CylinderParams : null); }).ToArray(); }
+    static void EnableParents(Feature feature, Dictionary<string, Feature> known, HashSet<string> visiting) {
+        if (!feature.IsSuppressed()) return; // Existing active dependencies need no mutation.
+        if (!visiting.Add(feature.Name)) return;
+        foreach (Feature parent in ArrayOf(feature.GetParents())) { if (!parent.IsSuppressed()) continue; if (!known.ContainsKey(parent.Name)) throw new Exception("Suppressed external parent not changed: " + parent.Name); EnableParents(known[parent.Name], known, visiting); }
+        if (feature.IsSuppressed()) feature.SetSuppression2((int)swFeatureSuppressionAction_e.swUnSuppressFeature, (int)swInConfigurationOpts_e.swThisConfiguration, null);
+    }
+    [STAThread] static int Main(string[] args) {
+        try { return Run(args); }
+        catch (Exception e) { var d = D("type", e.GetType().FullName, "hresult", "0x" + e.HResult.ToString("X8"), "message", Try(() => e.Message), "stack", Try(() => e.StackTrace)); File.WriteAllText(Path.Combine(args[0], args[1] + "_study_start_error.json"), j.Serialize(d)); Console.WriteLine(j.Serialize(d)); return 2; }
+    }
+    static int Run(string[] args) {
+        string root = Path.GetFullPath(args[0]), mode = args[1]; var all = new List<object>();
+        string report = Path.Combine(root, mode + "_native_cuts.json");
+        var sw = HarnessConnection.AttachVisible();
+        foreach (string path in File.ReadAllLines(Path.Combine(root, mode + "_manifest.private.txt"))) {
+            if (!Path.GetFullPath(path).StartsWith(Path.Combine(root, "study_copies") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(path).StartsWith("AFJ_R51_")) throw new Exception("COPY GUARD");
+            string name = Path.GetFileName(path); var row = D("file", name, "hash_before", Hash(path), "revision", sw.RevisionNumber()); all.Add(row); ModelDoc2 m = null;
+            var features = new List<Feature>(); var states = new Dictionary<string, bool>(); var cuts = new List<object>(); row["cuts"] = cuts;
+            try {
+                if (sw.GetOpenDocumentByName(path) != null) throw new Exception("Copy already open");
+                int error = 0, warning = 0; m = sw.OpenDoc6(path, 1, 3, "Default", ref error, ref warning) as ModelDoc2;
+                row["open_error"] = error; row["open_warning"] = warning; if (m == null || !m.IsOpenedReadOnly()) throw new Exception("Read-only copy not opened");
+                row["active_configuration"] = m.ConfigurationManager.ActiveConfiguration.Name;
+                for (Feature f = m.FirstFeature() as Feature; f != null; f = f.GetNextFeature() as Feature) { features.Add(f); states[f.Name] = f.IsSuppressed(); }
+                row["tree"] = features.Select(f => D("name", f.Name, "type", f.GetTypeName2(), "legacy_type", f.GetTypeName(), "suppressed", states[f.Name])).ToArray();
+                row["sheet_metal"] = features.Where(f => f.GetTypeName2() == "SheetMetal").Select(f => { var d = (SheetMetalFeatureData)f.GetDefinition(); return D("thickness_m", d.Thickness, "bend_radius_m", d.BendRadius); }).ToArray();
+                int ordinal = 0;
+                foreach (Feature feature in features.Where(f => f.GetTypeName2() == "Cut" || (f.GetTypeName2() == "ICE" && f.GetTypeName() == "Cut"))) {
+                    ordinal++; Console.WriteLine(mode + " " + name + " #" + ordinal); var cut = D("ordinal", ordinal, "metadata", Metadata(feature)); cuts.Add(cut);
+                    if (mode == "2354") {
+                        Body2 before = SingleBody(m); cut["before"] = Metric(before);
+                        string folder = Path.Combine(root, "native_study", name); Directory.CreateDirectory(folder); SaveBody(before, Path.Combine(folder, ordinal + "_before.brep"));
+                        EnableParents(feature, features.ToDictionary(f => f.Name), new HashSet<string>());
+                        cut["suppressed_after_enable"] = feature.IsSuppressed();
+                        if (feature.IsSuppressed()) throw new Exception("Private unsuppression rejected");
+                        Body2 after = SingleBody(m); cut["after"] = Metric(after); cut["metadata_enabled"] = Metadata(feature);
+                        SaveBody(after, Path.Combine(folder, ordinal + "_after.brep"));
+                        int code; var removed = AfjTemporaryBoolean.Boolean(before, after, (int)swBodyOperationType_e.SWBODYCUT, out code);
+                        cut["difference_code"] = code; cut["removed"] = removed.Select(Metric).ToArray(); cut["removed_faces"] = removed.Select(Faces).ToArray();
+                        double delta = AfjTemporaryBoolean.Volume(before) - AfjTemporaryBoolean.Volume(after), volume = AfjTemporaryBoolean.Total(removed);
+                        cut["removed_m3"] = volume; cut["delta_m3"] = delta; cut["mass_residual_m3"] = Math.Abs(delta - volume);
+                        cut["before_after_verified"] = code == 0 && before.Check2() == 0 && after.Check2() == 0 && removed.All(b => b.Check2() == 0) && delta > 1e-13 && Math.Abs(delta - volume) < 1e-12;
+                        for (int i = 0; i < removed.Count; i++) SaveBody(removed[i], Path.Combine(folder, ordinal + "_removed_" + i + ".brep"));
+                    }
+                    File.WriteAllText(report, j.Serialize(all));
+                }
+            } catch (Exception e) { row["exception"] = D("type", e.GetType().FullName, "hresult", "0x" + e.HResult.ToString("X8"), "message", e.Message, "stack", e.StackTrace); }
+            finally {
+                if (m != null) {
+                    // Study mutations are in-memory and restricted to private copies.
+                    foreach (Feature f in features.AsEnumerable().Reverse()) if (states[f.Name] && !f.IsSuppressed()) f.SetSuppression2((int)swFeatureSuppressionAction_e.swSuppressFeature, (int)swInConfigurationOpts_e.swThisConfiguration, null);
+                    row["original_suppression_restored"] = features.All(f => f.IsSuppressed() == states[f.Name]); sw.CloseDoc(m.GetTitle());
+                }
+                row["hash_after"] = Hash(path); row["file_bytes_unchanged"] = (string)row["hash_before"] == (string)row["hash_after"]; File.WriteAllText(report, j.Serialize(all));
+            }
+        }
+        return all.Any(r => ((Dictionary<string, object>)r).ContainsKey("exception")) ? 1 : 0;
+    }
+}

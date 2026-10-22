@@ -1,0 +1,48 @@
+[
+  {
+    "self_pid": 39192,
+    "session": 1,
+    "token": {
+      "elevated": false
+    }
+  },
+  {
+    "sw_pid": 27808,
+    "session": 1,
+    "token": {
+      "elevated": false
+    },
+    "responding": true,
+    "has_main_window": true
+  },
+  {
+    "sw_pid": 8508,
+    "session": 1,
+    "token": {
+      "elevated": false
+    },
+    "responding": true,
+    "has_main_window": false
+  },
+  {
+    "progid": "SldWorks.Application",
+    "hresult": "0x800401E3",
+    "exception": "System.Runtime.InteropServices.COMException",
+    "message": "操作を利用できません (HRESULT からの例外:0x800401E3 (MK_E_UNAVAILABLE))"
+  },
+  {
+    "progid": "SldWorks.Application.32",
+    "hresult": "0x800401E3",
+    "exception": "System.Runtime.InteropServices.COMException",
+    "message": "操作を利用できません (HRESULT からの例外:0x800401E3 (MK_E_UNAVAILABLE))"
+  },
+  {
+    "sw_moniker": "SolidWorks_PID_27808",
+    "cast_ok": true,
+    "sw_pid": 27808
+  },
+  {
+    "rot_moniker_count": 91,
+    "activation_performed": false
+  }
+]

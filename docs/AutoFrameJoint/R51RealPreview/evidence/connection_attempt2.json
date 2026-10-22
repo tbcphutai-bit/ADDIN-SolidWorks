@@ -1,0 +1,10 @@
+[
+  {
+    "fatal": {
+      "type": "System.Runtime.InteropServices.COMException",
+      "hresult": "0x800401E3",
+      "message": "操作を利用できません (HRESULT からの例外:0x800401E3 (MK_E_UNAVAILABLE))",
+      "stack": "   場所 System.Runtime.InteropServices.Marshal.GetActiveObject(Guid& rclsid, IntPtr reserved, Object& ppunk)\r\n   場所 System.Runtime.InteropServices.Marshal.GetActiveObject(String progID)\r\n   場所 DiagnosticHarness.Run(String[] args)\r\n   場所 DiagnosticHarness.Main(String[] args)"
+    }
+  }
+]

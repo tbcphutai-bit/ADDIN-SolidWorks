@@ -164,8 +164,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                     frameA.IsHidden(false) || frameB.IsHidden(false))
                 { message = "Chỉ hỗ trợ 2 Part cấp đầu, không Hidden/Suppressed."; return false; }
 
+                Trace.WriteLine("[AFJ-R51] source=profile-skin-cutter; MVID=" + typeof(AutoFrameJointGhostPreview).Assembly.ManifestModule.ModuleVersionId);
                 Trace.WriteLine("[AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION");
                 AfjJointSolution result = AfjJointSolver.Solve(app, sourceAssembly, frameA, frameB);
+                if (result.A.RemovedVolume + result.B.RemovedVolume <= 1e-12)
+                { message = "NO_NEW_CUT_REQUIRED: Hai Frame đã khớp quy tắc; không dựng lại Body gốc thành Preview cắt mới."; return false; }
                 MathTransform shift = CreateWorldShift(0.12);
                 MathTransform inverseA = result.TransformA.Inverse() as MathTransform;
                 MathTransform inverseB = result.TransformB.Inverse() as MathTransform;
@@ -203,7 +206,12 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Trace.WriteLine("[AFJ-SOLVER] HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex);
                 string cleanupError;
                 bool cleared = ClearInternal(out cleanupError);
-                message = ex.Message + (cleared ? "" : " | CLEANUP PENDING: " + cleanupError);
+                string reason = ex is AfjBooleanException
+                    ? "Hình học cắt chưa tạo được solid hợp lệ. Xem log AFJ-BOOLEAN."
+                    : ex.Message.StartsWith("UNVERIFIED_RULE", StringComparison.Ordinal)
+                        ? "UNVERIFIED_RULE: Chưa xác minh được quy tắc cho biên dạng, mặt che hoặc phần phôi của cặp Frame này. Xem log AFJ-SOLVER."
+                        : "Không tạo được Preview hình học. Xem log AFJ-SOLVER.";
+                message = reason + (cleared ? "" : " | Cần dọn Preview cũ; xem log cleanup.");
                 return false;
             }
             finally { busy = false; }
@@ -444,6 +452,8 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal double[][] ArcCenters;
         internal double[] Direction;
         internal double Length;
+        internal string DepthPolicy = "FORMED_PROFILE_ENVELOPE";
+        internal double NominalSheetDepth, ApiSheetThickness;
     }
     internal sealed class AfjCutOperation
     {
@@ -451,6 +461,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal AfjOperationKind Kind;
         internal readonly List<AfjToolDefinition> Tools=new List<AfjToolDefinition>();
         internal string RegionEvidence;
+        internal bool NormalCutIntent;
     }
     internal sealed class AfjCutPlan
     {
@@ -492,27 +503,47 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         internal static void Validate(Body2 b)
         {
-            if(b==null||!b.IsTemporaryBody()||b.GetType()!=(int)swBodyType_e.swSolidBody||b.Check2()!=0)throw new InvalidOperationException("AFJ: invalid temporary B-rep");
+            if (b == null || !b.IsTemporaryBody() || b.GetType() != (int)swBodyType_e.swSolidBody)
+                throw new InvalidOperationException("AFJ: requires a temporary solid B-rep");
+            int check2 = b.Check2();
+            FaultEntity faults = b.Check3;
+            int check3 = faults == null ? 0 : faults.Count;
+            if (check2 != 0 || check3 != 0)
+                throw new InvalidOperationException("AFJ: invalid B-rep; Check2=" + check2 + "; Check3 faults=" + check3);
             Volume(b);
         }
-        internal static List<Body2> Boolean(Body2 a, Body2 b, int operation, out int code)
+        internal static List<Body2> Boolean(Body2 a, Body2 b, int operation, out int code, string label = null)
         {
-            // Operations2 invalidates operands: always pass disposable copies.
-            Array raw=Copy(a).Operations2(operation, Copy(b), out code) as Array;
-            var result=new List<Body2>();
-            if(code!=0)
+            Validate(a);
+            Validate(b);
+            // Both operands are disposable copies. Never query/reuse consumed
+            // operands after Operations2, including its error path.
+            Body2 targetCopy = Copy(a), toolCopy = Copy(b);
+            Array raw = targetCopy.Operations2(operation, toolCopy, out code) as Array;
+            string errorName = Enum.IsDefined(typeof(swBodyOperationError_e), code)
+                ? ((swBodyOperationError_e)code).ToString() : "UNKNOWN";
+            string operationName = label ?? ((swBodyOperationType_e)operation).ToString();
+            Trace.WriteLine("[AFJ-BOOLEAN] operation=" + operationName +
+                " code=" + code + " name=" + errorName);
+            var result = new List<Body2>();
+            if (code != (int)swBodyOperationError_e.swBodyOperationNoError)
             {
-                if(operation==(int)swBodyOperationType_e.SWBODYINTERSECT&&(code==5||code==6||code==1067))return result;
-                if(operation==(int)swBodyOperationType_e.SWBODYCUT&&code==6)return result;
-                throw new InvalidOperationException("AFJ: Boolean error="+code);
+                bool emptyIntersection = operation == (int)swBodyOperationType_e.SWBODYINTERSECT &&
+                    (code == (int)swBodyOperationError_e.swBodyOperationDisjointBodies ||
+                     code == (int)swBodyOperationError_e.swBodyOperationEmptyBody ||
+                     code == (int)swBodyOperationError_e.swBodyOperationNoIntersect);
+                if (emptyIntersection || (operation == (int)swBodyOperationType_e.SWBODYCUT &&
+                    code == (int)swBodyOperationError_e.swBodyOperationEmptyBody)) return result;
+                // No production retry, ResetEdgeTolerances or fallback cutter.
+                throw new AfjBooleanException(operationName, code, errorName);
             }
-            if(raw==null)return result;
-            if(raw.Length>12)throw new InvalidOperationException("AFJ: too many solid fragments");
-            foreach(object o in raw)
+            if (raw == null) return result;
+            if (raw.Length > 12) throw new InvalidOperationException("AFJ: too many solid fragments");
+            foreach (object value in raw)
             {
-                Body2 x=o as Body2;
-                Validate(x);
-                result.Add(x);
+                Body2 body = value as Body2;
+                Validate(body);
+                result.Add(body);
             }
             return result;
         }
@@ -602,6 +633,40 @@ namespace ADDIN.Commands.AutoFrameJoint
             Validate(body);
             return body;
         }
+        static void VerifySingleSheetStock(ISldWorks app, Body2 source, AfjToolDefinition spec)
+        {
+            if (spec.DepthPolicy != "SINGLE_SHEET_BLIND_T_PLUS_OVERRUN") return;
+            double[] n = AfjParametricRules.Unit(spec.Direction);
+            double entry = AfjManufacturingConventions.CutterEntryClearance;
+            double[][] outer = spec.Polygon.Select(p => AfjParametricRules.Add(p, AfjParametricRules.Scale(n, entry))).ToArray();
+            bool outerFound = false, innerFound = false;
+            foreach (Face2 face in (Array)source.GetFaces())
+            {
+                Surface surface = face.GetSurface() as Surface;
+                if (surface == null || !surface.IsPlane()) continue;
+                double[] p = surface.PlaneParams as double[];
+                if (p == null || p.Length < 6 || Math.Abs(AfjParametricRules.Dot(AfjParametricRules.Unit(p.Take(3).ToArray()), n)) < .999999) continue;
+                double depth = AfjParametricRules.Dot(AfjParametricRules.Sub(p.Skip(3).Take(3).ToArray(), outer[0]), n);
+                if (Math.Abs(depth) < 1e-7) outerFound = true;
+                if (Math.Abs(depth - spec.ApiSheetThickness) < 1e-7) innerFound = true;
+            }
+            if (!outerFound || !innerFound)
+                throw new InvalidOperationException("UNVERIFIED_RULE: single-sheet source does not expose both verified skin planes");
+            var extensions = new[] {
+                new AfjToolDefinition { Polygon = spec.Polygon, Direction = n, Length = entry },
+                new AfjToolDefinition { Polygon = outer.Select(p => AfjParametricRules.Add(p, AfjParametricRules.Scale(n, spec.ApiSheetThickness))).ToArray(),
+                    Direction = n, Length = AfjManufacturingConventions.SheetCutOverrun }
+            };
+            foreach (AfjToolDefinition extension in extensions)
+            {
+                int code;
+                double intrusion = Total(Boolean(source, CreatePrism(app, extension),
+                    (int)swBodyOperationType_e.SWBODYINTERSECT, out code, "single_sheet:overrun_stock_guard"));
+                if (intrusion > 1e-13)
+                    throw new InvalidOperationException("UNVERIFIED_RULE: single-sheet overrun reaches additional material or a Bend; use a verified compound plan");
+            }
+        }
+
         internal static AfjBooleanResult Execute(ISldWorks app, Body2 source, AfjCutPlan plan)
         {
             if(plan==null||plan.Operations.Count>64)throw new InvalidOperationException("AFJ: invalid plan");
@@ -628,8 +693,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                         var next=new List<Body2>();
                         foreach(Body2 body in kept)
                         {
+                            VerifySingleSheetStock(app, body, spec);
                             int code;
-                            var intersection=Boolean(body, tool, (int)swBodyOperationType_e.SWBODYINTERSECT, out code);
+                            var intersection=Boolean(body, tool, (int)swBodyOperationType_e.SWBODYINTERSECT, out code, operation.EvidenceId + ":measure");
                             if(operation.Kind==AfjOperationKind.Cut)
                             {
                                 if(intersection.Count==0||Total(intersection)<=1e-13)
@@ -637,14 +703,14 @@ namespace ADDIN.Commands.AutoFrameJoint
                                     next.Add(Copy(body));
                                     continue;
                                 }
-                                next.AddRange(Boolean(body, tool, (int)swBodyOperationType_e.SWBODYCUT, out code));
+                                next.AddRange(Boolean(body, tool, (int)swBodyOperationType_e.SWBODYCUT, out code, operation.EvidenceId + ":cut"));
                                 result.Removed.AddRange(intersection);
                             }
                             else
                             {
                                 if(intersection.Count==0)throw new InvalidOperationException("AFJ: plan would erase entire member");
                                 next.AddRange(intersection);
-                                result.Removed.AddRange(Boolean(body, tool, (int)swBodyOperationType_e.SWBODYCUT, out code));
+                                result.Removed.AddRange(Boolean(body, tool, (int)swBodyOperationType_e.SWBODYCUT, out code, operation.EvidenceId + ":cut"));
                             }
                         }
                         if(next.Count==0||next.Count>12)throw new InvalidOperationException("AFJ: invalid remaining-body count");
@@ -706,7 +772,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             if(flangeCount!=1||sm==null||flange.IsSuppressed())throw new InvalidOperationException("UNVERIFIED_RULE: requires one formed base flange and SheetMetal");
             BaseFlangeFeatureData def=flange.GetDefinition() as BaseFlangeFeatureData;
             if(def==null)throw new InvalidOperationException("UNVERIFIED_RULE: base flange definition unavailable");
-            if(!def.ReverseThickness)throw new InvalidOperationException("UNVERIFIED_RULE: base skin/thickness side differs from verified formed family");
+            // ReverseThickness is Sketch-order dependent. Verify physical skins in Generate instead.
             Sketch sketch=null;
             Array parents=flange.GetParents() as Array;
             if(parents!=null)foreach(object p in parents)
@@ -974,7 +1040,8 @@ namespace ADDIN.Commands.AutoFrameJoint
     }
     internal static class AfjParametricRules
     {
-        internal const double AssemblyGap=.0001, ToolOverrun=.0001;
+        internal const double AssemblyGap=AfjManufacturingConventions.AssemblyFitGap;
+        internal const double ToolOverrun=AfjManufacturingConventions.CutterEnvelopeOverrun;
         internal static double Dot(double[] a, double[] b)
         {
             return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -1118,10 +1185,14 @@ namespace ADDIN.Commands.AutoFrameJoint
             double[] web=WebLine(p);
             return Scale(Add(P(web, 0), P(web, 1)), .5);
         }
-        static double[] Outgoing(AfjProfile p, MathTransform t, AfjProfile other, MathTransform ot)
+        static double[] Outgoing(AfjProfile p, Body2 body, MathTransform t, AfjProfile other, MathTransform ot)
         {
             double[] axis=Unit(WorldVector(p.Axis, t));
-            double[] o=WorldPoint(ProfileCenter(p), t), q=WorldPoint(ProfileCenter(other), ot);
+            double[] center=ProfileCenter(p), localAxis=Unit(p.Axis);
+            // The base Sketch can be at a stock end, rather than its center.
+            double middle=(AfjJointSolver.Projection(body, localAxis)-AfjJointSolver.Projection(body, Scale(localAxis, -1)))/2;
+            center=Add(center, Scale(localAxis, middle-Dot(center, localAxis)));
+            double[] o=WorldPoint(center, t), q=WorldPoint(ProfileCenter(other), ot);
             double distance=Dot(Sub(q, o), axis);
             if(Math.Abs(distance)<1e-4)throw new InvalidOperationException("UNVERIFIED_RULE: T/interior joint or ambiguous end");
             return Scale(axis, distance>0?1:-1);
@@ -1146,9 +1217,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         static AfjCutOperation Op(string id, AfjToolDefinition tool)
         {
+            if (id.IndexOf("BEND", StringComparison.Ordinal) >= 0) tool.DepthPolicy = "BEND_NORMAL_RELIEF";
             var op=new AfjCutOperation
             {
-                EvidenceId=id, Kind=AfjOperationKind.Cut, RegionEvidence="Parametric Web tangent / Wall face / outer Return coverage derivation"
+                EvidenceId=id, NormalCutIntent=true, Kind=AfjOperationKind.Cut, RegionEvidence="Parametric Web tangent / Wall face / outer Return coverage derivation"
             }
             ;
             op.Tools.Add(tool);
@@ -1231,6 +1303,51 @@ namespace ADDIN.Commands.AutoFrameJoint
             double missingW=AfjTemporaryBoolean.DifferenceVolume(expectedW.Kept[0], actualW.Kept[0]);
             if(missingL>2e-12||missingW>2e-12)throw new InvalidOperationException("UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3="+(missingL*1e9).ToString("R", System.Globalization.CultureInfo.InvariantCulture)+"/"+(missingW*1e9).ToString("R", System.Globalization.CultureInfo.InvariantCulture));
         }
+        static void VerifyPhysicalSkins(AfjUSection section, Body2 body, MathTransform transform)
+        {
+            var planes = new bool[6]; var bends = new bool[4];
+            double t = section.Thickness, r = section.Radius;
+            double[] expectedWidth = { 0, t, section.Width - t, section.Width };
+            foreach (Face2 face in (Array)body.GetFaces())
+            {
+                Surface surface = face.GetSurface() as Surface;
+                if (surface == null) continue;
+                if (surface.IsPlane())
+                {
+                    double[] p = surface.PlaneParams as double[];
+                    if (p == null || p.Length < 6) continue;
+                    double[] normal = Unit(WorldVector(p.Take(3).ToArray(), transform));
+                    double[] relative = Sub(WorldPoint(p.Skip(3).Take(3).ToArray(), transform), section.Origin);
+                    if (Math.Abs(Dot(normal, section.DepthDirection)) > .999999)
+                    {
+                        double depth = Dot(relative, section.DepthDirection);
+                        if (Math.Abs(depth) < 1e-7) planes[0] = true;
+                        if (Math.Abs(depth - t) < 1e-7) planes[1] = true;
+                    }
+                    if (Math.Abs(Dot(normal, section.WidthDirection)) > .999999)
+                    {
+                        double width = Dot(relative, section.WidthDirection);
+                        for (int i = 0; i < expectedWidth.Length; i++)
+                            if (Math.Abs(width - expectedWidth[i]) < 1e-7) planes[2 + i] = true;
+                    }
+                }
+                if (surface.IsCylinder())
+                {
+                    double[] p = surface.CylinderParams as double[];
+                    if (p == null || p.Length < 7 || Math.Abs(Dot(Unit(WorldVector(p.Skip(3).Take(3).ToArray(), transform)), Unit(section.Axis))) < .999999) continue;
+                    double[] center = Sub(WorldPoint(p.Take(3).ToArray(), transform), section.Origin);
+                    double width = Dot(center, section.WidthDirection), depth = Dot(center, section.DepthDirection);
+                    if (Math.Abs(depth - t - r) > 1e-7) continue;
+                    int side = Math.Abs(width - t - r) < 1e-7 ? 0 : Math.Abs(width - section.Width + t + r) < 1e-7 ? 1 : -1;
+                    int radius = Math.Abs(p[6] - r) < 1e-7 ? 0 : Math.Abs(p[6] - t - r) < 1e-7 ? 1 : -1;
+                    if (side >= 0 && radius >= 0) bends[side * 2 + radius] = true;
+                }
+            }
+            if (planes.Any(found => !found) || bends.Any(found => !found))
+                throw new InvalidOperationException("UNVERIFIED_RULE: profile Sketch does not match measured Web/Wall/Bend B-rep skins");
+            Trace.WriteLine("[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=" + t.ToString("R", CultureInfo.InvariantCulture) + " R=" + r.ToString("R", CultureInfo.InvariantCulture));
+        }
+
         internal static AfjParametricPlan Generate(AfjProfile profileA, AfjProfile profileB, Body2 bodyA, Body2 bodyB, MathTransform ta, MathTransform tb, bool aCovers, double webGap)
         {
             // The cover side is a manufacturing policy. It is not inferred from filenames,
@@ -1238,16 +1355,27 @@ namespace ADDIN.Commands.AutoFrameJoint
             AfjProfile pl=aCovers?profileB:profileA, pw=aCovers?profileA:profileB;
             Body2 bl=aCovers?bodyB:bodyA, bw=aCovers?bodyA:bodyB;
             MathTransform tl=aCovers?tb:ta, tw=aCovers?ta:tb;
-            double[] ul=Outgoing(pl, tl, pw, tw), uw=Outgoing(pw, tw, pl, tl);
+            double[] ul=Outgoing(pl, bl, tl, pw, tw), uw=Outgoing(pw, bw, tw, pl, tl);
             if(Math.Abs(Dot(ul, uw))>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: only orthogonal axes have native evidence");
             AfjUSection l=Section(pl, tl, uw), w=Section(pw, tw, ul);
             if(Math.Abs(l.Thickness-w.Thickness)>1e-8||Math.Abs(l.Radius-w.Radius)>1e-8)throw new InvalidOperationException("UNVERIFIED_RULE: unequal thickness/Bend R pair needs additional native evidence");
             if(Dot(l.WidthDirection, uw)<.999999||Dot(w.WidthDirection, ul)<.999999||Dot(l.DepthDirection, w.DepthDirection)<.999999)throw new InvalidOperationException("UNVERIFIED_RULE: incompatible folded skin orientation");
+            VerifyPhysicalSkins(l, bl, tl);
+            VerifyPhysicalSkins(w, bw, tw);
             double[] d=Unit(l.DepthDirection), o=Add(l.Origin, Scale(ul, Dot(Sub(w.Origin, l.Origin), ul)));
             if(Math.Abs(Dot(Sub(w.Origin, o), d))>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: Web skins are not coplanar");
             if(l.NearReturn||w.NearReturn)throw new InvalidOperationException("UNVERIFIED_RULE: near/inward Return needs a separate coverage collision rule");
             double outerDepthL=l.FarHeight+(l.FarReturn?l.Thickness:0), outerDepthW=w.FarHeight+(w.FarReturn?w.Thickness:0);
-            if(Math.Abs(l.NearHeight-w.NearHeight)>1e-7||Math.Abs(outerDepthL-outerDepthW)>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: Wall/outer contour levels differ; height-coverage trimming is not yet verified");
+            bool unequalHeights=Math.Abs(l.NearHeight-w.NearHeight)>1e-7||Math.Abs(outerDepthL-outerDepthW)>1e-7;
+            if (unequalHeights)
+            {
+                // Extend the existing cover policy only where the covering
+                // plain-U Walls reach all losing-wall cut edges. Return levels
+                // and a lower covering Wall need a separate verified rule.
+                if (l.FarReturn || w.FarReturn || w.NearHeight + 1e-7 < l.NearHeight ||
+                    outerDepthW + 1e-7 < outerDepthL)
+                    throw new InvalidOperationException("UNVERIFIED_RULE: actual covering Wall is too low or unequal Return levels lack evidence");
+            }
             double sf=w.FarTangent, qf=l.FarTangent, sn=w.NearTangent, qn=qf-(sf-sn);
             if(qn<=l.NearTangent+1e-8)qn=l.Thickness;
             // Constrain the seam to the inner near Wall when the ideal bisector enters its Bend zone.
@@ -1451,7 +1579,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             {
                 Plan=new AfjJointPlan
                 {
-                    RuleId="ORTHOGONAL_U_COVER", A=aCovers?wp:lp, B=aCovers?lp:wp
+                    RuleId=unequalHeights?"ORTHOGONAL_U_TALLER_COVER":"ORTHOGONAL_U_COVER", A=aCovers?wp:lp, B=aCovers?lp:wp
                 }
                 , Loser=l, Winner=w, JointOrigin=o, OutLoser=ul, OutWinner=uw, Depth=d, SeamNear=new[]
                 {
@@ -1467,4 +1595,66 @@ namespace ADDIN.Commands.AutoFrameJoint
             return result;
         }
     }
+}
+
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    internal sealed class AfjBooleanException : InvalidOperationException
+    {
+        internal readonly int OperationCode;
+        internal readonly string OperationName, ErrorName;
+        internal AfjBooleanException(string operation, int code, string name)
+            : base("AFJ: Boolean " + operation + " code=" + code + " name=" + name)
+        { OperationName = operation; OperationCode = code; ErrorName = name; }
+    }
+
+    internal static class AfjManufacturingConventions
+    {
+        // Independent manufacturing meanings even when the numeric values agree.
+        internal const double SheetCutOverrun = .0001;
+        internal const double AssemblyFitGap = .0001;
+        internal const double CutterEnvelopeOverrun = .0001;
+        internal const double CutterEntryClearance = .00001;
+    }
+
+    internal static class AfjSheetCutTools
+    {
+        // This factory is for a verified single planar sheet, not an entire
+        // formed profile. The caller supplies API thickness and both B-rep
+        // skins. NormalCut across a Bend needs a separate verified relief plan.
+        internal static AfjCutOperation BlindBetweenSkins(string evidenceId,
+            double[][] boundaryOnOuterSkin, double[] outerSkin, double[] innerSkin,
+            double[] intoSheet, double apiThickness, bool normalCut, bool crossesBend)
+        {
+            if (crossesBend)
+                throw new InvalidOperationException("UNVERIFIED_RULE: single-sheet Blind cannot replace NormalCut Bend relief");
+            if (String.IsNullOrEmpty(evidenceId) || boundaryOnOuterSkin == null ||
+                boundaryOnOuterSkin.Length < 3 || !AfjTemporaryBoolean.Finite(apiThickness) || apiThickness <= 0)
+                throw new InvalidOperationException("UNVERIFIED_RULE: missing single-sheet API/skin evidence");
+            double[] n = AfjParametricRules.Unit(intoSheet);
+            double[] delta = AfjParametricRules.Sub(innerSkin, outerSkin);
+            double separation = AfjParametricRules.Dot(delta, n);
+            if (Math.Abs(separation - apiThickness) > 1e-7 ||
+                Math.Sqrt(AfjParametricRules.Dot(AfjParametricRules.Sub(delta, AfjParametricRules.Scale(n, separation)),
+                    AfjParametricRules.Sub(delta, AfjParametricRules.Scale(n, separation)))) > 1e-7)
+                throw new InvalidOperationException("UNVERIFIED_RULE: sheet skin direction/separation does not match API thickness");
+            foreach (double[] point in boundaryOnOuterSkin)
+                if (Math.Abs(AfjParametricRules.Dot(AfjParametricRules.Sub(point, outerSkin), n)) > 1e-7)
+                    throw new InvalidOperationException("UNVERIFIED_RULE: sheet tool boundary is not on the verified outer skin");
+            double nominal = apiThickness + AfjManufacturingConventions.SheetCutOverrun;
+            var spec = new AfjToolDefinition {
+                Polygon = boundaryOnOuterSkin.Select(point => AfjParametricRules.Sub(point,
+                    AfjParametricRules.Scale(n, AfjManufacturingConventions.CutterEntryClearance))).ToArray(),
+                Direction = n, Length = nominal + AfjManufacturingConventions.CutterEntryClearance,
+                NominalSheetDepth = nominal, ApiSheetThickness = apiThickness,
+                DepthPolicy = "SINGLE_SHEET_BLIND_T_PLUS_OVERRUN"
+            };
+            var result = new AfjCutOperation { EvidenceId = evidenceId, Kind = AfjOperationKind.Cut,
+                RegionEvidence = "API thickness + two B-rep skins; single planar layer",
+                NormalCutIntent = normalCut };
+            result.Tools.Add(spec);
+            return result;
+        }
+    }
+
 }

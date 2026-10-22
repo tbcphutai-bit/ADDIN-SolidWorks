@@ -1,0 +1,4204 @@
+[
+  {
+    "record_type": "provenance",
+    "pid": 21764,
+    "revision": "32.5.0",
+    "harness_mvid": "8b788636-3f9e-4f05-9da8-7c3409fab81b",
+    "apartment": "STA",
+    "main_addin_built": false
+  },
+  {
+    "case": "2354-02-lc-B11",
+    "fixture": "2354_FR04_FR03",
+    "frame_a": "AFJ_PAIR_2354-04-lc-B11-fr04-1",
+    "frame_b": "AFJ_PAIR_2354-04-lc-B11-fr03-1",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_TALLER_COVER",
+      "cover": "A",
+      "length_a_m": 1.5,
+      "length_b_m": 3.2,
+      "a": {
+        "before_m3": 0.0006144043128087982,
+        "after_m3": 0.0005426509151279814,
+        "removed_m3": 7.175339768081618e-05,
+        "mass_residual_m3": 6.2341624917916505e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0005426509151279814,
+            "face_count": 22
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 7.174026935599264e-05,
+            "face_count": 22
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 1.3128324823542273e-08,
+            "face_count": 5
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.0011667292006587696,
+        "after_m3": 0.0010980635066544957,
+        "removed_m3": 6.866569400427415e-05,
+        "mass_residual_m3": 3.1170812458958252e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0010980635066544955,
+            "face_count": 23
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.866490951705345e-05,
+            "face_count": 22
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 7.844872207139674e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "after_gap_m": 9.999999999976694e-05,
+      "before_interference_m3": 1.28014016183895e-05,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.21250000000000013,
+                  -0.08299999999999974,
+                  0.0001000000000000007
+                ],
+                [
+                  0.21250000000000013,
+                  -0.06739999999999968,
+                  0.00010000000000000026
+                ],
+                [
+                  0.14760000000000006,
+                  -0.0025999999999997137,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.14760000000000006,
+                  -0.0024999999999999467,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.14500000000000002,
+                  -0.0024999999999999467,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.14500000000000002,
+                  0.013000000000000345,
+                  9.99999999999994e-05
+                ],
+                [
+                  -0.0129999999999999,
+                  0.013000000000000345,
+                  9.99999999999994e-05
+                ],
+                [
+                  -0.0129999999999999,
+                  -0.08299999999999974,
+                  0.0001000000000000007
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.060200000000000004,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.14760000000000006,
+                  -0.0024999999999999467,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.14760000000000006,
+                  0.013000000000000345,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.14500000000000002,
+                  0.013000000000000345,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.14500000000000002,
+                  -0.0024999999999999467,
+                  9.99999999999994e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0026999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  2.976900000000001,
+                  -0.08300000000000007,
+                  9.999999999999983e-05
+                ],
+                [
+                  2.976900000000001,
+                  -0.06740000000000002,
+                  9.999999999999983e-05
+                ],
+                [
+                  2.979558533471836,
+                  -0.06740000000000002,
+                  9.999999999999983e-05
+                ],
+                [
+                  3.044258687555041,
+                  -0.0026000000000000467,
+                  9.999999999999983e-05
+                ],
+                [
+                  3.0444000000000013,
+                  -0.0026000000000000467,
+                  9.999999999999983e-05
+                ],
+                [
+                  3.0444000000000013,
+                  0.0129999999999999,
+                  9.999999999999983e-05
+                ],
+                [
+                  3.213,
+                  0.0129999999999999,
+                  0.00010000000000000026
+                ],
+                [
+                  3.213,
+                  -0.08300000000000007,
+                  0.00010000000000000026
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.04220000000000001,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  3.044258687555041,
+                  -0.0027000000000000357,
+                  9.999999999999983e-05
+                ],
+                [
+                  3.213,
+                  -0.0027000000000000357,
+                  0.00010000000000000026
+                ],
+                [
+                  3.213,
+                  0.0129999999999999,
+                  0.00010000000000000026
+                ],
+                [
+                  3.044258687555041,
+                  0.0129999999999999,
+                  9.999999999999983e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0027999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  2.976900000000001,
+                  -0.08300000000000007,
+                  9.999999999999983e-05
+                ],
+                [
+                  3.213,
+                  -0.08300000000000007,
+                  0.00010000000000000026
+                ],
+                [
+                  3.213,
+                  -0.06740000000000002,
+                  0.00010000000000000026
+                ],
+                [
+                  2.976900000000001,
+                  -0.06740000000000002,
+                  9.999999999999983e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0027999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS",
+      "swap_status": "PASS",
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null
+    }
+  },
+  {
+    "case": "1618-02-bh-A6",
+    "fixture": "AFJ-R01",
+    "frame_a": "AFJ_PAIR_1618-04-bh-A6-fr1-2",
+    "frame_b": "AFJ_PAIR_1618-04-bh-A6-fr2-2",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.WebLine(AfjProfile profile)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "unsupported_public_preview": {
+      "returned": false,
+      "message": "UNVERIFIED_RULE: Chưa xác minh được quy tắc cho biên dạng, mặt che hoặc phần phôi của cặp Frame này. Xem log AFJ-SOLVER.",
+      "display3_status": "NOT_RUN"
+    },
+    "cleanup": true
+  },
+  {
+    "case": "1618-02-bh-A6",
+    "fixture": "AFJ-R04",
+    "frame_a": "AFJ_PAIR_1618-04-bh-A6-fr3-1",
+    "frame_b": "AFJ_PAIR_1618-04-bh-A6-fr4-2",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: no unique Web between parallel outward Walls",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.WebLine(AfjProfile profile)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "unsupported_public_preview": {
+      "returned": false,
+      "message": "UNVERIFIED_RULE: Chưa xác minh được quy tắc cho biên dạng, mặt che hoặc phần phôi của cặp Frame này. Xem log AFJ-SOLVER.",
+      "display3_status": "NOT_RUN"
+    },
+    "cleanup": true
+  },
+  {
+    "case": "3615-02-bh-T1",
+    "fixture": "AFJ-R05",
+    "frame_a": "AFJ_PAIR_3615-04-bh-T1-fr1-1",
+    "frame_b": "AFJ_PAIR_3615-04-bh-T1-fr2-1",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=27.708847204660252/0",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "profile_a": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "profile_b": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03000000000000013
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "native_before_cut_snapshots": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_COVER",
+      "cover": "A",
+      "length_a_m": 2,
+      "length_b_m": 3,
+      "a": {
+        "before_m3": 0.00048633451151369305,
+        "after_m3": 0.0004334571998420884,
+        "removed_m3": 5.287731167160266e-05,
+        "mass_residual_m3": 1.9922214919421144e-18,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00043345719984208824,
+            "face_count": 28
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.2870478932488036e-05,
+            "face_count": 28
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.832739114625224e-09,
+            "face_count": 5
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.000729501767270539,
+        "after_m3": 0.0004870282354412034,
+        "removed_m3": 0.0002424735318293358,
+        "mass_residual_m3": 1.8973538018496328e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0004870282354412034,
+            "face_count": 31
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00024247301539081663,
+            "face_count": 30
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.164385191762219e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "after_gap_m": 9.999999999991944e-05,
+      "before_interference_m3": 5.809438973883303e-06,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.7565000000000004,
+                  -0.010499999999999982,
+                  0.00010000000000011475
+                ],
+                [
+                  -0.7565000000000004,
+                  0.0021000000000000116,
+                  0.00010000000000011259
+                ],
+                [
+                  -0.8024000000000004,
+                  0.04790000000000001,
+                  0.00010000000000010608
+                ],
+                [
+                  -0.8024000000000004,
+                  0.048000000000000015,
+                  0.00010000000000010608
+                ],
+                [
+                  -0.8045000000000004,
+                  0.048000000000000015,
+                  0.00010000000000010565
+                ],
+                [
+                  -0.8045000000000004,
+                  0.07350000000000001,
+                  0.00010000000000010261
+                ],
+                [
+                  -1.0105,
+                  0.07350000000000001,
+                  0.00010000000000010218
+                ],
+                [
+                  -1.0105,
+                  -0.010499999999999982,
+                  0.00010000000000011432
+                ]
+              ],
+              "direction": [
+                -2.2204460492503136e-16,
+                -9.020562075079399e-17,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.8024000000000004,
+                  0.048000000000000015,
+                  0.00010000000000010608
+                ],
+                [
+                  -0.8024000000000004,
+                  0.07350000000000001,
+                  0.00010000000000010218
+                ],
+                [
+                  -0.8045000000000004,
+                  0.07350000000000001,
+                  0.00010000000000010261
+                ],
+                [
+                  -0.8045000000000004,
+                  0.048000000000000015,
+                  0.00010000000000010565
+                ]
+              ],
+              "direction": [
+                -2.2204460492503136e-16,
+                -9.020562075079399e-17,
+                -1
+              ],
+              "length_m": 0.0021999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.4744000000000001,
+                  -0.010499999999999954,
+                  0.0001000000000000007
+                ],
+                [
+                  0.4744000000000001,
+                  0.0020999999999999908,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.4765585147486053,
+                  0.0020999999999999908,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.5222587326135291,
+                  0.047900000000000054,
+                  9.999999999999419e-05
+                ],
+                [
+                  0.5224000000000001,
+                  0.047900000000000054,
+                  9.999999999999419e-05
+                ],
+                [
+                  0.5224000000000001,
+                  0.05010000000000003,
+                  9.999999999999376e-05
+                ],
+                [
+                  0.5375000000000001,
+                  0.05010000000000003,
+                  9.999999999999419e-05
+                ],
+                [
+                  0.5375000000000001,
+                  0.0734999999999999,
+                  9.999999999999159e-05
+                ],
+                [
+                  1.5105,
+                  0.0734999999999999,
+                  9.999999999999115e-05
+                ],
+                [
+                  1.5105,
+                  -0.010499999999999954,
+                  0.0001000000000000007
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5222587326135291,
+                  0.047800000000000065,
+                  9.999999999999419e-05
+                ],
+                [
+                  1.5105,
+                  0.047800000000000065,
+                  9.999999999999419e-05
+                ],
+                [
+                  1.5105,
+                  0.0734999999999999,
+                  9.999999999999115e-05
+                ],
+                [
+                  0.5222587326135291,
+                  0.0734999999999999,
+                  9.999999999999115e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.4744000000000001,
+                  -0.010499999999999954,
+                  0.0001000000000000007
+                ],
+                [
+                  1.5105,
+                  -0.010499999999999954,
+                  0.0001000000000000007
+                ],
+                [
+                  1.5105,
+                  0.0020999999999999908,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.4744000000000001,
+                  0.0020999999999999908,
+                  9.99999999999994e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS"
+    },
+    "private_copy_rollback_preview": {
+      "rollback_a": true,
+      "rollback_b": true,
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 52877.312 mm³; B bỏ 242473.532 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 52877.312 mm³; B bỏ 242473.532 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null,
+      "status": "PASS_DISPLAY3_API",
+      "restore_end_a": true,
+      "restore_end_b": true
+    }
+  },
+  {
+    "case": "3615-02-bh-T1",
+    "fixture": "AFJ-R06",
+    "frame_a": "AFJ_PAIR_3615-04-bh-T1-fr1-1",
+    "frame_b": "AFJ_PAIR_3615-04-bh-T1-fr4-2",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=28.493792724341706/258.41707902977316",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "profile_a": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "profile_b": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0.05,
+          -0.032
+        ]
+      ],
+      "bend_face_count": 4
+    },
+    "native_before_cut_snapshots": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_COVER",
+      "cover": "A",
+      "length_a_m": 1.8175000000000003,
+      "length_b_m": 3,
+      "a": {
+        "before_m3": 0.0004335448957058169,
+        "after_m3": 0.00038066758403421477,
+        "removed_m3": 5.287731167160279e-05,
+        "mass_residual_m3": 6.301925127571995e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00038066758403421466,
+            "face_count": 29
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.287047893248818e-05,
+            "face_count": 28
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.832739114626363e-09,
+            "face_count": 5
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.000654334511513693,
+        "after_m3": 0.00043596590276032127,
+        "removed_m3": 0.0002183686087533718,
+        "mass_residual_m3": 1.0842021724855044e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00043596590276032127,
+            "face_count": 23
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00021836809231485266,
+            "face_count": 22
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.164385191761428e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "after_gap_m": 0.00010000000000054323,
+      "before_interference_m3": 5.394905006657288e-06,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.7565000000000001,
+                  -0.010500000000000259,
+                  9.99999999999981e-05
+                ],
+                [
+                  0.7565000000000001,
+                  0.002099999999999734,
+                  9.999999999999853e-05
+                ],
+                [
+                  0.8024000000000001,
+                  0.047899999999999734,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.8024000000000001,
+                  0.04799999999999974,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.8045000000000001,
+                  0.04799999999999974,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.8045000000000001,
+                  0.07349999999999973,
+                  0.00010000000000000026
+                ],
+                [
+                  1.0105,
+                  0.07349999999999973,
+                  0.00010000000000000026
+                ],
+                [
+                  1.0105,
+                  -0.010500000000000259,
+                  9.999999999999853e-05
+                ]
+              ],
+              "direction": [
+                0,
+                2.0816681711721694e-17,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.8024000000000001,
+                  0.04799999999999974,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.8024000000000001,
+                  0.07349999999999973,
+                  9.999999999999983e-05
+                ],
+                [
+                  0.8045000000000001,
+                  0.07349999999999973,
+                  0.00010000000000000026
+                ],
+                [
+                  0.8045000000000001,
+                  0.04799999999999974,
+                  9.99999999999994e-05
+                ]
+              ],
+              "direction": [
+                0,
+                2.0816681711721694e-17,
+                -1
+              ],
+              "length_m": 0.0021999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.47439999999999954,
+                  -0.010499999999999926,
+                  9.999999999998638e-05
+                ],
+                [
+                  -0.4743999999999996,
+                  0.002100000000000067,
+                  9.999999999998638e-05
+                ],
+                [
+                  -0.4765585147486047,
+                  0.002100000000000067,
+                  9.999999999998638e-05
+                ],
+                [
+                  -0.5222587326135285,
+                  0.04790000000000009,
+                  9.999999999998508e-05
+                ],
+                [
+                  -0.5223999999999995,
+                  0.04790000000000009,
+                  9.999999999998508e-05
+                ],
+                [
+                  -0.5223999999999996,
+                  0.06050000000000009,
+                  9.999999999998508e-05
+                ],
+                [
+                  -1.5105,
+                  0.06050000000000025,
+                  9.99999999999569e-05
+                ],
+                [
+                  -1.5105,
+                  -0.010499999999999773,
+                  9.99999999999569e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5222587326135285,
+                  0.047800000000000085,
+                  9.999999999998508e-05
+                ],
+                [
+                  -1.5105,
+                  0.04780000000000024,
+                  9.999999999995646e-05
+                ],
+                [
+                  -1.5105,
+                  0.06050000000000025,
+                  9.99999999999569e-05
+                ],
+                [
+                  -0.5222587326135285,
+                  0.06050000000000009,
+                  9.999999999998508e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.47439999999999954,
+                  -0.010499999999999926,
+                  9.999999999998638e-05
+                ],
+                [
+                  -1.5105,
+                  -0.010499999999999773,
+                  9.99999999999569e-05
+                ],
+                [
+                  -1.5105,
+                  0.0021000000000002267,
+                  9.999999999995646e-05
+                ],
+                [
+                  -0.4743999999999996,
+                  0.002100000000000067,
+                  9.999999999998638e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS"
+    },
+    "private_copy_rollback_preview": {
+      "rollback_a": true,
+      "rollback_b": true,
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 52877.312 mm³; B bỏ 218368.609 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 52877.312 mm³; B bỏ 218368.609 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null,
+      "status": "PASS_DISPLAY3_API",
+      "restore_end_a": true,
+      "restore_end_b": true
+    }
+  },
+  {
+    "case": "3615-02-bh-T1",
+    "fixture": "AFJ-R07",
+    "frame_a": "AFJ_PAIR_3615-04-bh-T1-fr2-1",
+    "frame_b": "AFJ_PAIR_3615-04-bh-T1-fr3-2",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=363.89379272438691/256.85415805955813",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "profile_a": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03000000000000013
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "profile_b": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          -3.0616169978683824e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -3.0616169978683824e-18,
+          0,
+          0.05,
+          -0.032
+        ],
+        [
+          0,
+          0,
+          -0.03,
+          0,
+          -0.013,
+          -0.030000000000000002
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "native_before_cut_snapshots": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_COVER",
+      "cover": "B",
+      "length_a_m": 2.0245,
+      "length_b_m": 1.8045000000000004,
+      "a": {
+        "before_m3": 0.0004869539961085964,
+        "after_m3": 0.00024448046427926037,
+        "removed_m3": 0.00024247353182933607,
+        "mass_residual_m3": 2.710505431213761e-20,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0002444804642792604,
+            "face_count": 32
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00024247301539081692,
+            "face_count": 30
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.164385191769493e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.00043345719984209247,
+        "after_m3": 0.00038057988817048754,
+        "removed_m3": 5.2877311671602855e-05,
+        "mass_residual_m3": 2.066760391300493e-18,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00038057988817048754,
+            "face_count": 29
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.287047893248823e-05,
+            "face_count": 28
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.832739114624307e-09,
+            "face_count": 5
+          }
+        ]
+      },
+      "after_gap_m": 9.99999999995449e-05,
+      "before_interference_m3": 5.80937825209391e-06,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.4743999999999996,
+                  -0.010500000000000176,
+                  0.0001000000000000007
+                ],
+                [
+                  -0.4743999999999996,
+                  0.0020999999999997687,
+                  9.999999999999896e-05
+                ],
+                [
+                  -0.4765585147486048,
+                  0.0020999999999997687,
+                  9.999999999999896e-05
+                ],
+                [
+                  -0.5222587326135285,
+                  0.04789999999999983,
+                  9.999999999999159e-05
+                ],
+                [
+                  -0.5223999999999996,
+                  0.04789999999999983,
+                  9.999999999999159e-05
+                ],
+                [
+                  -0.5223999999999996,
+                  0.05009999999999981,
+                  9.999999999999115e-05
+                ],
+                [
+                  -0.5374999999999995,
+                  0.05009999999999981,
+                  9.999999999999115e-05
+                ],
+                [
+                  -0.5374999999999995,
+                  0.07349999999999968,
+                  9.999999999998725e-05
+                ],
+                [
+                  -1.5104999999999995,
+                  0.07349999999999968,
+                  9.999999999998682e-05
+                ],
+                [
+                  -1.5104999999999995,
+                  -0.010500000000000176,
+                  0.00010000000000000113
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5222587326135285,
+                  0.04779999999999984,
+                  9.999999999999159e-05
+                ],
+                [
+                  -1.5104999999999995,
+                  0.04779999999999984,
+                  9.999999999999115e-05
+                ],
+                [
+                  -1.5104999999999995,
+                  0.07349999999999968,
+                  9.999999999998682e-05
+                ],
+                [
+                  -0.5222587326135285,
+                  0.07349999999999968,
+                  9.999999999998725e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.4743999999999996,
+                  -0.010500000000000176,
+                  0.0001000000000000007
+                ],
+                [
+                  -1.5104999999999995,
+                  -0.010500000000000176,
+                  0.00010000000000000113
+                ],
+                [
+                  -1.5104999999999995,
+                  0.0020999999999997687,
+                  9.999999999999896e-05
+                ],
+                [
+                  -0.4743999999999996,
+                  0.0020999999999997687,
+                  9.999999999999896e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.7564999999999998,
+                  0.06049999999999989,
+                  0.000100000000000427
+                ],
+                [
+                  -0.7564999999999998,
+                  0.047900000000000054,
+                  0.00010000000000042917
+                ],
+                [
+                  -0.8023999999999999,
+                  0.0020999999999999908,
+                  0.00010000000000043871
+                ],
+                [
+                  -0.8023999999999999,
+                  0.0020000000000000018,
+                  0.00010000000000043871
+                ],
+                [
+                  -0.8044999999999999,
+                  0.0020000000000000018,
+                  0.00010000000000043871
+                ],
+                [
+                  -0.8044999999999999,
+                  -0.023499999999999854,
+                  0.00010000000000044348
+                ],
+                [
+                  -1.0105,
+                  -0.023499999999999854,
+                  0.00010000000000044869
+                ],
+                [
+                  -1.0105,
+                  0.0605,
+                  0.00010000000000043308
+                ]
+              ],
+              "direction": [
+                -2.220446049250313e-16,
+                -4.440892098500626e-16,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.8023999999999999,
+                  0.0020000000000000018,
+                  0.00010000000000043871
+                ],
+                [
+                  -0.8023999999999999,
+                  -0.023499999999999854,
+                  0.00010000000000044348
+                ],
+                [
+                  -0.8044999999999999,
+                  -0.023499999999999854,
+                  0.00010000000000044348
+                ],
+                [
+                  -0.8044999999999999,
+                  0.0020000000000000018,
+                  0.00010000000000043871
+                ]
+              ],
+              "direction": [
+                -2.220446049250313e-16,
+                -4.440892098500626e-16,
+                -1
+              ],
+              "length_m": 0.0021999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS"
+    },
+    "private_copy_rollback_preview": {
+      "rollback_a": true,
+      "rollback_b": true,
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 242473.532 mm³; B bỏ 52877.312 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 242473.532 mm³; B bỏ 52877.312 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null,
+      "status": "PASS_DISPLAY3_API",
+      "restore_end_a": true,
+      "restore_end_b": true
+    }
+  },
+  {
+    "case": "3615-02-bh-T1",
+    "fixture": "AFJ-R08",
+    "frame_a": "AFJ_PAIR_3615-04-bh-T1-fr4-2",
+    "frame_b": "AFJ_PAIR_3615-04-bh-T1-fr3-2",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=28.493792724329992/258.41707902979152",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "profile_a": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0.05,
+          -0.032
+        ]
+      ],
+      "bend_face_count": 4
+    },
+    "profile_b": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          -3.0616169978683824e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -3.0616169978683824e-18,
+          0,
+          0.05,
+          -0.032
+        ],
+        [
+          0,
+          0,
+          -0.03,
+          0,
+          -0.013,
+          -0.030000000000000002
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "native_before_cut_snapshots": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_COVER",
+      "cover": "B",
+      "length_a_m": 2.0224,
+      "length_b_m": 2,
+      "a": {
+        "before_m3": 0.00043597935929143744,
+        "after_m3": 0.00021761075053806762,
+        "removed_m3": 0.00021836860875337172,
+        "mass_residual_m3": 1.8973538018496328e-18,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0002176107505380676,
+            "face_count": 24
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00021836809231485255,
+            "face_count": 22
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.164385191763951e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.0004863345115136931,
+        "after_m3": 0.00043345719984208894,
+        "removed_m3": 5.287731167160257e-05,
+        "mass_residual_m3": 1.5924219408380846e-18,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00043345719984208894,
+            "face_count": 28
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.287047893248793e-05,
+            "face_count": 28
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.832739114625164e-09,
+            "face_count": 5
+          }
+        ]
+      },
+      "after_gap_m": 9.999999999995429e-05,
+      "before_interference_m3": 5.394841802678821e-06,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.47440000000000015,
+                  -0.010500000000000079,
+                  0.00010000000000001327
+                ],
+                [
+                  0.47440000000000015,
+                  0.0020999999999999214,
+                  0.0001000000000000137
+                ],
+                [
+                  0.47655851474860533,
+                  0.0020999999999999214,
+                  0.0001000000000000137
+                ],
+                [
+                  0.5222587326135291,
+                  0.04789999999999993,
+                  0.00010000000000001761
+                ],
+                [
+                  0.5224000000000002,
+                  0.04789999999999993,
+                  0.00010000000000001761
+                ],
+                [
+                  0.5224000000000002,
+                  0.06049999999999993,
+                  0.00010000000000001848
+                ],
+                [
+                  1.5105,
+                  0.060499999999999776,
+                  0.00010000000000004667
+                ],
+                [
+                  1.5105,
+                  -0.010500000000000245,
+                  0.00010000000000004276
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5222587326135291,
+                  0.047799999999999926,
+                  0.00010000000000001761
+                ],
+                [
+                  1.5105,
+                  0.04779999999999977,
+                  0.00010000000000004623
+                ],
+                [
+                  1.5105,
+                  0.060499999999999776,
+                  0.00010000000000004667
+                ],
+                [
+                  0.5222587326135291,
+                  0.06049999999999993,
+                  0.00010000000000001848
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.47440000000000015,
+                  -0.010500000000000079,
+                  0.00010000000000001327
+                ],
+                [
+                  1.5105,
+                  -0.010500000000000245,
+                  0.00010000000000004276
+                ],
+                [
+                  1.5105,
+                  0.0020999999999997687,
+                  0.00010000000000004363
+                ],
+                [
+                  0.47440000000000015,
+                  0.0020999999999999214,
+                  0.0001000000000000137
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.7565000000000004,
+                  0.060499999999999776,
+                  0.00010000000000003452
+                ],
+                [
+                  0.7565000000000004,
+                  0.04789999999999983,
+                  0.00010000000000003496
+                ],
+                [
+                  0.8024000000000003,
+                  0.0020999999999997687,
+                  0.00010000000000003409
+                ],
+                [
+                  0.8024000000000003,
+                  0.0019999999999997797,
+                  0.00010000000000003409
+                ],
+                [
+                  0.8045000000000003,
+                  0.0019999999999997797,
+                  0.00010000000000003409
+                ],
+                [
+                  0.8045000000000003,
+                  -0.023500000000000076,
+                  0.00010000000000003452
+                ],
+                [
+                  1.0105,
+                  -0.0235000000000003,
+                  0.00010000000000002932
+                ],
+                [
+                  1.0105,
+                  0.060499999999999776,
+                  0.00010000000000002845
+                ]
+              ],
+              "direction": [
+                -1.1102230246251568e-16,
+                -2.2204460492503136e-16,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.8024000000000003,
+                  0.0019999999999997797,
+                  0.00010000000000003409
+                ],
+                [
+                  0.8024000000000003,
+                  -0.023500000000000076,
+                  0.00010000000000003452
+                ],
+                [
+                  0.8045000000000003,
+                  -0.023500000000000076,
+                  0.00010000000000003452
+                ],
+                [
+                  0.8045000000000003,
+                  0.0019999999999997797,
+                  0.00010000000000003409
+                ]
+              ],
+              "direction": [
+                -1.1102230246251568e-16,
+                -2.2204460492503136e-16,
+                -1
+              ],
+              "length_m": 0.0021999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS"
+    },
+    "private_copy_rollback_preview": {
+      "rollback_a": true,
+      "rollback_b": true,
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 218368.609 mm³; B bỏ 52877.312 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 218368.609 mm³; B bỏ 52877.312 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null,
+      "status": "PASS_DISPLAY3_API",
+      "restore_end_a": true,
+      "restore_end_b": true
+    }
+  },
+  {
+    "case": "3615-02-bh-T2",
+    "fixture": "AFJ-R09",
+    "frame_a": "AFJ_PAIR_3615-04-bh-T2-fr1-3",
+    "frame_b": "AFJ_PAIR_3615-04-bh-T2-fr2-4",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551942786/284.56300526426185",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "profile_a": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "profile_b": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03000000000000013
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "native_before_cut_snapshots": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_COVER",
+      "cover": "A",
+      "length_a_m": 1.58,
+      "length_b_m": 2.1495,
+      "a": {
+        "before_m3": 0.00037579267246356385,
+        "after_m3": 0.00026516313754971127,
+        "removed_m3": 0.00011062953491385392,
+        "mass_residual_m3": 1.3417001884508117e-18,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0002651631375497113,
+            "face_count": 29
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00011062270217473928,
+            "face_count": 28
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.832739114626396e-09,
+            "face_count": 5
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.0005173499030782022,
+        "after_m3": 0.000305272278218472,
+        "removed_m3": 0.00021207762485973014,
+        "mass_residual_m3": 8.131516293641283e-20,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.000305272278218472,
+            "face_count": 32
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00021207710842121094,
+            "face_count": 30
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.16438519176143e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "after_gap_m": 0.00010000000000054323,
+      "before_interference_m3": 5.809439245796617e-06,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5190000000000002,
+                  -0.010500000000000259,
+                  9.999999999998465e-05
+                ],
+                [
+                  0.5190000000000002,
+                  0.002099999999999734,
+                  9.999999999998508e-05
+                ],
+                [
+                  0.5649000000000003,
+                  0.047899999999999734,
+                  9.999999999998595e-05
+                ],
+                [
+                  0.5649000000000003,
+                  0.04799999999999974,
+                  9.999999999998595e-05
+                ],
+                [
+                  0.5670000000000003,
+                  0.04799999999999974,
+                  9.999999999998595e-05
+                ],
+                [
+                  0.5670000000000003,
+                  0.07349999999999973,
+                  9.999999999998682e-05
+                ],
+                [
+                  1.0105,
+                  0.07349999999999973,
+                  9.999999999998638e-05
+                ],
+                [
+                  1.0105,
+                  -0.010500000000000259,
+                  9.999999999998465e-05
+                ]
+              ],
+              "direction": [
+                0,
+                2.0816681711721694e-17,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5649000000000003,
+                  0.04799999999999974,
+                  9.999999999998595e-05
+                ],
+                [
+                  0.5649000000000003,
+                  0.07349999999999973,
+                  9.999999999998638e-05
+                ],
+                [
+                  0.5670000000000003,
+                  0.07349999999999973,
+                  9.999999999998682e-05
+                ],
+                [
+                  0.5670000000000003,
+                  0.04799999999999974,
+                  9.999999999998595e-05
+                ]
+              ],
+              "direction": [
+                0,
+                2.0816681711721694e-17,
+                -1
+              ],
+              "length_m": 0.0021999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5993999999999996,
+                  -0.010499999999999905,
+                  9.999999999998248e-05
+                ],
+                [
+                  -0.5993999999999996,
+                  0.002100000000000088,
+                  9.999999999998248e-05
+                ],
+                [
+                  -0.6015585147486047,
+                  0.002100000000000088,
+                  9.999999999998248e-05
+                ],
+                [
+                  -0.6472587326135285,
+                  0.04790000000000011,
+                  9.999999999998118e-05
+                ],
+                [
+                  -0.6473999999999995,
+                  0.04790000000000011,
+                  9.999999999998118e-05
+                ],
+                [
+                  -0.6473999999999995,
+                  0.05010000000000012,
+                  9.999999999998118e-05
+                ],
+                [
+                  -0.6624999999999995,
+                  0.050100000000000124,
+                  9.999999999998075e-05
+                ],
+                [
+                  -0.6624999999999996,
+                  0.07350000000000012,
+                  9.999999999998075e-05
+                ],
+                [
+                  -1.5105,
+                  0.07350000000000025,
+                  9.999999999995646e-05
+                ],
+                [
+                  -1.5105,
+                  -0.010499999999999766,
+                  9.999999999995646e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.6472587326135285,
+                  0.047800000000000106,
+                  9.999999999998118e-05
+                ],
+                [
+                  -1.5105,
+                  0.047800000000000245,
+                  9.999999999995603e-05
+                ],
+                [
+                  -1.5105,
+                  0.07350000000000025,
+                  9.999999999995646e-05
+                ],
+                [
+                  -0.6472587326135285,
+                  0.0735000000000001,
+                  9.999999999998118e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5993999999999996,
+                  -0.010499999999999905,
+                  9.999999999998248e-05
+                ],
+                [
+                  -1.5105,
+                  -0.010499999999999766,
+                  9.999999999995646e-05
+                ],
+                [
+                  -1.5105,
+                  0.0021000000000002336,
+                  9.999999999995603e-05
+                ],
+                [
+                  -0.5993999999999996,
+                  0.002100000000000088,
+                  9.999999999998248e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS"
+    },
+    "private_copy_rollback_preview": {
+      "rollback_a": true,
+      "rollback_b": true,
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null,
+      "status": "PASS_DISPLAY3_API",
+      "restore_end_a": true,
+      "restore_end_b": true
+    }
+  },
+  {
+    "case": "3615-02-bh-T2",
+    "fixture": "AFJ-R10",
+    "frame_a": "AFJ_PAIR_3615-04-bh-T2-fr1-3",
+    "frame_b": "AFJ_PAIR_3615-04-bh-T2-fr2-3",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551960293/284.56300526237317",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "profile_a": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "profile_b": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03000000000000013
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "native_before_cut_snapshots": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_COVER",
+      "cover": "A",
+      "length_a_m": 2,
+      "length_b_m": 3,
+      "a": {
+        "before_m3": 0.00048633451151369294,
+        "after_m3": 0.0003757049765998385,
+        "removed_m3": 0.00011062953491385377,
+        "mass_residual_m3": 6.505213034913027e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00037570497659983847,
+            "face_count": 28
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00011062270217473916,
+            "face_count": 28
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.832739114625868e-09,
+            "face_count": 5
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.000729501767270539,
+        "after_m3": 0.0005174241424108093,
+        "removed_m3": 0.00021207762485973017,
+        "mass_residual_m3": 4.87890977618477e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0005174241424108093,
+            "face_count": 31
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00021207710842121102,
+            "face_count": 30
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.164385191765891e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "after_gap_m": 9.99999999999268e-05,
+      "before_interference_m3": 5.809438973883696e-06,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5190000000000002,
+                  -0.010500000000000037,
+                  0.00010000000000000243
+                ],
+                [
+                  -0.5190000000000002,
+                  0.002099999999999956,
+                  0.00010000000000000026
+                ],
+                [
+                  -0.5649000000000003,
+                  0.047899999999999957,
+                  9.999999999999332e-05
+                ],
+                [
+                  -0.5649000000000003,
+                  0.04799999999999996,
+                  9.999999999999332e-05
+                ],
+                [
+                  -0.5670000000000003,
+                  0.04799999999999996,
+                  9.999999999999332e-05
+                ],
+                [
+                  -0.5670000000000003,
+                  0.07349999999999995,
+                  9.999999999998985e-05
+                ],
+                [
+                  -1.0105,
+                  0.07349999999999995,
+                  9.999999999998985e-05
+                ],
+                [
+                  -1.0105,
+                  -0.010500000000000037,
+                  0.00010000000000000243
+                ]
+              ],
+              "direction": [
+                -2.220446049250314e-16,
+                -9.0205620750794e-17,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5649000000000003,
+                  0.04799999999999996,
+                  9.999999999999332e-05
+                ],
+                [
+                  -0.5649000000000003,
+                  0.07349999999999995,
+                  9.999999999998985e-05
+                ],
+                [
+                  -0.5670000000000003,
+                  0.07349999999999995,
+                  9.999999999998985e-05
+                ],
+                [
+                  -0.5670000000000003,
+                  0.04799999999999996,
+                  9.999999999999332e-05
+                ]
+              ],
+              "direction": [
+                -2.220446049250314e-16,
+                -9.0205620750794e-17,
+                -1
+              ],
+              "length_m": 0.0021999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5994,
+                  -0.010499999999999954,
+                  0.0001000000000000007
+                ],
+                [
+                  0.5994,
+                  0.0020999999999999908,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.6015585147486052,
+                  0.0020999999999999908,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.647258732613529,
+                  0.047900000000000054,
+                  9.999999999999419e-05
+                ],
+                [
+                  0.6474000000000001,
+                  0.047900000000000054,
+                  9.999999999999419e-05
+                ],
+                [
+                  0.6474000000000001,
+                  0.05010000000000003,
+                  9.999999999999376e-05
+                ],
+                [
+                  0.6625000000000001,
+                  0.05010000000000003,
+                  9.999999999999419e-05
+                ],
+                [
+                  0.6625000000000001,
+                  0.0734999999999999,
+                  9.999999999999159e-05
+                ],
+                [
+                  1.5105,
+                  0.0734999999999999,
+                  9.999999999999159e-05
+                ],
+                [
+                  1.5105,
+                  -0.010499999999999954,
+                  0.0001000000000000007
+                ]
+              ],
+              "direction": [
+                1.1102230246251568e-16,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.647258732613529,
+                  0.047800000000000065,
+                  9.999999999999419e-05
+                ],
+                [
+                  1.5105,
+                  0.047800000000000065,
+                  9.999999999999462e-05
+                ],
+                [
+                  1.5105,
+                  0.0734999999999999,
+                  9.999999999999159e-05
+                ],
+                [
+                  0.647258732613529,
+                  0.0734999999999999,
+                  9.999999999999115e-05
+                ]
+              ],
+              "direction": [
+                1.1102230246251568e-16,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5994,
+                  -0.010499999999999954,
+                  0.0001000000000000007
+                ],
+                [
+                  1.5105,
+                  -0.010499999999999954,
+                  0.0001000000000000007
+                ],
+                [
+                  1.5105,
+                  0.0020999999999999908,
+                  9.99999999999994e-05
+                ],
+                [
+                  0.5994,
+                  0.0020999999999999908,
+                  9.99999999999994e-05
+                ]
+              ],
+              "direction": [
+                1.1102230246251568e-16,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS"
+    },
+    "private_copy_rollback_preview": {
+      "rollback_a": true,
+      "rollback_b": true,
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null,
+      "status": "PASS_DISPLAY3_API",
+      "restore_end_a": true,
+      "restore_end_b": true
+    }
+  },
+  {
+    "case": "3615-02-bh-T2",
+    "fixture": "AFJ-R11",
+    "frame_a": "AFJ_PAIR_3615-04-bh-T2-fr2-4",
+    "frame_b": "AFJ_PAIR_3615-04-bh-T2-fr1-4",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551966921/284.56300526237982",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "profile_a": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03000000000000013
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "profile_b": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "native_before_cut_snapshots": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_COVER",
+      "cover": "B",
+      "length_a_m": 3,
+      "length_b_m": 2,
+      "a": {
+        "before_m3": 0.0007295017672705391,
+        "after_m3": 0.000517424142410809,
+        "removed_m3": 0.00021207762485973036,
+        "mass_residual_m3": 2.439454888092385e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.000517424142410809,
+            "face_count": 31
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00021207710842121124,
+            "face_count": 30
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.16438519176649e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.00048633451151369283,
+        "after_m3": 0.00037570497659983874,
+        "removed_m3": 0.0001106295349138538,
+        "mass_residual_m3": 2.981555974335137e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0003757049765998388,
+            "face_count": 28
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00011062270217473918,
+            "face_count": 28
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.832739114625133e-09,
+            "face_count": 5
+          }
+        ]
+      },
+      "after_gap_m": 9.999999999964898e-05,
+      "before_interference_m3": 5.809439428042317e-06,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5994000000000004,
+                  -0.0105000000000001,
+                  0.00010000000000001631
+                ],
+                [
+                  0.5994000000000004,
+                  0.0020999999999999075,
+                  0.00010000000000001718
+                ],
+                [
+                  0.6015585147486056,
+                  0.0020999999999999075,
+                  0.00010000000000001718
+                ],
+                [
+                  0.6472587326135293,
+                  0.047899999999999915,
+                  0.00010000000000002108
+                ],
+                [
+                  0.6474000000000004,
+                  0.047899999999999915,
+                  0.00010000000000002108
+                ],
+                [
+                  0.6474000000000004,
+                  0.05009999999999992,
+                  0.00010000000000002108
+                ],
+                [
+                  0.6625000000000003,
+                  0.050099999999999915,
+                  0.00010000000000002151
+                ],
+                [
+                  0.6625000000000003,
+                  0.0734999999999999,
+                  0.00010000000000002281
+                ],
+                [
+                  1.5105,
+                  0.07349999999999977,
+                  0.0001000000000000471
+                ],
+                [
+                  1.5105,
+                  -0.010500000000000238,
+                  0.00010000000000004276
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.6472587326135293,
+                  0.04779999999999991,
+                  0.00010000000000002108
+                ],
+                [
+                  1.5105,
+                  0.04779999999999977,
+                  0.0001000000000000458
+                ],
+                [
+                  1.5105,
+                  0.07349999999999977,
+                  0.0001000000000000471
+                ],
+                [
+                  0.6472587326135293,
+                  0.07349999999999991,
+                  0.00010000000000002238
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5994000000000004,
+                  -0.0105000000000001,
+                  0.00010000000000001631
+                ],
+                [
+                  1.5105,
+                  -0.010500000000000238,
+                  0.00010000000000004276
+                ],
+                [
+                  1.5105,
+                  0.0020999999999997687,
+                  0.0001000000000000432
+                ],
+                [
+                  0.5994000000000004,
+                  0.0020999999999999075,
+                  0.00010000000000001718
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5190000000000003,
+                  -0.010499999999999732,
+                  9.999999999999636e-05
+                ],
+                [
+                  -0.5190000000000003,
+                  0.002100000000000213,
+                  9.999999999999679e-05
+                ],
+                [
+                  -0.5649000000000003,
+                  0.047900000000000276,
+                  9.999999999999853e-05
+                ],
+                [
+                  -0.5649000000000003,
+                  0.048000000000000265,
+                  9.999999999999853e-05
+                ],
+                [
+                  -0.5670000000000003,
+                  0.048000000000000265,
+                  9.999999999999853e-05
+                ],
+                [
+                  -0.5670000000000003,
+                  0.07350000000000012,
+                  9.99999999999994e-05
+                ],
+                [
+                  -1.0105000000000004,
+                  0.07350000000000012,
+                  9.99999999999994e-05
+                ],
+                [
+                  -1.0105000000000004,
+                  -0.010499999999999732,
+                  9.999999999999679e-05
+                ]
+              ],
+              "direction": [
+                1.1102230246251568e-16,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5649000000000003,
+                  0.048000000000000265,
+                  9.999999999999853e-05
+                ],
+                [
+                  -0.5649000000000003,
+                  0.07350000000000012,
+                  9.99999999999994e-05
+                ],
+                [
+                  -0.5670000000000003,
+                  0.07350000000000012,
+                  9.99999999999994e-05
+                ],
+                [
+                  -0.5670000000000003,
+                  0.048000000000000265,
+                  9.999999999999853e-05
+                ]
+              ],
+              "direction": [
+                1.1102230246251568e-16,
+                0,
+                -1
+              ],
+              "length_m": 0.0021999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS"
+    },
+    "private_copy_rollback_preview": {
+      "rollback_a": true,
+      "rollback_b": true,
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 212077.625 mm³; B bỏ 110629.535 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 212077.625 mm³; B bỏ 110629.535 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null,
+      "status": "PASS_DISPLAY3_API",
+      "restore_end_a": true,
+      "restore_end_b": true
+    }
+  },
+  {
+    "case": "3615-02-bh-T2",
+    "fixture": "AFJ-R12",
+    "frame_a": "AFJ_PAIR_3615-04-bh-T2-fr1-4",
+    "frame_b": "AFJ_PAIR_3615-04-bh-T2-fr2-3",
+    "open_error": 0,
+    "open_warning": 0,
+    "native_current_state": {
+      "status": "UNVERIFIED_RULE",
+      "exception": {
+        "type": "System.InvalidOperationException",
+        "hresult": "0x80131509",
+        "message": "UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551969826/284.56300526423979",
+        "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 AcceptanceHarness.Run(String[] args)"
+      }
+    },
+    "profile_a": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.775737858763663e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "profile_b": {
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "thickness_m": 0.002,
+      "bend_radius_m": 0.0001,
+      "regions": [
+        "WEB",
+        "WALL",
+        "WALL",
+        "RETURN_LIP_OR_STEP"
+      ],
+      "profile_lines_m": [
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.032
+        ],
+        [
+          0,
+          0.05,
+          1.2246467991473536e-18,
+          0,
+          0.05,
+          -0.03
+        ],
+        [
+          0,
+          0.05,
+          -0.03,
+          0,
+          0.063,
+          -0.03000000000000013
+        ]
+      ],
+      "bend_face_count": 6
+    },
+    "native_before_cut_snapshots": {
+      "status": "PASS_GEOMETRY",
+      "rule": "ORTHOGONAL_U_COVER",
+      "cover": "A",
+      "length_a_m": 1.58,
+      "length_b_m": 2.1495,
+      "a": {
+        "before_m3": 0.00037579267246356363,
+        "after_m3": 0.0002651631375497123,
+        "removed_m3": 0.00011062953491385379,
+        "mass_residual_m3": 2.4530074152484538e-18,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00026516313754971224,
+            "face_count": 29
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00011062270217473918,
+            "face_count": 28
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 6.8327391146244815e-09,
+            "face_count": 5
+          }
+        ]
+      },
+      "b": {
+        "before_m3": 0.0005173499030782021,
+        "after_m3": 0.0003052722782184719,
+        "removed_m3": 0.00021207762485973033,
+        "mass_residual_m3": 1.0842021724855044e-19,
+        "kept": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.0003052722782184722,
+            "face_count": 32
+          }
+        ],
+        "removed": [
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 0.00021207710842121113,
+            "face_count": 30
+          },
+          {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "solid_type": 0,
+            "temporary": true,
+            "volume_m3": 5.164385191763166e-10,
+            "face_count": 8
+          }
+        ]
+      },
+      "after_gap_m": 9.99999999995449e-05,
+      "before_interference_m3": 5.80943942804148e-06,
+      "after_interference_m3": 0,
+      "plan_a": [
+        {
+          "evidence_id": "U_RULE:COVER_WEB_WALL",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.519,
+                  -0.010499999999999954,
+                  0.00010000000000026698
+                ],
+                [
+                  0.519,
+                  0.0020999999999999908,
+                  0.00010000000000026958
+                ],
+                [
+                  0.5649000000000001,
+                  0.047900000000000054,
+                  0.00010000000000027869
+                ],
+                [
+                  0.5649000000000001,
+                  0.04800000000000004,
+                  0.00010000000000027869
+                ],
+                [
+                  0.5670000000000001,
+                  0.04800000000000004,
+                  0.00010000000000027869
+                ],
+                [
+                  0.5670000000000001,
+                  0.0734999999999999,
+                  0.00010000000000028389
+                ],
+                [
+                  1.0105000000000004,
+                  0.0734999999999999,
+                  0.00010000000000028389
+                ],
+                [
+                  1.0105000000000004,
+                  -0.010499999999999954,
+                  0.00010000000000026698
+                ]
+              ],
+              "direction": [
+                2.2204460492503136e-16,
+                2.2204460492503136e-16,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NORMAL_BEND_CAP",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  0.5649000000000001,
+                  0.04800000000000004,
+                  0.00010000000000027869
+                ],
+                [
+                  0.5649000000000001,
+                  0.0734999999999999,
+                  0.00010000000000028389
+                ],
+                [
+                  0.5670000000000001,
+                  0.0734999999999999,
+                  0.00010000000000028389
+                ],
+                [
+                  0.5670000000000001,
+                  0.04800000000000004,
+                  0.00010000000000027869
+                ]
+              ],
+              "direction": [
+                2.2204460492503136e-16,
+                2.2204460492503136e-16,
+                -1
+              ],
+              "length_m": 0.0021999999999999997,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "plan_b": [
+        {
+          "evidence_id": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5993999999999998,
+                  -0.010500000000000176,
+                  0.00010000000000000113
+                ],
+                [
+                  -0.5993999999999998,
+                  0.0020999999999997687,
+                  9.999999999999896e-05
+                ],
+                [
+                  -0.601558514748605,
+                  0.0020999999999997687,
+                  9.999999999999896e-05
+                ],
+                [
+                  -0.6472587326135287,
+                  0.04789999999999983,
+                  9.999999999999159e-05
+                ],
+                [
+                  -0.6473999999999999,
+                  0.04789999999999983,
+                  9.999999999999159e-05
+                ],
+                [
+                  -0.6473999999999999,
+                  0.05009999999999981,
+                  9.999999999999115e-05
+                ],
+                [
+                  -0.6624999999999998,
+                  0.05009999999999981,
+                  9.999999999999115e-05
+                ],
+                [
+                  -0.6624999999999998,
+                  0.07349999999999968,
+                  9.999999999998725e-05
+                ],
+                [
+                  -1.5104999999999995,
+                  0.07349999999999968,
+                  9.999999999998725e-05
+                ],
+                [
+                  -1.5104999999999995,
+                  -0.010500000000000176,
+                  0.00010000000000000113
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.032200000000000006,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:FAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.6472587326135287,
+                  0.04779999999999984,
+                  9.999999999999159e-05
+                ],
+                [
+                  -1.5104999999999995,
+                  0.04779999999999984,
+                  9.999999999999159e-05
+                ],
+                [
+                  -1.5104999999999995,
+                  0.07349999999999968,
+                  9.999999999998725e-05
+                ],
+                [
+                  -0.6472587326135287,
+                  0.07349999999999968,
+                  9.999999999998725e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        },
+        {
+          "evidence_id": "U_RULE:NEAR_BEND_CLEARANCE",
+          "kind": "Cut",
+          "normal_cut_intent": true,
+          "region_evidence": "Parametric Web tangent / Wall face / outer Return coverage derivation",
+          "tools": [
+            {
+              "polygon_m": [
+                [
+                  -0.5993999999999998,
+                  -0.010500000000000176,
+                  0.00010000000000000113
+                ],
+                [
+                  -1.5104999999999995,
+                  -0.010500000000000176,
+                  0.00010000000000000113
+                ],
+                [
+                  -1.5104999999999995,
+                  0.0020999999999997687,
+                  9.999999999999896e-05
+                ],
+                [
+                  -0.5993999999999998,
+                  0.0020999999999997687,
+                  9.999999999999896e-05
+                ]
+              ],
+              "direction": [
+                0,
+                0,
+                -1
+              ],
+              "length_m": 0.0022999999999999995,
+              "depth_policy": "FORMED_PROFILE_ENVELOPE",
+              "nominal_sheet_depth_m": 0,
+              "api_sheet_thickness_m": 0
+            }
+          ]
+        }
+      ],
+      "required_keep_validation": "PASS",
+      "selected_end_guard": "PASS"
+    },
+    "private_copy_rollback_preview": {
+      "rollback_a": true,
+      "rollback_b": true,
+      "public_preview_modes": [
+        {
+          "mode": 1,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.",
+          "is_showing": true
+        },
+        {
+          "mode": 2,
+          "status": "PASS_DISPLAY3_API",
+          "message": "ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+          "is_showing": true
+        }
+      ],
+      "hide_status": "PASS",
+      "hide_message": null,
+      "status": "PASS_DISPLAY3_API",
+      "restore_end_a": true,
+      "restore_end_b": true
+    }
+  }
+]

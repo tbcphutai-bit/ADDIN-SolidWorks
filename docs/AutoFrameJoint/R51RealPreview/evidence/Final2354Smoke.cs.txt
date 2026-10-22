@@ -1,0 +1,95 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.Commands.AutoFrameJoint;
+class AcceptanceHarness {
+    [DllImport("ole32.dll")] static extern int CreateStreamOnHGlobal(IntPtr p, bool delete, out IStream stream);
+    static JavaScriptSerializer j = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 200 };
+    static List<object> rows = new List<object>(); static string output;
+    static Dictionary<string, object> D(params object[] a) { var d = new Dictionary<string, object>(); for (int i = 0; i < a.Length; i += 2) d[(string)a[i]] = a[i + 1]; return d; }
+    static object[] A(object a) { return ((Array)a).Cast<object>().ToArray(); }
+    static Dictionary<string, object> O(object a) { return (Dictionary<string, object>)a; }
+    static void Save() { File.WriteAllText(output, j.Serialize(rows)); }
+    static void Error(Dictionary<string, object> r, Exception e) { r["status"] = e.Message.StartsWith("UNVERIFIED_RULE", StringComparison.Ordinal) ? "UNVERIFIED_RULE" : "FAIL"; r["exception"] = D("type", e.GetType().FullName, "hresult", "0x" + e.HResult.ToString("X8"), "message", e.Message, "stack", e.StackTrace); }
+    static Body2 Restore(ISldWorks sw, string path) { IStream stream; Marshal.ThrowExceptionForHR(CreateStreamOnHGlobal(IntPtr.Zero, true, out stream)); try { byte[] bytes = File.ReadAllBytes(path); stream.Write(bytes, bytes.Length, IntPtr.Zero); stream.Seek(0, 0, IntPtr.Zero); Body2 b = ((Modeler)sw.GetModeler()).Restore(stream) as Body2; AfjTemporaryBoolean.Validate(b); return b; } finally { Marshal.ReleaseComObject(stream); } }
+    static object BodyMetrics(Body2 b) { FaultEntity fault = b.Check3; return D("check2", b.Check2(), "check3_fault_count", fault == null ? 0 : fault.Count, "solid_type", b.GetType(), "temporary", b.IsTemporaryBody(), "volume_m3", AfjTemporaryBoolean.Volume(b), "face_count", b.GetFaceCount()); }
+    static object Metrics(AfjBooleanResult r) { return D("before_m3", r.BeforeVolume, "after_m3", r.AfterVolume, "removed_m3", r.RemovedVolume, "mass_residual_m3", Math.Abs(r.BeforeVolume - r.AfterVolume - r.RemovedVolume), "kept", r.Kept.Select(BodyMetrics).ToArray(), "removed", r.Removed.Select(BodyMetrics).ToArray()); }
+    static object Plan(AfjCutPlan p) { return p.Operations.Select(o => D("evidence_id", o.EvidenceId, "kind", o.Kind.ToString(), "normal_cut_intent", o.NormalCutIntent, "region_evidence", o.RegionEvidence, "tools", o.Tools.Select(t => D("polygon_m", t.Polygon, "direction", t.Direction, "length_m", t.Length, "depth_policy", t.DepthPolicy, "nominal_sheet_depth_m", t.NominalSheetDepth, "api_sheet_thickness_m", t.ApiSheetThickness)).ToArray())).ToArray(); }
+    static void Result(Dictionary<string, object> r, AfjJointSolution s) { r["status"] = "PASS_GEOMETRY"; r["rule"] = s.Plan.RuleId; r["cover"] = s.CoverA ? "A" : "B"; r["length_a_m"] = s.LengthA; r["length_b_m"] = s.LengthB; r["a"] = Metrics(s.A); r["b"] = Metrics(s.B); r["after_gap_m"] = s.AfterGap; r["before_interference_m3"] = s.BeforeOverlap; r["after_interference_m3"] = s.AfterOverlap; r["plan_a"] = Plan(s.Plan.A); r["plan_b"] = Plan(s.Plan.B); r["required_keep_validation"] = "PASS"; r["selected_end_guard"] = "PASS"; }
+    static object Profile(AfjProfile p) { return D("axis", p.Axis, "thickness_m", p.Thickness, "bend_radius_m", p.Radius, "regions", p.Regions, "profile_lines_m", p.Lines, "bend_face_count", p.BendFaceCount); }
+    static void PublicPreview(ISldWorks sw, ModelDoc2 m, Component2 a, Component2 b, Dictionary<string, object> r) {
+        var ghost = new AutoFrameJointGhostPreview(sw, m);
+        var modes = new List<object>(); r["public_preview_modes"] = modes;
+        try { foreach (int mode in new[] { 1, 2 }) { string message; bool ok = ghost.TryShowCutCandidate(a, b, mode, out message); modes.Add(D("mode", mode, "status", ok && ghost.IsShowing ? "PASS_DISPLAY3_API" : "FAIL", "message", message, "is_showing", ghost.IsShowing)); if (!ok) throw new Exception("Public Preview rejected: " + message); } }
+        finally { string clean; bool ok = ghost.TryClear(out clean); r["hide_status"] = ok ? "PASS" : "FAIL"; r["hide_message"] = clean; if (!ok) throw new Exception("Hide cleanup failed"); }
+    }
+    [STAThread] static int Main(string[] args) {
+        output = Path.Combine(args[0], "final_2354_smoke_results.json");
+        Trace.Listeners.Add(new TextWriterTraceListener(Path.Combine(args[0], "final_2354_smoke_api.log"))); Trace.AutoFlush = true;
+        try { return Run(args); } catch (Exception e) { var r = D("case", "HARNESS_FATAL"); Error(r, e); rows.Add(r); Save(); Console.WriteLine(e.Message); return 2; }
+    }
+    static int Run(string[] args) {
+        string root = Path.GetFullPath(args[0]), previous = Path.GetFullPath(args[1]); ISldWorks sw = HarnessConnection.AttachVisible();
+        rows.Add(D("record_type", "provenance", "pid", sw.GetProcessID(), "revision", sw.RevisionNumber(), "harness_mvid", typeof(AcceptanceHarness).Assembly.ManifestModule.ModuleVersionId.ToString(), "apartment", System.Threading.Thread.CurrentThread.GetApartmentState().ToString(), "main_addin_built", false)); Save();
+        var maps = A(j.DeserializeObject(File.ReadAllText(Path.Combine(previous, "pair_copies/all_assembly_maps.json")))).Select(O).OrderBy(m => ((string)m["case"]).StartsWith("2354") ? 0 : ((string)m["case"]).StartsWith("1618") ? 1 : 2).ToArray();
+        var fixtures = A(j.DeserializeObject(File.ReadAllText(Path.Combine(previous, "joint_rules.json")))).Select(O).ToArray();
+        foreach (var map in maps.Where(x => ((string)x["case"]).StartsWith("2354"))) {
+            string name = (string)map["case"], path = (string)map["copy_assembly_path"];
+            if (!Path.GetFullPath(path).StartsWith(Path.Combine(previous, "pair_copies") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(path).StartsWith("AFJ_PAIR_")) throw new Exception("COPY GUARD");
+            if (sw.GetOpenDocumentByName(path) != null) throw new Exception("Private assembly already open; will not alter an existing document");
+            int error = 0, warning = 0; ModelDoc2 model = sw.OpenDoc6(path, 2, 3, "", ref error, ref warning) as ModelDoc2;
+            if (model == null) { rows.Add(D("case", name, "status", "FAIL", "open_error", error, "open_warning", warning)); Save(); continue; }
+            try {
+                int ae = 0; sw.ActivateDoc3(model.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref ae);
+                var components = A(((AssemblyDoc)model).GetComponents(false)).Cast<Component2>().ToDictionary(c => c.Name2);
+                var selected = fixtures.Where(f => (string)f["case"] == name && (!name.StartsWith("1618") || (string)f["id"] == "AFJ-R01" || (string)f["id"] == "AFJ-R04")).ToList();
+                if (name.StartsWith("2354")) selected.Add(D("id", "2354_FR04_FR03", "occurrence_a", components.Keys.Single(k => k.EndsWith("-fr04-1")), "occurrence_b", components.Keys.Single(k => k.EndsWith("-fr03-1"))));
+                foreach (var fixture in selected) {
+                    string id = (string)fixture["id"]; Console.WriteLine("START " + name + " " + id);
+                    Component2 ca = components[(string)fixture["occurrence_a"]], cb = components[(string)fixture["occurrence_b"]];
+                    var row = D("case", name, "fixture", id, "frame_a", ca.Name2, "frame_b", cb.Name2, "open_error", error, "open_warning", warning); rows.Add(row);
+                    var final = D(); row["native_current_state"] = final;
+                    try {
+                        var result = AfjJointSolver.Solve(sw, model, ca, cb); Result(final, result);
+                        var swapped = AfjJointSolver.Solve(sw, model, cb, ca);
+                        final["swap_status"] = swapped.CoverA != result.CoverA && Math.Abs(swapped.A.AfterVolume - result.B.AfterVolume) < 1e-12 && Math.Abs(swapped.B.AfterVolume - result.A.AfterVolume) < 1e-12 ? "PASS" : "FAIL";
+                        if (name.StartsWith("2354")) { PublicPreview(sw, model, ca, cb, final); if (result.A.RemovedVolume <= 1e-12 || result.B.RemovedVolume <= 1e-12) throw new Exception("Both Frames need positive cuts for this acceptance case"); }
+                    } catch (Exception e) { Error(final, e); }
+                    if (name.StartsWith("1618")) {
+                        var ghost = new AutoFrameJointGhostPreview(sw, model); string msg; bool ok = ghost.TryShowCutCandidate(ca, cb, 1, out msg);
+                        row["unsupported_public_preview"] = D("returned", ok, "message", msg, "display3_status", "NOT_RUN"); string clean; row["cleanup"] = ghost.TryClear(out clean);
+                        if (ok) final["status"] = "FAIL_UNVERIFIED_RULE_ADMITTED";
+                    }
+                    if (name.StartsWith("3615")) {
+                        ModelDoc2 pa, pb; MathTransform ta, tb; Body2 a = AfjJointSolver.NativeBody(ca, out pa, out ta), b = AfjJointSolver.NativeBody(cb, out pb, out tb);
+                        var pfa = AfjProfileAnalyzer.Analyze(pa, a); var pfb = AfjProfileAnalyzer.Analyze(pb, b); row["profile_a"] = Profile(pfa); row["profile_b"] = Profile(pfb);
+                        var opA = O(A(fixture["a_operations"])[0]); var opB = O(A(fixture["b_operations"])[0]);
+                        var before = D(); row["native_before_cut_snapshots"] = before;
+                        try {
+                            Body2 ba = Restore(sw, Path.Combine(previous, "study", "AFJ_STUDY_" + (string)fixture["a"], Convert.ToInt32(opA["native_ordinal"]) + "_before.brep"));
+                            Body2 bb = Restore(sw, Path.Combine(previous, "study", "AFJ_STUDY_" + (string)fixture["b"], Convert.ToInt32(opB["native_ordinal"]) + "_before.brep"));
+                            var solution = AfjJointSolver.SolveBodies(sw, model, ba, bb, pfa, pfb, pa, pb, ta, tb); Result(before, solution);
+                        } catch (Exception e) { Error(before, e); }
+                        var rollback = D(); row["private_copy_rollback_preview"] = rollback;
+                        try {
+                            bool ra = pa.FeatureManager.EditRollback(3, (string)opA["feature_name"]), rb = pb.FeatureManager.EditRollback(3, (string)opB["feature_name"]);
+                            rollback["rollback_a"] = ra; rollback["rollback_b"] = rb; if (!ra || !rb) throw new Exception("Private-copy rollback setup rejected");
+                            sw.ActivateDoc3(model.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref ae);
+                            PublicPreview(sw, model, ca, cb, rollback); rollback["status"] = "PASS_DISPLAY3_API";
+                        } catch (Exception e) { Error(rollback, e); }
+                        finally { rollback["restore_end_a"] = pa.FeatureManager.EditRollback(1, ""); rollback["restore_end_b"] = pb.FeatureManager.EditRollback(1, ""); }
+                    }
+                    Save(); Console.WriteLine(id + " current=" + final["status"]);
+                }
+            } finally { sw.CloseDoc(model.GetTitle()); }
+        }
+        Save(); return 0;
+    }
+}

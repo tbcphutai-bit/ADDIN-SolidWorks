@@ -1,0 +1,8 @@
+COM attached via PID moniker; pid=27808; no activation
+[AFJ-BOOLEAN] operation=legacy A intersect B code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=legacy shared intersect positive code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=legacy shared intersect negative code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=legacy subtract A code=547 name=swBodyOperationNonManifold
+[AFJ-BOOLEAN] operation=legacy one reset diagnostic A code=547 name=swBodyOperationNonManifold
+[AFJ-BOOLEAN] operation=legacy subtract B code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=legacy one reset diagnostic B code=0 name=swBodyOperationNoError

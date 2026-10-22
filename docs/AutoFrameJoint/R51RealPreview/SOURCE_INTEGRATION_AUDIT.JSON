@@ -1,0 +1,25 @@
+{
+  "variants": [
+    {
+      "variant": "branch",
+      "before_sha256": "18d6c9c1c1b45e4918a24d586d47e0937d437b068de757baf8ec26e25a72ddaf",
+      "after_sha256": "11b01b9852d70ce70373dbb4fb4c32edc0f421ab823b0e5c2652b258efca6b58"
+    },
+    {
+      "variant": "local",
+      "before_sha256": "f0fcda50d4852e715f353f9787d41d6c7d26de1ca4824e2b56752b6976c1584c",
+      "after_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b"
+    }
+  ],
+  "unchanged_local_methods": [
+    "TryShow",
+    "DisplayCandidateBodies",
+    "ShowComponent",
+    "TryClear",
+    "ClearInternal",
+    "IsOriginalAssemblyActive",
+    "RedrawSafely"
+  ],
+  "ui_changed": false,
+  "main_project_built": false
+}
