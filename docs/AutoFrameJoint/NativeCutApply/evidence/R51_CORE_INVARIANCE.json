@@ -1,0 +1,12 @@
+[
+  {
+    "variant": "local",
+    "r51_core_unchanged": true,
+    "core_sha256": "f2f8095d1e591894d54a02929932ca9ff7a5645fcf603d027f2764cc7c0d5f7c"
+  },
+  {
+    "variant": "branch",
+    "r51_core_unchanged": true,
+    "core_sha256": "f2f8095d1e591894d54a02929932ca9ff7a5645fcf603d027f2764cc7c0d5f7c"
+  }
+]

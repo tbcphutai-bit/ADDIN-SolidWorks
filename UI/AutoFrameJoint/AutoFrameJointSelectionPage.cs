@@ -11,7 +11,7 @@ namespace ADDIN.UI.AutoFrameJoint
     /// Native SOLIDWORKS PropertyManager Page for selecting EXACTLY two distinct
     /// Part component occurrences. This class is intentionally UI-only.
     ///
-    /// No Part cut features, geometry edits, configuration switching or saves.
+    /// Native Part cuts are delegated only after explicit OK closes the page; no Save.
     /// Read-only analyzer and parametric KEEP / KEEP-CUT previews belong to backend.
     /// </summary>
     [ComVisible(true)]
@@ -24,7 +24,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private const int ButtonAnalyze = 103;
         private const int LabelStatus = 104;
         private const int ButtonShowBodies = 105; // Explicit ghost preview; no real cut.
-        private const int ButtonFinish = 106; // Explicit exit; does NOT apply a cut.
+        private const int ButtonFinish = 106; // Same apply intent as the native green OK button.
         private const int ButtonCutP1 = 107;
         private const int ButtonCutP2 = 108;
         private const int GroupInformation = 110;
@@ -46,6 +46,10 @@ namespace ADDIN.UI.AutoFrameJoint
         private readonly Func<Component2, Component2, string> onShowBodies;
         private readonly Func<Component2, Component2, int, string> onPreviewCut;
         private readonly Action onClearPreview;
+        private readonly Func<Component2, Component2, string> onApplyCut;
+        private int closeReason;
+        private int selectionRevision, committedSelectionRevision;
+        private Component2 applyA, applyB;
         private readonly Action<AutoFrameJointSelectionPage> onClosed;
 
         private PropertyManagerPage2 page;
@@ -120,7 +124,8 @@ namespace ADDIN.UI.AutoFrameJoint
             Func<Component2, Component2, string> onShowBodies,
             Func<Component2, Component2, int, string> onPreviewCut,
             Action onClearPreview,
-            Action<AutoFrameJointSelectionPage> onClosed)
+            Action<AutoFrameJointSelectionPage> onClosed,
+            Func<Component2, Component2, string> onApplyCut = null)
         {
             this.app = app;
             this.onAnalyze = onAnalyze;
@@ -128,6 +133,7 @@ namespace ADDIN.UI.AutoFrameJoint
             this.onPreviewCut = onPreviewCut;
             this.onClearPreview = onClearPreview;
             this.onClosed = onClosed;
+            this.onApplyCut = onApplyCut;
             this.assembly = app == null ? null : app.ActiveDoc as ModelDoc2;
         }
 
@@ -268,7 +274,7 @@ namespace ADDIN.UI.AutoFrameJoint
         /// Finish from a PropertyManager button without closing the native page
         /// synchronously inside SOLIDWORKS OnButtonPress. The standard green
         /// OK and red Cancel corner buttons remain usable if posting fails.
-        /// Both paths close READ ONLY; OnClose/AfterClose owns cleanup.
+        /// OK applies the validated plan in AfterClose. Cancel/Esc only cleans up.
         /// </summary>
         private void QueueFinishPage()
         {
@@ -299,11 +305,22 @@ namespace ADDIN.UI.AutoFrameJoint
                     return;
                 }
                 if (page == null) return;
+                if (onApplyCut != null)
+                {
+                    Component2 currentA, currentB; string selectionReason;
+                    if (!TryReadSelection(out currentA,out currentB,out selectionReason,true))
+                    {
+                        finishRequested=false;
+                        TraceFlow("APPLY_FINISH_REJECT",selectionReason);
+                        UpdateReadyState();
+                        return;
+                    }
+                }
                 finishCloseIssued = true;
                 var timer = Stopwatch.StartNew();
                 try
                 {
-                    TraceFlow("FINISH_CLOSE_BEGIN", "close only; no Part cut");
+                    TraceFlow("FINISH_CLOSE_BEGIN", "OK intent; native Cut runs after page close");
                     page.Close(true);
                     TraceFlow("FINISH_CLOSE_RETURN", "ms=" + timer.ElapsedMilliseconds + " closing=" + closing);
                 }
@@ -392,8 +409,8 @@ namespace ADDIN.UI.AutoFrameJoint
             finishButtonControl = group.AddControl2(
                 ButtonFinish,
                 (short)swPropertyManagerPageControlType_e.swControlType_Button,
-                "Kết thúc (không cắt Part)", align, controlOptions,
-                "Đóng Auto Frame Joint và dọn Preview. Không lưu, không sửa Part.")
+                "Áp dụng cắt và kết thúc", align, controlOptions,
+                "Tạo Cut thật theo Preview đã xác minh rồi đóng lệnh. Part chưa được lưu.")
                 as PropertyManagerPageControl;
 
             statusLabel = group.AddControl2(
@@ -570,6 +587,7 @@ namespace ADDIN.UI.AutoFrameJoint
                                       out string reason, bool deepCheck)
         {
             RequireDeferredSelectionRead();
+            int readRevision=selectionRevision;
             a = null;
             b = null;
             if (!IsSameDocumentActive())
@@ -612,6 +630,9 @@ namespace ADDIN.UI.AutoFrameJoint
                 }
             }
 
+            if(readRevision!=selectionRevision)
+            { reason="Lựa chọn vừa đổi; hãy chờ cập nhật Frame A/B."; return false; }
+            committedSelectionRevision=readRevision;
             reason = deepCheck
                 ? "Hai Part hợp lệ để phân tích sơ bộ."
                 : "Đã chọn 2 Component — nhấn Phân tích.";
@@ -877,13 +898,27 @@ namespace ADDIN.UI.AutoFrameJoint
 
         public void OnClose(int reason)
         {
-            // Invalidate queued work BEFORE any native controls are released.
             TraceFlow("CLOSE", "reason=" + reason);
+            if (reason == (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay &&
+                (IsBackendBusy() || backendActionQueued ||
+                 (onApplyCut != null && selectionRevision != committedSelectionRevision)))
+            {
+                // S_FALSE is the documented managed PMP close deferral. Managed
+                // state only here; the active backend's finally posts Close later.
+                finishRequested=true; requestAutoAnalysis=false; requestFocusB=false;
+                TraceFlow("APPLY_CLOSE_WAIT", "retained OK intent; selectionRevision="+selectionRevision+" committed="+committedSelectionRevision);
+                TryQueueFinish(); // Managed dispatcher post only; no native selection read here.
+                throw new COMException("Auto Frame Joint is finishing the current Preview", 1);
+            }
+            closeReason = reason;
+            applyA = committedA;
+            applyB = committedB;
+            // Invalidate queued work BEFORE any native controls are released.
             finishRequested = false; finishQueued = false;
             closing = true;
             nativeActivated = false;
             System.Threading.Interlocked.Increment(ref pageEpoch);
-            Trace.WriteLine("[AFJ-R50] CLOSING reason=" + reason + " epoch=" + pageEpoch + "; no cut");
+            Trace.WriteLine("[AFJ-APPLY] CLOSING reason=" + reason + " epoch=" + pageEpoch + "; defer apply until AfterClose");
         }
 
         public void AfterClose()
@@ -914,13 +949,24 @@ namespace ADDIN.UI.AutoFrameJoint
             geometryGapLabel = null;
             geometryStatusLabel = null;
             geometryRoleLabel = null;
-            try { if (onClearPreview != null) onClearPreview(); }
-            catch (Exception ex) { TraceUiFault("preview cleanup", ex, false); }
+            try
+            {
+                if (closeReason == (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay && onApplyCut != null)
+                {
+                    TraceFlow("APPLY_CALLBACK_BEGIN", "closed page; no native controls retained");
+                    string result = onApplyCut(applyA, applyB);
+                    TraceFlow("APPLY_CALLBACK_END", result ?? "No apply result");
+                }
+            }
+            catch (Exception ex) { TraceUiFault("apply after close", ex, false); }
             finally
             {
+                applyA=null; applyB=null;
+                try { if (onClearPreview != null) onClearPreview(); }
+                catch (Exception ex) { TraceUiFault("preview cleanup", ex, false); }
                 try { if (onClosed != null) onClosed(this); }
                 catch (Exception ex) { TraceUiFault("page closed callback", ex, false); }
-                TraceFlow("AFTER_CLOSE_END", "cleanup/onClosed returned ms=" + closeTimer.ElapsedMilliseconds);
+                TraceFlow("AFTER_CLOSE_END", "apply/cleanup/onClosed returned ms=" + closeTimer.ElapsedMilliseconds);
             }
         }
 
@@ -970,6 +1016,7 @@ namespace ADDIN.UI.AutoFrameJoint
             {
                 TraceFlow("LIST_ENTER", "box=" + id + " count=" + count);
                 if (id != BoxFrameA && id != BoxFrameB) { TraceFlow("LIST_REJECT", "unknown box"); return; }
+                selectionRevision++; // Managed invalidation, including count-one replacement.
                 if (id == BoxFrameA) { callbackCountA = count; if (count != 1) { committedA = null; committedNameA = null; } }
                 else { callbackCountB = count; if (count != 1) { committedB = null; committedNameB = null; } }
                 QueueSelectionRefresh(id == BoxFrameA && count == 1, id == BoxFrameB && count == 1);
@@ -1015,6 +1062,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 // Full occurrence/document identity is checked after commit,
                 // then again before every action. Never clear/re-mark inline.
                 if (String.IsNullOrWhiteSpace(itemText)) itemText = id == BoxFrameA ? "Frame A" : "Frame B";
+                selectionRevision++;
                 accepted = true;
                 reason = "ACCEPT_FILTERED_PENDING_DEFERRED_IDENTITY";
                 return true;

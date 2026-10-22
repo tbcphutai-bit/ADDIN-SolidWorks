@@ -1,0 +1,40 @@
+﻿run,pair,case,input_state,status,native_apply_status,exported_native_definition_records,native_cut_creation_events,gap_mm,interference_m3,rollback_verified,source_hash_unchanged,copy_hash_unchanged,installed_addin,reason
+native_final_2354,2354 fr04 × fr03,public_preview_then_apply,current_native_part,PASS_NATIVE_API,NOT_AVAILABLE,0,4,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,True,True,False,
+native_final_2354,2354 fr04 × fr03,rollback_after_both_parts,current_native_part,PASS_NATIVE_API,REJECTED_OR_ROLLED_BACK,4,4,NOT_AVAILABLE,NOT_AVAILABLE,True,True,True,False,"HRESULT=0x80131509 System.InvalidOperationException: APPLY: native Cut differs from reviewed B-rep, delta_m3=6.8665694004274127E-05
+   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.VerifyBody(Body2 current, Body2 expected)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.ApplyPart(ISldWorks app, PartEdit edit, AfjCutPlan plan, Body2 expected, String frame, AfjNativeApplyReport report)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)"
+native_final_2354,2354 fr04 × fr03,stale_preview_rejected,current_native_part,PASS_NATIVE_API,REJECTED_OR_ROLLED_BACK,0,0,NOT_AVAILABLE,NOT_AVAILABLE,True,True,True,False,"HRESULT=0x80131509 System.InvalidOperationException: PREVIEW_STALE: hãy tạo lại Preview đúng hai Frame trước khi OK
+   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)"
+native_final_3615_T1,3615 T1 fr1 × fr2,positive,stock_setup_attempt_on_copy,FAIL,NOT_AVAILABLE,0,0,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,True,True,False,"System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))
+   場所 SolidWorks.Interop.sldworks.IFeature.GetTypeName2()
+   場所 NativeApplyHarness.StockBeforeCuts(ISldWorks app, ModelDoc2 model, Component2 a, Component2 b)
+   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)"
+native_1618_fr1_fr2_current,1618 fr1 × fr2,unsupported_current,current_native_part,PASS_NATIVE_REFUSAL,NOT_AVAILABLE,0,0,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,True,True,False,"System.InvalidOperationException: UNVERIFIED_RULE: no unique Web between parallel outward Walls
+   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.WebLine(AfjProfile profile)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)
+   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)"
+native_1618_fr3_fr4_current,1618 fr3 × fr4,unsupported_current,current_native_part,PASS_NATIVE_REFUSAL,NOT_AVAILABLE,0,0,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,True,True,False,"System.InvalidOperationException: UNVERIFIED_RULE: no unique Web between parallel outward Walls
+   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.WebLine(AfjProfile profile)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)
+   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)"
+native_3615_T1_current,3615 T1 fr1 × fr2,unsupported_current,current_native_part,PASS_NATIVE_REFUSAL,NOT_AVAILABLE,0,0,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,True,True,False,"System.InvalidOperationException: UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=27.708847204660248/0
+   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)
+   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)"
+native_3615_T2_current,3615 T2 fr1 × fr2,unsupported_current,current_native_part,PASS_NATIVE_REFUSAL,NOT_AVAILABLE,0,0,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,True,True,False,"System.InvalidOperationException: UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551942786/284.56300526426185
+   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.VerifyCoverage(ISldWorks app, AfjParametricPlan generated, MathTransform ta, MathTransform tb, Boolean aCovers, AfjBooleanResult a, AfjBooleanResult b)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)
+   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)
+   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)"
+native_3615_T1_stock,3615 T1 fr1 × fr2,positive,earlier_stock_copy_run,PASS_NATIVE_API,APPLY_VERIFIED,4,4,0.09999999999991943,0,False,True,False,False,
+native_3615_T2_stock_scope,3615 T2 fr1 × fr2,shared_part_rejected,earlier_stock_scope_attempt,FAIL,REJECTED_OR_ROLLED_BACK,0,0,NOT_AVAILABLE,NOT_AVAILABLE,True,True,False,False,"System.InvalidOperationException: Expected shared-Part scope refusal before native Feature creation
+   場所 NativeApplyHarness.Assert(Boolean value, String text)
+   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)"
+native_3615_T2_stock_scope,3615 T2 fr1 × fr2,SETUP,earlier_stock_scope_attempt,PREEXISTING_STATE_CHECK_FAILED,NOT_AVAILABLE,0,0,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,False,"System.Runtime.InteropServices.COMException (0x80010108): 起動されたオブジェクトはクライアントから切断されました。 (HRESULT からの例外:0x80010108 (RPC_E_DISCONNECTED))
+   場所 SolidWorks.Interop.sldworks.IModelDoc2.GetTitle()
+   場所 NativeApplyHarness.Main(String[] args)"
+native_final_3615_T2_suppressed_scope,3615 T2 fr1 × fr2,shared_part_rejected,stock_plus_suppressed_duplicate_scope,NOT_RUN,NOT_AVAILABLE,0,0,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,False,Final isolated batch stopped at the T1 stock-setup RPC_E_SERVERFAULT; no suppressed-occurrence native qualification claimed.
