@@ -9,8 +9,8 @@ namespace ADDIN.Commands.AutoFrameJoint
     /// <summary>
     /// Native PropertyManager entry for exactly two Part occurrences.
     /// Read-only Analyze, original Ghost, and user-triggered KEEP / KEEP-CUT TEMPORARY
-    /// Boolean both-frame cut candidates. Does NOT apply any cut to Part,
-    /// mate, feature or Save. Rules outside measured profiles/placements are refused.
+    /// Boolean both-frame cut candidates. Explicit OK applies the validated plan
+    /// as native Cut features after page close. Does not Save; unverified rules are refused.
     /// </summary>
     public static class AutoFrameJointCommandEntry
     {
@@ -150,6 +150,27 @@ namespace ADDIN.Commands.AutoFrameJoint
                         {
                             if (Object.ReferenceEquals(activePage, p))
                                 activePage = null;
+                        },
+                        (frameA, frameB) =>
+                        {
+                            string status;
+                            bool applied;
+                            try { applied = manager.TryApplyCut(pageToken, frameA, frameB, out status); }
+                            catch (Exception ex)
+                            {
+                                applied=false;
+                                status="Không áp dụng Cut; xem log AFJ-APPLY. " + ex.Message;
+                                Trace.WriteLine("[AFJ-APPLY] ENTRY_EXCEPTION HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex);
+                            }
+                            Trace.WriteLine("[AFJ-APPLY] ENTRY success=" + applied + " " + status);
+                            try
+                            {
+                                app.SendMsgToUser2(status,
+                                    applied ? (int)swMessageBoxIcon_e.swMbInformation : (int)swMessageBoxIcon_e.swMbStop,
+                                    (int)swMessageBoxBtn_e.swMbOk);
+                            }
+                            catch (Exception ex) { Trace.WriteLine("[AFJ-APPLY] Result notification unavailable " + ex.Message); }
+                            return status;
                         });
 
                 activePage = page;

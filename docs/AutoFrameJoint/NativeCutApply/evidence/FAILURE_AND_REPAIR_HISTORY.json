@@ -1,0 +1,567 @@
+[
+  {
+    "run": "native_2354_attempt1",
+    "records": [
+      {
+        "status": "API_UNAVAILABLE_OR_SETUP_FAILED",
+        "error": "System.InvalidOperationException: Need exactly one visible SOLIDWORKS ROT session; found 0. No activation performed.\r\n   場所 HarnessConnection.AttachVisible()\r\n   場所 NativeApplyHarness.Main(String[] args)",
+        "hresult": "0x80131509"
+      }
+    ]
+  },
+  {
+    "run": "native_2354_attempt2",
+    "records": [
+      {
+        "status": "API_UNAVAILABLE_OR_SETUP_FAILED",
+        "error": "System.InvalidOperationException: The previously verified SOLIDWORKS PID is no longer available; no fallback or activation.\r\n   場所 HarnessConnection.AttachVisible()\r\n   場所 NativeApplyHarness.Main(String[] args)",
+        "hresult": "0x80131509"
+      }
+    ]
+  },
+  {
+    "run": "native_2354_attempt3",
+    "records": [
+      {
+        "status": "API_UNAVAILABLE_OR_SETUP_FAILED",
+        "error": "System.InvalidOperationException: An existing SOLIDWORKS process prevents owned-session activation\r\n   場所 NativeApplyHarness.Assert(Boolean value, String text)\r\n   場所 NativeApplyHarness.Main(String[] args)",
+        "hresult": "0x80131509"
+      }
+    ]
+  },
+  {
+    "run": "native_2354_attempt4",
+    "records": [
+      {
+        "status": "API_UNAVAILABLE_OR_SETUP_FAILED",
+        "error": "System.InvalidOperationException: SOLIDWORKS process inventory changed; refusing additional activation\r\n   場所 NativeApplyHarness.Assert(Boolean value, String text)\r\n   場所 NativeApplyHarness.Main(String[] args)",
+        "hresult": "0x80131509"
+      }
+    ]
+  },
+  {
+    "run": "native_2354_attempt5",
+    "records": [
+      {
+        "status": "API_UNAVAILABLE_OR_SETUP_FAILED",
+        "error": "System.InvalidOperationException: A blank SOLIDWORKS session is required; existing user documents were not changed or closed\r\n   場所 NativeApplyHarness.Assert(Boolean value, String text)\r\n   場所 NativeApplyHarness.Main(String[] args)",
+        "hresult": "0x80131509"
+      }
+    ]
+  },
+  {
+    "run": "native_2354_attempt6",
+    "records": [
+      {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "saved_to_disk": false,
+        "open_error": 0,
+        "open_warning": 0,
+        "apply": {
+          "Status": "REJECTED_OR_ROLLED_BACK",
+          "Error": "HRESULT=0x80131509 System.InvalidOperationException: APPLY: bound Assembly and two independent Parts required\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)",
+          "RollbackVerified": true,
+          "SavedToDisk": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [],
+          "Rollback": []
+        },
+        "returned_success": false,
+        "message": "Chưa áp dụng Cut; hình học hai Part được giữ hoặc hoàn tác. APPLY: bound Assembly and two independent Parts required",
+        "status": "FAIL",
+        "error": "System.InvalidOperationException: Expected actual Cut-Extrude features\r\n   場所 NativeApplyHarness.Assert(Boolean value, String text)\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "hresult": "0x80131509",
+        "close_error": "System.Runtime.InteropServices.COMException (0x80010108): 起動されたオブジェクトはクライアントから切断されました。 (HRESULT からの例外:0x80010108 (RPC_E_DISCONNECTED))\r\n   場所 SolidWorks.Interop.sldworks.IModelDoc2.GetPathName()\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "preexisting_documents_preserved": true
+      }
+    ]
+  },
+  {
+    "run": "native_2354_attempt7",
+    "records": [
+      {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "saved_to_disk": false,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "assembly_active_after_solve": 1,
+        "apply": {
+          "Status": "ROLLBACK_UNVERIFIED",
+          "Error": "HRESULT=0x80131509 System.InvalidOperationException: APPLY: native Cut feature error=0\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.WriteTool(ISldWorks app, PartEdit edit, AfjToolDefinition spec, Boolean normalCut, String suffix, Boolean& reverse)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.ApplyPart(ISldWorks app, PartEdit edit, AfjCutPlan plan, Body2 expected, String frame, AfjNativeApplyReport report)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)",
+          "RollbackVerified": false,
+          "SavedToDisk": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [],
+          "Rollback": [
+            "AFJ_9a76fdac_A: ROLLBACK_UNVERIFIED Feature tree differs after undo"
+          ]
+        },
+        "returned_success": false,
+        "message": "Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+        "status": "FAIL",
+        "error": "System.InvalidOperationException: Expected actual Cut-Extrude features\r\n   場所 NativeApplyHarness.Assert(Boolean value, String text)\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "hresult": "0x80131509",
+        "close_error": "System.Runtime.InteropServices.COMException (0x80010108): 起動されたオブジェクトはクライアントから切断されました。 (HRESULT からの例外:0x80010108 (RPC_E_DISCONNECTED))\r\n   場所 SolidWorks.Interop.sldworks.IModelDoc2.GetPathName()\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "preexisting_documents_preserved": true
+      }
+    ]
+  },
+  {
+    "run": "native_2354_attempt8",
+    "records": [
+      {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "saved_to_disk": false,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "assembly_active_after_solve": 1,
+        "apply": {
+          "Status": "ROLLBACK_UNVERIFIED",
+          "Error": "HRESULT=0x80131509 System.InvalidOperationException: APPLY: cannot activate the bound document, error=2\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.Activate(ISldWorks app, ModelDoc2 part)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)",
+          "RollbackVerified": false,
+          "SavedToDisk": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:COVER_WEB_WALL",
+              "FeatureName": "AFJ_5d84378c_A_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.060200000000000004,
+              "RemovedCubicMetres": 7.174026935599266e-05,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:NORMAL_BEND_CAP",
+              "FeatureName": "AFJ_5d84378c_A_02_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0026999999999999997,
+              "RemovedCubicMetres": 1.3128324823542243e-08,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+              "FeatureName": "AFJ_5d84378c_B_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.04220000000000001,
+              "RemovedCubicMetres": 6.866490951705346e-05,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:FAR_BEND_CLEARANCE",
+              "FeatureName": "AFJ_5d84378c_B_02_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0027999999999999995,
+              "RemovedCubicMetres": 7.844872207149655e-10,
+              "SymmetricDifferenceCubicMetres": 0
+            }
+          ],
+          "Rollback": [
+            "AFJ_5d84378c_B: ROLLBACK_UNVERIFIED APPLY: native Cut differs from reviewed B-rep, delta_m3=6.866490951705346E-05",
+            "AFJ_5d84378c_A: ROLLBACK_UNVERIFIED APPLY: native Cut differs from reviewed B-rep, delta_m3=7.17402693559928E-05"
+          ]
+        },
+        "returned_success": false,
+        "message": "Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+        "status": "FAIL",
+        "error": "System.InvalidOperationException: Expected actual Cut-Extrude features\r\n   場所 NativeApplyHarness.Assert(Boolean value, String text)\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "hresult": "0x80131509",
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "preexisting_documents_preserved": true
+      }
+    ]
+  },
+  {
+    "run": "native_2354_attempt9",
+    "records": [
+      {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "saved_to_disk": false,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "assembly_active_after_solve": 1,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "Error": null,
+          "RollbackVerified": false,
+          "SavedToDisk": false,
+          "GapMetres": 9.999999999976694e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:COVER_WEB_WALL",
+              "FeatureName": "AFJ_1392534b_A_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.060200000000000004,
+              "RemovedCubicMetres": 7.174026935599264e-05,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:NORMAL_BEND_CAP",
+              "FeatureName": "AFJ_1392534b_A_02_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0026999999999999997,
+              "RemovedCubicMetres": 1.3128324823542243e-08,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+              "FeatureName": "AFJ_1392534b_B_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.04220000000000001,
+              "RemovedCubicMetres": 6.866490951705345e-05,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:FAR_BEND_CLEARANCE",
+              "FeatureName": "AFJ_1392534b_B_02_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0027999999999999995,
+              "RemovedCubicMetres": 7.844872207149655e-10,
+              "SymmetricDifferenceCubicMetres": 0
+            }
+          ],
+          "Rollback": []
+        },
+        "returned_success": true,
+        "message": "Đã tạo 4 Cut-Extrude trên hai Frame, khớp Preview. Part chưa được lưu; dùng Ctrl+S khi muốn lưu.",
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "PASS_NATIVE_API",
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "preexisting_documents_preserved": true
+      },
+      {
+        "case": "rollback_after_both_parts",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "saved_to_disk": false,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "assembly_active_after_solve": 1,
+        "apply": {
+          "Status": "ROLLBACK_UNVERIFIED",
+          "Error": "HRESULT=0x80131509 System.InvalidOperationException: APPLY: native Cut differs from reviewed B-rep, delta_m3=6.8665694004274154E-05\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.VerifyBody(Body2 current, Body2 expected)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.ApplyPart(ISldWorks app, PartEdit edit, AfjCutPlan plan, Body2 expected, String frame, AfjNativeApplyReport report)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)",
+          "RollbackVerified": false,
+          "SavedToDisk": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:COVER_WEB_WALL",
+              "FeatureName": "AFJ_345156c0_A_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.060200000000000004,
+              "RemovedCubicMetres": 7.174026935599267e-05,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:NORMAL_BEND_CAP",
+              "FeatureName": "AFJ_345156c0_A_02_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0026999999999999997,
+              "RemovedCubicMetres": 1.3128324823542243e-08,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+              "FeatureName": "AFJ_345156c0_B_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.04220000000000001,
+              "RemovedCubicMetres": 6.866490951705345e-05,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:FAR_BEND_CLEARANCE",
+              "FeatureName": "AFJ_345156c0_B_02_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0027999999999999995,
+              "RemovedCubicMetres": 7.844872207149655e-10,
+              "SymmetricDifferenceCubicMetres": 0
+            }
+          ],
+          "Rollback": [
+            "AFJ_345156c0_B: ROLLBACK_UNVERIFIED Cannot remove owned rollback feature AFJ_345156c0_B_02_Profile",
+            "AFJ_345156c0_A: ROLLBACK_UNVERIFIED Cannot remove owned rollback feature AFJ_345156c0_A_02_Profile"
+          ]
+        },
+        "returned_success": false,
+        "message": "Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+        "status": "FAIL",
+        "error": "System.InvalidOperationException: Expected rejection/verified rollback\r\n   場所 NativeApplyHarness.Assert(Boolean value, String text)\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "hresult": "0x80131509",
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "preexisting_documents_preserved": true
+      }
+    ]
+  },
+  {
+    "run": "native_2354_rollback_targeted",
+    "records": [
+      {
+        "case": "rollback_after_both_parts",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "saved_to_disk": false,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "assembly_active_after_solve": 1,
+        "apply": {
+          "Status": "REJECTED_OR_ROLLED_BACK",
+          "Error": "HRESULT=0x80131509 System.InvalidOperationException: APPLY: native Cut differs from reviewed B-rep, delta_m3=6.8665694004274154E-05\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.VerifyBody(Body2 current, Body2 expected)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.ApplyPart(ISldWorks app, PartEdit edit, AfjCutPlan plan, Body2 expected, String frame, AfjNativeApplyReport report)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)",
+          "RollbackVerified": true,
+          "SavedToDisk": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:COVER_WEB_WALL",
+              "FeatureName": "AFJ_3da3641a_A_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.060200000000000004,
+              "RemovedCubicMetres": 7.174026935599267e-05,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:NORMAL_BEND_CAP",
+              "FeatureName": "AFJ_3da3641a_A_02_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0026999999999999997,
+              "RemovedCubicMetres": 1.3128324823542243e-08,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+              "FeatureName": "AFJ_3da3641a_B_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.04220000000000001,
+              "RemovedCubicMetres": 6.866490951705345e-05,
+              "SymmetricDifferenceCubicMetres": 0
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:FAR_BEND_CLEARANCE",
+              "FeatureName": "AFJ_3da3641a_B_02_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0027999999999999995,
+              "RemovedCubicMetres": 7.844872207149655e-10,
+              "SymmetricDifferenceCubicMetres": 0
+            }
+          ],
+          "Rollback": [
+            "AFJ_3da3641a_B: OWNED_FEATURES_REMOVED_GEOMETRY_AND_TREE_RESTORED",
+            "AFJ_3da3641a_A: OWNED_FEATURES_REMOVED_GEOMETRY_AND_TREE_RESTORED"
+          ]
+        },
+        "returned_success": false,
+        "message": "Chưa áp dụng Cut; hình học hai Part được giữ hoặc hoàn tác. APPLY: native Cut differs from reviewed B-rep, delta_m3=6.8665694004274154E-05",
+        "status": "PASS_NATIVE_API",
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "preexisting_documents_preserved": true
+      }
+    ]
+  },
+  {
+    "run": "native_2354_public_final",
+    "records": [
+      {
+        "case": "public_preview_then_apply",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "saved_to_disk": false,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "assembly_active_after_solve": 1,
+        "public_preview_display3": true,
+        "public_manager_message": "Đã tạo 4 Cut-Extrude trên hai Frame, khớp Preview. Part chưa được lưu; dùng Ctrl+S khi muốn lưu.",
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "public_manager_closed": true,
+        "public_cleanup_message": "Không có Temporary Body còn chờ dọn.",
+        "status": "PASS_NATIVE_API",
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "preexisting_documents_preserved": true
+      },
+      {
+        "case": "stale_preview_rejected",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "saved_to_disk": false,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "assembly_active_after_solve": 1,
+        "apply": {
+          "Status": "REJECTED_OR_ROLLED_BACK",
+          "Error": "HRESULT=0x80131509 System.InvalidOperationException: PREVIEW_STALE: hãy tạo lại Preview đúng hai Frame trước khi OK\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)",
+          "RollbackVerified": true,
+          "SavedToDisk": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [],
+          "Rollback": []
+        },
+        "returned_success": false,
+        "message": "Chưa áp dụng Cut; hình học hai Part được giữ hoặc hoàn tác. PREVIEW_STALE: hãy tạo lại Preview đúng hai Frame trước khi OK",
+        "status": "PASS_NATIVE_API",
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "preexisting_documents_preserved": true
+      }
+    ]
+  },
+  {
+    "run": "native_2354_isolated_final",
+    "records": [
+      {
+        "status": "API_UNAVAILABLE_OR_SETUP_FAILED",
+        "error": "System.IO.IOException: 別のプロセスで使用されているため、プロセスはファイル '<ANALYSIS_OUTPUT>\\native_2354_isolated_final\\public_preview_then_apply\\AFJ_PAIR_2354-02-lc-B11.SLDASM' にアクセスできません。\r\n   場所 System.IO.__Error.WinIOError(Int32 errorCode, String maybeFullPath)\r\n   場所 System.IO.FileStream.Init(String path, FileMode mode, FileAccess access, Int32 rights, Boolean useRights, FileShare share, Int32 bufferSize, FileOptions options, SECURITY_ATTRIBUTES secAttrs, String msgPath, Boolean bFromProxy, Boolean useLongPath, Boolean checkHost)\r\n   場所 System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share)\r\n   場所 System.IO.File.OpenRead(String path)\r\n   場所 NativeApplyHarness.Hash(String file)\r\n   場所 NativeApplyHarness.<>c__DisplayClass6_0.<Case>b__9(String p)\r\n   場所 System.Linq.Enumerable.All[TSource](IEnumerable`1 source, Func`2 predicate)\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)\r\n   場所 NativeApplyHarness.Main(String[] args)",
+        "hresult": "0x80070020"
+      }
+    ]
+  }
+]

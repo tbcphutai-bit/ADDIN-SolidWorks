@@ -1,0 +1,23 @@
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.002 R=0.0001
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.002 R=0.0001
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError

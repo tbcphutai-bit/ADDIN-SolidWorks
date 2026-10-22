@@ -12,7 +12,7 @@ namespace ADDIN.Commands.AutoFrameJoint
     /// <summary>
     /// Temporary original-body overlay and parametric profile cut preview.
     /// All preview cut operations are on disposable B-rep copies ONLY;
-    /// no production cut or Part/Assembly feature is ever written.
+    /// this Preview class only prepares the reviewed ticket for the native writer.
     /// Runs on the SOLIDWORKS UI thread from explicit PMP buttons.
     /// The native A/B selector must pass its host smoke test first.
     /// </summary>
@@ -379,6 +379,32 @@ namespace ADDIN.Commands.AutoFrameJoint
             if (cachedSolution != null) Trace.WriteLine("[AFJ-R52-PERF] cache=INVALID reason=" + reason);
             cachedSolution = null; cachedSource = null; displayedCandidate = 0; displayedMessage = null;
         }
+        internal bool TryPrepareApply(Component2 frameA, Component2 frameB,
+                                      out AfjApplyTicket ticket, out string message)
+        {
+            ticket = null;
+            message = "PREVIEW_REQUIRED: hãy tạo Preview trước khi OK.";
+            if (busy || closeRequested || cachedSolution == null || cachedSource == null ||
+                frameA == null || frameB == null || !IsOriginalAssemblyActive()) return false;
+            if (frameA.GetParent()!=null || frameB.GetParent()!=null || frameA.IsSuppressed() || frameB.IsSuppressed() ||
+                frameA.IsHidden(false) || frameB.IsHidden(false))
+            { message="APPLY: cần hai Part cấp đầu đang hiển thị và resolved."; return false; }
+            PreviewSourceState state = cachedSource;
+            AfjJointSolution result = cachedSolution;
+            if (!SameSourceState(state, TryCaptureSourceState(frameA, frameB)))
+            { message = "PREVIEW_STALE: Frame đã thay đổi; hãy tạo Preview lại."; return false; }
+            ModelDoc2 pa, pb;
+            MathTransform ta, tb;
+            Body2 a = AfjJointSolver.NativeBody(frameA, out pa, out ta);
+            Body2 b = AfjJointSolver.NativeBody(frameB, out pb, out tb);
+            ticket = new AfjApplyTicket { FrameA=frameA, FrameB=frameB, Preview=result,
+                BeforeA=a, BeforeB=b,
+                IsSourceCurrent=() => !closeRequested && IsOriginalAssemblyActive() &&
+                    SameSourceState(state, TryCaptureSourceState(frameA, frameB)) };
+            message = "Validated Preview ticket prepared; no Part mutation.";
+            return true;
+        }
+
         internal void RequestClose()
         {
             closeRequested = true; // Managed latch, including reentrant close during a native operation.
@@ -1893,4 +1919,457 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
     }
 
+}
+
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.Globalization;
+    using System.Linq;
+    using SolidWorks.Interop.sldworks;
+    using SolidWorks.Interop.swconst;
+    internal sealed class AfjApplyTicket
+    {
+        internal Component2 FrameA, FrameB;
+        internal AfjJointSolution Preview;
+        internal Body2 BeforeA, BeforeB;
+        internal Func<bool> IsSourceCurrent;
+        internal bool Consumed;
+    }
+    internal sealed class AfjNativeCutEvidence
+    {
+        public string Frame, EvidenceId, FeatureName, FeatureType, UnderlyingType, DepthPolicy;
+        public int EndCondition;
+        public bool NormalCut, FlipSideToCut, ReverseDirection;
+        public double DepthMetres, RemovedCubicMetres, SymmetricDifferenceCubicMetres;
+    }
+    internal sealed class AfjNativeApplyReport
+    {
+        public string Status = "NOT_STARTED", Error;
+        public bool RollbackVerified, SaveApiCalled = false;
+        public double GapMetres, InterferenceCubicMetres;
+        public readonly List<AfjNativeCutEvidence> Cuts = new List<AfjNativeCutEvidence>();
+        public readonly List<string> Rollback = new List<string>();
+    }
+
+    /// <summary>
+    /// Native Cut-Extrude from an already reviewed temporary plan. No Save,
+    /// imported replacement body, assembly feature, build or deployment.
+    /// The caller must run after the native PropertyManager has closed.
+    /// </summary>
+    internal static class AfjNativeCutCommit
+    {
+        private sealed class PartEdit
+        {
+            internal ModelDoc2 Part;
+            internal Body2 Before;
+            internal string[] Tree, AfterTree;
+            internal int AfterStamp;
+            internal bool SheetMetal, Recording, GroupFinished, Started;
+            internal string Prefix;
+            internal readonly HashSet<int> OwnedIds = new HashSet<int>();
+        }
+
+        private static double[] Cross(double[] a, double[] b)
+        { return new[] { a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0] }; }
+        internal static bool ReverseForAlignment(double alignment)
+        {
+            if (!AfjTemporaryBoolean.Finite(alignment) || Math.Abs(Math.Abs(alignment)-1)>1e-7)
+                throw new InvalidOperationException("APPLY: cut axis is not normal to native sketch");
+            return alignment>0; // Native cut defaults to -sketch normal.
+        }
+        internal static bool UseNativeNormalCut(AfjCutOperation operation, AfjToolDefinition tool)
+        { return tool.DepthPolicy=="SINGLE_SHEET_BLIND_T_PLUS_OVERRUN" && operation.NormalCutIntent; }
+        private static double[] Point(ISldWorks app, double[] point, MathTransform transform)
+        {
+            var utility = app.GetMathUtility() as MathUtility;
+            var p = utility.CreatePoint(point) as MathPoint;
+            var transformed = p.MultiplyTransform(transform) as MathPoint;
+            var result = transformed.ArrayData as double[];
+            if (result == null || result.Length != 3 || result.Any(x => !AfjTemporaryBoolean.Finite(x)))
+                throw new InvalidOperationException("APPLY: invalid sketch transform");
+            return result;
+        }
+        private static bool Same(ISldWorks app, object a, object b)
+        { return a != null && b != null && app.IsSame(a, b) == (int)swObjectEquality.swObjectSame; }
+        internal static bool SameReferencePath(string a,string b)
+        {
+            if(String.IsNullOrWhiteSpace(a)||String.IsNullOrWhiteSpace(b)||!System.IO.Path.IsPathRooted(a)||!System.IO.Path.IsPathRooted(b))
+                throw new InvalidOperationException("APPLY: absolute component reference path required");
+            return String.Equals(System.IO.Path.GetFullPath(a),System.IO.Path.GetFullPath(b),StringComparison.OrdinalIgnoreCase);
+        }
+        private static void Activate(ISldWorks app, ModelDoc2 part)
+        {
+            if (Same(app, app.ActiveDoc, part)) return;
+            int errors = 0;
+            var active = app.ActivateDoc3(part.GetTitle(), false,
+                (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref errors) as ModelDoc2;
+            Trace.WriteLine("[AFJ-APPLY] ACTIVATE status="+errors+" identity="+Same(app,active,part));
+            if ((errors & ~(int)swActivateDocError_e.swDocNeedsRebuildWarning) != 0 || !Same(app, active, part))
+                throw new InvalidOperationException("APPLY: cannot activate the bound document, error=" + errors);
+        }
+        internal static Body2 CurrentBody(ModelDoc2 part)
+        {
+            var p = part as PartDoc;
+            Array bodies = p == null ? null : p.GetBodies2((int)swBodyType_e.swSolidBody, false) as Array;
+            if (bodies == null || bodies.Length != 1)
+                throw new InvalidOperationException("APPLY: exactly one current solid is required");
+            var native = bodies.GetValue(0) as Body2;
+            AfjTemporaryBoolean.Validate(AfjTemporaryBoolean.Copy(native));
+            return native;
+        }
+        private static string[] Tree(ModelDoc2 part)
+        {
+            var rows = new List<string>();
+            for (Feature f = part.FirstFeature() as Feature; f != null; f = f.GetNextFeature() as Feature)
+            {
+                if (rows.Count > 10000) throw new InvalidOperationException("APPLY: feature traversal exceeded limit");
+                rows.Add(f.GetTypeName2() + "|" + f.Name);
+            }
+            return rows.ToArray();
+        }
+        internal static double SymmetricDifference(Body2 a, Body2 b)
+        { return AfjTemporaryBoolean.DifferenceVolume(a, b) + AfjTemporaryBoolean.DifferenceVolume(b, a); }
+        private static double VerifyBody(Body2 current, Body2 expected)
+        {
+            Body2 actual = AfjTemporaryBoolean.Copy(current);
+            AfjTemporaryBoolean.Validate(actual);
+            double tolerance = Math.Max(1e-12, AfjTemporaryBoolean.Volume(expected) * 1e-8);
+            double difference = SymmetricDifference(actual, expected);
+            if (!AfjTemporaryBoolean.Finite(difference) || difference > tolerance)
+                throw new InvalidOperationException("APPLY: native Cut differs from reviewed B-rep, delta_m3=" + difference.ToString("R", CultureInfo.InvariantCulture));
+            return difference;
+        }
+        private static void PreflightPart(ISldWorks app, ModelDoc2 assembly, Component2 component, ModelDoc2 part)
+        {
+            if (part == null || part.GetType() != (int)swDocumentTypes_e.swDocPART || part.IsOpenedReadOnly() || part.IsOpenedViewOnly())
+                throw new InvalidOperationException("APPLY_READ_ONLY: writable resolved Part required");
+            if (part.GetActiveSketch2() != null)
+                throw new InvalidOperationException("APPLY: finish the active sketch before applying cuts");
+            var cfg = part.ConfigurationManager.ActiveConfiguration;
+            if (cfg == null || cfg.Name != component.ReferencedConfiguration)
+                throw new InvalidOperationException("APPLY: occurrence/configuration changed");
+            Array names = part.GetConfigurationNames() as Array;
+            if (names == null) throw new InvalidOperationException("APPLY: configuration inventory unavailable");
+            foreach (object name in names)
+            {
+                var other = part.GetConfigurationByName((string)name) as Configuration;
+                if (other == null || (!other.IsDerived() && other.Name != cfg.Name))
+                    throw new InvalidOperationException("UNVERIFIED_RULE: multiple independent Part configurations need an explicit cut scope");
+            }
+            var asm = assembly as AssemblyDoc;
+            if (asm == null || !Same(app, asm.GetEditTarget(), assembly))
+                throw new InvalidOperationException("APPLY: exit in-context Part edit before applying");
+            Array components = asm.GetComponents(false) as Array;
+            if (components == null) throw new InvalidOperationException("APPLY: component inventory unavailable");
+            int uses=0;
+            string targetPath=part.GetPathName();
+            foreach(Component2 c in components.Cast<object>().OfType<Component2>())
+            {
+                var referenced=c.GetModelDoc2() as ModelDoc2;
+                string path=c.GetPathName();
+                bool samePath=SameReferencePath(path,targetPath);
+                if(referenced==null&&String.Equals(System.IO.Path.GetExtension(path),".SLDASM",StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("SHARED_PART_UNVERIFIED: resolve subassemblies before qualifying Part reference scope");
+                bool ambiguous=referenced==null&&String.Equals(System.IO.Path.GetFileName(path),System.IO.Path.GetFileName(targetPath),StringComparison.OrdinalIgnoreCase);
+                if(Same(app,referenced,part)||samePath||ambiguous)uses++;
+            }
+            if (uses != 1)
+                throw new InvalidOperationException("SHARED_PART: selected Part has multiple occurrences; make the target independent before applying");
+        }
+        private static Feature FindSpecific(ISldWorks app, ModelDoc2 part, object specific)
+        {
+            for (Feature f = part.FirstFeature() as Feature; f != null; f = f.GetNextFeature() as Feature)
+            {
+                if (Same(app, f, specific) || Same(app, f.GetSpecificFeature2(), specific)) return f;
+            }
+            throw new InvalidOperationException("APPLY: created plane/sketch is not in the FeatureManager");
+        }
+        private static Feature Own(PartEdit edit, Feature feature, string suffix)
+        {
+            if (feature == null) throw new InvalidOperationException("APPLY: feature creation returned null");
+            edit.OwnedIds.Add(feature.GetID());
+            string name = edit.Prefix + suffix;
+            feature.Name = name;
+            if (feature.Name != name) throw new InvalidOperationException("APPLY: cannot name the owned feature");
+            return feature;
+        }
+        private static void EndSketch(ISldWorks app, ModelDoc2 part, Sketch sketch)
+        {
+            if (Same(app, part.GetActiveSketch2(), sketch)) part.SketchManager.InsertSketch(true);
+        }
+        private static Feature WriteTool(ISldWorks app, PartEdit edit, AfjToolDefinition spec,
+                                         bool normalCut, string suffix, out bool reverse)
+        {
+            ModelDoc2 part = edit.Part;
+            double[] n = AfjParametricRules.Unit(spec.Direction);
+            double[] p = spec.Polygon[0];
+            double[] u = AfjParametricRules.Unit(AfjParametricRules.Sub(spec.Polygon[1], p));
+            double[] v = AfjParametricRules.Unit(Cross(n, u));
+            part.ClearSelection2(true);
+            // Fixed datum is deliberate: this plan is a reviewed geometry snapshot.
+            // Direction is still read back from the native sketch's transform below.
+            object plane = part.CreatePlaneFixed2(p,
+                AfjParametricRules.Add(p, AfjParametricRules.Scale(u, .01)),
+                AfjParametricRules.Add(p, AfjParametricRules.Scale(v, .01)), false);
+            if (plane == null) throw new InvalidOperationException("APPLY: fixed cutter plane unavailable");
+            Feature planeFeature = Own(edit, FindSpecific(app, part, plane), suffix + "_Plane");
+            part.ClearSelection2(true);
+            if (!planeFeature.Select2(false, 0)) throw new InvalidOperationException("APPLY: cannot select cutter plane");
+            Sketch sketch = null;
+            Feature profile = null;
+            bool oldAddToDb = false, changedAddToDb = false;
+            try
+            {
+                part.SketchManager.InsertSketch(true);
+                sketch = part.GetActiveSketch2() as Sketch;
+                if (sketch == null || sketch.Is3D()) throw new InvalidOperationException("APPLY: expected an active 2D sketch");
+                profile = Own(edit, FindSpecific(app, part, sketch), suffix + "_Profile");
+                oldAddToDb = part.SketchManager.AddToDB;
+                changedAddToDb = true;
+                part.SketchManager.AddToDB = true;
+                MathTransform transform = sketch.ModelToSketchTransform;
+                MathTransform inverse = transform.Inverse() as MathTransform;
+                if (inverse == null) throw new InvalidOperationException("APPLY: native sketch transform unavailable");
+                double[] o = Point(app, new double[3], inverse);
+                double[] z = AfjParametricRules.Unit(AfjParametricRules.Sub(Point(app, new[] {0d,0d,1d}, inverse), o));
+                double alignment = AfjParametricRules.Dot(z, n);
+                reverse = ReverseForAlignment(alignment);
+                double[][] points = spec.Polygon.Select(x => Point(app, x, transform)).ToArray();
+                for (int i = 0; i < points.Length; i++)
+                {
+                    double[] a = points[i], b = points[(i+1)%points.Length];
+                    if (Math.Abs(a[2]) > 1e-8 || Math.Abs(b[2]) > 1e-8)
+                        throw new InvalidOperationException("APPLY: polygon is not on native sketch plane");
+                    SketchSegment segment;
+                    if (spec.ArcCenters != null && spec.ArcCenters[i] != null)
+                    {
+                        double[] c = Point(app, spec.ArcCenters[i], transform);
+                        double cross = (a[0]-c[0])*(b[1]-c[1])-(a[1]-c[1])*(b[0]-c[0]);
+                        if (Math.Abs(cross) < 1e-14 || Math.Abs(c[2]) > 1e-8)
+                            throw new InvalidOperationException("APPLY: unsupported arc");
+                        segment = part.SketchManager.CreateArc(c[0],c[1],0,a[0],a[1],0,b[0],b[1],0,(short)(cross>0?1:-1));
+                    }
+                    else segment = part.SketchManager.CreateLine(a[0],a[1],0,b[0],b[1],0);
+                    if (segment == null) throw new InvalidOperationException("APPLY: sketch entity returned null");
+                }
+            }
+            finally
+            {
+                try { if (changedAddToDb) part.SketchManager.AddToDB = oldAddToDb; }
+                finally { if (sketch != null) EndSketch(app, part, sketch); }
+            }
+            part.ClearSelection2(true);
+            if (!profile.Select2(false, 0)) throw new InvalidOperationException("APPLY: cannot select native cut profile");
+            Feature cut = part.FeatureManager.FeatureCut4(true, false, reverse,
+                (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind,
+                spec.Length, spec.Length, false,false,false,false,0,0,false,false,false,false,
+                normalCut,true,true,false,false,false,(int)swStartConditions_e.swStartSketchPlane,0,false,normalCut);
+            cut = Own(edit, cut, suffix + "_Cut");
+            bool warning;
+            int error = cut.GetErrorCode2(out warning);
+            string featureType=cut.GetTypeName2();
+            string underlyingType=featureType=="ICE"?cut.GetTypeName():featureType;
+            Trace.WriteLine("[AFJ-APPLY] NATIVE_FEATURE type="+featureType+" underlying="+underlyingType+" error="+error);
+            if (error != 0 || underlyingType != "Cut")
+                throw new InvalidOperationException("APPLY: native Cut feature error=" + error+" type="+featureType+" underlying="+underlyingType);
+            return cut;
+        }
+        private static void ApplyPart(ISldWorks app, PartEdit edit, AfjCutPlan plan,
+                                      Body2 expected, string frame, AfjNativeApplyReport report)
+        {
+            Activate(app, edit.Part);
+            VerifyBody(CurrentBody(edit.Part), edit.Before);
+            edit.Part.Extension.StartRecordingUndoObject();
+            edit.Started = true; edit.Recording = true;
+            try
+            {
+                int index = 0;
+                foreach (AfjCutOperation operation in plan.Operations)
+                foreach (AfjToolDefinition tool in operation.Tools)
+                {
+                    var step = new AfjCutPlan();
+                    var cutOperation = new AfjCutOperation { Kind=operation.Kind, EvidenceId=operation.EvidenceId };
+                    cutOperation.Tools.Add(tool); step.Operations.Add(cutOperation);
+                    var target = AfjTemporaryBoolean.Execute(app, AfjTemporaryBoolean.Copy(CurrentBody(edit.Part)), step);
+                    if (target.Kept.Count != 1) throw new InvalidOperationException("UNVERIFIED_RULE: intermediate Cut would split the Frame");
+                    if (target.RemovedVolume <= 1e-13) continue; // Avoid native empty cuts.
+                    bool normal = UseNativeNormalCut(operation,tool);
+                    bool reverse;
+                    Feature feature = WriteTool(app, edit, tool, normal, "_" + (++index).ToString("00", CultureInfo.InvariantCulture), out reverse);
+                    Body2 current = CurrentBody(edit.Part);
+                    if (current.IsSheetMetal() != edit.SheetMetal) throw new InvalidOperationException("APPLY: sheet metal body identity lost");
+                    double delta = VerifyBody(current, target.Kept.Single());
+                    var data = feature.GetDefinition() as ExtrudeFeatureData2;
+                    if (data == null || data.GetEndCondition(true) != (int)swEndConditions_e.swEndCondBlind ||
+                        Math.Abs(data.GetDepth(true)-tool.Length)>1e-8 || data.NormalCut != normal || data.FlipSideToCut || data.ReverseDirection != reverse)
+                        throw new InvalidOperationException("APPLY: native Cut definition differs from plan");
+                    var evidence = new AfjNativeCutEvidence { Frame=frame, EvidenceId=operation.EvidenceId,
+                        FeatureName=feature.Name, FeatureType=feature.GetTypeName2(), UnderlyingType=feature.GetTypeName2()=="ICE"?feature.GetTypeName():feature.GetTypeName2(), DepthPolicy=tool.DepthPolicy,
+                        EndCondition=data.GetEndCondition(true), DepthMetres=data.GetDepth(true), NormalCut=data.NormalCut,
+                        FlipSideToCut=data.FlipSideToCut, ReverseDirection=data.ReverseDirection,
+                        RemovedCubicMetres=target.RemovedVolume, SymmetricDifferenceCubicMetres=delta };
+                    report.Cuts.Add(evidence);
+                    Trace.WriteLine("[AFJ-APPLY] CUT_VERIFIED frame=" + frame + " id=" + operation.EvidenceId + " feature=" + feature.Name + " delta_m3=" + delta.ToString("R",CultureInfo.InvariantCulture));
+                }
+                VerifyBody(CurrentBody(edit.Part), expected);
+            }
+            finally
+            {
+                edit.GroupFinished = edit.Part.Extension.FinishRecordingUndoObject2("Auto Frame Joint " + frame, false);
+                edit.Recording = !edit.GroupFinished;
+                edit.AfterTree = Tree(edit.Part);
+                edit.AfterStamp = edit.Part.GetUpdateStamp();
+            }
+            if (!edit.GroupFinished) throw new InvalidOperationException("APPLY: native undo group could not be finalized");
+        }
+        private static bool Rollback(ISldWorks app, PartEdit edit, AfjNativeApplyReport report)
+        {
+            if (!edit.Started) return true;
+            try
+            {
+                Activate(app, edit.Part);
+                if (edit.Recording)
+                {
+                    edit.GroupFinished = edit.Part.Extension.FinishRecordingUndoObject2("Auto Frame Joint failed", false);
+                    edit.Recording = !edit.GroupFinished;
+                }
+                if(edit.Recording)throw new InvalidOperationException("Native Undo recording could not be closed; rollback is unverified");
+                string[] currentTree = Tree(edit.Part);
+                if (currentTree.SequenceEqual(edit.Tree))
+                {
+                    VerifyBody(CurrentBody(edit.Part), edit.Before);
+                    report.Rollback.Add(edit.Prefix + ": UNCHANGED_NO_UNDO");
+                    return true; // Never undo an unrelated item for an empty API group.
+                }
+                if (edit.AfterTree==null || !currentTree.SequenceEqual(edit.AfterTree) || edit.Part.GetUpdateStamp()!=edit.AfterStamp)
+                    throw new InvalidOperationException("Part changed outside the recorded AFJ transaction; automatic Undo refused");
+                // Native testing showed that a single EditUndo2 does not undo all
+                // plane/sketch/cut steps across sketch edit boundaries. Remove
+                // only the exact newly created feature IDs, never an earlier
+                // user Undo item or an original feature.
+                var currentFeatures=new List<Feature>();
+                for(Feature f=edit.Part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature)currentFeatures.Add(f);
+                var originalRows=currentFeatures.Where(f=>!edit.OwnedIds.Contains(f.GetID())).Select(f=>f.GetTypeName2()+"|"+f.Name).ToArray();
+                if(!originalRows.SequenceEqual(edit.Tree))throw new InvalidOperationException("Original feature history changed; owned-feature rollback refused");
+                int remaining=currentFeatures.Count(f=>edit.OwnedIds.Contains(f.GetID()));
+                for(int attempt=0;remaining>0&&attempt<edit.OwnedIds.Count;attempt++)
+                {
+                    // Deleting a Cut can also delete its absorbed sketch. Read
+                    // live IDs again instead of using now-disconnected RCWs.
+                    Feature f=null;
+                    for(Feature live=edit.Part.FirstFeature() as Feature;live!=null;live=live.GetNextFeature() as Feature)
+                        if(edit.OwnedIds.Contains(live.GetID()))f=live;
+                    if(f==null)break;
+                    string featureName=f.Name;
+                    string type=f.GetTypeName2();
+                    string underlying=type=="ICE"?f.GetTypeName():type;
+                    edit.Part.ClearSelection2(true);
+                    if(!f.Select2(false,0))throw new InvalidOperationException("Cannot select owned rollback feature "+featureName);
+                    int options=underlying=="Cut"?(int)swDeleteSelectionOptions_e.swDelete_Absorbed:0;
+                    if(!edit.Part.Extension.DeleteSelection2(options))throw new InvalidOperationException("Cannot remove owned rollback feature "+featureName);
+                    Trace.WriteLine("[AFJ-APPLY] REMOVE_OWNED "+featureName);
+                    int next=0;
+                    for(Feature live=edit.Part.FirstFeature() as Feature;live!=null;live=live.GetNextFeature() as Feature)
+                        if(edit.OwnedIds.Contains(live.GetID()))next++;
+                    if(next>=remaining)throw new InvalidOperationException("Owned-feature removal made no progress");
+                    remaining=next;
+                }
+                if(remaining!=0)throw new InvalidOperationException("Owned rollback feature limit exceeded");
+                VerifyBody(CurrentBody(edit.Part), edit.Before);
+                var restoredTree=Tree(edit.Part);
+                if (!restoredTree.SequenceEqual(edit.Tree))
+                {
+                    Trace.WriteLine("[AFJ-APPLY] TREE_BEFORE "+String.Join(";",edit.Tree));
+                    Trace.WriteLine("[AFJ-APPLY] TREE_AFTER_UNDO "+String.Join(";",restoredTree));
+                    throw new InvalidOperationException("Feature tree differs after undo");
+                }
+                report.Rollback.Add(edit.Prefix + ": OWNED_FEATURES_REMOVED_GEOMETRY_AND_TREE_RESTORED");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                report.Rollback.Add(edit.Prefix + ": ROLLBACK_UNVERIFIED " + ex.Message);
+                Trace.WriteLine("[AFJ-APPLY] ROLLBACK_FAILED " + ex);
+                return false;
+            }
+        }
+        internal static bool TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket,
+                                      out AfjNativeApplyReport report, out string message)
+        {
+            report = new AfjNativeApplyReport();
+            message = "Chưa áp dụng Cut.";
+            PartEdit a = null, b = null;
+            bool apiAllowed = false;
+            try
+            {
+                if (System.Threading.Thread.CurrentThread.GetApartmentState() != System.Threading.ApartmentState.STA)
+                    throw new InvalidOperationException("APPLY: SOLIDWORKS STA required");
+                if (app==null || assembly==null) throw new InvalidOperationException("APPLY: bound application/document required");
+                apiAllowed = true;
+                if (ticket == null || ticket.Consumed || ticket.Preview == null || ticket.IsSourceCurrent == null || !ticket.IsSourceCurrent())
+                    throw new InvalidOperationException("PREVIEW_STALE: hãy tạo lại Preview đúng hai Frame trước khi OK");
+                ticket.Consumed = true;
+                var result = ticket.Preview;
+                if (result.Plan==null || (result.Plan.RuleId!="ORTHOGONAL_U_COVER" && result.Plan.RuleId!="ORTHOGONAL_U_TALLER_COVER"))
+                    throw new InvalidOperationException("UNVERIFIED_RULE: native Cut writer has no qualified rule mapping");
+                var activeAssembly = app.ActiveDoc as ModelDoc2;
+                Trace.WriteLine("[AFJ-APPLY] PREFLIGHT active=" + (activeAssembly==null?"NONE":activeAssembly.GetTitle()) + " bound=" + assembly.GetTitle() +
+                    " assembly_equality=" + app.IsSame(activeAssembly,assembly) + " part_equality=" + app.IsSame(result.PartA,result.PartB));
+                if (!Same(app, activeAssembly, assembly))
+                    throw new InvalidOperationException("APPLY: the reviewed Assembly is no longer active");
+                if (Same(app, result.PartA, result.PartB))
+                    throw new InvalidOperationException("APPLY: two independent Part documents are required");
+                foreach (AfjCutOperation operation in result.Plan.A.Operations.Concat(result.Plan.B.Operations))
+                    if (operation.Kind != AfjOperationKind.Cut || operation.Tools.Count == 0 || String.IsNullOrEmpty(operation.EvidenceId))
+                        throw new InvalidOperationException("UNVERIFIED_RULE: native writer only supports verified subtractive prism plans");
+                PreflightPart(app, assembly, ticket.FrameA, result.PartA);
+                PreflightPart(app, assembly, ticket.FrameB, result.PartB);
+                string run = "AFJ_" + Guid.NewGuid().ToString("N").Substring(0,8);
+                a = new PartEdit { Part=result.PartA, Before=ticket.BeforeA, Tree=Tree(result.PartA), SheetMetal=CurrentBody(result.PartA).IsSheetMetal(), Prefix=run+"_A" };
+                b = new PartEdit { Part=result.PartB, Before=ticket.BeforeB, Tree=Tree(result.PartB), SheetMetal=CurrentBody(result.PartB).IsSheetMetal(), Prefix=run+"_B" };
+                if (!ticket.IsSourceCurrent()) throw new InvalidOperationException("PREVIEW_STALE: source changed before mutation");
+                ApplyPart(app, a, result.Plan.A, result.A.Kept.Single(), "A", report);
+                ApplyPart(app, b, result.Plan.B, result.B.Kept.Single(), "B", report);
+                Activate(app, assembly);
+                double[] actualA = ticket.FrameA.GetTotalTransform(false).ArrayData as double[];
+                double[] actualB = ticket.FrameB.GetTotalTransform(false).ArrayData as double[];
+                double[] oldA = result.TransformA.ArrayData as double[], oldB = result.TransformB.ArrayData as double[];
+                if (actualA==null || actualB==null || actualA.Length!=16 || actualB.Length!=16 ||
+                    actualA.Where((x,i)=>!AfjTemporaryBoolean.Finite(x)||Math.Abs(x-oldA[i])>1e-10).Any() ||
+                    actualB.Where((x,i)=>!AfjTemporaryBoolean.Finite(x)||Math.Abs(x-oldB[i])>1e-10).Any())
+                    throw new InvalidOperationException("APPLY: component placement changed from reviewed Preview");
+                VerifyBody(CurrentBody(a.Part),result.A.Kept.Single());
+                VerifyBody(CurrentBody(b.Part),result.B.Kept.Single());
+                var wa = AfjJointSolver.World(new[]{AfjTemporaryBoolean.Copy(CurrentBody(a.Part))}, result.TransformA);
+                var wb = AfjJointSolver.World(new[]{AfjTemporaryBoolean.Copy(CurrentBody(b.Part))}, result.TransformB);
+                report.InterferenceCubicMetres = AfjJointSolver.Overlap(wa, wb);
+                report.GapMetres = AfjJointSolver.Gap(assembly, wa, wb);
+                if (report.InterferenceCubicMetres>1e-12 || Math.Abs(report.GapMetres-AfjManufacturingConventions.AssemblyFitGap)>1e-6)
+                    throw new InvalidOperationException("APPLY: native pair failed overlap/fit-gap validation");
+                report.Status = "APPLY_VERIFIED";
+                message = "Đã tạo " + report.Cuts.Count + " Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi.";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                report.Error = "HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex;
+                Trace.WriteLine("[AFJ-APPLY] " + report.Error);
+                bool rb = b == null || Rollback(app,b,report);
+                bool ra = a == null || Rollback(app,a,report);
+                report.RollbackVerified = rb && ra;
+                report.Status = report.RollbackVerified ? "REJECTED_OR_ROLLED_BACK" : "ROLLBACK_UNVERIFIED";
+                message = report.RollbackVerified ? "Chưa áp dụng Cut; hình học hai Part được giữ hoặc hoàn tác. " + ex.Message
+                    : "Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.";
+                return false;
+            }
+            finally
+            {
+                try { if (apiAllowed) { Activate(app, assembly); assembly.GraphicsRedraw2(); } }
+                catch (Exception ex) { Trace.WriteLine("[AFJ-APPLY] Assembly restore failed " + ex); }
+            }
+        }
+    }
 }

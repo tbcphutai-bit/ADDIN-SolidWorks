@@ -30,7 +30,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal readonly AutoFrameJointGhostPreview Ghost;
             internal readonly int UiThreadId;
             internal SessionState State;
-            internal bool CloseRequested;
+            internal bool CloseRequested, Applying;
 
             internal Session(ISldWorks app, ModelDoc2 assembly)
             {
@@ -185,9 +185,9 @@ namespace ADDIN.Commands.AutoFrameJoint
             if (!FindOwnedSession(token, out session, out message))
                 return false;
 
-            if (session.CloseRequested)
+            if (session.CloseRequested || session.Applying)
             {
-                message = "PropertyManager đang đóng. Không thể tạo Preview.";
+                message = "PropertyManager đang đóng hoặc đang áp dụng Cut.";
                 return false;
             }
             if (session.State == SessionState.PendingCleanup ||
@@ -243,7 +243,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             Session session;
             if (!FindOwnedSession(token, out session, out message))
             { Trace.WriteLine("[AFJ-R52] stage=SESSION_REJECT reason=" + message); return false; }
-            if (session.CloseRequested ||
+            if (session.CloseRequested || session.Applying ||
                 session.State == SessionState.PendingCleanup ||
                 session.State == SessionState.DeferredDocument)
             {
@@ -291,6 +291,31 @@ namespace ADDIN.Commands.AutoFrameJoint
         /// Explicit reset while the PMP remains open. Also handles pending
         /// Hide failures after returning to the original Assembly.
         /// </summary>
+        /// <summary>Called after native page close on explicit OK/Apply only.</summary>
+        public bool TryApplyCut(Guid token, Component2 frameA, Component2 frameB, out string message)
+        {
+            Session session;
+            if (!FindOwnedSession(token, out session, out message)) return false;
+            if (session.Applying || session.CloseRequested || session.Ghost.IsBusy ||
+                session.State == SessionState.PendingCleanup || session.State == SessionState.DeferredDocument)
+            { message = "APPLY: phiên đang bận hoặc còn Preview cần dọn."; return false; }
+            AfjApplyTicket ticket;
+            if (!session.Ghost.TryPrepareApply(frameA, frameB, out ticket, out message)) return false;
+            session.Applying = true;
+            try
+            {
+                string cleanup;
+                if (!session.Ghost.TryClear(out cleanup))
+                { session.State=SessionState.PendingCleanup; message="APPLY: không dọn được Ghost; chưa cắt Part. " + cleanup; return false; }
+                AfjNativeApplyReport report;
+                bool applied = AfjNativeCutCommit.TryApply(session.App, session.Assembly, ticket, out report, out message);
+                Trace.WriteLine("[AFJ-APPLY] END status=" + report.Status + " cuts=" + report.Cuts.Count + " rollback=" + report.RollbackVerified + " saveApiCalled=" + report.SaveApiCalled);
+                session.State = SessionState.Ready;
+                return applied;
+            }
+            finally { session.Applying=false; }
+        }
+
         public bool TryClear(Guid token, out string message)
         {
             Session session;
@@ -346,7 +371,7 @@ namespace ADDIN.Commands.AutoFrameJoint
 
         private bool Cleanup(Session session, out string message)
         {
-            if (session.Ghost.IsBusy)
+            if (session.Ghost.IsBusy || session.Applying)
             {
                 session.State = SessionState.PendingCleanup;
                 message = "Đã ghi nhận đóng; chờ thao tác Preview trả về để dọn.";
