@@ -91,7 +91,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool selectionRefreshQueued;
         private bool requestFocusB;
         private bool requestAutoAnalysis;
-        private bool finishQueued;
+        private bool finishQueued, finishRequested, finishCloseIssued;
         private int selectionCallbackDepth, flowSequence, lastFocusBox;
         private int callbackCountA = -1, callbackCountB = -1, deferredCountA = -1, deferredCountB = -1;
         private Component2 committedA, committedB;
@@ -218,7 +218,7 @@ namespace ADDIN.UI.AutoFrameJoint
         private void QueueSelectionRefresh(bool advanceFromA, bool analyzeAfterB)
         {
             TraceFlow("SELECTION_REFRESH_REQUEST", "advance=" + advanceFromA + " analyze=" + analyzeAfterB);
-            if (!IsUiLive(pageEpoch)) { TraceFlow("SELECTION_REFRESH_REJECT", "page state/owner"); return; }
+            if (!IsUiLive(pageEpoch) || finishRequested) { TraceFlow("SELECTION_REFRESH_REJECT", "page state/owner/finish"); return; }
             requestFocusB |= advanceFromA;
             requestAutoAnalysis |= analyzeAfterB;
             if (selectionRefreshQueued) { TraceFlow("SELECTION_REFRESH_MERGED", "already queued"); return; }
@@ -227,6 +227,7 @@ namespace ADDIN.UI.AutoFrameJoint
             {
                 selectionRefreshQueued = false;
                 TraceFlow("SELECTION_REFRESH_RUN", "deferred");
+                if (finishRequested) { TryQueueFinish(); return; }
                 if (IsBackendBusy()) { TraceFlow("SELECTION_REFRESH_DEFER", "backend busy"); return; }
                 UpdateReadyState();
                 bool analyze = requestAutoAnalysis, advance = requestFocusB;
@@ -254,7 +255,7 @@ namespace ADDIN.UI.AutoFrameJoint
         /// </summary>
         private void QueueAutoAnalysis()
         {
-            if (!IsUiLive(pageEpoch)) return;
+            if (!IsUiLive(pageEpoch) || finishRequested) return;
             if (IsBackendBusy() || backendActionQueued)
             {
                 requestAutoAnalysis = true;
@@ -271,19 +272,47 @@ namespace ADDIN.UI.AutoFrameJoint
         /// </summary>
         private void QueueFinishPage()
         {
-            if (!IsUiLive(pageEpoch) || finishQueued) return;
+            TraceFlow("FINISH_REQUEST", "busy=" + IsBackendBusy() + " backendQueued=" + backendActionQueued);
+            if (!IsUiLive(pageEpoch) || finishCloseIssued) return;
+            finishRequested = true;
+            requestAutoAnalysis = false;
+            requestFocusB = false;
+            TryQueueFinish();
+        }
+
+        private void TryQueueFinish()
+        {
+            if (!finishRequested || finishQueued || finishCloseIssued || !IsUiLive(pageEpoch)) return;
             if (IsBackendBusy() || backendActionQueued)
             {
-                Trace.WriteLine("[AFJ-R50] FINISH deferred action busy; no native close");
+                TraceFlow("FINISH_WAIT", "request retained until backend returns; no native close inline");
                 return;
             }
             finishQueued = true;
             if (!PostUi("finish", delegate
             {
                 finishQueued = false;
-                if (IsBackendBusy() || backendActionQueued || page == null) return;
-                Trace.WriteLine("[AFJ-PMP] FINISH CLICK: close only, no cut");
-                page.Close(true);
+                if (!finishRequested || finishCloseIssued) return;
+                if (IsBackendBusy() || backendActionQueued)
+                {
+                    TraceFlow("FINISH_WAIT", "backend became busy; request retained");
+                    return;
+                }
+                if (page == null) return;
+                finishCloseIssued = true;
+                var timer = Stopwatch.StartNew();
+                try
+                {
+                    TraceFlow("FINISH_CLOSE_BEGIN", "close only; no Part cut");
+                    page.Close(true);
+                    TraceFlow("FINISH_CLOSE_RETURN", "ms=" + timer.ElapsedMilliseconds + " closing=" + closing);
+                }
+                catch (Exception ex)
+                {
+                    finishCloseIssued = false;
+                    finishRequested = false;
+                    TraceUiFault("finish close", ex, false);
+                }
             })) finishQueued = false;
         }
 
@@ -296,7 +325,7 @@ namespace ADDIN.UI.AutoFrameJoint
             selectionRefreshQueued = false;
             requestFocusB = false;
             requestAutoAnalysis = false;
-            finishQueued = false;
+            finishQueued = false; finishRequested = false; finishCloseIssued = false;
             if (dispatcher == null) return;
             try { dispatcher.Dispose(); }
             catch (Exception ex) { TraceUiFault("dispatcher dispose", ex, false); }
@@ -850,6 +879,7 @@ namespace ADDIN.UI.AutoFrameJoint
         {
             // Invalidate queued work BEFORE any native controls are released.
             TraceFlow("CLOSE", "reason=" + reason);
+            finishRequested = false; finishQueued = false;
             closing = true;
             nativeActivated = false;
             System.Threading.Interlocked.Increment(ref pageEpoch);
@@ -861,6 +891,7 @@ namespace ADDIN.UI.AutoFrameJoint
             if (closeNotified) return;
             closeNotified = true;
             TraceFlow("AFTER_CLOSE", "cleanup callback=" + (onClearPreview != null));
+            var closeTimer = Stopwatch.StartNew();
             committedA = null; committedB = null; committedNameA = null; committedNameB = null;
             closing = true;
             shown = false;
@@ -889,6 +920,7 @@ namespace ADDIN.UI.AutoFrameJoint
             {
                 try { if (onClosed != null) onClosed(this); }
                 catch (Exception ex) { TraceUiFault("page closed callback", ex, false); }
+                TraceFlow("AFTER_CLOSE_END", "cleanup/onClosed returned ms=" + closeTimer.ElapsedMilliseconds);
             }
         }
 
@@ -1160,6 +1192,7 @@ namespace ADDIN.UI.AutoFrameJoint
 
         private void ApplyReadyState()
         {
+            if (finishRequested) { TryQueueFinish(); return; }
             int epoch = pageEpoch;
             if (!IsUiLive(epoch) || IsBackendBusy() || updatingReadyState) return;
             updatingReadyState = true;
@@ -1205,9 +1238,8 @@ namespace ADDIN.UI.AutoFrameJoint
 
         private void QueueAfterAction(int epoch)
         {
-            // Managed gates only: posted refresh runs after the backend and
-            // this finally block have returned. Closing invalidates the token.
             if (!IsUiLive(epoch)) return;
+            if (finishRequested) { TryQueueFinish(); return; }
             UpdateReadyState();
             if (requestAutoAnalysis || requestFocusB) QueueSelectionRefresh(false, false);
         }
@@ -1215,29 +1247,38 @@ namespace ADDIN.UI.AutoFrameJoint
         private void QueueBackendAction(int kind, int candidate, bool automatic)
         {
             TraceFlow("ACTION_REQUEST", "kind=" + kind + " candidate=" + candidate + " automatic=" + automatic);
-            if (!IsUiLive(pageEpoch) || IsBackendBusy() || backendActionQueued || finishQueued)
+            if (!IsUiLive(pageEpoch) || IsBackendBusy() || backendActionQueued || finishRequested || finishCloseIssued)
             { TraceFlow("ACTION_REJECT", "page/owner/busy/queued/finish gate"); return; }
             backendActionQueued = true;
             if (!PostUi("backend kind=" + kind, delegate
             {
                 backendActionQueued = false;
-                TraceFlow("ACTION_RUN", "kind=" + kind + " candidate=" + candidate);
-                if (IsBackendBusy() || finishQueued) { TraceFlow("ACTION_REJECT", "busy/finish after posting"); return; }
-                int epoch = pageEpoch;
-                if (automatic)
+                var timer = Stopwatch.StartNew();
+                try
                 {
-                    Component2 a, b; string reason;
-                    bool ready = TryReadSelection(out a, out b, out reason, false);
-                    if (!IsUiLive(epoch) || !ready) { TraceFlow("AUTO_ANALYZE_SKIP", reason); return; }
-                    bool previous = IsPreviousPair(a, b);
-                    if (!IsUiLive(epoch)) return;
-                    if (previous && !String.IsNullOrEmpty(lastAnalysisMessage)) { TraceFlow("AUTO_ANALYZE_SKIP", "same analyzed pair"); return; }
+                    TraceFlow("ACTION_RUN", "kind=" + kind + " candidate=" + candidate);
+                    if (IsBackendBusy() || finishRequested || finishCloseIssued)
+                    { TraceFlow("ACTION_REJECT", "busy/finish after posting"); return; }
+                    int epoch = pageEpoch;
+                    if (automatic)
+                    {
+                        Component2 a, b; string reason;
+                        bool ready = TryReadSelection(out a, out b, out reason, false);
+                        if (!IsUiLive(epoch) || !ready) { TraceFlow("AUTO_ANALYZE_SKIP", reason); return; }
+                        bool previous = IsPreviousPair(a, b);
+                        if (!IsUiLive(epoch)) return;
+                        if (previous && !String.IsNullOrEmpty(lastAnalysisMessage)) { TraceFlow("AUTO_ANALYZE_SKIP", "same analyzed pair"); return; }
+                    }
+                    if (kind == 0) PerformAnalyze();
+                    else if (kind == 1) PerformShowBodies();
+                    else if (kind == 2) PerformCutCandidate(candidate);
                 }
-                if (kind == 0) PerformAnalyze();
-                else if (kind == 1) PerformShowBodies();
-                else if (kind == 2) PerformCutCandidate(candidate);
-                TraceFlow("ACTION_END", "kind=" + kind + " candidate=" + candidate);
-            })) { backendActionQueued = false; TraceFlow("ACTION_POST_FAILED", "kind=" + kind); }
+                finally
+                {
+                    TraceFlow("ACTION_END", "kind=" + kind + " candidate=" + candidate + " ms=" + timer.ElapsedMilliseconds);
+                    TryQueueFinish();
+                }
+            })) { backendActionQueued = false; TraceFlow("ACTION_POST_FAILED", "kind=" + kind); TryQueueFinish(); }
         }
 
         private void QueueInitialFocus()
@@ -1245,7 +1286,7 @@ namespace ADDIN.UI.AutoFrameJoint
             if (!IsUiLive(pageEpoch) || initialFocusApplied) return;
             PostUi("initial focus", delegate
             {
-                if (initialFocusApplied || selectionA == null) return;
+                if (finishRequested || initialFocusApplied || selectionA == null) return;
                 initialFocusApplied = true;
                 int epoch = pageEpoch;
                 if (IsSameDocumentActive() && IsUiLive(epoch) &&

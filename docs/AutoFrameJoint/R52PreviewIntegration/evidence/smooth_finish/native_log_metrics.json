@@ -1,0 +1,35 @@
+{
+  "input_sha256": "e224cb9280e89386f937b0094dfea41a6824c952db1a4befc4c3a71c2da5bce3",
+  "input_lines": 1019,
+  "mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+  "command_open": 3,
+  "button_106": 0,
+  "button_107": 4,
+  "button_108": 0,
+  "solver_begin": 4,
+  "solver_end": 4,
+  "display3_end": 8,
+  "display3_status0": 8,
+  "hide_end": 8,
+  "close": 3,
+  "after_close": 3,
+  "access_violation_lines": 0,
+  "last_process_exit": "0xffffffff",
+  "preview_visibility": "USER_CONFIRMED_VISIBLE",
+  "phase_timings_in_input": "NOT_AVAILABLE",
+  "exit_cause": "UNVERIFIED",
+  "new_patch_native_test": "NOT_RUN",
+  "process_snapshot": {
+    "solidworks_process_count": 1,
+    "visible_main_window_count": 0,
+    "interaction": "NONE"
+  },
+  "windows_application_events": {
+    "since_local": "2026-10-22T12:20:00",
+    "event_ids": [
+      1000,
+      1001
+    ],
+    "result": "No matching events returned by query; not proof of no crash"
+  }
+}

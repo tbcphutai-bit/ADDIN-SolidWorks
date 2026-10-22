@@ -216,6 +216,13 @@ namespace ADDIN.Commands.AutoFrameJoint
                 success = false;
             }
 
+            if (session.CloseRequested)
+            {
+                string cleanupMessage;
+                Cleanup(session, out cleanupMessage);
+                message = "Đã đóng trang Preview. " + cleanupMessage;
+                return false;
+            }
             session.State = success
                 ? SessionState.Showing
                 : (session.Ghost.IsShowing ? SessionState.PendingCleanup
@@ -265,6 +272,13 @@ namespace ADDIN.Commands.AutoFrameJoint
                 message = "Lỗi temporary geometry; xem Output.";
                 success = false;
             }
+            if (session.CloseRequested)
+            {
+                string cleanupMessage;
+                Cleanup(session, out cleanupMessage);
+                message = "Đã đóng trang Preview. " + cleanupMessage;
+                return false;
+            }
             session.State = success
                 ? SessionState.Showing
                 : (session.Ghost.IsShowing ? SessionState.PendingCleanup
@@ -301,6 +315,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 return false;
 
             session.CloseRequested = true;
+            session.Ghost.RequestClose();
             return Cleanup(session, out message);
         }
 
@@ -331,6 +346,13 @@ namespace ADDIN.Commands.AutoFrameJoint
 
         private bool Cleanup(Session session, out string message)
         {
+            if (session.Ghost.IsBusy)
+            {
+                session.State = SessionState.PendingCleanup;
+                message = "Đã ghi nhận đóng; chờ thao tác Preview trả về để dọn.";
+                Trace.WriteLine("[AFJ-R52] stage=CLOSE_WAIT_BACKEND token=" + session.Token.ToString("N"));
+                return false;
+            }
             // No bodies were registered; no COM Hide calls are needed.
             if (!session.Ghost.IsShowing)
             {

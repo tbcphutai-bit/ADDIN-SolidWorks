@@ -1,0 +1,127 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Diagnostics;
+using System.Collections.Generic;
+using System.Runtime.Remoting.Proxies;
+using System.Runtime.Remoting.Messaging;
+using System.Web.Script.Serialization;
+using System.Windows.Forms;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.UI.AutoFrameJoint;
+using ADDIN.Commands.AutoFrameJoint;
+class SmoothFinishHarness {
+ sealed class Proxy : RealProxy {
+  internal readonly Func<string,object[],object> Run;
+  internal Proxy(Type type,Func<string,object[],object> run):base(type){Run=run;}
+  public override IMessage Invoke(IMessage message){var call=(IMethodCallMessage)message;try{CheckCallback(call.MethodName);return new ReturnMessage(Run(call.MethodName,call.Args),null,0,call.LogicalCallContext,call);}catch(Exception e){return new ReturnMessage(e,call);}}
+ }
+ static AutoFrameJointSelectionPage page;static int simulatedCalls,inlineCalls,previews,analyzes,cleanup,focus=101,messageCalls,labelCalls;static bool acceptMessage=true,throwMessage;static string lastMessage;static object a,b,assembly,partA,partB;static readonly Dictionary<int,object> marks=new Dictionary<int,object>();static readonly List<object> rows=new List<object>();
+ static object Field(string name){return typeof(AutoFrameJointSelectionPage).GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).GetValue(page);}
+ static void Set(string name,object value){typeof(AutoFrameJointSelectionPage).GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).SetValue(page,value);}
+ static void CheckCallback(string member){simulatedCalls++;if(page!=null&&(int)Field("selectionCallbackDepth")!=0){inlineCalls++;throw new Exception("SIMULATED_INTERFACE_ACCESS_INSIDE_CALLBACK: "+member);}}
+ static T Make<T>(Func<string,object[],object> run){return (T)new Proxy(typeof(T),run).GetTransparentProxy();}
+ static void Assert(bool condition,string message){if(!condition)throw new Exception(message);}
+ static void Row(string name,Action action){try{action();rows.Add(new{test=name,status="PASS_MANAGED_CONTRACT",installed_addin=false,real_solidworks_api=false});Console.WriteLine(name+" PASS_MANAGED_CONTRACT");}catch(Exception e){rows.Add(new{test=name,status="FAIL",error=e.ToString()});Console.WriteLine(name+" FAIL "+e.Message);throw;}}
+ static void Pump(){for(int i=0;i<12;i++)Application.DoEvents();}
+ static bool Submit(int id,object selection,int type){string text="Native supplied item";int before=simulatedCalls;bool result=page.OnSubmitSelection(id,selection,type,ref text);Assert(before==simulatedCalls,"Submit queried an interface");return result;}
+ static object GetPrivate(object target,string name){return target.GetType().GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).GetValue(target);}
+ static void SetPrivate(object target,string name,object value){target.GetType().GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).SetValue(target,value);}
+ static object CallPrivate(object target,string name,params object[] args){return target.GetType().GetMethod(name,BindingFlags.NonPublic|BindingFlags.Instance).Invoke(target,args);}
+ static int closeCalls;static Action insidePreview;
+ static Control SetupFinishPage(){
+  closeCalls=0;insidePreview=null;
+  page=new AutoFrameJointSelectionPage((ISldWorks)Make<ISldWorks>((m,x)=>m=="get_ActiveDoc"?assembly:m=="IsSame"?(object)(int)(Object.ReferenceEquals(x[0],x[1])?swObjectEquality.swObjectSame:swObjectEquality.swObjectNotSame):null),
+   (x,y)=>"ANALYSIS",(x,y)=>"OVERLAY",(x,y,mode)=>{previews++;if(insidePreview!=null)insidePreview();return "PREVIEW_DELEGATE_ONLY";},()=>cleanup++,p=>{});
+  Set("shown",true);Set("nativeActivated",true);Set("analyzedA",a);Set("analyzedB",b);
+  Set("page",Make<PropertyManagerPage2>((m,x)=>{if(m=="Close"){Assert(!(bool)Field("handlingCutPreview")&&!(bool)Field("handlingAnalyze")&&!(bool)Field("handlingShowBodies"),"Closed while backend is busy");closeCalls++;page.OnClose(1);page.AfterClose();return null;}if(m=="SetMessage3")return true;throw new Exception("Unexpected page call "+m);}));
+  var dispatcher=new Control();IntPtr hwnd=dispatcher.Handle;Set("deferredFocusWindow",dispatcher);return dispatcher;
+ }
+ sealed class PreviewFixture {
+  internal ISldWorks App;internal ModelDoc2 Assembly,PartA,PartB;internal Component2 A,B;internal Body2 SourceA,SourceB;internal AutoFrameJointGhostPreview Ghost;
+  internal int AssemblyStamp=10,PartStampA=20,PartStampB=30,BodyStampA=40,BodyStampB=50,Copies,Displays,Hides,Redraws,Transforms,ViewportReads,DisplayStatus;
+  internal bool FailStamp,FailHide;internal string AssemblyCfg="Default",CfgA="Default",CfgB="Default";internal Action DuringDisplay;
+  internal double[] MatrixA=Identity(),MatrixB=Identity();
+  internal static double[] Identity(){return new[]{1d,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0};}
+  ConfigurationManager Config(Func<string> name){return Make<ConfigurationManager>((m,x)=>m=="get_ActiveConfiguration"?(object)Make<Configuration>((n,y)=>n=="get_Name"?name():null):null);}
+  MathTransform Transform(Func<double[]> values){MathTransform result=null;result=Make<MathTransform>((m,x)=>m=="get_ArrayData"?(object)values():m=="Inverse"?result:null);return result;}
+  Body2 Temporary(){return Make<Body2>((m,x)=>{if(m=="Copy"){Copies++;return Temporary();}if(m=="IsTemporaryBody")return true;if(m=="GetType")return (int)swBodyType_e.swSolidBody;if(m=="Check2")return 0;if(m=="get_Check3")return null;if(m=="GetMassProperties")return new double[]{0,0,0,.0001};if(m=="ApplyTransform"){Transforms++;return true;}if(m=="Display3"){Displays++;if(DuringDisplay!=null)DuringDisplay();return DisplayStatus;}if(m=="Hide"){Hides++;if(FailHide)throw new System.Runtime.InteropServices.COMException("SIMULATED_HIDE_FAILURE");return null;}if(m=="GetBodyBox"){ViewportReads++;throw new Exception("Verbose viewport should be disabled");}if(m=="set_MaterialPropertyValues2")return null;throw new Exception("Unexpected temporary proxy member "+m);});}
+  internal PreviewFixture(){
+   PartA=Make<ModelDoc2>((m,x)=>m=="GetUpdateStamp"?(object)PartStampA:m=="get_ConfigurationManager"?Config(()=>CfgA):m=="GetType"?(object)(int)swDocumentTypes_e.swDocPART:null);
+   PartB=Make<ModelDoc2>((m,x)=>m=="GetUpdateStamp"?(object)PartStampB:m=="get_ConfigurationManager"?Config(()=>CfgB):m=="GetType"?(object)(int)swDocumentTypes_e.swDocPART:null);
+   SourceA=Make<Body2>((m,x)=>m=="GetUpdateStamp"?(object)BodyStampA:null);SourceB=Make<Body2>((m,x)=>m=="GetUpdateStamp"?(object)BodyStampB:null);
+   Assembly=Make<ModelDoc2>((m,x)=>{if(m=="GetUpdateStamp"){if(FailStamp)throw new System.Runtime.InteropServices.COMException("SIMULATED_STAMP_FAILURE");return AssemblyStamp;}if(m=="get_ConfigurationManager")return Config(()=>AssemblyCfg);if(m=="GraphicsRedraw2"){Redraws++;return null;}if(m=="GetType")return (int)swDocumentTypes_e.swDocASSEMBLY;return null;});
+   A=Make<Component2>((m,x)=>m=="GetModelDoc2"?(object)PartA:m=="GetTotalTransform"?Transform(()=>MatrixA):m=="GetBodies3"?new object[]{SourceA}:m=="get_ReferencedConfiguration"?CfgA:m=="IsSuppressed"||m=="IsHidden"?(object)false:null);
+   B=Make<Component2>((m,x)=>m=="GetModelDoc2"?(object)PartB:m=="GetTotalTransform"?Transform(()=>MatrixB):m=="GetBodies3"?new object[]{SourceB}:m=="get_ReferencedConfiguration"?CfgB:m=="IsSuppressed"||m=="IsHidden"?(object)false:null);
+   MathUtility math=Make<MathUtility>((m,x)=>m=="CreateTransform"?(object)Transform(()=>((double[])x[0])):null);
+   App=Make<ISldWorks>((m,x)=>m=="get_ActiveDoc"?(object)Assembly:m=="GetMathUtility"?math:m=="IsSame"?(object)(int)(Object.ReferenceEquals(x[0],x[1])?swObjectEquality.swObjectSame:swObjectEquality.swObjectNotSame):null);
+   Ghost=new AutoFrameJointGhostPreview(App,Assembly);
+  }
+  internal object Capture(){return CallPrivate(Ghost,"TryCaptureSourceState",A,B);}
+  internal bool Same(object x,object y){return (bool)CallPrivate(Ghost,"SameSourceState",x,y);}
+  internal void Prime(int mode=1){
+   var result=new AfjJointSolution{Plan=new AfjJointPlan{RuleId="SIMULATED_POLICY_NO_GEOMETRY"},A=new AfjBooleanResult{RemovedVolume=0.00001},B=new AfjBooleanResult{RemovedVolume=0.00002},PartA=PartA,PartB=PartB,TransformA=Transform(()=>MatrixA),TransformB=Transform(()=>MatrixB),CoverA=true,AfterGap=.0001};
+   result.A.Kept.Add(Temporary());result.B.Kept.Add(Temporary());result.A.Removed.Add(Temporary());result.B.Removed.Add(Temporary());
+   SetPrivate(Ghost,"cachedSolution",result);SetPrivate(Ghost,"cachedSource",Capture());SetPrivate(Ghost,"displayedCandidate",mode);SetPrivate(Ghost,"displayedMessage","SIMULATED_ALREADY_DISPLAYED");
+   var tracked=(System.Collections.IList)GetPrivate(Ghost,"shown");Type entry=typeof(AutoFrameJointGhostPreview).GetNestedType("ShownBody",BindingFlags.NonPublic);
+   foreach(bool removed in mode==1?new[]{false,false}:new[]{false,false,true,true})tracked.Add(entry.GetConstructors(BindingFlags.NonPublic|BindingFlags.Instance)[0].Invoke(new object[]{Temporary(),PartA,removed}));
+  }
+  internal int Tracked{get{return ((System.Collections.IList)GetPrivate(Ghost,"shown")).Count;}}
+ }
+ static void ExtraControls(){
+  Row("FINISH_CANCELS_QUEUED_PREVIEW_AND_CLOSES_ONCE",()=>{using(var control=SetupFinishPage()){int before=previews;page.OnButtonPress(107);page.OnButtonPress(106);page.OnButtonPress(106);Assert(closeCalls==0,"Native close ran inline");Pump();Assert(closeCalls==1&&previews==before&&!page.IsOpen,"Finish was dropped or duplicate close executed");}});
+  Row("FINISH_DURING_RUNNING_BACKEND_IS_RETAINED",()=>{using(var control=SetupFinishPage()){int before=previews;insidePreview=()=>{page.OnButtonPress(106);Assert(closeCalls==0&&(bool)Field("finishRequested"),"Busy Finish was dropped/closed inline");};page.OnButtonPress(107);Pump();Assert(previews==before+1&&closeCalls==1&&!page.IsOpen,"Busy Finish was not drained");}});
+  Row("FINISH_PRIORITY_BLOCKS_NEW_BACKEND_AND_SELECTION_REFRESH",()=>{using(var control=SetupFinishPage()){int before=previews,analysisBefore=analyzes;Set("handlingCutPreview",true);page.OnButtonPress(106);page.OnButtonPress(108);page.OnSelectionboxListChanged(102,1);Pump();Assert(closeCalls==0&&previews==before&&analyzes==analysisBefore,"Finish lost priority");Set("handlingCutPreview",false);CallPrivate(page,"QueueAfterAction",(int)Field("pageEpoch"));Pump();Assert(closeCalls==1,"Retained finish not scheduled after idle");}});
+  Row("STANDARD_NATIVE_CLOSE_INVALIDATES_PENDING_FINISH",()=>{using(var control=SetupFinishPage()){int prior=cleanup;page.OnButtonPress(106);page.OnClose(2);page.AfterClose();Pump();Assert(closeCalls==0&&cleanup==prior+1,"Stale native Close or duplicate cleanup");}});
+  Row("NORMAL_CLOSE_EXCEPTION_ALLOWS_EXPLICIT_FINISH_RETRY",()=>{using(var control=SetupFinishPage()){Set("page",Make<PropertyManagerPage2>((m,x)=>{if(m=="Close"){closeCalls++;if(closeCalls==1)throw new System.Runtime.InteropServices.COMException("SIMULATED_CLOSE_FAILURE");page.OnClose(1);page.AfterClose();return null;}if(m=="SetMessage3")return true;return null;}));page.OnButtonPress(106);Pump();Assert(closeCalls==1&&!(bool)Field("finishCloseIssued")&&!(bool)Field("controlsFaulted"),"Close exception permanently disabled finish");page.OnButtonPress(106);Pump();Assert(closeCalls==2&&!page.IsOpen,"Explicit finish retry failed");}});
+  Row("CACHE_REPEATED_P1_HAS_NO_BODY_COPY_DISPLAY_HIDE_OR_REDRAW",()=>{var f=new PreviewFixture();f.Prime();string message;Assert(f.Ghost.TryShowCutCandidate(f.A,f.B,1,out message),"Exact source was not reused");Assert(f.Copies==0&&f.Displays==0&&f.Hides==0&&f.Redraws==0&&f.Tracked==2,"Repeated P1 performed display work");});
+  Row("CACHE_P1_TO_P2_DISPLAYS_ONLY_REMOVED_AND_REDRAWS_ONCE",()=>{var f=new PreviewFixture();f.Prime();string message;Assert(f.Ghost.TryShowCutCandidate(f.A,f.B,2,out message),"P2 failed");Assert(f.Displays==2&&f.Hides==0&&f.Redraws==1&&f.Tracked==4&&f.ViewportReads==0,"P2 replaced KEEP or ran viewport diagnostics");Assert(f.Ghost.TryShowCutCandidate(f.A,f.B,2,out message)&&f.Displays==2&&f.Redraws==1,"Repeated P2 duplicated bodies");});
+  Row("CACHE_P2_TO_P1_HIDES_ONLY_REMOVED_AND_REDRAWS_ONCE",()=>{var f=new PreviewFixture();f.Prime(2);string message;Assert(f.Ghost.TryShowCutCandidate(f.A,f.B,1,out message),"P1 failed");Assert(f.Displays==0&&f.Copies==0&&f.Hides==2&&f.Redraws==1&&f.Tracked==2,"P1 replaced KEEP");});
+  Row("CACHE_INVALIDATED_BY_DOCUMENT_AND_BODY_STAMPS",()=>{var f=new PreviewFixture();object first=f.Capture();Assert(first!=null&&f.Same(first,f.Capture()),"Initial state mismatch");f.AssemblyStamp++;Assert(!f.Same(first,f.Capture()),"Assembly stamp ignored");f.AssemblyStamp--;f.PartStampA++;Assert(!f.Same(first,f.Capture()),"Part A stamp ignored");f.PartStampA--;f.PartStampB++;Assert(!f.Same(first,f.Capture()),"Part B stamp ignored");f.PartStampB--;f.BodyStampA++;Assert(!f.Same(first,f.Capture()),"Body A stamp ignored");f.BodyStampA--;f.BodyStampB++;Assert(!f.Same(first,f.Capture()),"Body B stamp ignored");});
+  Row("CACHE_INVALIDATED_BY_CONFIGURATION_AND_FULL_TRANSFORM",()=>{var f=new PreviewFixture();object first=f.Capture();f.CfgA="Alternate";Assert(!f.Same(first,f.Capture()),"Configuration ignored");f.CfgA="Default";f.AssemblyCfg="Alternate";Assert(!f.Same(first,f.Capture()),"Assembly configuration ignored");f.AssemblyCfg="Default";f.MatrixA[9]=.001;Assert(!f.Same(first,f.Capture()),"Transform A ignored");f.MatrixA[9]=0;f.MatrixB[10]=.001;Assert(!f.Same(first,f.Capture()),"Transform B ignored");});
+  Row("CACHE_INVALIDATED_BY_SOURCE_BODY_IDENTITY_AND_AB_ORDER",()=>{var f=new PreviewFixture();object first=f.Capture();f.SourceA=Make<Body2>((m,x)=>m=="GetUpdateStamp"?(object)f.BodyStampA:null);Assert(!f.Same(first,f.Capture()),"New body with same stamp accepted");object second=f.Capture();Assert(!f.Same(second,CallPrivate(f.Ghost,"TryCaptureSourceState",f.B,f.A)),"Reversed A/B accepted");});
+  Row("CACHE_REQUIRES_CONCLUSIVE_COMPONENT_AND_PART_IDENTITY",()=>{var f=new PreviewFixture();object first=f.Capture(),second=f.Capture();var stateA=GetPrivate(second,"A");SetPrivate(stateA,"Component",f.B);Assert(!f.Same(first,second),"Different component accepted");second=f.Capture();stateA=GetPrivate(second,"A");SetPrivate(stateA,"Part",f.PartB);Assert(!f.Same(first,second),"Different Part accepted");});
+  Row("CACHE_STAMP_FAILURE_AND_NONFINITE_TRANSFORM_DISABLE_REUSE",()=>{var f=new PreviewFixture();f.FailStamp=true;Assert(f.Capture()==null,"Unavailable stamp guessed");f.FailStamp=false;f.MatrixA[9]=Double.NaN;Assert(f.Capture()==null,"Nonfinite transform accepted");});
+  Row("CLEAR_DROPS_CACHE_AFTER_HIDING_ALL_DISPLAYED_BODIES",()=>{var f=new PreviewFixture();f.Prime(2);string error;Assert(f.Ghost.TryClear(out error)&&f.Tracked==0&&f.Hides==4&&f.Redraws==1,"Clear did not hide all");Assert(GetPrivate(f.Ghost,"cachedSolution")==null&&GetPrivate(f.Ghost,"cachedSource")==null,"Clear retained result cache");});
+  Row("HIDE_FAILURE_RETAINS_OWNERSHIP_FOR_EXPLICIT_RETRY",()=>{var f=new PreviewFixture();f.Prime();f.FailHide=true;string error;Assert(!f.Ghost.TryClear(out error)&&f.Tracked==2,"Failed Hide lost references");f.FailHide=false;Assert(f.Ghost.TryClear(out error)&&f.Tracked==0,"Explicit cleanup retry failed");});
+  Row("NONZERO_DISPLAY3_STATUS_IS_FAILURE_AND_DROPS_CACHE",()=>{var f=new PreviewFixture();f.Prime();f.DisplayStatus=1;string message;Assert(!f.Ghost.TryShowCutCandidate(f.A,f.B,2,out message),"Failed Display3 was reported as success");Assert(f.Displays==1&&f.Tracked==0&&GetPrivate(f.Ghost,"cachedSolution")==null,"Failed display leaked bodies/cache");});
+  Row("CLOSE_WHILE_COMPUTING_WITH_NO_BODY_RETAINS_SESSION",()=>{var f=new PreviewFixture();var manager=(AutoFrameJointGhostSessionManager)Activator.CreateInstance(typeof(AutoFrameJointGhostSessionManager),true);Guid token;string message;Assert(manager.TryBegin(f.App,f.Assembly,out token,out message),"Begin failed");var session=GetPrivate(manager,"current");var ghost=(AutoFrameJointGhostPreview)session.GetType().GetField("Ghost",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(session);SetPrivate(ghost,"busy",true);Assert(!manager.CloseFromPage(token,out message)&&manager.HasSession,"Busy session discarded before backend unwound");SetPrivate(ghost,"busy",false);Assert(manager.RetryClosedCleanup(out message)&&!manager.HasSession,"Busy close failed to finish");});
+  Row("REENTRANT_NATIVE_CLOSE_STOPS_FURTHER_DISPLAY_AND_DRAINS_SESSION",()=>{var f=new PreviewFixture();var manager=(AutoFrameJointGhostSessionManager)Activator.CreateInstance(typeof(AutoFrameJointGhostSessionManager),true);Guid token;string message;Assert(manager.TryBegin(f.App,f.Assembly,out token,out message),"Begin failed");var session=GetPrivate(manager,"current");f.Ghost=(AutoFrameJointGhostPreview)session.GetType().GetField("Ghost",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(session);f.Prime();f.DuringDisplay=()=>{f.DuringDisplay=null;string closeMessage;Assert(!manager.CloseFromPage(token,out closeMessage),"Busy close should wait");};Assert(!manager.TryShowCutCandidate(token,f.A,f.B,2,out message),"Closed Preview reported success");Assert(f.Displays==1&&f.Tracked==0&&!manager.HasSession,"Display continued or closed session leaked");});
+ }
+
+ [STAThread]static int Main(string[] args){Directory.CreateDirectory(args[0]);string log=Path.Combine(args[0],"managed_flow.log");File.WriteAllText(log,String.Empty);Trace.Listeners.Add(new TextWriterTraceListener(log));Trace.AutoFlush=true;Trace.WriteLine("[R52-MANAGED-SIMULATION] No SOLIDWORKS process, no native PMP, no Body2 and no installed Add-in execution.");Control dispatcher=null;int exit=0;
+ try {
+  partA=Make<ModelDoc2>((m,x)=>m=="GetType"?(object)(int)swDocumentTypes_e.swDocPART:m=="GetTitle"?"PART_A":null);
+  partB=Make<ModelDoc2>((m,x)=>m=="GetType"?(object)(int)swDocumentTypes_e.swDocPART:m=="GetTitle"?"PART_B":null);
+  a=Make<Component2>((m,x)=>m=="get_Name2"?(object)"MANAGED_A":m=="GetModelDoc2"?partA:null);
+  b=Make<Component2>((m,x)=>m=="get_Name2"?(object)"MANAGED_B":m=="GetModelDoc2"?partB:null);
+  SelectionMgr mgr=Make<SelectionMgr>((m,x)=>{int mark=Convert.ToInt32(x[x.Length-1]);return m=="GetSelectedObjectCount2"?(object)(marks.ContainsKey(mark)?1:0):marks.ContainsKey(mark)?marks[mark]:null;});
+  assembly=Make<ModelDoc2>((m,x)=>m=="get_SelectionManager"?(object)mgr:m=="GetType"?(object)(int)swDocumentTypes_e.swDocASSEMBLY:null);
+  ISldWorks app=Make<ISldWorks>((m,x)=>m=="get_ActiveDoc"?assembly:m=="IsSame"?(object)(int)(Object.ReferenceEquals(x[0],x[1])?swObjectEquality.swObjectSame:swObjectEquality.swObjectNotSame):null);
+  page=new AutoFrameJointSelectionPage(app,(x,y)=>{analyzes++;return "MANAGED_ANALYSIS_NO_GEOMETRY";},(x,y)=>"MANAGED_OVERLAY",(x,y,mode)=>{Assert(Object.ReferenceEquals(x,a)&&Object.ReferenceEquals(y,b),"Wrong A/B pair");previews++;return "MANAGED_CALLBACK_ONLY_NO_BODY2_MODE_"+mode;},()=>cleanup++,p=>{});
+  Set("shown",true);Set("nativeActivated",true);
+  Set("page",Make<PropertyManagerPage2>((m,x)=>{if(m!="SetMessage3")throw new Exception("Unexpected native page call: "+m);messageCalls++;if(throwMessage)throw new System.Runtime.InteropServices.COMException("SIMULATED_MESSAGE_FAILURE",unchecked((int)0x80004005));lastMessage=(string)x[0];return acceptMessage;}));
+  foreach(string field in new[]{"statusLabel","geometryAngleLabel","geometryPointLabel","geometryGapLabel","geometryStatusLabel","geometryRoleLabel"})Set(field,Make<PropertyManagerPageLabel>((m,x)=>{labelCalls++;throw new Exception("Forbidden native label access: "+m);}));
+
+  dispatcher=new Control();IntPtr hwnd=dispatcher.Handle;Set("deferredFocusWindow",dispatcher);
+  Set("selectionA",Make<PropertyManagerPageSelectionbox>((m,x)=>m=="GetSelectionFocus"?(object)(focus==101):null));
+  Set("selectionB",Make<PropertyManagerPageSelectionbox>((m,x)=>{if(m=="SetSelectionFocus"){focus=102;page.OnSelectionboxFocusChanged(102);}return m=="GetSelectionFocus"?(object)(focus==102):null;}));
+  Row("A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B",()=>{page.OnSelectionboxFocusChanged(101);Assert(Submit(101,a,(int)swSelectType_e.swSelCOMPONENTS),"A rejected");marks[1]=a;int calls=simulatedCalls;page.OnSelectionboxListChanged(101,1);Assert(calls==simulatedCalls,"List callback queried interfaces");Assert(previews==0,"Auto Preview was added");Pump();Assert(focus==102&&!marks.ContainsKey(2),"Focus should not select B");});
+  Row("B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW",()=>{Assert(Submit(102,b,(int)swSelectType_e.swSelCOMPONENTS),"B rejected");marks[2]=b;page.OnSelectionboxListChanged(102,1);Assert(analyzes==0,"Analyze ran inline");Pump();Assert(analyzes==1&&previews==0,"Expected Analyze only");});
+  Row("BUTTON_107_DEFERRED_PREVIEW_DELEGATE",()=>{page.OnButtonPress(107);Assert(previews==0,"107 backend ran inline");Pump();Assert(previews==1,"107 delegate missing");});
+  Row("BUTTON_108_DEFERRED_PREVIEW_DELEGATE",()=>{page.OnButtonPress(108);Assert(previews==1,"108 backend ran inline");Pump();Assert(previews==2,"108 delegate missing");});
+  Row("REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ",()=>{Assert(!Submit(999,a,20),"Unknown box accepted");Assert(!Submit(102,null,20),"Null accepted");Assert(!Submit(102,b,999),"Unsupported type accepted");Assert(!Submit(102,new object(),20),"Unknown interface accepted");Assert(!Submit(102,a,20),"Cached duplicate accepted");});
+  Row("ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED",()=>{IEntity entity=Make<IEntity>((m,x)=>m=="GetComponent"?a:null);Assert(Submit(102,entity,(int)swSelectType_e.swSelFACES),"Entity dispatch rejected before deferred owner resolution");marks[2]=a;page.OnSelectionboxListChanged(102,1);Pump();page.OnButtonPress(107);Pump();Assert(previews==2,"Duplicate occurrence reached Preview");marks[2]=b;page.OnSelectionboxListChanged(102,1);Pump();});
+  Row("FOREIGN_THREAD_SUBMIT_REFUSED",()=>{bool accepted=true;var thread=new System.Threading.Thread(()=>accepted=Submit(102,b,20));thread.SetApartmentState(System.Threading.ApartmentState.STA);thread.Start();thread.Join();Assert(!accepted,"Foreign owner accepted");});
+  Row("VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY",()=>{var method=typeof(AutoFrameJointGhostPreview).GetMethod("ViewportEstimate",BindingFlags.NonPublic|BindingFlags.Static);Func<double[],double[],string> run=(x,y)=>(string)method.Invoke(null,new object[]{x,y});Assert(run(new[]{10d,10,20,20},new[]{0d,0,100,100})=="OVERLAPS_WINDOW_ESTIMATE","Inside estimate");Assert(run(new[]{110d,10,120,20},new[]{0d,0,100,100})=="OUTSIDE_WINDOW_ESTIMATE","Outside estimate");Assert(run(new[]{Double.NaN,10,20,20},new[]{0d,0,100,100})=="UNVERIFIED","Bad values admitted");});
+  Row("LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL",()=>{string text="Kết quả giao góc — tôn 2,50 mm — "+new string('X',1200);Set("lastGeometryLines",new[]{"Đã tính giao góc","Góc 90°","XYZ","Độ lệch","Trong chiều dài","Frame ngắn che"});var cache=typeof(AutoFrameJointSelectionPage).GetMethod("CacheStatusText",BindingFlags.Instance|BindingFlags.NonPublic);Assert((bool)cache.Invoke(page,new object[]{104,text,(int)Field("pageEpoch")}),"Cache failed");var publish=typeof(AutoFrameJointSelectionPage).GetMethod("PublishStatusMessage",BindingFlags.Instance|BindingFlags.NonPublic);int before=messageCalls;publish.Invoke(page,null);Assert(messageCalls==before+1&&lastMessage.Contains(text)&&lastMessage.Contains("Góc 90°"),"Full result/geometry not published");publish.Invoke(page,null);Assert(messageCalls==before+1,"Duplicate message not coalesced");Assert(labelCalls==0,"Native label was accessed");});
+  Row("MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL",()=>{acceptMessage=false;page.OnButtonPress(108);Pump();Assert(previews==3,"Message failure blocked Preview");Assert((bool)Field("messageUpdatesUnavailable")&&!(bool)Field("controlsFaulted"),"Wrong failure scope");int before=messageCalls;page.OnButtonPress(108);Pump();Assert(previews==4&&messageCalls==before,"Disabled message retried or Preview blocked");Assert(labelCalls==0,"Label fallback executed");});
+  Row("MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY",()=>{Set("messageUpdatesUnavailable",false);Set("lastPublishedMessage",null);throwMessage=true;page.OnButtonPress(107);Pump();Assert(previews==5&&(bool)Field("messageUpdatesUnavailable")&&!(bool)Field("controlsFaulted"),"Normal COM message failure escaped/blocked controls");Assert(labelCalls==0,"Label fallback executed");throwMessage=false;acceptMessage=true;});
+  Row("QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH",()=>{page.OnButtonPress(107);page.OnClose(2);Pump();Assert(previews==5,"Stale action executed");page.AfterClose();Assert(cleanup==1,"Cleanup missing");Assert(!Submit(102,b,20),"Closed page accepted");});
+  ExtraControls();
+  Assert(inlineCalls==0,"Callback interface access occurred");
+ }catch(Exception e){exit=1;Console.WriteLine(e.ToString());}finally{if(dispatcher!=null)dispatcher.Dispose();var output=new{status=exit==0?"PASS_MANAGED_CONTRACT":"FAIL",installed_addin_test="NOT_RUN",real_api_or_body2="NOT_RUN",preview_delegate_calls=previews,simulated_interface_calls=simulatedCalls,interface_access_inside_selection_callbacks=inlineCalls,native_label_interface_calls=labelCalls,page_message_proxy_calls=messageCalls,tests=rows};File.WriteAllText(Path.Combine(args[0],"managed_flow_results.json"),new JavaScriptSerializer{MaxJsonLength=Int32.MaxValue}.Serialize(output));}
+ return exit;}
+}
