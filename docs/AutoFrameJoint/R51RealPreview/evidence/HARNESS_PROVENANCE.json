@@ -1,0 +1,51 @@
+[
+  {
+    "harness": "AcceptanceHarness.exe",
+    "sha256": "b736d35cbd1062413a51a2f87324e6512662faefada37d42d640578ca50727f5",
+    "binary_published": false,
+    "build_scope": "DETACHED_EXPLICIT_SOURCE_FILES_NO_ADDIN_PROJECT",
+    "backend_source_sha256": "b43be8564a433c6554c7561163f636aae4a95ed07fb4a165e5c24eabf0213f40"
+  },
+  {
+    "harness": "NativeReplayHarness.exe",
+    "sha256": "116c66c15ade101353e0ee9cb7726b194363cb452d2b15d61b2b591e7a948500",
+    "binary_published": false,
+    "build_scope": "DETACHED_EXPLICIT_SOURCE_FILES_NO_ADDIN_PROJECT",
+    "backend_source_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b"
+  },
+  {
+    "harness": "R51ExistingVariants.exe",
+    "sha256": "c2017d9fbf0207050ad4eb43055cdf2bb9380c2ff83dff11ab3b577e81d7625d",
+    "binary_published": false,
+    "build_scope": "DETACHED_EXPLICIT_SOURCE_FILES_NO_ADDIN_PROJECT",
+    "backend_source_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b"
+  },
+  {
+    "harness": "R51HeightVariants.exe",
+    "sha256": "551c626007df63114f3d44c8e97f7b55c33ff1edbe7d057eb632d730eff7805f",
+    "binary_published": false,
+    "build_scope": "DETACHED_EXPLICIT_SOURCE_FILES_NO_ADDIN_PROJECT",
+    "backend_source_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b"
+  },
+  {
+    "harness": "SheetLayerGuardHarness.exe",
+    "sha256": "25f295922c60c59035fa764846dd2ecf7fc00b4a132c79d37eb1b41b299f48bf",
+    "binary_published": false,
+    "build_scope": "DETACHED_EXPLICIT_SOURCE_FILES_NO_ADDIN_PROJECT",
+    "backend_source_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b"
+  },
+  {
+    "harness": "Final2354Smoke.exe",
+    "sha256": "45e63724c3fe3c5a29a4008ac54435978d31891b63d8a9a21880d6eab90e7841",
+    "binary_published": false,
+    "build_scope": "DETACHED_EXPLICIT_SOURCE_FILES_NO_ADDIN_PROJECT",
+    "backend_source_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b"
+  },
+  {
+    "harness": "Final2354BranchSmoke.exe",
+    "sha256": "c0a43e2a3f0315e02942bb1cb848b3e1931d17af937116f6044b98087886da89",
+    "binary_published": false,
+    "build_scope": "DETACHED_EXPLICIT_SOURCE_FILES_NO_ADDIN_PROJECT",
+    "backend_source_sha256": "11b01b9852d70ce70373dbb4fb4c32edc0f421ab823b0e5c2652b258efca6b58"
+  }
+]

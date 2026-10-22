@@ -1,0 +1,4 @@
+{
+  "status": "FAIL",
+  "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 SheetLayerGuardHarness.Box(ISldWorks sw, Double z, Double width, Double depth, Double height, Double x)\r\n   場所 SheetLayerGuardHarness.Main(String[] args)"
+}

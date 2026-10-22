@@ -1,0 +1,40 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using ADDIN.Commands.AutoFrameJoint;
+class R51HeightVariants {
+ static JavaScriptSerializer J=new JavaScriptSerializer{MaxJsonLength=int.MaxValue};
+ static Dictionary<string,object> D(params object[] a){var d=new Dictionary<string,object>();for(int i=0;i<a.Length;i+=2)d[(string)a[i]]=a[i+1];return d;}
+ static AfjProfile Profile(double width,double h0,double h1,double lip,double t,double r){var lines=new List<double[]>{new[]{0d,0d,0d,0d,width,0d},new[]{0d,0d,0d,0d,0d,-h0},new[]{0d,width,0d,0d,width,-h1}};if(lip>0)lines.Add(new[]{0d,width,-h1,0d,width+lip,-h1});return new AfjProfile{Lines=lines.ToArray(),Axis=new[]{1d,0d,0d},Thickness=t,Radius=r};}
+ static Body2 Stock(ISldWorks sw,double width,double h0,double h1,double lip,double t,double r,double length){
+  double x=-length/2;var points=new List<double[]>();var centers=new List<double[]>();Action<double,double> point=(y,z)=>{points.Add(new[]{x,y,z});centers.Add(null);};Action<double,double,double,double> arc=(cy,cz,y,z)=>{centers[centers.Count-1]=new[]{x,cy,cz};point(y,z);};
+  point(0,-h0);point(0,-t-r);arc(t+r,-t-r,t+r,0);point(width-t-r,0);arc(width-t-r,-t-r,width,-t-r);
+  if(lip>0){point(width,-h1+r);arc(width+r,-h1+r,width+r,-h1);point(width+lip,-h1);point(width+lip,-h1-t);point(width+r,-h1-t);arc(width+r,-h1+r,width-t,-h1+r);point(width-t,-t-r);}else{point(width,-h1);point(width-t,-h1);point(width-t,-t-r);}
+  arc(width-t-r,-t-r,width-t-r,-t);point(t+r,-t);arc(t+r,-t-r,t,-t-r);point(t,-h0);
+  return AfjTemporaryBoolean.CreatePrism(sw,new AfjToolDefinition{Polygon=points.ToArray(),ArcCenters=centers.ToArray(),Direction=new[]{1d,0d,0d},Length=length});
+ }
+ static MathTransform Placement(MathUtility math,bool b,double length,double overhang,double rotation,double[] shift){double[] own=b?new[]{0d,-1d,0d,1d,0d,0d,0d,0d,1d,0d,-length/2+overhang,0d,1d,0d,0d,0d}:new[]{1d,0d,0d,0d,1d,0d,0d,0d,1d,-length/2+overhang,0d,0d,1d,0d,0d,0d};double c=Math.Cos(rotation),s=Math.Sin(rotation);for(int i=0;i<3;i++){double a=own[i*3],v=own[i*3+1];own[i*3]=a*c-v*s;own[i*3+1]=a*s+v*c;}double ox=own[9],oy=own[10];own[9]=ox*c-oy*s+shift[0];own[10]=ox*s+oy*c+shift[1];own[11]+=shift[2];return (MathTransform)math.CreateTransform(own);}
+ [STAThread] static int Main(string[] args) {
+  string root=args[0], prior=args[1];var rows=new List<object>();ISldWorks sw=HarnessConnection.AttachVisible();var math=(MathUtility)sw.GetMathUtility();
+  Trace.Listeners.Add(new TextWriterTraceListener(Path.Combine(root,"height_variants_api.log")));Trace.AutoFlush=true;
+  string path=Path.Combine(prior,"pair_copies/3615-02-bh-T2/AFJ_PAIR_3615-02-bh-T2.SLDASM");
+  if(sw.GetOpenDocumentByName(path)!=null)throw new Exception("Private context already open");int e=0,w=0;ModelDoc2 model=sw.OpenDoc6(path,2,3,"",ref e,ref w) as ModelDoc2;if(model==null)throw new Exception("No private distance context");
+  double[][] dimensions={new[]{70d,70,40,42,40,60,2.5,.1},new[]{60d,55,30,34,35,50,2,.3},new[]{90d,65,45,50,55,65,3,.8},new[]{60d,55,30,34,29,50,2,.3},new[]{60d,55,30,34,35,33,2,.3}};
+  try{for(int i=0;i<dimensions.Length;i++){double[] c=dimensions[i];var row=D("case","HEIGHT_VARIANT_"+(i+1),"dimensions_mm",c,"expected",i<3?"PASS_GEOMETRY":"UNVERIFIED_RULE","evidence","GEOMETRY_VERIFIED_SYNTHETIC_CONTROL");rows.Add(row);
+   try{double wa=c[0]/1000,wb=c[1]/1000,na=c[2]/1000,fa=c[3]/1000,nb=c[4]/1000,fb=c[5]/1000,t=c[6]/1000,r=c[7]/1000,la=1.25,lb=.85;
+    AfjProfile pa=Profile(wa,na,fa,0,t,r),pb=Profile(wb,nb,fb,0,t,r);Body2 a=Stock(sw,wa,na,fa,0,t,r,la),b=Stock(sw,wb,nb,fb,0,t,r,lb);
+    MathTransform ta=Placement(math,false,la,.25,.6457718232,new[]{.3,-.2,.15}),tb=Placement(math,true,lb,.25,.6457718232,new[]{.3,-.2,.15});
+    if(i==0){foreach(var pair in new[]{new{Body=a,T=ta,L=la},new{Body=b,T=tb,L=lb}}){double[] shift={1,0,0,0,1,0,0,0,1,pair.L/2,0,0,1,0,0,0};if(!pair.Body.ApplyTransform((MathTransform)math.CreateTransform(shift)))throw new Exception("Stock shift failed");double[] matrix=(double[])pair.T.ArrayData;for(int k=0;k<3;k++)matrix[9+k]-=matrix[k]*pair.L/2;pair.T.ArrayData=matrix;}row["one_sided_stock_profile_at_end"]=true;}
+    AfjJointSolution s=AfjJointSolver.SolveBodies(sw,model,a,b,pa,pb,null,null,ta,tb);row["rule"]=s.Plan.RuleId;row["cover"]=s.CoverA?"A":"B";row["gap_m"]=s.AfterGap;row["interference_m3"]=s.AfterOverlap;row["removed_a_m3"]=s.A.RemovedVolume;row["removed_b_m3"]=s.B.RemovedVolume;row["check2_a"]=s.A.Kept.Select(x=>x.Check2()).ToArray();row["check2_b"]=s.B.Kept.Select(x=>x.Check2()).ToArray();row["check3_a"]=s.A.Kept.Select(x=>x.Check3==null?0:x.Check3.Count).ToArray();row["check3_b"]=s.B.Kept.Select(x=>x.Check3==null?0:x.Check3.Count).ToArray();
+    var swapped=AfjJointSolver.SolveBodies(sw,model,b,a,pb,pa,null,null,tb,ta);bool swap=swapped.CoverA&&!s.CoverA&&Math.Abs(swapped.A.AfterVolume-s.B.AfterVolume)<1e-12&&Math.Abs(swapped.B.AfterVolume-s.A.AfterVolume)<1e-12;row["swap_status"]=swap?"PASS":"FAIL";row["status"]=i<3&&swap?"PASS_GEOMETRY":"FAIL_UNEXPECTED_ADMISSION";
+   }catch(Exception ex){row["status"]=ex.Message.StartsWith("UNVERIFIED_RULE")?"UNVERIFIED_RULE":"FAIL";row["message"]=ex.Message;row["hresult"]="0x"+ex.HResult.ToString("X8");row["stack"]=ex.StackTrace;}
+   Console.WriteLine(row["case"]+" "+row["status"]);File.WriteAllText(Path.Combine(root,"height_variants_results.json"),J.Serialize(rows),new UTF8Encoding(false));
+  }}finally{sw.CloseDoc(model.GetTitle());}return 0;
+ }
+}

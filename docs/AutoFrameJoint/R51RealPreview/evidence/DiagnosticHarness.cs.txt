@@ -1,0 +1,123 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.Commands.AutoFrameJoint;
+
+class DiagnosticHarness
+{
+    static JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue, RecursionLimit = 200 };
+    static Dictionary<string, object> D(params object[] values) { var d = new Dictionary<string, object>(); for (int i = 0; i < values.Length; i += 2) d[(string)values[i]] = values[i + 1]; return d; }
+    static string root;
+    static List<object> rows = new List<object>();
+    static void Save() { File.WriteAllText(Path.Combine(root, "diagnostic.json"), json.Serialize(rows)); }
+    static object Error(Exception e) { return D("type", e.GetType().FullName, "hresult", "0x" + e.HResult.ToString("X8"), "message", e.Message, "stack", e.StackTrace); }
+    static object Body(Body2 body) {
+        var edges = ((Array)body.GetEdges()).Cast<Edge>().ToArray();
+        return D("check2", body.Check2(), "temporary", body.IsTemporaryBody(), "type", body.GetType(), "volume_m3", AfjTemporaryBoolean.Volume(body), "faces", body.GetFaceCount(), "edges", edges.Length,
+            "edge_tolerance_api", "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+            "non_two_face_edges", edges.Count(e => { var a = e.GetTwoAdjacentFaces2() as Array; return a == null || a.Length != 2 || a.GetValue(0) == null || a.GetValue(1) == null; }));
+    }
+    static object Definition(BaseFlangeFeatureData d) { return D("thickness_m", d.Thickness, "radius_m", d.BendRadius, "reverse_thickness", d.ReverseThickness, "reverse_direction", d.ReverseDirection, "d1_length_m", d.D1OffsetDistance, "d1_type", d.D1OffsetType, "d2_type", d.D2OffsetType, "offset_directions", d.OffsetDirections); }
+    static object RawProfile(ModelDoc2 part, Body2 body) {
+        var tree = new List<object>(); var defs = new List<object>(); var faces = new List<object>();
+        for (Feature f = part.FirstFeature() as Feature; f != null; f = f.GetNextFeature() as Feature) {
+            tree.Add(D("name", f.Name, "type", f.GetTypeName2(), "suppressed", f.IsSuppressed()));
+            if (f.GetTypeName2() != "SMBaseFlange") continue;
+            var d = f.GetDefinition() as BaseFlangeFeatureData; var row = D("before_access", Definition(d)); defs.Add(row);
+            bool access = false;
+            try { access = d.AccessSelections(part, null); row["access_selections_on_private_copy"] = access; if (access) row["after_access"] = Definition(d); }
+            finally { if (access) d.ReleaseSelectionAccess(); }
+            foreach (Feature parent in ((Array)f.GetParents())) {
+                var sketch = parent.GetSpecificFeature2() as Sketch; if (sketch == null) continue;
+                var inverse = (MathTransform)sketch.ModelToSketchTransform.Inverse(); var matrix = (double[])inverse.ArrayData;
+                row["profile_segments_model_m"] = ((Array)sketch.GetSketchSegments()).Cast<SketchSegment>().Where(s => !s.ConstructionGeometry).Select(s => {
+                    var line = s as SketchLine; if (line == null) return D("kind", "non_line"); var a = (SketchPoint)line.GetStartPoint2(); var b = (SketchPoint)line.GetEndPoint2();
+                    return D("kind", "line", "a", AfjProfileAnalyzer.Transform(new[] { a.X, a.Y, a.Z }, matrix), "b", AfjProfileAnalyzer.Transform(new[] { b.X, b.Y, b.Z }, matrix)); }).ToArray();
+            }
+        }
+        foreach (Face2 face in (Array)body.GetFaces()) {
+            var surface = (Surface)face.GetSurface();
+            faces.Add(D("kind", surface.IsPlane() ? "plane" : surface.IsCylinder() ? "cylinder" : "other", "area_m2", face.GetArea(), "parameters", surface.IsPlane() ? surface.PlaneParams : surface.IsCylinder() ? surface.CylinderParams : null));
+        }
+        return D("features", tree, "base_flange", defs, "faces", faces, "body", Body(body));
+    }
+    static List<Body2> Op(Body2 a, Body2 b, int operation, string name, bool reset) {
+        var row = D("operation", name, "reset_edge_tolerances", reset, "target", Body(a), "tool", Body(b)); rows.Add(row); Save();
+        Body2 x = AfjTemporaryBoolean.Copy(a), y = AfjTemporaryBoolean.Copy(b);
+        if (reset) { x.ResetEdgeTolerances(); y.ResetEdgeTolerances(); row["reset_target"] = Body(x); row["reset_tool"] = Body(y); }
+        int error; var raw = x.Operations2(operation, y, out error) as Array;
+        string errorName = Enum.IsDefined(typeof(swBodyOperationError_e), error) ? ((swBodyOperationError_e)error).ToString() : "UNKNOWN";
+        Console.WriteLine("[AFJ-BOOLEAN] operation=" + name + " code=" + error + " name=" + errorName);
+        row["code"] = error; row["name"] = errorName;
+        // x/y are consumed. No post-operation use or retry on them.
+        var bodies = raw == null ? new List<Body2>() : raw.Cast<Body2>().ToList();
+        row["results"] = bodies.Select(Body).ToArray(); Save();
+        if (error != 0) throw new InvalidOperationException(name + " code=" + error + " name=" + errorName);
+        return bodies;
+    }
+    [STAThread] static int Main(string[] args) {
+        root = Path.GetFullPath(args[0]);
+        Trace.Listeners.Add(new TextWriterTraceListener(Path.Combine(root, "diagnostic_trace.log"))); Trace.AutoFlush = true;
+        try { return Run(args); } catch (Exception e) { rows.Add(D("fatal", Error(e))); Save(); Console.WriteLine(e); return 1; }
+    }
+    static int Run(string[] args) {
+        var sw = HarnessConnection.AttachVisible();
+        rows.Add(D("connection", "existing_PID_ROT_only", "pid", sw.GetProcessID(), "revision", sw.RevisionNumber(), "apartment", System.Threading.Thread.CurrentThread.GetApartmentState().ToString())); Save();
+        var maps = ((Array)json.DeserializeObject(File.ReadAllText(Path.Combine(args[1], "pair_copies/all_assembly_maps.json")))).Cast<Dictionary<string, object>>();
+        var map = maps.First(m => ((string)m["case"]).StartsWith("2354")); string path = (string)map["copy_assembly_path"];
+        if (!Path.GetFullPath(path).StartsWith(Path.Combine(Path.GetFullPath(args[1]), "pair_copies"), StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(path).StartsWith("AFJ_PAIR_")) throw new Exception("COPY GUARD");
+        if (sw.GetOpenDocumentByName(path) != null) throw new Exception("Private test assembly already open; refusing to close or alter an existing document");
+        ModelDoc2 originalActive = sw.ActiveDoc as ModelDoc2; int error = 0, warning = 0;
+        var model = sw.OpenDoc6(path, 2, 3, "", ref error, ref warning) as ModelDoc2;
+        rows.Add(D("private_assembly_open", model != null, "error", error, "warning", warning)); Save(); if (model == null) return 2;
+        try {
+            int activeError = 0; sw.ActivateDoc3(model.GetTitle(), false, 0, ref activeError);
+            var comps = ((Array)((AssemblyDoc)model).GetComponents(false)).Cast<Component2>().ToArray();
+            var ca = comps.Single(c => c.Name2.EndsWith("-fr04-1")); var cb = comps.Single(c => c.Name2.EndsWith("-fr03-1"));
+            ModelDoc2 pa, pb; MathTransform ta, tb; Body2 na = AfjJointSolver.NativeBody(ca, out pa, out ta), nb = AfjJointSolver.NativeBody(cb, out pb, out tb);
+            foreach (var v in new[] { new { Tag = "A", Part = pa, Native = na, Transform = ta }, new { Tag = "B", Part = pb, Native = nb, Transform = tb } }) {
+                rows.Add(D("frame", v.Tag, "raw_profile", RawProfile(v.Part, v.Native), "transform", v.Transform.ArrayData)); Save();
+            }
+            Body2 wa = AfjJointSolver.World(new[] { na }, ta)[0], wb = AfjJointSolver.World(new[] { nb }, tb)[0];
+            var legacy = new LegacyGhostPreview(sw, model);
+            string analysis = AutoFrameJointReadOnlyProbe.AnalyzePair(sw, model, ca, cb); rows.Add(D("legacy_readonly_analysis", analysis)); Save();
+            var readVector = typeof(LegacyGhostPreview).GetMethod("ReadVector", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var makeBox = typeof(LegacyGhostPreview).GetMethod("CreateBisectorHalfBox", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var readMm = typeof(LegacyGhostPreview).GetMethod("ReadVectorMm", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var origin = (double[])readMm.Invoke(null, new object[] { analysis, "JOINT_XYZ_MM:" });
+            var normal = (double[])readVector.Invoke(null, new object[] { analysis, "JOINT_BISECTOR_NORMAL_CANDIDATE_1:", 1.0 });
+            var shared = Op(wa, wb, (int)swBodyOperationType_e.SWBODYINTERSECT, "legacy A intersect B", false);
+            double span = 1; foreach (Body2 c in shared) { var box = (double[])c.GetBodyBox(); span = Math.Max(span, 4 * Math.Sqrt(Enumerable.Range(0, 3).Sum(i => Math.Pow(box[i + 3] - box[i], 2)))); }
+            var removedA = new List<Body2>(); var removedB = new List<Body2>();
+            foreach (Body2 c in shared) {
+                var hp = (Body2)makeBox.Invoke(legacy, new object[] { origin, normal, span, true });
+                var hn = (Body2)makeBox.Invoke(legacy, new object[] { origin, normal, span, false });
+                removedA.AddRange(Op(c, hp, (int)swBodyOperationType_e.SWBODYINTERSECT, "legacy shared intersect positive", false));
+                removedB.AddRange(Op(c, hn, (int)swBodyOperationType_e.SWBODYINTERSECT, "legacy shared intersect negative", false));
+            }
+            foreach (var pair in new[] { new { Label = "A", Target = wa, Removed = removedA }, new { Label = "B", Target = wb, Removed = removedB } }) {
+                Body2 remain = pair.Target;
+                foreach (Body2 cutter in pair.Removed) {
+                    try { remain = Op(remain, cutter, (int)swBodyOperationType_e.SWBODYCUT, "legacy subtract " + pair.Label, false).Single(); }
+                    catch (Exception e) { rows.Add(D("legacy_failure", pair.Label, "exception", Error(e))); Save();
+                        try { Op(remain, cutter, (int)swBodyOperationType_e.SWBODYCUT, "legacy one reset diagnostic " + pair.Label, true); } catch (Exception retry) { rows.Add(D("single_reset_failure", Error(retry))); Save(); }
+                        break;
+                    }
+                }
+            }
+            try { AfjJointSolver.Solve(sw, model, ca, cb); rows.Add(D("pr40", "unexpected admission")); }
+            catch (Exception e) { rows.Add(D("pr40_refusal", Error(e))); }
+            Save();
+        } finally {
+            sw.CloseDoc(model.GetTitle());
+            if (originalActive != null) { int ae = 0; sw.ActivateDoc3(originalActive.GetTitle(), false, 0, ref ae); }
+        }
+        return 0;
+    }
+}
