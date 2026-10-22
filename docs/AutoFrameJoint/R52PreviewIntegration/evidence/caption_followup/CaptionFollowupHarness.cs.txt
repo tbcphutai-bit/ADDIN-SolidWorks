@@ -1,0 +1,62 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Diagnostics;
+using System.Collections.Generic;
+using System.Runtime.Remoting.Proxies;
+using System.Runtime.Remoting.Messaging;
+using System.Web.Script.Serialization;
+using System.Windows.Forms;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.UI.AutoFrameJoint;
+using ADDIN.Commands.AutoFrameJoint;
+class CaptionFollowupHarness {
+ sealed class Proxy : RealProxy {
+  internal readonly Func<string,object[],object> Run;
+  internal Proxy(Type type,Func<string,object[],object> run):base(type){Run=run;}
+  public override IMessage Invoke(IMessage message){var call=(IMethodCallMessage)message;try{CheckCallback(call.MethodName);return new ReturnMessage(Run(call.MethodName,call.Args),null,0,call.LogicalCallContext,call);}catch(Exception e){return new ReturnMessage(e,call);}}
+ }
+ static AutoFrameJointSelectionPage page;static int simulatedCalls,inlineCalls,previews,analyzes,cleanup,focus=101,messageCalls,labelCalls;static bool acceptMessage=true,throwMessage;static string lastMessage;static object a,b,assembly,partA,partB;static readonly Dictionary<int,object> marks=new Dictionary<int,object>();static readonly List<object> rows=new List<object>();
+ static object Field(string name){return typeof(AutoFrameJointSelectionPage).GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).GetValue(page);}
+ static void Set(string name,object value){typeof(AutoFrameJointSelectionPage).GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).SetValue(page,value);}
+ static void CheckCallback(string member){simulatedCalls++;if(page!=null&&(int)Field("selectionCallbackDepth")!=0){inlineCalls++;throw new Exception("SIMULATED_INTERFACE_ACCESS_INSIDE_CALLBACK: "+member);}}
+ static T Make<T>(Func<string,object[],object> run){return (T)new Proxy(typeof(T),run).GetTransparentProxy();}
+ static void Assert(bool condition,string message){if(!condition)throw new Exception(message);}
+ static void Row(string name,Action action){try{action();rows.Add(new{test=name,status="PASS_MANAGED_CONTRACT",installed_addin=false,real_solidworks_api=false});Console.WriteLine(name+" PASS_MANAGED_CONTRACT");}catch(Exception e){rows.Add(new{test=name,status="FAIL",error=e.ToString()});Console.WriteLine(name+" FAIL "+e.Message);throw;}}
+ static void Pump(){for(int i=0;i<12;i++)Application.DoEvents();}
+ static bool Submit(int id,object selection,int type){string text="Native supplied item";int before=simulatedCalls;bool result=page.OnSubmitSelection(id,selection,type,ref text);Assert(before==simulatedCalls,"Submit queried an interface");return result;}
+ [STAThread]static int Main(string[] args){Directory.CreateDirectory(args[0]);string log=Path.Combine(args[0],"managed_flow.log");File.WriteAllText(log,String.Empty);Trace.Listeners.Add(new TextWriterTraceListener(log));Trace.AutoFlush=true;Trace.WriteLine("[R52-MANAGED-SIMULATION] No SOLIDWORKS process, no native PMP, no Body2 and no installed Add-in execution.");Control dispatcher=null;int exit=0;
+ try {
+  partA=Make<ModelDoc2>((m,x)=>m=="GetType"?(object)(int)swDocumentTypes_e.swDocPART:m=="GetTitle"?"PART_A":null);
+  partB=Make<ModelDoc2>((m,x)=>m=="GetType"?(object)(int)swDocumentTypes_e.swDocPART:m=="GetTitle"?"PART_B":null);
+  a=Make<Component2>((m,x)=>m=="get_Name2"?(object)"MANAGED_A":m=="GetModelDoc2"?partA:null);
+  b=Make<Component2>((m,x)=>m=="get_Name2"?(object)"MANAGED_B":m=="GetModelDoc2"?partB:null);
+  SelectionMgr mgr=Make<SelectionMgr>((m,x)=>{int mark=Convert.ToInt32(x[x.Length-1]);return m=="GetSelectedObjectCount2"?(object)(marks.ContainsKey(mark)?1:0):marks.ContainsKey(mark)?marks[mark]:null;});
+  assembly=Make<ModelDoc2>((m,x)=>m=="get_SelectionManager"?(object)mgr:m=="GetType"?(object)(int)swDocumentTypes_e.swDocASSEMBLY:null);
+  ISldWorks app=Make<ISldWorks>((m,x)=>m=="get_ActiveDoc"?assembly:m=="IsSame"?(object)(int)(Object.ReferenceEquals(x[0],x[1])?swObjectEquality.swObjectSame:swObjectEquality.swObjectNotSame):null);
+  page=new AutoFrameJointSelectionPage(app,(x,y)=>{analyzes++;return "MANAGED_ANALYSIS_NO_GEOMETRY";},(x,y)=>"MANAGED_OVERLAY",(x,y,mode)=>{Assert(Object.ReferenceEquals(x,a)&&Object.ReferenceEquals(y,b),"Wrong A/B pair");previews++;return "MANAGED_CALLBACK_ONLY_NO_BODY2_MODE_"+mode;},()=>cleanup++,p=>{});
+  Set("shown",true);Set("nativeActivated",true);
+  Set("page",Make<PropertyManagerPage2>((m,x)=>{if(m!="SetMessage3")throw new Exception("Unexpected native page call: "+m);messageCalls++;if(throwMessage)throw new System.Runtime.InteropServices.COMException("SIMULATED_MESSAGE_FAILURE",unchecked((int)0x80004005));lastMessage=(string)x[0];return acceptMessage;}));
+  foreach(string field in new[]{"statusLabel","geometryAngleLabel","geometryPointLabel","geometryGapLabel","geometryStatusLabel","geometryRoleLabel"})Set(field,Make<PropertyManagerPageLabel>((m,x)=>{labelCalls++;throw new Exception("Forbidden native label access: "+m);}));
+
+  dispatcher=new Control();IntPtr hwnd=dispatcher.Handle;Set("deferredFocusWindow",dispatcher);
+  Set("selectionA",Make<PropertyManagerPageSelectionbox>((m,x)=>m=="GetSelectionFocus"?(object)(focus==101):null));
+  Set("selectionB",Make<PropertyManagerPageSelectionbox>((m,x)=>{if(m=="SetSelectionFocus"){focus=102;page.OnSelectionboxFocusChanged(102);}return m=="GetSelectionFocus"?(object)(focus==102):null;}));
+  Row("A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B",()=>{page.OnSelectionboxFocusChanged(101);Assert(Submit(101,a,(int)swSelectType_e.swSelCOMPONENTS),"A rejected");marks[1]=a;int calls=simulatedCalls;page.OnSelectionboxListChanged(101,1);Assert(calls==simulatedCalls,"List callback queried interfaces");Assert(previews==0,"Auto Preview was added");Pump();Assert(focus==102&&!marks.ContainsKey(2),"Focus should not select B");});
+  Row("B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW",()=>{Assert(Submit(102,b,(int)swSelectType_e.swSelCOMPONENTS),"B rejected");marks[2]=b;page.OnSelectionboxListChanged(102,1);Assert(analyzes==0,"Analyze ran inline");Pump();Assert(analyzes==1&&previews==0,"Expected Analyze only");});
+  Row("BUTTON_107_DEFERRED_PREVIEW_DELEGATE",()=>{page.OnButtonPress(107);Assert(previews==0,"107 backend ran inline");Pump();Assert(previews==1,"107 delegate missing");});
+  Row("BUTTON_108_DEFERRED_PREVIEW_DELEGATE",()=>{page.OnButtonPress(108);Assert(previews==1,"108 backend ran inline");Pump();Assert(previews==2,"108 delegate missing");});
+  Row("REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ",()=>{Assert(!Submit(999,a,20),"Unknown box accepted");Assert(!Submit(102,null,20),"Null accepted");Assert(!Submit(102,b,999),"Unsupported type accepted");Assert(!Submit(102,new object(),20),"Unknown interface accepted");Assert(!Submit(102,a,20),"Cached duplicate accepted");});
+  Row("ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED",()=>{IEntity entity=Make<IEntity>((m,x)=>m=="GetComponent"?a:null);Assert(Submit(102,entity,(int)swSelectType_e.swSelFACES),"Entity dispatch rejected before deferred owner resolution");marks[2]=a;page.OnSelectionboxListChanged(102,1);Pump();page.OnButtonPress(107);Pump();Assert(previews==2,"Duplicate occurrence reached Preview");marks[2]=b;page.OnSelectionboxListChanged(102,1);Pump();});
+  Row("FOREIGN_THREAD_SUBMIT_REFUSED",()=>{bool accepted=true;var thread=new System.Threading.Thread(()=>accepted=Submit(102,b,20));thread.SetApartmentState(System.Threading.ApartmentState.STA);thread.Start();thread.Join();Assert(!accepted,"Foreign owner accepted");});
+  Row("VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY",()=>{var method=typeof(AutoFrameJointGhostPreview).GetMethod("ViewportEstimate",BindingFlags.NonPublic|BindingFlags.Static);Func<double[],double[],string> run=(x,y)=>(string)method.Invoke(null,new object[]{x,y});Assert(run(new[]{10d,10,20,20},new[]{0d,0,100,100})=="OVERLAPS_WINDOW_ESTIMATE","Inside estimate");Assert(run(new[]{110d,10,120,20},new[]{0d,0,100,100})=="OUTSIDE_WINDOW_ESTIMATE","Outside estimate");Assert(run(new[]{Double.NaN,10,20,20},new[]{0d,0,100,100})=="UNVERIFIED","Bad values admitted");});
+  Row("LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL",()=>{string text="Kết quả giao góc — tôn 2,50 mm — "+new string('X',1200);Set("lastGeometryLines",new[]{"Đã tính giao góc","Góc 90°","XYZ","Độ lệch","Trong chiều dài","Frame ngắn che"});var cache=typeof(AutoFrameJointSelectionPage).GetMethod("CacheStatusText",BindingFlags.Instance|BindingFlags.NonPublic);Assert((bool)cache.Invoke(page,new object[]{104,text,(int)Field("pageEpoch")}),"Cache failed");var publish=typeof(AutoFrameJointSelectionPage).GetMethod("PublishStatusMessage",BindingFlags.Instance|BindingFlags.NonPublic);int before=messageCalls;publish.Invoke(page,null);Assert(messageCalls==before+1&&lastMessage.Contains(text)&&lastMessage.Contains("Góc 90°"),"Full result/geometry not published");publish.Invoke(page,null);Assert(messageCalls==before+1,"Duplicate message not coalesced");Assert(labelCalls==0,"Native label was accessed");});
+  Row("MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL",()=>{acceptMessage=false;page.OnButtonPress(108);Pump();Assert(previews==3,"Message failure blocked Preview");Assert((bool)Field("messageUpdatesUnavailable")&&!(bool)Field("controlsFaulted"),"Wrong failure scope");int before=messageCalls;page.OnButtonPress(108);Pump();Assert(previews==4&&messageCalls==before,"Disabled message retried or Preview blocked");Assert(labelCalls==0,"Label fallback executed");});
+  Row("MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY",()=>{Set("messageUpdatesUnavailable",false);Set("lastPublishedMessage",null);throwMessage=true;page.OnButtonPress(107);Pump();Assert(previews==5&&(bool)Field("messageUpdatesUnavailable")&&!(bool)Field("controlsFaulted"),"Normal COM message failure escaped/blocked controls");Assert(labelCalls==0,"Label fallback executed");throwMessage=false;acceptMessage=true;});
+  Row("QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH",()=>{page.OnButtonPress(107);page.OnClose(2);Pump();Assert(previews==5,"Stale action executed");page.AfterClose();Assert(cleanup==1,"Cleanup missing");Assert(!Submit(102,b,20),"Closed page accepted");});
+  Assert(inlineCalls==0,"Callback interface access occurred");
+ }catch(Exception e){exit=1;Console.WriteLine(e.ToString());}finally{if(dispatcher!=null)dispatcher.Dispose();var output=new{status=exit==0?"PASS_MANAGED_CONTRACT":"FAIL",installed_addin_test="NOT_RUN",real_api_or_body2="NOT_RUN",preview_delegate_calls=previews,simulated_interface_calls=simulatedCalls,interface_access_inside_selection_callbacks=inlineCalls,native_label_interface_calls=labelCalls,page_message_proxy_calls=messageCalls,tests=rows};File.WriteAllText(Path.Combine(args[0],"managed_flow_results.json"),new JavaScriptSerializer{MaxJsonLength=Int32.MaxValue}.Serialize(output));}
+ return exit;}
+}

@@ -1,0 +1,317 @@
+[
+  {
+    "case": "INSTALLED_DLL_MVID",
+    "scope": "FILE_AUDIT",
+    "status": "PASS_BINARY_VERIFIED",
+    "evidence": "PE/Mono.Cecil",
+    "detail": "Matches user log 2f4e359e-bffe-4f74-9441-891bb4c77b12"
+  },
+  {
+    "case": "R51_SOLVER_AND_DISPLAY_CALLS_PRESENT",
+    "scope": "FILE_AUDIT",
+    "status": "PASS_BINARY_VERIFIED",
+    "evidence": "IL",
+    "detail": "Marker and existing Preview->solver->Display3 path present"
+  },
+  {
+    "case": "AFJ_251_METHOD_IL_COMPARISON",
+    "scope": "FILE_AUDIT",
+    "status": "PASS_BINARY_VERIFIED",
+    "evidence": "Normalized IL",
+    "detail": "251/251 method token streams match detached R51 local-source harness; not source/PDB byte proof"
+  },
+  {
+    "case": "PDB_DLL_GUID_AGE",
+    "scope": "FILE_AUDIT",
+    "status": "PASS_BINARY_VERIFIED",
+    "evidence": "PE CodeView / native PDB MSF",
+    "detail": "GUID and age match"
+  },
+  {
+    "case": "PDB_SOURCE_DOCUMENT_CHECKSUMS",
+    "scope": "FILE_AUDIT",
+    "status": "NOT_AVAILABLE",
+    "evidence": "Native PDB parser",
+    "detail": "No source hash obtained; empty entry is not a mismatch"
+  },
+  {
+    "case": "PROJECT_COMPILE_INCLUDES_OUTPUT_EVENTS",
+    "scope": "SOURCE_AUDIT",
+    "status": "PASS_SOURCE_VERIFIED",
+    "evidence": "XML read only",
+    "detail": "AFJ includes exist; Debug x64 existing output; pre/post-build events empty; no MSBuild evaluation"
+  },
+  {
+    "case": "COM_REGISTRATION_TARGET",
+    "scope": "REGISTRY_READ",
+    "status": "PASS_REGISTRY_VERIFIED",
+    "evidence": "HKLM CodeBase",
+    "detail": "Same target as DLL in user log; registration unchanged"
+  },
+  {
+    "case": "FRAME_B_IN_SUPPLIED_RUN",
+    "scope": "USER_LOG",
+    "status": "NOT_OBSERVED",
+    "evidence": "User summary",
+    "detail": "Last supplied ready record A=1 B=0; no native R52 test"
+  },
+  {
+    "case": "PREVIEW_BUTTON_IN_SUPPLIED_RUN",
+    "scope": "USER_LOG",
+    "status": "NOT_OBSERVED",
+    "evidence": "User summary",
+    "detail": "No BUTTON 107/108 in supplied summary"
+  },
+  {
+    "case": "BACKEND_IN_SUPPLIED_RUN",
+    "scope": "USER_LOG",
+    "status": "NOT_OBSERVED",
+    "evidence": "User summary",
+    "detail": "No BACKEND BEGIN Preview or AFJ-R51 marker"
+  },
+  {
+    "case": "HEAP_CORRUPTION_CAUSAL_MAPPING",
+    "scope": "EVENT_READ",
+    "status": "UNVERIFIED",
+    "evidence": "Application Error/WER",
+    "detail": "0xC0000374 events observed; no unique API callback or user-run exit mapping"
+  },
+  {
+    "case": "DETACHED_SIX_CLASS_COMPILE",
+    "scope": "local",
+    "status": "PASS_COMPILE_ONLY",
+    "evidence": "Explicit-source Roslyn",
+    "detail": "No main Add-in project/output/deploy"
+  },
+  {
+    "case": "A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "BUTTON_107_DEFERRED_PREVIEW_DELEGATE",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "BUTTON_108_DEFERRED_PREVIEW_DELEGATE",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "FOREIGN_THREAD_SUBMIT_REFUSED",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "DETACHED_SIX_CLASS_COMPILE",
+    "scope": "branch",
+    "status": "PASS_COMPILE_ONLY",
+    "evidence": "Explicit-source Roslyn",
+    "detail": "No main Add-in project/output/deploy"
+  },
+  {
+    "case": "A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "BUTTON_107_DEFERRED_PREVIEW_DELEGATE",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "BUTTON_108_DEFERRED_PREVIEW_DELEGATE",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "FOREIGN_THREAD_SUBMIT_REFUSED",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "evidence": "Managed proxy harness",
+    "detail": "No native PMP, solver, Body2 or Display3"
+  },
+  {
+    "case": "R50 control creation/marks/filters, captions, owner/epoch gates, readiness validators preserved",
+    "scope": "local",
+    "status": "PASS_STATIC_INVARIANT",
+    "evidence": "Source and SHA checks",
+    "detail": "Not a native execution test"
+  },
+  {
+    "case": "Selection callbacks have no selection/control/property getter calls; supplied-dispatch interface casts only",
+    "scope": "local",
+    "status": "PASS_STATIC_INVARIANT",
+    "evidence": "Source and SHA checks",
+    "detail": "Not a native execution test"
+  },
+  {
+    "case": "R51 classifier/rules/cutters/Boolean/validation helpers and +120 mm placement unchanged",
+    "scope": "local",
+    "status": "PASS_STATIC_INVARIANT",
+    "evidence": "Source and SHA checks",
+    "detail": "Not a native execution test"
+  },
+  {
+    "case": "R50 control creation/marks/filters, captions, owner/epoch gates, readiness validators preserved",
+    "scope": "branch",
+    "status": "PASS_STATIC_INVARIANT",
+    "evidence": "Source and SHA checks",
+    "detail": "Not a native execution test"
+  },
+  {
+    "case": "Selection callbacks have no selection/control/property getter calls; supplied-dispatch interface casts only",
+    "scope": "branch",
+    "status": "PASS_STATIC_INVARIANT",
+    "evidence": "Source and SHA checks",
+    "detail": "Not a native execution test"
+  },
+  {
+    "case": "R51 classifier/rules/cutters/Boolean/validation helpers and +120 mm placement unchanged",
+    "scope": "branch",
+    "status": "PASS_STATIC_INVARIANT",
+    "evidence": "Source and SHA checks",
+    "detail": "Not a native execution test"
+  },
+  {
+    "case": "Current local source/DLL/project/PDB match post-apply protection snapshot; exactly four intended CS writes",
+    "scope": "local protection",
+    "status": "PASS_STATIC_INVARIANT",
+    "evidence": "Source and SHA checks",
+    "detail": "Not a native execution test"
+  },
+  {
+    "case": "R52_SOURCE_IN_INSTALLED_DLL",
+    "scope": "INSTALLED_ADDIN",
+    "status": "NOT_BUILT",
+    "evidence": "Before/after DLL/PDB hashes",
+    "detail": "Source R52 applied; installed DLL remains R51; task did not Build/Deploy"
+  },
+  {
+    "case": "NATIVE_FRAME_B_COMMIT",
+    "scope": "R52_INSTALLED_ADDIN",
+    "status": "NOT_RUN",
+    "evidence": "No native R52 execution",
+    "detail": "User chose source/DLL audit first; no live Preview initiated"
+  },
+  {
+    "case": "NATIVE_BUTTON_107_108",
+    "scope": "R52_INSTALLED_ADDIN",
+    "status": "NOT_RUN",
+    "evidence": "No native R52 execution",
+    "detail": "User chose source/DLL audit first; no live Preview initiated"
+  },
+  {
+    "case": "NATIVE_SOLVER_BODY2",
+    "scope": "R52_INSTALLED_ADDIN",
+    "status": "NOT_RUN",
+    "evidence": "No native R52 execution",
+    "detail": "User chose source/DLL audit first; no live Preview initiated"
+  },
+  {
+    "case": "NATIVE_DISPLAY3_HIDE",
+    "scope": "R52_INSTALLED_ADDIN",
+    "status": "NOT_RUN",
+    "evidence": "No native R52 execution",
+    "detail": "User chose source/DLL audit first; no live Preview initiated"
+  },
+  {
+    "case": "NATIVE_VIEWPORT_CALIBRATION",
+    "scope": "R52_INSTALLED_ADDIN",
+    "status": "NOT_RUN",
+    "evidence": "No native R52 execution",
+    "detail": "User chose source/DLL audit first; no live Preview initiated"
+  },
+  {
+    "case": "PREVIEW_ACTUALLY_VISIBLE",
+    "scope": "R52_INSTALLED_ADDIN",
+    "status": "UNVERIFIED",
+    "evidence": "No screen/viewport capture or user confirmation",
+    "detail": "Display3 status, tracking or projection estimate alone would not prove visibility"
+  }
+]

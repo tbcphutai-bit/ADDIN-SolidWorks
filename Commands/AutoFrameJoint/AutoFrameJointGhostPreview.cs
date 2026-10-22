@@ -23,17 +23,26 @@ namespace ADDIN.Commands.AutoFrameJoint
         private readonly ISldWorks app;
         private readonly ModelDoc2 sourceAssembly;
         private readonly List<ShownBody> shown = new List<ShownBody>();
-        private bool busy;
+        private bool busy, closeRequested;
+        private AfjJointSolution cachedSolution;
+        private PreviewSourceState cachedSource;
+        private int displayedCandidate;
+        private string displayedMessage;
+        private static readonly bool verboseViewportDiagnostics =
+            String.Equals(System.Environment.GetEnvironmentVariable("AFJ_TRACE_VIEWPORT"), "1", StringComparison.Ordinal);
+        internal bool IsBusy { get { return busy; } }
 
         private sealed class ShownBody
         {
             internal readonly Body2 Copy;
             internal readonly ModelDoc2 Part;
+            internal readonly bool IsRemoved;
 
-            internal ShownBody(Body2 copy, ModelDoc2 part)
+            internal ShownBody(Body2 copy, ModelDoc2 part, bool isRemoved = false)
             {
                 Copy = copy;
                 Part = part;
+                IsRemoved = isRemoved;
             }
         }
 
@@ -56,9 +65,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                             out string message)
         {
             message = "Preview chưa được tạo.";
-            if (busy)
+            if (busy || closeRequested)
             {
-                message = "Preview đang được xử lý.";
+                message = "Preview đang xử lý hoặc đang đóng.";
                 return false;
             }
 
@@ -115,7 +124,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int colorB = ColorTranslator.ToWin32(Color.FromArgb(255, 155, 60));
 
                 int countA = ShowComponent(frameA, colorA, 0.65);
+                ThrowIfClosing();
                 int countB = ShowComponent(frameB, colorB, 0.65);
+                ThrowIfClosing();
                 RedrawSafely(); // One redraw after the complete pair, not per body.
                 message = String.Format(
                     "Đang xem bản sao trạng thái hiện tại: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
@@ -146,16 +157,16 @@ namespace ADDIN.Commands.AutoFrameJoint
         public bool TryShowCutCandidate(Component2 frameA, Component2 frameB,
                                         int candidate, out string message)
         {
+            Trace.WriteLine("[AFJ-R52] stage=GHOST_ENTER candidate=" + candidate + " busy=" + busy);
             message = "Chưa tạo preview vết cắt.";
-            if (busy) { message = "Preview đang xử lý."; return false; }
+            if (busy || closeRequested) { message = "Preview đang xử lý hoặc đang đóng."; return false; }
             if (candidate != 1 && candidate != 2)
             { message = "Chỉ có chế độ KEEP hoặc KEEP/CUT."; return false; }
             busy = true;
+            var total = Stopwatch.StartNew();
+            bool reused = false;
             try
             {
-                string previousError;
-                if (!ClearInternal(out previousError))
-                { message = "Không thể dọn preview cũ: " + previousError; return false; }
                 if (!IsOriginalAssemblyActive() || frameA == null || frameB == null ||
                     app.IsSame(frameA, frameB) != (int)swObjectEquality.swObjectNotSame)
                 { message = "Assembly/Frame A-B không còn hợp lệ."; return false; }
@@ -164,40 +175,102 @@ namespace ADDIN.Commands.AutoFrameJoint
                     frameA.IsHidden(false) || frameB.IsHidden(false))
                 { message = "Chỉ hỗ trợ 2 Part cấp đầu, không Hidden/Suppressed."; return false; }
 
-                Trace.WriteLine("[AFJ-R51] source=profile-skin-cutter; MVID=" + typeof(AutoFrameJointGhostPreview).Assembly.ManifestModule.ModuleVersionId);
-                Trace.WriteLine("[AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION");
-                AfjJointSolution result = AfjJointSolver.Solve(app, sourceAssembly, frameA, frameB);
-                if (result.A.RemovedVolume + result.B.RemovedVolume <= 1e-12)
-                { message = "NO_NEW_CUT_REQUIRED: Hai Frame đã khớp quy tắc; không dựng lại Body gốc thành Preview cắt mới."; return false; }
+                var phase = Stopwatch.StartNew();
+                PreviewSourceState before = TryCaptureSourceState(frameA, frameB);
+                reused = cachedSolution != null && before != null && SameSourceState(cachedSource, before);
+                Trace.WriteLine("[AFJ-R52-PERF] phase=source_state ms=" + phase.ElapsedMilliseconds + " cache=" + (reused ? "HIT" : "MISS"));
+                ThrowIfClosing();
+                if (!IsOriginalAssemblyActive())
+                { InvalidateCachedSolution("assembly no longer active"); message = "Assembly đã thay đổi; không cập nhật Preview."; return false; }
+                if (reused && displayedCandidate == candidate)
+                {
+                    message = displayedMessage;
+                    Trace.WriteLine("[AFJ-R52-PERF] phase=display mode=UNCHANGED no_solve=True no_hide=True no_display3=True");
+                    return true;
+                }
+
+                AfjJointSolution result = reused ? cachedSolution : null;
+                PreviewSourceState after = before;
+                if (!reused)
+                {
+                    InvalidateCachedSolution("source changed or unverified");
+                    Trace.WriteLine("[AFJ-R51] source=profile-skin-cutter; MVID=" + typeof(AutoFrameJointGhostPreview).Assembly.ManifestModule.ModuleVersionId);
+                    Trace.WriteLine("[AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION");
+                    Trace.WriteLine("[AFJ-R52] stage=SOLVER_BEGIN");
+                    phase.Restart();
+                    result = AfjJointSolver.Solve(app, sourceAssembly, frameA, frameB);
+                    Trace.WriteLine("[AFJ-R52-PERF] phase=solve ms=" + phase.ElapsedMilliseconds);
+                    Trace.WriteLine("[AFJ-R52] stage=SOLVER_END keptA=" + result.A.Kept.Count + " keptB=" + result.B.Kept.Count + " removedA_m3=" + result.A.RemovedVolume.ToString("R", CultureInfo.InvariantCulture) + " removedB_m3=" + result.B.RemovedVolume.ToString("R", CultureInfo.InvariantCulture));
+                    ThrowIfClosing();
+                    after = TryCaptureSourceState(frameA, frameB);
+                    if (before != null && after != null && !SameSourceState(before, after))
+                        throw new InvalidOperationException("SOURCE_CHANGED: Frame thay đổi khi tính Preview; hãy chọn lại.");
+                    if (!IsOriginalAssemblyActive())
+                        throw new InvalidOperationException("Assembly thay đổi khi tính Preview.");
+                    if (result.A.RemovedVolume + result.B.RemovedVolume <= 1e-12)
+                    {
+                        string unusedCleanup;
+                        bool cleaned = ClearInternal(out unusedCleanup);
+                        message = "NO_NEW_CUT_REQUIRED: Hai Frame đã khớp quy tắc; không dựng lại Body gốc thành Preview cắt mới." +
+                            (cleaned ? "" : " Còn Preview cần dọn: " + unusedCleanup);
+                        return false;
+                    }
+                    string previousError;
+                    phase.Restart();
+                    // Keep the old display until a new result has passed all validators.
+                    // Replacement redraws only once, after all new bodies are displayed.
+                    if (!ClearInternal(out previousError, false))
+                    { RedrawSafely(); message = "Không thể dọn preview cũ: " + previousError; return false; }
+                    Trace.WriteLine("[AFJ-R52-PERF] phase=replace_hide ms=" + phase.ElapsedMilliseconds);
+                }
+
+                ThrowIfClosing();
+                phase.Restart();
                 MathTransform shift = CreateWorldShift(0.12);
                 MathTransform inverseA = result.TransformA.Inverse() as MathTransform;
                 MathTransform inverseB = result.TransformB.Inverse() as MathTransform;
                 if (inverseA == null || inverseB == null)
                     throw new InvalidOperationException("Không đảo được hệ tọa độ Part.");
-                DisplayCandidateBodies(AfjJointSolver.World(result.A.Kept, result.TransformA),
-                    frameA, result.PartA, inverseA, shift,
-                    ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235)), 0.33);
-                DisplayCandidateBodies(AfjJointSolver.World(result.B.Kept, result.TransformB),
-                    frameB, result.PartB, inverseB, shift,
-                    ColorTranslator.ToWin32(Color.FromArgb(255, 165, 65)), 0.33);
+                if (!reused)
+                {
+                    DisplayCandidateBodies(AfjJointSolver.World(result.A.Kept, result.TransformA),
+                        frameA, result.PartA, inverseA, shift,
+                        ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235)), 0.33, "A_KEEP");
+                    DisplayCandidateBodies(AfjJointSolver.World(result.B.Kept, result.TransformB),
+                        frameB, result.PartB, inverseB, shift,
+                        ColorTranslator.ToWin32(Color.FromArgb(255, 165, 65)), 0.33, "B_KEEP");
+                }
                 if (candidate == 2)
                 {
                     DisplayCandidateBodies(AfjJointSolver.World(result.A.Removed, result.TransformA),
                         frameA, result.PartA, inverseA, shift,
-                        ColorTranslator.ToWin32(Color.FromArgb(235, 35, 85)), 0.08);
+                        ColorTranslator.ToWin32(Color.FromArgb(235, 35, 85)), 0.08, "A_CUT");
                     DisplayCandidateBodies(AfjJointSolver.World(result.B.Removed, result.TransformB),
                         frameB, result.PartB, inverseB, shift,
-                        ColorTranslator.ToWin32(Color.FromArgb(170, 35, 235)), 0.08);
+                        ColorTranslator.ToWin32(Color.FromArgb(170, 35, 235)), 0.08, "B_CUT");
                 }
+                else if (reused)
+                {
+                    string hideError;
+                    if (!HideDisplayedBodies(true, false, out hideError))
+                        throw new InvalidOperationException("Không ẩn được vùng CUT: " + hideError);
+                }
+                ThrowIfClosing();
                 RedrawSafely();
-                bool unchanged = result.A.RemovedVolume + result.B.RemovedVolume <= 1e-12;
-                message = String.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "{0}: {1} A bỏ {2:0.###} mm³; B bỏ {3:0.###} mm³. " +
-                    "Frame ngắn {5} che; khe hở {6:0.###} mm. Bản sao nâng Z +120 mm. {4}", result.Plan.RuleId,
-                    unchanged ? "ALREADY_MATCHES_RULE." : "Đã kiểm tra B-rep tạm.",
+                Trace.WriteLine("[AFJ-R52-PERF] phase=display ms=" + phase.ElapsedMilliseconds + " reuse_keep=" + reused);
+                message = String.Format(CultureInfo.InvariantCulture,
+                    "{0}: Đã kiểm tra B-rep tạm. A bỏ {1:0.###} mm³; B bỏ {2:0.###} mm³. " +
+                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Bản sao nâng Z +120 mm. {5}", result.Plan.RuleId,
                     result.A.RemovedVolume * 1e9, result.B.RemovedVolume * 1e9,
-                    candidate == 2 ? "Hồng/tím: CUT; xanh/cam: KEEP." : "Đang xem KEEP.",
-                    result.CoverA ? "A" : "B", result.AfterGap * 1000);
+                    result.CoverA ? "A" : "B", result.AfterGap * 1000,
+                    candidate == 2 ? "Hồng/tím: CUT; xanh/cam: KEEP." : "Đang xem KEEP.");
+                if (before != null && after != null)
+                {
+                    cachedSolution = result;
+                    cachedSource = after;
+                    displayedCandidate = candidate;
+                    displayedMessage = message;
+                }
                 Trace.WriteLine("[AFJ-SOLVER] " + message);
                 return true;
             }
@@ -206,15 +279,114 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Trace.WriteLine("[AFJ-SOLVER] HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex);
                 string cleanupError;
                 bool cleared = ClearInternal(out cleanupError);
-                string reason = ex is AfjBooleanException
-                    ? "Hình học cắt chưa tạo được solid hợp lệ. Xem log AFJ-BOOLEAN."
-                    : ex.Message.StartsWith("UNVERIFIED_RULE", StringComparison.Ordinal)
-                        ? "UNVERIFIED_RULE: Chưa xác minh được quy tắc cho biên dạng, mặt che hoặc phần phôi của cặp Frame này. Xem log AFJ-SOLVER."
-                        : "Không tạo được Preview hình học. Xem log AFJ-SOLVER.";
+                string reason = ex is OperationCanceledException
+                    ? "Đã kết thúc Preview; không thay đổi Part."
+                    : ex is AfjBooleanException
+                        ? "Hình học cắt chưa tạo được solid hợp lệ. Xem log AFJ-BOOLEAN."
+                        : ex.Message.StartsWith("UNVERIFIED_RULE", StringComparison.Ordinal)
+                            ? "UNVERIFIED_RULE: Chưa xác minh được quy tắc cho biên dạng, mặt che hoặc phần phôi của cặp Frame này. Xem log AFJ-SOLVER."
+                            : "Không tạo được Preview hình học. Xem log AFJ-SOLVER.";
                 message = reason + (cleared ? "" : " | Cần dọn Preview cũ; xem log cleanup.");
                 return false;
             }
-            finally { busy = false; }
+            finally
+            {
+                busy = false;
+                Trace.WriteLine("[AFJ-R52-PERF] phase=preview_total ms=" + total.ElapsedMilliseconds + " reused=" + reused + " closing=" + closeRequested);
+            }
+        }
+
+        private sealed class PreviewComponentState
+        {
+            internal Component2 Component;
+            internal ModelDoc2 Part;
+            internal Body2 Body;
+            internal int PartStamp, BodyStamp;
+            internal string Configuration;
+            internal double[] Transform;
+        }
+        private sealed class PreviewSourceState
+        {
+            internal int AssemblyStamp;
+            internal string AssemblyConfiguration;
+            internal PreviewComponentState A, B;
+        }
+        private PreviewComponentState CaptureComponentState(Component2 component)
+        {
+            var state = new PreviewComponentState { Component = component };
+            state.Part = component.GetModelDoc2() as ModelDoc2;
+            if (state.Part == null) throw new InvalidOperationException("unresolved Part");
+            state.PartStamp = state.Part.GetUpdateStamp();
+            state.Configuration = component.ReferencedConfiguration;
+            var active = state.Part.ConfigurationManager.ActiveConfiguration;
+            if (String.IsNullOrEmpty(state.Configuration) || active == null || active.Name != state.Configuration)
+                throw new InvalidOperationException("configuration mismatch");
+            MathTransform transform = component.GetTotalTransform(false);
+            double[] matrix = transform == null ? null : transform.ArrayData as double[];
+            if (matrix == null || matrix.Length != 16 || matrix.Any(x => Double.IsNaN(x) || Double.IsInfinity(x)))
+                throw new InvalidOperationException("transform unavailable");
+            state.Transform = (double[])matrix.Clone();
+            object info;
+            Array bodies = component.GetBodies3((int)swBodyType_e.swSolidBody, out info) as Array;
+            if (bodies == null || bodies.Length != 1 || (state.Body = bodies.GetValue(0) as Body2) == null)
+                throw new InvalidOperationException("single source body unavailable");
+            state.BodyStamp = state.Body.GetUpdateStamp();
+            if (state.PartStamp != state.Part.GetUpdateStamp()) throw new InvalidOperationException("source changed while reading");
+            return state;
+        }
+        private PreviewSourceState TryCaptureSourceState(Component2 a, Component2 b)
+        {
+            try
+            {
+                var state = new PreviewSourceState { AssemblyStamp = sourceAssembly.GetUpdateStamp() };
+                var cfg = sourceAssembly.ConfigurationManager.ActiveConfiguration;
+                if (cfg == null) throw new InvalidOperationException("assembly configuration unavailable");
+                state.AssemblyConfiguration = cfg.Name;
+                state.A = CaptureComponentState(a);
+                state.B = CaptureComponentState(b);
+                if (state.AssemblyStamp != sourceAssembly.GetUpdateStamp()) throw new InvalidOperationException("assembly changed while reading");
+                return state;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-R52-PERF] cache=DISABLED HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex.Message);
+                return null; // Full solver validation remains mandatory; no guessed identity.
+            }
+        }
+        private bool SameComponentState(PreviewComponentState a, PreviewComponentState b)
+        {
+            return a != null && b != null && a.PartStamp == b.PartStamp && a.BodyStamp == b.BodyStamp &&
+                a.Configuration == b.Configuration && a.Transform.SequenceEqual(b.Transform) &&
+                app.IsSame(a.Component, b.Component) == (int)swObjectEquality.swObjectSame &&
+                app.IsSame(a.Part, b.Part) == (int)swObjectEquality.swObjectSame &&
+                app.IsSame(a.Body, b.Body) == (int)swObjectEquality.swObjectSame;
+        }
+        private bool SameSourceState(PreviewSourceState a, PreviewSourceState b)
+        {
+            try
+            {
+                return a != null && b != null && a.AssemblyStamp == b.AssemblyStamp &&
+                    a.AssemblyConfiguration == b.AssemblyConfiguration && SameComponentState(a.A, b.A) && SameComponentState(a.B, b.B);
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-R52-PERF] cache=INVALID identity unavailable " + ex.Message);
+                return false;
+            }
+        }
+        private void InvalidateCachedSolution(string reason)
+        {
+            if (cachedSolution != null) Trace.WriteLine("[AFJ-R52-PERF] cache=INVALID reason=" + reason);
+            cachedSolution = null; cachedSource = null; displayedCandidate = 0; displayedMessage = null;
+        }
+        internal void RequestClose()
+        {
+            closeRequested = true; // Managed latch, including reentrant close during a native operation.
+            InvalidateCachedSolution("page closed");
+        }
+        private void ThrowIfClosing()
+        {
+            if (closeRequested) throw new OperationCanceledException("AFJ page has closed");
         }
 
         private static Body2 CopyBody(Body2 original)
@@ -240,18 +412,72 @@ namespace ADDIN.Commands.AutoFrameJoint
             return result;
         }
 
+        private static string DiagnosticArray(object value)
+        {
+            Array values = value as Array;
+            return values == null ? "NOT_AVAILABLE" : String.Join(";", values.Cast<object>().Select(x => Convert.ToDouble(x).ToString("R", CultureInfo.InvariantCulture)));
+        }
+        private void TraceProjectedPreview(Body2 shiftedWorld, string group)
+        {
+            if (!verboseViewportDiagnostics) return;
+            // Diagnostic only. Bounds do not define a cutter or prove pixels
+            // are visible; occlusion, clipping and transparency are not tested.
+            try
+            {
+                double[] box = shiftedWorld.GetBodyBox() as double[];
+                ModelView view = sourceAssembly.ActiveView as ModelView;
+                if (box == null || box.Length < 6 || view == null)
+                { Trace.WriteLine("[AFJ-R52] stage=VIEWPORT group=" + group + " status=UNVERIFIED no view/bounds"); return; }
+                MathTransform projection = view.Transform;
+                Array visible = view.GetVisibleBox() as Array;
+                Trace.WriteLine("[AFJ-R52] stage=VIEW_STATE group=" + group + " world_box_m=" + DiagnosticArray(box) +
+                    " visible_box_px=" + DiagnosticArray(visible) + " transform=" + DiagnosticArray(projection == null ? null : projection.ArrayData) +
+                    " scale=" + view.Scale2.ToString("R", CultureInfo.InvariantCulture) + " graphics_update=" + view.EnableGraphicsUpdate);
+                if (projection == null || visible == null || visible.Length != 4 || view.HasPerspective())
+                { Trace.WriteLine("[AFJ-R52] stage=VIEWPORT group=" + group + " status=UNVERIFIED projection/perspective"); return; }
+                MathUtility math = app.GetMathUtility() as MathUtility;
+                var points = new List<double[]>();
+                for (int mask = 0; mask < 8; mask++)
+                {
+                    double[] p = { box[(mask & 1) == 0 ? 0 : 3], box[(mask & 2) == 0 ? 1 : 4], box[(mask & 4) == 0 ? 2 : 5] };
+                    MathPoint point = math.CreatePoint(p) as MathPoint;
+                    MathPoint projected = point.MultiplyTransform(projection) as MathPoint;
+                    points.Add((double[])projected.ArrayData);
+                }
+                double[] rectangle = { points.Min(p => p[0]), points.Min(p => p[1]), points.Max(p => p[0]), points.Max(p => p[1]) };
+                double[] window = visible.Cast<object>().Select(Convert.ToDouble).ToArray();
+                Trace.WriteLine("[AFJ-R52] stage=VIEWPORT group=" + group + " projection_estimate=" + ViewportEstimate(rectangle, window) +
+                    " projected_box_px=" + DiagnosticArray(rectangle) + " actual_visibility=UNVERIFIED");
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-R52] stage=VIEWPORT group=" + group + " status=UNVERIFIED HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex.Message);
+            }
+        }
+        private static string ViewportEstimate(double[] rectangle, double[] window)
+        {
+            if (rectangle == null || window == null || rectangle.Length != 4 || window.Length != 4 ||
+                rectangle.Concat(window).Any(x => Double.IsNaN(x) || Double.IsInfinity(x)) ||
+                rectangle[0] > rectangle[2] || rectangle[1] > rectangle[3] || window[0] >= window[2] || window[1] >= window[3]) return "UNVERIFIED";
+            return rectangle[2] < window[0] || rectangle[0] > window[2] || rectangle[3] < window[1] || rectangle[1] > window[3]
+                ? "OUTSIDE_WINDOW_ESTIMATE" : "OVERLAPS_WINDOW_ESTIMATE";
+        }
+
         private void DisplayCandidateBodies(List<Body2> bodies,
                        Component2 component, ModelDoc2 part,
                        MathTransform inverse, MathTransform shift,
-                       int color, double transparency)
+                       int color, double transparency, string group)
         {
             foreach (Body2 world in bodies)
             {
+                ThrowIfClosing();
                 // Display3(component) places local solid in Assembly.
                 // world+shift --> inverse component --> Display3(component).
                 Body2 local = CopyBody(world);
-                if (!local.ApplyTransform(shift) ||
-                    !local.ApplyTransform(inverse))
+                if (!local.ApplyTransform(shift))
+                    throw new InvalidOperationException("Không đặt được vị trí Preview.");
+                TraceProjectedPreview(local, group);
+                if (!local.ApplyTransform(inverse))
                     throw new InvalidOperationException(
                         "Không chuyển ghost từ World XYZ về Part XYZ.");
                 try
@@ -269,9 +495,12 @@ namespace ADDIN.Commands.AutoFrameJoint
                 }
                 // Register first. Hide() cleanup after SOLIDWORKS may partly
                 // display an object, just like original GhostPreview.
-                shown.Add(new ShownBody(local, part));
+                ThrowIfClosing();
+                shown.Add(new ShownBody(local, part, group.EndsWith("_CUT", StringComparison.Ordinal)));
+                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_BEGIN group=" + group + " temporary=" + local.IsTemporaryBody() + " context=selected_component");
                 int status = local.Display3(component, color,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
+                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_END group=" + group + " status=" + status + " tracked=" + shown.Count + " actual_visibility=UNVERIFIED");
                 if (status != 0)
                     throw new InvalidOperationException(
                         "Display3 lỗi=" + status + ", ghost được giữ để dọn.");
@@ -338,6 +567,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             int count = 0;
             foreach (object item in bodies)
             {
+                ThrowIfClosing();
                 Body2 original = item as Body2;
                 if (original == null)
                     throw new InvalidOperationException(
@@ -372,6 +602,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 // Register the COM body BEFORE entering Display3.
                 // If COM throws after a partial draw, cleanup still has a
                 // strong reference to the possibly displayed body.
+                ThrowIfClosing();
                 ShownBody tracked = new ShownBody(copy, part);
                 shown.Add(tracked);
 
@@ -381,6 +612,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int result = copy.Display3(
                     component, colorRef,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
+                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_OVERLAY status=" + result + " actual_visibility=UNVERIFIED");
                 if (result != 0)
                     throw new InvalidOperationException(
                         "IBody2.Display3 thất bại, mã lỗi=" + result +
@@ -399,8 +631,10 @@ namespace ADDIN.Commands.AutoFrameJoint
             try
             {
                 // Do not activate an Assembly or redraw a different document.
-                if (IsOriginalAssemblyActive())
-                    sourceAssembly.GraphicsRedraw2();
+                bool active = IsOriginalAssemblyActive();
+                Trace.WriteLine("[AFJ-R52] stage=REDRAW_BEGIN bound_active=" + active + " tracked=" + shown.Count);
+                if (active) sourceAssembly.GraphicsRedraw2();
+                Trace.WriteLine("[AFJ-R52] stage=REDRAW_END actual_visibility=UNVERIFIED");
             }
             catch (Exception ex)
             {
@@ -408,37 +642,39 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
         }
 
-        private bool ClearInternal(out string error)
+        private bool ClearInternal(out string error, bool redraw = true)
+        {
+            InvalidateCachedSolution("clear");
+            return HideDisplayedBodies(false, redraw, out error);
+        }
+
+        private bool HideDisplayedBodies(bool removedOnly, bool redraw, out string error)
         {
             error = null;
-            bool attempted = shown.Count > 0;
-            List<ShownBody> failed = new List<ShownBody>();
+            bool attempted = false;
             for (int i = shown.Count - 1; i >= 0; i--)
             {
                 ShownBody entry = shown[i];
+                if (removedOnly && !entry.IsRemoved) continue;
+                attempted = true;
                 try
                 {
-                    // Official Hide signature accepts ModelDoc2 of the Part.
+                    Trace.WriteLine("[AFJ-R52] stage=HIDE_BEGIN tracked_index=" + i);
                     entry.Copy.Hide(entry.Part);
+                    shown.RemoveAt(i); // Remove ownership only after Hide returns.
+                    Trace.WriteLine("[AFJ-R52] stage=HIDE_END tracked_index=" + i);
                 }
                 catch (Exception ex)
                 {
-                    failed.Add(entry);
                     Trace.WriteLine("[AFJ-GHOST] Hide failed: " + ex);
                     error = "Hide thất bại: " + ex.Message;
                 }
             }
-            shown.Clear();
-            failed.Reverse();
-            shown.AddRange(failed);
-            if (attempted)
-                RedrawSafely();
-            return failed.Count == 0;
+            if (attempted && redraw) RedrawSafely();
+            return error == null;
         }
     }
 }
-
-
 
 namespace ADDIN.Commands.AutoFrameJoint
 {

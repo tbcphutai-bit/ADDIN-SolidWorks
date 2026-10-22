@@ -1,0 +1,30 @@
+[
+  {
+    "variant": "local",
+    "unchanged_callback_bodies": {
+      "OnSubmitSelection": true,
+      "OnSelectionboxListChanged": true,
+      "OnSelectionboxFocusChanged": true,
+      "OnButtonPress": true,
+      "IsUiLive": true
+    },
+    "r51_core_sha256": "4c2ee545d921acb2c5c87949fb83db52ef88f2b45728ab9c3b93d416a308dd0e",
+    "r51_core_unchanged": true,
+    "native_caption_enabled_setter_count": 0,
+    "main_build": "NOT_RUN"
+  },
+  {
+    "variant": "branch",
+    "unchanged_callback_bodies": {
+      "OnSubmitSelection": true,
+      "OnSelectionboxListChanged": true,
+      "OnSelectionboxFocusChanged": true,
+      "OnButtonPress": true,
+      "IsUiLive": true
+    },
+    "r51_core_sha256": "4c2ee545d921acb2c5c87949fb83db52ef88f2b45728ab9c3b93d416a308dd0e",
+    "r51_core_unchanged": true,
+    "native_caption_enabled_setter_count": 0,
+    "main_build": "NOT_RUN"
+  }
+]

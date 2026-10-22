@@ -1,0 +1,336 @@
+[R52-MANAGED-SIMULATION] No SOLIDWORKS process, no native PMP, no Body2 and no installed Add-in execution.
+[AFJ-R52] stage=FOCUS_ENTER seq=1 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False box=101
+[AFJ-R52] stage=FOCUS_EXIT seq=2 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=101 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False box=101
+[AFJ-R52] stage=SUBMIT_ENTER seq=3 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=101 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False box=101 type=20
+[AFJ-R52] stage=SUBMIT_EXIT seq=4 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=101 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False box=101 type=20 accepted=True reason=ACCEPT_FILTERED_PENDING_DEFERRED_IDENTITY ms=4.455
+[AFJ-R52] stage=LIST_ENTER seq=5 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=101 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False box=101 count=1
+[AFJ-R52] stage=SELECTION_REFRESH_REQUEST seq=6 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False advance=True analyze=False
+[AFJ-R52] stage=POST_REQUEST seq=7 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=LIST_EXIT seq=8 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False queued only; no COM selection read
+[AFJ-R52] stage=POST_RUN seq=9 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=SELECTION_REFRESH_RUN seq=10 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False deferred
+[AFJ-R52] stage=POST_REQUEST seq=11 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=12 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=13 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False mark=2 count=0 resolved=False route=COUNT_NOT_ONE component=NONE
+[AFJ-R52] stage=AUTO_FOCUS_BEGIN seq=14 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False A->B; this does not select Frame B
+[AFJ-R52] stage=FOCUS_ENTER seq=15 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=101 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False box=102
+[AFJ-R52] stage=FOCUS_EXIT seq=16 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False box=102
+[AFJ-R52] stage=AUTO_FOCUS_END seq=17 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False B_focus=True; awaiting B submit/list callback
+[AFJ-R52] stage=POST_END seq=18 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=POST_RUN seq=19 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=20 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=21 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False mark=2 count=0 resolved=False route=COUNT_NOT_ONE component=NONE
+[AFJ-SEL] READY=False A-count=1 B-count=0 reason=Đã chọn Frame A — tiếp tục chọn Frame B.
+[AFJ-R52] stage=READY seq=22 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False ready=False deferredCounts=1/0 A=MANAGED_A B=NONE reason=Đã chọn Frame A — tiếp tục chọn Frame B.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đã chọn Frame A — tiếp tục chọn Frame B.
+[AFJ-R52-CAPTION] STATUS_CACHE id=121 epoch=0 text=Góc hai trục: chưa tính
+[AFJ-R52-CAPTION] STATUS_CACHE id=122 epoch=0 text=XYZ gần nhất: chưa tính
+[AFJ-R52-CAPTION] STATUS_CACHE id=123 epoch=0 text=Khoảng cách trục: chưa tính
+[AFJ-R52-CAPTION] STATUS_CACHE id=124 epoch=0 text=Trạng thái: chưa tính
+[AFJ-R52-CAPTION] STATUS_CACHE id=125 epoch=0 text=Dài/ngắn: chưa tính
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=40
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=POST_END seq=23 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SUBMIT_ENTER seq=24 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False box=102 type=20
+[AFJ-R52] stage=SUBMIT_EXIT seq=25 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False box=102 type=20 accepted=True reason=ACCEPT_FILTERED_PENDING_DEFERRED_IDENTITY ms=0.020
+[AFJ-R52] stage=LIST_ENTER seq=26 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/-1 shown=True closing=False activated=True faulted=False box=102 count=1
+[AFJ-R52] stage=SELECTION_REFRESH_REQUEST seq=27 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False advance=False analyze=True
+[AFJ-R52] stage=POST_REQUEST seq=28 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=LIST_EXIT seq=29 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False queued only; no COM selection read
+[AFJ-R52] stage=POST_RUN seq=30 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=SELECTION_REFRESH_RUN seq=31 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False deferred
+[AFJ-R52] stage=POST_REQUEST seq=32 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_REQUEST seq=33 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0 automatic=True
+[AFJ-R52] stage=POST_REQUEST seq=34 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=AUTO_FOCUS_SKIP seq=35 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False not requested or no controls
+[AFJ-R52] stage=POST_END seq=36 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=POST_RUN seq=37 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=38 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=39 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=40 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=37
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=POST_END seq=41 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=POST_RUN seq=42 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=ACTION_RUN seq=43 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0
+[AFJ-R52] stage=SELECTION_READ seq=44 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=45 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=SELECTION_READ seq=46 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=47 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đang tính trục và giao góc 3D...
+[AFJ-R50] BACKEND BEGIN Analyze epoch=0
+[AFJ-R50] BACKEND END Analyze epoch=0
+[AFJ-R52] stage=SELECTION_READ seq=48 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=49 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=POST_REQUEST seq=50 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_END seq=51 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0
+[AFJ-R52] stage=POST_END seq=52 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=POST_RUN seq=53 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=54 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=55 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=56 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=MANAGED_ANALYSIS_NO_GEOMETRY
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=28
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=POST_END seq=57 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=BUTTON seq=58 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+[AFJ-R50] BUTTON id=107 epoch=0
+[AFJ-R52] stage=ACTION_REQUEST seq=59 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1 automatic=False
+[AFJ-R52] stage=POST_REQUEST seq=60 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=61 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=ACTION_RUN seq=62 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1
+[AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=63 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=1
+[AFJ-R52] stage=SELECTION_READ seq=64 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=65 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đang tạo Preview cho hai Frame...
+[AFJ-R50] BACKEND BEGIN Preview P1 epoch=0
+[AFJ-R52] stage=PREVIEW_CALLBACK_BEGIN seq=66 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=1 bound=True
+[AFJ-R52] stage=PREVIEW_CALLBACK_END seq=67 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=1
+[AFJ-R50] BACKEND END Preview P1 epoch=0
+[AFJ-R52] stage=SELECTION_READ seq=68 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=69 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=POST_REQUEST seq=70 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_END seq=71 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1
+[AFJ-R52] stage=POST_END seq=72 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=73 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=74 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=75 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=76 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=MANAGED_CALLBACK_ONLY_NO_BODY2_MODE_1
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=37
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=POST_END seq=77 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=BUTTON seq=78 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=108 onPreviewCut_bound=True
+[AFJ-R50] BUTTON id=108 epoch=0
+[AFJ-R52] stage=ACTION_REQUEST seq=79 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2 automatic=False
+[AFJ-R52] stage=POST_REQUEST seq=80 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=81 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=ACTION_RUN seq=82 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+[AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=83 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2
+[AFJ-R52] stage=SELECTION_READ seq=84 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=85 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đang tạo Preview cho hai Frame...
+[AFJ-R50] BACKEND BEGIN Preview P2 epoch=0
+[AFJ-R52] stage=PREVIEW_CALLBACK_BEGIN seq=86 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2 bound=True
+[AFJ-R52] stage=PREVIEW_CALLBACK_END seq=87 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2
+[AFJ-R50] BACKEND END Preview P2 epoch=0
+[AFJ-R52] stage=SELECTION_READ seq=88 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=89 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=POST_REQUEST seq=90 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_END seq=91 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+[AFJ-R52] stage=POST_END seq=92 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=93 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=94 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=95 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=96 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=MANAGED_CALLBACK_ONLY_NO_BODY2_MODE_2
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=37
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=POST_END seq=97 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SUBMIT_ENTER seq=98 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=999 type=20
+[AFJ-R52] stage=SUBMIT_EXIT seq=99 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=999 type=20 accepted=False reason=REJECT_BOX_ID ms=0.017
+[AFJ-R52] stage=SUBMIT_ENTER seq=100 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=20
+[AFJ-R52] stage=SUBMIT_EXIT seq=101 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=20 accepted=False reason=REJECT_NULL_DISPATCH ms=0.006
+[AFJ-R52] stage=SUBMIT_ENTER seq=102 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=999
+[AFJ-R52] stage=SUBMIT_EXIT seq=103 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=999 accepted=False reason=REJECT_FILTER_TYPE ms=0.006
+[AFJ-R52] stage=SUBMIT_ENTER seq=104 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=20
+[AFJ-R52] stage=SUBMIT_EXIT seq=105 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=20 accepted=False reason=REJECT_NO_COMPONENT_OR_ENTITY_INTERFACE ms=0.009
+[AFJ-R52] stage=SUBMIT_ENTER seq=106 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=20
+[AFJ-R52] stage=SUBMIT_EXIT seq=107 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=20 accepted=False reason=REJECT_DUPLICATE_CACHED_REFERENCE ms=0.006
+[AFJ-R52] stage=SUBMIT_ENTER seq=108 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=2
+[AFJ-R52] stage=SUBMIT_EXIT seq=109 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=2 accepted=True reason=ACCEPT_FILTERED_PENDING_DEFERRED_IDENTITY ms=0.031
+[AFJ-R52] stage=LIST_ENTER seq=110 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 count=1
+[AFJ-R52] stage=SELECTION_REFRESH_REQUEST seq=111 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False advance=False analyze=True
+[AFJ-R52] stage=POST_REQUEST seq=112 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=LIST_EXIT seq=113 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False queued only; no COM selection read
+[AFJ-R52] stage=POST_RUN seq=114 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=SELECTION_REFRESH_RUN seq=115 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False deferred
+[AFJ-R52] stage=POST_REQUEST seq=116 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_REQUEST seq=117 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0 automatic=True
+[AFJ-R52] stage=POST_REQUEST seq=118 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=AUTO_FOCUS_SKIP seq=119 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False not requested or no controls
+[AFJ-R52] stage=POST_END seq=120 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=POST_RUN seq=121 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=122 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=123 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-SEL] READY=False A-count=1 B-count=1 reason=Hai Frame trùng nhau hoặc chưa xác minh được.
+[AFJ-R52] stage=READY seq=124 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=False deferredCounts=1/1 A=MANAGED_A B=MANAGED_A reason=Hai Frame trùng nhau hoặc chưa xác minh được.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Hai Frame trùng nhau hoặc chưa xác minh được.
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=45
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=POST_END seq=125 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=POST_RUN seq=126 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=ACTION_RUN seq=127 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0
+[AFJ-R52] stage=SELECTION_READ seq=128 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=129 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=AUTO_ANALYZE_SKIP seq=130 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False Hai Frame trùng nhau hoặc chưa xác minh được.
+[AFJ-R52] stage=POST_END seq=131 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=BUTTON seq=132 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+[AFJ-R50] BUTTON id=107 epoch=0
+[AFJ-R52] stage=ACTION_REQUEST seq=133 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1 automatic=False
+[AFJ-R52] stage=POST_REQUEST seq=134 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=135 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=ACTION_RUN seq=136 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1
+[AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=137 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=1
+[AFJ-R52] stage=SELECTION_READ seq=138 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=139 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=PREVIEW_SELECTION_REJECT seq=140 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False Hai Frame trùng nhau hoặc chưa xác minh được.
+[AFJ-R52] stage=POST_REQUEST seq=141 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_END seq=142 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1
+[AFJ-R52] stage=POST_END seq=143 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=144 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=145 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=146 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-SEL] READY=False A-count=1 B-count=1 reason=Hai Frame trùng nhau hoặc chưa xác minh được.
+[AFJ-R52] stage=READY seq=147 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=False deferredCounts=1/1 A=MANAGED_A B=MANAGED_A reason=Hai Frame trùng nhau hoặc chưa xác minh được.
+[AFJ-R52] stage=POST_END seq=148 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=LIST_ENTER seq=149 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 count=1
+[AFJ-R52] stage=SELECTION_REFRESH_REQUEST seq=150 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False advance=False analyze=True
+[AFJ-R52] stage=POST_REQUEST seq=151 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=LIST_EXIT seq=152 epoch=0 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False queued only; no COM selection read
+[AFJ-R52] stage=POST_RUN seq=153 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=SELECTION_REFRESH_RUN seq=154 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False deferred
+[AFJ-R52] stage=POST_REQUEST seq=155 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_REQUEST seq=156 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0 automatic=True
+[AFJ-R52] stage=POST_REQUEST seq=157 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=AUTO_FOCUS_SKIP seq=158 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False not requested or no controls
+[AFJ-R52] stage=POST_END seq=159 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False selection refresh
+[AFJ-R52] stage=POST_RUN seq=160 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=161 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=162 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=163 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=37
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=POST_END seq=164 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=POST_RUN seq=165 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=ACTION_RUN seq=166 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0
+[AFJ-R52] stage=SELECTION_READ seq=167 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=168 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=SELECTION_READ seq=169 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=170 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đang tính trục và giao góc 3D...
+[AFJ-R50] BACKEND BEGIN Analyze epoch=0
+[AFJ-R50] BACKEND END Analyze epoch=0
+[AFJ-R52] stage=SELECTION_READ seq=171 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=172 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=POST_REQUEST seq=173 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_END seq=174 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=0 candidate=0
+[AFJ-R52] stage=POST_END seq=175 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=0
+[AFJ-R52] stage=POST_RUN seq=176 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=177 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=178 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=179 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=MANAGED_ANALYSIS_NO_GEOMETRY
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=28
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=POST_END seq=180 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SUBMIT_ENTER seq=181 epoch=0 thread=3 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=20
+[AFJ-R52] stage=SUBMIT_EXIT seq=182 epoch=0 thread=3 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False box=102 type=20 accepted=False reason=REJECT_PAGE_STATE_OR_OWNER ms=0.030
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Kết quả giao góc — tôn 2,50 mm — XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=1289
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=True
+[AFJ-R52] stage=BUTTON seq=183 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=108 onPreviewCut_bound=True
+[AFJ-R50] BUTTON id=108 epoch=0
+[AFJ-R52] stage=ACTION_REQUEST seq=184 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2 automatic=False
+[AFJ-R52] stage=POST_REQUEST seq=185 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=186 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=ACTION_RUN seq=187 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+[AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=188 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2
+[AFJ-R52] stage=SELECTION_READ seq=189 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=190 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đang tạo Preview cho hai Frame...
+[AFJ-R50] BACKEND BEGIN Preview P2 epoch=0
+[AFJ-R52] stage=PREVIEW_CALLBACK_BEGIN seq=191 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2 bound=True
+[AFJ-R52] stage=PREVIEW_CALLBACK_END seq=192 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2
+[AFJ-R50] BACKEND END Preview P2 epoch=0
+[AFJ-R52] stage=SELECTION_READ seq=193 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=194 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=POST_REQUEST seq=195 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_END seq=196 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+[AFJ-R52] stage=POST_END seq=197 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=198 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=199 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=200 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=201 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=MANAGED_CALLBACK_ONLY_NO_BODY2_MODE_2
+[AFJ-R52-CAPTION] STATUS_CACHE id=121 epoch=0 text=Góc 90°
+[AFJ-R52-CAPTION] STATUS_CACHE id=122 epoch=0 text=XYZ
+[AFJ-R52-CAPTION] STATUS_CACHE id=123 epoch=0 text=Độ lệch
+[AFJ-R52-CAPTION] STATUS_CACHE id=124 epoch=0 text=Trong chiều dài
+[AFJ-R52-CAPTION] STATUS_CACHE id=125 epoch=0 text=Frame ngắn che
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=93
+[AFJ-R52-CAPTION] MESSAGE_END epoch=0 accepted=False
+[AFJ-R52] stage=POST_END seq=202 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=BUTTON seq=203 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=108 onPreviewCut_bound=True
+[AFJ-R50] BUTTON id=108 epoch=0
+[AFJ-R52] stage=ACTION_REQUEST seq=204 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2 automatic=False
+[AFJ-R52] stage=POST_REQUEST seq=205 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=206 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=ACTION_RUN seq=207 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+[AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=208 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2
+[AFJ-R52] stage=SELECTION_READ seq=209 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=210 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đang tạo Preview cho hai Frame...
+[AFJ-R50] BACKEND BEGIN Preview P2 epoch=0
+[AFJ-R52] stage=PREVIEW_CALLBACK_BEGIN seq=211 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2 bound=True
+[AFJ-R52] stage=PREVIEW_CALLBACK_END seq=212 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=2
+[AFJ-R50] BACKEND END Preview P2 epoch=0
+[AFJ-R52] stage=SELECTION_READ seq=213 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=214 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=POST_REQUEST seq=215 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_END seq=216 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=2
+[AFJ-R52] stage=POST_END seq=217 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=218 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=219 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=220 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=221 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=MANAGED_CALLBACK_ONLY_NO_BODY2_MODE_2
+[AFJ-R52] stage=POST_END seq=222 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=BUTTON seq=223 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+[AFJ-R50] BUTTON id=107 epoch=0
+[AFJ-R52] stage=ACTION_REQUEST seq=224 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1 automatic=False
+[AFJ-R52] stage=POST_REQUEST seq=225 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=226 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=ACTION_RUN seq=227 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1
+[AFJ-R52] stage=PREVIEW_ACTION_ENTER seq=228 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=1
+[AFJ-R52] stage=SELECTION_READ seq=229 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=230 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=Đang tạo Preview cho hai Frame...
+[AFJ-R50] BACKEND BEGIN Preview P1 epoch=0
+[AFJ-R52] stage=PREVIEW_CALLBACK_BEGIN seq=231 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=1 bound=True
+[AFJ-R52] stage=PREVIEW_CALLBACK_END seq=232 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False candidate=1
+[AFJ-R50] BACKEND END Preview P1 epoch=0
+[AFJ-R52] stage=SELECTION_READ seq=233 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=234 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-R52] stage=POST_REQUEST seq=235 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=ACTION_END seq=236 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1
+[AFJ-R52] stage=POST_END seq=237 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=POST_RUN seq=238 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=SELECTION_READ seq=239 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_A
+[AFJ-R52] stage=SELECTION_READ seq=240 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=MANAGED_B
+[AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52] stage=READY seq=241 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready=True deferredCounts=1/1 A=MANAGED_A B=MANAGED_B reason=Đã chọn 2 Component — nhấn Phân tích.
+[AFJ-R52-CAPTION] STATUS_CACHE id=104 epoch=0 text=MANAGED_CALLBACK_ONLY_NO_BODY2_MODE_1
+[AFJ-R52-CAPTION] MESSAGE_BEGIN epoch=0 chars=93
+[AFJ-R52-CAPTION] MESSAGE_UNAVAILABLE HRESULT=0x80004005 System.Runtime.InteropServices.COMException SIMULATED_MESSAGE_FAILURE
+[AFJ-R52] stage=POST_END seq=242 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False ready refresh
+[AFJ-R52] stage=BUTTON seq=243 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+[AFJ-R50] BUTTON id=107 epoch=0
+[AFJ-R52] stage=ACTION_REQUEST seq=244 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False kind=2 candidate=1 automatic=False
+[AFJ-R52] stage=POST_REQUEST seq=245 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False backend kind=2
+[AFJ-R52] stage=CLOSE seq=246 epoch=0 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=False activated=True faulted=False reason=2
+[AFJ-R50] CLOSING reason=2 epoch=1; no cut
+[AFJ-R50] DROP stale/inactive UI work backend kind=2 epoch=0
+[AFJ-R52] stage=AFTER_CLOSE seq=247 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=102 callbackCounts=1/1 shown=True closing=True activated=False faulted=False cleanup callback=True
+[AFJ-R52] stage=SUBMIT_ENTER seq=248 epoch=2 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=False closing=True activated=False faulted=False box=102 type=20
+[AFJ-R52] stage=SUBMIT_EXIT seq=249 epoch=2 thread=1 owner=1 cbDepth=1 focusCache=102 callbackCounts=1/1 shown=False closing=True activated=False faulted=False box=102 type=20 accepted=False reason=REJECT_PAGE_STATE_OR_OWNER ms=0.024

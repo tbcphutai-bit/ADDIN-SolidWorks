@@ -216,6 +216,13 @@ namespace ADDIN.Commands.AutoFrameJoint
                 success = false;
             }
 
+            if (session.CloseRequested)
+            {
+                string cleanupMessage;
+                Cleanup(session, out cleanupMessage);
+                message = "Đã đóng trang Preview. " + cleanupMessage;
+                return false;
+            }
             session.State = success
                 ? SessionState.Showing
                 : (session.Ghost.IsShowing ? SessionState.PendingCleanup
@@ -232,18 +239,21 @@ namespace ADDIN.Commands.AutoFrameJoint
                                         Component2 frameB, int candidate,
                                         out string message)
         {
+            Trace.WriteLine("[AFJ-R52] stage=SESSION_PREVIEW_ENTER token=" + token.ToString("N") + " candidate=" + candidate);
             Session session;
             if (!FindOwnedSession(token, out session, out message))
-                return false;
+            { Trace.WriteLine("[AFJ-R52] stage=SESSION_REJECT reason=" + message); return false; }
             if (session.CloseRequested ||
                 session.State == SessionState.PendingCleanup ||
                 session.State == SessionState.DeferredDocument)
             {
+                Trace.WriteLine("[AFJ-R52] stage=SESSION_REJECT state=" + session.State + " closing=" + session.CloseRequested);
                 message = "Ghost pending cleanup or page closing.";
                 return false;
             }
             if (!IsBoundAssemblyActive(session.App, session.Assembly))
             {
+                Trace.WriteLine("[AFJ-R52] stage=SESSION_REJECT reason=BOUND_ASSEMBLY_INACTIVE");
                 session.State = SessionState.DeferredDocument;
                 message = "Assembly thay đổi; không tạo Preview.";
                 return false;
@@ -252,6 +262,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             bool success;
             try
             {
+                Trace.WriteLine("[AFJ-R52] stage=SESSION_GHOST_CALL token=" + token.ToString("N"));
                 success = session.Ghost.TryShowCutCandidate(
                     frameA, frameB, candidate, out message);
             }
@@ -261,10 +272,18 @@ namespace ADDIN.Commands.AutoFrameJoint
                 message = "Lỗi temporary geometry; xem Output.";
                 success = false;
             }
+            if (session.CloseRequested)
+            {
+                string cleanupMessage;
+                Cleanup(session, out cleanupMessage);
+                message = "Đã đóng trang Preview. " + cleanupMessage;
+                return false;
+            }
             session.State = success
                 ? SessionState.Showing
                 : (session.Ghost.IsShowing ? SessionState.PendingCleanup
                                           : SessionState.Ready);
+            Trace.WriteLine("[AFJ-R52] stage=SESSION_PREVIEW_END success=" + success + " state=" + session.State + " tracked=" + session.Ghost.IsShowing + " actual_visibility=UNVERIFIED");
             return success;
         }
 
@@ -296,6 +315,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 return false;
 
             session.CloseRequested = true;
+            session.Ghost.RequestClose();
             return Cleanup(session, out message);
         }
 
@@ -326,6 +346,13 @@ namespace ADDIN.Commands.AutoFrameJoint
 
         private bool Cleanup(Session session, out string message)
         {
+            if (session.Ghost.IsBusy)
+            {
+                session.State = SessionState.PendingCleanup;
+                message = "Đã ghi nhận đóng; chờ thao tác Preview trả về để dọn.";
+                Trace.WriteLine("[AFJ-R52] stage=CLOSE_WAIT_BACKEND token=" + session.Token.ToString("N"));
+                return false;
+            }
             // No bodies were registered; no COM Hide calls are needed.
             if (!session.Ghost.IsShowing)
             {

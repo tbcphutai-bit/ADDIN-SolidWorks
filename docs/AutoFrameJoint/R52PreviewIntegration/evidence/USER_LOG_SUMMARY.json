@@ -1,0 +1,18 @@
+{
+  "evidence": "USER_SUPPLIED_LOG_SUMMARY_NOT_RAW_CAPTURE",
+  "dll": "<EXISTING_ADDIN_OUTPUT>/ADDIN.dll",
+  "mvid": "2f4e359e-bffe-4f74-9441-891bb4c77b12",
+  "observed": [
+    "R50 ACTIVATED and SHOW",
+    "Frame A count=1",
+    "A->B AUTO FOCUS",
+    "READY=False A-count=1 B-count=0"
+  ],
+  "not_present_in_supplied_summary": [
+    "BUTTON id=107/108",
+    "BACKEND BEGIN Preview",
+    "AFJ-R51"
+  ],
+  "exit_code": "0xffffffff",
+  "unique_exit_cause": "UNVERIFIED"
+}

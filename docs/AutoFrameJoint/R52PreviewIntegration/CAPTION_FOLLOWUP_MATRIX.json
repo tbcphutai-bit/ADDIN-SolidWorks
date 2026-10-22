@@ -1,0 +1,212 @@
+[
+  {
+    "case": "A_B_COMMIT",
+    "scope": "USER_NATIVE_LOG",
+    "status": "OBSERVED_IN_USER_ADDIN_LOG",
+    "detail": "Submit accepted; marks 1/2 count=1"
+  },
+  {
+    "case": "BUTTONS",
+    "scope": "USER_NATIVE_LOG",
+    "status": "OBSERVED_IN_USER_ADDIN_LOG",
+    "detail": "107 once, 108 twice"
+  },
+  {
+    "case": "SOLVER",
+    "scope": "USER_NATIVE_LOG",
+    "status": "OBSERVED_IN_USER_ADDIN_LOG",
+    "detail": "Three solves; each keptA/B=1, positive removed volume"
+  },
+  {
+    "case": "DISPLAY3_API",
+    "scope": "USER_NATIVE_LOG",
+    "status": "OBSERVED_IN_USER_ADDIN_LOG",
+    "detail": "14 calls status=0"
+  },
+  {
+    "case": "HIDE_BETWEEN_PREVIEWS",
+    "scope": "USER_NATIVE_LOG",
+    "status": "OBSERVED_IN_USER_ADDIN_LOG",
+    "detail": "8 Hide END events before replacing Preview"
+  },
+  {
+    "case": "CRASH_SITE",
+    "scope": "USER_NATIVE_LOG_AND_SCREENSHOT",
+    "status": "FAIL_NATIVE_ACCESS_VIOLATION",
+    "detail": "Caption BEGIN 104 after repeated P2, no END; screenshot at label.Caption"
+  },
+  {
+    "case": "ROOT_CAUSE",
+    "scope": "USER_NATIVE_LOG",
+    "status": "UNVERIFIED",
+    "detail": "Earlier Caption writes succeeded; unique native memory corruption cause not established"
+  },
+  {
+    "case": "SIX_CLASS_DETACHED_COMPILE",
+    "scope": "local",
+    "status": "PASS_COMPILE_ONLY",
+    "detail": "Explicit source; no main Add-in build"
+  },
+  {
+    "case": "A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "BUTTON_107_DEFERRED_PREVIEW_DELEGATE",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "BUTTON_108_DEFERRED_PREVIEW_DELEGATE",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "FOREIGN_THREAD_SUBMIT_REFUSED",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH",
+    "scope": "local",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "SIX_CLASS_DETACHED_COMPILE",
+    "scope": "branch",
+    "status": "PASS_COMPILE_ONLY",
+    "detail": "Explicit source; no main Add-in build"
+  },
+  {
+    "case": "A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "BUTTON_107_DEFERRED_PREVIEW_DELEGATE",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "BUTTON_108_DEFERRED_PREVIEW_DELEGATE",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "FOREIGN_THREAD_SUBMIT_REFUSED",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH",
+    "scope": "branch",
+    "status": "PASS_MANAGED_CONTRACT",
+    "detail": "Proxy-only; 0 label calls, no native fix execution"
+  },
+  {
+    "case": "NEW_CAPTION_FIX_NATIVE",
+    "scope": "NEW_SOURCE",
+    "status": "NOT_RUN",
+    "detail": "DLL remains the user-built R52 baseline; pending owner manual build/test"
+  },
+  {
+    "case": "ACTUAL_PREVIEW_VISIBLE",
+    "scope": "USER_NATIVE_LOG",
+    "status": "UNVERIFIED",
+    "detail": "Viewport estimates/status=0 do not prove visible pixels or complete fit"
+  }
+]

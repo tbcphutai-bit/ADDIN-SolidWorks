@@ -1,0 +1,62 @@
+{
+  "scope": "R52 smooth Preview / reliable close follow-up",
+  "native_input": {
+    "input_sha256": "e224cb9280e89386f937b0094dfea41a6824c952db1a4befc4c3a71c2da5bce3",
+    "input_lines": 1019,
+    "mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+    "command_open": 3,
+    "button_106": 0,
+    "button_107": 4,
+    "button_108": 0,
+    "solver_begin": 4,
+    "solver_end": 4,
+    "display3_end": 8,
+    "display3_status0": 8,
+    "hide_end": 8,
+    "close": 3,
+    "after_close": 3,
+    "access_violation_lines": 0,
+    "last_process_exit": "0xffffffff",
+    "preview_visibility": "USER_CONFIRMED_VISIBLE",
+    "phase_timings_in_input": "NOT_AVAILABLE",
+    "exit_cause": "UNVERIFIED",
+    "new_patch_native_test": "NOT_RUN",
+    "process_snapshot": {
+      "solidworks_process_count": 1,
+      "visible_main_window_count": 0,
+      "interaction": "NONE"
+    },
+    "windows_application_events": {
+      "since_local": "2026-10-22T12:20:00",
+      "event_ids": [
+        1000,
+        1001
+      ],
+      "result": "No matching events returned by query; not proof of no crash"
+    }
+  },
+  "binary": {
+    "installed_file": "ADDIN.dll",
+    "installed_mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+    "user_log_mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+    "mvid_matches_user_log": true,
+    "comparison_baseline": "Caption follow-up local detached harness, before smooth/finish changes",
+    "afj_method_count": 267,
+    "normalized_il_matches": 267,
+    "pdb_matches_dll_guid_age": true,
+    "pdb_document_source_checksums": "NOT_AVAILABLE",
+    "installed_dll_sha256": "21524f3d5a7fa5d92c6a3ee5d95e32147e26e5b8a29bc5939ed6dc7f479e8435",
+    "installed_pdb_sha256": "90ba656f3275e55608073190c5b4903a340f98424a941eacc30530d3f36d534d",
+    "conclusion": "Installed module contains the earlier Caption fix. Smooth/finish follow-up exists in source only; no main Build/Deploy."
+  },
+  "managed_controls_per_variant": 30,
+  "managed_controls_total": 60,
+  "new_followup_native_test": "NOT_RUN",
+  "main_build_deploy": "NOT_RUN",
+  "production_source_files_changed": [
+    "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+    "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs"
+  ],
+  "merge": "NOT_PERFORMED"
+}

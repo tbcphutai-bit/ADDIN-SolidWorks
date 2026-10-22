@@ -1,0 +1,61 @@
+L210: [AFJ-R52] stage=COMMAND_OPEN MVID=023f24dd-0f95-4cdd-9352-2629defdfab7
+L486: [AFJ-R52] stage=CLOSE seq=114 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False reason=1
+L488: [AFJ-R52] stage=AFTER_CLOSE seq=115 epoch=2 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=True activated=False faulted=False cleanup callback=True
+L489: [AFJ-GHOST] AfterClose CLEAN Không có Temporary Body còn chờ dọn.
+L491: [AFJ-R52] stage=COMMAND_OPEN MVID=023f24dd-0f95-4cdd-9352-2629defdfab7
+L636: [AFJ-R52] stage=BUTTON seq=66 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+L646: [AFJ-R50] BACKEND BEGIN Preview P1 epoch=1
+L651: [AFJ-R52] stage=GHOST_ENTER candidate=1 busy=False
+L654: [AFJ-R52] stage=SOLVER_BEGIN
+L682: [AFJ-R52] stage=SOLVER_END keptA=1 keptB=1 removedA_m3=7.1753397680816218E-05 removedB_m3=6.8665694004274154E-05
+L687: [AFJ-R52] stage=DISPLAY3_END group=A_KEEP status=0 tracked=1 actual_visibility=UNVERIFIED
+L691: [AFJ-R52] stage=DISPLAY3_END group=B_KEEP status=0 tracked=2 actual_visibility=UNVERIFIED
+L699: [AFJ-R50] BACKEND END Preview P1 epoch=1
+L714: [AFJ-R52] stage=BUTTON seq=86 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+L724: [AFJ-R50] BACKEND BEGIN Preview P1 epoch=1
+L729: [AFJ-R52] stage=GHOST_ENTER candidate=1 busy=False
+L730: [AFJ-R52] stage=HIDE_BEGIN tracked_index=1
+L731: [AFJ-R52] stage=HIDE_END tracked_index=1
+L732: [AFJ-R52] stage=HIDE_BEGIN tracked_index=0
+L733: [AFJ-R52] stage=HIDE_END tracked_index=0
+L738: [AFJ-R52] stage=SOLVER_BEGIN
+L766: [AFJ-R52] stage=SOLVER_END keptA=1 keptB=1 removedA_m3=7.1753397680816218E-05 removedB_m3=6.8665694004274114E-05
+L771: [AFJ-R52] stage=DISPLAY3_END group=A_KEEP status=0 tracked=1 actual_visibility=UNVERIFIED
+L775: [AFJ-R52] stage=DISPLAY3_END group=B_KEEP status=0 tracked=2 actual_visibility=UNVERIFIED
+L783: [AFJ-R50] BACKEND END Preview P1 epoch=1
+L801: [AFJ-R52] stage=CLOSE seq=106 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False reason=1
+L803: [AFJ-R52] stage=AFTER_CLOSE seq=107 epoch=2 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=True activated=False faulted=False cleanup callback=True
+L804: [AFJ-R52] stage=HIDE_BEGIN tracked_index=1
+L805: [AFJ-R52] stage=HIDE_END tracked_index=1
+L806: [AFJ-R52] stage=HIDE_BEGIN tracked_index=0
+L807: [AFJ-R52] stage=HIDE_END tracked_index=0
+L810: [AFJ-GHOST] AfterClose CLEAN Đã yêu cầu Hide tất cả Temporary Body của phiên.
+L816: [AFJ-R52] stage=COMMAND_OPEN MVID=023f24dd-0f95-4cdd-9352-2629defdfab7
+L841: [AFJ-R52] stage=BUTTON seq=12 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+L851: [AFJ-R50] BACKEND BEGIN Preview P1 epoch=1
+L856: [AFJ-R52] stage=GHOST_ENTER candidate=1 busy=False
+L859: [AFJ-R52] stage=SOLVER_BEGIN
+L887: [AFJ-R52] stage=SOLVER_END keptA=1 keptB=1 removedA_m3=7.1753397680816218E-05 removedB_m3=6.8665694004274182E-05
+L892: [AFJ-R52] stage=DISPLAY3_END group=A_KEEP status=0 tracked=1 actual_visibility=UNVERIFIED
+L896: [AFJ-R52] stage=DISPLAY3_END group=B_KEEP status=0 tracked=2 actual_visibility=UNVERIFIED
+L904: [AFJ-R50] BACKEND END Preview P1 epoch=1
+L920: [AFJ-R52] stage=BUTTON seq=32 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False id=107 onPreviewCut_bound=True
+L930: [AFJ-R50] BACKEND BEGIN Preview P1 epoch=1
+L935: [AFJ-R52] stage=GHOST_ENTER candidate=1 busy=False
+L936: [AFJ-R52] stage=HIDE_BEGIN tracked_index=1
+L937: [AFJ-R52] stage=HIDE_END tracked_index=1
+L938: [AFJ-R52] stage=HIDE_BEGIN tracked_index=0
+L939: [AFJ-R52] stage=HIDE_END tracked_index=0
+L944: [AFJ-R52] stage=SOLVER_BEGIN
+L972: [AFJ-R52] stage=SOLVER_END keptA=1 keptB=1 removedA_m3=7.1753397680816218E-05 removedB_m3=6.8665694004274182E-05
+L977: [AFJ-R52] stage=DISPLAY3_END group=A_KEEP status=0 tracked=1 actual_visibility=UNVERIFIED
+L981: [AFJ-R52] stage=DISPLAY3_END group=B_KEEP status=0 tracked=2 actual_visibility=UNVERIFIED
+L989: [AFJ-R50] BACKEND END Preview P1 epoch=1
+L1007: [AFJ-R52] stage=CLOSE seq=52 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=False activated=True faulted=False reason=1
+L1009: [AFJ-R52] stage=AFTER_CLOSE seq=53 epoch=2 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=-1/-1 shown=True closing=True activated=False faulted=False cleanup callback=True
+L1010: [AFJ-R52] stage=HIDE_BEGIN tracked_index=1
+L1011: [AFJ-R52] stage=HIDE_END tracked_index=1
+L1012: [AFJ-R52] stage=HIDE_BEGIN tracked_index=0
+L1013: [AFJ-R52] stage=HIDE_END tracked_index=0
+L1016: [AFJ-GHOST] AfterClose CLEAN Đã yêu cầu Hide tất cả Temporary Body của phiên.
+L1019: The program '[PROCESS] SLDWORKS.exe' has exited with code 4294967295 (0xffffffff).

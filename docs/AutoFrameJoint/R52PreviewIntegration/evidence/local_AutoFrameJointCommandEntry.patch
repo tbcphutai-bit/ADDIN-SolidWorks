@@ -1,0 +1,8 @@
+--- a/Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs
++++ b/Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs
+@@ -42,0 +43 @@
++            Trace.WriteLine("[AFJ-R52] stage=COMMAND_OPEN MVID=" + typeof(AutoFrameJointCommandEntry).Assembly.ManifestModule.ModuleVersionId);
+@@ -128,0 +130 @@
++                            Trace.WriteLine("[AFJ-R52] stage=ENTRY_PREVIEW_BEGIN token=" + pageToken.ToString("N") + " candidate=" + candidate);
+@@ -130,0 +133 @@
++                            Trace.WriteLine("[AFJ-R52] stage=ENTRY_PREVIEW_END token=" + pageToken.ToString("N") + " success=" + ok + " status=" + status);

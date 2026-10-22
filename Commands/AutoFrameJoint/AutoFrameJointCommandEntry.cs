@@ -40,6 +40,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             if (opening || (activePage != null && activePage.IsOpen))
                 return;
 
+            Trace.WriteLine("[AFJ-R52] stage=COMMAND_OPEN MVID=" + typeof(AutoFrameJointCommandEntry).Assembly.ManifestModule.ModuleVersionId);
             opening = true;
             var manager = AutoFrameJointGhostSessionManager.Shared;
             Guid pageToken = Guid.Empty;
@@ -126,8 +127,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                             // Explicit button only. Boolean construction and
                             // Display3 are on SOLIDWORKS UI STA via Ghost owner.
                             string status;
+                            Trace.WriteLine("[AFJ-R52] stage=ENTRY_PREVIEW_BEGIN token=" + pageToken.ToString("N") + " candidate=" + candidate);
                             bool ok = manager.TryShowCutCandidate(
                                 pageToken, frameA, frameB, candidate, out status);
+                            Trace.WriteLine("[AFJ-R52] stage=ENTRY_PREVIEW_END token=" + pageToken.ToString("N") + " success=" + ok + " status=" + status);
                             Trace.WriteLine("[AFJ-CUT-CANDIDATE] " +
                                 (ok ? "SHOW " : "ERROR ") + status);
                             return status;

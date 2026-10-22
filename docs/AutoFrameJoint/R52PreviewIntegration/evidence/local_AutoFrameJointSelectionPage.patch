@@ -1,0 +1,308 @@
+--- a/UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs
++++ b/UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs
+@@ -91,0 +92,4 @@
++        private int selectionCallbackDepth, flowSequence, lastFocusBox;
++        private int callbackCountA = -1, callbackCountB = -1, deferredCountA = -1, deferredCountB = -1;
++        private Component2 committedA, committedB;
++        private string committedNameA, committedNameB;
+@@ -163,0 +168 @@
++                TraceFlow("SHOW", "source=R52 MVID=" + typeof(AutoFrameJointSelectionPage).Assembly.ManifestModule.ModuleVersionId + " preview_callback=" + (onPreviewCut != null));
+@@ -209 +214,2 @@
+-            if (!IsUiLive(pageEpoch)) return;
++            TraceFlow("SELECTION_REFRESH_REQUEST", "advance=" + advanceFromA + " analyze=" + analyzeAfterB);
++            if (!IsUiLive(pageEpoch)) { TraceFlow("SELECTION_REFRESH_REJECT", "page state/owner"); return; }
+@@ -212 +218 @@
+-            if (selectionRefreshQueued) return;
++            if (selectionRefreshQueued) { TraceFlow("SELECTION_REFRESH_MERGED", "already queued"); return; }
+@@ -217 +223,2 @@
+-                if (IsBackendBusy()) return; // Requests drain after the current action.
++                TraceFlow("SELECTION_REFRESH_RUN", "deferred");
++                if (IsBackendBusy()) { TraceFlow("SELECTION_REFRESH_DEFER", "backend busy"); return; }
+@@ -219,4 +226,2 @@
+-                bool analyze = requestAutoAnalysis;
+-                bool advance = requestFocusB;
+-                requestAutoAnalysis = false;
+-                requestFocusB = false;
++                bool analyze = requestAutoAnalysis, advance = requestFocusB;
++                requestAutoAnalysis = false; requestFocusB = false;
+@@ -224 +229 @@
+-                if (!advance || selectionA == null || selectionB == null) return;
++                if (!advance || selectionA == null || selectionB == null) { TraceFlow("AUTO_FOCUS_SKIP", "not requested or no controls"); return; }
+@@ -226,4 +231,4 @@
+-                if (selectionA.GetSelectionFocus() && IsUiLive(epoch) &&
+-                    IsSameDocumentActive() && IsUiLive(epoch) &&
+-                    Selected(MarkFrameA) != null && IsUiLive(epoch) &&
+-                    Selected(MarkFrameB) == null && IsUiLive(epoch))
++                bool focusA = selectionA.GetSelectionFocus();
++                Component2 a = IsUiLive(epoch) && IsSameDocumentActive() ? Selected(MarkFrameA) : null;
++                Component2 b = IsUiLive(epoch) ? Selected(MarkFrameB) : null;
++                if (focusA && a != null && b == null && IsUiLive(epoch))
+@@ -230,0 +236 @@
++                    TraceFlow("AUTO_FOCUS_BEGIN", "A->B; this does not select Frame B");
+@@ -232 +238 @@
+-                    Trace.WriteLine("[AFJ-SEL] A->B AUTO FOCUS");
++                    if (IsUiLive(epoch)) TraceFlow("AUTO_FOCUS_END", "B_focus=" + selectionB.GetSelectionFocus() + "; awaiting B submit/list callback");
+@@ -233,0 +240 @@
++                else TraceFlow("AUTO_FOCUS_SKIP", "focusA=" + focusA + " hasA=" + (a != null) + " hasB=" + (b != null));
+@@ -483 +490,2 @@
+-            if (assembly == null) return null;
++            RequireDeferredSelectionRead();
++            if (assembly == null) { TraceFlow("SELECTION_READ_REJECT", "no bound assembly"); return null; }
+@@ -485,2 +493 @@
+-            if (mgr == null) return null;
+-
++            if (mgr == null) { TraceFlow("SELECTION_READ_REJECT", "no SelectionMgr"); return null; }
+@@ -488,14 +495,23 @@
+-            if (count != 1) return null;
+-
+-            Component2 component =
+-                mgr.GetSelectedObjectsComponent4(1, mark) as Component2;
+-            if (component != null) return component;
+-
+-            object selected = mgr.GetSelectedObject6(1, mark);
+-            component = selected as Component2;
+-            if (component != null) return component;
+-
+-            IEntity entity = selected as IEntity;
+-            if (entity != null)
+-                component = entity.GetComponent() as Component2;
+-
++            Component2 component = null;
++            string route = "COUNT_NOT_ONE";
++            if (count == 1)
++            {
++                component = mgr.GetSelectedObjectsComponent4(1, mark) as Component2;
++                route = "GET_SELECTED_COMPONENT";
++                if (component == null)
++                {
++                    object selected = mgr.GetSelectedObject6(1, mark);
++                    component = selected as Component2;
++                    if (component == null)
++                    {
++                        IEntity entity = selected as IEntity;
++                        if (entity != null) component = entity.GetComponent() as Component2;
++                        route = "ENTITY_OWNER";
++                    }
++                    else route = "DIRECT_COMPONENT";
++                }
++            }
++            string name = DeferredComponentName(component);
++            if (mark == MarkFrameA) { committedA = component; committedNameA = name; deferredCountA = count; }
++            else if (mark == MarkFrameB) { committedB = component; committedNameB = name; deferredCountB = count; }
++            TraceFlow("SELECTION_READ", "mark=" + mark + " count=" + count + " resolved=" + (component != null) + " route=" + route + " component=" + name);
+@@ -507,17 +523,4 @@
+-            try
+-            {
+-                SelectionMgr mgr = assembly.SelectionManager as SelectionMgr;
+-                if (mgr == null) return;
+-
+-                int aCount = mgr.GetSelectedObjectCount2(MarkFrameA);
+-                int bCount = mgr.GetSelectedObjectCount2(MarkFrameB);
+-                Trace.WriteLine("[AFJ-SEL] READY=" + ready +
+-                    " A-count=" + aCount +
+-                    " B-count=" + bCount +
+-                    " reason=" + reason);
+-            }
+-            catch (Exception ex)
+-            {
+-                Trace.WriteLine("[AFJ-SEL] Ready trace unavailable: " +
+-                                ex.Message);
+-            }
++            RequireDeferredSelectionRead();
++            Trace.WriteLine("[AFJ-SEL] READY=" + ready + " A-count=" + deferredCountA + " B-count=" + deferredCountB + " reason=" + reason);
++            TraceFlow("READY", "ready=" + ready + " deferredCounts=" + deferredCountA + "/" + deferredCountB +
++                " A=" + committedNameA + " B=" + committedNameB + " reason=" + reason);
+@@ -533,0 +537 @@
++            RequireDeferredSelectionRead();
+@@ -761 +765,2 @@
+-            if (!IsUiLive(epoch) || IsBackendBusy()) return;
++            TraceFlow("PREVIEW_ACTION_ENTER", "candidate=" + candidate);
++            if (!IsUiLive(epoch) || IsBackendBusy()) { TraceFlow("PREVIEW_ACTION_REJECT", "page/owner/busy"); return; }
+@@ -768,0 +774 @@
++                    TraceFlow("PREVIEW_SELECTION_REJECT", reason);
+@@ -778,0 +785 @@
++                TraceFlow("PREVIEW_CALLBACK_BEGIN", "candidate=" + candidate + " bound=" + (onPreviewCut != null));
+@@ -779,0 +787 @@
++                TraceFlow("PREVIEW_CALLBACK_END", "candidate=" + candidate);
+@@ -781 +789 @@
+-                if (!IsActionPairCurrent(a, b, epoch)) return;
++                if (!IsActionPairCurrent(a, b, epoch)) { TraceFlow("PREVIEW_RESULT_DROP", "page/pair changed"); return; }
+@@ -823,0 +832 @@
++            TraceFlow("CLOSE", "reason=" + reason);
+@@ -833,0 +843,2 @@
++            TraceFlow("AFTER_CLOSE", "cleanup callback=" + (onClearPreview != null));
++            committedA = null; committedB = null; committedNameA = null; committedNameB = null;
+@@ -877,0 +889 @@
++            TraceFlow("BUTTON", "id=" + id + " onPreviewCut_bound=" + (onPreviewCut != null));
+@@ -892,2 +904,8 @@
+-            if (id == BoxFrameA || id == BoxFrameB)
+-                Trace.WriteLine("[AFJ-SEL] Focus box=" + id);
++            selectionCallbackDepth++;
++            try
++            {
++                TraceFlow("FOCUS_ENTER", "box=" + id);
++                if (id == BoxFrameA || id == BoxFrameB) lastFocusBox = id;
++                TraceFlow("FOCUS_EXIT", "box=" + id);
++            }
++            finally { selectionCallbackDepth--; }
+@@ -898,9 +916,11 @@
+-            if (id != BoxFrameA && id != BoxFrameB) return;
+-
+-            // This callback runs DURING the SOLIDWORKS selection process.
+-            // Don't read selection COM state or change focus/selection here.
+-            // Multiple events are coalesced into one deferred UI refresh.
+-            Trace.WriteLine("[AFJ-SEL] List box=" + id + " count=" + count);
+-            QueueSelectionRefresh(
+-                id == BoxFrameA && count == 1,
+-                id == BoxFrameB && count == 1);
++            selectionCallbackDepth++;
++            try
++            {
++                TraceFlow("LIST_ENTER", "box=" + id + " count=" + count);
++                if (id != BoxFrameA && id != BoxFrameB) { TraceFlow("LIST_REJECT", "unknown box"); return; }
++                if (id == BoxFrameA) { callbackCountA = count; if (count != 1) { committedA = null; committedNameA = null; } }
++                else { callbackCountB = count; if (count != 1) { committedB = null; committedNameB = null; } }
++                QueueSelectionRefresh(id == BoxFrameA && count == 1, id == BoxFrameB && count == 1);
++                TraceFlow("LIST_EXIT", "queued only; no COM selection read");
++            }
++            finally { selectionCallbackDepth--; }
+@@ -919,0 +940,3 @@
++            selectionCallbackDepth++;
++            bool accepted = false;
++            string reason = "REJECT_UNKNOWN";
+@@ -921,5 +944,6 @@
+-            try
+-            {
+-                if (id != BoxFrameA && id != BoxFrameB)
+-                    return false;
+-
++            TraceFlow("SUBMIT_ENTER", "box=" + id + " type=" + type);
++            try
++            {
++                if (id != BoxFrameA && id != BoxFrameB) { reason = "REJECT_BOX_ID"; return false; }
++                if (!IsUiLive(pageEpoch)) { reason = "REJECT_PAGE_STATE_OR_OWNER"; return false; }
++                if (selection == null) { reason = "REJECT_NULL_DISPATCH"; return false; }
+@@ -929,5 +953,4 @@
+-                    return false;
+-
+-                if (!IsSameDocumentActive())
+-                    return false;
+-
++                { reason = "REJECT_FILTER_TYPE"; return false; }
++
++                // Only inspect the supplied dispatch interface. Do not read
++                // SelectionMgr, Part documents, Name2 or native PMP controls.
+@@ -935,23 +958,10 @@
+-                if (candidate == null &&
+-                    (type == (int)swSelectType_e.swSelFACES ||
+-                     type == (int)swSelectType_e.swSelEDGES))
+-                {
+-                    IEntity entity = selection as IEntity;
+-                    if (entity != null)
+-                        candidate = entity.GetComponent() as Component2;
+-                }
+-                if (candidate == null)
+-                {
+-                    Trace.WriteLine("[AFJ-SEL] No owning Component for type=" + type);
+-                    return false;
+-                }
+-
+-                Component2 other = Selected(
+-                    id == BoxFrameA ? MarkFrameB : MarkFrameA);
+-                if (other != null && !DefinitelyDifferent(candidate, other))
+-                {
+-                    Trace.WriteLine("[AFJ-SEL] Rejected duplicate A/B");
+-                    return false;
+-                }
+-
+-                itemText = candidate.Name2;
++                if (candidate == null && !(selection is IEntity))
++                { reason = "REJECT_NO_COMPONENT_OR_ENTITY_INTERFACE"; return false; }
++                Component2 other = id == BoxFrameA ? committedB : committedA;
++                if (candidate != null && Object.ReferenceEquals(candidate, other))
++                { reason = "REJECT_DUPLICATE_CACHED_REFERENCE"; return false; }
++                // Full occurrence/document identity is checked after commit,
++                // then again before every action. Never clear/re-mark inline.
++                if (String.IsNullOrWhiteSpace(itemText)) itemText = id == BoxFrameA ? "Frame A" : "Frame B";
++                accepted = true;
++                reason = "ACCEPT_FILTERED_PENDING_DEFERRED_IDENTITY";
+@@ -962 +972,2 @@
+-                Trace.WriteLine("[AFJ-SEL] Selection rejected: " + ex.Message);
++                reason = "REJECT_EXCEPTION HRESULT=0x" + ex.HResult.ToString("X8");
++                TraceFlow("SUBMIT_EXCEPTION", ex.GetType().FullName + " " + ex.Message);
+@@ -967,6 +978,4 @@
+-                double elapsedMs = (Stopwatch.GetTimestamp() - started) *
+-                                   1000.0 / Stopwatch.Frequency;
+-                if (elapsedMs >= 50.0)
+-                    Trace.WriteLine("[AFJ-SEL] SLOW OnSubmitSelection " +
+-                                    elapsedMs.ToString("F1") + "ms type=" +
+-                                    type + " box=" + id);
++                double ms = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
++                TraceFlow("SUBMIT_EXIT", "box=" + id + " type=" + type + " accepted=" + accepted +
++                    " reason=" + reason + " ms=" + ms.ToString("F3", System.Globalization.CultureInfo.InvariantCulture));
++                selectionCallbackDepth--;
+@@ -993,0 +1003,23 @@
++        // Managed-only callback diagnostics: no COM properties or native controls.
++        private void TraceFlow(string stage, string detail)
++        {
++            Trace.WriteLine("[AFJ-R52] stage=" + stage + " seq=" + (++flowSequence) + " epoch=" + pageEpoch +
++                " thread=" + System.Threading.Thread.CurrentThread.ManagedThreadId + " owner=" + ownerThreadId +
++                " cbDepth=" + selectionCallbackDepth + " focusCache=" + lastFocusBox +
++                " callbackCounts=" + callbackCountA + "/" + callbackCountB +
++                " shown=" + shown + " closing=" + closing + " activated=" + nativeActivated +
++                " faulted=" + controlsFaulted + " " + detail);
++        }
++        private void RequireDeferredSelectionRead()
++        {
++            if (selectionCallbackDepth != 0)
++                throw new InvalidOperationException("R52: COM selection/control work attempted inside a selection callback");
++        }
++        private string DeferredComponentName(Component2 component)
++        {
++            RequireDeferredSelectionRead();
++            if (component == null) return "NONE";
++            try { return component.Name2; }
++            catch (Exception ex) { TraceFlow("COMPONENT_NAME_UNAVAILABLE", "HRESULT=0x" + ex.HResult.ToString("X8")); return "UNAVAILABLE"; }
++        }
++
+@@ -1009 +1041,2 @@
+-            if (!IsUiLive(epoch)) return false;
++            if (!IsUiLive(epoch)) { TraceFlow("POST_REJECT", operation + " page/owner"); return false; }
++            TraceFlow("POST_REQUEST", operation);
+@@ -1025 +1058 @@
+-                    try { action(); }
++                    try { RequireDeferredSelectionRead(); TraceFlow("POST_RUN", operation); action(); TraceFlow("POST_END", operation); }
+@@ -1130,0 +1164 @@
++            TraceFlow("ACTION_REQUEST", "kind=" + kind + " candidate=" + candidate + " automatic=" + automatic);
+@@ -1132,4 +1166 @@
+-            {
+-                Trace.WriteLine("[AFJ-R50] ACTION rejected busy/inactive kind=" + kind);
+-                return;
+-            }
++            { TraceFlow("ACTION_REJECT", "page/owner/busy/queued/finish gate"); return; }
+@@ -1137,2 +1167,0 @@
+-            Trace.WriteLine("[AFJ-R50] ACTION QUEUED kind=" + kind +
+-                " candidate=" + candidate + " automatic=" + automatic + " epoch=" + pageEpoch);
+@@ -1142 +1171,2 @@
+-                if (IsBackendBusy() || finishQueued) return;
++                TraceFlow("ACTION_RUN", "kind=" + kind + " candidate=" + candidate);
++                if (IsBackendBusy() || finishQueued) { TraceFlow("ACTION_REJECT", "busy/finish after posting"); return; }
+@@ -1146,2 +1176 @@
+-                    Component2 a, b;
+-                    string reason;
++                    Component2 a, b; string reason;
+@@ -1149 +1178 @@
+-                    if (!IsUiLive(epoch) || !ready) return;
++                    if (!IsUiLive(epoch) || !ready) { TraceFlow("AUTO_ANALYZE_SKIP", reason); return; }
+@@ -1152,2 +1181 @@
+-                    if (previous && !String.IsNullOrEmpty(lastAnalysisMessage)) return;
+-                    Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE START");
++                    if (previous && !String.IsNullOrEmpty(lastAnalysisMessage)) { TraceFlow("AUTO_ANALYZE_SKIP", "same analyzed pair"); return; }
+@@ -1158,5 +1186,2 @@
+-                if (automatic) Trace.WriteLine("[AFJ-SEL] AUTO ANALYZE END");
+-            }))
+-            {
+-                backendActionQueued = false;
+-            }
++                TraceFlow("ACTION_END", "kind=" + kind + " candidate=" + candidate);
++            })) { backendActionQueued = false; TraceFlow("ACTION_POST_FAILED", "kind=" + kind); }
