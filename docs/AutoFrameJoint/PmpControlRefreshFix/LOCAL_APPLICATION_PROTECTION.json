@@ -1,0 +1,58 @@
+{
+  "operation": "single-source UI patch; no build/deploy",
+  "ui_sha256": "17a7cc2e448e2d71c5fc88af19fc99f1a710773e541a1b84de0e66ca47d919fe",
+  "branch_unchanged": true,
+  "head_unchanged": true,
+  "protected_files": [
+    {
+      "file": "ADDIN.csproj",
+      "before_sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+      "after_sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+      "unchanged": true
+    },
+    {
+      "file": "ADDIN.dll",
+      "before_sha256": "f50b0061b1e213e605761026f4dd9be1d3ea3a2dbb86874ae7018b1f42f329a3",
+      "after_sha256": "f50b0061b1e213e605761026f4dd9be1d3ea3a2dbb86874ae7018b1f42f329a3",
+      "unchanged": true
+    },
+    {
+      "file": "ADDIN.pdb",
+      "before_sha256": "47b58fcfe6e9f553f1cc44fd0993b0290f18fffc08e95cd385aaef106e8263c6",
+      "after_sha256": "47b58fcfe6e9f553f1cc44fd0993b0290f18fffc08e95cd385aaef106e8263c6",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointCommandEntry.cs",
+      "before_sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+      "after_sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointGhostPreview.cs",
+      "before_sha256": "f0fcda50d4852e715f353f9787d41d6c7d26de1ca4824e2b56752b6976c1584c",
+      "after_sha256": "f0fcda50d4852e715f353f9787d41d6c7d26de1ca4824e2b56752b6976c1584c",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointGhostSessionManager.cs",
+      "before_sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+      "after_sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointReadOnlyProbe.cs",
+      "before_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "after_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "unchanged": true
+    },
+    {
+      "file": "AutoFrameJointGeometryMath.cs",
+      "before_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "after_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "unchanged": true
+    }
+  ],
+  "working_status_listing_unchanged": true,
+  "scope_note": "UI was already untracked; status equality does not imply unchanged contents. Its before/after hashes are recorded in PATCH_AUDIT.json. Only the guarded UI target was written."
+}
