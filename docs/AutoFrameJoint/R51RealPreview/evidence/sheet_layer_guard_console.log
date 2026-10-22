@@ -1,0 +1,2 @@
+COM attached via PID moniker; pid=45240; no activation
+{"fixture":"CONNECTED_SECOND_LAYER_0_05_MM_BEHIND_INNER_SKIN","before_volume_m3":3.5050000000000005E-05,"check2":0,"check3_faults":0,"status":"UNVERIFIED_RULE","message":"UNVERIFIED_RULE: single-sheet overrun reaches additional material or a Bend; use a verified compound plan","expected_refusal_matched":true}

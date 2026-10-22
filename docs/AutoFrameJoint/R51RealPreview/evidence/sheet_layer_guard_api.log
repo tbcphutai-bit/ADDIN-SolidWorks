@@ -1,0 +1,4 @@
+[AFJ-BOOLEAN] operation=negative_fixture:connect_top code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=negative_fixture:connect_return code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=single_sheet:overrun_stock_guard code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=single_sheet:overrun_stock_guard code=0 name=swBodyOperationNoError

@@ -1,0 +1,110 @@
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-R51] source=profile-skin-cutter; MVID=62ad6a4d-20fd-42f5-b4c5-576cb3ebf366
+[AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-SOLVER] ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.
+[AFJ-R51] source=profile-skin-cutter; MVID=62ad6a4d-20fd-42f5-b4c5-576cb3ebf366
+[AFJ-SOLVER] PROFILE -> RULE -> PLAN A/B -> BOOLEAN -> VALIDATION
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.0025 R=0.0001
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-SOLVER] ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
