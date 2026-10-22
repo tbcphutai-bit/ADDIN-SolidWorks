@@ -1,0 +1,34 @@
+{
+  "compiler": "Visual Studio 18 Roslyn csc.exe",
+  "target": "standalone exe x64, C# 7.3, TRACE",
+  "main_addin_project_invoked": false,
+  "main_addin_output_written": false,
+  "checks": [
+    {
+      "output": "Final2354Smoke.exe",
+      "exit_code": 0,
+      "backend_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b",
+      "sources": [
+        "Final2354Smoke.cs",
+        "HarnessConnection.cs",
+        "GhostPreview.local.patched.cs",
+        "AutoFrameJointCommandEntry.cs",
+        "AutoFrameJointGeometryMath.cs",
+        "AutoFrameJointGhostSessionManager.cs",
+        "AutoFrameJointReadOnlyProbe.cs",
+        "AutoFrameJointSelectionPage.cs"
+      ]
+    },
+    {
+      "output": "Final2354BranchSmoke.exe",
+      "exit_code": 0,
+      "backend_sha256": "11b01b9852d70ce70373dbb4fb4c32edc0f421ab823b0e5c2652b258efca6b58",
+      "sources": [
+        "Final2354Smoke.cs",
+        "HarnessConnection.cs",
+        "GhostPreview.branch.patched.cs"
+      ]
+    }
+  ],
+  "compiler_diagnostics": "No diagnostics emitted by either final explicit-source compile; successful execution results recorded separately."
+}
