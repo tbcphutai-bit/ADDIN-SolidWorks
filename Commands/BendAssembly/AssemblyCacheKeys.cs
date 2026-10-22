@@ -59,7 +59,8 @@ namespace ADDIN.Commands.BendAssembly
         }
         internal static bool CatalogCurrent(ToolProfileLibrarySnapshot lib) => lib?.Current == true && lib.PlacementSources?.Current != false &&
             (lib.PlacementSources == null || lib.PlacementSources.Tools.All(t => t.MasterDatums?.Status != DatumEvidenceStatus.Stale && t.MappingReview?.Status != ToolReviewStatus.Stale &&
-                t.SeatingEvidence?.Status != ToolReviewStatus.Stale && t.HolderObstacles?.Current != false));
+                t.SeatingEvidence?.Status != ToolReviewStatus.Stale && t.HolderObstacles?.Current != false)) &&
+            (lib.PlacementSources?.LimitRules?.All(r=>r.ApplicabilityReview?.Status!=ToolReviewStatus.Stale) ?? true);
     }
     internal sealed class AssemblyGeometryBundle
     {

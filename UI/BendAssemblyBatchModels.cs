@@ -25,6 +25,16 @@ namespace ADDIN.UI
         public string StatusDisplay => Status == CollisionStatus.COLLISION ? "Có phương án va chạm*" : BendCheckDisplayText.Collision(Status);
         public string ManufacturingStatus => "CHƯA XÁC MINH";
         public string Reason { get; set; }
+        // These source-health fields are captured WITH the audited run projection.
+        // Catalog IDs are never interchangeable with loaded Punch/Holder geometry.
+        public string ToolSourceError { get; set; }
+        public string ToolSourceFingerprint { get; set; }
+        public int ToolCatalogCount { get; set; }
+        public int LoadedPunchCount { get; set; }
+        public int ReadyGeometryPairs { get; set; }
+        public int VerifiedMountingPairs { get; set; }
+        public int ExcelRuleCount { get; set; }
+        public bool HasCandidateCollision { get; set; }
         public string SourceKey { get; set; }
         public string SelectionKey => RawPartResult?.OccurrenceSetKey ?? SourceKey;
         public bool IsExpanded { get; set; }
@@ -135,6 +145,10 @@ namespace ADDIN.UI
         public string CombinedReason { get; set; }
         public AxialCollisionWitness PunchWitness { get; set; }
         public AxialCollisionWitness HolderWitness { get; set; }
+        public string PunchWitnessFrameId { get; set; }
+        public string HolderWitnessFrameId { get; set; }
+        public string PunchWitnessSourceSha256 { get; set; }
+        public string HolderWitnessSourceSha256 { get; set; }
 
         public override string ToString() => $"{ToolId} - Punch: {PunchStatusDisplay}, Holder: {HolderStatusDisplay}, Geom: {GeometricStatusDisplay}";
     }
@@ -288,6 +302,13 @@ namespace ADDIN.UI
                     Reason = !part.Current ? "SOURCE_INVALIDATED — cần chạy lại." : part.Reason ??
                         "Kết quả theo ứng viên; chưa xác minh sản xuất hoặc chọn dao cho toàn Part.",
                     SourceKey = part.SourceKey,
+                    ToolSourceError = read.ToolSourceError,
+                    ToolSourceFingerprint = read.ToolSourceFingerprint,
+                    ToolCatalogCount = read.CatalogCount,
+                    LoadedPunchCount = read.LoadedPunchCount,
+                    ReadyGeometryPairs = read.GeometryPairCount,
+                    VerifiedMountingPairs = read.VerifiedMountingPairCount,
+                    ExcelRuleCount = read.ExcelRuleCount,
                     RawPartResult = part.Source
                 };
 
@@ -317,12 +338,20 @@ namespace ADDIN.UI
                     });
                 }
 
-                // The backend currently exports IDs through candidates, but no
-                // native angle/radius DTO. Never invent IDs or dimensions.
-                var featureIds = part.BendCount == 0 ? new int[0] : part.StaticCandidates.Select(c => c.FeatureId)
-                    .Concat(part.ProcessCandidates.Select(c => c.FeatureId)).Distinct().OrderBy(id => id).ToArray();
+                // Native Check Min bend metadata wins over tool candidates. A bend
+                // must remain selectable even when there are zero source tools or
+                // collision queries. Unknown recognition is NOT a verified zero.
+                var nativeIds = part.Source.BendMetadata.Where(m=>m!=null && m.FeatureId>0)
+                    .Select(m=>m.FeatureId).Distinct().OrderBy(id=>id).ToArray();
+                var candidateIds = part.StaticCandidates.Select(c=>c.FeatureId)
+                    .Concat(part.ProcessCandidates.Select(c=>c.FeatureId))
+                    .Where(id=>id>0).Distinct().OrderBy(id=>id).ToArray();
+                var featureIds = part.BendCount==0 ? new int[0] :
+                    nativeIds.Length==part.BendCount ? nativeIds :
+                    nativeIds.Concat(candidateIds).Distinct().OrderBy(id=>id).ToArray();
                 if (featureIds.Length != part.BendCount)
-                    partVm.Reason += " Chưa có dữ liệu đầy đủ về FeatureId của các nếp chấn.";
+                    partVm.Reason += " UNRECOGNIZED_BEND_INVENTORY: có " + part.BendCount +
+                        " nếp báo cáo nhưng chỉ đối chiếu được " + featureIds.Length + " FeatureId.";
                 var staticByFeature = part.StaticCandidates.ToLookup(c => c.FeatureId);
                 var processByFeature = part.ProcessCandidates.ToLookup(c => c.FeatureId);
                 foreach (int featureId in featureIds)
@@ -340,6 +369,8 @@ namespace ADDIN.UI
 
                     var staticByTool = staticByFeature[featureId].ToLookup(c => c.ToolId, StringComparer.Ordinal);
                     var processByTool = processByFeature[featureId].ToLookup(c => c.ToolId, StringComparer.Ordinal);
+                    var availableEnvelopes = part.Source.ReviewEnvelopes.Where(e=>e?.Binding?.FeatureId==featureId).Take(2).ToArray();
+                    var verifiedEnvelope = availableEnvelopes.Length==1 ? availableEnvelopes[0] : null;
                     foreach (string toolId in CompanyToolIds.All)
                     {
                         var statics = staticByTool[toolId].ToArray();
@@ -353,8 +384,9 @@ namespace ADDIN.UI
 
                         var toolVm = new BatchToolCandidateViewModel
                         {
-                            CadAssembly = read.ToolPairs.SingleOrDefault(p=>p.Id==toolId),
-                            NativeEnvelope = part.Source.ReviewEnvelopes.SingleOrDefault(e=>e.Binding.FeatureId==featureId),
+                            CadAssembly = read.ToolPairs.Where(p=>p!=null && p.Id==toolId).Take(2).Count()==1 ?
+                                read.ToolPairs.First(p=>p!=null && p.Id==toolId) : null,
+                            NativeEnvelope = verifiedEnvelope,
                             ToolId = toolId,
                             FeatureId = featureId,
                             StaticSimulationOnly = part.SimulationOnly || staticCand?.SimulationOnly==true,
@@ -365,6 +397,10 @@ namespace ADDIN.UI
                             PunchClearanceMm = staticCand?.PunchResult?.CertifiedClearanceLowerMm,
                             HolderClearanceMm = staticCand?.HolderResult?.CertifiedClearanceLowerMm,
                             PunchWitness = staticCand?.PunchResult?.Witness, HolderWitness = staticCand?.HolderResult?.Witness,
+                            PunchWitnessFrameId = staticCand?.PunchResult?.FrameId,
+                            HolderWitnessFrameId = staticCand?.HolderResult?.FrameId,
+                            PunchWitnessSourceSha256 = staticCand?.PunchResult?.SourceSha256,
+                            HolderWitnessSourceSha256 = staticCand?.HolderResult?.SourceSha256,
                             PunchReason = staticCand?.PunchResult?.Reasons?.FirstOrDefault() ?? "chưa đủ bằng chứng mapping",
                             HolderReason = staticCand?.HolderResult?.Reasons?.FirstOrDefault() ?? "vị trí gá Holder chưa xác minh",
                             CombinedReason = !part.Current ? "SOURCE_INVALIDATED" : statics.Length > 1 || processes.Length > 1 ?
@@ -388,18 +424,22 @@ namespace ADDIN.UI
                         bendVm.ToolCandidates.Add(toolVm);
                     }
 
-                    bendVm.Status = bendVm.ToolCandidates.Any(t => t.GeometricStatus == CollisionStatus.COLLISION || t.ProcessStatus == CollisionStatus.COLLISION) ?
-                        CollisionStatus.COLLISION : bendVm.ToolCandidates.All(t => t.GeometricStatus == CollisionStatus.CLEAR && t.ProcessStatus == CollisionStatus.CLEAR) ?
-                        CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
+                    // Per-candidate tests are NOT an entire-bend feasibility proof.
+                    // Keep these facts inside ToolCandidates and technical details.
+                    bendVm.Status = CollisionStatus.UNKNOWN;
 
                     partVm.Bends.Add(bendVm);
                 }
 
-                partVm.Status = Aggregate(partVm.Bends.SelectMany(b => b.ToolCandidates).Select(t => t.GeometricStatus),
-                    partVm.Bends.Count == part.BendCount && part.BendCount > 0);
-                partVm.ProcessStatus = Aggregate(partVm.Bends.SelectMany(b => b.ToolCandidates).Select(t => t.ProcessStatus),
-                    partVm.Bends.Count == part.BendCount && part.BendCount > 0);
-                partVm.Reason += " Quá trình: " + partVm.ProcessStatus + "; sản xuất: CHƯA XÁC MINH.";
+                partVm.HasCandidateCollision = partVm.Bends.SelectMany(b=>b.ToolCandidates)
+                    .Any(t=>t.GeometricStatus==CollisionStatus.COLLISION || t.ProcessStatus==CollisionStatus.COLLISION);
+                // A failed single tool is not an impossible Part; all candidate
+                // CLEAR values are still not one complete verified bend sequence.
+                partVm.Status = CollisionStatus.UNKNOWN;
+                partVm.ProcessStatus = CollisionStatus.UNKNOWN;
+                partVm.Reason += partVm.HasCandidateCollision ?
+                    " Có ứng viên va chạm (xem Bộ dao); chưa kết luận khả năng chấn toàn Part." :
+                    " Chưa xác minh đầy đủ trình tự, Excel MAX và sản xuất.";
 
                 result.Add(partVm);
             }

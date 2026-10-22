@@ -86,6 +86,91 @@ namespace ADDIN.Commands.BendPlacement
         internal void Invalidate(){MasterDatums?.Invalidate();HolderObstacles?.Invalidate();SeatingEvidence.Invalidate();MappingReview.Invalidate();}
     }
     internal enum BendLimitKind { MaxBendLength, DeepBendClearanceExample }
+
+    // Conditions in an externally signed Excel case. This is an applicability
+    // envelope, NOT a value measured from a picture or a candidate tool pose.
+    internal sealed class BendExcelCaseConditions
+    {
+        public string MachineSystem { get; }
+        public string MaterialCode { get; }
+        public string SectionKind { get; }
+        public double? ThicknessMinMm { get; }
+        public double? ThicknessMaxMm { get; }
+        public double? AngleMinDeg { get; }
+        public double? AngleMaxDeg { get; }
+        public double? WMinMm { get; }
+        public double? WMaxMm { get; }
+        public double? LMinMm { get; }
+        public double? LMaxMm { get; }
+        internal BendExcelCaseConditions(BendLimitSelection s)
+        {
+            MachineSystem=s?.MachineSystem;MaterialCode=s?.MaterialCode;SectionKind=s?.SectionKind;
+            ThicknessMinMm=s?.ThicknessMinMm;ThicknessMaxMm=s?.ThicknessMaxMm;
+            AngleMinDeg=s?.AngleMinDeg;AngleMaxDeg=s?.AngleMaxDeg;
+            WMinMm=s?.WMinMm;WMaxMm=s?.WMaxMm;LMinMm=s?.LMinMm;LMaxMm=s?.LMaxMm;
+        }
+        private static bool Range(double? lo,double? hi,bool positive)
+        {
+            return lo.HasValue && hi.HasValue && ToolPoint.Finite(lo.Value) && ToolPoint.Finite(hi.Value) &&
+                lo.Value<=hi.Value && (!positive || lo.Value>0);
+        }
+        public bool Complete => !string.IsNullOrWhiteSpace(MachineSystem) && !string.IsNullOrWhiteSpace(MaterialCode) &&
+            !string.IsNullOrWhiteSpace(SectionKind) &&
+            Range(ThicknessMinMm,ThicknessMaxMm,true) && Range(AngleMinDeg,AngleMaxDeg,false) &&
+            Range(WMinMm,WMaxMm,true) && Range(LMinMm,LMaxMm,true);
+        private static string N(double? d)=>d.HasValue?ToolEvidenceCanonical.Number(d.Value):"MISSING";
+        public string Binding => Complete ? ToolEvidenceCanonical.Hash("ExcelCaseConditionsV1",MachineSystem,MaterialCode,SectionKind,
+            N(ThicknessMinMm),N(ThicknessMaxMm),N(AngleMinDeg),N(AngleMaxDeg),
+            N(WMinMm),N(WMaxMm),N(LMinMm),N(LMaxMm)) : null;
+    }
+    internal sealed class BendExcelObservation
+    {
+        // Populated ONLY from one current native model/source + real measurement.
+        internal string ToolId,MachineSystem,MaterialCode,SectionKind;
+        internal double? ThicknessMm,AngleDeg,Wmm,Lmm,BendLengthMm;
+        internal bool Current;
+        internal bool Complete => Current && !string.IsNullOrWhiteSpace(ToolId) &&
+            !string.IsNullOrWhiteSpace(MachineSystem) && !string.IsNullOrWhiteSpace(MaterialCode) &&
+            !string.IsNullOrWhiteSpace(SectionKind) && new[]{ThicknessMm,AngleDeg,Wmm,Lmm,BendLengthMm}
+                .All(x=>x.HasValue&&ToolPoint.Finite(x.Value)) && ThicknessMm>0 && Wmm>0 && Lmm>0 && BendLengthMm>0;
+    }
+    internal enum BendExcelCaseApplicability { MATCH_UNRESOLVED, MATCH_CONFIRMED, NOT_APPLICABLE_CONFIRMED }
+    internal sealed class BendExcelCaseResult
+    {
+        internal BendExcelCaseApplicability Applicability {get;}
+        internal bool? ExceedsCertifiedLength {get;}
+        internal string Evidence {get;}
+        internal BendExcelCaseResult(BendExcelCaseApplicability state,bool? exceeded,string evidence)
+        {Applicability=state;ExceedsCertifiedLength=exceeded;Evidence=evidence;}
+    }
+    internal static class BendExcelCaseMatcher
+    {
+        private static bool InRange(double v,double lo,double hi) => v>=lo && v<=hi;
+        internal static BendExcelCaseResult Evaluate(BendLimitRuleDraft rule,BendExcelObservation measured)
+        {
+            if(rule==null||rule.ReferenceOnly||rule.Kind!=BendLimitKind.MaxBendLength||
+                !rule.FamilyMappingVerified||rule.ApprovedConditions?.Complete!=true||!rule.ValueMm.HasValue)
+                return new BendExcelCaseResult(BendExcelCaseApplicability.MATCH_UNRESOLVED,null,"UNAPPROVED_OR_REFERENCE_EXCEL_RULE");
+            if(measured?.Complete!=true)
+                return new BendExcelCaseResult(BendExcelCaseApplicability.MATCH_UNRESOLVED,null,"MISSING_NATIVE_EXCEL_APPLICABILITY_MEASUREMENTS");
+            var c=rule.ApprovedConditions;
+            bool applies=rule.ToolIds.Contains(measured.ToolId,StringComparer.OrdinalIgnoreCase) &&
+                string.Equals(c.MachineSystem,measured.MachineSystem,StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(c.MaterialCode,measured.MaterialCode,StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(c.SectionKind,measured.SectionKind,StringComparison.OrdinalIgnoreCase) &&
+                InRange(measured.ThicknessMm.Value,c.ThicknessMinMm.Value,c.ThicknessMaxMm.Value) &&
+                InRange(measured.AngleDeg.Value,c.AngleMinDeg.Value,c.AngleMaxDeg.Value) &&
+                InRange(measured.Wmm.Value,c.WMinMm.Value,c.WMaxMm.Value) &&
+                InRange(measured.Lmm.Value,c.LMinMm.Value,c.LMaxMm.Value);
+            string evidence=rule.WorkbookSha256+"/"+rule.Sheet+"!"+rule.Locator+"/"+rule.Id;
+            if(!applies)return new BendExcelCaseResult(BendExcelCaseApplicability.NOT_APPLICABLE_CONFIRMED,null,evidence);
+            // This checks certified machine-supported bend-line length only.
+            // It never pretends the Excel 4200/6000 values are flange heights.
+            return new BendExcelCaseResult(BendExcelCaseApplicability.MATCH_CONFIRMED,
+                measured.BendLengthMm.Value>rule.ValueMm.Value,evidence);
+        }
+    }
+
     internal sealed class BendLimitRuleDraft
     {
         public string Id { get; }
@@ -97,17 +182,26 @@ namespace ADDIN.Commands.BendPlacement
         public string ObjectSha256 { get; }
         public string Unit { get; }
         public double? ValueMm { get; }
-        public bool FamilyMappingVerified => false;
-        public bool ReferenceOnly => true;
+        public ToolReviewValidation ApplicabilityReview { get; }
+        public BendExcelCaseConditions ApprovedConditions { get; }
+        public bool FamilyMappingVerified => Kind==BendLimitKind.MaxBendLength && ApplicabilityReview?.Status==ToolReviewStatus.VerifiedExternalRecord &&
+            ApprovedConditions?.Complete==true && Reasons.Count==0;
+        public bool ReferenceOnly => !FamilyMappingVerified;
         public IReadOnlyList<string> ToolIds { get; }
         public IReadOnlyList<string> Reasons { get; }
-        internal BendLimitRuleDraft(string id,string family,BendLimitKind kind,string sha,string sheet,string locator,string objectSha,string unit,double? value,IEnumerable<string> ids,IEnumerable<string> reasons)
-        {Id=id;FamilyId=family;Kind=kind;WorkbookSha256=sha;Sheet=sheet;Locator=locator;ObjectSha256=objectSha;Unit=unit;ValueMm=value;ToolIds=PlacementLists.Copy(ids);Reasons=PlacementLists.Reasons(reasons);}
+        internal BendLimitRuleDraft(string id,string family,BendLimitKind kind,string sha,string sheet,string locator,string objectSha,string unit,double? value,IEnumerable<string> ids,IEnumerable<string> reasons,
+            ToolReviewValidation applicabilityReview=null,BendExcelCaseConditions approvedConditions=null)
+        {Id=id;FamilyId=family;Kind=kind;WorkbookSha256=sha;Sheet=sheet;Locator=locator;ObjectSha256=objectSha;Unit=unit;ValueMm=value;
+            ToolIds=PlacementLists.Copy(ids);Reasons=PlacementLists.Reasons(reasons);
+            ApplicabilityReview=applicabilityReview??ToolReviewValidation.Missing("EXCEL_CASE_NOT_APPROVED");
+            ApprovedConditions=approvedConditions;}
     }
     internal sealed class PlacementSourceSnapshot
     {
         private readonly PlacementLease lease=new PlacementLease();
-        public bool Current => lease.Current;
+        // A once-signed Excel rule expires dynamically, not only when a JSON
+        // file is reloaded. Invalidate the whole held source snapshot on expiry.
+        public bool Current => lease.Current && LimitRules.All(r=>r.ApplicabilityReview?.Status!=ToolReviewStatus.Stale);
         public string Status => "CHUA_XAC_MINH";
         public string Fingerprint { get; }
         public IReadOnlyList<ToolAssemblyProfile> Tools { get; }

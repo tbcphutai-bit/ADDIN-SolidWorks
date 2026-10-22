@@ -34,7 +34,8 @@ namespace ADDIN.Commands.BendPlacement
                 string root=Path.GetDirectoryName(Path.GetFullPath(configurationPath));
                 var master=BendMasterAssemblyReader.Read(PlacementSourceIo.Resolve(root,c.MasterPath),PlacementSourceIo.Resolve(root,c.MasterManifestPath),PlacementSourceIo.Resolve(root,c.MasterDatumEvidencePath),token,
                     PlacementSourceIo.Resolve(root,c.HolderEvidencePath),PlacementSourceIo.Resolve(root,c.PairSeatingEvidencePath),PlacementSourceIo.Resolve(root,c.ReviewAuthoritiesPath),PlacementSourceIo.Resolve(root,c.ReviewWorkspacePath));
-                var limits=BendLimitWorkbookReader.Read(PlacementSourceIo.Resolve(root,c.LimitWorkbookPath),PlacementSourceIo.Resolve(root,c.LimitManifestPath),token);
+                var limits=BendLimitWorkbookReader.Read(PlacementSourceIo.Resolve(root,c.LimitWorkbookPath),
+                    PlacementSourceIo.Resolve(root,c.LimitManifestPath),token,PlacementSourceIo.Resolve(root,c.ReviewAuthoritiesPath));
                 return new PlacementSourceSnapshot(PlacementSourceIo.Hash(PlacementSourceIo.Hash(bytes)+master.Fingerprint+limits.Fingerprint),master.Tools,limits.Rules,master.Reasons.Concat(limits.Reasons));
             }
             catch(OperationCanceledException){throw;}
