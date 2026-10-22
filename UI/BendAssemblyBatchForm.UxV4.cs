@@ -274,9 +274,10 @@ namespace ADDIN.UI
             try { current=settings.Load(); }
             catch(Exception ex)
             {
-                MessageBox.Show(this,"Không đọc được cấu hình hiện có: "+ex.Message,
-                    "Nguồn dao DXF",MessageBoxButtons.OK,MessageBoxIcon.Warning);
-                return;
+                if(MessageBox.Show(this,"Cấu hình nguồn hiện tại không đọc được: "+ex.Message+
+                    "\nBạn có muốn chọn nguồn mới? File cũ sẽ được sao lưu trước khi lưu lựa chọn.",
+                    "Khôi phục cấu hình nguồn dao",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)!=DialogResult.Yes)return;
+                current=new ToolProfileSourceConfiguration();
             }
             var proposed=new ToolProfileSourceConfiguration {
                 Version=1, DirectoryPath=current.DirectoryPath,
@@ -289,6 +290,15 @@ namespace ADDIN.UI
             {
                 if(folder.ShowDialog(this)!=DialogResult.OK)return;
                 proposed.DirectoryPath=folder.SelectedPath;
+            }
+            if(proposed.UseMasterPairsAsLibrary)
+            {
+                var mode=MessageBox.Show(this,
+                    "Cấu hình cũ đang dùng cặp CAD theo PlacementConfig, không dùng trực tiếp thư mục DXF.\n"+
+                    "Yes: chuyển sang thư viện DXF vừa chọn. No: tiếp tục cặp CAD theo PlacementConfig.",
+                    "Chọn đúng chế độ nguồn",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question);
+                if(mode==DialogResult.Cancel)return;
+                if(mode==DialogResult.Yes)proposed.UseMasterPairsAsLibrary=false;
             }
             var manifestChoice=MessageBox.Show(this,
                 "Có manifest JSON đã duyệt cho Punch và Holder không?\nYes: chọn file. No: dùng quy ước mặc định, có thể thiếu Holder.",
