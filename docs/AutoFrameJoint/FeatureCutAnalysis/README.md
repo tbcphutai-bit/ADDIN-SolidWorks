@@ -1,5 +1,7 @@
 # Auto Frame Joint — Native Feature Cut Analysis
 
+> **Cập nhật nghiên cứu 2026-10-22:** Đã có 42 Cut before/after, 28 replay oracle và quy tắc tham số U đối chiếu 8 góc T1/T2. Các nhận định “chưa có before/after/mapping” bên dưới là trạng thái lịch sử của lần trích xuất API đầu tiên. Xem [nghiên cứu mới](11_PARAMETRIC_RULE_RESEARCH/README.md), [matrix](11_PARAMETRIC_RULE_RESEARCH/TEST_MATRIX.csv) và [giới hạn](11_PARAMETRIC_RULE_RESEARCH/05_TEST_RESULTS_AND_LIMITATIONS.md). Dữ liệu API đã xác minh trước được giữ nguyên; source solver nằm ở branch riêng.
+
 Đã kết nối phiên SOLIDWORKS hiện có qua COM ngoài sandbox và đọc thành công **15/15 Part**, **503 mục top-level**, **43 Cut-Extrude thật**. Trong 43 Cut có 28 `Cut` và 15 `ICE` có legacy type `Cut`; không dùng tên hiển thị để đoán loại lệnh. Không có Part thiếu Feature Tree trong 15 nguồn này.
 
 | Chỉ số | Kết quả |
