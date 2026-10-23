@@ -1,0 +1,18 @@
+{
+  "log_sha256": "c2e59b9622f24f02186e1edcacc85087a46897fcf7bc37f869336400dc35ccae",
+  "loaded_r53_marker": true,
+  "loaded_mvid": "71279ae1-72e7-4f90-9a36-d8c03e0e0ddd",
+  "frame_a_count": 1,
+  "frame_b_count": 0,
+  "selection_revision_at_close": 2,
+  "validated_revision_at_close": 0,
+  "b_submit_events": 0,
+  "b_list_events": 0,
+  "preview_callback_begin_events": 0,
+  "native_apply_entry_events": 0,
+  "observed_exception": "Auto Frame Joint is finishing the current Preview",
+  "source_exception_hresult": 1,
+  "process_exit_hex": "0xffffffff",
+  "process_termination_cause": "UNVERIFIED: log does not distinguish debugger termination from native fault",
+  "evidence_scope": "User supplied log; no assumptions about attempted B clicks"
+}

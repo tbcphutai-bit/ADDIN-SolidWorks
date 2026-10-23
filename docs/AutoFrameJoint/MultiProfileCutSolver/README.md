@@ -1,3 +1,5 @@
+> **R54 — sửa lỗi đóng trang A-only:** đã cập nhật trực tiếp class SelectionPage, xem [bản sửa và kiểm tra callback](R54/README.md). Người dùng tự Rebuild; chưa xác nhận native PMP sau Rebuild.
+
 > **R53 — 2026-10-23:** source chính đã tích hợp writer Sketch gắn Face, không tạo Plane mới; hai ca native đã chạy với đúng source. Xem [báo cáo và giới hạn R53](R53/README.md). Các kết quả lịch sử dưới đây được giữ nguyên.
 
 # Auto Frame Joint: folded profiles and native Sketch research

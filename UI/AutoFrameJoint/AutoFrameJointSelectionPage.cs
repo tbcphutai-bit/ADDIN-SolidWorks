@@ -48,7 +48,9 @@ namespace ADDIN.UI.AutoFrameJoint
         private readonly Action onClearPreview;
         private readonly Func<Component2, Component2, string> onApplyCut;
         private int closeReason;
-        private int selectionRevision, committedSelectionRevision;
+        private int selectionRevision, committedSelectionRevision, observedSelectionRevision;
+        private bool currentPairValidated, applyOnCloseReady;
+        private string applyCloseSkipReason;
         private Component2 applyA, applyB;
         private readonly Action<AutoFrameJointSelectionPage> onClosed;
 
@@ -179,6 +181,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 Trace.WriteLine("[AFJ-R52-CAPTION] status_channel=PAGE_MESSAGE no_runtime_label_writes=True");
                 TraceFlow("SHOW", "source=R52 MVID=" + typeof(AutoFrameJointSelectionPage).Assembly.ManifestModule.ModuleVersionId + " preview_callback=" + (onPreviewCut != null));
                 Trace.WriteLine("[AFJ-R50] SHOW epoch=" + pageEpoch + " owner=" + ownerThreadId);
+                Trace.WriteLine("[AFJ-R54] CLOSE_POLICY=ALLOW_TEARDOWN_VALID_PAIR_ONLY MVID="+typeof(AutoFrameJointSelectionPage).Assembly.ManifestModule.ModuleVersionId);
                 UpdateReadyState();
                 QueueInitialFocus();
             }
@@ -588,6 +591,7 @@ namespace ADDIN.UI.AutoFrameJoint
         {
             RequireDeferredSelectionRead();
             int readRevision=selectionRevision;
+            currentPairValidated=false;
             a = null;
             b = null;
             if (!IsSameDocumentActive())
@@ -598,6 +602,12 @@ namespace ADDIN.UI.AutoFrameJoint
 
             a = Selected(MarkFrameA);
             b = Selected(MarkFrameB);
+            if(readRevision!=selectionRevision)
+            { reason="Lựa chọn vừa đổi; hãy chờ cập nhật Frame A/B."; return false; }
+            // A stable A-only/empty snapshot is processed input, not pending work.
+            // It is deliberately separate from a validated, complete pair.
+            observedSelectionRevision=readRevision;
+            TraceFlow("SELECTION_SNAPSHOT", "observed="+observedSelectionRevision+" pair_present="+(a!=null&&b!=null));
             if (a == null || b == null)
             {
                 reason = a == null
@@ -633,6 +643,7 @@ namespace ADDIN.UI.AutoFrameJoint
             if(readRevision!=selectionRevision)
             { reason="Lựa chọn vừa đổi; hãy chờ cập nhật Frame A/B."; return false; }
             committedSelectionRevision=readRevision;
+            currentPairValidated=true;
             reason = deepCheck
                 ? "Hai Part hợp lệ để phân tích sơ bộ."
                 : "Đã chọn 2 Component — nhấn Phân tích.";
@@ -899,26 +910,29 @@ namespace ADDIN.UI.AutoFrameJoint
         public void OnClose(int reason)
         {
             TraceFlow("CLOSE", "reason=" + reason);
-            if (reason == (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay &&
-                (IsBackendBusy() || backendActionQueued ||
-                 (onApplyCut != null && selectionRevision != committedSelectionRevision)))
-            {
-                // S_FALSE is the documented managed PMP close deferral. Managed
-                // state only here; the active backend's finally posts Close later.
-                finishRequested=true; requestAutoAnalysis=false; requestFocusB=false;
-                TraceFlow("APPLY_CLOSE_WAIT", "retained OK intent; selectionRevision="+selectionRevision+" committed="+committedSelectionRevision);
-                TryQueueFinish(); // Managed dispatcher post only; no native selection read here.
-                throw new COMException("Auto Frame Joint is finishing the current Preview", 1);
-            }
-            closeReason = reason;
-            applyA = committedA;
-            applyB = committedB;
-            // Invalidate queued work BEFORE any native controls are released.
-            finishRequested = false; finishQueued = false;
-            closing = true;
-            nativeActivated = false;
+            if(closing || closeNotified) { TraceFlow("CLOSE_DUPLICATE", "already captured"); return; }
+            // Managed state only. Always allow native teardown; do not throw a
+            // close-veto COMException for incomplete selection or pending work.
+            bool okay=reason==(int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay;
+            bool idle=!IsBackendBusy()&&!backendActionQueued;
+            bool complete=currentPairValidated&&committedA!=null&&committedB!=null;
+            bool current=selectionRevision==committedSelectionRevision;
+            applyOnCloseReady=okay&&onApplyCut!=null&&idle&&complete&&current;
+            applyCloseSkipReason=!okay?"CANCEL_OR_OTHER_CLOSE":onApplyCut==null?"NO_APPLY_CALLBACK":
+                !complete?"INCOMPLETE_OR_INVALID_PAIR":!current?"SELECTION_CHANGED":
+                !idle?"BACKEND_BUSY_OR_QUEUED":"NONE";
+            closeReason=reason;
+            applyA=applyOnCloseReady?committedA:null;
+            applyB=applyOnCloseReady?committedB:null;
+            finishRequested=false; finishQueued=false;
+            requestAutoAnalysis=false; requestFocusB=false;
+            closing=true;
+            nativeActivated=false;
             System.Threading.Interlocked.Increment(ref pageEpoch);
-            Trace.WriteLine("[AFJ-APPLY] CLOSING reason=" + reason + " epoch=" + pageEpoch + "; defer apply until AfterClose");
+            Trace.WriteLine("[AFJ-R54] CLOSE no_exception=True apply_eligible="+applyOnCloseReady+
+                " skip="+applyCloseSkipReason+" revision="+selectionRevision+
+                " observed="+observedSelectionRevision+" validated="+committedSelectionRevision);
+            Trace.WriteLine("[AFJ-APPLY] CLOSING reason="+reason+" epoch="+pageEpoch+"; eligible apply deferred until AfterClose");
         }
 
         public void AfterClose()
@@ -951,17 +965,18 @@ namespace ADDIN.UI.AutoFrameJoint
             geometryRoleLabel = null;
             try
             {
-                if (closeReason == (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay && onApplyCut != null)
+                if (applyOnCloseReady && closeReason == (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay && onApplyCut != null && applyA != null && applyB != null)
                 {
                     TraceFlow("APPLY_CALLBACK_BEGIN", "closed page; no native controls retained");
                     string result = onApplyCut(applyA, applyB);
                     TraceFlow("APPLY_CALLBACK_END", result ?? "No apply result");
                 }
+                else Trace.WriteLine("[AFJ-R54] APPLY_SKIPPED reason="+(applyCloseSkipReason??"NO_CAPTURED_ELIGIBLE_PAIR"));
             }
             catch (Exception ex) { TraceUiFault("apply after close", ex, false); }
             finally
             {
-                applyA=null; applyB=null;
+                applyA=null; applyB=null; applyOnCloseReady=false;
                 try { if (onClearPreview != null) onClearPreview(); }
                 catch (Exception ex) { TraceUiFault("preview cleanup", ex, false); }
                 try { if (onClosed != null) onClosed(this); }
@@ -1016,7 +1031,7 @@ namespace ADDIN.UI.AutoFrameJoint
             {
                 TraceFlow("LIST_ENTER", "box=" + id + " count=" + count);
                 if (id != BoxFrameA && id != BoxFrameB) { TraceFlow("LIST_REJECT", "unknown box"); return; }
-                selectionRevision++; // Managed invalidation, including count-one replacement.
+                selectionRevision++; currentPairValidated=false; // Managed invalidation, including count-one replacement.
                 if (id == BoxFrameA) { callbackCountA = count; if (count != 1) { committedA = null; committedNameA = null; } }
                 else { callbackCountB = count; if (count != 1) { committedB = null; committedNameB = null; } }
                 QueueSelectionRefresh(id == BoxFrameA && count == 1, id == BoxFrameB && count == 1);
@@ -1063,6 +1078,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 // then again before every action. Never clear/re-mark inline.
                 if (String.IsNullOrWhiteSpace(itemText)) itemText = id == BoxFrameA ? "Frame A" : "Frame B";
                 selectionRevision++;
+                currentPairValidated=false;
                 accepted = true;
                 reason = "ACCEPT_FILTERED_PENDING_DEFERRED_IDENTITY";
                 return true;
