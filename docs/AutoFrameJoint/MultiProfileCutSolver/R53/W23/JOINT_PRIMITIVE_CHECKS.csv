@@ -1,0 +1,14 @@
+pair,observation,value,unit,scope
+fr2 × fr3,Pair axes orthogonal,2.081668171172168e-16,absolute dot,API inputs + offline arithmetic
+fr2 × fr3,Cut 586 ↔ Cut 578 diagonal line residual,1.0885796387569147e-12,mm,Projected Sketch line only; not B-rep clearance
+fr2 × fr3,Diagonal segment overlap,49.21463197058351,mm,Projected Sketch segments
+fr2 × fr3,Main diagonal unoriented angle,135.00000000000028,degrees,Relative to Assembly X
+fr2 × fr3,Parallel shoulder separation,0.09999999999911469,mm,Sketch boundary separation; not whole Assembly minimum gap
+fr2 × fr3,Parallel vertical step separation,0.09999999999976694,mm,Sketch boundary separation
+fr2 × fr3,fr3 shoulder length,26.100000000000456,mm,Equals 65 − 39 + 0.1 numerically
+fr2 × fr3,65 mm Web candidate alignment,1.0,absolute dot,Pair-axis plane criterion
+fr2 × fr3,230 mm alternate candidate alignment,1.729580572113002e-16,absolute dot,Alternate strip outside joint plane
+fr3 × fr4,Pair axes orthogonal,1.5265566588595905e-16,absolute dot,API inputs + offline arithmetic
+fr3 × fr4,Cut 586 ↔ Cut 611 diagonal line residual,3.8798174742393776e-13,mm,Projected Sketch line only
+fr3 × fr4,Main diagonal unoriented angle,59.13032837786929,degrees,Requires third-component context
+fr3/fr4 ↔ ft1,Cut 957 / Cut 906 maximum distance to ft1 local X=0 plane,3.4694469519536137e-13,mm,Three trim line segments transformed from API

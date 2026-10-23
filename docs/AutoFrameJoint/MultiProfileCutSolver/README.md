@@ -1,3 +1,5 @@
+> **R53 — 2026-10-23:** source chính đã tích hợp writer Sketch gắn Face, không tạo Plane mới; hai ca native đã chạy với đúng source. Xem [báo cáo và giới hạn R53](R53/README.md). Các kết quả lịch sử dưới đây được giữ nguyên.
+
 # Auto Frame Joint: folded profiles and native Sketch research
 
 **Source and report snapshot — 2026-10-22.** The source audit is complete for commit `90876693d34fbaf6b13f0570b548ba7f6b946547` on `feat/afj-multi-profile-cut-preview-20261022`: three existing classes were patched against the exact local/branch baselines, while the UI, project, installed DLL and PDB were preserved. See [SOURCE_VERIFICATION.json](SOURCE_VERIFICATION.json). The main DLL has not been rebuilt or deployed. Native copy-harness evidence remains distinct from an installed Add-in interaction.
