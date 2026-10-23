@@ -53,7 +53,7 @@ The full eight-vertex cover Sketch is a separate experiment. [U_COVER_MASTER_TRI
 
 ## Native constrained U milestones (2026-10-23)
 
-These later experiments preserve the earlier legacy failures. They use disposable copies of the actual 2354 fr03/fr04 pair; no original CAD, Add-in DLL/PDB or project configuration was changed.
+These later geometry experiments preserve the earlier legacy failures and use disposable copies of the actual 2354 fr03/fr04 pair. Their source hash results are scoped per run. A later, separate original-source Pack and Go attempt detected an unexpected Assembly hash change; see [the source preservation incident](SOURCE_HASH_INCIDENT20261023.md). No Add-in DLL/PDB or project configuration was changed.
 
 | Gate | Native observation | Scope |
 | --- | --- | --- |
@@ -69,3 +69,13 @@ The two parameters are `AFJ_AssemblyFitGap` and the shared `AFJ_ToolClosureMargi
 [Full master/loser milestones](U_NATIVE_MILESTONES_README.md), [machine-readable matrix](U_NATIVE_MILESTONES.json), [four-Cut JSON](U_FOUR_CUT_ROUNDTRIP.json) and accompanying CSV/source manifests record the precise evidence. Earlier width trials1/2 remain failed measurements; trial3 measures both endpoint sets and is the qualified follow test. Four-Cut trial1 remains a harness logging failure before any Cut; trial2 is the completed native roundtrip.
 
 The installed Part-open hang remains **UNVERIFIED**. A new native Sketch/transaction wrapper and controlled-failure rollback need separate qualification before the production U route changes. A successful copy harness is not an installed Add-in test or proof of visible Preview.
+
+## Delivery checkpoint and source preservation incident (2026-10-23)
+
+The constrained U writer has a completed four-Cut copy roundtrip, but its production route remains disabled. The latest strict transaction test created four constrained Sketches and completed only two Cuts before `0x80010105` in native Feature traversal. Rollback was unverified and recorded no Delete calls. Copies were closed without Save, with that run's frozen source/copy hashes unchanged. See [final delivery checkpoint](FINAL_DELIVERY20261023.md) and [JSON](FINAL_DELIVERY20261023.json).
+
+The separate Pack and Go attempt changed the original Assembly hash despite Read-Only API observations. The user confirmed no Save action; five original Parts remained unchanged. The cause is unverified and no exact backup restoration was performed. See [source incident](SOURCE_HASH_INCIDENT20261023.md) and [JSON](SOURCE_HASH_INCIDENT20261023.json). No global claim that all original CAD stayed unchanged is made.
+
+## Source package for immediate review
+
+[The full gated source candidate](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/tree/feat/afj-multi-profile-cut-preview-20261022/research/AutoFrameJoint/ConstrainedUWriter20261023) is published on the source PR branch in `research/`, outside the main project Compile items. It includes the constrained writer, pair transaction, strict journal, integration patch, compile scope and source hashes. It is **not installed or enabled**; the default gate rejects U Apply if that candidate is integrated unchanged. Existing production source remains unchanged. This package must not be copied over a different local baseline.

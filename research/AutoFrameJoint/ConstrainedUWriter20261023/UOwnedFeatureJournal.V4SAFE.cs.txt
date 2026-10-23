@@ -1,0 +1,737 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Web.Script.Serialization;
+using System.Security.Cryptography;
+using System.Text;
+using System.Globalization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    // Detached native probe helper only. It never starts Undo, saves, reloads,
+    // rebuilds or deploys an Add-in. Caller owns all native execution/timeouts.
+    internal sealed class AfjUOwnedFeatureJournal
+    {
+        internal sealed class FeatureInfo
+        {
+            public long Sequence;
+            public string Document, Kind, Name, Role;
+            public int Id;
+            public bool TokenCaptured, Removed;
+        }
+        internal sealed class DeletionInfo
+        {
+            public string Document, Kind, Name, Status;
+            public int Id, Options;
+            public int[] DisappearedOwnedIds;
+        }
+        internal sealed class DependentInfo
+        {
+            public string Document, Kind, Name, Evidence;
+            public int Id;
+            public bool Owned, Protected;
+        }
+        internal sealed class RollbackReport
+        {
+            public string Status = "NOT_STARTED", Error;
+            public bool Verified, AssemblyContextRestored, ProtectedFeaturesPreserved;
+            public bool OriginalTreesAndSuppressionRestored, ZeroOwnedFeaturesRemain;
+            public bool SaveApiCalled = false;
+            public string DirtyFlagQualification = "NOT_QUALIFIED_NOT_CLEARED";
+            public string UndoStackQualification = "NOT_QUALIFIED_NO_UNDO_CALLED";
+            public double BodyDifferenceA = Double.NaN, BodyDifferenceB = Double.NaN;
+            public double BodyTolerance = 1e-12;
+            public bool DirtyA, DirtyB, DirtyAssembly;
+            public readonly List<DeletionInfo> Deletions = new List<DeletionInfo>();
+            public readonly List<DependentInfo> BlockingDependents = new List<DependentInfo>();
+            public readonly List<FeatureInfo> Owned = new List<FeatureInfo>();
+        }
+        internal sealed class Checkpoint
+        {
+            internal readonly object Scope;
+            internal readonly object Snapshot;
+            internal readonly long JournalSequence;
+            internal Checkpoint(object scope, object snapshot, long sequence)
+            { Scope = scope; Snapshot = snapshot; JournalSequence = sequence; }
+        }
+        private sealed class Node
+        {
+            internal Feature Feature;
+            internal int Id, Order;
+            internal string Type, Kind, Name, ParentPath;
+            internal bool Suppressed;
+            // Baseline holder identity is retained privately for diagnostics.
+            // It is never serialized or accepted as deletion authority.
+            internal byte[] PrivateBaselineHolderToken;
+            internal string BaselineHolderTokenStatus;
+            internal Dictionary<string, object> PrivateBaselineHolderProbe;
+            internal Dictionary<string, object> PrivateBaselineReferenceProbe;
+        }
+        private sealed class Snapshot
+        {
+            internal readonly Dictionary<int, Node> Nodes = new Dictionary<int, Node>();
+            internal readonly List<int> Order = new List<int>();
+        }
+        private sealed class Scope
+        {
+            internal ModelDoc2 Document;
+            internal string Label, PrivatePath;
+            internal Snapshot Baseline;
+            internal Body2 Before;
+        }
+        private sealed class Entry
+        {
+            internal Scope Scope;
+            internal int Id;
+            internal long Sequence;
+            internal string Kind, Name, Role;
+            internal byte[] PrivateToken;
+            internal bool Removed;
+        }
+        private readonly ISldWorks App;
+        private readonly ModelDoc2 Assembly;
+        private readonly Scope[] Scopes;
+        private readonly List<Entry> Entries = new List<Entry>();
+        private readonly Action<string> StageSink;
+        private readonly List<Dictionary<string, object>> PrivateReadDiagnostics = new List<Dictionary<string, object>>();
+        private long Sequence;
+        private bool RollingBack;
+        private const int MaxNodes = 2400, MaxDepth = 16, MaxRelations = 2400, MaxParents = 512;
+
+        internal AfjUOwnedFeatureJournal(ISldWorks app, ModelDoc2 assembly,
+            ModelDoc2 partA, ModelDoc2 partB, Body2 beforeA, Body2 beforeB,
+            Action<string> stageSink = null)
+        {
+            Need(app != null && assembly != null && partA != null && partB != null, "Bound documents required");
+            App = app; Assembly = assembly; StageSink = stageSink;
+            Need(!Same(partA, partB) && !Same(partA, assembly) && !Same(partB, assembly), "Three independent bound documents required");
+            RequireAssemblyContext();
+            Scopes = new[] {
+                NewScope(partA, "A", beforeA),
+                NewScope(partB, "B", beforeB),
+                NewScope(assembly, "ASSEMBLY", null)
+            };
+            Mark("BASELINES_CAPTURED");
+        }
+        private Scope NewScope(ModelDoc2 doc, string label, Body2 before)
+        {
+            Need(doc.GetActiveSketch2() == null, "No preexisting active Sketch allowed in journal baseline");
+            var scope = new Scope { Document = doc, Label = label, PrivatePath = doc.GetPathName() };
+            Need(!String.IsNullOrWhiteSpace(scope.PrivatePath), "Saved document identity required");
+            if (before != null) scope.Before = AfjTemporaryBoolean.Copy(before);
+            scope.Baseline = Read(scope);
+            // Baseline keeps primitive rows and private token bytes only.
+            // Never query a retained baseline Feature RCW after mutation.
+            foreach (Node original in scope.Baseline.Nodes.Values) original.Feature = null;
+            return scope;
+        }
+        private static void Need(bool value, string reason)
+        { if (!value) throw new InvalidOperationException("U_OWNED_ROLLBACK_UNVERIFIED: " + reason); }
+        private bool Same(object a, object b)
+        { return a != null && b != null && App.IsSame(a, b) == (int)swObjectEquality.swObjectSame; }
+        private void Mark(string phase)
+        { if (StageSink != null) StageSink("U_JOURNAL." + phase + " UTC=" + DateTime.UtcNow.ToString("o")); }
+        private Scope Bound(ModelDoc2 doc)
+        {
+            var scope = Scopes.SingleOrDefault(s => Same(s.Document, doc));
+            Need(scope != null, "Document is outside bound A/B/Assembly scope");
+            Need(String.Equals(scope.PrivatePath, doc.GetPathName(), StringComparison.OrdinalIgnoreCase), "Bound document identity/path changed");
+            return scope;
+        }
+        private void RequireAssemblyContext()
+        {
+            var assy = Assembly as AssemblyDoc;
+            Need(assy != null && Same(assy.GetEditTarget(), Assembly), "Exit component edit before journal setup/rollback");
+            Need(Assembly.GetActiveSketch2() == null, "Exit active Assembly Sketch before journal setup/rollback");
+        }
+        private Snapshot Read(Scope scope)
+        {
+            Mark("READ_BEGIN_" + scope.Label);
+            var snapshot = new Snapshot(); int count = 0;
+            Action<Feature, bool, string, int> visit = null;
+            visit = (first, top, parent, depth) =>
+            {
+                Need(depth < MaxDepth, "Feature traversal depth bound exceeded");
+                var siblings = new HashSet<int>();
+                for (Feature feature = first; feature != null; feature = (top ? feature.GetNextFeature() : feature.GetNextSubFeature()) as Feature)
+                {
+                    Need(++count <= MaxNodes, "Feature traversal node bound exceeded");
+                    int id = feature.GetID(); Need(siblings.Add(id), "Repeated sibling Feature ID");
+                    Node repeated;
+                    if (snapshot.Nodes.TryGetValue(id, out repeated))
+                    {
+                        // Diagnostic only. Do not change traversal/scope policy
+                        // before a native diff identifies the repeated object.
+                        const string nativeSame = "NOT_QUERIED_SAFE_DIAGNOSTIC";
+                        if (PrivateReadDiagnostics.Count < 1024)
+                            PrivateReadDiagnostics.Add(new Dictionary<string, object> {
+                                {"utc", DateTime.UtcNow.ToString("o")}, {"scope", scope.Label}, {"id", id},
+                                {"first_kind", repeated.Kind}, {"first_name", repeated.Name}, {"first_parent", repeated.ParentPath},
+                                {"repeat_type", feature.GetTypeName2()}, {"repeat_name", feature.Name}, {"repeat_parent", parent},
+                                {"native_same", nativeSame}
+                            });
+                        Mark("DUPLICATE_NUMERIC_ID scope=" + scope.Label + " id=" + id +
+                            " first_kind=" + repeated.Kind + " first_name=" + repeated.Name +
+                            " first_parent=" + repeated.ParentPath + " repeat_type=" + feature.GetTypeName2() +
+                            " repeat_name=" + feature.Name + " repeat_parent=" + parent +
+                            " native_same=" + nativeSame);
+                        continue;
+                    }
+                    string type = feature.GetTypeName2();
+                    var node = new Node { Feature = feature, Id = id, Type = type,
+                        Kind = type == "ICE" ? feature.GetTypeName() : type,
+                        Name = feature.Name, Suppressed = feature.IsSuppressed(),
+                        ParentPath = parent, Order = snapshot.Order.Count };
+                    if (scope.Baseline == null && scope.Label == "ASSEMBLY" && type == "InContextFeatHolder")
+                    {
+                        try
+                        {
+                            node.PrivateBaselineHolderToken = scope.Document.Extension.GetPersistReference3(feature) as byte[];
+                            node.BaselineHolderTokenStatus = node.PrivateBaselineHolderToken != null &&
+                                node.PrivateBaselineHolderToken.Length > 0 ? "CAPTURED_PRIVATE_NOT_SERIALIZED" : "EMPTY_OR_NULL";
+                        }
+                        catch (Exception ex) { node.BaselineHolderTokenStatus = DiagnosticError(ex); }
+                        node.PrivateBaselineHolderProbe = ProbeBaselineHolder(scope, node);
+                    }
+                    if (scope.Baseline == null && !(scope.Label == "ASSEMBLY" && type == "InContextFeatHolder"))
+                        node.PrivateBaselineReferenceProbe = ProbeExternalReferences(feature);
+                    snapshot.Nodes.Add(id, node); snapshot.Order.Add(id);
+                    var sub = feature.GetFirstSubFeature() as Feature;
+                    if (sub != null) visit(sub, false, parent + "/" + id, depth + 1);
+                }
+            };
+            visit(scope.Document.FirstFeature() as Feature, true, "", 0);
+            Mark("READ_END_" + scope.Label); return snapshot;
+        }
+        private static bool RowSame(Node a, Node b, bool includeParent)
+        {
+            return a.Id == b.Id && a.Type == b.Type && a.Kind == b.Kind &&
+                a.Name == b.Name && a.Suppressed == b.Suppressed &&
+                (!includeParent || a.ParentPath == b.ParentPath);
+        }
+        private void CheckProtected(Scope scope, Snapshot now, bool exactFinal)
+        {
+            foreach (var original in scope.Baseline.Nodes.Values)
+            {
+                Node live;
+                Need(now.Nodes.TryGetValue(original.Id, out live),
+                    "Protected original Feature disappeared in " + scope.Label +
+                    "; id=" + original.Id + "; type=" + original.Type + "; kind=" + original.Kind +
+                    "; name=" + original.Name + "; parent=" + original.ParentPath +
+                    "; order=" + original.Order + "; suppressed=" + original.Suppressed +
+                    "; baseline_count=" + scope.Baseline.Nodes.Count + "; live_count=" + now.Nodes.Count);
+                Need(RowSame(original, live, exactFinal),
+                    "Protected original Feature identity/type/name/suppression changed in " + scope.Label +
+                    "; id=" + original.Id + "; before_type=" + original.Type + "; after_type=" + live.Type +
+                    "; before_kind=" + original.Kind + "; after_kind=" + live.Kind +
+                    "; before_name=" + original.Name + "; after_name=" + live.Name +
+                    "; before_parent=" + original.ParentPath + "; after_parent=" + live.ParentPath +
+                    "; before_suppressed=" + original.Suppressed + "; after_suppressed=" + live.Suppressed +
+                    "; exact_final=" + exactFinal);
+            }
+            if (exactFinal)
+            {
+                Need(now.Nodes.Count == scope.Baseline.Nodes.Count, "Original recursive Feature count not restored in " + scope.Label);
+                Need(now.Order.SequenceEqual(scope.Baseline.Order), "Original recursive Feature order not restored in " + scope.Label);
+            }
+        }
+        internal Checkpoint CaptureCheckpoint(ModelDoc2 document)
+        {
+            Need(!RollingBack, "Cannot checkpoint during rollback");
+            Scope scope = Bound(document); var snapshot = Read(scope); CheckProtected(scope, snapshot, false);
+            return new Checkpoint(scope, snapshot, Sequence);
+        }
+        internal FeatureInfo RegisterNewNativeFeature(ModelDoc2 document, Feature feature, string role)
+        {
+            Need(!RollingBack && feature != null, "A returned new native Feature is required");
+            Scope scope = Bound(document); int id = feature.GetID();
+            Need(!scope.Baseline.Nodes.ContainsKey(id), "Refusing ownership of an original Feature");
+            string type = feature.GetTypeName2(), kind = type == "ICE" ? feature.GetTypeName() : type;
+            Entry existing = Entries.SingleOrDefault(e => e.Scope == scope && e.Id == id);
+            if (existing != null)
+            {
+                Need(!existing.Removed && existing.Kind == kind, "Registered Feature changed identity/kind");
+                RefreshToken(existing, feature); existing.Name = feature.Name; return Public(existing);
+            }
+            // Record provisional ID before token retrieval or later name/relations
+            // can fail; Part tree ownership is checked after the Sketch closes.
+            var entry = new Entry { Scope = scope, Id = id, Sequence = ++Sequence,
+                Kind = kind, Name = feature.Name, Role = role ?? "NOT_AVAILABLE" };
+            Entries.Add(entry); Mark("REGISTER_" + scope.Label + "_" + id);
+            RefreshToken(entry, feature); return Public(entry);
+        }
+        private void RefreshToken(Entry entry, Feature feature)
+        {
+            byte[] token = entry.Scope.Document.Extension.GetPersistReference3(feature) as byte[];
+            Need(token != null && token.Length > 0, "Owned Feature persistent identity unavailable");
+            if (entry.PrivateToken != null)
+            {
+                int status; var prior = entry.Scope.Document.Extension.GetObjectByPersistReference3(entry.PrivateToken, out status) as Feature;
+                Need(status == 0 && prior != null && prior.GetID() == entry.Id && Same(prior, feature), "Owned Feature persistent identity changed");
+            }
+            entry.PrivateToken = token;
+        }
+        internal FeatureInfo[] CaptureNewFeatures(ModelDoc2 document, Checkpoint before,
+            IEnumerable<int> declaredFeatureIds, string role)
+        {
+            Scope scope = Bound(document);
+            Need(before != null && before.Scope == scope && before.JournalSequence <= Sequence, "Checkpoint does not belong to this document/journal");
+            var declared = new HashSet<int>(declaredFeatureIds ?? Enumerable.Empty<int>());
+            var now = Read(scope); CheckProtected(scope, now, false);
+            var prior = (Snapshot)before.Snapshot;
+            foreach (Node old in prior.Nodes.Values)
+            {
+                Node live; Need(now.Nodes.TryGetValue(old.Id, out live) && RowSame(old, live, false), "Checkpoint Feature changed/disappeared outside declared creation");
+            }
+            var added = now.Nodes.Values.Where(n => !prior.Nodes.ContainsKey(n.Id)).ToArray();
+            Need(added.All(n => declared.Contains(n.Id) || Entries.Any(e => e.Scope == scope && e.Id == n.Id && !e.Removed)), "Undeclared native delta is not automatically owned");
+            Need(declared.All(id => now.Nodes.ContainsKey(id) && !scope.Baseline.Nodes.ContainsKey(id)), "Declared rescue ID missing or protected");
+            var rows = new List<FeatureInfo>();
+            foreach (Node node in added.OrderBy(n => n.Order))
+                if (declared.Contains(node.Id)) rows.Add(RegisterNewNativeFeature(document, node.Feature, role));
+            return rows.ToArray();
+        }
+        private FeatureInfo Public(Entry entry)
+        {
+            return new FeatureInfo { Sequence = entry.Sequence, Document = entry.Scope.Label,
+                Id = entry.Id, Kind = entry.Kind, Name = entry.Name, Role = entry.Role,
+                TokenCaptured = entry.PrivateToken != null, Removed = entry.Removed };
+        }
+        internal FeatureInfo[] GetPublicOwnedFeatures() { return Entries.Select(Public).ToArray(); }
+        internal void WritePrivateJournal(string privateFilePath)
+        {
+            Need(Path.IsPathRooted(privateFilePath) &&
+                privateFilePath.EndsWith(".private.json", StringComparison.OrdinalIgnoreCase),
+                "Private path/token evidence requires an explicit absolute .private.json target");
+            var rows = Entries.Select(e => new Dictionary<string, object> {
+                {"sequence", e.Sequence}, {"document_label", e.Scope.Label},
+                {"private_document_path", e.Scope.PrivatePath}, {"feature_id", e.Id},
+                {"kind", e.Kind}, {"name", e.Name}, {"role", e.Role},
+                {"private_persistent_token_base64", e.PrivateToken == null ? null : Convert.ToBase64String(e.PrivateToken)},
+                {"removed", e.Removed}
+            }).ToArray();
+            var serializer = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue };
+            File.WriteAllText(privateFilePath, serializer.Serialize(new Dictionary<string, object> {
+                {"scope", "PRIVATE_NATIVE_OWNERSHIP_NOT_FOR_PUBLIC_REPORT"},
+                {"utc", DateTime.UtcNow.ToString("o")}, {"owned", rows}
+            }));
+        }
+        private static string DiagnosticError(Exception error)
+        { return "HRESULT=0x" + error.HResult.ToString("X8") + " " + error.GetType().FullName + " " + error.Message; }
+        private Dictionary<string, object> ProbeFeature(Feature feature)
+        {
+            var row = new Dictionary<string, object> { {"nonnull", feature != null} };
+            if (feature == null) return row;
+            try { row["id"] = feature.GetID(); } catch (Exception ex) { row["id_error"] = DiagnosticError(ex); }
+            try { row["type"] = feature.GetTypeName2(); } catch (Exception ex) { row["type_error"] = DiagnosticError(ex); }
+            try { row["name"] = feature.Name; } catch (Exception ex) { row["name_error"] = DiagnosticError(ex); }
+            try { row["suppressed"] = feature.IsSuppressed(); } catch (Exception ex) { row["suppressed_error"] = DiagnosticError(ex); }
+            try { row["rolled_back"] = feature.IsRolledBack(); } catch (Exception ex) { row["rolled_back_error"] = DiagnosticError(ex); }
+            row["native_feature_equality_queried"] = false;
+            return row;
+        }
+        private static object[] PrimitiveReferenceArray(object raw)
+        {
+            var array = raw as Array; if (array == null) return new object[0];
+            if (array.Length > MaxParents) return new object[] { "REFERENCE_ARRAY_COUNT_BOUND_EXCEEDED" };
+            return array.Cast<object>().Select(value => value == null ? null : Convert.ToString(value, CultureInfo.InvariantCulture)).Cast<object>().ToArray();
+        }
+        private Dictionary<string, object> ProbeExternalReferences(Feature feature)
+        {
+            var row = new Dictionary<string, object>();
+            try
+            {
+                int count = feature.ListExternalFileReferencesCount(); row["count"] = count;
+                Need(count >= 0 && count <= MaxParents, "Diagnostic external reference count bound");
+                if (count > 0)
+                {
+                    object paths, components, features, types, status, entities, featureComponents;
+                    int configOption; string configName;
+                    feature.ListExternalFileReferences2(out paths, out components, out features, out types,
+                        out status, out entities, out featureComponents, out configOption, out configName);
+                    row["paths"] = PrimitiveReferenceArray(paths); row["components"] = PrimitiveReferenceArray(components);
+                    row["features"] = PrimitiveReferenceArray(features); row["types"] = PrimitiveReferenceArray(types);
+                    row["statuses"] = PrimitiveReferenceArray(status); row["entity_descriptions"] = PrimitiveReferenceArray(entities);
+                    row["feature_components"] = PrimitiveReferenceArray(featureComponents);
+                    row["configuration_option"] = configOption; row["configuration_name"] = configName;
+                }
+                string canonical = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue }.Serialize(row);
+                using (var sha = SHA256.Create()) row["sha256"] = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(canonical))).Replace("-", "").ToLowerInvariant();
+                row["qualified"] = true;
+            }
+            catch (Exception ex) { row["qualified"] = false; row["error"] = DiagnosticError(ex); }
+            return row;
+        }
+        private object[] ProbeOriginalReferenceSignatures(Scope scope, Snapshot now)
+        {
+            var rows = new List<object>();
+            foreach (Node original in scope.Baseline.Order.Select(id => scope.Baseline.Nodes[id]))
+            {
+                if (original.PrivateBaselineReferenceProbe == null) continue;
+                Node fresh;
+                bool freshMatches = now.Nodes.TryGetValue(original.Id, out fresh) && fresh.Type == original.Type && fresh.Name == original.Name;
+                var after = freshMatches ? ProbeExternalReferences(fresh.Feature) : new Dictionary<string, object> {
+                    {"qualified", false}, {"error", "ORIGINAL_FEATURE_NOT_RESOLVED_IN_FRESH_CURRENT_TREE_BY_ID_TYPE_NAME"}
+                }; object priorHash, currentHash;
+                bool qualified = original.PrivateBaselineReferenceProbe.ContainsKey("qualified") &&
+                    (bool)original.PrivateBaselineReferenceProbe["qualified"] && after.ContainsKey("qualified") && (bool)after["qualified"];
+                bool equal = qualified && original.PrivateBaselineReferenceProbe.TryGetValue("sha256", out priorHash) &&
+                    after.TryGetValue("sha256", out currentHash) && Object.Equals(priorHash, currentHash);
+                rows.Add(new Dictionary<string, object> { {"id", original.Id}, {"type", original.Type}, {"name", original.Name},
+                    {"before", original.PrivateBaselineReferenceProbe}, {"after", after}, {"qualified_both", qualified}, {"identical_signatures", equal} });
+            }
+            return rows.ToArray();
+        }
+        private object[] ProbeLinkedFeatures(Array raw)
+        {
+            if (raw == null) return new object[0];
+            if (raw.Length > MaxParents) return new object[] { "FEATURE_LINK_COUNT_BOUND_EXCEEDED" };
+            var rows = new List<object>();
+            foreach (object value in raw)
+            {
+                var feature = value as Feature;
+                if (feature == null) { rows.Add(new Dictionary<string, object> { {"is_feature", false}, {"nonnull", value != null} }); continue; }
+                var row = new Dictionary<string, object> { {"is_feature", true} };
+                try { row["id"] = feature.GetID(); } catch (Exception ex) { row["id_error"] = DiagnosticError(ex); }
+                try { row["type"] = feature.GetTypeName2(); } catch (Exception ex) { row["type_error"] = DiagnosticError(ex); }
+                try { row["name"] = feature.Name; } catch (Exception ex) { row["name_error"] = DiagnosticError(ex); }
+                rows.Add(row);
+            }
+            return rows.ToArray();
+        }
+        private Dictionary<string, object> ProbeBaselineHolder(Scope scope, Node original, string phase = "BASELINE_BEFORE_FIRST_NATIVE_MUTATION")
+        {
+            Need(scope.Baseline == null && original.Feature != null, "Holder baseline diagnostic must run before baseline RCWs are cleared");
+            var row = new Dictionary<string, object> {
+                {"phase", phase},
+                {"token_capture_status", original.BaselineHolderTokenStatus},
+                {"token_present", original.PrivateBaselineHolderToken != null && original.PrivateBaselineHolderToken.Length > 0}
+            };
+            if (original.PrivateBaselineHolderToken != null && original.PrivateBaselineHolderToken.Length > 0)
+            {
+                try
+                {
+                    int status; object resolved = scope.Document.Extension.GetObjectByPersistReference3(original.PrivateBaselineHolderToken, out status);
+                    row["immediate_persist_resolve_status"] = status;
+                    row["immediate_persist_resolved_nonnull"] = resolved != null;
+                    row["immediate_persist_resolved_is_feature"] = resolved is Feature;
+                    row["immediate_persist_resolved_feature"] = ProbeFeature(resolved as Feature);
+                }
+                catch (Exception ex) { row["immediate_persist_resolve_error"] = DiagnosticError(ex); }
+            }
+            try { row["direct_parents"] = ProbeLinkedFeatures(original.Feature.GetParents() as Array); }
+            catch (Exception ex) { row["direct_parents_error"] = DiagnosticError(ex); }
+            try { row["direct_children"] = ProbeLinkedFeatures(original.Feature.GetChildren() as Array); }
+            catch (Exception ex) { row["direct_children_error"] = DiagnosticError(ex); }
+            row["external_references"] = ProbeExternalReferences(original.Feature);
+            row["retained_feature"] = ProbeFeature(original.Feature);
+            try
+            {
+                object specific = original.Feature.GetSpecificFeature2();
+                row["specific_nonnull"] = specific != null; row["specific_is_feature"] = specific is Feature;
+                row["specific_feature"] = ProbeFeature(specific as Feature);
+            }
+            catch (Exception ex) { row["specific_feature_error"] = DiagnosticError(ex); }
+            try { row["owner_feature"] = ProbeFeature(original.Feature.GetOwnerFeature()); }
+            catch (Exception ex) { row["owner_feature_error"] = DiagnosticError(ex); }
+            return row;
+        }
+        private object[] MissingOriginalDiagnostics(Scope scope, Snapshot now)
+        {
+            Node[] missing = scope.Baseline.Order.Where(id => !now.Nodes.ContainsKey(id)).Select(id => scope.Baseline.Nodes[id]).ToArray();
+            if (missing.Length == 0) return new object[0];
+            Feature[] managerFeatures = null; string managerError = null;
+            try
+            {
+                var raw = scope.Document.FeatureManager.GetFeatures(false) as Array;
+                if (raw != null && raw.Length <= MaxNodes) managerFeatures = raw.Cast<object>().OfType<Feature>().ToArray();
+                else managerError = raw == null ? "NULL_ARRAY" : "FEATURE_COUNT_BOUND_EXCEEDED";
+            }
+            catch (Exception ex) { managerError = DiagnosticError(ex); }
+            var rows = new List<object>();
+            foreach (Node original in missing)
+            {
+                var row = new Dictionary<string, object> {
+                    {"id", original.Id}, {"type", original.Type}, {"name", original.Name}, {"parent_path", original.ParentPath},
+                    {"retained_baseline_rcw_queried", false},
+                    {"baseline_holder_token_status", original.BaselineHolderTokenStatus ?? "NOT_CAPTURED_BY_DIAGNOSTIC_SCOPE"},
+                    {"baseline_holder_probe", original.PrivateBaselineHolderProbe},
+                    {"missing_retained_holder_semantics_queried", false},
+                    {"baseline_holder_token_present", original.PrivateBaselineHolderToken != null && original.PrivateBaselineHolderToken.Length > 0},
+                    {"feature_manager_get_features_false_error", managerError}
+                };
+                if (original.PrivateBaselineHolderToken != null && original.PrivateBaselineHolderToken.Length > 0)
+                {
+                    try
+                    {
+                        int status; object resolved = scope.Document.Extension.GetObjectByPersistReference3(original.PrivateBaselineHolderToken, out status);
+                        row["persist_resolve_status"] = status; row["persist_resolved_nonnull"] = resolved != null;
+                        row["persist_resolved_is_feature"] = resolved is Feature;
+                        row["persist_resolved_feature"] = ProbeFeature(resolved as Feature);
+                    }
+                    catch (Exception ex) { row["persist_resolve_error"] = DiagnosticError(ex); }
+                }
+                try
+                {
+                    var assembly = scope.Document as AssemblyDoc; var part = scope.Document as PartDoc;
+                    Feature byName = assembly != null ? assembly.FeatureByName(original.Name) as Feature :
+                        part != null ? part.FeatureByName(original.Name) as Feature : null;
+                    row["feature_by_exact_name"] = ProbeFeature(byName);
+                }
+                catch (Exception ex) { row["feature_by_exact_name_error"] = DiagnosticError(ex); }
+                if (managerFeatures != null)
+                {
+                    var matches = new List<object>(); var errors = new List<object>();
+                    foreach (Feature candidate in managerFeatures)
+                    {
+                        try
+                        {
+                            int candidateId = candidate.GetID();
+                            string candidateName = candidate.Name;
+                            if (candidateId == original.Id || String.Equals(candidateName, original.Name, StringComparison.Ordinal))
+                                matches.Add(ProbeFeature(candidate));
+                        }
+                        catch (Exception ex) { if (errors.Count < 32) errors.Add(DiagnosticError(ex)); }
+                    }
+                    row["feature_manager_get_features_false_count"] = managerFeatures.Length;
+                    row["feature_manager_get_features_false_matches_id_or_name_ONLY"] = matches.ToArray();
+                    row["feature_manager_candidate_errors"] = errors.ToArray();
+                }
+                rows.Add(row);
+            }
+            return rows.ToArray();
+        }
+        // Private diagnostic API. It records only primitive tree rows, with
+        // no live RCW, path, Body or persistent-reference token payload.
+        // This does not change ownership or permit deletion of a missing node.
+        internal void WritePrivateSnapshotDiff(string privateFilePath)
+        {
+            Need(Path.IsPathRooted(privateFilePath) &&
+                privateFilePath.EndsWith(".private.json", StringComparison.OrdinalIgnoreCase),
+                "Snapshot diff requires an explicit absolute .private.json target");
+            Func<Node, object> dto = node => new Dictionary<string, object> {
+                {"id", node.Id}, {"type", node.Type}, {"kind", node.Kind}, {"name", node.Name},
+                {"parent_path", node.ParentPath}, {"order", node.Order}, {"suppressed", node.Suppressed},
+                {"baseline_holder_probe", node.PrivateBaselineHolderProbe}
+            };
+            var rows = Scopes.Select(scope => {
+                var now = Read(scope);
+                return new Dictionary<string, object> {
+                    {"document_label", scope.Label},
+                    {"baseline", scope.Baseline.Order.Select(id => dto(scope.Baseline.Nodes[id])).ToArray()},
+                    {"current", now.Order.Select(id => dto(now.Nodes[id])).ToArray()},
+                    {"missing_original_ids", scope.Baseline.Order.Where(id => !now.Nodes.ContainsKey(id)).ToArray()},
+                    {"missing_original_diagnostics", MissingOriginalDiagnostics(scope, now)},
+                    {"original_feature_reference_signatures", ProbeOriginalReferenceSignatures(scope, now)},
+                    {"new_ids", now.Order.Where(id => !scope.Baseline.Nodes.ContainsKey(id)).ToArray()},
+                    {"changed_original_ids", scope.Baseline.Order.Where(id => now.Nodes.ContainsKey(id) &&
+                        !RowSame(scope.Baseline.Nodes[id], now.Nodes[id], true)).ToArray()}
+                };
+            }).ToArray();
+            var serializer = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue };
+            File.WriteAllText(privateFilePath, serializer.Serialize(new Dictionary<string, object> {
+                {"scope", "PRIVATE_NATIVE_SCOPE_DIFF_NOT_OWNERSHIP_AUTHORITY"},
+                {"diagnostic_version", "4SAFE_NO_RETAINED_BASELINE_RCW_QUERY_NO_DIAGNOSTIC_FEATURE_ISSAME"}, {"utc", DateTime.UtcNow.ToString("o")},
+                {"trees", rows}, {"read_diagnostics", PrivateReadDiagnostics.ToArray()}
+            }));
+        }
+        private string PublicError(Exception error)
+        {
+            string text = "HRESULT=0x" + error.HResult.ToString("X8") + " " + error;
+            foreach (Scope scope in Scopes)
+            {
+                if (!String.IsNullOrEmpty(scope.PrivatePath))
+                    text = text.Replace(scope.PrivatePath, "<" + scope.Label + "_DOCUMENT>");
+                string folder = Path.GetDirectoryName(scope.PrivatePath);
+                if (!String.IsNullOrEmpty(folder)) text = text.Replace(folder, "<BOUND_PRIVATE_FOLDER>");
+            }
+            return text;
+        }
+        private Entry EntryFor(Scope scope, int id)
+        { return Entries.SingleOrDefault(e => e.Scope == scope && e.Id == id && !e.Removed); }
+        private Feature Resolve(Entry entry, Snapshot snapshot)
+        {
+            Node live; if (!snapshot.Nodes.TryGetValue(entry.Id, out live)) return null;
+            Need(!entry.Scope.Baseline.Nodes.ContainsKey(entry.Id), "Owned ID now belongs to protected baseline");
+            Need(live.Kind == entry.Kind, "Live owned Feature kind differs");
+            Need(entry.PrivateToken != null, "No private token; refusing guessed ID deletion");
+            int state; var resolved = entry.Scope.Document.Extension.GetObjectByPersistReference3(entry.PrivateToken, out state) as Feature;
+            Need(state == 0 && resolved != null && resolved.GetID() == entry.Id && Same(resolved, live.Feature), "Cannot resolve exact owned Feature identity");
+            return resolved;
+        }
+        private bool MapsTo(Feature candidate, Feature target)
+        { return candidate != null && target != null && Same(candidate, target); }
+        private Feature DefinitionFeature(object entity)
+        {
+            var feature = entity as Feature; if (feature != null) return feature;
+            var segment = entity as SketchSegment;
+            if (segment != null) return segment.GetSketch() as Feature;
+            var point = entity as SketchPoint;
+            if (point != null) return point.GetSketch() as Feature;
+            var face = entity as Face2;
+            return face == null ? null : face.GetFeature() as Feature;
+        }
+        private List<DependentInfo> Dependents(Entry deleting, Feature target, Dictionary<Scope, Snapshot> current)
+        {
+            var found = new List<DependentInfo>();
+            Action<Scope, Node, string> add = (scope, node, reason) =>
+            {
+                if (scope == deleting.Scope && node.Id == deleting.Id) return;
+                if (found.Any(r => r.Document == scope.Label && r.Id == node.Id && r.Evidence == reason)) return;
+                found.Add(new DependentInfo { Document = scope.Label, Id = node.Id, Kind = node.Kind,
+                    Name = node.Name, Owned = EntryFor(scope, node.Id) != null,
+                    Protected = scope.Baseline.Nodes.ContainsKey(node.Id), Evidence = reason });
+            };
+            Array children = target.GetChildren() as Array;
+            Need(children == null || children.Length <= MaxParents, "Child enumeration bound exceeded");
+            if (children != null) foreach (var child in children.Cast<object>().OfType<Feature>())
+            {
+                bool mapped = false;
+                foreach (var pair in current) foreach (Node node in pair.Value.Nodes.Values)
+                    if (MapsTo(child, node.Feature)) { add(pair.Key, node, "NATIVE_CHILD"); mapped = true; }
+                Need(mapped, "Native child outside declared scopes or unresolved context identity");
+            }
+            foreach (var pair in current) foreach (Node node in pair.Value.Nodes.Values)
+            {
+                if (pair.Key == deleting.Scope && node.Id == deleting.Id) continue;
+                Array parents = node.Feature.GetParents() as Array;
+                Need(parents == null || parents.Length <= MaxParents, "Parent enumeration bound exceeded");
+                if (parents != null && parents.Cast<object>().OfType<Feature>().Any(p => MapsTo(p, target)))
+                    add(pair.Key, node, "DIRECT_PARENT");
+                if (node.Type == "ProfileFeature" || node.Type == "3DProfileFeature")
+                {
+                    var sketch = node.Feature.GetSpecificFeature2() as Sketch;
+                    Need(sketch != null, "Cannot inspect dependent Sketch");
+                    Array relations = sketch.RelationManager.GetRelations((int)swSketchRelationFilterType_e.swAll) as Array;
+                    Need(relations == null || relations.Length <= MaxRelations, "Relation enumeration bound exceeded");
+                    if (relations != null) foreach (var relation in relations.Cast<object>().OfType<SketchRelation>())
+                    {
+                        Array entities = relation.GetDefinitionEntities2() as Array;
+                        Need(entities == null || entities.Length <= 32, "Definition entity bound exceeded");
+                        if (entities != null && entities.Cast<object>().Select(DefinitionFeature).Any(p => MapsTo(p, target)))
+                            add(pair.Key, node, "SKETCH_RELATION_DEFINITION_ENTITY");
+                    }
+                }
+                // External names are a conservative guard in addition to actual
+                // parent/relation identities, never ownership authority.
+                if (node.Feature.ListExternalFileReferencesCount() > 0)
+                {
+                    object paths, components, features, types, status, entities, featureComponents;
+                    int configOption; string configName;
+                    node.Feature.ListExternalFileReferences2(out paths, out components, out features,
+                        out types, out status, out entities, out featureComponents, out configOption, out configName);
+                    Array modelPaths = paths as Array, refs = entities as Array;
+                    if (modelPaths != null)
+                    {
+                        Need(modelPaths.Length <= MaxParents, "External reference enumeration bound exceeded");
+                        for (int i = 0; i < modelPaths.Length; i++)
+                        {
+                            string path = Convert.ToString(modelPaths.GetValue(i));
+                            if (!String.Equals(path, deleting.Scope.PrivatePath, StringComparison.OrdinalIgnoreCase)) continue;
+                            string description = refs != null && i < refs.Length ? Convert.ToString(refs.GetValue(i)) : "";
+                            if (String.IsNullOrWhiteSpace(description))
+                                add(pair.Key, node, "EXTERNAL_DOCUMENT_REFERENCE_TARGET_UNRESOLVED");
+                            else if (!String.IsNullOrEmpty(target.Name) && description.IndexOf(target.Name, StringComparison.OrdinalIgnoreCase) >= 0)
+                                add(pair.Key, node, "EXTERNAL_REFERENCE_NAME_MATCH_REQUIRES_NATIVE_IDENTITY");
+                        }
+                    }
+                }
+            }
+            return found;
+        }
+        private void Activate(ModelDoc2 document)
+        {
+            RequireAssemblyContext();
+            if (Same(App.ActiveDoc, document)) return;
+            int error = 0; var active = App.ActivateDoc3(document.GetTitle(), false,
+                (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref error) as ModelDoc2;
+            Need(Same(active, document) && (error & ~(int)swActivateDocError_e.swDocNeedsRebuildWarning) == 0, "Cannot activate exact rollback document");
+        }
+        internal RollbackReport Rollback()
+        {
+            var report = new RollbackReport(); RollingBack = true;
+            try
+            {
+                RequireAssemblyContext();
+                Need(Scopes.All(s => s.Document.GetActiveSketch2() == null), "Caller must close owned Sketch before rollback");
+                Mark("ROLLBACK_BEGIN");
+                // All Cuts before all other Features. Within each phase, reverse
+                // the actual cross-document registration/creation sequence.
+                var order = Entries.OrderBy(e => e.Kind == "Cut" ? 0 : 1).ThenByDescending(e => e.Sequence).ToArray();
+                Need(order.Length <= 256, "Owned feature journal bound exceeded");
+                foreach (Entry entry in order)
+                {
+                    var before = Scopes.ToDictionary(s => s, Read);
+                    foreach (var pair in before) CheckProtected(pair.Key, pair.Value, false);
+                    Feature target = Resolve(entry, before[entry.Scope]);
+                    if (target == null)
+                    {
+                        Need(entry.Removed, "Owned Feature disappeared without a recorded owned deletion");
+                        continue;
+                    }
+                    var dependents = Dependents(entry, target, before);
+                    if (dependents.Count != 0)
+                    {
+                        report.BlockingDependents.AddRange(dependents);
+                        Need(false, "Live owned/protected/undeclared dependents remain before deletion; no cascade assumed or permitted");
+                    }
+                    Activate(entry.Scope.Document);
+                    Mark("DELETE_BEGIN_" + entry.Scope.Label + "_" + entry.Id);
+                    entry.Scope.Document.ClearSelection2(true);
+                    Need(target.Select2(false, 0), "Cannot select exact owned Feature");
+                    Need(entry.Scope.Document.Extension.DeleteSelection2(0), "Native option0 owned deletion returned false");
+                    var after = Scopes.ToDictionary(s => s, Read);
+                    var disappearedHere = new List<int>();
+                    foreach (Scope scope in Scopes)
+                    {
+                        CheckProtected(scope, after[scope], false);
+                        foreach (int id in before[scope].Nodes.Keys.Where(id => !after[scope].Nodes.ContainsKey(id)))
+                        {
+                            Entry removed = EntryFor(scope, id);
+                            Need(removed != null, "Unregistered/protected Feature disappeared during option0 deletion");
+                            removed.Removed = true;
+                            if (scope == entry.Scope) disappearedHere.Add(id);
+                        }
+                        Need(after[scope].Nodes.Keys.All(id => before[scope].Nodes.ContainsKey(id)), "Native deletion created an unexplained Feature");
+                    }
+                    Need(entry.Removed, "Owned deletion made no progress");
+                    report.Deletions.Add(new DeletionInfo { Document = entry.Scope.Label, Id = entry.Id,
+                        Kind = entry.Kind, Name = entry.Name, Options = 0, Status = "REMOVED_REGISTERED_OWNED_ONLY",
+                        DisappearedOwnedIds = disappearedHere.ToArray() });
+                    Mark("DELETE_END_" + entry.Scope.Label + "_" + entry.Id);
+                }
+                foreach (Scope scope in Scopes) CheckProtected(scope, Read(scope), true);
+                report.ZeroOwnedFeaturesRemain = Entries.All(e => e.Removed);
+                Need(report.ZeroOwnedFeaturesRemain, "Registered owned Feature remains");
+                report.BodyDifferenceA = AfjNativeCutCommit.SymmetricDifference(
+                    AfjTemporaryBoolean.Copy(AfjNativeCutCommit.CurrentBody(Scopes[0].Document)), Scopes[0].Before);
+                report.BodyDifferenceB = AfjNativeCutCommit.SymmetricDifference(
+                    AfjTemporaryBoolean.Copy(AfjNativeCutCommit.CurrentBody(Scopes[1].Document)), Scopes[1].Before);
+                Need(AfjTemporaryBoolean.Finite(report.BodyDifferenceA) && AfjTemporaryBoolean.Finite(report.BodyDifferenceB) &&
+                    report.BodyDifferenceA <= report.BodyTolerance && report.BodyDifferenceB <= report.BodyTolerance,
+                    "Initial Body B-rep not restored within explicit tolerance");
+                report.OriginalTreesAndSuppressionRestored = true;
+                report.ProtectedFeaturesPreserved = true;
+                Activate(Assembly); RequireAssemblyContext(); report.AssemblyContextRestored = true;
+                report.Verified = true; report.Status = "PASS_NATIVE_OWNED_FEATURES_TREE_SUPPRESSION_BREP_RESTORED";
+            }
+            catch (Exception ex)
+            {
+                report.Status = "ROLLBACK_UNVERIFIED";
+                report.Error = PublicError(ex);
+            }
+            finally
+            {
+                try { Activate(Assembly); RequireAssemblyContext(); report.AssemblyContextRestored = true; }
+                catch (Exception ex) { report.Verified = false; report.Status = "ROLLBACK_UNVERIFIED"; report.Error += " CONTEXT_RESTORE " + PublicError(ex); }
+                try { report.DirtyA = Scopes[0].Document.GetSaveFlag(); report.DirtyB = Scopes[1].Document.GetSaveFlag(); report.DirtyAssembly = Assembly.GetSaveFlag(); }
+                catch (Exception ex) { report.Error += " DIRTY_OBSERVATION " + PublicError(ex); }
+                report.Owned.AddRange(Entries.Select(Public)); Mark("ROLLBACK_END_" + report.Status);
+            }
+            return report;
+        }
+    }
+}

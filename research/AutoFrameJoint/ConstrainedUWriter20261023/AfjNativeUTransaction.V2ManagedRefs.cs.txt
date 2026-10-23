@@ -1,0 +1,419 @@
+// PRIVATE integration candidate. Requires its own native qualification.
+// This file is not routed into the Add-in and does not establish installed behavior.
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Collections.Generic;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    internal sealed class AfjNativeUTransaction
+    {
+        private sealed class FeatureState
+        {
+            internal int Id;
+            internal string Type, Name;
+            internal bool Suppressed;
+        }
+        private sealed class DocumentState
+        {
+            internal ModelDoc2 Model;
+            internal string Label, Path, Configuration;
+            internal HashSet<int> TopIds;
+            internal Dictionary<int, FeatureState> Original;
+            internal int AcceptedStamp;
+        }
+        private sealed class Step
+        {
+            internal int Part;
+            internal AfjCutOperation Operation;
+            internal Body2 Before, Target;
+            internal double Removed;
+        }
+        private sealed class RawCreation
+        {
+            // Mutation/registration accounting is primitive; native ownership
+            // belongs to the journal's private persistent reference.
+            internal string Frame, Role;
+            internal int FeatureId=-1;
+            internal bool JournalReturned;
+        }
+        internal sealed class SketchCheck
+        {
+            public string Phase, Frame, EvidenceId;
+            public int FeatureId, Status, Relations, Dangling, Overdefining, Dimensions;
+            public int ReferenceType, SupportOwnerId, Error;
+            public bool Warning, ReferenceIsFace, OriginalSupportOwner;
+        }
+
+        private readonly ISldWorks App;
+        private readonly ModelDoc2 Assembly;
+        private readonly AfjApplyTicket Ticket;
+        private readonly AfjJointSolution Preview;
+        private readonly AfjParametricPlan Intent;
+        private readonly AfjNativeApplyReport Report;
+        private readonly string Prefix;
+        private readonly Action<string> Sink;
+        private readonly DocumentState[] Documents;
+        private readonly Component2[] Components;
+        private readonly double[][] OriginalTransforms;
+        private readonly Body2[] Expected;
+        private readonly bool[] OriginalSheetMetal;
+        private readonly List<Step> Steps = new List<Step>();
+        private readonly List<RawCreation> Raw = new List<RawCreation>();
+        private readonly AfjUOwnedFeatureJournal Journal;
+        private bool Applied, ApplyStarted, Committed, UnresolvedCreation;
+
+        internal AfjUParametricSketchWriter.WriteResult SketchWriterResult { get; private set; }
+        internal readonly List<SketchCheck> SketchChecks = new List<SketchCheck>();
+        internal AfjUOwnedFeatureJournal.RollbackReport RollbackResult { get; private set; }
+        internal bool HasNativeMutation { get { return Raw.Count != 0 || UnresolvedCreation; } }
+        internal bool Complete { get { return Applied; } }
+        internal bool IsCommitted { get { return Committed; } }
+
+        // Construction reads and computes independent temporary targets only.
+        // The caller must keep this instance before calling Apply so a failure
+        // during the very first native Sketch can still reach its journal.
+        internal AfjNativeUTransaction(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket,
+            AfjParametricPlan intent, AfjNativeApplyReport report, string prefix,
+            Action<string> stageSink = null)
+        {
+            Need(System.Threading.Thread.CurrentThread.GetApartmentState() == System.Threading.ApartmentState.STA,
+                "SOLIDWORKS owner STA thread required");
+            Need(app != null && assembly != null && ticket != null && ticket.Preview != null && report != null,
+                "Bound application, Assembly, reviewed ticket and report required");
+            App = app; Assembly = assembly; Ticket = ticket; Preview = ticket.Preview;
+            Intent = intent; Report = report; Prefix = prefix; Sink = stageSink;
+            Need(intent != null && Object.ReferenceEquals(intent.Plan, Preview.Plan) && intent.Folded == null,
+                "Use the exact immutable intent retained by the reviewed Solve; do not regenerate on OK");
+            Need(intent.Plan.RuleId == "ORTHOGONAL_U_COVER" || intent.Plan.RuleId == "ORTHOGONAL_U_TALLER_COVER",
+                "The constrained-U transaction cannot handle this rule");
+            Need(!String.IsNullOrWhiteSpace(prefix) && prefix.StartsWith("AFJ_", StringComparison.Ordinal) &&
+                prefix.Length <= 48 && prefix.All(c => Char.IsLetterOrDigit(c) || c == '_'), "Unique AFJ_ prefix required");
+            Need(Same(App.ActiveDoc, Assembly) && Assembly is AssemblyDoc &&
+                Same(((AssemblyDoc)Assembly).GetEditTarget(), Assembly), "Active reviewed Assembly outside component edit required");
+            Need(Assembly.GetActiveSketch2() == null, "Close existing Sketch before starting a transaction");
+            Components = new[] { ticket.FrameA, ticket.FrameB };
+            Need(Components.All(c => c != null) && !Same(Preview.PartA, Preview.PartB), "Independent occurrences/Parts required");
+            var parts = new[] { Preview.PartA, Preview.PartB };
+            for (int i = 0; i < 2; i++)
+                Need(parts[i] != null && Same(Components[i].GetModelDoc2(), parts[i]) &&
+                    parts[i].GetActiveSketch2() == null, "Reviewed occurrence/Part identity or existing Sketch differs");
+            OriginalTransforms = Components.Select(c => CloneTransform(c.GetTotalTransform(false))).ToArray();
+            Expected = new[] { AfjTemporaryBoolean.Copy(ticket.BeforeA), AfjTemporaryBoolean.Copy(ticket.BeforeB) };
+            OriginalSheetMetal = parts.Select(p => AfjNativeCutCommit.CurrentBody(p).IsSheetMetal()).ToArray();
+            Documents = new[] { Capture(parts[0], "A"), Capture(parts[1], "B"), Capture(Assembly, "ASSEMBLY") };
+            Report.GapMetres = Double.NaN; Report.InterferenceCubicMetres = Double.NaN;
+            CheckInvariant("BEFORE_TEMPORARY_TARGETS");
+            PrepareSteps();
+            Need(ticket.IsSourceCurrent != null && ticket.IsSourceCurrent(), "PREVIEW_STALE before first mutation");
+            CheckInvariant("BEFORE_JOURNAL");
+            Journal = new AfjUOwnedFeatureJournal(app, assembly, parts[0], parts[1], Expected[0], Expected[1], Log);
+            AcceptStamps();
+        }
+
+        private static void Need(bool ok, string reason)
+        { if (!ok) throw new InvalidOperationException("AFJ_U_TRANSACTION_UNVERIFIED: " + reason); }
+        private bool Same(object a, object b)
+        { return a != null && b != null && App.IsSame(a, b) == (int)swObjectEquality.swObjectSame; }
+        // Logging must never become a new failure between native creation and
+        // ownership token capture, or while a rollback is already running.
+        private void Log(string phase)
+        {
+            try { Trace.WriteLine("[AFJ-U-TRANSACTION] " + phase); } catch { }
+            try { if (Sink != null) Sink(phase); } catch { }
+        }
+        private static double[] CloneTransform(MathTransform transform)
+        {
+            var v = transform == null ? null : transform.ArrayData as double[];
+            Need(v != null && v.Length == 16 && v.All(AfjTemporaryBoolean.Finite), "Native rigid transform unavailable");
+            return (double[])v.Clone();
+        }
+        private static Dictionary<int, FeatureState> Features(ModelDoc2 part, out HashSet<int> top)
+        {
+            var result = new Dictionary<int, FeatureState>(); var topIds = new HashSet<int>(); int count = 0;
+            Action<Feature, bool, int> visit = null;
+            visit = (first, isTop, depth) =>
+            {
+                Need(depth < 16, "Recursive Feature depth bound exceeded"); var siblings = new HashSet<int>();
+                for (var f = first; f != null; f = (isTop ? f.GetNextFeature() : f.GetNextSubFeature()) as Feature)
+                {
+                    Need(++count < 2400, "Recursive Feature count bound exceeded"); int id = f.GetID();
+                    Need(siblings.Add(id), "Duplicate Feature sibling identity"); if (isTop) topIds.Add(id);
+                    if (result.ContainsKey(id)) continue;
+                    result.Add(id, new FeatureState { Id = id, Type = f.GetTypeName2(), Name = f.Name, Suppressed = f.IsSuppressed() });
+                    var sub = f.GetFirstSubFeature() as Feature; if (sub != null) visit(sub, false, depth + 1);
+                }
+            };
+            visit(part.FirstFeature() as Feature, true, 0); top = topIds; return result;
+        }
+        private static DocumentState Capture(ModelDoc2 part, string label)
+        {
+            HashSet<int> top; var original = Features(part, out top); var configuration = part.ConfigurationManager.ActiveConfiguration;
+            Need(configuration != null, "Active configuration unavailable");
+            return new DocumentState { Model = part, Label = label, Path = part.GetPathName(),
+                Configuration = configuration.Name, Original = original, TopIds = top, AcceptedStamp = part.GetUpdateStamp() };
+        }
+        private Feature Find(ModelDoc2 part, int id)
+        {
+            Feature found = null; int n = 0; var seen = new HashSet<int>(); Action<Feature, bool, int> visit = null;
+            visit = (first, top, depth) =>
+            {
+                Need(depth < 16, "Feature lookup depth bound");
+                for (var f = first; f != null; f = (top ? f.GetNextFeature() : f.GetNextSubFeature()) as Feature)
+                {
+                    Need(++n < 2400, "Feature lookup count bound"); int fid = f.GetID(); if (!seen.Add(fid)) continue;
+                    if (fid == id) { found = f; return; }
+                    var sub = f.GetFirstSubFeature() as Feature; if (sub != null) visit(sub, false, depth + 1); if (found != null) return;
+                }
+            };
+            visit(part.FirstFeature() as Feature, true, 0); return found;
+        }
+        private void AcceptStamps()
+        { foreach (var state in Documents) state.AcceptedStamp = state.Model.GetUpdateStamp(); }
+        private void RequireAcceptedStamps()
+        {
+            foreach (var state in Documents)
+                Need(state.Model.GetUpdateStamp() == state.AcceptedStamp,
+                    "Unexpected native update after accepted checkpoint in " + state.Label);
+        }
+        private void CheckInvariant(string phase)
+        {
+            Log(phase + ".INVARIANTS_BEGIN");
+            for (int i = 0; i < Documents.Length; i++)
+            {
+                var state = Documents[i]; var configuration = state.Model.ConfigurationManager.ActiveConfiguration;
+                Need(configuration != null && configuration.Name == state.Configuration &&
+                    String.Equals(state.Model.GetPathName(), state.Path, StringComparison.OrdinalIgnoreCase),
+                    "Document/configuration identity changed in " + state.Label);
+                HashSet<int> top; var now = Features(state.Model, out top);
+                foreach (var original in state.Original.Values)
+                {
+                    FeatureState current;
+                    Need(now.TryGetValue(original.Id, out current) && current.Type == original.Type &&
+                        current.Name == original.Name && current.Suppressed == original.Suppressed,
+                        "Protected original Feature changed in " + state.Label);
+                }
+                var owned = Journal == null ? new HashSet<int>() : new HashSet<int>(Journal.GetPublicOwnedFeatures()
+                    .Where(e => e.Document == state.Label && !e.Removed).Select(e => e.Id));
+                Need(now.Keys.All(id => state.Original.ContainsKey(id) || owned.Contains(id)),
+                    "Unregistered native Feature delta in " + state.Label);
+                Need(owned.All(now.ContainsKey), "Registered owned Feature disappeared in " + state.Label);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                var state = Documents[i]; Need(Same(Components[i].GetModelDoc2(), state.Model) &&
+                    Components[i].ReferencedConfiguration == state.Configuration, "Occurrence/configuration changed");
+                var matrix = CloneTransform(Components[i].GetTotalTransform(false));
+                Need(matrix.Where((v, k) => Math.Abs(v - OriginalTransforms[i][k]) > 1e-10).Count() == 0,
+                    "Occurrence transform changed");
+                var current = AfjNativeCutCommit.CurrentBody(state.Model); AfjTemporaryBoolean.Validate(current);
+                Need(current.IsSheetMetal() == OriginalSheetMetal[i], "Sheet-metal identity changed");
+                double delta = AfjNativeCutCommit.SymmetricDifference(AfjTemporaryBoolean.Copy(current), Expected[i]);
+                Need(AfjTemporaryBoolean.Finite(delta) && delta <= 1e-12, "Unplanned Body change in " + state.Label);
+            }
+            Log(phase + ".INVARIANTS_END");
+        }
+        private void PrepareSteps()
+        {
+            var running = Expected.Select(AfjTemporaryBoolean.Copy).ToArray(); int winner = Preview.CoverA ? 0 : 1;
+            foreach (int i in new[] { 1 - winner, winner })
+            {
+                var plan = i == 0 ? Preview.Plan.A : Preview.Plan.B;
+                foreach (var operation in plan.Operations)
+                {
+                    Need(operation.Kind == AfjOperationKind.Cut && operation.Tools.Count == 1 &&
+                        !String.IsNullOrEmpty(operation.EvidenceId), "Independent verified single prism operation required");
+                    var stepPlan = new AfjCutPlan(); stepPlan.Operations.Add(operation);
+                    var target = AfjTemporaryBoolean.Execute(App, AfjTemporaryBoolean.Copy(running[i]), stepPlan);
+                    Need(target.Kept.Count == 1, "Each intermediate native Cut must keep one solid");
+                    if (target.RemovedVolume <= 1e-13) continue;
+                    Steps.Add(new Step { Part = i, Operation = operation, Before = running[i],
+                        Target = target.Kept.Single(), Removed = target.RemovedVolume });
+                    running[i] = target.Kept.Single();
+                }
+            }
+            Need(Steps.Count == 4 && Steps.Select(s => s.Operation.EvidenceId).Distinct().Count() == 4,
+                "Only the native-qualified four nonempty U operations are admitted");
+            for (int i = 0; i < 2; i++)
+            {
+                var target = i == 0 ? Preview.A.Kept.Single() : Preview.B.Kept.Single();
+                Need(AfjNativeCutCommit.SymmetricDifference(running[i], target) <= 1e-12,
+                    "Sequential operation targets differ from reviewed final Preview");
+            }
+        }
+        private void Register(ModelDoc2 part, Feature feature, string role)
+        {
+            var raw = new RawCreation { Role = role }; Raw.Add(raw);
+            try
+            {
+                // Capture exact ownership first; no new COM readback precedes it.
+                var captured=Journal.RegisterNewNativeFeature(part, feature, role);
+                raw.Frame=captured.Document;raw.FeatureId=captured.Id;raw.JournalReturned=true;
+            }
+            catch { UnresolvedCreation = true; throw; }
+        }
+        private void Activate(ModelDoc2 document)
+        {
+            Need(Same(((AssemblyDoc)Assembly).GetEditTarget(), Assembly) && Assembly.GetActiveSketch2() == null,
+                "Native Cut requires restored Assembly edit context");
+            if (Same(App.ActiveDoc, document)) return;
+            int error = 0; var actual = App.ActivateDoc3(document.GetTitle(), false,
+                (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref error) as ModelDoc2;
+            Need(Same(actual, document) && (error & ~(int)swActivateDocError_e.swDocNeedsRebuildWarning) == 0,
+                "Cannot activate exact native target");
+        }
+        internal void Apply()
+        {
+            Need(!ApplyStarted && !Committed, "Transaction cannot be reused"); ApplyStarted = true;
+            RequireAcceptedStamps(); CheckInvariant("BEFORE_FIRST_NATIVE_SKETCH");
+            Need(Ticket.IsSourceCurrent != null && Ticket.IsSourceCurrent(), "PREVIEW_STALE before first mutation");
+            int winner = Preview.CoverA ? 0 : 1, loser = 1 - winner;
+            SketchWriterResult = AfjUParametricSketchWriter.TryWrite(App, Assembly, Components[loser], Components[winner],
+                Intent, Documents[loser].TopIds, Documents[winner].TopIds, Prefix, Register, Log);
+            // InsertSketch may mutate native history before a Feature interface
+            // is available. Keep that uncertainty on the transaction itself so
+            // the caller cannot skip rollback merely because Raw is still empty.
+            UnresolvedCreation |= SketchWriterResult.UnresolvedCreation;
+            Need(SketchWriterResult.Success && !SketchWriterResult.UnresolvedCreation && SketchWriterResult.ContextRestored,
+                "Native U Sketch writer failed: " + SketchWriterResult.Error);
+            CheckInvariant("AFTER_FOUR_NATIVE_SKETCHES"); CheckSketches("BEFORE_ANY_CUT"); AcceptStamps();
+            foreach (var step in Steps)
+            {
+                RequireAcceptedStamps(); CheckInvariant("BEFORE_CUT_" + step.Operation.EvidenceId);
+                var owned = SketchWriterResult.Owned.Single(o => o.EvidenceId == step.Operation.EvidenceId);
+                Need(Same(owned.Part, Documents[step.Part].Model), "Prepared Sketch/operation Part mapping differs");
+                ApplyCut(step, owned); Expected[step.Part] = step.Target;
+                CheckSketches("AFTER_CUT_" + step.Operation.EvidenceId);
+                CheckInvariant("AFTER_CUT_" + step.Operation.EvidenceId); AcceptStamps();
+            }
+            Activate(Assembly); CheckSketches("PAIR_FINAL"); CheckInvariant("PAIR_FINAL");
+            var wa = AfjJointSolver.World(new[] { AfjTemporaryBoolean.Copy(AfjNativeCutCommit.CurrentBody(Documents[0].Model)) }, Components[0].GetTotalTransform(false));
+            var wb = AfjJointSolver.World(new[] { AfjTemporaryBoolean.Copy(AfjNativeCutCommit.CurrentBody(Documents[1].Model)) }, Components[1].GetTotalTransform(false));
+            Report.GapMetres = AfjJointSolver.Gap(Assembly, wa, wb); Report.InterferenceCubicMetres = AfjJointSolver.Overlap(wa, wb);
+            Need(Report.InterferenceCubicMetres <= 1e-12 && Math.Abs(Report.GapMetres - AfjManufacturingConventions.AssemblyFitGap) <= 2e-7,
+                "Final native pair fit/interference failed");
+            Need(Report.Cuts.Count == 4 && Raw.All(r => r.JournalReturned), "Native ownership/result count incomplete");
+            Applied = true; AcceptStamps(); Log("PAIR_GEOMETRY_AND_SKETCHES_VERIFIED_NOT_YET_COMMITTED");
+        }
+        private void ApplyCut(Step step, AfjUParametricSketchWriter.OwnedSketch owned)
+        {
+            var part = Documents[step.Part].Model; Activate(part); var feature = Find(part, owned.FeatureId);
+            Need(feature != null, "Exact owned profile disappeared before Cut"); var sketch = feature.GetSpecificFeature2() as Sketch;
+            Need(sketch != null && sketch.GetConstrainedStatus() == (int)swConstrainedStatus_e.swFullyConstrained, "Fully constrained native Sketch required");
+            var spec = step.Operation.Tools.Single(); var inverse = sketch.ModelToSketchTransform.Inverse() as MathTransform;
+            Need(inverse != null, "Sketch inverse unavailable"); var matrix = inverse.ArrayData as double[];
+            var origin = AfjProfileAnalyzer.Transform(new double[3], matrix);
+            var normal = AfjParametricRules.Unit(AfjParametricRules.Sub(AfjProfileAnalyzer.Transform(new[] { 0d, 0d, 1d }, matrix), origin));
+            bool reverse = AfjNativeCutCommit.ReverseForAlignment(AfjParametricRules.Dot(normal, spec.Direction));
+            bool normalCut = AfjNativeCutCommit.UseNativeNormalCut(step.Operation, spec);
+            double signedOffset = AfjParametricRules.Dot(AfjParametricRules.Sub(spec.Polygon[0], origin), normal), offset = Math.Abs(signedOffset);
+            bool offsetReverse = signedOffset < 0;
+            Need(Math.Abs(offset - AfjManufacturingConventions.CutterEnvelopeOverrun) < 1e-8, "Reviewed start offset differs from calibrated native representation");
+            string ownedSketchName=feature.Name;
+            part.ClearSelection2(true); Need(feature.Select2(false, 0), "Cannot select exact owned Sketch");
+            // Native selection owns the selected profile for FeatureCut4. These
+            // pre-Cut aliases must not be queried or retained after mutation.
+            feature=null;sketch=null;inverse=null;
+            // Register the returned native object immediately, without any log,
+            // rename, readback, file I/O or callback between return and capture.
+            Feature cut;
+            try
+            {
+                cut = part.FeatureManager.FeatureCut4(true, false, reverse, (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind,
+                    spec.Length, spec.Length, false, false, false, false, 0, 0, false, false, false, false, normalCut, true, true,
+                    false, false, false, (int)swStartConditions_e.swStartOffset, offset, offsetReverse, normalCut);
+            }
+            catch
+            {
+                // A native call can throw after mutation; without a returned
+                // Feature identity the journal must not guess new ownership.
+                UnresolvedCreation = true; throw;
+            }
+            if (cut == null)
+            {
+                UnresolvedCreation = true;
+                Need(false, "FeatureCut4 returned null; no Cut identity available");
+            }
+            Register(part, cut, step.Operation.EvidenceId + ":CUT");
+            cut.Name = owned.IntendedName + "_Cut";
+            bool warning; int error = cut.GetErrorCode2(out warning); var data = cut.GetDefinition() as ExtrudeFeatureData2;
+            Need(error == 0 && data != null && data.GetEndCondition(true) == (int)swEndConditions_e.swEndCondBlind &&
+                Math.Abs(data.GetDepth(true) - spec.Length) < 1e-8 && data.ReverseDirection == reverse && data.NormalCut == normalCut &&
+                !data.FlipSideToCut && data.FromType == (int)swExtrudeFrom_e.swExtrudeFrom_Offset &&
+                Math.Abs(data.FromOffsetDistance - offset) < 1e-8 && data.FromOffsetReverse == offsetReverse,
+                "Native Cut definition differs from reviewed operation");
+            double delta = AfjNativeCutCommit.SymmetricDifference(AfjTemporaryBoolean.Copy(AfjNativeCutCommit.CurrentBody(part)), step.Target);
+            Need(AfjTemporaryBoolean.Finite(delta) && delta <= 1e-12, "Native Cut differs from independent sequential target");
+            var measured = MeasureSketch(part, owned, "CONSUMED_BY_NATIVE_CUT");
+            Report.Cuts.Add(new AfjNativeCutEvidence { Frame = Documents[step.Part].Label, EvidenceId = step.Operation.EvidenceId,
+                FeatureName = cut.Name, FeatureType = cut.GetTypeName2(), UnderlyingType = cut.GetTypeName(),
+                DepthPolicy = spec.DepthPolicy, EndCondition = data.GetEndCondition(true), NormalCut = data.NormalCut,
+                FlipSideToCut = data.FlipSideToCut, ReverseDirection = data.ReverseDirection, DepthMetres = data.GetDepth(true),
+                RemovedCubicMetres = step.Removed, SymmetricDifferenceCubicMetres = delta,
+                NativeRepresentation = "FACE_ATTACHED_U_DATUM_PROFILE", PlanCutterLengthMetres = spec.Length,
+                NativeActualDepthMetres = data.GetDepth(true), SketchName = ownedSketchName, SketchSupport = "ORIGINAL_OUTER_WEB_FACE",
+                SketchReferenceType = measured.ReferenceType, SketchConstrainedStatus = measured.Status,
+                SketchRelationCount = measured.Relations, SketchDrivingDimensions = measured.Dimensions, NewReferencePlanes = 0,
+                SketchReferenceQualification = "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+                SketchObservedReferenceType = measured.ReferenceType, SketchSupportOwnerId = measured.SupportOwnerId,
+                SketchObservedReferenceIsFace = measured.ReferenceIsFace, SketchPlaneVerified = true });
+            // Primitive report construction is complete before the next Cut.
+            data=null;cut=null;
+            Log("NATIVE_CUT_VERIFIED " + Documents[step.Part].Label + " " + step.Operation.EvidenceId);
+        }
+        private SketchCheck MeasureSketch(ModelDoc2 part, AfjUParametricSketchWriter.OwnedSketch owned, string phase)
+        {
+            int index = Same(part, Documents[0].Model) ? 0 : 1; var feature = Find(part, owned.FeatureId);
+            Need(feature != null && owned.ClosedOwnerVerified, "Cannot resolve closed owned Sketch");
+            var sketch = feature.GetSpecificFeature2() as Sketch; Need(sketch != null && !sketch.Is3D(), "Owned 2D Sketch interface unavailable");
+            int referenceType = 0; var face = sketch.GetReferenceEntity(ref referenceType) as Face2;
+            var owner = face == null ? null : face.GetFeature() as Feature; bool warning; int error = feature.GetErrorCode2(out warning), dimensions = 0;
+            for (var d = feature.GetFirstDisplayDimension() as DisplayDimension; d != null; d = feature.GetNextDisplayDimension(d) as DisplayDimension)
+                Need(++dimensions < 64, "Sketch dimension traversal bound");
+            var row = new SketchCheck { Phase = phase, Frame = Documents[index].Label, EvidenceId = owned.EvidenceId,
+                FeatureId = owned.FeatureId, Status = sketch.GetConstrainedStatus(),
+                Relations = sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll),
+                Dangling = sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling),
+                Overdefining = sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining),
+                Dimensions = dimensions, ReferenceType = referenceType, SupportOwnerId = owner == null ? -1 : owner.GetID(),
+                Error = error, Warning = warning, ReferenceIsFace = face != null,
+                OriginalSupportOwner = owner != null && Documents[index].Original.ContainsKey(owner.GetID()) };
+            int wanted = owned.EvidenceId == "U_RULE:COVER_WEB_WALL" || owned.EvidenceId == "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN" ? 1 : 0;
+            SketchChecks.Add(row);
+            Need(row.Status == (int)swConstrainedStatus_e.swFullyConstrained && row.Dangling == 0 && row.Overdefining == 0 &&
+                dimensions == wanted && error == 0 && face != null && referenceType == 2 && row.OriginalSupportOwner,
+                "Owned Sketch constraint/support graph failed after " + phase);
+            return row;
+        }
+        internal void CheckSketches(string phase)
+        {
+            Need(SketchWriterResult != null && SketchWriterResult.Owned.Count == 4, "Four owned Sketches not prepared");
+            foreach (var owned in SketchWriterResult.Owned) MeasureSketch(owned.Part, owned, phase);
+        }
+        internal void Commit()
+        {
+            Need(Applied && !Committed && !UnresolvedCreation, "Only a fully applied owned transaction can commit");
+            RequireAcceptedStamps(); CheckSketches("BEFORE_COMMIT"); CheckInvariant("BEFORE_COMMIT");
+            Need(Same(App.ActiveDoc, Assembly) && Same(((AssemblyDoc)Assembly).GetEditTarget(), Assembly) &&
+                Assembly.GetActiveSketch2() == null, "Restore Assembly context before committing");
+            Committed = true; Log("COMMITTED_NO_SAVE");
+        }
+        internal AfjUOwnedFeatureJournal.RollbackReport Rollback()
+        {
+            Need(!Committed, "Committed transaction cannot be reused for rollback");
+            RollbackResult = Journal.Rollback();
+            if (UnresolvedCreation || Raw.Any(r => !r.JournalReturned))
+            {
+                RollbackResult.Verified = false; RollbackResult.Status = "ROLLBACK_UNVERIFIED";
+                RollbackResult.Error += " Unresolved creation or incomplete immediate ownership capture";
+            }
+            Report.RollbackVerified = RollbackResult.Verified;
+            Report.Rollback.Add("CONSTRAINED_U_GLOBAL_JOURNAL " + RollbackResult.Status);
+            if (!String.IsNullOrEmpty(RollbackResult.Error)) Report.Rollback.Add(RollbackResult.Error);
+            return RollbackResult;
+        }
+    }
+}
