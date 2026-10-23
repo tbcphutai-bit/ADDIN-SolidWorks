@@ -21,7 +21,7 @@ The user log reached AFJ cleanup/AfterClose completion after four matching Cuts 
 | Copy Part activation and explicit rebuild | COMPLETED | No hang in basic native harness; no installed UI claim |
 | Fresh-copy Save / Read-Only reopen | COMPLETED_WITH_SKETCH_REQUIREMENTS_FAIL | Both copies reopened Read-Only with valid bodies, no new feature errors; all four Sketches still status2/zero relations |
 | Cause of installed Part-open hang/exit | UNVERIFIED | No causal native stack or matching Part-open event span |
-| Proposed U writer rewrite | INFERRED | Design only; not compiled or native-tested |
+| Constrained U replacement research | API_AND_GEOMETRY_VERIFIED_WITH_BOUNDED_SCOPE | Four linked Sketch/Cut copies qualified below; production integration and rollback are separate |
 
 ## Files
 
@@ -50,3 +50,22 @@ Source production files remain unchanged in this post-load audit. The audit cont
 The separate four-point probe passed: all four critical U seam/Wall points were fully constrained by eight direct Coincident relations to actual native Frame geometry, with zero dimensions and zero new planes. This was a Sketch-only gate; no Cut, parameter-follow or installed Add-in result is implied. Finite trimmed Edge checks and Face underlying-plane limits are retained in [U_CRITICAL_POINTS_PROBE.md](U_CRITICAL_POINTS_PROBE.md), [JSON](U_CRITICAL_POINTS_PROBE.json) and [CSV](U_CRITICAL_POINTS_PROBE.csv).
 
 The full eight-vertex cover Sketch is a separate experiment. [U_COVER_MASTER_TRIALS.json](U_COVER_MASTER_TRIALS.json) records every completed trial, including failed native relation creation. The candidate uses direct Frame datums, geometric relations and one shared ToolClosureMargin parameter; no per-point coordinate dimensions, Convert or FIX. These research helpers are not routed into the production Add-in. Full-profile, native Cut, later-operation dependencies, rollback, follow and reopen must be qualified separately before enabling a replacement U writer.
+
+## Native constrained U milestones (2026-10-23)
+
+These later experiments preserve the earlier legacy failures. They use disposable copies of the actual 2354 fr03/fr04 pair; no original CAD, Add-in DLL/PDB or project configuration was changed.
+
+| Gate | Native observation | Scope |
+| --- | --- | --- |
+| Context diagnosis | Created line handles and reacquired original Assembly-context Sketch handles behaved differently; actual relation creation qualified after exact segment-ID reacquisition. | [Line context matrix](LINE_CONTEXT_MATRIX.md) |
+| Four linked Sketches | Fully constrained status3 throughout; relation counts28/36/6/10 (80 total); two meaningful driving parameters total; zero new planes. | Existing actual Web Faces, direct Frame/Sketch Coincident, Parallel, Perpendicular, point alignment and Equal relations; no Convert, FIX or per-point coordinate dimensions. |
+| Source width change/restore |70→71→70mm; native master and loser endpoints followed; signed assembly gap preserved at0.10mm; no solver rerun. | [Width/cap follow report](U_NATIVE_FOLLOW_CAPS20261023.md). Sketch follow only; not complete Cut follow. |
+| Four actual sequential Cuts | Four nonempty Cut-Extrudes, each exact symmetric difference0 against its independent temporary Boolean target. One empty near-bend subtraction was skipped, not a fifth native Cut. | [Four-Cut roundtrip](U_FOUR_CUT_ROUNDTRIP.md). |
+| Later-feature and Rebuild graph | All four Sketches stayed status3 with zero dangling/overdefining relations after every Cut, both explicit copied-Part rebuilds and copied-Assembly rebuild. Final gap0.10mm, overlap0, transform change0. | Same bounded four-Cut case; no installed Add-in claim. |
+| Copy save/reopen | Both copied Parts reopened Read-Only with errors/warnings0/0 and retained valid body/Sketch observations. | Post-disk body health, volume/area and Sketch/reference checks; exact B-rep comparisons were performed before Save, not replayed after disk reopen. |
+
+The two parameters are `AFJ_AssemblyFitGap` and the shared `AFJ_ToolClosureMargin`. The latter only closes the cutter outside the retained material; it is not the sheet overrun. `AssemblyFitGap`, `SheetCutOverrun` and `CutterEnvelopeOverrun` remain separate concepts even where numerical values coincide. The four native Cut readbacks retain the reviewed per-operation depths and NormalCut policy; formed-profile cuts are not blindly assigned a single-sheet `t+0.10mm` depth.
+
+[Full master/loser milestones](U_NATIVE_MILESTONES_README.md), [machine-readable matrix](U_NATIVE_MILESTONES.json), [four-Cut JSON](U_FOUR_CUT_ROUNDTRIP.json) and accompanying CSV/source manifests record the precise evidence. Earlier width trials1/2 remain failed measurements; trial3 measures both endpoint sets and is the qualified follow test. Four-Cut trial1 remains a harness logging failure before any Cut; trial2 is the completed native roundtrip.
+
+The installed Part-open hang remains **UNVERIFIED**. A new native Sketch/transaction wrapper and controlled-failure rollback need separate qualification before the production U route changes. A successful copy harness is not an installed Add-in test or proof of visible Preview.

@@ -1,0 +1,5 @@
+run_id,revision,status,cuts,cover_relations,loser_relations,short_cap_relations,long_cap_relations,total_relations,total_driving_dimensions,new_planes,width_change,solver_rerun,save_called,source_hashes_unchanged,copy_hashes_unchanged,blank_session_restored,installed_addin
+native_u_two_caps_01,32.5.0,PASS_NATIVE_TWO_CAP_SKETCHES_ZERO_DIM_ZERO_PLANE_NO_CUT_NO_FOLLOW_TEST,0,28,36,6,10,80,2,0,NOT_RUN,False,False,True,True,True,False
+native_u_width_follow_03,32.5.0,PASS_COPY_NATIVE_WIDTH_FOLLOW_SKETCHES_ONLY_NO_CUT_NO_SOLVER_RERUN,0,28,36,NOT_CREATED,NOT_CREATED,64,2,0,70->71->70mm,False,False,True,True,True,False
+native_u_width_follow_01,32.5.0,FAIL_OR_UNVERIFIED,0,28,36,NOT_CREATED,NOT_CREATED,64,2,0,70->71mm;finally_source_parameter_restored_only,False,False,True,True,True,False
+native_u_width_follow_02,32.5.0,FAIL_OR_UNVERIFIED,0,28,36,NOT_CREATED,NOT_CREATED,64,2,0,70->71mm;finally_source_parameter_restored_only,False,False,True,True,True,False

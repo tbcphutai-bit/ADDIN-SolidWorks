@@ -1,0 +1,130 @@
+// Standalone diagnostic library: SOLIDWORKS Interop only, no solver/project code.
+// Run ONLY on an isolated copied assembly; caller opens/closes copies, owns hashes.
+// No Cut, Save, rebuild, activation, FIX, Convert or dimension API is called.
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+
+public static class AfjLineContextMatrixProbe
+{
+ public sealed class CreationRow { public string Manager,Status,Error,SegmentId,OwnerSketchId;public bool Construction;public int SegmentType=-1;public double[] Start,End; }
+ public sealed class QueryRow { public string Manager,Input,Pack,Status,Error,SegmentId,OwnerSketchId;public int[] Allowed=new int[0];public int ConstraintStatus=-1,RelationCount=-1; }
+ public sealed class MappingRow { public string Operation,Status,Error,InputId,OutputId,OutputOwnerSketchId;public bool OutputSketchSegment; }
+ public sealed class SelectionRow { public string Input,Status,Error;public bool Select4Returned;public int AssemblySelectionCount=-1,PartSelectionCount=-1; }
+ public sealed class HorizontalRow { public bool Requested,Attempted,NativeRelationCreated;public string Manager,Input,Reason,Error;public int RelationType=-1,CountBefore=-1,CountAfter=-1;public string[] DefinitionEntityTypes=new string[0]; }
+ public sealed class Result {
+  public string Scope="TWO_CONSTRUCTION_LINES_CONTEXT_MATRIX_ONLY",Status="UNVERIFIED",Error,SupportMethod="UNIQUE_BASE_SKETCH_WEB_PLUS_NATIVE_OUTER_FACE";
+  public bool NativeApi,InstalledAddin=false,CutCreated=false,SaveApiCalled=false,RebuildApiCalled=false,EditContextRestored,OwnedSketchInTargetPart;
+  public string CoordinateContext="ASSEMBLY_WORLD_TO_TARGET_PART_TO_SKETCH",SketchName;
+  public int SketchFeatureId=-1,SupportReferenceType=-1,AssemblyPartSketchEquality=-1,NewPlanes=-1,Dimensions=-1;
+  public readonly List<CreationRow> Creations=new List<CreationRow>();public readonly List<QueryRow> Queries=new List<QueryRow>();public readonly List<MappingRow> Mappings=new List<MappingRow>();public readonly List<SelectionRow> Selections=new List<SelectionRow>();public readonly List<string> Stages=new List<string>();
+  public HorizontalRow Horizontal=new HorizontalRow();
+ }
+ sealed class ManagerRef { internal string Name;internal Sketch Sketch; }
+ sealed class InputRef { internal string Name,Id,Owner;internal SketchSegment Segment; }
+ static void Need(bool b,string text){if(!b)throw new InvalidOperationException("LINE_CONTEXT_UNVERIFIED: "+text);}
+ static double[] Add(double[] a,double[] b){return a.Zip(b,(x,y)=>x+y).ToArray();}
+ static double[] Sub(double[] a,double[] b){return a.Zip(b,(x,y)=>x-y).ToArray();}
+ static double[] Mul(double[] a,double b){return a.Select(x=>x*b).ToArray();}
+ static double Dot(double[] a,double[] b){return a.Zip(b,(x,y)=>x*y).Sum();}
+ static double Norm(double[] a){return Math.Sqrt(Dot(a,a));}
+ static bool Finite(double x){return !Double.IsNaN(x)&&!Double.IsInfinity(x);}
+ static double[] Unit(double[] a){double n=Norm(a);Need(Finite(n)&&n>1e-10,"invalid vector");return Mul(a,1/n);}
+ static double[] Cross(double[] a,double[] b){return new[]{a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};}
+ static double[] Transform(double[] p,double[] m){Need(m!=null&&m.Length==16&&m.All(Finite),"invalid transform");var q=new double[3];for(int i=0;i<3;i++)q[i]=(p[0]*m[i]+p[1]*m[3+i]+p[2]*m[6+i])*m[12]+m[9+i];return q;}
+ static bool Same(ISldWorks app,object a,object b){return a!=null&&b!=null&&app.IsSame(a,b)==(int)swObjectEquality.swObjectSame;}
+ static string Id(object raw){var a=raw as Array;return a==null?Convert.ToString(raw):String.Join(",",a.Cast<object>().Select(Convert.ToString));}
+ static string SegmentId(SketchSegment s){return s==null?null:Id(s.GetID());}
+ static string SketchId(Sketch s){var f=s as Feature;return f==null?null:f.GetID().ToString();}
+ static string OwnerId(SketchSegment segment){return SketchId(segment.GetSketch() as Sketch);}
+ static int PlaneCount(ModelDoc2 part){int n=0,seen=0;for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(++seen<2000,"feature traversal bound");if(f.GetTypeName2()=="RefPlane")n++;}return n;}
+ static HashSet<int> FeatureIds(ModelDoc2 part){var ids=new HashSet<int>();int seen=0;for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(++seen<2000,"feature traversal bound");ids.Add(f.GetID());}return ids;}
+ static Feature FindFeature(ModelDoc2 part,int id){int seen=0;for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(++seen<2000,"feature traversal bound");if(f.GetID()==id)return f;}return null;}
+ static void CopyBound(string root,ModelDoc2 model){string p=model.GetPathName();Need(!String.IsNullOrEmpty(p)&&Path.IsPathRooted(p)&&Path.GetFullPath(p).StartsWith(root,StringComparison.OrdinalIgnoreCase),"document escaped caller's copied-data root");}
+ static Body2 Body(Component2 c){object info;var raw=c.GetBodies3((int)swBodyType_e.swSolidBody,out info) as Array;Need(raw!=null&&raw.Length==1,"exactly one resolved native body");return raw.GetValue(0) as Body2;}
+ static double[] End(double[] line,int end){return line.Skip(end*3).Take(3).ToArray();}
+ static bool Near(double[] a,double[] b){return Norm(Sub(a,b))<1e-8;}
+ static double[] OtherEnd(double[] line,double[] p){return Near(End(line,0),p)?End(line,1):Near(End(line,1),p)?End(line,0):null;}
+ static Face2 WebFace(ModelDoc2 part,Body2 body,out double[] center)
+ {
+  var bases=new List<Feature>();int seen=0;for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(++seen<2000,"base traversal bound");if(f.GetTypeName2()=="SMBaseFlange")bases.Add(f);}Need(bases.Count==1,"one base flange required");
+  var parents=bases[0].GetParents() as Array;Need(parents!=null,"base parents unavailable");var sketches=parents.Cast<object>().OfType<Feature>().Select(f=>f.GetSpecificFeature2() as Sketch).Where(s=>s!=null).ToArray();Need(sketches.Length==1,"unique base profile Sketch required");
+  var inverse=sketches[0].ModelToSketchTransform.Inverse() as MathTransform;Need(inverse!=null,"base inverse unavailable");var matrix=inverse.ArrayData as double[];var axis=Unit(new[]{matrix[6],matrix[7],matrix[8]});
+  var raw=sketches[0].GetSketchSegments() as Array;Need(raw!=null,"base Sketch segments unavailable");var lines=new List<double[]>();
+  foreach(SketchSegment segment in raw.Cast<object>().OfType<SketchSegment>()){
+   if(segment.ConstructionGeometry)continue;var line=segment as SketchLine;Need(line!=null,"bounded straight base profile only");var a=line.GetStartPoint2() as SketchPoint;var b=line.GetEndPoint2() as SketchPoint;Need(a!=null&&b!=null,"base line endpoints unavailable");lines.Add(Transform(new[]{a.X,a.Y,a.Z},matrix).Concat(Transform(new[]{b.X,b.Y,b.Z},matrix)).ToArray());
+  }
+  var candidates=new List<double[]>();foreach(var line in lines){var a=End(line,0);var b=End(line,1);var u=Unit(Sub(b,a));var first=lines.Where(l=>!Object.ReferenceEquals(l,line)&&OtherEnd(l,a)!=null).ToArray();var last=lines.Where(l=>!Object.ReferenceEquals(l,line)&&OtherEnd(l,b)!=null).ToArray();if(first.Length!=1||last.Length!=1)continue;var v=Unit(Sub(OtherEnd(first[0],a),a));var w=Unit(Sub(OtherEnd(last[0],b),b));if(Math.Abs(Dot(u,v))<1e-7&&Dot(v,w)>.999999)candidates.Add(line);}
+  Need(candidates.Count==1,"no unique Web between parallel outward Walls");var web=candidates[0];var origin=End(web,0);var normal=Unit(Cross(axis,Unit(Sub(End(web,1),origin))));double support=Dot(origin,normal);
+  var faces=body.GetFaces() as Array;Need(faces!=null,"native faces unavailable");Face2 chosen=null;double area=0;
+  foreach(Face2 face in faces.Cast<object>().OfType<Face2>()){var surface=face.GetSurface() as Surface;if(surface==null||!surface.IsPlane())continue;var p=surface.PlaneParams as double[];if(p==null||p.Length!=6)continue;if(Math.Abs(Math.Abs(Dot(Unit(p.Take(3).ToArray()),normal))-1)>1e-7||Math.Abs(Dot(p.Skip(3).Take(3).ToArray(),normal)-support)>1e-8)continue;double current=face.GetArea();if(current>area){area=current;chosen=face;}}
+  Need(chosen!=null,"actual outer Web Face unavailable");double x,y,z;Need(body.GetExtremePoint(axis[0],axis[1],axis[2],out x,out y,out z),"positive native extent unavailable");double high=Dot(new[]{x,y,z},axis);Need(body.GetExtremePoint(-axis[0],-axis[1],-axis[2],out x,out y,out z),"negative native extent unavailable");double low=Dot(new[]{x,y,z},axis);
+  center=Mul(Add(End(web,0),End(web,1)),.5);center=Add(center,Mul(axis,(low+high)/2-Dot(center,axis)));return chosen;
+ }
+ static SketchSegment Create(SketchManager manager,string name,double x,double y,Result result)
+ {
+  var row=new CreationRow{Manager=name,Status="UNVERIFIED"};result.Creations.Add(row);bool read=false,old=false;
+  try{old=manager.AddToDB;read=true;manager.AddToDB=true;var s=manager.CreateLine(x,y,0,x+.003,y+.002,0);Need(s!=null,"CreateLine returned null");s.ConstructionGeometry=true;row.SegmentId=SegmentId(s);row.OwnerSketchId=OwnerId(s);row.SegmentType=s.GetType();row.Construction=s.ConstructionGeometry;var line=s as SketchLine;Need(line!=null,"line QueryInterface unavailable");var a=line.GetStartPoint2() as SketchPoint;var b=line.GetEndPoint2() as SketchPoint;row.Start=new[]{a.X,a.Y,a.Z};row.End=new[]{b.X,b.Y,b.Z};row.Status="NATIVE_LINE_CREATED";return s;}
+  catch(Exception ex){row.Status="CREATION_FAILED";row.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;return null;}
+  finally{if(read)manager.AddToDB=old;}
+ }
+ static void Map(string label,SketchSegment input,Func<object,object> operation,List<InputRef> inputs,Result result)
+ {
+  var row=new MappingRow{Operation=label};result.Mappings.Add(row);try{row.InputId=SegmentId(input);object value=operation(input);var output=value as SketchSegment;row.OutputSketchSegment=output!=null;if(output==null){row.Status="MAPPING_UNAVAILABLE";return;}row.OutputId=SegmentId(output);row.OutputOwnerSketchId=OwnerId(output);row.Status="MAPPING_RETURNED_SKETCH_SEGMENT";inputs.Add(new InputRef{Name=label,Segment=output});}catch(Exception ex){row.Status="MAPPING_FAILED";row.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;}
+ }
+ static int[] Allowed(Sketch sketch,SketchSegment segment,bool wrapped){object values=wrapped?(object)new[]{new DispatchWrapper(segment)}:new object[]{segment};var result=sketch.RelationManager.GetAllowedRelations(values) as Array;return result==null?new int[0]:result.Cast<object>().Select(Convert.ToInt32).ToArray();}
+ public static Result Run(ISldWorks app,ModelDoc2 model,Component2 target,string freshCopyRoot,bool trySingleHorizontal,Action<string> stageSink)
+ {
+  var result=new Result();result.Horizontal.Requested=trySingleHorizontal;var assembly=model as AssemblyDoc;ModelDoc2 part=null;bool editing=false,opened=false;Sketch sketch=null;
+  Action<string> mark=s=>{result.Stages.Add(s);if(stageSink!=null)stageSink(s);};
+  try{
+   Need(Thread.CurrentThread.GetApartmentState()==ApartmentState.STA,"STA required");Need(app!=null&&assembly!=null&&target!=null,"bound app/assembly/target required");result.NativeApi=true;
+   string root=Path.GetFullPath(freshCopyRoot).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar)+Path.DirectorySeparatorChar;
+   part=target.GetModelDoc2() as ModelDoc2;Need(part!=null&&part.GetType()==(int)swDocumentTypes_e.swDocPART,"resolved target Part required");CopyBound(root,model);CopyBound(root,part);
+   Need(Same(app,app.ActiveDoc,model)&&Same(app,assembly.GetEditTarget(),model),"bound active assembly outside edit context required");Need(part.GetActiveSketch2()==null,"finish existing Sketch first");
+   int beforePlanes=PlaneCount(part);var beforeIds=FeatureIds(part);mark("READ_ONE_NATIVE_WEB_FACE");double[] center;var face=WebFace(part,Body(target),out center);object support=target.GetCorrespondingEntity(face);Need(support is Face2,"corresponding Web unavailable");
+   mark("ENTER_EDIT_PART");model.ClearSelection2(true);Need(target.Select4(false,null,false),"select target component");int information=0;assembly.EditPart2(true,false,ref information);editing=true;Need(Same(app,assembly.GetEditTarget(),part)&&Same(app,assembly.GetEditTargetComponent(),target),"exact edit target missing");
+   mark("OPEN_SKETCH_ASSEMBLY_MANAGER");model.ClearSelection2(true);Need(((IEntity)support).Select4(false,null),"select actual Web");model.SketchManager.InsertSketch(true);opened=true;
+   var asmSketch=model.SketchManager.ActiveSketch;var partSketch=part.SketchManager.ActiveSketch;sketch=partSketch??asmSketch;Need(sketch!=null&&!sketch.Is3D(),"2D active Sketch unavailable");
+   result.AssemblyPartSketchEquality=asmSketch==null||partSketch==null?-1:app.IsSame(asmSketch,partSketch);var feature=sketch as Feature;Need(feature!=null,"Sketch Feature QueryInterface unavailable");result.SketchFeatureId=feature.GetID();int referenceType=0;object reference=sketch.GetReferenceEntity(ref referenceType);result.SupportReferenceType=referenceType;Need(reference is Face2,"native support reference not Face");
+   var toSketch=sketch.ModelToSketchTransform.ArrayData as double[];var local=Transform(center,toSketch);Need(Math.Abs(local[2])<1e-8,"actual native center not in target Part Sketch");
+   mark("CREATE_LINE_ASSEMBLY_MANAGER");var asmLine=Create(model.SketchManager,"ASSEMBLY_MANAGER",local[0]-.006,local[1]-.006,result);
+   mark("CREATE_LINE_PART_MANAGER");var partLine=Create(part.SketchManager,"PART_MANAGER",local[0]+.003,local[1]+.003,result);Need(asmLine!=null||partLine!=null,"neither manager created a native line");
+   var inputs=new List<InputRef>();if(asmLine!=null)inputs.Add(new InputRef{Name="ASSEMBLY_CREATED_DIRECT",Segment=asmLine});if(partLine!=null)inputs.Add(new InputRef{Name="PART_CREATED_DIRECT",Segment=partLine});
+   if(asmLine!=null){mark("MAP_ASM_LINE_TO_NATIVE_PART");Map("PART_EXTENSION_GET_CORRESPONDING_ASM_LINE",asmLine,o=>part.Extension.GetCorresponding(o),inputs,result);}
+   if(partLine!=null){mark("MAP_PART_LINE_TO_ASSEMBLY_COMPONENT");Map("COMPONENT_GET_CORRESPONDING_PART_LINE",partLine,o=>target.GetCorresponding(o),inputs,result);}
+   var managers=new List<ManagerRef>();if(partSketch!=null)managers.Add(new ManagerRef{Name="PART_ACTIVE_SKETCH",Sketch=partSketch});if(asmSketch!=null)managers.Add(new ManagerRef{Name="ASSEMBLY_ACTIVE_SKETCH",Sketch=asmSketch});
+   mark("READ_NATIVE_OWNED_FEATURE_SPECIFIC_SKETCH");var ownedSpecific=feature.GetSpecificFeature2() as Sketch;if(ownedSpecific!=null)managers.Add(new ManagerRef{Name="OWNED_FEATURE_SPECIFIC_SKETCH",Sketch=ownedSpecific});
+   if(ownedSpecific!=null){mark("REACQUIRE_NATIVE_OWNED_SEGMENTS");var segments=ownedSpecific.GetSketchSegments() as Array;var reacquired=new List<InputRef>();if(segments!=null)foreach(SketchSegment segment in segments.Cast<object>().OfType<SketchSegment>()){string id=SegmentId(segment);if((asmLine!=null&&id==SegmentId(asmLine))||(partLine!=null&&id==SegmentId(partLine)))reacquired.Add(new InputRef{Name="REACQUIRED_NATIVE_OWNED_SEGMENT_"+id,Segment=segment});}foreach(var input in reacquired){inputs.Add(input);mark("MAP_NATIVE_OWNED_SEGMENT_TO_ASSEMBLY");Map("COMPONENT_GET_CORRESPONDING_"+input.Name,input.Segment,o=>target.GetCorresponding(o),inputs,result);}}
+   foreach(var input in inputs){input.Id=SegmentId(input.Segment);input.Owner=OwnerId(input.Segment);var row=new SelectionRow{Input=input.Name};result.Selections.Add(row);try{mark("SELECT4_"+input.Name);model.ClearSelection2(true);row.Select4Returned=input.Segment.Select4(false,null);var am=model.SelectionManager as SelectionMgr;var pm=part.SelectionManager as SelectionMgr;row.AssemblySelectionCount=am==null?-1:am.GetSelectedObjectCount2(-1);row.PartSelectionCount=pm==null?-1:pm.GetSelectedObjectCount2(-1);row.Status="NATIVE_SELECTION_COUNTS_READ";}catch(Exception ex){row.Status="SELECTION_QUERY_FAILED";row.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;}}
+   model.ClearSelection2(true);
+   ManagerRef horizontalManager=null;InputRef horizontalInput=null;bool horizontalWrapped=true;
+   foreach(var manager in managers)foreach(var input in inputs)foreach(bool wrapped in input.Name=="ASSEMBLY_CREATED_DIRECT"?new[]{true,false}:new[]{true}){
+    var row=new QueryRow{Manager=manager.Name,Input=input.Name,Pack=wrapped?"DISPATCH_WRAPPER_ARRAY":"RAW_OBJECT_ARRAY"};result.Queries.Add(row);
+    try{mark("SINGLE_ALLOWED_"+row.Manager+"_"+row.Input+"_"+row.Pack);row.SegmentId=input.Id;row.OwnerSketchId=input.Owner;row.Allowed=Allowed(manager.Sketch,input.Segment,wrapped);row.ConstraintStatus=manager.Sketch.GetConstrainedStatus();row.RelationCount=manager.Sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);row.Status="NATIVE_QUERY_COMPLETED";if(horizontalManager==null&&row.Allowed.Contains((int)swConstraintType_e.swConstraintType_HORIZONTAL)){horizontalManager=manager;horizontalInput=input;horizontalWrapped=wrapped;}}
+    catch(Exception ex){row.Status="QUERY_FAILED";row.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;}
+   }
+   if(trySingleHorizontal&&horizontalManager!=null){
+    mark("ADD_ONE_HORIZONTAL_ONLY_ADVERTISED");var row=result.Horizontal;row.Attempted=true;row.Manager=horizontalManager.Name;row.Input=horizontalInput.Name;
+    try{row.CountBefore=horizontalManager.Sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);object values=horizontalWrapped?(object)new[]{new DispatchWrapper(horizontalInput.Segment)}:new object[]{horizontalInput.Segment};var added=horizontalManager.Sketch.RelationManager.AddRelation(values,(int)swConstraintType_e.swConstraintType_HORIZONTAL) as SketchRelation;row.CountAfter=horizontalManager.Sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);if(added!=null){row.RelationType=added.GetRelationType();var definition=added.GetDefinitionEntities2() as Array;row.DefinitionEntityTypes=definition==null?new string[0]:definition.Cast<object>().Select(o=>o==null?"NULL":o.GetType().FullName).ToArray();}row.NativeRelationCreated=added!=null&&row.RelationType==(int)swConstraintType_e.swConstraintType_HORIZONTAL&&row.CountAfter>row.CountBefore;row.Reason=row.NativeRelationCreated?"NATIVE_HORIZONTAL_TYPE_AND_COUNT_READBACK":"NATIVE_CREATION_NOT_VERIFIED";}
+    catch(Exception ex){row.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;row.Reason="NATIVE_HORIZONTAL_FAILED";}
+   }else result.Horizontal.Reason=trySingleHorizontal?"NO_SINGLE_LINE_QUERY_ADVERTISED_HORIZONTAL":"NOT_REQUESTED_QUERY_ONLY";
+   mark("CLOSE_SKETCH");model.SketchManager.InsertSketch(true);opened=false;mark("RESTORE_EDIT_ASSEMBLY");assembly.EditAssembly();editing=false;
+   var owned=FindFeature(part,result.SketchFeatureId);result.OwnedSketchInTargetPart=owned!=null&&!beforeIds.Contains(result.SketchFeatureId);Need(result.OwnedSketchInTargetPart,"Sketch not proven in target Part");owned.Name="AFJ_LINE_CONTEXT_MATRIX_PROBE";result.SketchName=owned.Name;result.NewPlanes=PlaneCount(part)-beforePlanes;Need(result.NewPlanes==0,"unexpected new plane");
+   result.Dimensions=0;for(DisplayDimension d=owned.GetFirstDisplayDimension() as DisplayDimension;d!=null;d=owned.GetNextDisplayDimension(d) as DisplayDimension)Need(++result.Dimensions<64,"dimension traversal bound");Need(result.Dimensions==0,"unexpected dimensions");
+   result.EditContextRestored=Same(app,assembly.GetEditTarget(),model);Need(result.EditContextRestored,"edit context not restored");
+   result.Status=result.Creations.All(r=>r.Status=="NATIVE_LINE_CREATED")?"MATRIX_COMPLETED_OBSERVATION_ONLY":"MATRIX_COMPLETED_WITH_LINE_CREATION_FAILURE";
+  }catch(Exception ex){result.Status="FAIL_OR_UNVERIFIED";result.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;}
+  finally{
+   try{if(opened&&model!=null){mark("FINALLY_CLOSE_SKETCH");model.SketchManager.InsertSketch(true);}}catch(Exception ex){result.Status="FAIL_OR_UNVERIFIED";result.Error+=" SKETCH_CLOSE "+ex;}
+   try{if(editing&&assembly!=null){mark("FINALLY_RESTORE_ASSEMBLY");assembly.EditAssembly();}}catch(Exception ex){result.Status="FAIL_OR_UNVERIFIED";result.Error+=" EDIT_RESTORE "+ex;}
+   try{if(assembly!=null&&app!=null)result.EditContextRestored=Same(app,assembly.GetEditTarget(),model);}catch(Exception ex){result.Status="FAIL_OR_UNVERIFIED";result.Error+=" CONTEXT_RECHECK "+ex;}
+  }
+  return result;
+ }
+}
