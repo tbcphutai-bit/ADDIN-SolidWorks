@@ -1,3 +1,5 @@
+> **R53 — 2026-10-23:** source chính đã tích hợp writer Sketch gắn Face, không tạo Plane mới; hai ca native đã chạy với đúng source. Xem [báo cáo và giới hạn R53](R53/README.md). Các kết quả lịch sử dưới đây được giữ nguyên.
+
 # Auto Frame Joint — Native Feature Cut Analysis
 
 > **R51 2026-10-22:** Đã kiểm kê lại 42 Cut, xác minh NormalCut/depth và nghiên cứu ba Cut bị suppress của 2354. Cặp Debug 2354 có Preview API đạt kiểm tra hình học theo quy tắc Frame ngắn che; 1618 vẫn UNVERIFIED. Xem [bổ sung R51](12_R51_FEATURE_CUT_AUDIT/README.md) và [Draft PR #42](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/42). Nội dung các lần trích xuất trước được giữ để truy vết.
