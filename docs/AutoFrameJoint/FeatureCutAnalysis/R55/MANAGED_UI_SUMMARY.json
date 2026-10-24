@@ -1,0 +1,37 @@
+{
+  "status": "PASS_MANAGED_UI_CONTRACTS_BOTH_BASELINES",
+  "candidates": [
+    {
+      "candidate": "local",
+      "ui_sha256": "dd1506216efc372d82220e05fc5b0dec97898ab8c712910a6fdb6e03b01cd1e7",
+      "preview_flow_status": "PASS_MANAGED_UI_FLOW",
+      "preview_flow_tests": 17,
+      "preview_flow_failures": 0,
+      "close_status": "PASS_MANAGED_CONTRACT",
+      "close_tests": 11,
+      "close_failures": 0,
+      "real_com_calls": 0,
+      "com_activations": 0,
+      "installed_addin_test": "NOT_RUN",
+      "geometry_test": "NOT_RUN_BY_THIS_HARNESS"
+    },
+    {
+      "candidate": "git",
+      "ui_sha256": "e614e97f6aaeec37f61385a58b5f12a44904ab40dffa2e0a250d24b22f76d737",
+      "preview_flow_status": "PASS_MANAGED_UI_FLOW",
+      "preview_flow_tests": 17,
+      "preview_flow_failures": 0,
+      "close_status": "PASS_MANAGED_CONTRACT",
+      "close_tests": 11,
+      "close_failures": 0,
+      "real_com_calls": 0,
+      "com_activations": 0,
+      "installed_addin_test": "NOT_RUN",
+      "geometry_test": "NOT_RUN_BY_THIS_HARNESS"
+    }
+  ],
+  "scope": "Managed candidate UI contracts only. No installed SOLIDWORKS Add-in interaction or native geometry is tested by this harness.",
+  "main_addin_build": "NOT_RUN",
+  "flow_harness_sha256": "b449ec0a29115ac9749b2b76b78ae043135cd71fa62b99b495acf81e42116604",
+  "close_harness_sha256": "63751639ebb78e10e4593ffe4580b62c5b9b3da14cf7d5513f81bd7971efda72"
+}
