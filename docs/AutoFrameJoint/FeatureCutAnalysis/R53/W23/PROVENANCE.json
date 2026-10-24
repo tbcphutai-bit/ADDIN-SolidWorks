@@ -1,0 +1,64 @@
+{
+  "study": "R53 W23 unequal-width and folded U section research",
+  "date": "2026-10-23",
+  "part_evidence_id": "R53-W23-PART-READONLY-01",
+  "assembly_evidence_id": "R53-W23-ASSEMBLY-READONLY-01",
+  "part_run_status": "PASS_READONLY_COPIED_PART_METADATA_NO_BEFORE_AFTER",
+  "assembly_run_status": "PASS_READONLY_COPIED_ASSEMBLY_POSES",
+  "part_run_completed_utc": "2026-10-23T09:22:12.1036139Z",
+  "assembly_run_completed_utc": "2026-10-23T09:31:22.1618134Z",
+  "solidworks_revision": "32.5.0",
+  "part_metadata_count": 3,
+  "assembly_unique_part_dependencies": 8,
+  "assembly_component_occurrences_captured": 9,
+  "source_files_locked_for_assembly_inventory": 9,
+  "part_source_hashes_unchanged": true,
+  "part_copy_hashes_unchanged": true,
+  "assembly_source_hashes_unchanged": true,
+  "assembly_copy_hashes_unchanged": true,
+  "part_session_blank_after": true,
+  "assembly_session_blank_after": true,
+  "native_source_methods": [
+    "ModelDoc2.FirstFeature / Feature.GetNextFeature",
+    "Feature.GetDefinition",
+    "Feature.GetParents / Sketch Feature.GetSpecificFeature2",
+    "Sketch.GetReferenceEntity / GetSketchSegments / RelationManager.GetRelations",
+    "Body2.GetFaces / Check2",
+    "Component2.Transform2 / GetTotalTransform(false)"
+  ],
+  "native_save_rebuild_edit_packgo_calls": false,
+  "computer_use_performed": false,
+  "offline_calculation_scope": "Transform captured Sketch endpoints into Assembly plane, compare line traces and relative step clearances.",
+  "absolute_coordinates_transforms_native_files_persistence_payloads_included": false,
+  "summary": {
+    "parts_with_feature_tree": 3,
+    "cut_features_with_listed_api_parameters": 23,
+    "active_cut_features": 20,
+    "suppressed_cut_features": 3,
+    "all_direction_1_end_conditions": {
+      "Blind": 11,
+      "Through All": 6,
+      "Up To Vertex": 2,
+      "Through All Both": 4
+    },
+    "active_direction_1_end_conditions": {
+      "Blind": 8,
+      "Through All": 6,
+      "Up To Vertex": 2,
+      "Through All Both": 4
+    },
+    "normal_cut_true_all": 17,
+    "normal_cut_true_active": 14,
+    "flip_side_to_cut_true_all": 4,
+    "reverse_direction_true_all": 3,
+    "fully_constrained_consumed_sketches": 22,
+    "underconstrained_consumed_sketches": 1,
+    "face2_supported_consumed_sketches": 23,
+    "before_after_brep_verified_cuts": 0,
+    "w23_native_apply_tests": 0,
+    "w23_installed_addin_tests": 0,
+    "active_blind_depth_parameter_mm_counts": {
+      "2.0": 8
+    }
+  }
+}

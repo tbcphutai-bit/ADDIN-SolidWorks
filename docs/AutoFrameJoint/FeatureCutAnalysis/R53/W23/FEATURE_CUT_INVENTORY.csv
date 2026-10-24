@@ -1,0 +1,24 @@
+record_id,part,feature_id,feature_name,flat_tree_order_zero_based,suppressed_in_captured_configuration,end_condition_1,end_condition_2,depth_1_parameter_mm,depth_2_parameter_mm,normal_cut,flip_side_to_cut,reverse_direction,consumed_sketch_id,sketch_support_kind,sketch_constraint_status_code,sketch_relation_count,inferred_role,evidence_level,role_evidence_level,before_after_brep_verified
+fr2:Cut:983,2216-04-lc-W23-fr2.SLDPRT,983,ｶｯﾄ - 押し出し110,22,False,Blind,Through All,2.0,10.0,False,False,False,982,Face2,3,10,CAPSULE_SLOT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:1099,2216-04-lc-W23-fr2.SLDPRT,1099,ｶｯﾄ - 押し出し111,27,False,Through All,Through All,0,0,True,False,False,1093,Face2,3,4,STOCK_END_TRIM_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:1107,2216-04-lc-W23-fr2.SLDPRT,1107,ｶｯﾄ - 押し出し112,29,False,Through All,Through All,0,0,True,True,False,1101,Face2,3,4,STOCK_END_TRIM_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:611,2216-04-lc-W23-fr2.SLDPRT,611,ｶｯﾄ - 押し出し3,31,False,Through All,Through All,0,0,True,False,False,599,Face2,3,7,STEPPED_MITER_END_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:586,2216-04-lc-W23-fr2.SLDPRT,586,ｶｯﾄ - 押し出し1,34,False,Through All,Through All,0,0,True,False,False,574,Face2,3,15,STEPPED_MITER_END_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:1270,2216-04-lc-W23-fr2.SLDPRT,1270,ｶｯﾄ - 押し出し113,40,False,Up To Vertex,Through All,0,0,True,False,False,1261,Face2,3,9,LOCAL_FLANGE_END_REFINEMENT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:1282,2216-04-lc-W23-fr2.SLDPRT,1282,ｶｯﾄ - 押し出し114,42,False,Up To Vertex,Through All,2.0,2.0,True,False,False,1273,Face2,3,9,LOCAL_FLANGE_END_REFINEMENT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:892,2216-04-lc-W23-fr2.SLDPRT,892,ｶｯﾄ - 押し出し18,52,False,Blind,Blind,2.0,10.0,True,False,False,891,Face2,3,10,CAPSULE_SLOT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:1388,2216-04-lc-W23-fr2.SLDPRT,1388,ｶｯﾄ - 押し出し115,58,False,Blind,Through All,2.0,10.0,False,False,False,1387,Face2,3,10,CAPSULE_SLOT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:1406,2216-04-lc-W23-fr2.SLDPRT,1406,ｶｯﾄ - 押し出し116,63,False,Blind,Through All,2.0,10.0,False,False,False,1405,Face2,3,11,CAPSULE_SLOT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:1483,2216-04-lc-W23-fr2.SLDPRT,1483,ｶｯﾄ - 押し出し117,68,True,Blind,Blind,2.0,2.0,True,False,True,1474,Face2,3,7,SUPPRESSED_RECTANGULAR_RELIEF_CANDIDATE,API_VERIFIED,INFERRED,False
+fr2:Cut:1624,2216-04-lc-W23-fr2.SLDPRT,1624,ｶｯﾄ - 押し出し118,70,True,Blind,Blind,2.0,10.0,True,False,True,1615,Face2,3,7,SUPPRESSED_RECTANGULAR_RELIEF_CANDIDATE,API_VERIFIED,INFERRED,False
+fr3:Cut:849,2216-04-lc-W23-fr3.SLDPRT,849,ｶｯﾄ - 押し出し110,22,False,Blind,Through All,2.0,10.0,False,False,False,848,Face2,3,10,CAPSULE_SLOT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr3:Cut:957,2216-04-lc-W23-fr3.SLDPRT,957,ｶｯﾄ - 押し出し113,27,False,Through All,Through All,10.0,10.0,True,False,False,946,Face2,2,4,ADDITIONAL_ANGLED_TRIM_CANDIDATE,API_VERIFIED,INFERRED,False
+fr3:Cut:586,2216-04-lc-W23-fr3.SLDPRT,586,ｶｯﾄ - 押し出し2,29,False,Through All Both,Through All,2.0,2.3,True,False,False,580,Face2,3,6,STEPPED_MITER_END_CANDIDATE,API_VERIFIED,INFERRED,False
+fr3:Cut:578,2216-04-lc-W23-fr3.SLDPRT,578,ｶｯﾄ - 押し出し1,32,False,Through All Both,Through All,2.8,10.0,True,True,False,572,Face2,3,14,STEPPED_MITER_END_CANDIDATE,API_VERIFIED,INFERRED,False
+fr3:Cut:872,2216-04-lc-W23-fr3.SLDPRT,872,ｶｯﾄ - 押し出し111,34,False,Blind,Through All,2.0,10.0,True,False,False,866,Face2,3,5,LOCAL_FLANGE_END_REFINEMENT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr3:Cut:875,2216-04-lc-W23-fr3.SLDPRT,875,ｶｯﾄ - 押し出し112,36,False,Blind,Blind,2.0,10.0,True,False,False,874,Face2,3,11,CAPSULE_SLOT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr4:Cut:728,2216-04-lc-W23-fr4.SLDPRT,728,ｶｯﾄ - 押し出し14,22,False,Blind,Through All,2.0,10.0,False,False,False,727,Face2,3,10,CAPSULE_SLOT_CANDIDATE,API_VERIFIED,INFERRED,False
+fr4:Cut:611,2216-04-lc-W23-fr4.SLDPRT,611,ｶｯﾄ - 押し出し3,27,False,Through All Both,Through All,2.0,2.3,True,True,True,599,Face2,3,13,STEPPED_MITER_END_CANDIDATE,API_VERIFIED,INFERRED,False
+fr4:Cut:586,2216-04-lc-W23-fr4.SLDPRT,586,ｶｯﾄ - 押し出し1,30,False,Through All Both,Through All,2.0,2.3,True,False,False,574,Face2,3,12,STEPPED_MITER_END_CANDIDATE,API_VERIFIED,INFERRED,False
+fr4:Cut:885,2216-04-lc-W23-fr4.SLDPRT,885,ｶｯﾄ - 押し出し17,32,True,Blind,Blind,2.5,0,True,False,False,876,Face2,3,7,SUPPRESSED_RETURN_REGION_RELIEF_CANDIDATE,API_VERIFIED,INFERRED,False
+fr4:Cut:906,2216-04-lc-W23-fr4.SLDPRT,906,ｶｯﾄ - 押し出し18,36,False,Through All,Through All,2.0,10.0,False,True,False,900,Face2,3,9,ADDITIONAL_ANGLED_TRIM_CANDIDATE,API_VERIFIED,INFERRED,False

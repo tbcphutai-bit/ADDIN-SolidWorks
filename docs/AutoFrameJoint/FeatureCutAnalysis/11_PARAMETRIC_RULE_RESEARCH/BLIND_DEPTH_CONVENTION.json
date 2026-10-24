@@ -1,0 +1,121 @@
+[
+  {
+    "part": "1618-04-bh-A6-fr1.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し110",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し14",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し110",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し119",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し14",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し15",
+    "api_depth_mm": 10.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し16",
+    "api_depth_mm": 2.1,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し11",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し13",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T1-fr2.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し11",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し11",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し13",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T1-fr4.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し11",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T2-fr1.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し11",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T2-fr1.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し13",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "3615-04-bh-T2-fr2.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し11",
+    "api_depth_mm": 2.0,
+    "user_convention_mm": 2.1,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  },
+  {
+    "part": "4114-04-HN-C07-12_New.SLDPRT",
+    "feature": "ｶｯﾄ - 押し出し1",
+    "api_depth_mm": 2.3,
+    "user_convention_mm": 2.4,
+    "evidence": "API_VERIFIED depth; USER_SPECIFIED convention"
+  }
+]

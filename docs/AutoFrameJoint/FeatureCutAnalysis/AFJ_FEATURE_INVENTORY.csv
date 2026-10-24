@@ -1,0 +1,713 @@
+﻿part,configuration,first_tree_path,feature_name,type_name2,legacy_type,suppressed_active,suppressed_by_configuration,parents,evidence
+1618-04-bh-A6-fr1.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,14,A1100-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,22,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,23,ｶｯﾄ - 押し出し110,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,24,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し110;a,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,25,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",ｶｯﾄ - 押し出し110;a,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,26,スタッド10x16<1>,LibraryFeature,LibraryFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し110;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,28,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,29,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,30,ｽｹｯﾁ3,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,31,ｶｯﾄ - 押し出し2,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,32,ｽｹｯﾁ16,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し2,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,33,ｶｯﾄ - 押し出し112,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ16;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し2,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,34,M4 すきま穴1,HoleWzd,HoleWzd,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｽｹｯﾁ31,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,34.1,a1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,34.2,ｽｹｯﾁ31,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,35,ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",M4 すきま穴1;a1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,36,M4-NCサラ(表)<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｽｹｯﾁ31;M4 すきま穴1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,37,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,37.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,37.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,37.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,37.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,37.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>9,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-fr1.SLDPRT,Default,37.6,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,10.2,Sheet<2>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,14,A1100-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Top;Origin,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Top,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,23,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,24,ﾎﾞｽ - 押し出し2,ICE,Boss,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,25,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾎﾞｽ - 押し出し2;a,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,26,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",ﾎﾞｽ - 押し出し2;a,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,27,スタッド7.5<1>,LibraryFeature,LibraryFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾎﾞｽ - 押し出し2;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,28,a1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,29,ﾎﾞｽ - 押し出し21,ICE,Boss,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,30,ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾎﾞｽ - 押し出し21;a1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,31,ｶｰﾌﾞ ﾊﾟﾀｰﾝ21,CurvePattern,CurvePattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",ﾎﾞｽ - 押し出し21;a1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,32,スタッド7.5<2>,LibraryFeature,LibraryFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾎﾞｽ - 押し出し21;ｶｰﾌﾞ ﾊﾟﾀｰﾝ11;ｶｰﾌﾞ ﾊﾟﾀｰﾝ21,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,33,a2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,34,ﾎﾞｽ - 押し出し22,ICE,Boss,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,35,ｶｰﾌﾞ ﾊﾟﾀｰﾝ12,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾎﾞｽ - 押し出し22;a2,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,36,ｶｰﾌﾞ ﾊﾟﾀｰﾝ22,CurvePattern,CurvePattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",ﾎﾞｽ - 押し出し22;a2,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,37,スタッド7.5<3>,LibraryFeature,LibraryFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",a2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾎﾞｽ - 押し出し22;ｶｰﾌﾞ ﾊﾟﾀｰﾝ12;ｶｰﾌﾞ ﾊﾟﾀｰﾝ22,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,38,a3,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,39,ﾎﾞｽ - 押し出し23,ICE,Boss,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,40,ｶｰﾌﾞ ﾊﾟﾀｰﾝ13,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾎﾞｽ - 押し出し23;a3,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,41,ｶｰﾌﾞ ﾊﾟﾀｰﾝ23,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾎﾞｽ - 押し出し23;a3,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,42,スタッド7.5<4>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾎﾞｽ - 押し出し23;ｶｰﾌﾞ ﾊﾟﾀｰﾝ13;ｶｰﾌﾞ ﾊﾟﾀｰﾝ23,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,44,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,44.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,44.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-1.SLDPRT,Default,44.3,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,14,A1100-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,22,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,23,ｶｯﾄ - 押し出し14,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,24,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し14;a,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,25,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し14;a,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,26,スタッド10x16<1>,LibraryFeature,LibraryFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し14;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,27,ｽｹｯﾁ4,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,28,ｶｯﾄ - 押し出し3,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ4;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,30,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,31,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,32,ｽｹｯﾁ7,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,33,ｶｯﾄ - 押し出し15,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ7;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,34,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,34.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,34.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,34.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,34.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>2,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr2.SLDPRT,Default,34.5,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,10.2,Sheet<2>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,14,A1100-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,21.5,ﾍﾞｰｽﾍﾞﾝﾄﾞ5,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,21.6,ﾍﾞｰｽﾍﾞﾝﾄﾞ6,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,22,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,23,ｶｯﾄ - 押し出し110,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,24,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し110;a,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,25,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",ｶｯﾄ - 押し出し110;a,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,26,スタッド10x16<1>,LibraryFeature,LibraryFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し110;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,28,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ6,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,29,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ6;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,30,ｽｹｯﾁ27,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,31,ｶｯﾄ - 押し出し116,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ27;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,32,ｽｹｯﾁ22,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ｶｯﾄ - 押し出し116,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,33,ｶｯﾄ - 押し出し114,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ22;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ｶｯﾄ - 押し出し116,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,35,ｽｹｯﾁ23,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,36,ｶｯﾄ - 押し出し115,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ23;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ6;ｶｯﾄ - 押し出し1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,37,ｽｹｯﾁ28,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,38,ｶｯﾄ - 押し出し117,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ28;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,39,ｽｹｯﾁ29,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し116;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,40,ﾎﾞｽ - 押し出し1,ICE,Boss,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ29;ｶｯﾄ - 押し出し116;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,41,a1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,42,ｶｯﾄ - 押し出し119,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,43,ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し119;a1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,44,4.2<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し119;ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>4,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45.6,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ5>4,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ5,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45.7,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ6>4,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ6,API_VERIFIED
+1618-04-bh-A6-fr3.SLDPRT,Default,45.8,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,14,A1100-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ5,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,22,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,23,ｶｯﾄ - 押し出し14,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,24,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し14;a,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,25,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",ｶｯﾄ - 押し出し14;a,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,26,スタッド10x16<1>,LibraryFeature,LibraryFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [true]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し14;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,27,ｽｹｯﾁ4,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ5;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,28,ｶｯﾄ - 押し出し3,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ4;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ5;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,30,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ5;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,31,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ5;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,32,ｽｹｯﾁ5,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ5;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ｶｯﾄ - 押し出し3,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,33,ｶｯﾄ - 押し出し15,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ5;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ5;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ｶｯﾄ - 押し出し3,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,34,ｽｹｯﾁ6,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ5;ｶｯﾄ - 押し出し1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,35,ｶｯﾄ - 押し出し16,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ6;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ5;ｶｯﾄ - 押し出し1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,36,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,36.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,36.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,36.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,36.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ5>6,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ5,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,36.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>2,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-fr4.SLDPRT,Default,36.6,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,14,A1100-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ2,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,21.5,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,23,ｽｹｯﾁ6,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,24,ｶｯﾄ - 押し出し13,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ6;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,25,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,25.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,25.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,25.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,25.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ2>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ2,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,25.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,25.6,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+1618-04-bh-A6-中骨1.SLDPRT,Default,25.7,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,14,A1100P-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front;Origin,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Front,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,23,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,23.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,23.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,23.3,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-1.SLDPRT,Default,23.3.1,ｽｹｯﾁ2-2,ProfileFeature,ProfileFeature,True,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,14,A1100P-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,23,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,24,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,25,ｽｹｯﾁ3,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,26,ｶｯﾄ - 押し出し2,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,27,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,28,ｶｯﾄ - 押し出し11,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,29,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,30,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,31,スタッド10x16<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し11;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,32,a1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,33,ｶｯﾄ - 押し出し13,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,34,ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し13;a1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,35,4.2<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し13;ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,36,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｽｹｯﾁ2,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,36.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,36.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,36.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,36.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,36.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>4,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,36.6,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr1.SLDPRT,Default,36.6.1,ｽｹｯﾁ2-1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,14,A1100P-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,23,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,24,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,25,ｽｹｯﾁ3,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,26,ｶｯﾄ - 押し出し2,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,27,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,28,ｶｯﾄ - 押し出し11,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,29,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,30,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,31,スタッド10x16<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し11;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,32,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,32.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,32.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,32.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,32.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,32.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>9,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+3615-04-bh-T1-fr2.SLDPRT,Default,32.6,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,14,A1100P-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,23,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,24,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,25,ｽｹｯﾁ3,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,26,ｶｯﾄ - 押し出し2,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,27,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,28,ｶｯﾄ - 押し出し11,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,29,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,30,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,31,スタッド10x16<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し11;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,32,a1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,33,ｶｯﾄ - 押し出し13,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,34,ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し13;a1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,35,4.2<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し13;ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,36,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,36.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,36.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,36.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,36.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,36.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>4,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+3615-04-bh-T1-fr3.SLDPRT,Default,36.6,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,14,A1100P-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,23,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,24,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,25,ｽｹｯﾁ3,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,26,ｶｯﾄ - 押し出し2,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,27,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,28,ｶｯﾄ - 押し出し11,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,29,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,30,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,31,スタッド10x16<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し11;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,32,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,32.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,32.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,32.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,32.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T1-fr4.SLDPRT,Default,32.5,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,14,A1100P-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front;Origin,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Front,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,23,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,23.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,23.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-1.SLDPRT,Default,23.3,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,14,A1100P-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,23,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,24,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,25,ｽｹｯﾁ3,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,26,ｶｯﾄ - 押し出し2,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,27,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,28,ｶｯﾄ - 押し出し11,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,29,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,30,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,31,スタッド10x16<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し11;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,32,a1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,33,ｶｯﾄ - 押し出し13,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,34,ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し13;a1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,35,4.2<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し13;ｶｰﾌﾞ ﾊﾟﾀｰﾝ11,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,36,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｽｹｯﾁ2,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,36.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,36.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,36.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,36.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,36.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>4,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,36.6,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr1.SLDPRT,Default,36.6.1,ｽｹｯﾁ2-1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,2,Favorites,FavoriteFolder,FavoriteFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,3,History,HistoryFolder,HistoryFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,4,Selection Sets,SelectionSetFolder,SelectionSetFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,5,Sensors,SensorFolder,SensorFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,6,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,7,Annotations,DetailCabinet,DetailCabinet,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,7.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,7.2,Notes Area,AnnotationViewFeat,AnnotationViewFeat,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,7.3,Notes1___EndTag___,FtrFolder,FtrFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,8,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,9,Lights and Cameras,EnvFolder,EnvFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,9.1,Ambient,AmbientLight,AmbientLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,9.2,Directional1,DirectionLight,DirectionLight,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,10,Solid Bodies,SolidBodyFolder,SolidBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,10.1,Sheet<1>,CutListFolder,CutListFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,11,Surface Bodies,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,12,Comments,CommentsFolder,CommentsFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,13,Equations,EqnFolder,EqnFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,14,A1100P-,MaterialFolder,MaterialFolder,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,15,Front,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,16,Top,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,17,Right,RefPlane,RefPlane,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,18,Origin,OriginProfileFeature,OriginProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Front,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,19,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",Right;Origin,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,20,板金19,SheetMetal,SheetMetal,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,21,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ｽｹｯﾁ1;Right,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,21.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,21.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,21.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,23,ｽｹｯﾁ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,24,ｶｯﾄ - 押し出し1,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ2;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,25,ｽｹｯﾁ3,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,26,ｶｯﾄ - 押し出し2,Cut,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ3;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ4;ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,27,a,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,28,ｶｯﾄ - 押し出し11,ICE,Cut,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,29,ｶｰﾌﾞ ﾊﾟﾀｰﾝ1,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,30,ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,CurvePattern,CurvePattern,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ｶｯﾄ - 押し出し11;a,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,31,スタッド10x16<1>,LibraryFeature,LibraryFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",a;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｶｯﾄ - 押し出し11;ｶｰﾌﾞ ﾊﾟﾀｰﾝ1;ｶｰﾌﾞ ﾊﾟﾀｰﾝ2,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,32,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19,FlatPattern,FlatPattern,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",板金;板金19;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,32.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,32.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,32.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,32.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>1,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,32.5,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>9,UiBend,UiBend,False,"{""Default"": [false], ""DefaultSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+3615-04-bh-T2-fr2.SLDPRT,Default,32.6,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""Default"": [true], ""DefaultSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,1,Configuration Comments,ConfigCommentsFolder,ConfigCommentsFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,2,お気に入り,FavoriteFolder,FavoriteFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,3,履歴,HistoryFolder,HistoryFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,4,選択ｾｯﾄ,SelectionSetFolder,SelectionSetFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,5,ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ,DocsFolder,DocsFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,6,ｱﾉﾃｰﾄ ｱｲﾃﾑ,DetailCabinet,DetailCabinet,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,6.1,Notes,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,6.2,注記領域,AnnotationViewFeat,AnnotationViewFeat,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,6.3,Notes1___EndTag___,NotesAreaFtrFolder,NotesAreaFtrFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,7,Markups,InkMarkupFolder,InkMarkupFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,8,照明とｶﾒﾗ,EnvFolder,EnvFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,8.1,ｱﾝﾋﾞｴﾝﾄ,AmbientLight,AmbientLight,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,8.2,指向性1,DirectionLight,DirectionLight,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,8.3,指向性2,DirectionLight,DirectionLight,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,8.4,指向性3,DirectionLight,DirectionLight,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,8.5,指向性4,DirectionLight,DirectionLight,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,9,ｾﾝｻｰ,SensorFolder,SensorFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,10,ｿﾘｯﾄﾞ ﾎﾞﾃﾞｨ,SolidBodyFolder,SolidBodyFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,10.1,ｶｯﾄ-ﾘｽﾄ-ｱｲﾃﾑ1,CutListFolder,CutListFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,11,ｻｰﾌｪｽ ﾎﾞﾃﾞｨ（複数）,SurfaceBodyFolder,SurfaceBodyFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,12,ｺﾒﾝﾄ,CommentsFolder,CommentsFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,13,関係式,EqnFolder,EqnFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,14,NSD-,MaterialFolder,MaterialFolder,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,15,正面,RefPlane,RefPlane,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,16,平面,RefPlane,RefPlane,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,17,右側面,RefPlane,RefPlane,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,18,原点,OriginProfileFeature,OriginProfileFeature,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",正面,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,19,X軸,RefAxis,RefAxis,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",右側面;平面,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,20,左側面,RefPlane,RefPlane,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",X軸;右側面,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,21,ｽｹｯﾁ1,ProfileFeature,ProfileFeature,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",正面;原点,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,22,板金12,SheetMetal,SheetMetal,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",板金,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,23,ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,SMBaseFlange,SMBaseFlange,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",板金;板金12;ｽｹｯﾁ1;正面,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,23.2,ﾍﾞｰｽﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,23.3,ﾍﾞｰｽﾍﾞﾝﾄﾞ2,SketchBend,SketchBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,23.4,ﾍﾞｰｽﾍﾞﾝﾄﾞ3,SketchBend,SketchBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,23.5,ﾍﾞｰｽﾍﾞﾝﾄﾞ4,SketchBend,SketchBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,25,ｽｹｯﾁ6,ProfileFeature,ProfileFeature,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,26,ｶｯﾄ - 押し出し1,ICE,Cut,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ｽｹｯﾁ6;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,27,ｴｯｼﾞ-ﾌﾗﾝｼﾞ1,EdgeFlange,EdgeFlange,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",板金;板金12;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｽｹｯﾁ9,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,27.1,ｽｹｯﾁ9,ProfileFeature,ProfileFeature,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,27.2,ｴｯｼﾞﾍﾞﾝﾄﾞ1,OneBend,OneBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ｴｯｼﾞ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,28,平面1,RefPlane,RefPlane,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,29,ｽｹｯﾁ10,ProfileFeature,ProfileFeature,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",平面1;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,30,とめつぎﾌﾗﾝｼﾞ1,SMMiteredFlange,SMMiteredFlange,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",板金;板金12;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1;ｽｹｯﾁ10;平面1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,30.2,とめつぎﾍﾞﾝﾄﾞ1,SketchBend,SketchBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",とめつぎﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,31,ADDIN_VCut_Bend_890,Attribute,Attribute,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32,ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ12,FlatPattern,FlatPattern,True,"{""ﾃﾞﾌｫﾙﾄ"": [true], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",板金;板金12;ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.1,ﾍﾞﾝﾄﾞ-ﾗｲﾝ2,ProfileFeature,ProfileFeature,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.2,境界ﾎﾞｯｸｽ2,ProfileFeature,ProfileFeature,True,"{""ﾃﾞﾌｫﾙﾄ"": [true], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.3,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.4,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ2>1,UiBend,UiBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ2,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.5,ｽｹｯﾁ変換1,FoldUpDownSketchFolder,FoldUpDownSketchFolder,True,"{""ﾃﾞﾌｫﾙﾄ"": [true], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.6,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>2,UiBend,UiBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ3,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.7,ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>2,UiBend,UiBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ﾍﾞｰｽﾍﾞﾝﾄﾞ4,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.8,ﾌﾗｯﾄ-<ｴｯｼﾞﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",ｴｯｼﾞﾍﾞﾝﾄﾞ1,API_VERIFIED
+4114-04-HN-C07-12_New.SLDPRT,ﾃﾞﾌｫﾙﾄ,32.9,ﾌﾗｯﾄ-<とめつぎﾍﾞﾝﾄﾞ1>1,UiBend,UiBend,False,"{""ﾃﾞﾌｫﾙﾄ"": [false], ""ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"": [false]}",とめつぎﾍﾞﾝﾄﾞ1,API_VERIFIED

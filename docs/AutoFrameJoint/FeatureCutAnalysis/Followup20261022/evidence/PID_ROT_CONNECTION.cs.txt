@@ -1,0 +1,35 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using SolidWorks.Interop.sldworks;
+static class HarnessConnection {
+    [DllImport("ole32.dll")] static extern int GetRunningObjectTable(int reserved, out IRunningObjectTable rot);
+    [DllImport("ole32.dll")] static extern int CreateBindCtx(int reserved, out IBindCtx context);
+    internal static ISldWorks AttachVisible() {
+        IRunningObjectTable rot; IBindCtx context;
+        Marshal.ThrowExceptionForHR(GetRunningObjectTable(0, out rot));
+        Marshal.ThrowExceptionForHR(CreateBindCtx(0, out context));
+        IEnumMoniker iterator; rot.EnumRunning(out iterator); var item = new IMoniker[1];
+        var candidates = new Dictionary<int, ISldWorks>();
+        while (iterator.Next(1, item, IntPtr.Zero) == 0) {
+            try {
+                string name; item[0].GetDisplayName(context, null, out name);
+                if (!name.StartsWith("SolidWorks_PID_", StringComparison.OrdinalIgnoreCase)) continue;
+                object value; rot.GetObject(item[0], out value); var sw = value as ISldWorks;
+                if (sw == null) continue;
+                int pid = sw.GetProcessID(); var process = Process.GetProcessById(pid);
+                if (process.SessionId == Process.GetCurrentProcess().SessionId && process.MainWindowHandle != IntPtr.Zero) candidates[pid] = sw;
+            } catch (COMException e) { Console.WriteLine("ROT entry unavailable HRESULT=0x" + e.HResult.ToString("X8")); }
+        }
+        int preferred;
+        bool hasPreferred = Int32.TryParse(System.Environment.GetEnvironmentVariable("AFJ_R51_SW_PID"), out preferred);
+        if (hasPreferred && !candidates.ContainsKey(preferred)) throw new InvalidOperationException("The previously verified SOLIDWORKS PID is no longer available; no fallback or activation.");
+        if (!hasPreferred && candidates.Count != 1) throw new InvalidOperationException("Need exactly one visible SOLIDWORKS ROT session; found " + candidates.Count + ". No activation performed.");
+        var selected = hasPreferred ? candidates.Single(c => c.Key == preferred) : candidates.Single();
+        Console.WriteLine("COM attached via PID moniker; pid=" + selected.Key + "; no activation");
+        return selected.Value;
+    }
+}
