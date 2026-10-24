@@ -1,0 +1,15 @@
+{
+  "status": "PASS_DETACHED_CSHARP_COMPILE",
+  "source_sha256": "cc7fc64ab6b5a6d51cbf5e5ef6b59bd1d15f509d29af262d2e173a52cb92b68c",
+  "scope": "six AFJ source files plus Interop; same existing file with embedded helpers",
+  "language_version": "7.3",
+  "platform": "x64",
+  "define": "TRACE",
+  "project_build": false,
+  "csproj_changed": false,
+  "dll_pdb_deployed": false,
+  "installed_addin_test": false,
+  "native_tested_source_sha256": "2bc61527c5aea88efe145eeb6262fedb0a3445967238116cff35239024529d55",
+  "delivery_difference": "Removed one redundant LF at EOF only; no C# token or logic change",
+  "recompiled_after_eof_cleanup": true
+}

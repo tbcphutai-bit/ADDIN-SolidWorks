@@ -1,0 +1,35 @@
+{
+  "normalized_text_lf": true,
+  "files": [
+    {
+      "name": "FEATURE_CUT_INVENTORY.csv",
+      "sha256": "a2ad89ad2efe9a0e72ddd95265a61ccc0e6aad97ed7765f86ce67193a89e2195",
+      "bytes": 4913
+    },
+    {
+      "name": "FEATURE_CUT_INVENTORY.json",
+      "sha256": "de9df5ff9d1c2111b15a1df8e43bdf178c48d566cd90220f71ebcd53130c02a0",
+      "bytes": 47627
+    },
+    {
+      "name": "JOINT_PRIMITIVE_CHECKS.csv",
+      "sha256": "68d4d070d8aba017d6bde877d168027157712a401d9ffb991d5077a830fb7839",
+      "bytes": 1398
+    },
+    {
+      "name": "PROVENANCE.json",
+      "sha256": "1ced53ac210197bb592c79cbe23fc89159f0855dd530aa9d153c83143cc5cef4",
+      "bytes": 2485
+    },
+    {
+      "name": "README.md",
+      "sha256": "e247b8d3875ce045f00f3f6cb425fd4b98a6206289deaf9ce693021b7b6a4cd5",
+      "bytes": 5416
+    },
+    {
+      "name": "SCOPE_LIMITS.md",
+      "sha256": "c6e4283ca9250e3383e41da82ad9000f97bc4cb39c15dd238ac2d32cf0008a00",
+      "bytes": 3528
+    }
+  ]
+}

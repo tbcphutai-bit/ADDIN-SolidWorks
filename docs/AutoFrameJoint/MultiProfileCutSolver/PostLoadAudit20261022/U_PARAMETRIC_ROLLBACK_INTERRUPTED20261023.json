@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "run_id": "native_u_parametric_rollback_01",
+  "public_status": "INTERRUPTED_NO_FINAL_RESULT",
+  "raw_progress_status_retained": "RUNNING",
+  "evidence_level": "API_PROGRESS_OBSERVATION_ONLY",
+  "installed_addin_test": false,
+  "production_route_enabled": false,
+  "started_utc": "2026-10-23T00:12:12.6154721Z",
+  "last_recorded_phase": "WRITER.U_RULE:NORMAL_BEND_CAP:CREATE_LINES_BEFORE_RELATIONS",
+  "last_recorded_phase_utc": "2026-10-23T00:14:15.0394502Z",
+  "last_native_call": {
+    "phase": "AfjUParametricSketchWriter.TryWrite",
+    "state": "BEGIN",
+    "utc": "2026-10-23T00:12:59.7837836Z",
+    "previous_completed_phase": "SOLVE_REVIEWED_PAIR.AfjJointSolver.Solve"
+  },
+  "solidworks_revision": "32.5.0",
+  "standalone_harness_mvid": "d43e1eb6-bc9d-443d-aa67-f379f39ed620",
+  "save_api_called_as_of_last_progress": false,
+  "missing_final_fields": [
+    "completed_utc",
+    "blank_session_restored",
+    "final_document_count",
+    "source_file_hashes_unchanged",
+    "copy_file_hashes_unchanged",
+    "rollback_report"
+  ],
+  "process_observation": "Root reported that the harness process was no longer running when work resumed. No native completion/finally result was recorded.",
+  "interruption_cause": "UNVERIFIED",
+  "geometry_result": "NOT_AVAILABLE",
+  "rollback_result": "NOT_AVAILABLE",
+  "final_cleanup_result": "NOT_AVAILABLE",
+  "final_file_hash_result": "NOT_AVAILABLE",
+  "partial_counts_published": false,
+  "failure_classification": "INTERRUPTED_EXPERIMENT_NOT_A_GEOMETRY_FAIL_OR_PASS",
+  "raw_progress_sha256": "63d1f3fb820a91314ec42f3488aa99840955ee4e562538ba462f94d286c27225",
+  "last_call_record_sha256": "f3c6a6e740e42c01297968c6811faebdd517fdeb02709da5979981ea4ce4e3c9",
+  "private_stage_log_sha256": "004d7478b999a9bff2a61ec392c84ea07183323efc7adabb51ad1fb175e771b5",
+  "boundaries": [
+    "The last progress marker is not an exception or proof of a deadlock at that API call.",
+    "Empty in-progress native_cuts or graph_checks arrays do not establish a final count or completed rollback.",
+    "No completed status, file-hash verification or blank-session cleanup was available in this progress file.",
+    "Earlier completed four-Cut round-trip run02 remains a separate, unchanged experiment."
+  ]
+}

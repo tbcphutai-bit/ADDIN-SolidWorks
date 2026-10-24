@@ -155,6 +155,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                         {
                             string status;
                             bool applied;
+                            // AFJ-APPLY-NOTIFICATION-PERF-20261022
+                            var applyTimer = Stopwatch.StartNew();
                             try { applied = manager.TryApplyCut(pageToken, frameA, frameB, out status); }
                             catch (Exception ex)
                             {
@@ -162,14 +164,44 @@ namespace ADDIN.Commands.AutoFrameJoint
                                 status="Không áp dụng Cut; xem log AFJ-APPLY. " + ex.Message;
                                 Trace.WriteLine("[AFJ-APPLY] ENTRY_EXCEPTION HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex);
                             }
-                            Trace.WriteLine("[AFJ-APPLY] ENTRY success=" + applied + " " + status);
-                            try
+                            finally
                             {
-                                app.SendMsgToUser2(status,
-                                    applied ? (int)swMessageBoxIcon_e.swMbInformation : (int)swMessageBoxIcon_e.swMbStop,
-                                    (int)swMessageBoxBtn_e.swMbOk);
+                                Trace.WriteLine("[AFJ-APPLY-PERF] phase=session_apply ms=" + applyTimer.ElapsedMilliseconds);
                             }
-                            catch (Exception ex) { Trace.WriteLine("[AFJ-APPLY] Result notification unavailable " + ex.Message); }
+                            Trace.WriteLine("[AFJ-APPLY] ENTRY success=" + applied + " " + status);
+                            bool notify = !applied;
+                            if (notify)
+                            {
+                                var notificationTimer = Stopwatch.StartNew();
+                                try
+                                {
+                                    app.SendMsgToUser2(status,
+                                        applied ? (int)swMessageBoxIcon_e.swMbInformation : (int)swMessageBoxIcon_e.swMbStop,
+                                        (int)swMessageBoxBtn_e.swMbOk);
+                                }
+                                catch (Exception ex) { Trace.WriteLine("[AFJ-APPLY] Result notification unavailable " + ex.Message); }
+                                finally
+                                {
+                                    Trace.WriteLine("[AFJ-APPLY-PERF] phase=result_notification ms=" + notificationTimer.ElapsedMilliseconds + " shown=True");
+                                }
+                            }
+                            else
+                            {
+                                // AFJ-APPLY-STATUSBAR-20261022
+                                var statusTimer = Stopwatch.StartNew();
+                                bool statusShown=false;
+                                try
+                                {
+                                    var frame = app.Frame() as IFrame;
+                                    if (frame != null) { frame.SetStatusBarText(status); statusShown=true; }
+                                }
+                                catch (Exception ex) { Trace.WriteLine("[AFJ-APPLY] Nonmodal status unavailable " + ex.Message); }
+                                finally
+                                {
+                                    Trace.WriteLine("[AFJ-APPLY-PERF] phase=result_notification ms=" + statusTimer.ElapsedMilliseconds +
+                                        " shown=" + statusShown + " modal=False channel=status_bar");
+                                }
+                            }
                             return status;
                         });
 

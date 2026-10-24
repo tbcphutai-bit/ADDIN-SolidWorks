@@ -1,0 +1,238 @@
+        // AFJ-U-WEB-FACE-OFFSET-PROBE-20261022
+        // Detached gate-1 experiment. Default refusal prevents accidental use as
+        // a production writer before native signed-offset/constraint qualification.
+        internal static bool AllowWebFaceOffsetProbe = false;
+        internal static int WebFaceOffsetNormalSign = 0;
+        private sealed class AfjWebFaceSketchEvidence
+        {
+            internal Feature Feature;
+            internal Sketch Sketch;
+            internal string Name,Qualification;
+            internal double[] Normal;
+            internal double Support,Offset;
+            internal int OriginalOwnerId,ReferenceType,ObservedReferenceType,Status,Relations,OwnFrameRelations,ClosureRelations,Dimensions,NewPlanes,FromType;
+            internal bool OffsetReverse,InitialReferenceVerified,ClosedReferenceVerified,PostCutPlaneVerified,FullyDefined;
+        }
+        private sealed class AfjWebLineGuide
+        {
+            internal Edge Edge;
+            internal double[] A,B;
+        }
+        private static double WebDot(double[] a,double[] b){return AfjParametricRules.Dot(a,b);}
+        private static double WebNorm(double[] a){return Math.Sqrt(WebDot(a,a));}
+        private static bool WebFinite(double[] a){return a!=null&&a.Length>=3&&a.Take(3).All(AfjTemporaryBoolean.Finite);}
+        private static bool WebOnLine(double[] p,double[] a,double[] b,bool bounded)
+        {
+            double[] d=AfjParametricRules.Sub(b,a),q=AfjParametricRules.Sub(p,a);double length=WebDot(d,d);
+            if(length<1e-16)return false;double t=WebDot(q,d)/length;
+            return (!bounded||(t>=-1e-7&&t<=1+1e-7))&&WebNorm(AfjParametricRules.Sub(q,AfjParametricRules.Scale(d,t)))<1e-8;
+        }
+        private static SketchPoint WebStart(SketchSegment segment)
+        {
+            var line=segment as SketchLine;if(line!=null)return line.GetStartPoint2() as SketchPoint;
+            var arc=segment as SketchArc;if(arc!=null)return arc.GetStartPoint2() as SketchPoint;
+            throw new InvalidOperationException("WEB_FACE: unsupported sketch entity");
+        }
+        private static SketchPoint WebEnd(SketchSegment segment)
+        {
+            var line=segment as SketchLine;if(line!=null)return line.GetEndPoint2() as SketchPoint;
+            var arc=segment as SketchArc;if(arc!=null)return arc.GetEndPoint2() as SketchPoint;
+            throw new InvalidOperationException("WEB_FACE: unsupported sketch entity");
+        }
+        private static Face2 WebSupportFace(PartEdit edit,AfjToolDefinition spec,out double support)
+        {
+            double[] n=AfjParametricRules.Unit(spec.Direction);double start=WebDot(spec.Polygon[0],n);
+            support=start+AfjManufacturingConventions.CutterEnvelopeOverrun;
+            foreach(double[] point in spec.Polygon)
+                if(!WebFinite(point)||Math.Abs(WebDot(point,n)-start)>1e-8)throw new InvalidOperationException("WEB_FACE: nonplanar reviewed tool");
+            var candidates=new List<Face2>();Array faces=CurrentBody(edit.Part).GetFaces() as Array;
+            if(faces==null)throw new InvalidOperationException("WEB_FACE: native faces unavailable");
+            foreach(Face2 face in faces.Cast<object>().OfType<Face2>())
+            {
+                Surface surface=face.GetSurface() as Surface;if(surface==null||!surface.IsPlane())continue;
+                double[] plane=surface.PlaneParams as double[];
+                if(plane==null||plane.Length!=6||plane.Any(x=>!AfjTemporaryBoolean.Finite(x)))continue;
+                if(Math.Abs(Math.Abs(WebDot(AfjParametricRules.Unit(plane.Take(3).ToArray()),n))-1)>1e-7||
+                   Math.Abs(WebDot(plane.Skip(3).Take(3).ToArray(),n)-support)>1e-8||face.GetArea()<1e-12)continue;
+                Feature owner=face.GetFeature() as Feature;
+                if(owner==null||edit.OwnedIds.Contains(owner.GetID()))continue;
+                candidates.Add(face);
+            }
+            Face2 chosen=candidates.OrderByDescending(f=>f.GetArea()).FirstOrDefault();
+            if(chosen==null)throw new InvalidOperationException("WEB_FACE_UNVERIFIED: no original outer Web at reviewed start + CutterEnvelopeOverrun; no plane fallback");
+            return chosen;
+        }
+        private static void WebRelations(ISldWorks app,PartEdit edit,Face2 support,Sketch sketch,List<SketchSegment> segments,double[][] local,AfjWebFaceSketchEvidence evidence)
+        {
+            MathTransform transform=sketch.ModelToSketchTransform;
+            var guides=new List<AfjWebLineGuide>();var vertices=new List<Vertex>();
+            Array edges=support.GetEdges() as Array;
+            if(edges==null)throw new InvalidOperationException("WEB_FACE: support boundary unavailable");
+            foreach(Edge edge in edges.Cast<object>().OfType<Edge>())
+            {
+                Vertex va=edge.GetStartVertex() as Vertex,vb=edge.GetEndVertex() as Vertex;
+                if(va!=null)vertices.Add(va);if(vb!=null)vertices.Add(vb);
+                Curve curve=edge.GetCurve() as Curve;if(curve==null||!curve.IsLine()||va==null||vb==null)continue;
+                double[] a=va.GetPoint() as double[],b=vb.GetPoint() as double[];
+                if(!WebFinite(a)||!WebFinite(b))continue;a=Point(app,a,transform);b=Point(app,b,transform);
+                if(Math.Abs(a[2])>1e-8||Math.Abs(b[2])>1e-8||WebNorm(AfjParametricRules.Sub(a,b))<1e-8)continue;
+                guides.Add(new AfjWebLineGuide{Edge=edge,A=a,B=b});
+            }
+            // This gate intentionally adds only provable direct relations. It
+            // never invents a datum for the unconstrained critical seam.
+            for(int i=0;i<segments.Count;i++)
+            {
+                SketchPoint end=WebEnd(segments[i]),next=WebStart(segments[(i+1)%segments.Count]);
+                if(!Same(app,end,next)){EndRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,end,next);evidence.ClosureRelations++;}
+            }
+            for(int i=0;i<segments.Count;i++)
+            {
+                if(!(segments[i] is SketchLine))continue;
+                double[] a=local[i],b=local[(i+1)%segments.Count];
+                var collinear=guides.FirstOrDefault(g=>WebOnLine(a,g.A,g.B,false)&&WebOnLine(b,g.A,g.B,false));
+                if(collinear!=null)
+                {
+                    EndRelation(sketch,(int)swConstraintType_e.swConstraintType_COLINEAR,segments[i],collinear.Edge);evidence.OwnFrameRelations++;
+                }
+                else
+                {
+                    double[] d=AfjParametricRules.Unit(AfjParametricRules.Sub(b,a));
+                    var parallel=guides.FirstOrDefault(g=>Math.Abs(Math.Abs(WebDot(d,AfjParametricRules.Unit(AfjParametricRules.Sub(g.B,g.A))))-1)<1e-7);
+                    if(parallel!=null){EndRelation(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,segments[i],parallel.Edge);evidence.OwnFrameRelations++;}
+                    else
+                    {
+                        var perpendicular=guides.FirstOrDefault(g=>Math.Abs(WebDot(d,AfjParametricRules.Unit(AfjParametricRules.Sub(g.B,g.A))))<1e-7);
+                        if(perpendicular!=null){EndRelation(sketch,(int)swConstraintType_e.swConstraintType_PERPENDICULAR,segments[i],perpendicular.Edge);evidence.OwnFrameRelations++;}
+                    }
+                }
+            }
+            // A vertex coincidence is added only where no adjacent collinear
+            // segment has already fixed that location. This avoids redundant
+            // constraints at an existing native corner.
+            for(int i=0;i<segments.Count;i++)
+            {
+                int previous=(i+segments.Count-1)%segments.Count;double[] p=local[i];
+                bool implied=guides.Any(g=>(segments[i] is SketchLine&&WebOnLine(p,g.A,g.B,false)&&WebOnLine(local[(i+1)%segments.Count],g.A,g.B,false))||
+                    (segments[previous] is SketchLine&&WebOnLine(local[previous],g.A,g.B,false)&&WebOnLine(p,g.A,g.B,false)));
+                if(implied)continue;
+                Vertex vertex=vertices.FirstOrDefault(v=>{double[] raw=v.GetPoint() as double[];return WebFinite(raw)&&WebNorm(AfjParametricRules.Sub(Point(app,raw,transform),p))<1e-8;});
+                if(vertex!=null){EndRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,WebStart(segments[i]),vertex);evidence.OwnFrameRelations++;}
+                else
+                {
+                    var edge=guides.FirstOrDefault(g=>WebOnLine(p,g.A,g.B,true));
+                    if(edge!=null){EndRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,WebStart(segments[i]),edge.Edge);evidence.OwnFrameRelations++;}
+                }
+            }
+            for(int i=0;i<segments.Count;i++)
+            {
+                SketchPoint p=WebStart(segments[i]),q=WebEnd(segments[i]);double[] expected=local[i],end=local[(i+1)%segments.Count];
+                if(WebNorm(AfjParametricRules.Sub(new[]{p.X,p.Y,p.Z},expected))>1e-8||WebNorm(AfjParametricRules.Sub(new[]{q.X,q.Y,q.Z},end))>1e-8)
+                    throw new InvalidOperationException("WEB_FACE: relations changed the reviewed polygon");
+            }
+        }
+        private static void VerifyWebFaceSketches(ISldWorks app,PartEdit edit,string stage)
+        {
+            foreach(var evidence in edit.WebFaceSketches)
+            {
+                if(evidence.Feature==null||evidence.Sketch==null||!edit.OwnedIds.Contains(evidence.Feature.GetID())||
+                   !Same(app,evidence.Feature.GetSpecificFeature2(),evidence.Sketch))throw new InvalidOperationException("WEB_FACE: owned Sketch identity unavailable");
+                int refType=0;object reference=evidence.Sketch.GetReferenceEntity(ref refType);evidence.ObservedReferenceType=refType;
+                MathTransform inverse=evidence.Sketch.ModelToSketchTransform.Inverse() as MathTransform;
+                if(inverse==null)throw new InvalidOperationException("WEB_FACE: Sketch transform unavailable");
+                double[] origin=Point(app,new double[3],inverse),normal=AfjParametricRules.Unit(AfjParametricRules.Sub(Point(app,new[]{0d,0d,1d},inverse),origin));
+                evidence.PostCutPlaneVerified=Math.Abs(Math.Abs(WebDot(normal,evidence.Normal))-1)<1e-7&&Math.Abs(WebDot(origin,evidence.Normal)-evidence.Support)<1e-8;
+                Array parents=evidence.Feature.GetParents() as Array;
+                bool ownerParent=parents!=null&&parents.Cast<object>().OfType<Feature>().Any(f=>f.GetID()==evidence.OriginalOwnerId);
+                evidence.Status=evidence.Sketch.GetConstrainedStatus();
+                evidence.Relations=evidence.Sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+                int dangling=evidence.Sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling),over=evidence.Sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining);
+                evidence.Dimensions=0;for(DisplayDimension dim=evidence.Feature.GetFirstDisplayDimension() as DisplayDimension;dim!=null;dim=evidence.Feature.GetNextDisplayDimension(dim) as DisplayDimension)
+                    if(++evidence.Dimensions>256)throw new InvalidOperationException("WEB_FACE: dimension traversal exceeded limit");
+                if(!evidence.InitialReferenceVerified||!evidence.ClosedReferenceVerified||!evidence.PostCutPlaneVerified||!ownerParent||
+                   dangling!=0||over!=0||evidence.Dimensions!=0||
+                   (evidence.Status!=(int)swConstrainedStatus_e.swFullyConstrained&&evidence.Status!=(int)swConstrainedStatus_e.swUnderConstrained))
+                    throw new InvalidOperationException("WEB_FACE: invalid native Sketch at "+stage+" status="+evidence.Status+" parent="+ownerParent);
+                evidence.FullyDefined=evidence.Status==(int)swConstrainedStatus_e.swFullyConstrained;
+                evidence.Qualification=evidence.FullyDefined?"PROBE_NATIVE_FULL_STATUS_CRITICAL_INTENT_STILL_UNQUALIFIED":"PROBE_NATIVE_UNDERCONSTRAINED_CRITICAL_SEAM_UNQUALIFIED";
+                Trace.WriteLine("[AFJ-U-FACE-PROBE] stage="+stage+" name="+evidence.Name+" status="+evidence.Status+" relations="+evidence.Relations+
+                    " own_frame_relations="+evidence.OwnFrameRelations+" dimensions="+evidence.Dimensions+" new_planes="+evidence.NewPlanes+
+                    " initial_ref_type="+evidence.ReferenceType+" current_ref_type="+evidence.ObservedReferenceType+" current_face="+(reference is Face2)+
+                    " sketch_plane="+evidence.PostCutPlaneVerified+" original_owner_parent="+ownerParent+" qualification="+evidence.Qualification);
+            }
+        }
+        private static Feature WriteTool(ISldWorks app,PartEdit edit,AfjToolDefinition spec,bool normalCut,string suffix,out bool reverse)
+        {
+            if(!AllowWebFaceOffsetProbe||(WebFaceOffsetNormalSign!=1&&WebFaceOffsetNormalSign!=-1))
+                throw new InvalidOperationException("WEB_FACE_PROBE_ONLY: explicit copied-CAD probe permission and signed-offset calibration required");
+            ModelDoc2 part=edit.Part;double support;Face2 face=WebSupportFace(edit,spec,out support);
+            double[] direction=AfjParametricRules.Unit(spec.Direction);double start=WebDot(spec.Polygon[0],direction);
+            double[][] projected=spec.Polygon.Select(p=>AfjParametricRules.Add(p,AfjParametricRules.Scale(direction,support-start))).ToArray();
+            Feature originalOwner=face.GetFeature() as Feature;
+            int beforePlanes=EndPlaneCount(part);part.ClearSelection2(true);
+            if(!((IEntity)face).Select4(false,null))throw new InvalidOperationException("WEB_FACE: cannot select actual outer Web");
+            var evidence=new AfjWebFaceSketchEvidence{Normal=direction,Support=support,OriginalOwnerId=originalOwner.GetID()};
+            Sketch sketch=null;Feature profile=null;bool changed=false,oldAddToDb=false;double signedOffset=Double.NaN;
+            try
+            {
+                part.SketchManager.InsertSketch(true);sketch=part.GetActiveSketch2() as Sketch;
+                if(sketch==null||sketch.Is3D())throw new InvalidOperationException("WEB_FACE: no active 2D face Sketch");
+                profile=Own(edit,FindSpecific(app,part,sketch),suffix+"_Profile");evidence.Feature=profile;evidence.Sketch=sketch;evidence.Name=profile.Name;
+                int referenceType=0;object reference=sketch.GetReferenceEntity(ref referenceType);evidence.ReferenceType=referenceType;
+                evidence.InitialReferenceVerified=reference is Face2&&Same(app,reference,face);
+                if(!evidence.InitialReferenceVerified)throw new InvalidOperationException("WEB_FACE: actual Sketch is not attached to selected Web");
+                MathTransform transform=sketch.ModelToSketchTransform,inverse=transform.Inverse() as MathTransform;
+                if(inverse==null)throw new InvalidOperationException("WEB_FACE: Sketch transform missing");
+                double[] origin=Point(app,new double[3],inverse),sketchNormal=AfjParametricRules.Unit(AfjParametricRules.Sub(Point(app,new[]{0d,0d,1d},inverse),origin));
+                reverse=ReverseForAlignment(WebDot(sketchNormal,direction));
+                signedOffset=WebDot(AfjParametricRules.Sub(spec.Polygon[0],origin),sketchNormal);
+                if(Math.Abs(Math.Abs(signedOffset)-AfjManufacturingConventions.CutterEnvelopeOverrun)>1e-8)
+                    throw new InvalidOperationException("WEB_FACE: physical start offset is not reviewed CutterEnvelopeOverrun");
+                evidence.Offset=Math.Abs(signedOffset);evidence.OffsetReverse=signedOffset*WebFaceOffsetNormalSign<0;
+                evidence.FromType=(int)swStartConditions_e.swStartOffset;
+                var local=projected.Select(p=>Point(app,p,transform)).ToArray();var segments=new List<SketchSegment>();
+                oldAddToDb=part.SketchManager.AddToDB;changed=true;part.SketchManager.AddToDB=true;
+                for(int i=0;i<local.Length;i++)
+                {
+                    double[] a=local[i],b=local[(i+1)%local.Length];
+                    if(Math.Abs(a[2])>1e-8||Math.Abs(b[2])>1e-8)throw new InvalidOperationException("WEB_FACE: projected tool is not on Web");
+                    SketchSegment segment;
+                    if(spec.ArcCenters!=null&&spec.ArcCenters[i]!=null)
+                    {
+                        double[] nativeCenter=AfjParametricRules.Add(spec.ArcCenters[i],AfjParametricRules.Scale(direction,support-start));
+                        double[] c=Point(app,nativeCenter,transform);double cross=(a[0]-c[0])*(b[1]-c[1])-(a[1]-c[1])*(b[0]-c[0]);
+                        if(Math.Abs(c[2])>1e-8||Math.Abs(cross)<1e-14)throw new InvalidOperationException("WEB_FACE: unsupported reviewed arc");
+                        segment=part.SketchManager.CreateArc(c[0],c[1],0,a[0],a[1],0,b[0],b[1],0,(short)(cross>0?1:-1));
+                    }
+                    else segment=part.SketchManager.CreateLine(a[0],a[1],0,b[0],b[1],0);
+                    if(segment==null)throw new InvalidOperationException("WEB_FACE: Sketch entity returned null");segments.Add(segment);
+                }
+                part.SketchManager.AddToDB=oldAddToDb;changed=false;WebRelations(app,edit,face,sketch,segments,local,evidence);
+            }
+            finally
+            {
+                try{if(changed)part.SketchManager.AddToDB=oldAddToDb;}
+                finally{if(sketch!=null)EndSketch(app,part,sketch);}
+            }
+            int closedType=0;object closedReference=sketch.GetReferenceEntity(ref closedType);
+            evidence.ClosedReferenceVerified=closedType==evidence.ReferenceType&&closedReference is Face2&&Same(app,closedReference,face);
+            if(!evidence.ClosedReferenceVerified)throw new InvalidOperationException("WEB_FACE: native face attachment lost on Sketch close");
+            edit.WebFaceSketches.Add(evidence);edit.LastWebFaceSketch=evidence;
+            part.ClearSelection2(true);if(!profile.Select2(false,0))throw new InvalidOperationException("WEB_FACE: owned profile selection failed");
+            Feature cut=part.FeatureManager.FeatureCut4(true,false,reverse,(int)swEndConditions_e.swEndCondBlind,(int)swEndConditions_e.swEndCondBlind,
+                spec.Length,spec.Length,false,false,false,false,0,0,false,false,false,false,normalCut,true,true,false,false,false,
+                (int)swStartConditions_e.swStartOffset,evidence.Offset,evidence.OffsetReverse,normalCut);
+            cut=Own(edit,cut,suffix+"_Cut");bool warning;int error=cut.GetErrorCode2(out warning);
+            var data=cut.GetDefinition() as ExtrudeFeatureData2;string kind=cut.GetTypeName2();if(kind=="ICE")kind=cut.GetTypeName();
+            evidence.NewPlanes=EndPlaneCount(part)-beforePlanes;
+            if(error!=0||kind!="Cut"||data==null||data.FromType!=(int)swExtrudeFrom_e.swExtrudeFrom_Offset||
+               Math.Abs(data.FromOffsetDistance-evidence.Offset)>1e-8||data.FromOffsetReverse!=evidence.OffsetReverse||
+               data.GetEndCondition(true)!=(int)swEndConditions_e.swEndCondBlind||Math.Abs(data.GetDepth(true)-spec.Length)>1e-8||
+               data.ReverseDirection!=reverse||data.NormalCut!=normalCut||data.FlipSideToCut||evidence.NewPlanes!=0)
+                throw new InvalidOperationException("WEB_FACE: native Cut offset/depth/direction/plane result differs from probe intent");
+            evidence.FromType=data.FromType;
+            VerifyWebFaceSketches(app,edit,"post_cut");
+            Trace.WriteLine("[AFJ-U-FACE-PROBE] representation=EXISTING_WEB_FACE_OFFSET signed_offset_sketch_normal_m="+signedOffset.ToString("R",CultureInfo.InvariantCulture)+
+                " calibration="+WebFaceOffsetNormalSign+" from_type="+data.FromType+" offset_m="+data.FromOffsetDistance.ToString("R",CultureInfo.InvariantCulture)+
+                " offset_reverse="+data.FromOffsetReverse+" blind_length_m="+spec.Length.ToString("R",CultureInfo.InvariantCulture)+" NormalCut="+data.NormalCut);
+            return cut;
+        }

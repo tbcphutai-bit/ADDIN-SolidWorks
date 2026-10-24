@@ -1,0 +1,18 @@
+{
+  "source_file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "source_before_sha256": "8ba673a608bf6dd2b9899429ae479dd5e23469b376cb1591668ca2b598cbdd06",
+  "source_after_sha256": "cc7fc64ab6b5a6d51cbf5e5ef6b59bd1d15f509d29af262d2e173a52cb92b68c",
+  "backup_sha256": "8ba673a608bf6dd2b9899429ae479dd5e23469b376cb1591668ca2b598cbdd06",
+  "only_main_source_file_written": true,
+  "protected_other_afj_sources_and_csproj_unchanged": true,
+  "main_branch_unchanged": true,
+  "main_head_unchanged": true,
+  "dll_sha256": "242d1773792740ae8e0cafcf89cf6bc2ef74c66e34b3902f777af6a9d2af5a45",
+  "pdb_sha256": "a95d8cfbfd1d6be8fe3cc4718f8b8182b2e027014910419642965cef43a7c45e",
+  "dll_pdb_unchanged": true,
+  "addin_build_deploy_performed": false,
+  "installed_addin_test": false,
+  "completed_utc": "2026-10-23T10:17:34.9720054Z",
+  "native_tested_source_sha256": "2bc61527c5aea88efe145eeb6262fedb0a3445967238116cff35239024529d55",
+  "final_change": "Removed one redundant LF at EOF only; no C# token or logic change"
+}
