@@ -258,7 +258,7 @@ namespace ADDIN.UI.AutoFrameJoint
         }
 
         /// <summary>
-        /// Automatic read-only analysis after both selections are committed.
+        /// Automatic analysis and qualified temporary KEEP preview after both selections commit.
         /// No background COM and no call inside OnSelectionboxListChanged.
         /// The user can still press Analyze manually to repeat the probe.
         /// </summary>
@@ -385,8 +385,8 @@ namespace ADDIN.UI.AutoFrameJoint
             analyzeButtonControl = group.AddControl2(
                 ButtonAnalyze,
                 (short)swPropertyManagerPageControlType_e.swControlType_Button,
-                "Phân tích", align, controlOptions,
-                "Đọc hai Frame. Không cắt hoặc thay đổi Part.")
+                "Phân tích và Preview", align, controlOptions,
+                "Đọc hai Frame và hiển thị Preview KEEP đã kiểm tra. Xem Preview trước khi nhấn OK; Part chưa cắt.")
                 as PropertyManagerPageControl;
 
             showBodiesButtonControl = group.AddControl2(
@@ -1331,9 +1331,23 @@ namespace ADDIN.UI.AutoFrameJoint
                         if (!IsUiLive(epoch) || !ready) { TraceFlow("AUTO_ANALYZE_SKIP", reason); return; }
                         bool previous = IsPreviousPair(a, b);
                         if (!IsUiLive(epoch)) return;
-                        if (previous && !String.IsNullOrEmpty(lastAnalysisMessage)) { TraceFlow("AUTO_ANALYZE_SKIP", "same analyzed pair"); return; }
+                        if (previous && !String.IsNullOrEmpty(lastAnalysisMessage) && !String.IsNullOrEmpty(lastPreviewMessage)) { TraceFlow("AUTO_ANALYZE_SKIP", "same analyzed and previewed pair"); return; }
                     }
-                    if (kind == 0) PerformAnalyze();
+                    if (kind == 0)
+                    {
+                        PerformAnalyze();
+                        // R55: analysis and its qualified KEEP preview share the posted UI action.
+                        // Close/Finish during analysis cancels this continuation; native Apply still
+                        // requires the backend's exact-source reviewed Preview ticket.
+                        if (onPreviewCut != null && IsUiLive(epoch) && currentPairValidated &&
+                            !IsBackendBusy() && !finishRequested && !finishCloseIssued)
+                        {
+                            TraceFlow("ANALYZE_PREVIEW_BEGIN", "candidate=1 automatic=" + automatic);
+                            PerformCutCandidate(1);
+                            TraceFlow("ANALYZE_PREVIEW_END", "candidate=1 automatic=" + automatic);
+                        }
+                        else TraceFlow("ANALYZE_PREVIEW_SKIP", "page/pair/busy/finish gate");
+                    }
                     else if (kind == 1) PerformShowBodies();
                     else if (kind == 2) PerformCutCandidate(candidate);
                 }
