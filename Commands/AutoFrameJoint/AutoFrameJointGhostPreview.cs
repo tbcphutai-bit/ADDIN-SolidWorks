@@ -61,7 +61,7 @@ namespace ADDIN.Commands.AutoFrameJoint
 
             app = swApp;
             sourceAssembly = originalAssembly;
-            Trace.WriteLine("[AFJ-R55] SOURCE=SECTION_GRAPH_ADJUSTED_BISECTOR_LINKED_FACE_SKETCH plane_fallback=DISABLED MVID=" +
+            Trace.WriteLine("[AFJ-R56] SOURCE=SECTION_GRAPH_ADJUSTED_BISECTOR_LINKED_FACE_SKETCH plane_fallback=DISABLED MVID=" +
                 typeof(AutoFrameJointGhostPreview).Assembly.ManifestModule.ModuleVersionId);
         }
 
@@ -869,15 +869,27 @@ namespace ADDIN.Commands.AutoFrameJoint
     {
         internal static Body2 Copy(Body2 b)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Boolean.Copy"))
+            {
+
             Body2 c=b==null?null:b.Copy() as Body2;
             if(c==null||!c.IsTemporaryBody())throw new InvalidOperationException("AFJ: temporary copy unavailable");
             return c;
+
+            }
         }
         internal static double Volume(Body2 b)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Boolean.Volume"))
+            {
+
             double[] p=b.GetMassProperties(1) as double[];
             if(p==null||p.Length<4||!Finite(p[3])||p[3]<=0)throw new InvalidOperationException("AFJ: invalid solid volume");
             return p[3];
+
+            }
         }
         internal static bool Finite(double x)
         {
@@ -891,6 +903,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         internal static void Validate(Body2 b)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Boolean.Validate"))
+            {
+
             if (b == null || !b.IsTemporaryBody() || b.GetType() != (int)swBodyType_e.swSolidBody)
                 throw new InvalidOperationException("AFJ: requires a temporary solid B-rep");
             int check2 = b.Check2();
@@ -899,9 +915,15 @@ namespace ADDIN.Commands.AutoFrameJoint
             if (check2 != 0 || check3 != 0)
                 throw new InvalidOperationException("AFJ: invalid B-rep; Check2=" + check2 + "; Check3 faults=" + check3);
             Volume(b);
+
+            }
         }
         internal static List<Body2> Boolean(Body2 a, Body2 b, int operation, out int code, string label = null)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Boolean.Operations2Wrapper"))
+            {
+
             Validate(a);
             Validate(b);
             // Both operands are disposable copies. Never query/reuse consumed
@@ -934,6 +956,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 result.Add(body);
             }
             return result;
+
+            }
         }
         internal static double DifferenceVolume(Body2 a, Body2 b)
         {
@@ -1055,6 +1079,30 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
         }
 
+        private static void VerifyMaterialPartition(Body2 original,List<Body2> kept,List<Body2> removed,double scalarResidual)
+        {
+            const double geometricTolerance=1e-12;
+            var pieces=kept.Concat(removed).ToArray();
+            if(pieces.Length==0||pieces.Length>32)throw new InvalidOperationException("AFJ: material partition piece bound");
+            int code;double outside=0,overlap=0;
+            foreach(var piece in pieces)
+                outside+=Total(Boolean(piece,original,(int)swBodyOperationType_e.SWBODYCUT,out code,"PARTITION:outside"));
+            for(int i=0;i<pieces.Length;i++)for(int j=i+1;j<pieces.Length;j++)
+                overlap+=Total(Boolean(pieces[i],pieces[j],(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"PARTITION:overlap"));
+            var missing=new List<Body2>{Copy(original)};
+            foreach(var piece in pieces)
+            {
+                var remainder=new List<Body2>();
+                foreach(var body in missing)remainder.AddRange(Boolean(body,piece,(int)swBodyOperationType_e.SWBODYCUT,out code,"PARTITION:coverage"));
+                missing=remainder;if(missing.Count==0)break;
+                if(missing.Count>32)throw new InvalidOperationException("AFJ: material partition remainder bound");
+            }
+            double absent=Total(missing);
+            Trace.WriteLine("[AFJ-R56] EXACT_MATERIAL_PARTITION scalar_residual_m3="+scalarResidual.ToString("R",CultureInfo.InvariantCulture)+" outside_m3="+outside.ToString("R",CultureInfo.InvariantCulture)+" overlap_m3="+overlap.ToString("R",CultureInfo.InvariantCulture)+" missing_m3="+absent.ToString("R",CultureInfo.InvariantCulture)+" tolerance_m3="+geometricTolerance.ToString("R",CultureInfo.InvariantCulture));
+            if(outside>geometricTolerance||overlap>geometricTolerance||absent>geometricTolerance)
+                throw new InvalidOperationException("AFJ: exact material conservation failed; scalar_residual="+scalarResidual.ToString("R",CultureInfo.InvariantCulture));
+        }
+
         internal static AfjBooleanResult Execute(ISldWorks app, Body2 source, AfjCutPlan plan)
         {
             if(plan==null||plan.Operations.Count>64)throw new InvalidOperationException("AFJ: invalid plan");
@@ -1091,7 +1139,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                                     next.Add(Copy(body));
                                     continue;
                                 }
-                                next.AddRange(Boolean(body, tool, (int)swBodyOperationType_e.SWBODYCUT, out code, operation.EvidenceId + ":cut"));
+                                var difference=Boolean(body, tool, (int)swBodyOperationType_e.SWBODYCUT, out code, operation.EvidenceId + ":cut");
+                                double beforeStep=Volume(body),afterStep=Total(difference),removedStep=Total(intersection);
+                                Trace.WriteLine("[AFJ-R56] BOOLEAN_VOLUME role="+operation.EvidenceId+" before_m3="+beforeStep.ToString("R",CultureInfo.InvariantCulture)+" after_m3="+afterStep.ToString("R",CultureInfo.InvariantCulture)+" intersect_m3="+removedStep.ToString("R",CultureInfo.InvariantCulture)+" residual_m3="+(beforeStep-afterStep-removedStep).ToString("R",CultureInfo.InvariantCulture));
+                                next.AddRange(difference);
                                 result.Removed.AddRange(intersection);
                             }
                             else
@@ -1109,7 +1160,15 @@ namespace ADDIN.Commands.AutoFrameJoint
             result.Kept.AddRange(kept);
             result.AfterVolume=Total(kept);
             result.RemovedVolume=Total(result.Removed);
-            if(Math.Abs(result.BeforeVolume-result.AfterVolume-result.RemovedVolume)>Math.Max(1e-12, result.BeforeVolume*1e-8))throw new InvalidOperationException("AFJ: volume conservation failed");
+            double residual=result.BeforeVolume-result.AfterVolume-result.RemovedVolume;
+            if(Math.Abs(residual)>Math.Max(1e-12,result.BeforeVolume*1e-8))
+            {
+                // A scalar mass-property sum alone cannot establish which
+                // material is missing. Keep its residual and independently
+                // verify exact B-rep set containment, disjointness and coverage.
+                // No retry, cutter modification or relaxed geometric tolerance.
+                VerifyMaterialPartition(source,result.Kept,result.Removed,residual);
+            }
             return result;
         }
     }
@@ -1144,10 +1203,16 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private static Identity Read(Feature feature)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Traversal.IdentityRead"))
+            {
+
             if (feature == null) throw new InvalidOperationException("AFJ_FEATURE_TRAVERSAL: unresolved native Feature");
             string type=feature.GetTypeName2();
             return new Identity { Feature=feature, Id=feature.GetID(), Type=type,
                 Kind=type=="ICE"?feature.GetTypeName():type, Name=feature.Name, Suppressed=feature.IsSuppressed() };
+
+            }
         }
         private static void Match(Identity old, Identity current, string scope)
         {
@@ -1157,6 +1222,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         internal static Feature[] Top(ModelDoc2 document)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Traversal.Top"))
+            {
+
             if (document==null) throw new InvalidOperationException("AFJ_FEATURE_TRAVERSAL: document unavailable");
             var seen=new Dictionary<int,Identity>(); var result=new List<Feature>();
             Feature feature=document.FirstFeature() as Feature;
@@ -1175,9 +1244,15 @@ namespace ADDIN.Commands.AutoFrameJoint
                 feature=feature.GetNextFeature() as Feature;
             }
             return result.ToArray();
+
+            }
         }
         internal static Feature[] Union(ModelDoc2 document)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Traversal.Union"))
+            {
+
             var top=Top(document); var seen=new Dictionary<int,Identity>();
             foreach(var feature in top) { var row=Read(feature); seen.Add(row.Id,row); }
             var raw=document.FeatureManager.GetFeatures(false) as Array;
@@ -1217,6 +1292,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             // top prefix is ordered; remaining identities are deterministic.
             var topIds=new HashSet<int>(top.Select(feature=>feature.GetID()));
             return top.Concat(seen.Values.Where(row=>!topIds.Contains(row.Id)).OrderBy(row=>row.Id).Select(row=>row.Feature)).ToArray();
+
+            }
         }
     }
     // Original SheetMetal metadata may be omitted by both public inventories
@@ -1383,7 +1460,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 double dot=c[3]*result.Axis[0]+c[4]*result.Axis[1]+c[5]*result.Axis[2];
                 if(Math.Abs(Math.Abs(dot)-1)<1e-7&&(Math.Abs(c[6]-result.Radius)<1e-8||Math.Abs(c[6]-result.Radius-result.Thickness)<1e-8))result.BendFaceCount++;
             }
-            if(result.BendFaceCount<2)throw new InvalidOperationException("UNVERIFIED_RULE: formed Bend B-rep not found (flat configuration?)");
+            if(result.BendFaceCount<2)throw new InvalidOperationException("UNVERIFIED_RULE: no formed R/R+t Bend pair aligned with the measured base-profile axis; this native construction is not qualified");
             return result;
         }
         private static bool Adjacent(double[] a, double[] b)
@@ -1421,6 +1498,27 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal static AfjParametricPlan Create(AfjProfile a, AfjProfile b, Body2 ba, Body2 bb, MathTransform ta, MathTransform tb, bool aCovers)
         {
             return AfjParametricRules.Generate(a, b, ba, bb, ta, tb, aCovers, AfjParametricRules.AssemblyGap);
+        }
+    }
+    // Diagnostic only: timestamp existing stages; never query COM from a
+    // timer, callback, worker thread or log formatter.
+    internal sealed class AfjStageTiming
+    {
+        readonly string scope;
+        readonly Stopwatch clock;
+        long previous;
+        internal AfjStageTiming(string scopeName)
+        {
+            if(!AfjNativeObservationMetrics.Enabled)return;
+            scope=scopeName;clock=Stopwatch.StartNew();Mark("BEGIN");
+        }
+        internal void Mark(string phase)
+        {
+            if(clock==null)return;
+            long now=clock.ElapsedMilliseconds;
+            Trace.WriteLine("[AFJ-R56-PERF] scope="+scope+" phase="+phase+
+                " elapsed_ms="+now+" delta_ms="+(now-previous));
+            previous=now;
         }
     }
     internal static class AfjJointSolver
@@ -1513,12 +1611,28 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             ModelDoc2 pa, pb;
             MathTransform ta, tb;
-            Body2 a=NativeBody(ca, out pa, out ta), b=NativeBody(cb, out pb, out tb);
-            AfjProfile pfa=AfjProfileAnalyzer.Analyze(pa, a), pfb=AfjProfileAnalyzer.Analyze(pb, b);
-            return SolveBodies(sw, assembly, a, b, pfa, pfb, pa, pb, ta, tb);
+            var timing=new AfjStageTiming("solve_input");
+            timing.Mark("native_body_A_BEGIN");
+            Body2 a=NativeBody(ca, out pa, out ta);
+            timing.Mark("native_body_A_END");
+            timing.Mark("native_body_B_BEGIN");
+            Body2 b=NativeBody(cb, out pb, out tb);
+            timing.Mark("native_body_B_END");
+            timing.Mark("profile_A_BEGIN");
+            AfjProfile pfa=AfjProfileAnalyzer.Analyze(pa, a);
+            timing.Mark("profile_A_END");
+            timing.Mark("profile_B_BEGIN");
+            AfjProfile pfb=AfjProfileAnalyzer.Analyze(pb, b);
+            timing.Mark("profile_B_END");
+            timing.Mark("SolveBodies_BEGIN");
+            var result=SolveBodies(sw, assembly, a, b, pfa, pfb, pa, pb, ta, tb);
+            timing.Mark("SolveBodies_END");
+            return result;
         }
         internal static AfjJointSolution SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)
         {
+            var timing=new AfjStageTiming("solve_bodies");
+            timing.Mark("rigid_and_length_BEGIN");
             // The current manufacturing policy is explicitly supplied by the user:
             // the shorter actual Frame covers. Base-extrusion stock lengths, names,
             // historical Cut tool coordinates and A/B order do not select a winner.
@@ -1527,20 +1641,41 @@ namespace ADDIN.Commands.AutoFrameJoint
             double la=Length(a, pfa.Axis), lb=Length(b, pfb.Axis);
             if(Math.Abs(la-lb)<1e-6)throw new InvalidOperationException("UNVERIFIED_RULE: equal-length Frames require a consistent drawing cover side");
             bool coverA=la<lb;
+            timing.Mark("rigid_and_length_END");
+            timing.Mark("rule_library_CREATE_BEGIN");
             AfjParametricPlan generated=AfjJointRuleLibrary.Create(pfa, pfb, a, b, ta, tb, coverA);
+            timing.Mark("rule_library_CREATE_END");
             var result=new AfjJointSolution
             {
                 Plan=generated.Plan, ReviewedIntent=generated, PartA=pa, PartB=pb, TransformA=ta, TransformB=tb, LengthA=la, LengthB=lb, CoverA=coverA, CoverageWarning=generated.CoverageWarning, ProfileGraphAJson=generated.Folded==null?null:(coverA?generated.Folded.Winner.GraphJson:generated.Folded.Loser.GraphJson), ProfileGraphBJson=generated.Folded==null?null:(coverA?generated.Folded.Loser.GraphJson:generated.Folded.Winner.GraphJson)
             }
             ;
+            if(generated.GeneralFoldFootprint)
+            {
+                result.ProfileGraphAJson=(coverA?generated.Winner:generated.Loser).FullGraph.GraphJson;
+                result.ProfileGraphBJson=(coverA?generated.Loser:generated.Winner).FullGraph.GraphJson;
+            }
+            timing.Mark("boolean_A_BEGIN");
             result.A=AfjTemporaryBoolean.Execute(sw, a, generated.Plan.A);
+            timing.Mark("boolean_A_END");
+            timing.Mark("boolean_B_BEGIN");
             result.B=AfjTemporaryBoolean.Execute(sw, b, generated.Plan.B);
+            timing.Mark("boolean_B_END");
             if(result.A.Kept.Count!=1||result.B.Kept.Count!=1)throw new InvalidOperationException("UNVERIFIED_RULE: each Frame must remain one connected solid");
+            timing.Mark("selected_end_A_BEGIN");
             SelectedEnd(result.A, ta, generated.Folded==null?generated.JointOrigin:AfjFoldedButtRules.SelectedOrigin(generated,coverA), coverA?generated.OutWinner:generated.OutLoser);
+            timing.Mark("selected_end_A_END");
+            timing.Mark("selected_end_B_BEGIN");
             SelectedEnd(result.B, tb, generated.Folded==null?generated.JointOrigin:AfjFoldedButtRules.SelectedOrigin(generated,!coverA), coverA?generated.OutLoser:generated.OutWinner);
+            timing.Mark("selected_end_B_END");
+            timing.Mark("verify_coverage_BEGIN");
             AfjParametricRules.VerifyCoverage(sw, generated, ta, tb, coverA, result.A, result.B);
+            timing.Mark("verify_coverage_END");
+            timing.Mark("world_kept_BEGIN");
             var wa=World(result.A.Kept, ta);
             var wb=World(result.B.Kept, tb);
+            timing.Mark("world_kept_END");
+            timing.Mark("before_overlap_BEGIN");
             result.BeforeOverlap=Overlap(World(new[]
             {
                 a
@@ -1550,12 +1685,22 @@ namespace ADDIN.Commands.AutoFrameJoint
                 b
             }
             , tb));
+            timing.Mark("before_overlap_END");
+            timing.Mark("after_overlap_BEGIN");
             result.AfterOverlap=Overlap(wa, wb);
+            timing.Mark("after_overlap_END");
             if(result.AfterOverlap>1e-12)throw new InvalidOperationException("UNVERIFIED_RULE: remaining solids interfere");
+            timing.Mark("exact_gap_BEGIN");
             result.AfterGap=Gap(assembly, wa, wb);
+            timing.Mark("exact_gap_END");
             if(Math.Abs(result.AfterGap-AfjParametricRules.AssemblyGap)>1e-6)throw new InvalidOperationException("UNVERIFIED_RULE: exact minimum assembly clearance is not 0.1 mm");
+            timing.Mark("exposure_long_BEGIN");
             AfjFoldedButtRules.MeasureLongCutExposure(sw, generated, result, wa, wb);
+            timing.Mark("exposure_long_END");
+            timing.Mark("exposure_U_BEGIN");
             AfjFoldedButtRules.MeasureUWallCapExposure(sw,generated,result,wa,wb);
+            timing.Mark("exposure_U_END");
+            timing.Mark("END");
             return result;
         }
     }
@@ -1581,6 +1726,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
         }
         internal bool NearReturn, FarReturn;
+        internal bool InwardNearSuffix, InwardFarSuffix, GeneralFoldCertified;
         // R55: full graph is independent of the rejected axial-butt plan.
         internal double[][] NearPath, FarPath;
         internal AfjFoldedButtRules.Section FullGraph;
@@ -1595,6 +1741,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal AfjUSection Loser, Winner;
         internal double[] SeamNear, SeamFar;
         internal string Derivation, CoverageWarning;
+        internal bool GeneralFoldFootprint;
         internal AfjFoldedButtRules.Context Folded;
     }
     internal static class AfjParametricRules
@@ -1839,7 +1986,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                     s.FarReturn=true;
                     s.MaxWidth=Math.Max(s.MaxWidth, y);
                 }
-                if(side==0&&y>1e-7||side==1&&y<s.Width-1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: U miter inward Return has no qualified collision/coverage construction; no axial BUTT fallback");
+                if(side==0&&y>1e-7)s.InwardNearSuffix=true;
+                if(side==1&&y<s.Width-1e-7){s.InwardFarSuffix=true;s.FarReturn=false;}
             }
             s.MaxDepth=Math.Max(s.NearHeight, s.FarHeight+(s.FarReturn?s.Thickness:0));
             if(s.Width<2*(s.Thickness+s.Radius)||s.NearHeight<2*(s.Thickness+s.Radius)||s.FarHeight<2*(s.Thickness+s.Radius))throw new InvalidOperationException("UNVERIFIED_RULE: Bend zones overlap");
@@ -1854,6 +2002,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             if(plan==null||plan.Folded!=null||plan.Winner==null||plan.Loser==null)return false;
             var l=plan.Loser;var w=plan.Winner;
+            if(plan.GeneralFoldFootprint)return l.GeneralFoldCertified&&w.GeneralFoldCertified&&l.FullGraph!=null&&w.FullGraph!=null;
             return !l.NearReturn&&!w.NearReturn&&
                 (!l.FarReturn||(l.CertifiedFarCascade&&l.FullGraph!=null&&l.FarPath.Length==2))&&
                 (!w.FarReturn||(w.CertifiedFarCascade&&w.FullGraph!=null));
@@ -1968,19 +2117,69 @@ namespace ADDIN.Commands.AutoFrameJoint
             // Independent ideal formed stock is generated from the measured section.
             // Only the small joint band is checked. Existing holes in that band are
             // deliberately refused until a drawing-specific exception is verified.
+            var timing=new AfjStageTiming("verify_coverage");
             MathTransform tl=aCovers?tb:ta, tw=aCovers?ta:tb;
+            timing.Mark("interior_stock_LONG_BEGIN");
             Body2 il=generated.Loser.FullGraph==null?
                 IdealJointStock(app,generated.Loser,tl,generated.JointOrigin,generated.OutLoser,generated.Winner.MaxWidth+.001):
                 AfjFoldedButtRules.InteriorStock(app,generated.Loser.FullGraph,generated.Loser.FullGraph.SourceBody,tl,generated.JointOrigin,generated.OutLoser,-.001,generated.Winner.MaxWidth+.001);
+            timing.Mark("interior_stock_LONG_END");
+            timing.Mark("interior_stock_SHORT_BEGIN");
             Body2 iw=generated.Winner.FullGraph==null?
                 IdealJointStock(app,generated.Winner,tw,generated.JointOrigin,generated.OutWinner,generated.Loser.MaxWidth+.001):
                 AfjFoldedButtRules.InteriorStock(app,generated.Winner.FullGraph,generated.Winner.FullGraph.SourceBody,tw,generated.JointOrigin,generated.OutWinner,-.001,generated.Loser.MaxWidth+.001);
+            timing.Mark("interior_stock_SHORT_END");
+            timing.Mark("expected_keep_LONG_BEGIN");
             var expectedL=AfjTemporaryBoolean.Execute(app, il, aCovers?generated.Plan.B:generated.Plan.A);
+            timing.Mark("expected_keep_LONG_END");
+            timing.Mark("expected_keep_SHORT_BEGIN");
             var expectedW=AfjTemporaryBoolean.Execute(app, iw, aCovers?generated.Plan.A:generated.Plan.B);
+            timing.Mark("expected_keep_SHORT_END");
             AfjBooleanResult actualL=aCovers?b:a, actualW=aCovers?a:b;
+            if(generated.GeneralFoldFootprint)
+            {
+                timing.Mark("removed_stock_guard_LONG_BEGIN");
+                VerifyGeneralRemovedStock(app,generated.Loser,tl,generated.JointOrigin,generated.OutLoser,actualL,"LONG");
+                timing.Mark("removed_stock_guard_LONG_END");
+                timing.Mark("removed_stock_guard_SHORT_BEGIN");
+                VerifyGeneralRemovedStock(app,generated.Winner,tw,generated.JointOrigin,generated.OutWinner,actualW,"SHORT");
+                timing.Mark("removed_stock_guard_SHORT_END");
+            }
+            timing.Mark("missing_keep_BEGIN");
             double missingL=AfjTemporaryBoolean.DifferenceVolume(expectedL.Kept[0], actualL.Kept[0]);
             double missingW=AfjTemporaryBoolean.DifferenceVolume(expectedW.Kept[0], actualW.Kept[0]);
+            timing.Mark("missing_keep_END");
+            timing.Mark("END");
             if(missingL>2e-12||missingW>2e-12)throw new InvalidOperationException("UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3="+(missingL*1e9).ToString("R", System.Globalization.CultureInfo.InvariantCulture)+"/"+(missingW*1e9).ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        // A complete base graph does not describe local material added at an
+        // end. This bounded rule may remove only stock independently witnessed
+        // by two clean native interior sections. Inspect actual removed sets,
+        // so material elsewhere in the Part is outside this rule's authority.
+        // End flange/Boss/MoveFace names are deliberately not consulted.
+        static void VerifyGeneralRemovedStock(ISldWorks app,AfjUSection section,MathTransform transform,
+            double[] origin,double[] outgoing,AfjBooleanResult actual,string side)
+        {
+            if(section==null||!section.GeneralFoldCertified||section.FullGraph==null||
+                section.FullGraph.SourceBody==null||actual==null)
+                throw new InvalidOperationException("UNVERIFIED_RULE: complete measured stock required for added-stock protection");
+            if(actual.Removed.Count==0)return;
+            Body2 original=section.FullGraph.SourceBody;
+            double begin=-Extreme(original,transform,Scale(outgoing,-1),origin)-.001;
+            double end=Extreme(original,transform,outgoing,origin)+.001;
+            Body2 measuredSweep=AfjFoldedButtRules.InteriorStock(app,section.FullGraph,original,
+                transform,origin,outgoing,begin,end);
+            double unrepresented=0;
+            foreach(Body2 removed in actual.Removed)
+                unrepresented+=AfjTemporaryBoolean.DifferenceVolume(removed,measuredSweep);
+            Trace.WriteLine("[AFJ-R56] GENERAL_REMOVED_STOCK side="+side+
+                " removed_outside_measured_sweep_m3="+unrepresented.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+
+                " stock_begin_m="+begin.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+
+                " stock_end_m="+end.ToString("R",System.Globalization.CultureInfo.InvariantCulture));
+            if(!AfjTemporaryBoolean.Finite(unrepresented)||unrepresented>2e-12)
+                throw new InvalidOperationException("UNVERIFIED_RULE: ADDED_STOCK_IN_CUT_REQUIRES_LOCAL_CONTACT_RULE; side="+side+
+                    "; removed outside independently measured stock mm3="+(unrepresented*1e9).ToString("R",System.Globalization.CultureInfo.InvariantCulture));
+            GC.KeepAlive(measuredSweep);
         }
         static void VerifyPhysicalSkins(AfjUSection section, Body2 body, MathTransform transform)
         {
@@ -2091,12 +2290,18 @@ namespace ADDIN.Commands.AutoFrameJoint
 
         internal static AfjParametricPlan Generate(AfjProfile profileA, AfjProfile profileB, Body2 bodyA, Body2 bodyB, MathTransform ta, MathTransform tb, bool aCovers, double webGap)
         {
+            var timing=new AfjStageTiming("rule_generate");
             // AFJ-R53: more formed strips do not select another joint family.
             // A U Frame remains a U Frame. Never replace an unqualified miter
             // with an axial BUTT merely because a Return is present.
+            timing.Mark("select_joint_webs_BEGIN");
             SelectJointWebs(profileA,profileB,bodyA,bodyB,ta,tb);
+            timing.Mark("select_joint_webs_END");
+            timing.Mark("require_topology_BEGIN");
             RequireMiterTopology(profileA, "A");
             RequireMiterTopology(profileB, "B");
+            timing.Mark("require_topology_END");
+            timing.Mark("section_geometry_BEGIN");
             // The cover side is a manufacturing policy. It is not inferred from filenames,
             // fixture coordinates, stock length, A/B selection order or a universal KCC tag.
             AfjProfile pl=aCovers?profileB:profileA, pw=aCovers?profileA:profileB;
@@ -2107,8 +2312,25 @@ namespace ADDIN.Commands.AutoFrameJoint
             AfjUSection l=Section(pl, tl, uw), w=Section(pw, tw, ul);
             // Each section is verified against its own thickness/radius before policy dispatch.
             if(Dot(l.WidthDirection, uw)<.999999||Dot(w.WidthDirection, ul)<.999999||Dot(l.DepthDirection, w.DepthDirection)<.999999)throw new InvalidOperationException("UNVERIFIED_RULE: incompatible folded skin orientation");
+            timing.Mark("section_geometry_END");
+            timing.Mark("verify_physical_skins_LONG_BEGIN");
             VerifyPhysicalSkins(l, bl, tl);
+            timing.Mark("verify_physical_skins_LONG_END");
+            timing.Mark("verify_physical_skins_SHORT_BEGIN");
             VerifyPhysicalSkins(w, bw, tw);
+            timing.Mark("verify_physical_skins_SHORT_END");
+            bool generalFold=NeedsGeneralFold(l,tl,true)||NeedsGeneralFold(w,tw,false);
+            if(generalFold)
+            {
+                timing.Mark("qualify_general_LONG_BEGIN");
+                QualifyGeneralSection(l,pl,bl,tl);
+                timing.Mark("qualify_general_LONG_END");
+                timing.Mark("qualify_general_SHORT_BEGIN");
+                QualifyGeneralSection(w,pw,bw,tw);
+                timing.Mark("qualify_general_SHORT_END");
+            }
+            else
+            {
             if(l.NearPath.Length>1||l.FarPath.Length>2)
                 throw new InvalidOperationException("UNVERIFIED_RULE: losing-member additional cascade has no certified U KEEP/CUT allocation");
             if(w.NearPath.Length>1)
@@ -2126,12 +2348,15 @@ namespace ADDIN.Commands.AutoFrameJoint
                 if(-Extreme(cascade.Item3,cascade.Item4,Scale(section.DepthDirection,-1),section.Origin)<-1e-7)
                     throw new InvalidOperationException("UNVERIFIED_RULE: cascade crosses behind outer Web skin");
             }
+            }
+            timing.Mark("qualified_section_END");
+            timing.Mark("support_and_cutter_plan_BEGIN");
             // AFJ-R53: unequal t, R, width or formed-strip count never
             // authorize a square axial BUTT. Each skin was measured above;
             // the remaining miter checks either qualify this pair or refuse it.
             double[] d=Unit(l.DepthDirection), o=Add(l.Origin, Scale(ul, Dot(Sub(w.Origin, l.Origin), ul)));
             if(Math.Abs(Dot(Sub(w.Origin, o), d))>1e-7)throw new InvalidOperationException("UNVERIFIED_RULE: Web skins are not coplanar");
-            if(l.NearReturn||w.NearReturn)throw new InvalidOperationException("UNVERIFIED_RULE: U miter near Return needs qualified collision/coverage construction; no axial BUTT fallback");
+            if(!generalFold&&(l.NearReturn||w.NearReturn))throw new InvalidOperationException("UNVERIFIED_RULE: uncertified near Return");
             double outerDepthL=l.FarHeight+(l.FarReturn?l.Thickness:0), outerDepthW=w.FarHeight+(w.FarReturn?w.Thickness:0);
             bool unequalHeights=Math.Abs(l.NearHeight-w.NearHeight)>1e-7||Math.Abs(outerDepthL-outerDepthW)>1e-7;
             if (unequalHeights)
@@ -2139,14 +2364,14 @@ namespace ADDIN.Commands.AutoFrameJoint
                 // Extend the existing cover policy only where the covering
                 // plain-U Walls reach all losing-wall cut edges. Return levels
                 // and a lower covering Wall need a separate verified rule.
-                if((l.FarReturn&&!l.CertifiedFarCascade)||(w.FarReturn&&!w.CertifiedFarCascade))
+                if(!generalFold&&((l.FarReturn&&!l.CertifiedFarCascade)||(w.FarReturn&&!w.CertifiedFarCascade)))
                     throw new InvalidOperationException("UNVERIFIED_RULE: unequal Return level lacks certified U KEEP/CUT");
                 // Lower short Walls retain short-cover priority. Actual exposed
                 // axial Wall caps are reported after the complete solid solve.
             }
             double sf=w.FarTangent, qf=l.FarTangent, sn=w.NearTangent, qn=qf-(sf-sn);
             bool unequalWidths=Math.Abs(l.Width-w.Width)>1e-7;
-            if(unequalWidths)
+            if(unequalWidths||generalFold)
             {
                 // Preserve the geometric bisector through the two far Bend
                 // tangencies. Wider cover moves the near endpoint along s;
@@ -2165,16 +2390,18 @@ namespace ADDIN.Commands.AutoFrameJoint
             double m=Math.Max(.01, 5*Math.Max(l.Thickness+l.Radius, w.Thickness+w.Radius));
             double sMax=Math.Max(Extreme(bl, tl, ul, o), w.MaxWidth)+m, qMax=Math.Max(Extreme(bw, tw, uw, o), l.MaxWidth)+m;
             double qMin=l.MinWidth-m, sMin=w.MinWidth-m, near=l.NearTangent, far=l.FarTangent;
+            double nearAxial=generalFold?w.MinWidth:0;
+            double farRow=generalFold?far+AssemblyGap:far;
             double sStart=Math.Max(w.Thickness, seamS(near)), qHit=qn+(w.Thickness+gapShift-sn)/ds;
             var loserBoundary=new List<double[]>
             {
                 new[]
                 {
-                    -AssemblyGap, qMin
+                    nearAxial-AssemblyGap, qMin
                 }
                 , new[]
                 {
-                    -AssemblyGap, near
+                    nearAxial-AssemblyGap, near
                 }
                 , new[]
                 {
@@ -2189,13 +2416,13 @@ namespace ADDIN.Commands.AutoFrameJoint
             );
             loserBoundary.Add(new[]
             {
-                seamS(far), far
+                seamS(farRow), farRow
             }
             );
             double farWall=w.Width-w.Thickness-AssemblyGap;
-            if(Math.Abs(farWall-seamS(far))>1e-9)loserBoundary.Add(new[]
+            if(Math.Abs(farWall-seamS(farRow))>1e-9)loserBoundary.Add(new[]
             {
-                farWall, far
+                farWall, farRow
             }
             );
             if(l.FarReturn)
@@ -2278,6 +2505,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 sMin, qMax
             }
             );
+            if(generalFold)VerifyGeneralPartition(l,w,loserBoundary,winnerBoundary,m);
             var lp=new AfjCutPlan();
             var wp=new AfjCutPlan();
             lp.Operations.Add(Op("U_RULE:LOSER_STEPPED_WEB_WALL_RETURN", Prism(loserBoundary, -ToolOverrun, l.MaxDepth+ToolOverrun, tl, o, ul, uw, d)));
@@ -2361,7 +2589,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 {
                     RuleId=unequalHeights?"ORTHOGONAL_U_TALLER_COVER":"ORTHOGONAL_U_COVER", A=aCovers?wp:lp, B=aCovers?lp:wp
                 }
-                , Loser=l, Winner=w, JointOrigin=o, OutLoser=ul, OutWinner=uw, Depth=d, SeamNear=new[]
+                , GeneralFoldFootprint=generalFold, Loser=l, Winner=w, JointOrigin=o, OutLoser=ul, OutWinner=uw, Depth=d, SeamNear=new[]
                 {
                     sn, qn
                 }
@@ -2373,7 +2601,94 @@ namespace ADDIN.Commands.AutoFrameJoint
                 , Derivation=(unequalWidths?"Unequal-width geometric bisector through far Bend tangencies; near endpoint follows actual near tangent of the limiting Web; ":"Common seam from Bend tangencies; near seam constrained to inner Wall; ")+"Wall assembly gap=0.1 mm; outer Return coverage; analytic NormalCut cap; web gap="+webGap.ToString("R", System.Globalization.CultureInfo.InvariantCulture)+(w.CertifiedFarCascade?"; "+w.CascadeEvidence:"")
             }
             ;
+            if(generalFold)
+            {
+                result.Derivation+="; GENERAL_FOLDED_SHARED_STEPPED_MITER: complete native strip/Bend graph; full-depth offset far shoulder; exact planar KEEP separation certificate";
+                result.CoverageWarning=(result.CoverageWarning??"")+" General folded suffix: exposed-edge measurement is partial; high-fold diagonal edges require review.";
+            }
+            timing.Mark("support_and_cutter_plan_END");
+            timing.Mark("END");
             return result;
+        }
+
+        private static bool NeedsGeneralFold(AfjUSection s,MathTransform t,bool losing)
+        {
+            if(s.NearReturn||s.InwardNearSuffix||s.InwardFarSuffix||s.NearPath.Length>1||losing&&s.FarPath.Length>2)return true;
+            for(int k=1;k<s.FarPath.Length;k++)
+            {
+                double[] u=Unit(WorldVector(Sub(s.FarPath[k],s.FarPath[k-1]),t));
+                if(Dot(u,s.WidthDirection)<-1e-7||Dot(u,s.DepthDirection)<-1e-7||
+                    Math.Max(Math.Abs(Dot(u,s.WidthDirection)),Math.Abs(Dot(u,s.DepthDirection)))<.999999)return true;
+            }
+            return false;
+        }
+        // R56: this certificate is independent of suffix count and filenames.
+        // Extrema close the tools; native Web skins/tangencies choose the joint.
+        private static void QualifyGeneralSection(AfjUSection s,AfjProfile p,Body2 body,MathTransform t)
+        {
+            s.FullGraph=AfjFoldedButtRules.Audit(p,body,t);
+            s.MinWidth=-Extreme(body,t,Scale(s.WidthDirection,-1),s.Origin);
+            s.MaxWidth=Extreme(body,t,s.WidthDirection,s.Origin);
+            s.MaxDepth=Extreme(body,t,s.DepthDirection,s.Origin);
+            double low=-Extreme(body,t,Scale(s.DepthDirection,-1),s.Origin);
+            if(low < -1e-7 || s.MaxDepth<=0 || s.MaxWidth-s.MinWidth<=0)
+                throw new InvalidOperationException("UNVERIFIED_RULE: full native folded section crosses behind outer Web or has invalid support");
+            // FarReturn now denotes the actual exterior shoulder; all suffix
+            // paths and inward flags remain available as truthful metadata.
+            s.FarReturn=s.MaxWidth>s.Width+1e-7;
+            s.GeneralFoldCertified=true;
+            s.CascadeEvidence="API_BREP_COMPLETE_FOLDED_GRAPH; strips="+s.FullGraph.Ordered.Length+"; near_suffix="+s.NearPath.Length+"; far_suffix="+s.FarPath.Length+"; inward_near="+s.InwardNearSuffix+"; inward_far="+s.InwardFarSuffix;
+            Trace.WriteLine("[AFJ-R56] GENERAL_SECTION "+s.CascadeEvidence+" transverse_m="+s.MinWidth.ToString("R",CultureInfo.InvariantCulture)+"/"+s.MaxWidth.ToString("R",CultureInfo.InvariantCulture)+" depth_m="+low.ToString("R",CultureInfo.InvariantCulture)+"/"+s.MaxDepth.ToString("R",CultureInfo.InvariantCulture));
+        }
+
+        private static List<double[]> ClipAxis(List<double[]> points,int axis,double bound,bool keepGreater)
+        {
+            var result=new List<double[]>();if(points.Count==0)return result;
+            var a=points[points.Count-1];double da=(a[axis]-bound)*(keepGreater?1:-1);
+            foreach(var b in points)
+            {
+                double db=(b[axis]-bound)*(keepGreater?1:-1);
+                if((da>=0)!=(db>=0))
+                { double u=da/(da-db);result.Add(new[]{a[0]+u*(b[0]-a[0]),a[1]+u*(b[1]-a[1])}); }
+                if(db>=0)result.Add(b);a=b;da=db;
+            }
+            return result;
+        }
+        private static double Cross2(double[] a,double[] b,double[] c)
+        {return (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);}
+        private static double PointSegment2(double[] p,double[] a,double[] b)
+        { double x=b[0]-a[0],y=b[1]-a[1],d=x*x+y*y;double u=d>1e-30?Math.Max(0,Math.Min(1,((p[0]-a[0])*x+(p[1]-a[1])*y)/d)):0;return Math.Sqrt(Math.Pow(p[0]-a[0]-u*x,2)+Math.Pow(p[1]-a[1]-u*y,2)); }
+        private static bool Contains2(List<double[]> polygon,double[] p)
+        {
+            bool inside=false;for(int i=0,j=polygon.Count-1;i<polygon.Count;j=i++)
+            {var a=polygon[i];var b=polygon[j];if((a[1]>p[1])!=(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;}
+            return inside;
+        }
+        private static void VerifyGeneralPartition(AfjUSection l,AfjUSection w,List<double[]> removedL,List<double[]> removedW,double margin)
+        {
+            double low=Math.Min(l.MinWidth,w.MinWidth)-Math.Max(.02,2*margin);
+            // The complementary KEEP boundaries, clipped only to measured
+            // transverse supports. Negative axial tails are included; farther
+            // tails are separated by more than the closure margin.
+            var keepL=new List<double[]>{new[]{low,removedL[0][1]}};
+            keepL.AddRange(removedL.Take(removedL.Count-2));keepL.Add(new[]{low,removedL[removedL.Count-3][1]});
+            keepL=ClipAxis(ClipAxis(keepL,1,l.MinWidth,true),1,l.MaxWidth,false);
+            var keepW=new List<double[]>{new[]{removedW[0][0],low}};
+            keepW.AddRange(removedW.Take(removedW.Count-2));keepW.Add(new[]{removedW[removedW.Count-3][0],low});
+            keepW=ClipAxis(ClipAxis(keepW,0,w.MinWidth,true),0,w.MaxWidth,false);
+            if(keepL.Count<3||keepW.Count<3)throw new InvalidOperationException("UNVERIFIED_RULE: empty general KEEP footprint");
+            double minimum=Double.PositiveInfinity;
+            for(int i=0;i<keepL.Count;i++)for(int j=0;j<keepW.Count;j++)
+            {
+                var a=keepL[i];var b=keepL[(i+1)%keepL.Count];var c=keepW[j];var d=keepW[(j+1)%keepW.Count];
+                double ab1=Cross2(a,b,c),ab2=Cross2(a,b,d),cd1=Cross2(c,d,a),cd2=Cross2(c,d,b);
+                if(ab1*ab2<0&&cd1*cd2<0)minimum=0;
+                minimum=Math.Min(minimum,Math.Min(Math.Min(PointSegment2(a,c,d),PointSegment2(b,c,d)),Math.Min(PointSegment2(c,a,b),PointSegment2(d,a,b))));
+            }
+            if(Contains2(keepL,keepW[0])||Contains2(keepW,keepL[0]))minimum=0;
+            Trace.WriteLine("[AFJ-R56] EXACT_PLANAR_KEEP_CERTIFICATE min_gap_m="+minimum.ToString("R",CultureInfo.InvariantCulture)+" long_vertices="+keepL.Count+" short_vertices="+keepW.Count+" all_depths=True");
+            if(!AfjTemporaryBoolean.Finite(minimum)||minimum<AssemblyGap-1e-8)
+                throw new InvalidOperationException("UNVERIFIED_RULE: general shared folded KEEP footprint clearance below 0.1 mm; measured="+minimum.ToString("R",CultureInfo.InvariantCulture));
         }
     }
 }
@@ -3868,7 +4183,7 @@ internal static void MeasureUWallCapExposure(ISldWorks app,AfjParametricPlan pla
     var longs=solution.CoverA?worldB:worldA;var shorts=solution.CoverA?worldA:worldB;
     if(longs==null||shorts==null||longs.Count!=1||shorts.Count!=1)return;
     double[] normal=Unit(plan.OutLoser);double basis=Dot(plan.JointOrigin,normal),g=AfjParametricRules.AssemblyGap;
-    var coordinates=new List<double>{-g,plan.Winner.Width-plan.Winner.Thickness-g};
+    var coordinates=new List<double>{(plan.GeneralFoldFootprint?plan.Winner.MinWidth:0)-g,plan.Winner.Width-plan.Winner.Thickness-g};
     if(plan.Loser.FarReturn)coordinates.Add(plan.Winner.MaxWidth);
     var rows=coordinates.Distinct().Select(s=>MeasureCapExposure(app,longs[0],shorts[0],normal,basis+s,
         g+plan.Winner.Thickness/2,.00001,plan.Depth)).ToArray();
@@ -3888,6 +4203,7 @@ internal static void MeasureUWallCapExposure(ISldWorks app,AfjParametricPlan pla
     solution.CoverageWarning=verified
         ? "Frame ngắn ưu tiên che; các mặt đầu Wall/Lip còn hở " + (solution.LongCutExposedAreaSquareMetres.Value*1e6).ToString("0.###",CultureInfo.InvariantCulture) + " mm² theo lát kiểm tra B-rep. Chưa đo mép chéo Web và mức che theo mọi hướng nhìn."
         : "EXPOSURE_UNVERIFIED: Chưa đo đủ mép Wall/Lip còn hở; không coi diện tích hở bằng 0.";
+    if(plan.GeneralFoldFootprint)solution.CoverageWarning+=" Các nếp phụ: chưa đo toàn bộ mép chéo và mức che theo mọi hướng nhìn.";
 }
 
 
@@ -4068,7 +4384,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         private sealed class FeatureState
         {
             internal int Id;
-            internal string Type, Name;
+            internal string Type, Kind, Name;
             internal bool Suppressed;
         }
         private sealed class DocumentState
@@ -4188,8 +4504,21 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(v != null && v.Length == 16 && v.All(AfjTemporaryBoolean.Finite), "Native rigid transform unavailable");
             return (double[])v.Clone();
         }
-        private static Dictionary<int, FeatureState> Features(ModelDoc2 part, out HashSet<int> top, out int[] topOrder)
+        private static FeatureState ReadFeatureState(Feature feature,int? observedId=null)
         {
+            // Retain the same ICE underlying-kind identity checked by Union.
+            // This scalar observation belongs only to the current inventory read.
+            string type=feature.GetTypeName2();
+            return new FeatureState{Id=observedId??feature.GetID(),Type=type,Kind=type=="ICE"?feature.GetTypeName():type,
+                Name=feature.Name,Suppressed=feature.IsSuppressed()};
+        }
+        private static Dictionary<int, FeatureState> Features(ModelDoc2 part, out HashSet<int> top, out int[] topOrder,
+            out Feature[] nativeSheetMetadata)
+        {
+
+            using(AfjNativeObservationMetrics.Measure("Transaction.Features"))
+            {
+
             // Native absorbed Sketches are included by the flat API. Do not recurse
             // GetFirstSubFeature/GetNextSubFeature through an edited feature tree.
             top = new HashSet<int>(); var orderedTop = new List<int>(); var topFeatures=new Dictionary<int,Feature>(); int count = 0;
@@ -4205,11 +4534,11 @@ namespace ADDIN.Commands.AutoFrameJoint
             {
                 var feature=item as Feature; Need(feature!=null, "Flat inventory contains a non-Feature entry");
                 int id=feature.GetID();
-                var row=new FeatureState { Id=id, Type=feature.GetTypeName2(), Name=feature.Name, Suppressed=feature.IsSuppressed() };
+                var row=ReadFeatureState(feature,id);
                 FeatureState existing;
                 if (result.TryGetValue(id,out existing))
                 {
-                    Need(existing.Type==row.Type && existing.Name==row.Name && existing.Suppressed==row.Suppressed,
+                    Need(existing.Type==row.Type && existing.Kind==row.Kind && existing.Name==row.Name && existing.Suppressed==row.Suppressed,
                         "Duplicate flat Feature identity has conflicting native state");
                     continue;
                 }
@@ -4217,10 +4546,10 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
             foreach(var pair in topFeatures)
             {
-                var row=new FeatureState{Id=pair.Key,Type=pair.Value.GetTypeName2(),Name=pair.Value.Name,Suppressed=pair.Value.IsSuppressed()};
+                var row=ReadFeatureState(pair.Value,pair.Key);
                 FeatureState flat;
                 if(result.TryGetValue(pair.Key,out flat))
-                    Need(flat.Type==row.Type&&flat.Name==row.Name&&flat.Suppressed==row.Suppressed,
+                    Need(flat.Type==row.Type&&flat.Kind==row.Kind&&flat.Name==row.Name&&flat.Suppressed==row.Suppressed,
                         "Conflicting top/flat Feature identity; id="+pair.Key);
                 else result.Add(pair.Key,row);
             }
@@ -4234,25 +4563,42 @@ namespace ADDIN.Commands.AutoFrameJoint
                 {
                     var parent=value as Feature;Need(parent!=null,"SheetMetal has unresolved native parent");
                     if(parent.GetTypeName2()!="TemplateSheetMetal")continue;
-                    var row=new FeatureState{Id=parent.GetID(),Type=parent.GetTypeName2(),Name=parent.Name,Suppressed=parent.IsSuppressed()};
+                    var row=ReadFeatureState(parent);
                     FeatureState existing;
                     if(result.TryGetValue(row.Id,out existing))
-                        Need(existing.Type==row.Type&&existing.Name==row.Name&&existing.Suppressed==row.Suppressed,
+                        Need(existing.Type==row.Type&&existing.Kind==row.Kind&&existing.Name==row.Name&&existing.Suppressed==row.Suppressed,
                             "Conflicting native SheetMetal template parent; id="+row.Id);
                     else result.Add(row.Id,row);
                 }
             }
             Need(result.Count<2400,"Native inventory with SheetMetal parent closure exceeds bound");
+            // These native handles are already covered by this same fresh
+            // Top/Flat identity check and exact SheetMetal parent closure.
+            // Capture consumes them immediately into persistent baseline tokens;
+            // no native-handle cache survives a checkpoint or native mutation.
+            // Preserve Union's Top-preferred handles and ordered Top prefix.
+            var sheetById=sheets.ToDictionary(sheet=>sheet.GetID());
+            nativeSheetMetadata=orderedTop.Where(sheetById.ContainsKey).Select(id=>topFeatures[id])
+                .Concat(sheetById.Where(pair=>!topFeatures.ContainsKey(pair.Key)).OrderBy(pair=>pair.Key).Select(pair=>pair.Value)).ToArray();
             topOrder=orderedTop.ToArray(); return result;
+
+            }
         }
         private static DocumentState Capture(ModelDoc2 part, string label)
         {
-            HashSet<int> top; int[] topOrder; var original = Features(part, out top, out topOrder); var configuration = part.ConfigurationManager.ActiveConfiguration;
+
+            using(AfjNativeObservationMetrics.Measure("Transaction.Capture",true))
+            {
+
+            HashSet<int> top; int[] topOrder; Feature[] nativeSheetMetadata;
+            var original = Features(part, out top, out topOrder, out nativeSheetMetadata); var configuration = part.ConfigurationManager.ActiveConfiguration;
             Need(configuration != null, "Active configuration unavailable");
             return new DocumentState { Model = part, Label = label, Path = part.GetPathName(),
                 Configuration = configuration.Name, Original = original, TopIds = top, TopOrder = topOrder, AcceptedStamp = part.GetUpdateStamp(),
-                OriginalSheetMetadata=AfjNativeFeatureTraversal.Union(part).Where(feature=>feature.GetTypeName2()=="SheetMetal")
+                OriginalSheetMetadata=nativeSheetMetadata
                     .Select(feature=>AfjOriginalSheetMetalIdentity.Capture(part,feature)).ToArray() };
+
+            }
         }
         private Feature Find(ModelDoc2 part, int id)
         {
@@ -4324,6 +4670,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private void CheckInvariant(string phase)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Transaction.CheckInvariant",true))
+            {
+
             Log(phase + ".INVARIANTS_BEGIN");
             for (int i = 0; i < Documents.Length; i++)
             {
@@ -4331,23 +4681,24 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Need(configuration != null && configuration.Name == state.Configuration &&
                     String.Equals(state.Model.GetPathName(), state.Path, StringComparison.OrdinalIgnoreCase),
                     "Document/configuration identity changed in " + state.Label);
-                HashSet<int> top; int[] topOrder; var now = Features(state.Model, out top, out topOrder);
+                HashSet<int> top; int[] topOrder; Feature[] nativeSheetMetadata;
+                var now = Features(state.Model, out top, out topOrder, out nativeSheetMetadata);
                 foreach(var identity in state.OriginalSheetMetadata)
                 {
                     var native=identity.Resolve(state.Model);
-                    var row=new FeatureState{Id=native.GetID(),Type=native.GetTypeName2(),Name=native.Name,Suppressed=native.IsSuppressed()};
+                    var row=ReadFeatureState(native);
                     FeatureState prior;
                     if(now.TryGetValue(row.Id,out prior))
-                        Need(prior.Type==row.Type && prior.Name==row.Name && prior.Suppressed==row.Suppressed,
+                        Need(prior.Type==row.Type && prior.Kind==row.Kind && prior.Name==row.Name && prior.Suppressed==row.Suppressed,
                             "Current inventory conflicts with exact original SheetMetal token; id="+row.Id);
                     else now.Add(row.Id,row);
                 }
                 if(Journal!=null)foreach(var native in Journal.GetKnownOwnedPassiveNativeFeatures(state.Model))
                 {
-                    var row=new FeatureState{Id=native.GetID(),Type=native.GetTypeName2(),Name=native.Name,Suppressed=native.IsSuppressed()};
+                    var row=ReadFeatureState(native);
                     FeatureState prior;
                     if(now.TryGetValue(row.Id,out prior))
-                        Need(prior.Type==row.Type&&prior.Name==row.Name&&prior.Suppressed==row.Suppressed,
+                        Need(prior.Type==row.Type&&prior.Kind==row.Kind&&prior.Name==row.Name&&prior.Suppressed==row.Suppressed,
                             "Current native inventory conflicts with exact owned passive token; id="+row.Id);
                     else now.Add(row.Id,row);
                 }
@@ -4357,7 +4708,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 {
                     FeatureState current;
                     Need(now.TryGetValue(original.Id, out current) && current.Type == original.Type &&
-                        current.Name == original.Name && current.Suppressed == original.Suppressed,
+                        current.Kind == original.Kind && current.Name == original.Name && current.Suppressed == original.Suppressed,
                         "Protected original Feature changed in " + state.Label + "; id="+original.Id+
                         "; before="+original.Type+":"+original.Name+":"+original.Suppressed+
                         "; current="+(current==null?"MISSING":current.Type+":"+current.Name+":"+current.Suppressed));
@@ -4385,9 +4736,15 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Need(AfjTemporaryBoolean.Finite(delta) && delta <= 1e-12, "Unplanned Body change in " + state.Label);
             }
             Log(phase + ".INVARIANTS_END");
+
+            }
         }
         private void PrepareSteps()
         {
+
+            using(AfjNativeObservationMetrics.Measure("Transaction.PrepareSteps",true))
+            {
+
             var running = Expected.Select(AfjTemporaryBoolean.Copy).ToArray(); int winner = Preview.CoverA ? 0 : 1;
             foreach (int i in new[] { 1 - winner, winner })
             {
@@ -4412,6 +4769,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var target = i == 0 ? Preview.A.Kept.Single() : Preview.B.Kept.Single();
                 Need(AfjNativeCutCommit.SymmetricDifference(running[i], target) <= 1e-12,
                     "Sequential operation targets differ from reviewed final Preview");
+            }
+
             }
         }
         private void Register(ModelDoc2 part, Feature feature, string role)
@@ -4738,6 +5097,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         private static double[] CachedNative(CachedDatumFrame frame,double[] point){return AfjProfileAnalyzer.Transform(point,frame.InverseMatrix);}
         private CachedDatumFrame NativeDatumFrame(Component2 component)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Writer.NativeDatumFrame"))
+            {
+
             var existing=NativeDatumFrames.FirstOrDefault(f=>Object.ReferenceEquals(f.Component,component));if(existing!=null)return existing;
             var timer=System.Diagnostics.Stopwatch.StartNew();var transform=component.GetTotalTransform(false);Need(transform!=null,"datum component transform unavailable");
             var inverse=transform.Inverse() as MathTransform;Need(inverse!=null,"datum inverse unavailable");
@@ -4755,6 +5118,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             NativeDatumFrames.Add(frame);
             System.Diagnostics.Trace.WriteLine("[U-DATUM-CACHE] phase=one_native_face_snapshot faces="+raw.Length+" planar="+frame.Faces.Count+" ms="+timer.ElapsedMilliseconds);
             return frame;
+
+            }
         }
         private static int CachedOwner(CachedDatumFace face)
         {
@@ -4883,12 +5248,12 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal readonly List<string> SourcePointIds=new List<string>(),SourceSegmentIds=new List<string>(),ReacquiredSegmentIds=new List<string>();
             internal double[][] ExpectedWorld;
         }
-        static SketchPoint SourceEndpoint(ISldWorks app,Component2 component,Feature feature,double[] expected,double[] other)
+        static SketchPoint SourceEndpoint(ISldWorks app,Component2 component,Feature feature,double[] expected,double[] other,bool construction=false)
         {
             // The actual reviewed contour segment supplies its structural
             // endpoint. Other Coincident construction points at this same
             // coordinate may legitimately retain a different native point ID.
-            var segment=MasterLine(app,component,feature,expected,other,false);var sketch=feature.GetSpecificFeature2() as Sketch;
+            var segment=MasterLine(app,component,feature,expected,other,construction);var sketch=feature.GetSpecificFeature2() as Sketch;
             var inverse=sketch.ModelToSketchTransform.Inverse() as MathTransform;Need(inverse!=null,"source endpoint transform unavailable");
             var a=SegmentStart(segment);var b=SegmentEnd(segment);var wa=World(app,Point(app,new[]{a.X,a.Y,a.Z},inverse),component);var wb=World(app,Point(app,new[]{b.X,b.Y,b.Z},inverse),component);
             bool matchA=Norm(Sub(wa,expected))<1e-8,matchB=Norm(Sub(wb,expected))<1e-8;Need(matchA!=matchB,"source segment endpoint not uniquely identified");return matchA?a:b;
@@ -4989,6 +5354,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private void ValidateTransactionHistory()
         {
+
+            using(AfjNativeObservationMetrics.Measure("Writer.ValidateHistory"))
+            {
+
             Need(Same(_app,_app.ActiveDoc,_model)&&Same(_app,_assembly.GetEditTarget(),_model),"history validation requires bound assembly outside Part edit");
             foreach(var part in new[]{_longPart,_shortPart})
             {
@@ -4997,6 +5366,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var actual=Ids(part);
                 Need(actual.SetEquals(expected),"Part history differs from immutable originals plus exact closed transaction-owned Sketches; missing_ids="+
                     String.Join(",",expected.Except(actual).OrderBy(id=>id))+"; extra_ids="+String.Join(",",actual.Except(expected).OrderBy(id=>id)));
+            }
+
             }
         }
         private string IntendedName(string role)
@@ -5399,16 +5770,17 @@ namespace ADDIN.Commands.AutoFrameJoint
                 ValidateTransactionHistory();
                 BeginNativeDatumRole("U_RULE:LOSER_STEPPED_WEB_WALL_RETURN");
                 int beforePlanes=Planes(part);var beforeIds=Ids(part);double g=AfjManufacturingConventions.AssemblyFitGap;
-                double m=Math.Max(.01,5*Math.Max(plan.Loser.Thickness+plan.Loser.Radius,plan.Winner.Thickness+plan.Winner.Radius)),sn=plan.SeamNear[0],qn=plan.SeamNear[1],sf=plan.SeamFar[0],qf=plan.SeamFar[1],near=plan.Loser.NearTangent,far=plan.Loser.FarTangent;
+                bool general=plan.GeneralFoldFootprint;double nearSupport=general?plan.Winner.MinWidth:0;
+                double m=Math.Max(.01,5*Math.Max(plan.Loser.Thickness+plan.Loser.Radius,plan.Winner.Thickness+plan.Winner.Radius)),sn=plan.SeamNear[0],qn=plan.SeamNear[1],sf=plan.SeamFar[0],qf=plan.SeamFar[1],near=plan.Loser.NearTangent,far=plan.Loser.FarTangent+(general?g:0);
                 double ds=(sf-sn)/(qf-qn),shift=g*Math.Sqrt(1+ds*ds);Func<double,double> seam=q=>sn+(q-qn)*ds-shift;
                 double qHit=qn+(plan.Winner.Thickness+shift-sn)/ds;bool knee=qHit>near+1e-8&&qHit<far-1e-8;
                 Need(seam(near)>plan.Winner.Thickness+1e-8||knee,"degenerate near clipping is not admitted");
                 bool returnStep=plan.Loser.FarReturn;
-                int gapCount=returnStep?4:3;
+                int gapCount=(returnStep?4:3)+(general?1:0),farRowGapIndex=returnStep?4:3;
                 int vertexCount=(knee?9:8)+(returnStep?2:0),seamPoint=knee?3:2,farPoint=knee?4:3,farWallPoint=farPoint+1,farTopPoint=farPoint+(returnStep?4:2),rightTopPoint=farTopPoint+1;
                 double farWall=plan.Winner.Width-plan.Winner.Thickness-g;Need(Math.Abs(farWall-seam(far))>1e-9,"far zero-length extra segment unsupported");
                 double longEnd=AfjParametricRules.Extreme(NativeBody(longFrame),longFrame.GetTotalTransform(false),plan.OutLoser,plan.JointOrigin),sMax=Math.Max(longEnd,plan.Winner.MaxWidth)+m,qMin=plan.Loser.MinWidth-m,qTop=plan.Loser.MaxWidth+m;
-                var coordinateList=new List<double[]>{new[]{-g,qMin},new[]{-g,near},new[]{Math.Max(plan.Winner.Thickness,seam(near)),near}};
+                var coordinateList=new List<double[]>{new[]{nearSupport-g,qMin},new[]{nearSupport-g,near},new[]{Math.Max(plan.Winner.Thickness,seam(near)),near}};
                 if(knee)coordinateList.Add(new[]{plan.Winner.Thickness,qHit});
                 coordinateList.AddRange(new[]{new[]{seam(far),far},new[]{farWall,far}});
                 if(returnStep) coordinateList.AddRange(new[]{new[]{farWall,plan.Loser.Width+g},new[]{plan.Winner.MaxWidth,plan.Loser.Width+g},new[]{plan.Winner.MaxWidth,qTop}});
@@ -5425,22 +5797,25 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var masterMargin=MasterLine(app,shortFrame,shortMasterFeature,Common(plan,plan.Winner.MinWidth-m,qf),Common(plan,plan.Winner.MinWidth,qf),true);
                 object seamContext=shortFrame.GetCorresponding(masterSeam),marginContext=shortFrame.GetCorresponding(masterMargin);Need(seamContext is SketchSegment&&marginContext is SketchSegment,"actual master segment contexts unavailable");
                 int masterDims=0;for(DisplayDimension display=shortMasterFeature.GetFirstDisplayDimension() as DisplayDimension;display!=null;display=shortMasterFeature.GetNextDisplayDimension(display) as DisplayDimension){Need(++masterDims<64,"master dimension traversal bound");var dim=display.GetDimension2(0) as Dimension;Need(dim!=null&&dim.DrivenState==(int)swDimensionDrivenState_e.swDimensionDriving&&dim.FullName.IndexOf("AFJ_ToolClosureMargin",StringComparison.Ordinal)>=0&&Math.Abs(Math.Abs(dim.SystemValue)-m)<1e-8,"actual one master margin driving dimension required");}Need(masterDims==1,"one actual master margin dimension required");result.MasterMarginIdentityVerified=true;result.MarginMasterDefinitionIds.Add(SegmentObjectId(masterMargin));
-                mark("READ_NATIVE_FRAME_DATUMS");var ownWeb=FaceDatum(app,longFrame,Unit(plan.Depth),seeds[2],"LONG_OUTER_WEB_SUPPORT");var nearEdge=EdgeDatum(app,longFrame,(Face2)ownWeb.Native,Unit(plan.OutLoser),seeds[2],"LONG_NEAR_WEB_BEND_TANGENT");var farEdge=EdgeDatum(app,longFrame,(Face2)ownWeb.Native,Unit(plan.OutLoser),seeds[farPoint],"LONG_FAR_WEB_BEND_TANGENT");
-                var shortNear=FaceDatum(app,shortFrame,Unit(plan.OutLoser),Common(plan,0,0),"SHORT_OUTER_NEAR_WALL_PLANE");
+                mark("READ_NATIVE_FRAME_DATUMS");var ownWeb=FaceDatum(app,longFrame,Unit(plan.Depth),seeds[2],"LONG_OUTER_WEB_SUPPORT");var nearEdge=EdgeDatum(app,longFrame,(Face2)ownWeb.Native,Unit(plan.OutLoser),seeds[2],"LONG_NEAR_WEB_BEND_TANGENT");var farEdge=EdgeDatum(app,longFrame,(Face2)ownWeb.Native,Unit(plan.OutLoser),general?Common(plan,seam(qf),qf):seeds[farPoint],"LONG_FAR_WEB_BEND_TANGENT");
+                var shortNear=FaceDatum(app,shortFrame,Unit(plan.OutLoser),Common(plan,nearSupport,0),general?"SHORT_COMPLETE_PROFILE_MINIMUM_SUPPORT":"SHORT_OUTER_NEAR_WALL_PLANE");
                 var shortInnerNear=knee?FaceDatum(app,shortFrame,Unit(plan.OutLoser),Common(plan,plan.Winner.Thickness,near),"SHORT_INNER_NEAR_WALL_FOR_BISECTOR_KNEE"):null;
                 var shortInnerFar=FaceDatum(app,shortFrame,Unit(plan.OutLoser),Common(plan,plan.Winner.Width-plan.Winner.Thickness,far),"SHORT_INNER_FAR_WALL_PLANE");
                 var longNear=FaceDatum(app,longFrame,Unit(plan.OutWinner),Common(plan,0,plan.Loser.MinWidth),"LONG_OUTER_NEAR_WALL_PLANE");var longFar=FaceDatum(app,longFrame,Unit(plan.OutWinner),Common(plan,0,plan.Loser.MaxWidth),"LONG_MAX_PROFILE_SUPPORT_PLANE");
+                var longPrimaryNear=general?FaceDatum(app,longFrame,Unit(plan.OutWinner),Common(plan,0,0),"LONG_PRIMARY_NEAR_WALL_FOR_GAP_GUIDE"):longNear;
                 var returnWall=returnStep?FaceDatum(app,longFrame,Unit(plan.OutWinner),Common(plan,farWall,plan.Loser.Width),"LONG_RETURN_OUTER_WALL_FOR_FIT_GAP"):null;
                 var returnCoverEnd=returnStep?FaceDatum(app,shortFrame,Unit(plan.OutLoser),Common(plan,plan.Winner.MaxWidth,plan.Loser.Width+g),"SHORT_MAX_PROFILE_FOR_RETURN_STEP"):null;
-                bool endDominates=longEnd>=plan.Winner.MaxWidth;var axial=FaceDatum(app,endDominates?longFrame:shortFrame,Unit(plan.OutLoser),Common(plan,sMax-m,qf),endDominates?"LONG_ACTUAL_AXIAL_END_PLANE":"SHORT_MAX_PROFILE_SUPPORT_PLANE");
+                bool endDominates=longEnd>=plan.Winner.MaxWidth;var axial=FaceDatum(app,endDominates?longFrame:shortFrame,Unit(plan.OutLoser),Common(plan,sMax-m,far),endDominates?"LONG_ACTUAL_AXIAL_END_PLANE":"SHORT_MAX_PROFILE_SUPPORT_PLANE");
                 // No guide overlaps a profile edge. Near gap uses q=0 rather
                 // than P1's q=near; the latter overlaps profile segment1.
-                double projection=Dot(Sub(seeds[farPoint],masterA),masterDirection);Need(projection>=-1e-8&&projection<=Norm(Sub(masterB,masterA))+1e-8,"normal foot outside finite master seam");
-                var gapStartList=new List<double[]>{Common(plan,-g,0),seeds[farWallPoint],seeds[farPoint]};
-                var gapEndList=new List<double[]>{Common(plan,0,0),Common(plan,plan.Winner.Width-plan.Winner.Thickness,far),Add(masterA,Mul(masterDirection,projection))};
+                double[] seamGapSeed=general?Common(plan,seam(qf),qf):seeds[farPoint];
+                double projection=Dot(Sub(seamGapSeed,masterA),masterDirection);Need(projection>=-1e-8&&projection<=Norm(Sub(masterB,masterA))+1e-8,"normal foot outside finite master seam");
+                var gapStartList=new List<double[]>{Common(plan,nearSupport-g,0),seeds[farWallPoint],seamGapSeed};
+                var gapEndList=new List<double[]>{Common(plan,nearSupport,0),Common(plan,plan.Winner.Width-plan.Winner.Thickness,far),Add(masterA,Mul(masterDirection,projection))};
                 if(returnStep){gapStartList.Add(seeds[farPoint+2]);gapEndList.Add(Common(plan,farWall,plan.Loser.Width));}
+                if(general){gapStartList.Add(seeds[farPoint]);gapEndList.Add(Common(plan,seam(far),qf));}
                 double[][] gapStart=gapStartList.ToArray(),gapEnd=gapEndList.ToArray();
-                double[][] closureStart={Common(plan,0,qMin),Common(plan,0,qTop),Common(plan,sMax,qf)},closureEnd={Common(plan,0,plan.Loser.MinWidth),Common(plan,0,plan.Loser.MaxWidth),Common(plan,sMax-m,qf)};
+                double[][] closureStart={Common(plan,nearSupport,qMin),Common(plan,nearSupport,qTop),Common(plan,sMax,far)},closureEnd={Common(plan,nearSupport,plan.Loser.MinWidth),Common(plan,nearSupport,plan.Loser.MaxWidth),Common(plan,sMax-m,far)};
                 for(int i=0;i<gapCount;i++)Need(Math.Abs(Norm(Sub(gapStart[i],gapEnd[i]))-g)<1e-8,"gap guide seed not g");for(int i=0;i<3;i++)Need(Math.Abs(Norm(Sub(closureStart[i],closureEnd[i]))-m)<1e-8,"closure guide seed not m");
                 mark("ENTER_LONG_PART_EDIT");model.ClearSelection2(true);Need(longFrame.Select4(false,null,false),"select long target");int information=0;assembly.EditPart2(true,false,ref information);editing=true;Need(Same(app,assembly.GetEditTarget(),part)&&Same(app,assembly.GetEditTargetComponent(),longFrame),"exact long edit target unavailable");
                 model.ClearSelection2(true);Need(((IEntity)ownWeb.Context).Select4(false,null),"select actual own Web");sketch=OpenOwnedSketch(part,longFrame,"U_RULE:LOSER_STEPPED_WEB_WALL_RETURN");opened=true;Need(sketch!=null&&!sketch.Is3D(),"2D native Sketch unavailable");
@@ -5471,12 +5846,20 @@ namespace ADDIN.Commands.AutoFrameJoint
                     Need(advertised.Contains(type),"native axis relation not advertised; index="+i+" requested="+type+" allowed="+String.Join(",",advertised));
                     RelationChecked(sketch,type,profile[i],nearEdge.Context);result.AxisRelations++;
                 }
-                RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(profile[2]),nearEdge.Context);RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(profile[farPoint]),farEdge.Context);
+                RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(profile[2]),nearEdge.Context);if(!general)RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(profile[farPoint]),farEdge.Context);
                 MasterRelationChecked(app,sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,profile[seamPoint],seamContext,masterSeam,result);result.MasterSeamParallelVerified=true;
                 if(knee)RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(profile[2]),AtSeed(app,shortInnerNear,seeds[2]).Context);
                 mark("THREE_GAP_GUIDES_SHARED_ONE_GAP_DIM");
-                RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[0]),profile[0]);RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[0]),longNear.Context);
-                if(!Same(app,SegmentStart(gap[1]),SegmentStart(profile[farWallPoint])))RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[1]),SegmentStart(profile[farWallPoint]));if(!Same(app,SegmentStart(gap[2]),SegmentStart(profile[farPoint])))RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[2]),SegmentStart(profile[farPoint]));
+                RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[0]),profile[0]);RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[0]),longPrimaryNear.Context);
+                if(!Same(app,SegmentStart(gap[1]),SegmentStart(profile[farWallPoint])))RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[1]),SegmentStart(profile[farWallPoint]));
+                if(general)
+                {
+                    // Normal seam clearance is measured at the ORIGINAL tangent
+                    // row. The main cutter far row is independently offset by g.
+                    RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[2]),profile[seamPoint]);
+                    RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[2]),farEdge.Context);
+                }
+                else if(!Same(app,SegmentStart(gap[2]),SegmentStart(profile[farPoint])))RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[2]),SegmentStart(profile[farPoint]));
                 for(int i=0;i<3;i++)
                 {
                     if(i<2){RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,gap[i],nearEdge.Context);var datum=AtSeed(app,i==0?shortNear:shortInnerFar,gapEnd[i]);RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentEnd(gap[i]),datum.Context);result.GapDatums.Add(datum);}else{MasterRelationChecked(app,sketch,(int)swConstraintType_e.swConstraintType_PERPENDICULAR,gap[i],seamContext,masterSeam,result);MasterRelationChecked(app,sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentEnd(gap[i]),seamContext,masterSeam,result);result.MasterGapFootCoincidentVerified=true;}
@@ -5490,6 +5873,14 @@ namespace ADDIN.Commands.AutoFrameJoint
                     var gapDatum=AtSeed(app,returnWall,gapEnd[3]);RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentEnd(gap[3]),gapDatum.Context);result.GapDatums.Add(gapDatum);
                     RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_SAMELENGTH,gap[0],gap[3]);
                     var tipDatum=AtSeed(app,returnCoverEnd,seeds[farPoint+3]);RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(profile[farPoint+3]),tipDatum.Context);result.ClosureDatums.Add(tipDatum);
+                }
+                if(general)
+                {
+                    mark("R56_FAR_ROW_OFFSET_SHARED_ASSEMBLY_FIT_GAP");
+                    if(!Same(app,SegmentStart(gap[farRowGapIndex]),SegmentStart(profile[farPoint])))RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(gap[farRowGapIndex]),SegmentStart(profile[farPoint]));
+                    RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_PERPENDICULAR,gap[farRowGapIndex],nearEdge.Context);
+                    RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentEnd(gap[farRowGapIndex]),farEdge.Context);
+                    RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_SAMELENGTH,gap[0],gap[farRowGapIndex]);
                 }
                 mark("THREE_NONOVERLAP_CLOSURES_EQUAL_ACTUAL_MASTER_MARGIN");
                 RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(closure[0]),profile[vertexCount-1]);RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(closure[0]),shortNear.Context);
@@ -5529,6 +5920,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int masterId=shortMasterFeature.GetID(),loserId=longLoserFeature.GetID();result.MasterFeatureId=masterId;result.LoserFeatureId=loserId;
                 Need(FindFeature(shortPart,masterId)!=null&&FindFeature(longPart,loserId)!=null,"source Sketch IDs not in expected Parts");
                 ValidateTransactionHistory();
+                bool general=plan.GeneralFoldFootprint;
                 double g=AfjManufacturingConventions.AssemblyFitGap,m=Math.Max(.01,5*Math.Max(plan.Loser.Thickness+plan.Loser.Radius,plan.Winner.Thickness+plan.Winner.Radius)),sn=plan.SeamNear[0],qn=plan.SeamNear[1],sf=plan.SeamFar[0],qf=plan.SeamFar[1];
                 double ds=(sf-sn)/(qf-qn),shift=g*Math.Sqrt(1+ds*ds);Func<double,double> seam=q=>sn+(q-qn)*ds-shift;
                 double qHit=qn+(plan.Winner.Thickness+shift-sn)/ds;bool knee=qHit>plan.Loser.NearTangent+1e-8&&qHit<plan.Loser.FarTangent-1e-8;
@@ -5538,11 +5930,17 @@ namespace ADDIN.Commands.AutoFrameJoint
                 OneDrivingDimension(shortMasterFeature,"AFJ_ToolClosureMargin",m);OneDrivingDimension(longLoserFeature,"AFJ_AssemblyFitGap",g);result.GapValue=g;result.SharedMarginValue=m;
                 mark("READ_ACTUAL_SOURCE_POINTS_AND_NEAR_GAP_SEGMENT");
                 var shortA=Common(plan,plan.Winner.Width-plan.Winner.Thickness,qf);var shortB=Common(plan,shortMax,plan.Loser.Width);
-                var longBL=Common(plan,seam(qf),qf-g);var longTR=Common(plan,sMaxLong,qTop);var loserP3World=Common(plan,seam(qf),qf);var loserP4World=Common(plan,farWall,qf);
+                var longBL=Common(plan,seam(qf),qf-g);var longTR=Common(plan,sMaxLong,qTop);var loserP3World=Common(plan,seam(qf),qf);var loserP4World=Common(plan,farWall,qf+(general?g:0));
                 var sourceMasterP3=SourceEndpoint(app,shortFrame,shortMasterFeature,shortA,Common(plan,plan.Winner.Width-plan.Winner.Thickness,plan.Loser.Width));var sourceMasterP5=SourceEndpoint(app,shortFrame,shortMasterFeature,shortB,Common(plan,plan.Winner.Width-plan.Winner.Thickness,plan.Loser.Width));
-                var sourceLoserP3=SourceEndpoint(app,longFrame,longLoserFeature,loserP3World,loserP4World);var sourceLoserP4=SourceEndpoint(app,longFrame,longLoserFeature,loserP4World,loserP3World);var sourceLoserP6=SourceEndpoint(app,longFrame,longLoserFeature,longTR,Common(plan,plan.Loser.FarReturn?plan.Winner.MaxWidth:farWall,qTop));
-                var nearGap=MasterLine(app,longFrame,longLoserFeature,Common(plan,-g,0),Common(plan,0,0),true);object nearGapContext=longFrame.GetCorresponding(nearGap);Need(nearGapContext is SketchSegment,"actual losing near-gap guide context missing");
-                SketchPoint[][] nativePoints={new[]{sourceMasterP3,sourceMasterP5},new[]{sourceLoserP3,sourceLoserP4,sourceLoserP6}};
+                double[] masterStart=Common(plan,sn,qn),masterDirection=Unit(Sub(Common(plan,sf,qf),Common(plan,sn,qn)));
+                double projection=Dot(Sub(loserP3World,masterStart),masterDirection);
+                var sourceLoserP3=general?SourceEndpoint(app,longFrame,longLoserFeature,loserP3World,Add(masterStart,Mul(masterDirection,projection)),true):SourceEndpoint(app,longFrame,longLoserFeature,loserP3World,loserP4World);
+                var shiftedFar=Common(plan,seam(qf+g),qf+g);
+                var sourceLoserP4=SourceEndpoint(app,longFrame,longLoserFeature,loserP4World,general?shiftedFar:loserP3World);var sourceLoserP6=SourceEndpoint(app,longFrame,longLoserFeature,longTR,Common(plan,plan.Loser.FarReturn?plan.Winner.MaxWidth:farWall,qTop));
+                var sourceLoserQ=general?SourceEndpoint(app,longFrame,longLoserFeature,Common(plan,seam(qf+g),qf),shiftedFar,true):null;
+                double nearSupport=general?plan.Winner.MinWidth:0;
+                var nearGap=MasterLine(app,longFrame,longLoserFeature,Common(plan,nearSupport-g,0),Common(plan,nearSupport,0),true);object nearGapContext=longFrame.GetCorresponding(nearGap);Need(nearGapContext is SketchSegment,"actual losing near-gap guide context missing");
+                SketchPoint[][] nativePoints={new[]{sourceMasterP3,sourceMasterP5},general?new[]{sourceLoserP3,sourceLoserP4,sourceLoserP6,sourceLoserQ}:new[]{sourceLoserP3,sourceLoserP4,sourceLoserP6}};
                 object[][] sourceContexts={nativePoints[0].Select(p=>shortFrame.GetCorresponding(p)).ToArray(),nativePoints[1].Select(p=>longFrame.GetCorresponding(p)).ToArray()};
                 Need(sourceContexts.SelectMany(a=>a).All(o=>o is SketchPoint),"actual source Sketch point Assembly contexts unavailable");
                 double[][][] expected={new[]{shortA,Common(plan,shortMax,qf),shortB,Common(plan,plan.Winner.Width-plan.Winner.Thickness,plan.Loser.Width)},new[]{longBL,Common(plan,sMaxLong,qf-g),longTR,Common(plan,seam(qf),qTop)}};
@@ -5568,7 +5966,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     var inverse=target.GetTotalTransform(false).Inverse() as MathTransform;Need(inverse!=null,"target inverse missing");Func<double[],double[]> local=p=>Point(app,Point(app,p,inverse),sketch.ModelToSketchTransform);var localSeeds=seeds.Select(local).ToArray();Need(localSeeds.All(p=>Math.Abs(p[2])<1e-8),"cap seeds not planar in actual target Sketch");
                     // The far guide is inside the rectangle at source P4.s;
                     // using P3.s would overlap the left polygon edge.
-                    var gapA=local(Common(plan,farWall,qf-g));var gapB=local(loserP4World);var lines=new SketchSegment[4];SketchSegment guide=null;bool previous=model.SketchManager.AddToDB;
+                    var gapA=local(Common(plan,farWall,qf-g));var gapB=local(Common(plan,farWall,qf));var lines=new SketchSegment[4];SketchSegment guide=null;bool previous=model.SketchManager.AddToDB;
                     mark(role+":CREATE_LINES_BEFORE_RELATIONS");try{model.SketchManager.AddToDB=true;for(int i=0;i<4;i++){var a=localSeeds[i];var b=localSeeds[(i+1)%4];lines[i]=model.SketchManager.CreateLine(a[0],a[1],0,b[0],b[1],0);Need(lines[i]!=null,"cap line null");}if(capIndex==1){Need(Math.Abs(gapA[2])+Math.Abs(gapB[2])<1e-8&&Math.Abs(Norm(Sub(gapA,gapB))-g)<1e-8,"far guide exact g seed invalid");guide=model.SketchManager.CreateLine(gapA[0],gapA[1],0,gapB[0],gapB[1],0);Need(guide!=null,"far guide null");guide.ConstructionGeometry=true;}}finally{model.SketchManager.AddToDB=previous;}
                     mark(role+":REACQUIRE_ORIGINAL_ASSEMBLY_FEATURE_SPECIFIC");var aliases=capIndex==0?lines:lines.Concat(new[]{guide}).ToArray();var starts=capIndex==0?localSeeds:localSeeds.Concat(new[]{gapA}).ToArray();var ends=localSeeds.Skip(1).Concat(new[]{localSeeds[0]}).ToArray();if(capIndex==1)ends=ends.Concat(new[]{gapB}).ToArray();var batch=Reacquire(original,aliases,starts,ends,Enumerable.Repeat(false,4).Concat(capIndex==0?new bool[0]:new[]{true}).ToArray(),result);
                     for(int i=0;i<4;i++)lines[i]=batch.Lines[i];if(capIndex==1)guide=batch.Lines[4];sketch=batch.Sketch;row.ReacquiredSegmentCount=batch.Lines.Length;row.ReacquiredSegmentIds.AddRange(batch.Ids);row.ReacquisitionSource="ORIGINAL_ASSEMBLY_CONTEXT_SKETCH_FEATURE_GETSPECIFICFEATURE2";
@@ -5584,12 +5982,20 @@ namespace ADDIN.Commands.AutoFrameJoint
                         // Same s, movement along measured q axis. This is a
                         // relation to actual source P3, not coordinate dim.
                         MasterRelationChecked(app,sketch,qIsX?(int)swConstraintType_e.swConstraintType_HORIZPOINTS:(int)swConstraintType_e.swConstraintType_VERTPOINTS,SegmentStart(lines[0]),sourceContexts[1][0],sourceLoserP3,result);
-                        RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(guide),lines[0]);MasterRelationChecked(app,sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentEnd(guide),sourceContexts[1][1],sourceLoserP4,result);
+                        RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(guide),lines[0]);
+                        if(general)
+                        {
+                            // The shifted contour endpoint supplies s. The
+                            // actual far-row gap endpoint supplies original qf.
+                            MasterRelationChecked(app,sketch,qIsX?(int)swConstraintType_e.swConstraintType_HORIZPOINTS:(int)swConstraintType_e.swConstraintType_VERTPOINTS,SegmentEnd(guide),sourceContexts[1][1],sourceLoserP4,result);
+                            MasterRelationChecked(app,sketch,qIsX?(int)swConstraintType_e.swConstraintType_VERTPOINTS:(int)swConstraintType_e.swConstraintType_HORIZPOINTS,SegmentEnd(guide),sourceContexts[1][3],sourceLoserQ,result);
+                        }
+                        else MasterRelationChecked(app,sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentEnd(guide),sourceContexts[1][1],sourceLoserP4,result);
                         RelationChecked(sketch,(int)swConstraintType_e.swConstraintType_PERPENDICULAR,guide,edge.Context);MasterRelationChecked(app,sketch,(int)swConstraintType_e.swConstraintType_SAMELENGTH,guide,nearGapContext,nearGap,result);
-                        row.SourcePointIds.Add(PointId(sourceLoserP3));row.SourcePointIds.Add(PointId(sourceLoserP4));row.SourcePointIds.Add(PointId(sourceLoserP6));row.SourceSegmentIds.Add(SegmentObjectId(nearGap));Need(Norm(Sub(new[]{SegmentStart(guide).X,SegmentStart(guide).Y,SegmentStart(guide).Z},gapA))<1e-8&&Norm(Sub(new[]{SegmentEnd(guide).X,SegmentEnd(guide).Y,SegmentEnd(guide).Z},gapB))<1e-8,"constraints changed exact gap guide");
+                        row.SourcePointIds.Add(PointId(sourceLoserP3));row.SourcePointIds.Add(PointId(sourceLoserP4));row.SourcePointIds.Add(PointId(sourceLoserP6));if(general)row.SourcePointIds.Add(PointId(sourceLoserQ));row.SourceSegmentIds.Add(SegmentObjectId(nearGap));Need(Norm(Sub(new[]{SegmentStart(guide).X,SegmentStart(guide).Y,SegmentStart(guide).Z},gapA))<1e-8&&Norm(Sub(new[]{SegmentEnd(guide).X,SegmentEnd(guide).Y,SegmentEnd(guide).Z},gapB))<1e-8,"constraints changed exact gap guide");
                     }
                     CheckFullPolygon(lines,localSeeds);row.SeedGeometryUnchanged=true;row.ConstraintStatus=sketch.GetConstrainedStatus();row.Relations=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);row.Dangling=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling);row.Overdefining=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining);row.SourceDefinitionIdentitiesVerified=result.MasterDefinitionIdentitiesVerified-beforeDefinitionCount;
-                    Need(row.ConstraintStatus==(int)swConstrainedStatus_e.swFullyConstrained&&row.Dangling==0&&row.Overdefining==0,"cap not native full3 with valid graph");Need(row.SourceDefinitionIdentitiesVerified==(capIndex==0?2:4),"cap actual source definition identity count differs");
+                    Need(row.ConstraintStatus==(int)swConstrainedStatus_e.swFullyConstrained&&row.Dangling==0&&row.Overdefining==0,"cap not native full3 with valid graph");Need(row.SourceDefinitionIdentitiesVerified==(capIndex==0?2:(general?5:4)),"cap actual source definition identity count differs");
                     mark(role+":CLOSE_AND_RESTORE_CONTEXT");model.SketchManager.InsertSketch(true);opened=false;assembly.EditAssembly();editing=false;var owned=FindFeature(part,row.SketchFeatureId);row.SketchOwnerVerified=owned!=null&&!beforeIds.Contains(row.SketchFeatureId);Need(row.SketchOwnerVerified,"cap Sketch ownership unverified");NameOwned(part,owned,role);row.SketchName=owned.Name;
                     row.Dimensions=0;for(DisplayDimension dimension=owned.GetFirstDisplayDimension() as DisplayDimension;dimension!=null;dimension=owned.GetNextDisplayDimension(dimension) as DisplayDimension)Need(++row.Dimensions<64,"cap dimension traversal bound");row.NewPlanes=Planes(part)-beforePlanes;row.ExternalReferences=part.Extension.ListExternalFileReferencesCount();Need(row.Dimensions==0&&row.NewPlanes==0&&row.ExternalReferences>0,"zero dimensions/new planes/external reference result not qualified");
                     var closed=owned.GetSpecificFeature2() as Sketch;row.ClosedFullyConstrained=closed!=null&&closed.GetConstrainedStatus()==(int)swConstrainedStatus_e.swFullyConstrained&&closed.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&closed.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0;Need(row.ClosedFullyConstrained,"closed cap Sketch lost valid full3 graph");Need(Same(app,assembly.GetEditTarget(),model),"assembly context not restored between cap Sketches");row.Status="PASS_NATIVE_CAP_SKETCH_ZERO_DIM_ZERO_PLANE_NO_CUT_NO_FOLLOW_TEST";
@@ -5688,8 +6094,120 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal readonly Dictionary<int, Node> Nodes = new Dictionary<int, Node>();
             internal readonly List<int> Order = new List<int>();
         }
+        // A reference-identity proof captured before the first mutation. It
+        // grants no Feature ownership, rebinding or deletion authority.
+        private sealed class PassiveReferenceAlias
+        {
+            internal string HistoricalPath, HistoricalFullPath, CanonicalPath, FileSha256;
+            internal string OccurrenceName, OccurrenceConfiguration, NativeConfiguration;
+            internal Component2 NativeOccurrence;
+            internal ModelDoc2 AlreadyLoadedNativePart;
+        }
+        private sealed class PassiveNativePartObservation
+        {
+            internal ModelDoc2 Document;
+            internal string Path;
+            private bool ConfigurationRead;
+            private string ConfigurationName;
+            internal string ReadConfiguration()
+            {
+                if(!ConfigurationRead)
+                {
+                    AfjNativeObservationMetrics.Add("passive.native_part_configuration_reads");
+                    var configuration=Document.ConfigurationManager.ActiveConfiguration;
+                    ConfigurationName=configuration==null?null:configuration.Name;
+                    ConfigurationRead=true;
+                }
+                return ConfigurationName;
+            }
+        }
+        private sealed class PassiveReadObservation : IDisposable
+        {
+            private readonly AfjUOwnedFeatureJournal Owner;
+            private readonly Scope BoundScope;
+            private Dictionary<string,PassiveNativePartObservation[]> PartsByFilename;
+            private Dictionary<string,Component2[]> ComponentsByName;
+            private readonly Dictionary<string,string> FileHashes=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+            internal PassiveReadObservation(AfjUOwnedFeatureJournal owner,Scope scope)
+            { Owner=owner;BoundScope=scope;AfjNativeObservationMetrics.Add("journal.read_observation_frames"); }
+            internal PassiveNativePartObservation[] Parts(string filename)
+            {
+                AfjNativeObservationMetrics.Add("passive.filename_lookups");
+                if(PartsByFilename==null)
+                {
+                    AfjNativeObservationMetrics.Add("native.GetDocuments.passive_read_snapshot");
+                    var raw=Owner.App.GetDocuments() as Array;
+                    Need(raw!=null&&raw.Length<=MaxNodes,"Loaded native document inventory unavailable or exceeds passive alias bound");
+                    var rows=new List<PassiveNativePartObservation>();
+                    foreach(var doc in raw.Cast<object>().OfType<ModelDoc2>())
+                    {
+                        AfjNativeObservationMetrics.Add("native.Document.GetType.passive_snapshot");
+                        if(doc.GetType()!=(int)swDocumentTypes_e.swDocPART)continue;
+                        AfjNativeObservationMetrics.Add("native.Document.GetPathName.passive_snapshot");
+                        rows.Add(new PassiveNativePartObservation{Document=doc,Path=doc.GetPathName()});
+                    }
+                    PartsByFilename=rows.GroupBy(row=>System.IO.Path.GetFileName(row.Path)??String.Empty,StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(group=>group.Key,group=>group.ToArray(),StringComparer.OrdinalIgnoreCase);
+                    AfjNativeObservationMetrics.Add("passive.loaded_part_rows",rows.Count);
+                }
+                else AfjNativeObservationMetrics.Add("passive.loaded_parts_snapshot_reuses");
+                PassiveNativePartObservation[] result;
+                return PartsByFilename.TryGetValue(filename??String.Empty,out result)?result:new PassiveNativePartObservation[0];
+            }
+            internal Component2[] MatchingOccurrence(Component2 expected)
+            {
+                if(ComponentsByName==null)
+                {
+                    var assembly=BoundScope.Document as AssemblyDoc;
+                    Need(assembly!=null,"Existing passive context requires Assembly document");
+                    AfjNativeObservationMetrics.Add("native.Assembly.GetComponents.passive_read_snapshot");
+                    var raw=assembly.GetComponents(false) as Array;
+                    Need(raw!=null&&raw.Length<=MaxNodes,"Assembly Component inventory unavailable or exceeds bound");
+                    var rows=new List<KeyValuePair<string,Component2>>();
+                    foreach(var component in raw.Cast<object>().OfType<Component2>())
+                    {
+                        AfjNativeObservationMetrics.Add("native.Component.Name2.passive_index");
+                        rows.Add(new KeyValuePair<string,Component2>(component.Name2??String.Empty,component));
+                    }
+                    ComponentsByName=rows.GroupBy(row=>row.Key,StringComparer.Ordinal)
+                        .ToDictionary(group=>group.Key,group=>group.Select(row=>row.Value).ToArray(),StringComparer.Ordinal);
+                    AfjNativeObservationMetrics.Add("passive.component_index_rows",rows.Count);
+                }
+                else AfjNativeObservationMetrics.Add("passive.component_snapshot_reuses");
+                AfjNativeObservationMetrics.Add("native.Component.Name2.passive_lookup");
+                Component2[] candidates;
+                if(!ComponentsByName.TryGetValue(expected.Name2??String.Empty,out candidates))return new Component2[0];
+                // The name is only an accelerator. Exact native equality still
+                // determines membership and uniqueness; no name-based identity.
+                return candidates.Where(candidate=>{AfjNativeObservationMetrics.Add("native.IsSame.passive_membership");return Owner.Same(candidate,expected);}).ToArray();
+            }
+            internal string FileHash(string path)
+            {
+                AfjNativeObservationMetrics.Add("passive.alias_hash_requests");string value;
+                if(FileHashes.TryGetValue(path,out value)){AfjNativeObservationMetrics.Add("passive.alias_hash_snapshot_reuses");return value;}
+                value=PassiveAliasFileHash(path);FileHashes.Add(path,value);return value;
+            }
+            internal void Complete()
+            {
+                // Recheck each distinct file at the end of this read interval.
+                // This is read-only filesystem verification, not a CAD API call.
+                foreach(var pair in FileHashes)
+                {
+                    AfjNativeObservationMetrics.Add("passive.alias_hash_end_rechecks");
+                    Need(PassiveAliasFileHash(pair.Key)==pair.Value,"Passive alias file changed during one immutable native read phase");
+                }
+            }
+            public void Dispose()
+            {
+                if(PartsByFilename!=null)PartsByFilename.Clear();
+                if(ComponentsByName!=null)ComponentsByName.Clear();FileHashes.Clear();
+                PartsByFilename=null;ComponentsByName=null;
+            }
+        }
+
         private sealed class Scope
         {
+            internal readonly Dictionary<int,PassiveReferenceAlias> PassiveReferenceAliases=new Dictionary<int,PassiveReferenceAlias>();
             internal ModelDoc2 Document;
             internal string Label, PrivatePath;
             internal Snapshot Baseline;
@@ -5783,7 +6301,12 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private Snapshot Read(Scope scope)
         {
+            using(var readObservation=new PassiveReadObservation(this,scope))
+            using(AfjNativeObservationMetrics.Measure("Journal.Read.",scope.Label,true))
+            {
+
             Mark("READ_BEGIN_" + scope.Label);
+            AfjNativeObservationMetrics.Add("journal.read_calls.",scope.Label);
             var snapshot = new Snapshot();
             // AFJ-R53: feature identity is flat; only the top-level definition
             // sequence is ordered. GetFeatures(false) itself has no ordering
@@ -5798,9 +6321,12 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int id = feature.GetID();
                 Need(topSeen.Add(id), "Repeated top-level Feature identity");
                 topIds.Add(id); topFeatures.Add(id,feature);
+                AfjNativeObservationMetrics.Add("journal.top_feature_rows.",scope.Label);
             }
+            AfjNativeObservationMetrics.Add("native.FeatureManager.GetFeatures.journal_read");
             var raw = scope.Document.FeatureManager.GetFeatures(false) as Array;
             Need(raw != null && raw.Length <= MaxNodes, "Flat Feature inventory unavailable or too large");
+            AfjNativeObservationMetrics.Add("journal.flat_feature_rows.",scope.Label,raw.Length);
             var features = new Dictionary<int, Feature>();
             foreach (object value in raw)
             {
@@ -5894,7 +6420,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     // can be unavailable immediately after a verified Cut. Keep
                     // exact live identity/parents/occurrence as protected state;
                     // this grants no removal, rebinding or retirement authority.
-                    node.PrivateBaselinePassiveContextFingerprint=PassiveContextFingerprint(scope,node,features);
+                    node.PrivateBaselinePassiveContextFingerprint=PassiveContextFingerprint(scope,node,features,readObservation);
                     if(scope.Baseline==null)
                     {
                         byte[] token=null; Feature resolved=null; int state=-1; string unavailable=null;
@@ -5916,11 +6442,19 @@ namespace ADDIN.Commands.AutoFrameJoint
                     }
                 }
             }
+            AfjNativeObservationMetrics.Add("journal.final_feature_rows.",scope.Label,snapshot.Nodes.Count);
+            readObservation.Complete();
             Mark("READ_END_" + scope.Label);
             return snapshot;
+
+            }
         }
-        private string PassiveContextFingerprint(Scope scope,Node holder,Dictionary<int,Feature> inventory)
+        private string PassiveContextFingerprint(Scope scope,Node holder,Dictionary<int,Feature> inventory,PassiveReadObservation readObservation)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Journal.PassiveFingerprint"))
+            {
+
             Need(scope.Label=="ASSEMBLY" && holder.Type=="InContextFeatHolder" && holder.Kind==holder.Type,
                 "Passive context baseline is limited to exact native holder metadata");
             var raw=holder.Feature.GetParents() as Array;
@@ -5943,19 +6477,124 @@ namespace ADDIN.Commands.AutoFrameJoint
             var component=references[0].GetSpecificFeature2() as Component2;
             Need(component!=null,"Existing passive context Reference has no native Component2");
             var model=component.GetModelDoc2() as ModelDoc2;
-            Need(model!=null,"Existing passive context Component2 model is unresolved");
-            var assembly=scope.Document as AssemblyDoc;
-            Need(assembly!=null,"Existing passive context requires Assembly document");
-            var components=assembly.GetComponents(false) as Array;
-            Need(components!=null && components.Length<=MaxNodes,"Assembly Component inventory unavailable or exceeds bound");
-            var contained=components.Cast<object>().OfType<Component2>().Where(candidate=>Same(candidate,component)).ToArray();
-            Need(contained.Length==1 && Same(contained[0].GetModelDoc2(),model),
+            int suppression=component.GetSuppression2();
+            bool suppressedWithoutModel=model==null&&suppression==(int)swComponentSuppressionState_e.swComponentSuppressed;
+            Need(model!=null||suppressedWithoutModel,"Existing passive context nonsuppressed Component2 model is unresolved");
+            var contained=readObservation.MatchingOccurrence(component);
+            Need(contained.Length==1 && (suppressedWithoutModel
+                ? contained[0].GetModelDoc2()==null&&contained[0].GetSuppression2()==(int)swComponentSuppressionState_e.swComponentSuppressed
+                : Same(contained[0].GetModelDoc2(),model)),
                 "Existing passive context Component2/model is not contained exactly once in this Assembly");
+            // Suppressed occurrences legitimately have no ModelDoc2. They are
+            // passive baseline metadata only: exact parent graph, occurrence
+            // identity, native suppression/configuration/path remain frozen.
+            // This never resolves, unsuppresses, edits, owns or deletes them.
+            string referenceIdentity=PassiveReferenceIdentity(scope,holder.Id,component,model,suppression,readObservation);
+            string modelIdentity=suppressedWithoutModel
+                ? "SUPPRESSED_NO_MODEL;SUPPRESSION="+suppression
+                : model.GetPathName();
             return holder.Id+":"+holder.Type+":"+holder.Kind+":"+holder.Name+":"+holder.Suppressed+"|"+
                 String.Join("|",parents.Select(parent=>parent.GetID()+":"+parent.GetTypeName2()+":"+parent.Name+":"+parent.IsSuppressed())
                     .OrderBy(value=>value,StringComparer.Ordinal))+"|COMPONENT="+component.Name2+
-                "|CONFIGURATION="+component.ReferencedConfiguration+"|REFERENCE_PATH="+component.GetPathName()+"|MODEL_PATH="+model.GetPathName();
+                "|CONFIGURATION="+component.ReferencedConfiguration+"|COMPONENT_SUPPRESSION="+suppression+"|REFERENCE_PATH="+referenceIdentity+"|MODEL_PATH="+modelIdentity;
+
+            }
         }
+        private static bool ProvenMissingReferenceFile(string path)
+        {
+            // File.Exists alone also returns false on some access failures.
+            // Only a native filesystem not-found result proves the old file
+            // absent; permission and other I/O errors remain failures.
+            try { File.GetAttributes(path); return false; }
+            catch(FileNotFoundException) { return true; }
+            catch(DirectoryNotFoundException) { return true; }
+        }
+        private static string ExactReferencePath(string path)
+        {
+            Need(!String.IsNullOrWhiteSpace(path)&&Path.IsPathRooted(path),"Passive reference identity requires an absolute saved path");
+            return Path.GetFullPath(path);
+        }
+        private static string PassiveAliasFileHash(string path)
+        {
+
+            using(AfjNativeObservationMetrics.Measure("Journal.PassiveFileHash"))
+            {
+
+            using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
+            using(var sha=SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-","").ToLowerInvariant();
+
+            }
+        }
+        private PassiveNativePartObservation[] AlreadyLoadedPartsWithFilename(string filename,PassiveReadObservation readObservation)
+        { return readObservation.Parts(filename); }
+        private string PassiveReferenceIdentity(Scope scope,int holderId,Component2 occurrence,ModelDoc2 occurrenceModel,int suppression,PassiveReadObservation readObservation)
+        {
+
+            using(AfjNativeObservationMetrics.Measure("Journal.PassiveReferenceIdentity"))
+            {
+
+            string observed=occurrence.GetPathName();
+            PassiveReferenceAlias alias;
+            if(scope.Baseline==null&&!scope.PassiveReferenceAliases.ContainsKey(holderId)&&occurrenceModel==null&&
+                suppression==(int)swComponentSuppressionState_e.swComponentSuppressed&&!String.IsNullOrWhiteSpace(observed)&&Path.IsPathRooted(observed))
+            {
+                string historical=ExactReferencePath(observed);
+                if(ProvenMissingReferenceFile(historical))
+                {
+                    string assemblyPath=ExactReferencePath(scope.PrivatePath);
+                    var loaded=AlreadyLoadedPartsWithFilename(Path.GetFileName(historical),readObservation);
+                    // Exactly one pre-existing native Part, in the exact bound
+                    // Assembly directory, is eligible. An alias is never first
+                    // discovered after a Sketch or Cut has changed native state.
+                    if(loaded.Length==1)
+                    {
+                        var native=loaded[0].Document;string canonical=ExactReferencePath(loaded[0].Path);
+                        if(String.Equals(Path.GetDirectoryName(canonical),Path.GetDirectoryName(assemblyPath),StringComparison.OrdinalIgnoreCase)&&
+                            !ProvenMissingReferenceFile(canonical))
+                        {
+                            string configuration=loaded[0].ReadConfiguration();
+                            Need(configuration!=null&&configuration==occurrence.ReferencedConfiguration,
+                                "Preloaded passive alias native configuration differs from the frozen occurrence");
+                            alias=new PassiveReferenceAlias{HistoricalPath=observed,HistoricalFullPath=historical,CanonicalPath=canonical,
+                                FileSha256=readObservation.FileHash(canonical),OccurrenceName=occurrence.Name2,
+                                OccurrenceConfiguration=occurrence.ReferencedConfiguration,NativeConfiguration=configuration,
+                                NativeOccurrence=occurrence,AlreadyLoadedNativePart=native};
+                            scope.PassiveReferenceAliases.Add(holderId,alias);
+                            Mark("PREREGISTERED_PASSIVE_REFERENCE_ALIAS_holder="+holderId+";historical_missing=true;already_loaded_native_part=true;same_assembly_directory=true;sha256="+alias.FileSha256);
+                        }
+                    }
+                }
+            }
+            if(!scope.PassiveReferenceAliases.TryGetValue(holderId,out alias))return observed;
+            Need(scope.Label=="ASSEMBLY"&&occurrenceModel==null&&suppression==(int)swComponentSuppressionState_e.swComponentSuppressed,
+                "Preregistered passive reference alias cannot apply to a resolved or nonsuppressed occurrence");
+            Need(Same(occurrence,alias.NativeOccurrence)&&occurrence.Name2==alias.OccurrenceName&&
+                occurrence.ReferencedConfiguration==alias.OccurrenceConfiguration,
+                "Preregistered passive reference occurrence identity/configuration changed");
+            string current=ExactReferencePath(observed);
+            Need(String.Equals(current,alias.HistoricalFullPath,StringComparison.OrdinalIgnoreCase)||
+                String.Equals(current,alias.CanonicalPath,StringComparison.OrdinalIgnoreCase),
+                "Passive reference path is neither exact preregistered historical nor native canonical identity");
+            Need(ProvenMissingReferenceFile(alias.HistoricalFullPath),"Historical passive reference file now exists; alias equivalence refused");
+            var stillLoaded=AlreadyLoadedPartsWithFilename(Path.GetFileName(alias.CanonicalPath),readObservation);
+            Need(stillLoaded.Length==1&&Same(stillLoaded[0].Document,alias.AlreadyLoadedNativePart)&&
+                String.Equals(ExactReferencePath(stillLoaded[0].Path),alias.CanonicalPath,StringComparison.OrdinalIgnoreCase),
+                "Preregistered native passive alias Part is no longer uniquely loaded with the same identity/path");
+            string active=stillLoaded[0].ReadConfiguration();
+            Need(active!=null&&active==alias.NativeConfiguration,"Preregistered native passive alias Part configuration changed");
+            Need(String.Equals(Path.GetDirectoryName(alias.CanonicalPath),Path.GetDirectoryName(ExactReferencePath(scope.PrivatePath)),StringComparison.OrdinalIgnoreCase)&&
+                readObservation.FileHash(alias.CanonicalPath)==alias.FileSha256,
+                "Preregistered native passive alias Part directory/file hash changed");
+            if(!String.Equals(current,alias.HistoricalFullPath,StringComparison.OrdinalIgnoreCase))
+                Mark("OBSERVED_NATIVE_PASSIVE_REFERENCE_RELOCATION_holder="+holderId+";preregistered_identity_and_sha256_verified=true;no_reference_write=true");
+            // Return the BEFORE-mutation key. All existing parent/holder/child,
+            // suppression/configuration and immutable Feature guards still run.
+            return alias.HistoricalPath;
+
+            }
+        }
+
         private Feature ResolveKnownPassiveNativeFeature(Entry entry)
         {
             Need(entry.SheetMetalCompanion && !entry.Scope.Baseline.Nodes.ContainsKey(entry.Id) &&
@@ -6028,8 +6667,12 @@ namespace ADDIN.Commands.AutoFrameJoint
                     "; before_suppressed=" + original.Suppressed + "; after_suppressed=" + live.Suppressed +
                     "; exact_final=" + exactFinal);
                 if(original.PrivateBaselinePassiveContextFingerprint!=null)
+                {
+                    if(live.PrivateBaselinePassiveContextFingerprint!=original.PrivateBaselinePassiveContextFingerprint)
+                        Trace.WriteLine("[AFJ-R56-PASSIVE-FINGERPRINT-DIFF] id="+original.Id+" old="+original.PrivateBaselinePassiveContextFingerprint+" live="+live.PrivateBaselinePassiveContextFingerprint);
                     Need(live.PrivateBaselinePassiveContextFingerprint==original.PrivateBaselinePassiveContextFingerprint,
                         "Protected original passive context holder parents/occurrence fingerprint changed; id="+original.Id);
+                }
             }
             if (exactFinal)
             {
@@ -6039,12 +6682,22 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         internal Checkpoint CaptureCheckpoint(ModelDoc2 document)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Journal.CaptureCheckpoint"))
+            {
+
             Need(!RollingBack, "Cannot checkpoint during rollback");
             Scope scope = Bound(document); var snapshot = Read(scope); CheckProtected(scope, snapshot, false);
             return new Checkpoint(scope, snapshot, Sequence);
+
+            }
         }
         internal FeatureInfo RegisterNewNativeFeature(ModelDoc2 document, Feature feature, string role)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Journal.RegisterNewFeature"))
+            {
+
             Need(!RollingBack && feature != null, "A returned new native Feature is required");
             Scope scope = Bound(document); int id = feature.GetID();
             Need(!scope.Baseline.Nodes.ContainsKey(id), "Refusing ownership of an original Feature");
@@ -6061,6 +6714,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Kind = kind, Name = feature.Name, Role = role ?? "NOT_AVAILABLE" };
             Entries.Add(entry); Mark("REGISTER_" + scope.Label + "_" + id);
             RefreshToken(entry, feature); return Public(entry);
+
+            }
         }
         private void RefreshToken(Entry entry, Feature feature)
         {
@@ -6076,6 +6731,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal FeatureInfo ConfirmClosedNativeFeature(ModelDoc2 document, Feature feature,
             string role, string requiredPrefix)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Journal.ConfirmClosedFeature"))
+            {
+
             Need(!RollingBack && feature != null, "Closed native Feature required");
             RequireAssemblyContext();
             Scope scope = Bound(document); int id = feature.GetID();
@@ -6100,6 +6759,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             else { entry.PrivateToken = token; entry.ClosedIdentityConfirmed = true; }
             entry.Name = feature.Name; Mark("CONFIRMED_CLOSED_" + scope.Label + "_" + id);
             return Public(entry);
+
+            }
         }
         private string ContextParents(Feature feature, Component2 componentA, Component2 componentB,
             out int partIndex, out int[] parentIds)
@@ -6133,6 +6794,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         private Component2[] ContextComponents;
         internal FeatureInfo[] CaptureOwnedAssemblyContextFeatures(Component2 componentA,Component2 componentB,string prefix)
         {
+
+            using(AfjNativeObservationMetrics.Measure("Journal.CaptureOwnedContext"))
+            {
+
             Need(!RollingBack && componentA!=null && componentB!=null && !Same(componentA,componentB),"Bound occurrences required for context capture");
             RequireAssemblyContext();
             Need(!String.IsNullOrWhiteSpace(prefix) && prefix.StartsWith("AFJ_",StringComparison.Ordinal),"Exact run prefix required");
@@ -6170,6 +6835,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 captured.Add(Public(entry));
             }
             return captured.ToArray();
+
+            }
         }
         internal FeatureInfo[] CaptureCutFactoryAssemblyContextFeatures(Component2 componentA,Component2 componentB,
             string prefix,Checkpoint before,ModelDoc2 cutDocument,Feature registeredCut)
@@ -6843,6 +7510,70 @@ namespace ADDIN.Commands.AutoFrameJoint
                 report.Owned.AddRange(Entries.Select(Public)); Mark("ROLLBACK_END_" + report.Status);
             }
             return report;
+        }
+    }
+}
+
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    // PRIVATE R56 profiling: managed counters/timers only; no CAD API calls,
+    // geometry changes, cache shortcuts, callbacks, rebuilds or deployment.
+    internal static class AfjNativeObservationMetrics
+    {
+        // Verbose diagnostics are opt-in for this process. Ordinary Add-in
+        // use keeps existing boundary/overall logs without cumulative dumps.
+        internal static readonly bool Enabled=ReadEnabled();
+        private static bool ReadEnabled()
+        {
+            try{return System.String.Equals(System.Environment.GetEnvironmentVariable("AFJ_R56_PROFILE_DETAIL"),"1",System.StringComparison.Ordinal);}
+            catch{return false;}
+        }
+        private sealed class NoOp:System.IDisposable
+        {
+            internal static readonly System.IDisposable Instance=new NoOp();
+            public void Dispose(){}
+        }
+        private static readonly object Gate=Enabled?new object():null;
+        private static readonly System.Collections.Generic.Dictionary<string,long> Counts=Enabled?new System.Collections.Generic.Dictionary<string,long>():null;
+        private static readonly System.Collections.Generic.Dictionary<string,long> Ticks=Enabled?new System.Collections.Generic.Dictionary<string,long>():null;
+        internal static void Add(string key,long value=1)
+        {
+            if(!Enabled)return;
+            lock(Gate){long old;Counts.TryGetValue(key,out old);Counts[key]=old+value;}
+        }
+        internal static void Add(string prefix,string suffix,long value=1)
+        {if(Enabled)Add(prefix+suffix,value);}
+        internal static System.IDisposable Measure(string name,bool dump=false)
+        {
+            if(!Enabled)return NoOp.Instance;
+            Add("calls."+name);return new Interval(name,dump);
+        }
+        internal static System.IDisposable Measure(string prefix,string suffix,bool dump=false)
+        {return Enabled?Measure(prefix+suffix,dump):NoOp.Instance;}
+        private sealed class Interval:System.IDisposable
+        {
+            private readonly string Name;private readonly bool Dump;
+            private readonly System.Diagnostics.Stopwatch Timer=System.Diagnostics.Stopwatch.StartNew();
+            internal Interval(string name,bool dump){Name=name;Dump=dump;}
+            public void Dispose()
+            {
+                try
+                {
+                    long elapsed=Timer.ElapsedTicks;lock(Gate){long old;Ticks.TryGetValue(Name,out old);Ticks[Name]=old+elapsed;}
+                    if(Dump)Snapshot(Name,elapsed);
+                }
+                catch { /* Profiling must never replace a native guard result. */ }
+            }
+        }
+        private static void Snapshot(string phase,long elapsed)
+        {
+            if(!Enabled)return;
+            lock(Gate)
+            {
+                string counts=System.String.Join(";",System.Linq.Enumerable.Select(Counts,p=>p.Key+"="+p.Value));
+                string timings=System.String.Join(";",System.Linq.Enumerable.Select(Ticks,p=>p.Key+"="+(p.Value*1000.0/System.Diagnostics.Stopwatch.Frequency).ToString("0.###",System.Globalization.CultureInfo.InvariantCulture)));
+                System.Diagnostics.Trace.WriteLine("[AFJ-R56-OBSERVATION] phase="+phase+" elapsed_ms="+(elapsed*1000.0/System.Diagnostics.Stopwatch.Frequency).ToString("0.###",System.Globalization.CultureInfo.InvariantCulture)+" cumulative_counts={"+counts+"} cumulative_ms={"+timings+"}");
+            }
         }
     }
 }
