@@ -61,7 +61,7 @@ namespace ADDIN.Commands.AutoFrameJoint
 
             app = swApp;
             sourceAssembly = originalAssembly;
-            Trace.WriteLine("[AFJ-R56] SOURCE=SECTION_GRAPH_ADJUSTED_BISECTOR_LINKED_FACE_SKETCH plane_fallback=DISABLED MVID=" +
+            Trace.WriteLine("[AFJ-R57] SOURCE=SECTION_GRAPH_ADJUSTED_BISECTOR_LINKED_FACE_SKETCH diagnostic=BOUNDARY_TRACE_ONLY plane_fallback=DISABLED MVID=" +
                 typeof(AutoFrameJointGhostPreview).Assembly.ManifestModule.ModuleVersionId);
         }
 
@@ -4795,14 +4795,49 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
             catch { UnresolvedCreation=true; throw; }
         }
+        // Diagnostic only. Labels use managed references already retained by the
+        // transaction; tracing must never query a COM object for its identity.
+        private string R57DocumentLabel(ModelDoc2 document)
+        {
+            if(Object.ReferenceEquals(document,Assembly))return "ASSEMBLY";
+            foreach(var state in Documents)if(Object.ReferenceEquals(document,state.Model))return state.Label;
+            return "UNKNOWN_MANAGED_REFERENCE";
+        }
+        private static void R57Trace(string state,string phase,Exception error=null)
+        {
+            try
+            {
+                Trace.WriteLine("[AFJ-R57-BOUNDARY] state="+state+" phase="+phase+
+                    " utc="+DateTime.UtcNow.ToString("o")+" thread="+System.Threading.Thread.CurrentThread.ManagedThreadId+
+                    (error==null?"":" HRESULT=0x"+error.HResult.ToString("X8")+" "+error.GetType().FullName+" "+error.Message));
+                if(error!=null)Trace.WriteLine(error.StackTrace);
+            }
+            catch { /* Diagnostic output must not replace a native guard result. */ }
+        }
+        private static T R57Boundary<T>(string phase,Func<T> action)
+        {
+            R57Trace("BEGIN",phase);
+            try{T result=action();R57Trace("END",phase);return result;}
+            catch(Exception error){R57Trace("FAULT",phase,error);throw;}
+        }
+        private static void R57Boundary(string phase,Action action)
+        {
+            R57Trace("BEGIN",phase);
+            try{action();R57Trace("END",phase);}
+            catch(Exception error){R57Trace("FAULT",phase,error);throw;}
+        }
         private void Activate(ModelDoc2 document)
         {
-            Need(Same(((AssemblyDoc)Assembly).GetEditTarget(), Assembly) && Assembly.GetActiveSketch2() == null,
+            string phase="ACTIVATE "+R57DocumentLabel(document);
+            Need(R57Boundary(phase+".CONTEXT_EDIT_TARGET_SAME",()=>Same(((AssemblyDoc)Assembly).GetEditTarget(), Assembly)) &&
+                R57Boundary(phase+".CONTEXT_ACTIVE_SKETCH",()=>Assembly.GetActiveSketch2()) == null,
                 "Native Cut requires restored Assembly edit context");
-            if (Same(App.ActiveDoc, document)) return;
-            int error = 0; var actual = App.ActivateDoc3(document.GetTitle(), false,
-                (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref error) as ModelDoc2;
-            Need(Same(actual, document) && (error & ~(int)swActivateDocError_e.swDocNeedsRebuildWarning) == 0,
+            if (R57Boundary(phase+".ACTIVE_DOC_SAME",()=>Same(App.ActiveDoc, document))) return;
+            int error = 0;
+            string title=R57Boundary(phase+".GET_TITLE",()=>document.GetTitle());
+            var actual = R57Boundary(phase+".ACTIVATE_DOC3",()=>App.ActivateDoc3(title, false,
+                (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref error) as ModelDoc2);
+            Need(R57Boundary(phase+".RETURNED_DOC_SAME",()=>Same(actual, document)) && (error & ~(int)swActivateDocError_e.swDocNeedsRebuildWarning) == 0,
                 "Cannot activate exact native target");
         }
         internal void Apply()
@@ -4824,9 +4859,10 @@ namespace ADDIN.Commands.AutoFrameJoint
             foreach (var step in Steps)
             {
                 RequireAcceptedStamps(); CheckInvariant("BEFORE_CUT_" + step.Operation.EvidenceId);
-                var owned = SketchWriterResult.Owned.Single(o => o.EvidenceId == step.Operation.EvidenceId);
-                Need(Same(owned.Part, Documents[step.Part].Model), "Prepared Sketch/operation Part mapping differs");
-                ApplyCut(step, owned); Expected[step.Part] = step.Target;
+                string stepPhase="STEP "+Documents[step.Part].Label+" "+step.Operation.EvidenceId;
+                var owned = R57Boundary(stepPhase+".OWNED_LOOKUP",()=>SketchWriterResult.Owned.Single(o => o.EvidenceId == step.Operation.EvidenceId));
+                Need(R57Boundary(stepPhase+".SAME_PART",()=>Same(owned.Part, Documents[step.Part].Model)), "Prepared Sketch/operation Part mapping differs");
+                R57Boundary(stepPhase+".APPLY_CUT",()=>ApplyCut(step, owned)); Expected[step.Part] = step.Target;
                 CheckSketches("AFTER_CUT_" + step.Operation.EvidenceId);
                 CheckInvariant("AFTER_CUT_" + step.Operation.EvidenceId); AcceptStamps();
 #if AFJ_U_LINKED_WRITER_HARNESS
@@ -4846,28 +4882,36 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private void ApplyCut(Step step, AfjUParametricSketchWriter.OwnedSketch owned)
         {
-            var part = Documents[step.Part].Model; Activate(part); var feature = Find(part, owned.FeatureId);
-            Need(feature != null, "Exact owned profile disappeared before Cut"); var sketch = feature.GetSpecificFeature2() as Sketch;
-            Need(sketch != null && sketch.GetConstrainedStatus() == (int)swConstrainedStatus_e.swFullyConstrained, "Fully constrained native Sketch required");
-            var spec = step.Operation.Tools.Single(); var inverse = sketch.ModelToSketchTransform.Inverse() as MathTransform;
-            Need(inverse != null, "Sketch inverse unavailable"); var matrix = inverse.ArrayData as double[];
-            var origin = AfjProfileAnalyzer.Transform(new double[3], matrix);
-            var normal = AfjParametricRules.Unit(AfjParametricRules.Sub(AfjProfileAnalyzer.Transform(new[] { 0d, 0d, 1d }, matrix), origin));
-            bool reverse = AfjNativeCutCommit.ReverseForAlignment(AfjParametricRules.Dot(normal, spec.Direction));
-            bool normalCut = AfjNativeCutCommit.UseNativeNormalCut(step.Operation, spec);
-            double signedOffset = AfjParametricRules.Dot(AfjParametricRules.Sub(spec.Polygon[0], origin), normal), offset = Math.Abs(signedOffset);
+            string phase="CUT "+Documents[step.Part].Label+" "+step.Operation.EvidenceId;
+            var part = Documents[step.Part].Model; R57Boundary(phase+".ACTIVATE",()=>Activate(part));
+            var feature = R57Boundary(phase+".FRESH_FEATURE_FIND",()=>Find(part, owned.FeatureId));
+            Need(feature != null, "Exact owned profile disappeared before Cut");
+            var sketch = R57Boundary(phase+".GET_SPECIFIC_FEATURE2",()=>feature.GetSpecificFeature2() as Sketch);
+            Need(sketch != null && R57Boundary(phase+".GET_CONSTRAINED_STATUS",()=>sketch.GetConstrainedStatus()) == (int)swConstrainedStatus_e.swFullyConstrained, "Fully constrained native Sketch required");
+            var spec = step.Operation.Tools.Single();
+            var modelToSketch=R57Boundary(phase+".GET_MODEL_TO_SKETCH_TRANSFORM",()=>sketch.ModelToSketchTransform);
+            var inverse = R57Boundary(phase+".GET_INVERSE",()=>modelToSketch.Inverse() as MathTransform);
+            Need(inverse != null, "Sketch inverse unavailable");
+            var matrix = R57Boundary(phase+".GET_INVERSE_ARRAY_DATA",()=>inverse.ArrayData as double[]);
+            var origin = R57Boundary(phase+".ALIGN_ORIGIN",()=>AfjProfileAnalyzer.Transform(new double[3], matrix));
+            var normal = R57Boundary(phase+".ALIGN_NORMAL",()=>AfjParametricRules.Unit(AfjParametricRules.Sub(AfjProfileAnalyzer.Transform(new[] { 0d, 0d, 1d }, matrix), origin)));
+            bool reverse = R57Boundary(phase+".ALIGN_REVERSE",()=>AfjNativeCutCommit.ReverseForAlignment(AfjParametricRules.Dot(normal, spec.Direction)));
+            bool normalCut = R57Boundary(phase+".NORMAL_CUT_POLICY",()=>AfjNativeCutCommit.UseNativeNormalCut(step.Operation, spec));
+            double signedOffset = R57Boundary(phase+".ALIGN_SIGNED_OFFSET",()=>AfjParametricRules.Dot(AfjParametricRules.Sub(spec.Polygon[0], origin), normal)), offset = Math.Abs(signedOffset);
             bool offsetReverse = signedOffset < 0;
-            Need(Math.Abs(offset - AfjManufacturingConventions.CutterEnvelopeOverrun) < 1e-8, "Reviewed start offset differs from calibrated native representation");
-            string ownedSketchName=feature.Name;
-            var assemblyFactoryCheckpoint=Journal.CaptureCheckpoint(Assembly);
-            var factoryCheckpoint=Journal.CaptureCheckpoint(part); // no native modeling factory call occurs between this read and FeatureCut4 below.
-            part.ClearSelection2(true); Need(feature.Select2(false, 0), "Cannot select exact owned Sketch");
+            R57Boundary(phase+".ALIGN_OFFSET_GUARD",()=>Need(Math.Abs(offset - AfjManufacturingConventions.CutterEnvelopeOverrun) < 1e-8, "Reviewed start offset differs from calibrated native representation"));
+            string ownedSketchName=R57Boundary(phase+".GET_SKETCH_NAME",()=>feature.Name);
+            var assemblyFactoryCheckpoint=R57Boundary(phase+".CHECKPOINT_ASSEMBLY",()=>Journal.CaptureCheckpoint(Assembly));
+            var factoryCheckpoint=R57Boundary(phase+".CHECKPOINT_PART",()=>Journal.CaptureCheckpoint(part)); // no native modeling factory call occurs between this read and FeatureCut4 below.
+            R57Boundary(phase+".CLEAR_SELECTION",()=>part.ClearSelection2(true));
+            Need(R57Boundary(phase+".SELECT_PROFILE",()=>feature.Select2(false, 0)), "Cannot select exact owned Sketch");
             // Native selection owns the selected profile for FeatureCut4. These
             // pre-Cut aliases must not be queried or retained after mutation.
-            feature=null;sketch=null;inverse=null;
+            feature=null;sketch=null;inverse=null;modelToSketch=null;
             // Register the returned native object immediately, without any log,
             // rename, readback, file I/O or callback between return and capture.
             Feature cut;
+            R57Trace("BEGIN",phase+".FEATURECUT4");
             try
             {
                 cut = part.FeatureManager.FeatureCut4(true, false, reverse, (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind,
@@ -4878,7 +4922,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             {
                 // A native call can throw after mutation; without a returned
                 // Feature identity the journal must not guess new ownership.
-                UnresolvedCreation = true; throw;
+                UnresolvedCreation = true; R57Trace("FAULT",phase+".FEATURECUT4"); throw;
             }
             if (cut == null)
             {
@@ -4886,6 +4930,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Need(false, "FeatureCut4 returned null; no Cut identity available");
             }
             Register(part, cut, step.Operation.EvidenceId + ":CUT");
+            R57Trace("RETURN_REGISTERED",phase+".FEATURECUT4");
             cut.Name = owned.IntendedName + "_Cut";
             ConfirmClosed(part,cut,step.Operation.EvidenceId + ":CUT");
             var section=step.Part==(Preview.CoverA?0:1)?Intent.Winner:Intent.Loser;
