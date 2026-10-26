@@ -1,5 +1,7 @@
 # Auto Frame Joint — parameterized U-section cut solver
 
+**Latest R58 installed API check (2026-10-26):** the actual deployed DLL completed all four corners on the same disposable Assembly through the existing selection/Preview and native PMP `Close(true)` path: **16 Cuts, 16 fully constrained face-supported 2D Sketches, zero new planes**, 0.10 mm final gaps and zero pair overlap. This passed with **CAD opened before the Add-in was loaded**. Main-first document opening still produced native failures; **the crash is not fixed**. Source/DLL/PDB were unchanged, and both final test hosts closed without saving and exited normally. [Evidence, limits and reproduction](R58/README.md).
+
 **Review status: partial implementation with real geometry tests. General AFJ is not complete.** The solver generates tools from measured section topology, sheet thickness/Bend R, assembly placement and the user's cover policy. Native Cut shapes are research oracles, not runtime templates.
 
 **Stability limit:** one SOLIDWORKS crash occurred during harness transition after the native suite. It is logged in [API diagnostics](06_API_DIAGNOSTICS.md); root cause and installed Add-in stability remain unverified.
