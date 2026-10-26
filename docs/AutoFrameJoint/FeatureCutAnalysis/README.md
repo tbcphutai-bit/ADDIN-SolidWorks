@@ -1,3 +1,5 @@
+> **R58 — 2026-10-26:** API đã chạy qua đúng DLL đang cài và luồng PMP/OK ở đủ 4 góc trên cùng bản sao Assembly: **16 Cut, 16 Sketch 2D ràng buộc đầy đủ trên Face2 có sẵn, 0 Plane mới**, khe hở 0,10 mm, giao thoa 0. Chỉ đạt trong phép thử mở CAD trước rồi nạp Add-in; **crash khi nạp Add-in trước CAD chưa được sửa**. Xem [bằng chứng và giới hạn](R58/README.md), [JSON từng góc](R58/FOUR_CORNERS_API.json) và [commit báo cáo PR #45](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/commit/ec6d528bc87343c1491332874204b8d70d5bd50d). 16 Cut sinh khi thử được tách khỏi 43 Cut mẫu / 42 before-after; không đổi dữ liệu mẫu hoặc source Add-in trong branch tài liệu này.
+
 > **R54 — sửa lỗi đóng trang A-only:** đã cập nhật trực tiếp class SelectionPage, xem [bản sửa và kiểm tra callback](R54/README.md). Người dùng tự Rebuild; chưa xác nhận native PMP sau Rebuild.
 
 > **R53 — 2026-10-23:** source chính đã tích hợp writer Sketch gắn Face, không tạo Plane mới; hai ca native đã chạy với đúng source. Xem [báo cáo và giới hạn R53](R53/README.md). Các kết quả lịch sử dưới đây được giữ nguyên.
