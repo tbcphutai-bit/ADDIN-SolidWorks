@@ -1,3 +1,5 @@
+> **R59 — 2026-10-28:** Cut từng lớp tôn Normal/Blind=t+0,10 mm: 2354 đủ 4 góc, 33 Cut; 4332 thêm 8 Cut. Source chính đã chép để người dùng tự rebuild; kết quả là API harness, chưa xác nhận DLL/PMP sau rebuild. Xem [bằng chứng và giới hạn](R59/README.md).
+
 # Auto Frame Joint — parameterized U-section cut solver
 
 **Latest R58 installed API check (2026-10-26):** the actual deployed DLL completed all four corners on the same disposable Assembly through the existing selection/Preview and native PMP `Close(true)` path: **16 Cuts, 16 fully constrained face-supported 2D Sketches, zero new planes**, 0.10 mm final gaps and zero pair overlap. This passed with **CAD opened before the Add-in was loaded**. Main-first document opening still produced native failures; **the crash is not fixed**. Source/DLL/PDB were unchanged, and both final test hosts closed without saving and exited normally. [Evidence, limits and reproduction](R58/README.md).

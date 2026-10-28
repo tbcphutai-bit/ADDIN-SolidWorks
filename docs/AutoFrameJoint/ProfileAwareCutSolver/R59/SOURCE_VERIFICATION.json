@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-28",
+  "source_files": [
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "main_sha256": "4795F987AF95740776F834CC454419BB50D557AB681F989452D6F2E35CDD3002",
+      "candidate_sha256": "4795F987AF95740776F834CC454419BB50D557AB681F989452D6F2E35CDD3002",
+      "main_modified_by_r59": false
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+      "main_sha256": "8678133EE61C94FB0D1262A33585803579760CB3B0F088C3BDC71142F04980F5",
+      "candidate_sha256": "8678133EE61C94FB0D1262A33585803579760CB3B0F088C3BDC71142F04980F5",
+      "main_modified_by_r59": false
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "main_sha256": "B505CE2611AFFAAA795D2246C8DD19560EE197DAE8E7D79035BB89FC26D01FA1",
+      "candidate_sha256": "B505CE2611AFFAAA795D2246C8DD19560EE197DAE8E7D79035BB89FC26D01FA1",
+      "main_modified_by_r59": false
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+      "main_sha256": "5B233792C7EA6D9042EDDBDD2E5529BE52DAD354392BD8699BA2981CD6EF4A9B",
+      "candidate_sha256": "5B233792C7EA6D9042EDDBDD2E5529BE52DAD354392BD8699BA2981CD6EF4A9B",
+      "main_modified_by_r59": false
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "main_sha256": "036844470F9C779F1A0392EC0AB25ECF6D3BBAFA2B366645C460DD39064E9525",
+      "candidate_sha256": "036844470F9C779F1A0392EC0AB25ECF6D3BBAFA2B366645C460DD39064E9525",
+      "main_modified_by_r59": true
+    },
+    {
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "main_sha256": "DD1506216EFC372D82220E05FC5B0DEC97898AB8C712910A6FDB6E03B01CD1E7",
+      "candidate_sha256": "DD1506216EFC372D82220E05FC5B0DEC97898AB8C712910A6FDB6E03B01CD1E7",
+      "main_modified_by_r59": false
+    }
+  ],
+  "main_copy_verified": true,
+  "main_compile": "PASS_STANDALONE_SIX_SOURCE_ONLY",
+  "branch_compile": "PASS_STANDALONE_SIX_SOURCE_ONLY",
+  "main_build": false,
+  "deployment": false,
+  "installed_dll_contains_r59": false,
+  "installed_dll_sha256": "F22D57943B23D6FF17B6A17EB68E95424A604EAB9F082C180B8162A034FB44C7",
+  "installed_dll_mvid": "472fc9a6-5298-4ceb-a696-86bc9a0658fe",
+  "project_preserved": true,
+  "pdb_preserved": true,
+  "selection_ui_preserved": true,
+  "tested_scope": "INPROCESS_DIRECT_API_HARNESS_NOT_INSTALLED_ADDIN_NOT_PMP",
+  "failure_rollback": "UNVERIFIED",
+  "original_cad_hashes_unchanged": true
+}
