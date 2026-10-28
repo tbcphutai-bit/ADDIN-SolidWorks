@@ -63,6 +63,15 @@ namespace ADDIN.Commands
             // a context-independent source. Never break references here.
             return states==null||states.Length!=count||states.Cast<object>().Any(s=>Convert.ToInt32(s)!=(int)swExternalReferenceStatus_e.swExternalReferenceBroken);
         }
+        // Diagnostics describe the COM return shape, never source geometry.
+        // A scalar/null metadata result is not evidence that a body is normal.
+        private static object AssemblyArrayShape(object value)
+        {
+            var array=value as Array;
+            return new {ClrType=value?.GetType().FullName??"null",Rank=array?.Rank,
+                Length=array?.Length,LowerBounds=array==null?null:Enumerable.Range(0,array.Rank).Select(array.GetLowerBound).ToArray(),
+                Dimensions=array==null?null:Enumerable.Range(0,array.Rank).Select(array.GetLength).ToArray()};
+        }
         private void VisitAssemblyInventory(Component2 component,HashSet<string> visited,bool flexibleParent)
         {
             BendNativeCaptureDiagnostics.Stage("Assembly.Inventory.visit." + visited.Count);
@@ -84,6 +93,8 @@ namespace ADDIN.Commands
                 // read-only guarantee. A caller may resolve needed components
                 // explicitly and run again. Never use saved Part as instance proof.
                 var entry=record(AssemblyOccurrenceKind.Lightweight,false,false,subassembly?"LIGHTWEIGHT_SUBASSEMBLY_SCOPE_UNRESOLVED":"LIGHTWEIGHT_NEEDS_EXPLICIT_USER_RESOLVE");
+                BendCheckRunDiagnostics.Write("Assembly.Inventory.skipped",new {OccurrenceId=id,Component=name,SourceFile=Path.GetFileName(path),
+                    ReferencedConfiguration=config,Suppression=suppression,Reason=entry.Reason});
                 InventoryOccurrences.Add(entry);if(!subassembly)AddAssemblyItem(component,null,path,config,id,entry,false,entry.Reason);return;
             }
             if(suppression!=(int)swComponentSuppressionState_e.swComponentFullyResolved&&suppression!=(int)swComponentSuppressionState_e.swComponentResolved)
@@ -101,15 +112,46 @@ namespace ADDIN.Commands
             if(model==null){error="UNLOADED_COMPONENT";kind=AssemblyOccurrenceKind.Unloaded;}
             else
             {
+                object rawBodies=null,info=null;
+                string metadataIssue=null;
                 try
                 {
-                    object info;var bodies=(component.GetBodies3((int)swBodyType_e.swSolidBody,out info) as object[]??new object[0]).OfType<Body2>().ToArray();BodyMetadataReads++;
+                    // Diagnostics use the captured component configuration; no
+                    // extra native configuration query can veto body eligibility.
+                    BendCheckRunDiagnostics.Write("Assembly.Inventory.body.begin",new {OccurrenceId=id,Component=name,SourceFile=Path.GetFileName(path),
+                        ReferencedConfiguration=config,ModelConfigurationQuery="DeferredToNativeCapture",Suppression=suppression});
+                    rawBodies=component.GetBodies3((int)swBodyType_e.swSolidBody,out info);BodyMetadataReads++;
+                    // SAFEARRAY lower bounds need not be zero. Enumerate a
+                    // documented one-dimensional array without discarding any
+                    // unrecognized element before matching its metadata.
+                    var nativeBodies=rawBodies as Array;
+                    var entries=nativeBodies!=null&&nativeBodies.Rank==1?nativeBodies.Cast<object>().ToArray():new object[0];
+                    var bodies=entries.OfType<Body2>().ToArray();
                     var flags=info as Array;
+                    bool bodyArrayKnown=nativeBodies!=null&&nativeBodies.Rank==1&&entries.Length==bodies.Length;
+                    bool hasUserBody;
+                    string flagProblem=AssemblyOccurrenceEligibility.BodyMetadataProblem(info,bodies.Length,
+                        (int)swBodyInfo_e.swNormalBody_e,(int)swBodyInfo_e.swUserBody_e,out hasUserBody);
+                    object[] flagEntries=flags!=null&&flags.Rank==1?flags.Cast<object>().ToArray():new object[0];
+                    if(nativeBodies==null)metadataIssue=rawBodies==null?"BODY_RETURN_NULL":"BODY_RETURN_NOT_ARRAY";
+                    else if(nativeBodies.Rank!=1)metadataIssue="BODY_ARRAY_RANK_UNSUPPORTED";
+                    else if(entries.Length!=bodies.Length)metadataIssue="BODY_ARRAY_CONTAINS_UNRECOGNIZED_ENTRIES";
+                    else if(bodies.Length==0)metadataIssue="EMPTY_SOLID_BODY_ARRAY";
+                    else metadataIssue=flagProblem;
+                    bool? singleBodySheetMetal=bodies.Length==1?(bool?)bodies[0].IsSheetMetal():null;
+                    BendCheckRunDiagnostics.Write("Assembly.Inventory.body.result",new {OccurrenceId=id,Component=name,SourceFile=Path.GetFileName(path),
+                        ReferencedConfiguration=config,ModelConfigurationQuery="DeferredToNativeCapture",Suppression=suppression,
+                        Bodies=AssemblyArrayShape(rawBodies),BodyInfo=AssemblyArrayShape(info),ReturnedEntries=entries.Length,
+                        Body2Count=bodies.Length,DiscardedEntries=entries.Length-bodies.Length,
+                        BodyEntryClrTypes=entries.Select(v=>v?.GetType().FullName??"null").ToArray(),
+                        BodyInfoElementTypes=flagEntries.Select(v=>v?.GetType().FullName??"null").ToArray(),
+                        BodyInfoValues=flagProblem==null?flagEntries.Select(v=>Convert.ToInt32(v)).ToArray():null,
+                        SingleBodySheetMetal=singleBodySheetMetal,MetadataIssue=metadataIssue});
                     if(flags==null)minimumError="Chưa đọc được body trong Assembly.";
-                    if(flags==null||flags.Length!=bodies.Length||bodies.Length==0)error="UNKNOWN_ASSEMBLY_BODY_METADATA";
-                    else modified=flags.Cast<object>().Any(v=>Convert.ToInt32(v)==(int)swBodyInfo_e.swUserBody_e);
+                    if(!bodyArrayKnown||flagProblem!=null||bodies.Length==0)error="UNKNOWN_ASSEMBLY_BODY_METADATA";
+                    else modified=hasUserBody;
                     if(bodies.Length>1)error="MULTIBODY_INSTANCE_UNSUPPORTED";
-                    else if(bodies.Length==1&&!bodies[0].IsSheetMetal()){kind=AssemblyOccurrenceKind.NonSheetMetal;error="NON_SHEET_METAL_PART";}
+                    else if(singleBodySheetMetal==false){kind=AssemblyOccurrenceKind.NonSheetMetal;error="NON_SHEET_METAL_PART";}
                     if(modified){error="ASSEMBLY_MODIFIED_BODY_REQUIRES_INSTANCE_GEOMETRY";kind=AssemblyOccurrenceKind.Unsupported;minimumError="Body có sửa trong Assembly; cần kiểm tra hình học instance.";}
                     else if(mirrored||!Rigid(transform))error="MIRRORED_OR_UNVERIFIED_INSTANCE_TRANSFORM";
                     else if(flexible)error="FLEXIBLE_ASSEMBLY_CONTEXT_UNVERIFIED";
@@ -120,8 +162,17 @@ namespace ADDIN.Commands
                     // source never permits the protected alternate-config copy.
                     shareable=error==null&&!virtualPart&&!string.IsNullOrWhiteSpace(path);
                 }
-                catch(Exception ex){error="ASSEMBLY_BODY_PROOF_FAILED:"+ex.GetType().Name;kind=AssemblyOccurrenceKind.Unsupported;minimumError="Chưa đối chiếu body Assembly: "+ex.Message;}
+                catch(Exception ex)
+                {
+                    BendCheckRunDiagnostics.Write("Assembly.Inventory.body.error",new {OccurrenceId=id,Component=name,SourceFile=Path.GetFileName(path),
+                        ReferencedConfiguration=config,ModelConfigurationQuery="DeferredToNativeCapture",Suppression=suppression,
+                        Bodies=AssemblyArrayShape(rawBodies),BodyInfo=AssemblyArrayShape(info),MetadataIssue=metadataIssue},ex);
+                    error="ASSEMBLY_BODY_PROOF_FAILED:"+ex.GetType().Name;kind=AssemblyOccurrenceKind.Unsupported;minimumError="Chưa đối chiếu body Assembly: "+ex.Message;
+                }
             }
+            BendCheckRunDiagnostics.Write("Assembly.Inventory.classified",new {OccurrenceId=id,Component=name,SourceFile=Path.GetFileName(path),
+                ReferencedConfiguration=config,Suppression=suppression,Kind=kind.ToString(),Modified=modified,
+                Mirrored=mirrored,Flexible=flexible,Shareable=shareable,Reason=error,MinimumError=minimumError});
             BendNativeCaptureDiagnostics.Stage("Assembly.Inventory.proof-complete." + visited.Count);
             var occurrence=record(kind,shareable,modified,error);InventoryOccurrences.Add(occurrence);
             AddAssemblyItem(component,model,path,config,id,occurrence,modified,error,minimumError);

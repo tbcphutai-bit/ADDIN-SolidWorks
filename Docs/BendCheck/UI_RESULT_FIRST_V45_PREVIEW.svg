@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<rect width="1280" height="720" fill="#f5f7fa"/>
+<rect x="24" y="24" width="1232" height="672" rx="12" fill="#fff" stroke="#d8e0ea"/>
+<text x="50" y="68" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#192d49">CHECK CHẤN</text>
+<text x="1063" y="66" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#59708b">PREVIEW UI V4.5</text>
+<rect x="42" y="88" width="150" height="35" rx="7" fill="#2467c7"/>
+<text x="80" y="111" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="600" fill="white">Kết quả</text>
+<text x="212" y="110" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#63748e">Bộ dao</text>
+<text x="300" y="110" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#63748e">Thứ tự chấn</text>
+<text x="430" y="110" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#63748e">Giới hạn Excel</text>
+<text x="590" y="110" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#63748e">Chi tiết kỹ thuật</text>
+<text x="50" y="151" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#64748b">5 Part · 2 nếp chấn được nhận diện (ví dụ hiển thị)</text>
+<rect x="43" y="168" width="255" height="445" rx="8" fill="#fff" stroke="#dbe3ee"/>
+<rect x="311" y="168" width="625" height="445" rx="8" fill="#fff" stroke="#dbe3ee"/>
+<rect x="950" y="168" width="287" height="445" rx="8" fill="#fff" stroke="#dbe3ee"/>
+<text x="60" y="200" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" fill="#243c57">Chi tiết</text>
+<rect x="56" y="215" width="229" height="44" rx="5" fill="#e9f1ff"/>
+<text x="66" y="241" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#1e4f94">XL-02</text><text x="263" y="241" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#59718b">2 nếp</text>
+<rect x="56" y="269" width="229" height="44" rx="5" fill="#f8fafc"/>
+<text x="66" y="295" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#273c54">SIX-1</text><text x="263" y="295" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#59718b">6 nếp</text>
+<text x="332" y="201" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" fill="#243c57">Mặt cắt · XL-02</text>
+<rect x="330" y="218" width="590" height="304" rx="6" fill="#fbfdff" stroke="#e1e7f0"/>
+<path d="M435 438 L435 280 L559 280 L559 405 L685 405 L685 327 L816 327" fill="none" stroke="#d58a30" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M435 438 L450 438 M435 438 L435 422" stroke="#b7792d" stroke-width="2" fill="none"/>
+<text x="343" y="248" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#ad7432">● Part · biên dạng mặt cắt</text>
+<text x="480" y="483" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#68798b">Chưa ghép dao: thiếu tọa độ gá xác minh</text>
+<text x="335" y="554" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#273c54">Chọn nếp chấn</text>
+<rect x="336" y="568" width="80" height="32" rx="6" fill="#dceaff" stroke="#98bbe8"/>
+<text x="364" y="590" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#1c5aa9">B1</text>
+<rect x="425" y="568" width="80" height="32" rx="6" fill="#fff" stroke="#ccd8e8"/>
+<text x="453" y="590" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#52677d">B2</text>
+<text x="969" y="200" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" fill="#243c57">Kết quả</text>
+<text x="966" y="260" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" fill="#9a6b2d">CHƯA XÁC MINH</text>
+<text x="968" y="290" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#52677d">Chưa nạp được hình học dao.</text>
+<text x="968" y="312" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#52677d">Chưa có kết quả MAX/va chạm.</text>
+<line x1="970" y1="329" x2="1218" y2="329" stroke="#e1e7ee"/>
+<text x="969" y="361" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#34465d">Check Min</text><text x="1217" y="361" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#238164">Đạt*</text>
+<text x="969" y="403" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#34465d">Check MAX</text><text x="1217" y="403" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#a57939">Chưa kiểm tra</text>
+<text x="969" y="445" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#34465d">Va chạm</text><text x="1217" y="445" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#a57939">Chưa kiểm tra</text>
+<text x="969" y="487" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#34465d">Hình học dao</text><text x="1217" y="487" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#8d5c27">0/18</text>
+<rect x="974" y="542" width="240" height="43" rx="7" fill="#edf4ff" stroke="#bed4f2"/>
+<text x="1031" y="569" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#285b9b">Xem kết quả từng dao</text>
+<text x="54" y="664" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#708097">* Đây là bản xem trước giao diện; hình và số liệu minh họa, không phải kết quả mới từ SOLIDWORKS. Không có xác nhận sản xuất.</text>
+</svg>

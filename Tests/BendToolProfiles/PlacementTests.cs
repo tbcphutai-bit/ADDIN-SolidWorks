@@ -252,6 +252,51 @@ internal static partial class ToolProfileTests
             Check(draft.Current&&candidate.DatumStatus==DatumEvidenceStatus.Stale&&candidate.Reasons.Contains("STALE_DATUM_EVIDENCE"),"Datum stale does not masquerade as current evidence");
             Check(!candidate.ReadyForCollisionCheck&&candidate.Status=="CHUA_XAC_MINH","No stale evidence readiness");
         });
+
+        Test("Excel-first: unsigned numeric case stays unresolved",()=> {
+            var selection=new BendLimitSelection {MachineSystem="HDS",MaterialCode="ST",SectionKind="U",PoseId="CONTROLLED_U90",
+                ThicknessMinMm=1,ThicknessMaxMm=3,AngleMinDeg=80,AngleMaxDeg=100,
+                WMinMm=5,WMaxMm=90,LMinMm=5,LMaxMm=90};
+            var conditions=new BendExcelCaseConditions(selection);
+            Check(conditions.Complete,"Finite, bounded source conditions");
+            var draft=new BendLimitRuleDraft("R1","SASH",BendLimitKind.MaxBendLength,new string('a',64),
+                "金型限界表","cell:B3",new string('b',64),"mm",4200,new[]{CompanyToolIds.All[0]},new string[0],
+                approvedConditions:conditions);
+            var measured=new BendExcelObservation {ToolId=CompanyToolIds.All[0],MachineSystem="HDS",
+                MaterialCode="ST",SectionKind="U",PoseId="CONTROLLED_U90",ThicknessMm=2,AngleDeg=90,Wmm=30,Lmm=35,
+                BendLengthMm=4300,Current=true,SourceBinding=new string('d',64),WorkbookSha256=new string('a',64),
+                Review=new ToolReviewValidation(ToolReviewStatus.VerifiedExternalRecord,"CONTROLLED_MEASUREMENT",new string('d',64),expiry:DateTime.UtcNow.AddHours(1))};
+            Check(BendExcelCaseMatcher.Evaluate(draft,measured).Applicability==BendExcelCaseApplicability.MATCH_UNRESOLVED,
+                "Unsigned Excel rule is NOT a certified MAX failure");
+        });
+        Test("Excel-first: bounded signed case only certifies bend-line length",()=> {
+            var selection=new BendLimitSelection {MachineSystem="HDS",MaterialCode="ST",SectionKind="U",PoseId="CONTROLLED_U90",
+                ThicknessMinMm=1,ThicknessMaxMm=3,AngleMinDeg=80,AngleMaxDeg=100,
+                WMinMm=5,WMaxMm=90,LMinMm=5,LMaxMm=90};
+            var conditions=new BendExcelCaseConditions(selection);
+            // Managed fixture: trusted reviewer simulation for matcher logic.
+            // Production approval is exclusively through ToolReviewVerifier.
+            var review=new ToolReviewValidation(ToolReviewStatus.VerifiedExternalRecord,"SYNTHETIC_TEST",expiry:DateTime.UtcNow.AddHours(1));
+            var rule=new BendLimitRuleDraft("R1","SASH",BendLimitKind.MaxBendLength,new string('a',64),
+                "金型限界表","cell:B3",new string('b',64),"mm",4200,new[]{CompanyToolIds.All[0]},new string[0],review,conditions);
+            var measured=new BendExcelObservation {ToolId=CompanyToolIds.All[0],MachineSystem="HDS",
+                MaterialCode="ST",SectionKind="U",PoseId="CONTROLLED_U90",ThicknessMm=2,AngleDeg=90,Wmm=30,Lmm=35,
+                BendLengthMm=4300,Current=true,SourceBinding=new string('d',64),WorkbookSha256=new string('a',64),
+                Review=new ToolReviewValidation(ToolReviewStatus.VerifiedExternalRecord,"CONTROLLED_MEASUREMENT",new string('d',64),expiry:DateTime.UtcNow.AddHours(1))};
+            var hit=BendExcelCaseMatcher.Evaluate(rule,measured);
+            Check(hit.Applicability==BendExcelCaseApplicability.MATCH_CONFIRMED &&
+                hit.ExceedsCertifiedLength==true,"4300 exceeds signed length 4200");
+            measured.MaterialCode="SUS";
+            Check(BendExcelCaseMatcher.Evaluate(rule,measured).Applicability==BendExcelCaseApplicability.NOT_APPLICABLE_CONFIRMED,
+                "Complete verified source conditions can rule out a case");
+            measured.MaterialCode="ST";measured.Wmm=null;
+            Check(BendExcelCaseMatcher.Evaluate(rule,measured).Applicability==BendExcelCaseApplicability.MATCH_UNRESOLVED,
+                "Unknown W dimension must never become negative match");
+            review.Invalidate();
+            measured.Wmm=30;
+            Check(BendExcelCaseMatcher.Evaluate(rule,measured).Applicability==BendExcelCaseApplicability.MATCH_UNRESOLVED,
+                "Expired/stale signed evidence blocks numeric decisions");
+        });
         Test("limits: source cells, drawing IDs, media hash and phonetic text are read independently",()=> {
             string path=Workbook(Folder());var objects=BendLimitWorkbookReader.ReadObjects(File.ReadAllBytes(path),CancellationToken.None);
             Check(objects.Count==6&&objects.Single(o=>o.Locator=="cell:A1").Text=="対応長さ： ４.2Ｍ","Rich text excludes phonetics");

@@ -42,7 +42,7 @@ namespace ADDIN.UI
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 ColumnCount = 1,
-                RowCount = 3,
+                RowCount = 4,
                 BackColor = TaiTheme.Surface,
                 Margin = Padding.Empty,
                 Padding = Padding.Empty
@@ -102,6 +102,17 @@ namespace ADDIN.UI
             content.Controls.Add(bendToolError, 0, 2);
             content.SizeChanged += (s, e) => bendToolError.MaximumSize = new Size(Math.Max(100, content.Width - 12), 0);
 
+            var sourceButton=new Button {Text="Nguồn DXF / Master / Excel Check Chấn…",AutoSize=true,Dock=DockStyle.Top,
+                Margin=new Padding(0,8,0,0)};
+            sourceButton.Click+=(sender,args)=>{
+                if(bendToolDisposed)return;sourceButton.Enabled=false;
+                BendAssemblyBatchForm.ConfigureToolSourcesAsync(this).ContinueWith(t=>{
+                    var observed=t.Exception;
+                    PublishBendToolCompletion(()=>{if(!sourceButton.IsDisposed)sourceButton.Enabled=true;},()=>{});
+                },TaskScheduler.Default);
+            };
+            content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            content.Controls.Add(sourceButton,0,3);
             card.Controls.Add(content);
 
             bendToolPath.TextChanged += (s, e) => {

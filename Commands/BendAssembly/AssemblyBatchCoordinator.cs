@@ -108,6 +108,8 @@ namespace ADDIN.Commands.BendAssembly
         public string ManufacturingStatus => "CHUA_XAC_MINH";
         public string WinnerToolId => null;
         internal IReadOnlyList<ToolAssemblyProfile> ToolPairs => request.Library?.PlacementSources?.Tools??new ToolAssemblyProfile[0];
+        // Read only inside the same audited AssemblyBatchReadSnapshot copy.
+        internal ToolProfileLibrarySnapshot ToolCatalogForDisplay => request.Library;
         internal AssemblyBatchReadSnapshot ReadSnapshot()
         {
             var clock = Stopwatch.StartNew();
@@ -247,8 +249,19 @@ namespace ADDIN.Commands.BendAssembly
                             string condition=source.ProgramUse.CanShare(source,AssemblyCacheKeys.Program(source))?source.ProgramUse.PayloadSha256:
                                 ToolEvidenceCanonical.Hash(occurrences[0].Canonical,"INSTANCE_SPECIFIC_UNVERIFIED_PROGRAM");
                             string resultKey=ToolEvidenceCanonical.Hash(geoKey,catalogKey,policyKey,AssemblyCacheKeys.Program(source),AssemblyCacheKeys.EvidenceBindings(source),condition,source.ProgramUse.SimulationOnly.ToString());
-                            var sr=new CollisionBatchRequest(source.Model,request.Library,bundle.Envelopes,source.Setups);
-                            var pr=new ProcessBatchRequest(source.Model,request.Library,source.Plans,bundle.Envelopes);
+                            var excel=source.Model.Bends.SelectMany(b=>CompanyToolIds.All.Select(id=>new {
+                                Key=BendExcelApplicabilityAdapter.Key(id,b.FeatureId),
+                                Value=BendExcelApplicabilityAdapter.Evaluate(source,bundle.Envelopes,request.Library,b.FeatureId,id)
+                            })).ToDictionary(v=>v.Key,v=>v.Value,StringComparer.Ordinal);
+                            // Explicit controlled simulations may exercise the numeric
+                            // engines without Excel; their simulation flag is retained.
+                            bool referenceSimulation=source.Model.SimulationOnly||source.ProgramUse.SimulationOnly;
+                            Func<string,int,string> staticAdmission=(id,f)=>referenceSimulation?null:excel[BendExcelApplicabilityAdapter.Key(id,f)].AdmissionReason(false);
+                            Func<string,int,string> processAdmission=(id,f)=>referenceSimulation?null:excel[BendExcelApplicabilityAdapter.Key(id,f)].AdmissionReason(true);
+                            resultKey=ToolEvidenceCanonical.Hash("ExcelAdmissionV1",resultKey,
+                                ToolEvidenceCanonical.Hash(excel.OrderBy(e=>e.Key,StringComparer.Ordinal).Select(e=>e.Key+"/"+e.Value.Applicability+"/"+e.Value.Evidence).ToArray()));
+                            var sr=new CollisionBatchRequest(source.Model,request.Library,bundle.Envelopes,source.Setups) {CadAdmission=staticAdmission};
+                            var pr=new ProcessBatchRequest(source.Model,request.Library,source.Plans,bundle.Envelopes) {CadAdmission=processAdmission};
                             Func<AssemblyStaticCertificate> checkStatic=()=> {
                                 CollisionBatchSnapshot result;
                                 using(new CollisionTimingScope(ms=>{lock(progressGate)kernelMs+=ms;}))
@@ -277,10 +290,14 @@ namespace ADDIN.Commands.BendAssembly
                             using(new CollisionTimingScope(ms=>{lock(progressGate)kernelMs+=ms;}))
                                 planning = planner.Run(ToolEvidenceCanonical.Hash(source.SourceKey, condition, source.ConditionsRevision),
                                     source.Model, request.Library, source.Sequence, token: token, externalInvalid: readGuard.Check,
-                                    sharedInvalid: invalid, externalConsume: consume, progress: progress==null?null:new PlannerProgress(p=>{
+                                    sharedInvalid: invalid, externalConsume: consume, cadAdmission: processAdmission, progress: progress==null?null:new PlannerProgress(p=>{
                                         lock(progressGate) progress.Report(new AssemblyBatchProgress(done,jobs.Count,bends,candidates,null,p)); }));
                             output[index]=new AssemblyPartResult(source.SourceKey,occurrences,null,restoredStatic,restoredProcess,source.Model.Bends.Count,
-                                source.Model.SimulationOnly||source.ProgramUse.SimulationOnly,readGuard.Check,planning,source.BendMetadata,bundle.Envelopes) {ReadinessDiagnostics=source.ReadinessDiagnostics};
+                                source.Model.SimulationOnly||source.ProgramUse.SimulationOnly,readGuard.Check,planning,source.BendMetadata,bundle.Envelopes) {
+                                    ReadinessDiagnostics=source.ReadinessDiagnostics,NativeInventoryKnown=InventoryKnown(source),
+                                    NativeFeatureIds=PlacementLists.Copy(source.Model.Bends.Select(b=>b.FeatureId)),
+                                    ExcelResults=new System.Collections.ObjectModel.ReadOnlyDictionary<string,BendExcelCaseResult>(excel),
+                                    DisplaySetups=source.Setups};
                         }
                     }
                     catch(OperationCanceledException){state.Stop("CANCELLED");output[index]=Unknown(source,occurrences,"CANCELLED",readGuard.Check);}
@@ -311,8 +328,13 @@ namespace ADDIN.Commands.BendAssembly
                 processes.Add(new ProcessCandidateResult(id,bend.FeatureId,Enum.GetValues(typeof(BendProcessPhase)).Cast<BendProcessPhase>().SelectMany(phase=>
                     Enum.GetValues(typeof(CollisionPairKind)).Cast<CollisionPairKind>().Select(p=>new ProcessPairResult(p,"UNKNOWN:"+phase,phase,CollisionStatus.UNKNOWN,new[]{reason},invalid,null,0,0,0,0,0))),source.Model.SimulationOnly));
             }
-            return new AssemblyPartResult(source.SourceKey,occurrences,reason,statics,processes,source.Model?.Bends.Count??0,source.Model?.SimulationOnly==true||source.ProgramUse.SimulationOnly,invalid,null,source.BendMetadata) {ReadinessDiagnostics=source.ReadinessDiagnostics};
+            return new AssemblyPartResult(source.SourceKey,occurrences,reason,statics,processes,source.Model?.Bends.Count??0,source.Model?.SimulationOnly==true||source.ProgramUse.SimulationOnly,invalid,null,source.BendMetadata) {ReadinessDiagnostics=source.ReadinessDiagnostics,
+                    NativeInventoryKnown=InventoryKnown(source),NativeFeatureIds=PlacementLists.Copy(source.Model?.Bends.Select(b=>b.FeatureId))};
         }
+        private static bool InventoryKnown(AssemblySourceInput source) => source.Model!=null&&
+            (source.Model.Bends.Count>0||source.Model.CompleteBodyCoverage)&&
+            source.Model.Bends.All(b=>b.FeatureId>0)&&source.Model.Bends.Select(b=>b.FeatureId).Distinct().Count()==source.Model.Bends.Count&&
+            source.BendMetadata.All(m=>source.Model.Bends.Any(b=>b.FeatureId==m.FeatureId));
         internal void Cancel()
         {lock(gate){activeState?.Stop("CANCELLED");published?.State.Stop("CANCELLED");active?.Cancel();statics.Clear();processes.Clear();}}
         public void Dispose()

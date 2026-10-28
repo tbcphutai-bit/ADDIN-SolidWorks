@@ -45,7 +45,7 @@ namespace ADDIN.UI
                     Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
                     Padding = new Padding(0), Margin = Padding.Empty
                 };
-                sectionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 51));
+                sectionLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
                 sectionLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
                 var excelBar = new TableLayoutPanel {
                     Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
@@ -58,7 +58,7 @@ namespace ADDIN.UI
                     DropDownStyle = ComboBoxStyle.DropDownList,
                     Margin = new Padding(5, 9, 5, 8)
                 };
-                uxV44ExcelCase.Items.Add("Tự dò Excel (chưa xác minh)");
+                uxV44ExcelCase.Items.Add("Mẫu Excel: chưa xác định");
                 foreach (var item in BendExcelReferenceV4.KnownFamilies)
                     uxV44ExcelCase.Items.Add(item.Family + " · " +
                         item.ReferenceLengthMm.ToString("0") + " mm");
@@ -71,6 +71,7 @@ namespace ADDIN.UI
                 };
                 excelBar.Controls.Add(uxV44ExcelCase, 0, 0);
                 excelBar.Controls.Add(uxV44EvidenceLabel, 1, 0);
+                excelBar.Visible = false; // An unverified Excel case selector must not distract from actual results.
                 uxV43Section = new BendSection2DCanvas();
                 sectionLayout.Controls.Add(excelBar, 0, 0);
                 sectionLayout.Controls.Add(uxV43Section, 0, 1);
@@ -86,6 +87,10 @@ namespace ADDIN.UI
             }
             finally { parent.ResumeLayout(true); }
         }
+
+        private static bool SameSectionFrame(BendWorkFrame a,BendWorkFrame b) => a!=null&&b!=null&&a.FrameId==b.FrameId&&
+            EnvelopeBinding.Vector(a.OriginMm)==EnvelopeBinding.Vector(b.OriginMm)&&EnvelopeBinding.Vector(a.X)==EnvelopeBinding.Vector(b.X)&&
+            EnvelopeBinding.Vector(a.Y)==EnvelopeBinding.Vector(b.Y)&&EnvelopeBinding.Vector(a.BendAxis)==EnvelopeBinding.Vector(b.BendAxis);
 
         private void UxV43ClearSection()
         {
@@ -117,9 +122,10 @@ namespace ADDIN.UI
                 SourceKey = part.SelectionKey,
                 FeatureId = bend.FeatureId,
                 ToolId = tool?.ToolId,
-                ExcelCaseCaption = "Tự dò Excel: chưa có điều kiện/mapping đã duyệt",
-                ExcelCaseSource = BendExcelReferenceV4.WorkbookName,
-                DecisionText = "CHƯA XÁC MINH · Chưa thể xác nhận trường hợp Excel áp dụng"
+                ExcelCaseCaption = BatchCheckOutcome.ExcelText(tool?.ExcelCase),
+                ExcelCaseSource = tool?.ExcelCase?.Evidence??BendExcelReferenceV4.WorkbookName,
+                DecisionText = BatchCheckOutcome.ExcelText(tool?.ExcelCase),
+                EvidenceCurrent = ()=>part.RawPartResult.Current&&(!isRunning)&&tool?.NativeEnvelope?.Current!=false
             };
             // A user-selected family here is a REFERENCE VIEW, not an automatic
             // tool match, not a scored fit and not a production decision.
@@ -134,7 +140,10 @@ namespace ADDIN.UI
                     " · " + family.CellRange;
             }
             if (uxV44EvidenceLabel != null && !uxV44EvidenceLabel.IsDisposed)
-                uxV44EvidenceLabel.Text = "Chưa duyệt Excel → ToolId/W-L · CAD fallback chưa có chứng cứ";
+                uxV44EvidenceLabel.Text = BatchCheckOutcome.ExcelText(tool?.ExcelCase);
+            // Only uniform, original final-Part geometry can share an exact
+            // work frame with a static axial contact witness.
+            string verifiedFrame=null, verifiedSource=null;
             try
             {
                 // These envelopes are from THIS snapshot, not a file-name lookup.
@@ -143,7 +152,7 @@ namespace ADDIN.UI
                 var envelopes = (part.RawPartResult.ReviewEnvelopes ?? new SheetEnvelopeCapture[0])
                     .Where(e => e != null && e.Current && e.Binding != null &&
                          e.Binding.FeatureId == bend.FeatureId && e.Binding.Model != null &&
-                         e.Binding.Model.Lease.Current).ToArray();
+                         e.Binding.Model.Lease.Current&&e.Binding.Configuration==part.Configuration).ToArray();
                 if (envelopes.Length == 1)
                 {
                     var env = envelopes[0];
@@ -151,9 +160,12 @@ namespace ADDIN.UI
                     var sections = model.Sections.Where(s => s != null && s.FeatureId == bend.FeatureId).ToArray();
                     if (sections.Length == 1 &&
                         sections[0].Coverage == SheetCoverage.CompleteUniformExtrusion &&
-                        sections[0].Boundary != null && sections[0].Boundary.Count > 0)
+                        sections[0].Boundary != null && sections[0].Boundary.Count > 0 &&
+                        SameSectionFrame(sections[0].Frame,env.Binding.WorkFrame))
                     {
                         data.Part = BendSection2DScene.CopyCurves(sections[0].Boundary);
+                        verifiedFrame = env.Binding.FrameId;
+                        verifiedSource = env.Binding.SourceSha256;
                         data.PartEvidence = "Mặt cắt hình học cuối · " + sections[0].Frame.FrameId;
                     }
                     else
@@ -161,7 +173,7 @@ namespace ADDIN.UI
                         // A finite observed slice may be drawn, but NEVER
                         // claimed to prove continuous coverage or manufacturing.
                         var observed = env.ObservedSlices.FirstOrDefault(s => s != null &&
-                            s.Material != null && s.Material.Valid && s.Material.Contours != null &&
+                            s.Material != null && s.Material.Current && s.Material.FrameId==env.Binding.FrameId && s.Material.Valid && s.Material.Contours != null &&
                             s.Material.Contours.Any(c => c?.Boundary?.Count > 0));
                         if (observed != null)
                         {
@@ -197,8 +209,17 @@ namespace ADDIN.UI
                         data.Punch = BendSection2DScene.CopyCurves(cad.Punch.Curves);
                     if (cad?.Holder?.Curves != null)
                         data.Holder = BendSection2DScene.CopyCurves(cad.Holder.Curves);
-                    data.ToolEvidence = "Chưa đăng ký tọa độ gá đã duyệt. " +
-                        "Không được coi cạnh gần dao là va chạm.";
+                    data.ToolEvidence = "Chưa đăng ký tọa độ gá đã duyệt. Không được coi cạnh gần dao là va chạm.";
+                    if(cad?.ClampVerified==true && verifiedFrame!=null &&
+                        tool.RegisteredPunch?.Current==true&&tool.RegisteredHolder?.Current==true&&
+                        tool.RegisteredPunch.Valid&&tool.RegisteredHolder.Valid&&
+                        tool.RegisteredPunch.FrameId==verifiedFrame&&tool.RegisteredHolder.FrameId==verifiedFrame)
+                    {
+                        data.RegisteredPunch=BendSection2DScene.CopyCurves(tool.RegisteredPunch.Contours.SelectMany(c=>c.Boundary));
+                        data.RegisteredHolder=BendSection2DScene.CopyCurves(tool.RegisteredHolder.Contours.SelectMany(c=>c.Boundary));
+                        data.PlacementRegistered=true;
+                        data.ToolEvidence="Mốc gá từ hồ sơ đã duyệt, cùng snapshot / mặt cắt hình học cuối. Hình vẽ chỉ để xem.";
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -208,6 +229,26 @@ namespace ADDIN.UI
                     System.Diagnostics.Trace.WriteLine("[CHECK CHAN TOOL SECTION 2D] " + ex);
                 }
             }
+            // Kernel witnesses identify an interior contact POINT, not a native
+            // edge. No whole-edge red stroke is invented or chosen by proximity.
+            if(tool!=null&&verifiedFrame!=null&&verifiedSource!=null&&data.Part.Count>0)
+            {
+                var points=new List<System.Drawing.PointF>();
+                if(BatchCheckOutcome.StaticWitness(tool,true))points.Add(new System.Drawing.PointF((float)tool.PunchWitness.PointMm.X,(float)tool.PunchWitness.PointMm.Y));
+                if(BatchCheckOutcome.StaticWitness(tool,false))points.Add(new System.Drawing.PointF((float)tool.HolderWitness.PointMm.X,(float)tool.HolderWitness.PointMm.Y));
+                if(points.Count>0)
+                {
+                    data.VerifiedContactPoints=points.AsReadOnly();data.ContactPointProven=true;
+                    data.ProofReference=part.SelectionKey+" / "+part.Configuration+" / FeatureId "+bend.FeatureId+" / "+
+                        tool.ToolId+" / "+verifiedFrame+" / "+verifiedSource+" / "+tool.SourceFingerprint+" / FinalModelObserved";
+                    data.ToolEvidence="Điểm va chạm số trên mặt cắt cuối; chưa có EdgeId để tô đỏ toàn cạnh.";
+                }
+            }
+            // A process witness belongs to its registered intermediate state;
+            // it must never be drawn on the finished-Part section by assumption.
+            if(tool!=null&&BatchCheckOutcome.ProcessWitness(tool)&&!data.ContactPointProven)
+                data.ToolEvidence="Có va chạm trong quá trình (xem chi tiết trạng thái); không vẽ điểm đó lên hình học cuối.";
+            if(!part.RawPartResult.Current){UxV43ClearSection();return;}
             uxV43SelectionKey = data.SourceKey;
             uxV43FeatureId = data.FeatureId;
             uxV43ToolId = data.ToolId;

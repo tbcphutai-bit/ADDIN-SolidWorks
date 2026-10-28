@@ -68,9 +68,44 @@ internal static partial class ToolProfileTests
     }
     private static string StaticPairText(AxialPairResult p) => p.Status+":"+string.Join(",",p.Reasons)+":"+p.CertifiedClearanceLowerMm+":"+
         (p.Witness==null?"-":ToolEvidenceCanonical.Point(p.Witness.PointMm)+":"+ToolEvidenceCanonical.Number(p.Witness.AxialMm));
+    private static void AssemblyBodyMetadataTests()
+    {
+        Test("assembly body metadata: normal and user SAFEARRAY flags remain distinct",()=> {
+            bool modified;
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new[]{1},1,1,0,out modified)==null&&!modified,
+                "Normal integer metadata is accepted without assembly modification");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new[]{1,0},2,1,0,out modified)==null&&modified,
+                "A user body is explicitly marked modified");
+            var shifted=Array.CreateInstance(typeof(int),new[]{2},new[]{3});shifted.SetValue(1,3);shifted.SetValue(0,4);
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(shifted,2,1,0,out modified)==null&&modified,
+                "Rank-one metadata with nonzero SAFEARRAY lower bound remains ordered");
+        });
+        Test("assembly body metadata: null scalar rank count and unknown values never prove normal",()=> {
+            bool modified;
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(null,1,1,0,out modified)=="BODY_INFO_NULL"&&!modified,
+                "Missing COM metadata is UNKNOWN, not normal");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(1,1,1,0,out modified)=="BODY_INFO_NOT_ARRAY"&&!modified,
+                "Undocumented scalar return is not silently normalized");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new int[1,1],1,1,0,out modified)=="BODY_INFO_ARRAY_RANK_UNSUPPORTED",
+                "Multidimensional metadata is unsupported");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new[]{1},2,1,0,out modified)=="BODY_INFO_COUNT_MISMATCH",
+                "Every returned body requires matching metadata");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new[]{1,2},2,1,0,out modified)=="BODY_INFO_VALUE_UNSUPPORTED"&&!modified,
+                "Unknown enum value cannot become a normal body");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new object[]{true},1,1,0,out modified)=="BODY_INFO_ELEMENT_TYPE_UNSUPPORTED",
+                "Boolean metadata is not converted to integer normal");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new[]{1.4},1,1,0,out modified)=="BODY_INFO_ELEMENT_TYPE_UNSUPPORTED",
+                "Floating-point metadata is not rounded into normal");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new[]{ulong.MaxValue},1,1,0,out modified)=="BODY_INFO_VALUE_UNSUPPORTED",
+                "Oversized integer metadata fails closed without overflow");
+            Check(AssemblyOccurrenceEligibility.BodyMetadataProblem(new int[0],0,1,0,out modified)=="EMPTY_SOLID_BODY_ARRAY",
+                "A valid empty return is distinct from missing metadata and proves no bend geometry");
+        });
+    }
     private static void AssemblyBatchTests()
     {
         AssemblyReadTests();
+        AssemblyBodyMetadataTests();
         Test("assembly cache: bounded LRU, stale guards and exceptions cannot strand flights",()=> {
             var cache=new AssemblyManagedCache<string>(2,8);bool hit;int made=0;bool fresh=true;
             Func<string,string> get=k=>cache.Get(k,()=>{made++;return k;},_=>fresh,_=>4,CancellationToken.None,out hit);

@@ -223,6 +223,7 @@ namespace ADDIN.Commands.BendTools
         }
         private static byte[] Read(string path, int limit, CancellationToken cancellation)
         {
+            ToolSourceReadScope.Attempt(path);
             DateTime stamp = File.GetLastWriteTimeUtc(path);
             using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
             using (var buffer = new MemoryStream())
@@ -236,7 +237,7 @@ namespace ADDIN.Commands.BendTools
                     if (buffer.Length > limit) throw new InvalidDataException("Evidence read limit exceeded.");
                 }
                 if (length != buffer.Length || stream.Length != length || stamp != File.GetLastWriteTimeUtc(path)) throw new IOException("Evidence changed during read.");
-                return buffer.ToArray();
+                var bytes=buffer.ToArray();ToolSourceReadScope.Observed(path,bytes);return bytes;
             }
         }
 

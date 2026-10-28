@@ -56,6 +56,14 @@ internal static partial class ToolProfileTests
     }
     private static int Main(string[] args)
     {
+#if V46_SOURCE_TESTS
+        if(args.Length==1&&args[0]=="--v46-source-tests")
+        {
+            temporary=Path.Combine(Path.GetTempPath(),"ADDIN-V46-Controlled-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(temporary);
+            V46SourceRegression();Console.WriteLine("RESULT "+passed+" passed; "+failed+" failed; "+assertions+" assertions; controlled sources only");
+            return failed==0?0:1;
+        }
+#endif
         if(args.Length>0&&args[0]=="--final-review-company")return FinalReviewCompany(args);
         if(args.Length>0&&args[0]=="--final-review-tests")
         {

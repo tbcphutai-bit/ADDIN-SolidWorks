@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="ToolProfiles.Tests.csproj" />
+  <PropertyGroup>
+    <AssemblyName>V46.Source.Tests</AssemblyName><TargetName>V46.Source.Tests</TargetName>
+    <TargetFileName>V46.Source.Tests.exe</TargetFileName><StartupObject>ToolProfileTests</StartupObject>
+    <DefineConstants>$(DefineConstants);V46_SOURCE_TESTS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\UI\BendAssemblyBatchModels.cs" />
+    <Compile Include="..\..\UI\BendCheckDisplayText.cs" />
+    <Compile Include="..\..\UI\BendVerifiedToolChangePlanner.cs" />
+    <Compile Include="V46SourceRegression.cs" />
+  </ItemGroup>
+</Project>

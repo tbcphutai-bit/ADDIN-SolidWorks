@@ -10,6 +10,7 @@ namespace ADDIN.Commands.BendAssembly
     {
         public int FeatureId { get; }
         public string PersistentId { get; }
+        public string MaterialCode { get; }
         public string Name { get; }
         public double? AngleDeg { get; }
         public double? RadiusMm { get; }
@@ -18,8 +19,8 @@ namespace ADDIN.Commands.BendAssembly
         public string MinimumDetails { get; }
         public IReadOnlyList<AssemblyBendMinimumSide> Sides { get; }
         internal AssemblyBendMetadata(int feature, string persistentId, string name, double? angle, double? radius,
-            string status, string summary, string details, IEnumerable<AssemblyBendMinimumSide> sides)
-        { FeatureId = feature; PersistentId = persistentId; Name = name; AngleDeg = angle; RadiusMm = radius;
+            string status, string summary, string details, IEnumerable<AssemblyBendMinimumSide> sides,string materialCode=null)
+        { FeatureId = feature; PersistentId = persistentId; MaterialCode=materialCode; Name = name; AngleDeg = angle; RadiusMm = radius;
             MinimumStatus = status; MinimumSummary = summary; MinimumDetails = details; Sides = PlacementLists.Copy(sides); }
     }
     internal sealed class AssemblyBendMinimumSide

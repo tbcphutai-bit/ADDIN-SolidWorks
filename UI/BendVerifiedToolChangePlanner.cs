@@ -31,8 +31,8 @@ namespace ADDIN.UI
             "không thay thế chứng nhận gá và điều kiện sản xuất.";
     }
 
-    // Searches all evidenced prefixes and minimizes (1) install/setup changes,
-    // (2) tool swaps, (3) unique tools, (4) reorientations, (5) steps.
+    // Searches complete evidenced paths, minimizing (1) tool swaps,
+    // (2) install/setup changes, (3) unique tools, (4) reorientations, (5) steps.
     // Never fabricates process states.
     internal static class BendVerifiedToolChangePlanner
     {
@@ -54,8 +54,8 @@ namespace ADDIN.UI
         {
             public int Compare(Node a, Node b)
             {
-                int c = a.SetupChanges.CompareTo(b.SetupChanges); if (c != 0) return c;
-                c = a.Switches.CompareTo(b.Switches); if (c != 0) return c;
+                int c = a.Switches.CompareTo(b.Switches); if (c != 0) return c;
+                c = a.SetupChanges.CompareTo(b.SetupChanges); if (c != 0) return c;
                 c = a.DistinctTools.CompareTo(b.DistinctTools); if (c != 0) return c;
                 c = a.Reorientations.CompareTo(b.Reorientations); if (c != 0) return c;
                 c = a.Steps.CompareTo(b.Steps); if (c != 0) return c;

@@ -16,6 +16,7 @@ namespace ADDIN.Commands.BendEnvelope
         public ToolProfileLibrarySnapshot Library { get; }
         public IReadOnlyList<SheetEnvelopeCapture> Envelopes { get; }
         public IReadOnlyList<ToolAxialSetupEvidence> Setups { get; }
+        internal Func<string,int,string> CadAdmission {get;set;}
         private readonly Dictionary<string, IReadOnlyList<ToolAxialSetupEvidence>> setupIndex;
         private static readonly IReadOnlyList<ToolAxialSetupEvidence> NoSetups=PlacementLists.Copy<ToolAxialSetupEvidence>(null);
         private readonly HashSet<string> simulationTools;
@@ -192,6 +193,9 @@ namespace ADDIN.Commands.BendEnvelope
                     {
                         SheetEnvelopeCapture envelope; envelopes.TryGetValue(job.Bend.FeatureId, out envelope);
                         Func<CollisionPairKind, AxialPairResult> evaluate = pair => {
+                            string admission=request.CadAdmission?.Invoke(job.Id,job.Bend.FeatureId);
+                            if(admission!=null)return new AxialPairResult(new AxialCollisionQuery(envelope,null,pair,options.PairPolicy,invalid),
+                                CollisionStatus.UNKNOWN,new[]{admission},0,0,0);
                             var evidence = request.FindSetups(job.Id, job.Bend.FeatureId, pair);
                             AxialToolOccupancy occupancy = evidence.Count == 1 && envelope != null && evidence[0].AppliesTo(envelope, request.Library) ? evidence[0].Occupancy :
                                 new AxialToolOccupancy(null, null, 0, "UNVERIFIED_SETUP", false, null, new[] {

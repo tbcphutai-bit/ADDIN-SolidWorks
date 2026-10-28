@@ -58,6 +58,35 @@ namespace ADDIN.Commands.BendAssembly
     // for its normal siblings in a legacy Check Min file/config group.
     internal static class AssemblyOccurrenceEligibility
     {
+        // Pure managed validation of GetBodies3's documented parallel integer
+        // array. Null/scalar/malformed metadata never certifies normal bodies.
+        // The caller supplies swBodyInfo_e values; this boundary owns no COM.
+        internal static string BodyMetadataProblem(object rawInfo,int bodyCount,int normalKind,int userKind,out bool modified)
+        {
+            modified=false;
+            if(bodyCount<=0)return "EMPTY_SOLID_BODY_ARRAY";
+            if(normalKind==userKind)return "BODY_INFO_KIND_CONTRACT_INVALID";
+            var flags=rawInfo as Array;
+            if(flags==null)return rawInfo==null?"BODY_INFO_NULL":"BODY_INFO_NOT_ARRAY";
+            if(flags.Rank!=1)return "BODY_INFO_ARRAY_RANK_UNSUPPORTED";
+            if(flags.Length!=bodyCount)return "BODY_INFO_COUNT_MISMATCH";
+            bool hasUserBody=false;
+            foreach(object value in flags)
+            {
+                if(value==null)return "BODY_INFO_ELEMENT_TYPE_UNSUPPORTED";
+                var kind=Type.GetTypeCode(value.GetType());
+                if(kind!=TypeCode.SByte&&kind!=TypeCode.Byte&&kind!=TypeCode.Int16&&kind!=TypeCode.UInt16&&
+                    kind!=TypeCode.Int32&&kind!=TypeCode.UInt32&&kind!=TypeCode.Int64&&kind!=TypeCode.UInt64)
+                    return "BODY_INFO_ELEMENT_TYPE_UNSUPPORTED";
+                // Decimal exactly represents all integer CLR types, including
+                // UInt64 values outside Int64; do not truncate bool/float data.
+                decimal flag=Convert.ToDecimal(value,System.Globalization.CultureInfo.InvariantCulture);
+                if(flag==userKind)hasUserBody=true;
+                else if(flag!=normalKind)return "BODY_INFO_VALUE_UNSUPPORTED";
+            }
+            modified=hasUserBody;
+            return null;
+        }
         internal static string Reason(AssemblyOccurrence occurrence)
         {
             if (occurrence == null) return "MISSING_ASSEMBLY_OCCURRENCE";
@@ -197,6 +226,11 @@ namespace ADDIN.Commands.BendAssembly
         public IReadOnlyList<VolumeCandidateCollisionResult> StaticCandidates { get; }
         public IReadOnlyList<ProcessCandidateResult> ProcessCandidates { get; }
         public int BendCount { get; }
+        internal bool NativeInventoryKnown {get;set;}
+        internal IReadOnlyList<int> NativeFeatureIds {get;set;} = PlacementLists.Copy<int>(null);
+        internal IReadOnlyDictionary<string,BendExcelCaseResult> ExcelResults {get;set;} =
+            new System.Collections.ObjectModel.ReadOnlyDictionary<string,BendExcelCaseResult>(new Dictionary<string,BendExcelCaseResult>());
+        internal IReadOnlyList<ToolAxialSetupEvidence> DisplaySetups {get;set;} = PlacementLists.Copy<ToolAxialSetupEvidence>(null);
         public bool SimulationOnly { get; }
         public bool Current => invalid() == null;
         public PartPlanningResult Planning { get; }
@@ -206,9 +240,9 @@ namespace ADDIN.Commands.BendAssembly
         // certificate and never substituted into a collision query.
         internal IReadOnlyList<SheetEnvelopeCapture> ReviewEnvelopes { get; } = PlacementLists.Copy<SheetEnvelopeCapture>(null);
         public string WinnerToolId => null;
-        public CollisionStatus GeometricStatus => !Current ? CollisionStatus.UNKNOWN :
-            StaticCandidates.Any(r => r.CombinedResult == CollisionStatus.COLLISION) || ProcessCandidates.Any(r => r.ProcessResult == CollisionStatus.COLLISION) ? CollisionStatus.COLLISION :
-            ProcessCandidates.Count > 0 && ProcessCandidates.All(r => r.ProcessResult == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
+        public bool HasCandidateCollision => Current && (StaticCandidates.Any(r=>r.CombinedResult==CollisionStatus.COLLISION)||
+            ProcessCandidates.Any(r=>r.ProcessResult==CollisionStatus.COLLISION));
+        public CollisionStatus GeometricStatus => CollisionStatus.UNKNOWN; // no whole-Part inference from candidates
         internal AssemblyPartResult(string source, IEnumerable<AssemblyOccurrence> occurrences, string reason, IEnumerable<VolumeCandidateCollisionResult> statics,
             IEnumerable<ProcessCandidateResult> processes, int bends, bool simulation, Func<string> invalid)
             : this(source, occurrences, reason, statics, processes, bends, simulation, invalid, null) { }

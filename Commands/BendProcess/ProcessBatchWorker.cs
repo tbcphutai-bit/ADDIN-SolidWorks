@@ -19,6 +19,7 @@ namespace ADDIN.Commands.BendProcess
         // data; it is NEVER converted into Before/During/After states.
         public IReadOnlyList<SheetEnvelopeCapture> ObservedFinalGeometry { get; }
         public IReadOnlyList<BendProcessPlan> Plans { get; }
+        internal Func<string,int,string> CadAdmission {get;set;}
         private readonly Dictionary<string, IReadOnlyList<BendProcessPlan>> planIndex;
         private static readonly IReadOnlyList<BendProcessPlan> NoPlans=PlacementLists.Copy<BendProcessPlan>(null);
         internal ProcessBatchRequest(PlacementModelCapture model, ToolProfileLibrarySnapshot library,
@@ -180,8 +181,8 @@ namespace ADDIN.Commands.BendProcess
                     {
                         var plans = request.FindPlans(job.Tool, job.Bend.FeatureId);
                         var plan = plans.Count == 1 ? plans[0] : null;
-                        string missing = plans.Count > 1 ? "DUPLICATE_PROCESS_PLAN" : plan == null ? "UNKNOWN_PROCESS_GEOMETRY" :
-                            !ReferenceEquals(plan.Binding.Model, request.Model) ? "MISMATCHED_PROCESS_MODEL" : fullInvalid();
+                        string missing = request.CadAdmission?.Invoke(job.Tool,job.Bend.FeatureId) ?? (plans.Count > 1 ? "DUPLICATE_PROCESS_PLAN" : plan == null ? "UNKNOWN_PROCESS_GEOMETRY" :
+                            !ReferenceEquals(plan.Binding.Model, request.Model) ? "MISMATCHED_PROCESS_MODEL" : fullInvalid());
                         if (missing == null)
                         {
                             simulation |= plan.SimulationOnly;

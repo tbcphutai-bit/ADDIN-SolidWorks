@@ -20,9 +20,11 @@ namespace ADDIN.Commands
             foreach (var row in item.Rows)
             {
                 var check = item.Context.Evaluate(row);
+                BendMinimumFeatureGeometry nativeMinimum;
+                item.Context.Geometry.TryGetValue(row.FeatureId,out nativeMinimum);
                 output.Add(new AssemblyBendMetadata(row.FeatureId, row.PersistentId, row.FeatureName, row.BendAngleDeg, row.BendRadiusMm,
                     check.Status.ToString(), check.Summary, check.Details, check.Sides.Where(s => s.Measure != null).Select(s =>
-                        new AssemblyBendMinimumSide(s.Measure.Shape, s.Measure.Dimension, s.Measure.ValueMm, s.LimitMm))));
+                        new AssemblyBendMinimumSide(s.Measure.Shape, s.Measure.Dimension, s.Measure.ValueMm, s.LimitMm)),nativeMinimum?.MaterialCode));
             }
             return output.AsReadOnly();
         }

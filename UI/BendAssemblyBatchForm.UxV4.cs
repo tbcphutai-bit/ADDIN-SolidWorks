@@ -11,12 +11,19 @@ using SolidWorks.Interop.sldworks;
 using System.Linq;
 using System.Windows.Forms;
 using ADDIN.Commands.BendCollision;
+using ADDIN.Commands.BendTools;
+using ADDIN.Commands.BendPlacement;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ADDIN.UI
 {
     internal partial class BendAssemblyBatchForm
     {
         private TabControl uxV4Tabs;
+        private TabPage uxV45ToolDetailsTab;
+        private Label uxV45Decision, uxV45Reason, uxV45Max, uxV45Collision, uxV45ToolData;
+        private Button uxV45RecoverSource;
         private TabPage uxV4MainTab, uxV4PlanningTab, uxV4EvidenceTab, uxV4ExcelTab, uxV4TechnicalTab;
         private DataGridView uxV4Parts, uxV4Tools;
         private FlowLayoutPanel uxV4Bends;
@@ -49,7 +56,8 @@ namespace ADDIN.UI
                     Name = "checkChanUxV4Tabs", Dock = DockStyle.Fill,
                     Font = new Font("Segoe UI", 9.5f), Padding = new Point(14, 7)
                 };
-                uxV4MainTab = PageV4("Kiểm tra chi tiết");
+                uxV4MainTab = PageV4("Kết quả");
+                uxV45ToolDetailsTab = PageV4("Bộ dao");
                 uxV4PlanningTab = PageV4("Thứ tự chấn");
                 uxV4EvidenceTab = PageV4("Hồ sơ dao");
                 uxV4ExcelTab = PageV4("Giới hạn Excel");
@@ -81,13 +89,14 @@ namespace ADDIN.UI
                 pnlRoot.Controls.Add(uxV4Tabs, 0, 3);
 
                 BuildUxV4Main();
+                InstallUxV45ResultFirst();
                 InstallUxV43();  // V4.3: genuine final-Part 2D section, DXF unplaced.
                 // Keep illustrative test data out of day-to-day production UI.
                 btnToggleMockup.Visible = false;
                 BuildUxV4Excel();
                 BuildUxV4PlanningCaption();
                 uxV4Tabs.TabPages.AddRange(new[] {
-                    uxV4MainTab, uxV4PlanningTab, uxV4EvidenceTab,
+                    uxV4MainTab, uxV45ToolDetailsTab, uxV4PlanningTab, uxV4EvidenceTab,
                     uxV4ExcelTab, uxV4TechnicalTab
                 });
                 uxV4Tabs.SelectedTab = uxV4MainTab;
@@ -100,6 +109,256 @@ namespace ADDIN.UI
                 };
             }
             finally { pnlRoot.ResumeLayout(true); }
+        }
+
+
+        // Result-first presentation. Reuses live data grid and event handlers without changing checks.
+        private void InstallUxV45ResultFirst()
+        {
+            if (uxV45Decision != null) return;
+            Control card = uxV4Tools?.Parent?.Parent;
+            var columns = card?.Parent as TableLayoutPanel;
+            if (card == null || columns == null || columns.ColumnStyles.Count != 3)
+                throw new InvalidOperationException("CHECK_CHAN_UI_ANCHOR_MISSING");
+            columns.SuspendLayout();
+            try
+            {
+                columns.Controls.Remove(card);
+                uxV45ToolDetailsTab.Controls.Add(card);
+                card.Dock = DockStyle.Fill;
+                columns.ColumnStyles[0].Width = 22;
+                columns.ColumnStyles[1].Width = 51;
+                columns.ColumnStyles[2].Width = 27;
+
+                var result = UxV4Table(1, 10);
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+                result.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                result.RowStyles.Add(new RowStyle(SizeType.Absolute, 43));
+                result.Controls.Add(UxV4Label("KẾT QUẢ", 10f, true, uxV4Text, 32), 0, 0);
+                uxV45Decision = UxV4Label("CHƯA CÓ KẾT QUẢ", 13.5f, true, uxV4Text, 74);
+                result.Controls.Add(uxV45Decision, 0, 1);
+                uxV45Reason = UxV4Label("Chọn Part và nếp chấn.", 9f, false, uxV4Muted, 62);
+                result.Controls.Add(uxV45Reason, 0, 2);
+                if (uxV4Minimum.Parent != null)
+                    uxV4Minimum.Parent.Controls.Remove(uxV4Minimum);
+                result.Controls.Add(uxV4Minimum, 0, 3);
+                uxV45Max = UxV4Label("Check MAX: chưa đối chiếu", 9f, false, uxV4Text, 40);
+                result.Controls.Add(uxV45Max, 0, 4);
+                uxV45Collision = UxV4Label("Va chạm: chưa kiểm tra", 9f, false, uxV4Text, 48);
+                result.Controls.Add(uxV45Collision, 0, 5);
+                uxV45ToolData = UxV4Label("Hình học dao: chưa có", 8.5f, false, uxV4Muted, 38);
+                result.Controls.Add(uxV45ToolData, 0, 6);
+                uxV45RecoverSource = UxV4Action("Chọn lại nguồn dao DXF");
+                uxV45RecoverSource.Dock = DockStyle.Fill;
+                uxV45RecoverSource.Visible = false;
+                uxV45RecoverSource.Click += async (sender, args) => await UxV45RecoverSourceAsync();
+                result.Controls.Add(uxV45RecoverSource, 0, 7);
+                var openDetails = UxV4Action("Xem kết quả từng dao");
+                openDetails.Dock = DockStyle.Fill;
+                openDetails.Click += (sender, args) => uxV4Tabs.SelectedTab = uxV45ToolDetailsTab;
+                result.Controls.Add(openDetails, 0, 9);
+                columns.Controls.Add(UxV4Card("uxV45Results", result), 2, 0);
+
+                // Decorative explanations stay in their detail tabs instead of crowding results.
+                if (uxV4Preview?.Parent is TableLayoutPanel view && view.RowStyles.Count >= 5)
+                {
+                    view.RowStyles[3].Height = 58;
+                    view.RowStyles[4].Height = 0;
+                }
+                uxV4Excel.Visible = false;
+                if (uxV4Parts?.Parent is TableLayoutPanel parts && parts.RowStyles.Count >= 3)
+                    parts.RowStyles[2].Height = 0;
+            }
+            finally { columns.ResumeLayout(true); }
+            UxV45UpdateOutcome();
+        }
+
+        // UI projection only; no native I/O, source reload, or numeric rerun.
+        private void UxV45UpdateOutcome()
+        {
+            if(uxV45Decision==null||uxV45Decision.IsDisposed)return;
+            var result=BatchCheckOutcome.Project(selectedPart,selectedBend,selectedTool,isRunning,isMockupMode);
+            uxV45Decision.Text=result.Caption;
+            uxV45Reason.Text=result.Reason;
+            uxV45Decision.ForeColor=result.State==BatchOutcomeState.MIN_NG||result.State==BatchOutcomeState.EXCEL_LIMIT_FAIL||
+                result.State==BatchOutcomeState.CAD_COLLISION_CONFIRMED?Color.FromArgb(170,48,48):
+                result.State==BatchOutcomeState.RUNNING||result.State==BatchOutcomeState.NOT_RUN?uxV4Text:Color.FromArgb(141,98,40);
+            bool current=!isRunning&&!isMockupMode&&selectedPart?.RawPartResult?.Current==true;
+            uxV45ToolData.Text=current?"Punch "+selectedPart.LoadedPunchCount+"/"+selectedPart.ToolCatalogCount+
+                " · ghép CAD "+selectedPart.MatchedCadPairs+" · gá duyệt "+selectedPart.VerifiedMountingPairs:"Hình học dao: chưa có kết quả hiện hành";
+            toolTips.SetToolTip(uxV45ToolData,current?"Mã khai báo: "+selectedPart.ToolCatalogCount+"\nPunch đã đọc: "+selectedPart.LoadedPunchCount+
+                "\nCặp CAD đối chiếu: "+selectedPart.MatchedCadPairs+"\nCặp có đường bao: "+selectedPart.ReadyGeometryPairs+
+                "\nProfile đủ điều kiện hình học: "+selectedPart.CollisionProfileReadyPairs+"\nGá vật lý duyệt: "+selectedPart.VerifiedMountingPairs:
+                "Chưa có số liệu hiện hành. Profile đủ điều kiện không thay cho pose, chiều dài hữu dụng và kiểm tra số.");
+            uxV45Max.Text=current?BatchCheckOutcome.ExcelText(selectedTool?.ExcelCase):"Check MAX: chưa kiểm tra";
+            uxV45Collision.Text=!current?"Va chạm: chưa kiểm tra":result.State==BatchOutcomeState.CAD_COLLISION_CONFIRMED?
+                "Va chạm: có bằng chứng số · "+result.Scope:result.State==BatchOutcomeState.PARTIAL_CLEAR?
+                "Va chạm: mới đạt một phần · "+result.Scope:"Va chạm: chưa xác minh toàn bộ quá trình";
+            UxV45ShowSourceRecovery(current&&!string.IsNullOrWhiteSpace(selectedPart.ToolSourceError));
+            toolTips.SetToolTip(uxV45Reason,"Phạm vi: "+result.Scope+"\nNguồn: "+result.Fingerprint);
+            toolTips.SetToolTip(uxV45Max,selectedTool?.ExcelCase?.Evidence??"Chưa có dữ liệu Excel gắn với nếp/dao hiện hành.");
+        }
+
+        private void UxV45ShowSourceRecovery(bool visible)
+        {
+            if(uxV45RecoverSource==null||uxV45RecoverSource.IsDisposed)return;
+            uxV45RecoverSource.Visible=visible;
+            var grid=uxV45RecoverSource.Parent as TableLayoutPanel;
+            if(grid!=null&&grid.RowStyles.Count>7)grid.RowStyles[7].Height=visible?43:0;
+        }
+
+        private Task UxV45RecoverSourceAsync()
+        {
+            if(isRunning||IsDisposed||uxV45RecoverSource==null||!uxV45RecoverSource.Enabled)return Task.CompletedTask;
+            uxV45RecoverSource.Enabled=false;
+            btnRunBatch.Enabled=false;
+            var task=ConfigureToolSourcesAsync(this,()=>uxV45ToolData.Text="Đã lưu nguồn; bấm Bắt đầu kiểm tra để đọc snapshot mới.",()=>!isRunning&&!IsDisposed);
+            task.ContinueWith(t=>{
+                var observed=t.Exception;
+                if(IsDisposed||!IsHandleCreated)return;
+                try { BeginInvoke(new Action(()=>{if(!IsDisposed&&!uxV45RecoverSource.IsDisposed){uxV45RecoverSource.Enabled=!isRunning;btnRunBatch.Enabled=!isRunning;}})); }
+                catch(InvalidOperationException) { }
+            },TaskScheduler.Default);
+            return task;
+        }
+
+        // One opt-in workflow shared by Check Chấn and existing Settings.
+        // Every No preserves the existing field. The only write is a backed-up
+        // settings JSON after a validated preview and an explicit final Yes.
+        internal static Task ConfigureToolSourcesAsync(Control owner,Action saved=null,Func<bool> canProceed=null)
+        {
+            if(owner==null||owner.IsDisposed||!owner.IsHandleCreated)return Task.CompletedTask;
+            if(owner.InvokeRequired)throw new InvalidOperationException("SOURCE_SELECTION_REQUIRES_UI_STA");
+            var overrides=ToolProfileSourceSettings.OverrideNames.Where(n=> System.Environment.GetEnvironmentVariable(n)!=null).ToArray();
+            if(overrides.Length>0)
+            {
+                MessageBox.Show(owner,"Biến môi trường đang ưu tiên hơn cấu hình cục bộ:\n"+string.Join("\n",overrides)+
+                    "\nHãy kiểm tra và gỡ override nếu muốn lưu nguồn cục bộ. Công cụ không tự sửa environment.",
+                    "Nguồn Check Chấn",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+                return Task.CompletedTask;
+            }
+            var settings=new ToolProfileSourceSettings();ToolProfileSourceConfiguration current;
+            try { current=settings.Load(); }
+            catch(Exception ex)
+            {
+                if(MessageBox.Show(owner,"Không đọc được cấu hình: "+ex.GetType().Name+" · "+ex.Message+
+                    "\nChọn lại nguồn? JSON cũ được sao lưu khi bạn duyệt lưu.","Nguồn Check Chấn",MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return Task.CompletedTask;
+                current=new ToolProfileSourceConfiguration();
+            }
+            var proposed=new ToolProfileSourceConfiguration {Version=1,DirectoryPath=current.DirectoryPath,
+                ManifestPath=current.ManifestPath,DatumEvidencePath=current.DatumEvidencePath,
+                PlacementConfigurationPath=current.PlacementConfigurationPath,UseMasterPairsAsLibrary=current.UseMasterPairsAsLibrary};
+            var mode=MessageBox.Show(owner,"Chế độ hiện tại: "+(proposed.UseMasterPairsAsLibrary?"18 cặp cố định trong Master CAD":"thư mục DXF / manifest")+
+                "\nCó đổi sang chế độ còn lại không? No giữ nguyên.","Chế độ nguồn",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2);
+            if(mode==DialogResult.Cancel)return Task.CompletedTask;
+            if(mode==DialogResult.Yes)proposed.UseMasterPairsAsLibrary=!proposed.UseMasterPairsAsLibrary;
+            if(!proposed.UseMasterPairsAsLibrary)
+            {
+                bool required=!Directory.Exists(proposed.DirectoryPath);
+                var change=required?DialogResult.Yes:MessageBox.Show(owner,"Đổi thư mục DXF? No giữ: "+proposed.DirectoryPath,
+                    "Thư mục DXF",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2);
+                if(change==DialogResult.Cancel)return Task.CompletedTask;
+                if(change==DialogResult.Yes)using(var folder=new FolderBrowserDialog {Description="Thư mục DXF gốc (chỉ đọc)",SelectedPath=required?"":proposed.DirectoryPath})
+                {if(folder.ShowDialog(owner)!=DialogResult.OK)return Task.CompletedTask;proposed.DirectoryPath=folder.SelectedPath;}
+            }
+            Func<string,string,bool,string> choose=(caption,existing,required)=>{
+                var answer=required?DialogResult.Yes:MessageBox.Show(owner,"Đổi "+caption+"? No giữ nguyên:\n"+(existing??"Chưa cấu hình"),
+                    "Nguồn Check Chấn",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2);
+                if(answer==DialogResult.Cancel)throw new OperationCanceledException();
+                if(answer!=DialogResult.Yes)return existing;
+                using(var file=new OpenFileDialog {Title=caption,Filter="JSON (*.json)|*.json",CheckFileExists=true,Multiselect=false})
+                {if(file.ShowDialog(owner)!=DialogResult.OK)throw new OperationCanceledException();return file.FileName;}
+            };
+            try
+            {
+                if(!proposed.UseMasterPairsAsLibrary)
+                {
+                    proposed.ManifestPath=choose("manifest Punch–Holder",proposed.ManifestPath,false);
+                    proposed.DatumEvidencePath=choose("hồ sơ mốc dao",proposed.DatumEvidencePath,false);
+                }
+                proposed.PlacementConfigurationPath=choose("cấu hình Master / gá / Excel",proposed.PlacementConfigurationPath,
+                    proposed.UseMasterPairsAsLibrary&&string.IsNullOrWhiteSpace(proposed.PlacementConfigurationPath));
+            }
+            catch(OperationCanceledException){return Task.CompletedTask;}
+            var completed=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var lifetime=new CancellationTokenSource();var token=lifetime.Token;
+            var provider=new ToolProfileLibraryProvider(()=>proposed);
+            var lifecycle=new object();Task worker=null;int finished=0;
+            Action finish=null;EventHandler closed=null;
+            closed=(s,e)=>{
+                Task wait;
+                lock(lifecycle){if(finished!=0)return;lifetime.Cancel();wait=worker??Task.CompletedTask;}
+                wait.ContinueWith(t=>{var observed=t.Exception;finish();},TaskScheduler.Default);
+            };
+            owner.Disposed+=closed;
+            finish=()=>{
+                lock(lifecycle){if(finished!=0)return;finished=1;}
+                if(!owner.IsDisposed)owner.Disposed-=closed;
+                // Called only after a worker completes; no native/UI resources
+                // or live COM references are owned by this provider.
+                provider.Dispose();lifetime.Dispose();completed.TrySetResult(true);
+            };
+            Action<Action> publish=action=>{
+                if(Volatile.Read(ref finished)!=0||owner.IsDisposed||!owner.IsHandleCreated){finish();return;}
+                try {owner.BeginInvoke(new Action(()=>{if(Volatile.Read(ref finished)!=0||owner.IsDisposed||canProceed?.Invoke()==false){finish();return;}action();}));}
+                catch(InvalidOperationException){finish();}
+            };
+            var reading=Task.Run(()=>provider.Read(token),token);worker=reading;
+            reading.ContinueWith(read=>{
+                var observed=read.Exception;
+                publish(()=>{
+                    if(read.IsCanceled){finish();return;}
+                    if(read.IsFaulted)
+                    {
+                        MessageBox.Show(owner,read.Exception.GetBaseException().Message,"Chưa lưu nguồn",MessageBoxButtons.OK,MessageBoxIcon.Warning);finish();return;
+                    }
+                    var preview=read.Result;
+                    string problem=preview.SelectionProblem(proposed);
+                    if(problem!=null){MessageBox.Show(owner,problem,"Nguồn chưa hợp lệ",MessageBoxButtons.OK,MessageBoxIcon.Warning);finish();return;}
+                    string summary="Chế độ: "+(proposed.UseMasterPairsAsLibrary?"18 cặp cố định":"DXF / manifest")+
+                        "\nSettings: "+ToolProfileSourceSettings.DefaultSettingsPath+
+                        "\nThư mục: "+proposed.DirectoryPath+"\nManifest: "+proposed.ManifestPath+
+                        "\nPlacement: "+proposed.PlacementConfigurationPath+
+                        "\nKhai báo: "+preview.Tools.Count+" · Punch đọc: "+preview.Tools.Count(t=>t.Validation.PunchGeometryReadComplete)+
+                        " · cặp: "+preview.PlacementSources.Tools.Count(t=>t.CadPair?.Matched==true)+
+                        " · gá xác minh: "+preview.PlacementSources.Tools.Count(t=>t.ClampVerified)+
+                        "\nSHA nguồn hiệu lực: "+preview.EffectiveSources?.Fingerprint+
+                        "\n\nThiếu mapping Excel / mốc gá / quá trình vẫn UNKNOWN. KIK hở được giữ nguyên."+
+                        "\nViệc lưu sẽ làm hết hiệu lực kết quả đang mở ở nguồn cũ.\nLưu cấu hình cục bộ này (có sao lưu)?";
+                    if(MessageBox.Show(owner,summary,"Xem nguồn trước khi lưu",MessageBoxButtons.YesNo,MessageBoxIcon.Question,
+                        MessageBoxDefaultButton.Button2)!=DialogResult.Yes){finish();return;}
+                    if(token.IsCancellationRequested){finish();return;}
+                    Task saving;
+                    lock(lifecycle)
+                    {
+                        if(finished!=0||token.IsCancellationRequested)return;
+                        saving=Task.Run(()=>settings.SaveApprovedSelection(proposed,preview,token),token);worker=saving;
+                    }
+                    saving.ContinueWith(save=>{
+                        var saveError=save.Exception;
+                        publish(()=>{
+                        try
+                        {
+                            if(save.IsCanceled)return;
+                            if(save.IsFaulted){MessageBox.Show(owner,save.Exception.GetBaseException().Message,"Chưa lưu nguồn",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
+                            saved?.Invoke();
+                            MessageBox.Show(owner,"Đã lưu nguồn. Bấm Bắt đầu kiểm tra để đọc dữ liệu hiện hành. Chưa xác minh sản xuất.",
+                                "Nguồn Check Chấn",MessageBoxButtons.OK,MessageBoxIcon.Information);
+                        }
+                        finally {finish();}
+                        });
+                    },TaskScheduler.Default);
+                });
+            },TaskScheduler.Default);
+            return completed.Task;
         }
 
         private TabPage PageV4(string caption)
@@ -206,7 +465,7 @@ namespace ADDIN.UI
             uxV4Parts.Columns[1].FillWeight = 17;
             uxV4Parts.Columns[2].FillWeight = 17;
             parts.Controls.Add(uxV4Parts, 0, 1);
-            var partNote = UxV4Label("Mỗi cấu hình Part chỉ liệt kê một lần.", 8.2f, false, uxV4Muted, 34);
+            var partNote = UxV4Label("Theo Part, cấu hình và nhóm occurrence.", 8.2f, false, uxV4Muted, 34);
             parts.Controls.Add(partNote, 0, 2);
             columns.Controls.Add(UxV4Card("uxV4PartsCard", parts), 0, 0);
 
@@ -341,7 +600,7 @@ namespace ADDIN.UI
                 uxV4Parts.Rows.Clear();
                 foreach (var part in displayedParts)
                 {
-                    int i = uxV4Parts.Rows.Add(part.PartName, part.BendCount, part.Quantity);
+                    int i = uxV4Parts.Rows.Add(part.PartName, part.NativeInventoryKnown?(object)part.BendCount:"? / "+part.BendCount, part.Quantity);
                     var row = uxV4Parts.Rows[i];
                     row.Tag = part;
                     row.Cells[0].ToolTipText = (part.Configuration ?? "") + "\n" + (part.Reason ?? "");
@@ -357,9 +616,8 @@ namespace ADDIN.UI
                     match.Selected = true;
                 }
                 else uxV4Parts.ClearSelection();
-                uxV4PartCounts.Text = allParts.Count == 0 ? "Chưa có kết quả CAD" :
-                    "Đã nhận " + allParts.Count + " mẫu Part/cấu hình  •  " +
-                    allParts.Sum(p => p.BendCount) + " nếp  •  Sản xuất: CHƯA XÁC MINH";
+                uxV4PartCounts.Text = allParts.Count == 0 ? "Chưa có kết quả" :
+                    allParts.Count + " Part · " + allParts.Sum(p => p.BendCount) + " nếp chấn";
             }
             finally { uxV4Parts.ResumeLayout(); uxV4Binding = false; }
             if (selectedPart == null && uxV4Parts.CurrentRow?.Tag is BatchPartViewModel emptyPart &&
@@ -428,7 +686,7 @@ namespace ADDIN.UI
                 uxV4BendButtons.Clear();
                 if (selectedPart == null || !allParts.Contains(selectedPart))
                 {
-                    uxV4PartTitle.Text = "2  XEM PART VÀ NẾP CHẤN";
+                    uxV4PartTitle.Text = "Chọn chi tiết";
                     uxV4BendTitle.Text = "Chọn Part để xem các nếp";
                     uxV4Preview.SetPart(null, null, false);
                     UxV43ClearSection();
@@ -437,17 +695,18 @@ namespace ADDIN.UI
                     uxV4Minimum.Text = "Check Min: Chưa có dữ liệu của nếp đang chọn.";
                     uxV4ToolReason.Text = "Chưa có bộ dao đang chọn.";
                     uxV4Plan.Text = "Thứ tự chấn: Chưa có phương án được xác minh.";
+                    UxV45UpdateOutcome();
                     return;
                 }
-                uxV4PartTitle.Text = "2  " + selectedPart.PartName;
-                uxV4BendTitle.Text = "Các nếp chấn (" + selectedPart.Bends.Count + ") — chọn để làm sáng trên SOLIDWORKS";
+                uxV4PartTitle.Text = selectedPart.PartName;
+                uxV4BendTitle.Text = "Chọn nếp chấn (" + selectedPart.Bends.Count + ")";
                 uxV4Preview.SetPart(selectedPart.PartName, selectedPart.SelectionKey,
                     selectedPart.RawPartResult?.Current == true && !isMockupMode);
                 foreach (var bend in selectedPart.Bends)
                 {
                     var local = bend;
                     var button = new Button {
-                        Text = (bend.BendIndex > 0 ? "B" + bend.BendIndex + "  " : "") + bend.BendName,
+                        Text = bend.BendIndex > 0 ? "B" + bend.BendIndex : bend.BendName,
                         AutoSize = true, Height = 32, FlatStyle = FlatStyle.Flat,
                         BackColor = ReferenceEquals(bend, selectedBend) ? Color.FromArgb(223, 236, 252) : Color.White,
                         ForeColor = ReferenceEquals(bend, selectedBend) ? uxV4Accent : uxV4Text,
@@ -506,6 +765,7 @@ namespace ADDIN.UI
         private void UxV4RefreshToolStatus()
         {
             UxV43UpdateSection();
+            UxV45UpdateOutcome();
             if (uxV4ToolReason == null) return;
             var tool = selectedTool;
             if (tool == null)
@@ -516,8 +776,8 @@ namespace ADDIN.UI
             string reason = BendCheckDisplayText.Reasons(tool.CombinedReason, false);
             uxV4ToolReason.Text = "Đang xem " + tool.ToolId + " (không phải dao được khuyên dùng) · " + (string.IsNullOrWhiteSpace(reason) ?
                 "Cần xem bằng chứng gá và chuyển động." : reason);
-            uxV4Excel.Text = "Excel MAX: " + tool.ToolId +
-                " chưa có ánh xạ Excel → CAD được phê duyệt; xem tab Giới hạn Excel.";
+            uxV4Excel.Text=BatchCheckOutcome.ExcelText(tool.ExcelCase);
+            toolTips.SetToolTip(uxV4ToolReason,tool.CombinedReason+"\nExcel: "+tool.ExcelCase?.Evidence);
         }
 
         private void UxV4SyncStatus(string message)
@@ -534,6 +794,7 @@ namespace ADDIN.UI
             uxV4Tools.Enabled = !running;
             uxV4Bends.Enabled = !running;
             if (running) UxV43ClearSection();
+            UxV45UpdateOutcome();
             if (!running && selectedPart != null)
             {
                 UxV4RequestSavedFilePreview(selectedPart);
