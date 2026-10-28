@@ -5071,7 +5071,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         private void ApplyCut(Step step, AfjUParametricSketchWriter.OwnedSketch owned)
         {
             string phase="CUT "+Documents[step.Part].Label+" "+step.Operation.EvidenceId;
-            var part = Documents[step.Part].Model; R57Boundary(phase+".ACTIVATE",()=>Activate(part));
+            var part = Documents[step.Part].Model; R57Boundary(phase+".ACTIVATE_ASSEMBLY_ONLY",()=>Activate(Assembly));
             var feature = R57Boundary(phase+".FRESH_FEATURE_FIND",()=>Find(part, owned.FeatureId));
             Need(feature != null, "Exact owned profile disappeared before Cut");
             var sketch = R57Boundary(phase+".GET_SPECIFIC_FEATURE2",()=>feature.GetSpecificFeature2() as Sketch);
@@ -5093,34 +5093,13 @@ namespace ADDIN.Commands.AutoFrameJoint
             string ownedSketchName=R57Boundary(phase+".GET_SKETCH_NAME",()=>feature.Name);
             var assemblyFactoryCheckpoint=R57Boundary(phase+".CHECKPOINT_ASSEMBLY",()=>Journal.CaptureCheckpoint(Assembly));
             var factoryCheckpoint=R57Boundary(phase+".CHECKPOINT_PART",()=>Journal.CaptureCheckpoint(part)); // no native modeling factory call occurs between this read and FeatureCut4 below.
-            R57Boundary(phase+".CLEAR_SELECTION",()=>part.ClearSelection2(true));
-            Need(R57Boundary(phase+".SELECT_PROFILE",()=>feature.Select2(false, 0)), "Cannot select exact owned Sketch");
-            // Native selection owns the selected profile for FeatureCut4. These
-            // pre-Cut aliases must not be queried or retained after mutation.
+            // Keep the Assembly document active. The former standalone Part
+            // ActivateDoc3 at this boundary crashed the installed Add-in before
+            // FeatureCut4. Enter only the exact occurrence's Part edit context.
             feature=null;sketch=null;inverse=null;modelToSketch=null;
-            // Register the returned native object immediately, without any log,
-            // rename, readback, file I/O or callback between return and capture.
-            Feature cut;
-            R57Trace("BEGIN",phase+".FEATURECUT4");
-            try
-            {
-                cut = part.FeatureManager.FeatureCut4(true, false, reverse, (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind,
-                    spec.Length, spec.Length, false, false, false, false, 0, 0, false, false, false, false, normalCut, true, true,
-                    false, false, false, (int)swStartConditions_e.swStartSketchPlane, 0, false, optimizeGeometry);
-            }
-            catch
-            {
-                // A native call can throw after mutation; without a returned
-                // Feature identity the journal must not guess new ownership.
-                UnresolvedCreation = true; R57Trace("FAULT",phase+".FEATURECUT4"); throw;
-            }
-            if (cut == null)
-            {
-                UnresolvedCreation = true;
-                Need(false, "FeatureCut4 returned null; no Cut identity available");
-            }
-            Register(part, cut, step.Operation.EvidenceId + ":CUT");
-            R57Trace("RETURN_REGISTERED",phase+".FEATURECUT4");
+            int createdId=R60CreateCutInAssemblyContext(step,owned,reverse,normalCut,optimizeGeometry,phase);
+            var cut=Find(part,createdId);
+            Need(cut!=null,"R60 registered native Cut cannot be reacquired after EditAssembly");
             cut.Name = owned.IntendedName + "_Cut";
             ConfirmClosed(part,cut,step.Operation.EvidenceId + ":CUT");
             var section=step.Part==(Preview.CoverA?0:1)?Intent.Winner:Intent.Loser;
@@ -5192,6 +5171,77 @@ namespace ADDIN.Commands.AutoFrameJoint
             data=null;cut=null;
             Log("NATIVE_CUT_VERIFIED " + Documents[step.Part].Label + " " + step.Operation.EvidenceId);
         }
+        private int R60CreateCutInAssemblyContext(Step step,AfjUParametricSketchWriter.OwnedSketch owned,
+                                                     bool reverse,bool normalCut,bool optimizeGeometry,string phase)
+        {
+            var part=Documents[step.Part].Model;var component=Components[step.Part];var assembly=(AssemblyDoc)Assembly;
+            bool entered=false;
+            try
+            {
+                Need(Same(App.ActiveDoc,Assembly)&&Same(assembly.GetEditTarget(),Assembly)&&Assembly.GetActiveSketch2()==null,
+                    "R60 exact Assembly must remain active outside every Part edit");
+                Assembly.ClearSelection2(true);
+                Need(component.Select4(false,null,false),"R60 exact target occurrence selection failed");
+                int information=0;R57Boundary(phase+".ENTER_COMPONENT_EDIT",()=>assembly.EditPart2(true,false,ref information));
+                entered=Same(assembly.GetEditTarget(),part)&&Same(assembly.GetEditTargetComponent(),component);
+                Need(entered&&Same(App.ActiveDoc,Assembly)&&Assembly.GetActiveSketch2()==null,
+                    "R60 exact component Part edit context unavailable");
+                var nativeProfile=Find(part,owned.FeatureId);
+                Need(nativeProfile!=null,"R60 exact native child Sketch disappeared at edit entry");
+                var contextProfile=component.GetCorresponding(nativeProfile) as Feature;
+                Need(contextProfile!=null&&contextProfile.GetID()==owned.FeatureId,
+                    "R60 component-context child Sketch identity mismatch");
+                var roundtrip=part.Extension.GetCorresponding2(contextProfile) as Feature;
+                Need(roundtrip!=null&&Same(roundtrip,nativeProfile),"R60 child Sketch native/context roundtrip mismatch");
+                Assembly.ClearSelection2(true);
+                Need(contextProfile.Select2(false,0),"R60 exact component-context child Sketch selection failed");
+                var selections=Assembly.SelectionManager as SelectionMgr;
+                Need(selections!=null&&selections.GetSelectedObjectCount2(-1)==1&&
+                    Same(selections.GetSelectedObject6(1,-1),contextProfile)&&
+                    Same(selections.GetSelectedObjectsComponent4(1,-1),component),
+                    "R60 selected Sketch is not the exact bound occurrence");
+                nativeProfile=null;roundtrip=null;contextProfile=null;selections=null;
+                Need(Same(App.ActiveDoc,Assembly)&&Same(assembly.GetEditTarget(),part)&&
+                    Same(assembly.GetEditTargetComponent(),component),"R60 edit context changed before FeatureCut4");
+                Feature returned;
+                R57Trace("BEGIN",phase+".FEATURECUT4_IN_ASSEMBLY_PART_EDIT");
+                try
+                {
+                    var spec=step.Operation.Tools.Single();
+                    returned=Assembly.FeatureManager.FeatureCut4(true,false,reverse,(int)swEndConditions_e.swEndCondBlind,(int)swEndConditions_e.swEndCondBlind,
+                        spec.Length,spec.Length,false,false,false,false,0,0,false,false,false,false,normalCut,true,true,
+                        false,false,false,(int)swStartConditions_e.swStartSketchPlane,0,false,optimizeGeometry);
+                }
+                catch {UnresolvedCreation=true;throw;}
+                if(returned==null){UnresolvedCreation=true;Need(false,"R60 FeatureCut4 returned null");}
+                // Mandatory context-to-native ownership conversion is the first
+                // operation after factory return; no log or callback intervenes.
+                var nativeCut=part.Extension.GetCorresponding2(returned) as Feature;
+                // FeatureCut4 can already return the native Part Feature while
+                // editing an occurrence. A null context conversion alone does
+                // not invalidate that returned identity: prove it against the
+                // exact Part tree object, never infer ownership from a name.
+                if(nativeCut==null)
+                {
+                    var exactReturned=Find(part,returned.GetID());
+                    if(exactReturned!=null&&Same(exactReturned,returned))nativeCut=exactReturned;
+                }
+                if(nativeCut==null){UnresolvedCreation=true;Need(false,"R60 returned Cut native Part identity unavailable");}
+                Register(part,nativeCut,step.Operation.EvidenceId+":CUT");
+                int id=nativeCut.GetID();nativeCut=null;returned=null;
+                R57Trace("RETURN_REGISTERED",phase+".FEATURECUT4_IN_ASSEMBLY_PART_EDIT");
+                return id;
+            }
+            finally
+            {
+                if(entered||!Same(assembly.GetEditTarget(),Assembly))
+                    R57Boundary(phase+".RESTORE_ASSEMBLY_EDIT",()=>assembly.EditAssembly());
+                Need(Same(App.ActiveDoc,Assembly)&&Same(assembly.GetEditTarget(),Assembly)&&Assembly.GetActiveSketch2()==null,
+                    "R60 exact Assembly edit context was not restored after native Cut");
+                Assembly.ClearSelection2(true);
+            }
+        }
+
         private void R59VerifyNativeContour(Step step,Sketch sketch,string phase)
         {
             var nativeInverse=sketch.ModelToSketchTransform.Inverse() as MathTransform;

@@ -52,6 +52,13 @@ namespace ADDIN.UI.AutoFrameJoint
         private bool currentPairValidated, applyOnCloseReady;
         private string applyCloseSkipReason;
         private Component2 applyA, applyB;
+        private int applySelectionRevision;
+        private bool closedActionPending, afterCloseReturned;
+        private DSldWorksEvents_Event closedActionEvents;
+        private bool closedActionIdleHooked, closedActionIdleObserved, closedActionPosted;
+        private int closedActionIdleDepth;
+        private System.Windows.Forms.Control closedActionDispatcher;
+        private System.Windows.Forms.MethodInvoker pendingClosedAction;
         private readonly Action<AutoFrameJointSelectionPage> onClosed;
 
         private PropertyManagerPage2 page;
@@ -139,7 +146,7 @@ namespace ADDIN.UI.AutoFrameJoint
             this.assembly = app == null ? null : app.ActiveDoc as ModelDoc2;
         }
 
-        public bool IsOpen { get { return shown && !closing; } }
+        public bool IsOpen { get { return (shown && !closing) || closedActionPending; } }
 
         public void Show()
         {
@@ -171,6 +178,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 InitializeDeferredFocusWindow();
                 if (deferredFocusWindow == null)
                     throw new InvalidOperationException("Không tạo được bộ điều phối UI. Hãy mở lại lệnh.");
+                InitializeClosedActionIdleBarrier();
                 shown = true;
                 showInProgress = true;
                 int status;
@@ -193,6 +201,7 @@ namespace ADDIN.UI.AutoFrameJoint
                 showInProgress = false;
                 System.Threading.Interlocked.Increment(ref pageEpoch);
                 DisposeDeferredFocusWindow();
+                DetachClosedActionIdleBarrier();
                 throw;
             }
         }
@@ -217,6 +226,59 @@ namespace ADDIN.UI.AutoFrameJoint
                 if (dispatcher != null) dispatcher.Dispose();
                 deferredFocusWindow = null;
             }
+        }
+
+        private void InitializeClosedActionIdleBarrier()
+        {
+            if (closedActionIdleHooked) return;
+            closedActionEvents = app as DSldWorksEvents_Event;
+            if (closedActionEvents == null)
+                throw new InvalidOperationException("SOLIDWORKS idle event is required before opening this page.");
+            closedActionEvents.OnIdleNotify += OnNativeIdleForClosedAction;
+            closedActionIdleHooked = true;
+        }
+
+        private void DetachClosedActionIdleBarrier()
+        {
+            if (!closedActionIdleHooked) { closedActionEvents = null; return; }
+            if (System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThreadId)
+            {
+                TraceFlow("AFJ_R60_IDLE_GATE", "detach withheld on wrong owner thread");
+                return;
+            }
+            var events = closedActionEvents;
+            closedActionIdleHooked = false;
+            closedActionEvents = null;
+            try { if (events != null) events.OnIdleNotify -= OnNativeIdleForClosedAction; }
+            catch (Exception ex) { TraceUiFault("detach closed action idle barrier", ex, false); }
+        }
+
+        // SOLIDWORKS reports a genuine idle notification after the native
+        // close command settles. This native callback only posts managed work:
+        // no model API, active-document switch, Hide, cleanup or event detach.
+        private int OnNativeIdleForClosedAction()
+        {
+            closedActionIdleDepth++;
+            try
+            {
+                if (!closeNotified || !afterCloseReturned || !closedActionPending ||
+                    closedActionPosted || pendingClosedAction == null ||
+                    System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThreadId) return 0;
+                closedActionIdleObserved = true;
+                var dispatcher = closedActionDispatcher;
+                if (dispatcher == null || dispatcher.IsDisposed || !dispatcher.IsHandleCreated)
+                { TraceFlow("AFJ_R60_IDLE_GATE", "idle observed but retained owner dispatcher unavailable; no native work"); return 0; }
+                try
+                {
+                    closedActionPosted = true;
+                    dispatcher.BeginInvoke(pendingClosedAction);
+                    TraceFlow("AFJ_R60_IDLE_GATE", "native_idle_observed=True posted=True model_work_inside_idle=False");
+                }
+                catch (Exception ex)
+                { closedActionPosted = false; TraceUiFault("post after native idle; no inline fallback", ex, false); }
+                return 0;
+            }
+            finally { closedActionIdleDepth--; }
         }
 
         /// <summary>
@@ -924,6 +986,7 @@ namespace ADDIN.UI.AutoFrameJoint
             closeReason=reason;
             applyA=applyOnCloseReady?committedA:null;
             applyB=applyOnCloseReady?committedB:null;
+            applySelectionRevision=selectionRevision;
             finishRequested=false; finishQueued=false;
             requestAutoAnalysis=false; requestFocusB=false;
             closing=true;
@@ -932,15 +995,24 @@ namespace ADDIN.UI.AutoFrameJoint
             Trace.WriteLine("[AFJ-R54] CLOSE no_exception=True apply_eligible="+applyOnCloseReady+
                 " skip="+applyCloseSkipReason+" revision="+selectionRevision+
                 " observed="+observedSelectionRevision+" validated="+committedSelectionRevision);
-            Trace.WriteLine("[AFJ-APPLY] CLOSING reason="+reason+" epoch="+pageEpoch+"; eligible apply deferred until AfterClose");
+            Trace.WriteLine("[AFJ-APPLY] CLOSING reason="+reason+" epoch="+pageEpoch+"; eligible apply posted after native AfterClose returns");
         }
 
         public void AfterClose()
         {
             if (closeNotified) return;
             closeNotified = true;
-            TraceFlow("AFTER_CLOSE", "cleanup callback=" + (onClearPreview != null));
-            var closeTimer = Stopwatch.StartNew();
+            afterCloseReturned = false;
+            TraceFlow("AFTER_CLOSE", "managed teardown only; native work deferred");
+            // Preserve the existing owner-STA dispatcher independently of the
+            // discarded PMP controls. Pending page messages fail IsUiLive and
+            // cannot reuse native controls after the epoch changes.
+            System.Windows.Forms.Control closeDispatcher = deferredFocusWindow;
+            deferredFocusWindow = null;
+            bool eligible = applyOnCloseReady && closeReason == (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay &&
+                onApplyCut != null && applyA != null && applyB != null;
+            Component2 capturedA = applyA, capturedB = applyB;
+            int capturedRevision = applySelectionRevision;
             committedA = null; committedB = null; committedNameA = null; committedNameB = null;
             closing = true;
             shown = false;
@@ -948,7 +1020,7 @@ namespace ADDIN.UI.AutoFrameJoint
             System.Threading.Interlocked.Increment(ref pageEpoch);
             ClearAnalysisResult();
             cachedStatusText.Clear();
-            DisposeDeferredFocusWindow();
+            DisposeDeferredFocusWindow(); // Clears queues only: handle ownership moved above.
             page = null;
             selectionA = null;
             selectionB = null;
@@ -963,25 +1035,121 @@ namespace ADDIN.UI.AutoFrameJoint
             geometryGapLabel = null;
             geometryStatusLabel = null;
             geometryRoleLabel = null;
-            try
-            {
-                if (applyOnCloseReady && closeReason == (int)swPropertyManagerPageCloseReasons_e.swPropertyManagerPageClose_Okay && onApplyCut != null && applyA != null && applyB != null)
-                {
-                    TraceFlow("APPLY_CALLBACK_BEGIN", "closed page; no native controls retained");
-                    string result = onApplyCut(applyA, applyB);
-                    TraceFlow("APPLY_CALLBACK_END", result ?? "No apply result");
-                }
-                else Trace.WriteLine("[AFJ-R54] APPLY_SKIPPED reason="+(applyCloseSkipReason??"NO_CAPTURED_ELIGIBLE_PAIR"));
-            }
-            catch (Exception ex) { TraceUiFault("apply after close", ex, false); }
+            applyA = null; applyB = null; applyOnCloseReady = false;
+            try { QueueClosedPageAction(closeDispatcher, eligible, capturedA, capturedB, capturedRevision); }
             finally
             {
-                applyA=null; applyB=null; applyOnCloseReady=false;
-                try { if (onClearPreview != null) onClearPreview(); }
-                catch (Exception ex) { TraceUiFault("preview cleanup", ex, false); }
-                try { if (onClosed != null) onClosed(this); }
-                catch (Exception ex) { TraceUiFault("page closed callback", ex, false); }
-                TraceFlow("AFTER_CLOSE_END", "apply/cleanup/onClosed returned ms=" + closeTimer.ElapsedMilliseconds);
+                TraceFlow("AFTER_CLOSE_RETURN", "no Apply/Hide/session cleanup ran in native callback");
+                // No calls after this assignment: next owner message can run
+                // only after this callback has returned to SOLIDWORKS.
+                afterCloseReturned = true;
+            }
+        }
+
+        private void QueueClosedPageAction(System.Windows.Forms.Control dispatcher, bool eligible,
+            Component2 capturedA, Component2 capturedB, int capturedRevision)
+        {
+            closedActionPending = true;
+            closedActionIdleObserved = false;
+            closedActionPosted = false;
+            closedActionDispatcher = dispatcher;
+            try
+            {
+                if (System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThreadId ||
+                    dispatcher == null || dispatcher.IsDisposed || !dispatcher.IsHandleCreated)
+                    throw new InvalidOperationException("Closed-page owner dispatcher unavailable; no native work was run inline.");
+                pendingClosedAction = (System.Windows.Forms.MethodInvoker)delegate
+                {
+                    // No native API or retained PMP-control access occurs in
+                    // this method until all managed callback/lifetime gates pass.
+                    if (!afterCloseReturned || !closedActionIdleObserved || closedActionIdleDepth != 0)
+                    {
+                        closedActionPosted = false;
+                        TraceFlow("AFJ_R60_IDLE_GATE", "waiting for next native idle after close/idle callback unwinds");
+                        return;
+                    }
+                    if (System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThreadId ||
+                        System.Threading.Thread.CurrentThread.GetApartmentState() != System.Threading.ApartmentState.STA)
+                    {
+                        TraceFlow("CLOSED_ACTION_REJECT", "callback not returned or wrong owner STA; native work withheld");
+                        closedActionPending = false;
+                        try { dispatcher.Dispose(); } catch (Exception ex) { TraceUiFault("closed dispatcher dispose", ex, false); }
+                        return;
+                    }
+                    // This is the posted owner message, outside both native
+                    // AfterClose and OnIdleNotify. A still-active native command
+                    // causes another idle wait; never continue into modeling.
+                    if (app != null)
+                    {
+                        int command; string commandTitle; bool commandUi;
+                        try
+                        {
+                            app.GetRunningCommandInfo(out command, out commandTitle, out commandUi);
+                            bool inProgress = app.CommandInProgress;
+                            TraceFlow("AFJ_R60_IDLE_GATE", "post_idle command=" + command + " command_ui=" + commandUi +
+                                " command_in_progress=" + inProgress + " native_idle_observed=" + closedActionIdleObserved);
+                            if (commandUi || inProgress)
+                            {
+                                closedActionPosted = false;
+                                closedActionIdleObserved = false;
+                                TraceFlow("AFJ_R60_IDLE_GATE", "native command still active; wait next idle, no modeling");
+                                return;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            closedActionPosted = false;
+                            closedActionIdleObserved = false;
+                            TraceUiFault("post-idle native command state unavailable; no modeling", ex, false);
+                            return;
+                        }
+                    }
+                    var closeTimer = Stopwatch.StartNew();
+                    try
+                    {
+                        TraceFlow("CLOSED_ACTION_BEGIN", "native AfterClose and idle callbacks returned; original owner STA");
+                        if (eligible && capturedRevision == selectionRevision && capturedA != null && capturedB != null)
+                        {
+                            TraceFlow("APPLY_CALLBACK_BEGIN", "posted after native close idle barrier; captured revision=" + capturedRevision);
+                            string result = onApplyCut(capturedA, capturedB);
+                            TraceFlow("APPLY_CALLBACK_END", result ?? "No apply result");
+                        }
+                        else Trace.WriteLine("[AFJ-R60] APPLY_SKIPPED reason=" +
+                            (eligible ? "SELECTION_REVISION_CHANGED_AFTER_CLOSE" : (applyCloseSkipReason ?? "NO_CAPTURED_ELIGIBLE_PAIR")));
+                    }
+                    catch (Exception ex) { TraceUiFault("posted apply after close", ex, false); }
+                    finally
+                    {
+                        // The Shared session and CommandEntry page ownership
+                        // must survive until apply settles; clearing earlier
+                        // would consume/cancel the reviewed Preview ticket.
+                        capturedA = null; capturedB = null;
+                        try { if (onClearPreview != null) onClearPreview(); }
+                        catch (Exception ex) { TraceUiFault("posted preview cleanup", ex, false); }
+                        closedActionPending = false;
+                        closedActionPosted = false;
+                        pendingClosedAction = null;
+                        closedActionDispatcher = null;
+                        DetachClosedActionIdleBarrier();
+                        try { if (onClosed != null) onClosed(this); }
+                        catch (Exception ex) { TraceUiFault("posted page closed callback", ex, false); }
+                        TraceFlow("CLOSED_ACTION_END", "apply/cleanup/onClosed returned ms=" + closeTimer.ElapsedMilliseconds);
+                        try { dispatcher.Dispose(); }
+                        catch (Exception ex) { TraceUiFault("closed dispatcher dispose", ex, false); }
+                    }
+                };
+                TraceFlow("AFJ_R60_IDLE_GATE", "armed=True native_idle_observed=False posted=False session ownership retained");
+            }
+            catch (Exception ex)
+            {
+                closedActionPending = false;
+                pendingClosedAction = null;
+                closedActionDispatcher = null;
+                TraceUiFault("arm closed action; cleanup remains pending, no inline fallback", ex, false);
+                try { if (dispatcher != null) dispatcher.Dispose(); }
+                catch (Exception disposeError) { TraceUiFault("closed dispatcher dispose", disposeError, false); }
+                // Never recover by calling native Apply/Hide/Close from the
+                // still-active SOLIDWORKS AfterClose callback.
             }
         }
 
@@ -1030,6 +1198,7 @@ namespace ADDIN.UI.AutoFrameJoint
             try
             {
                 TraceFlow("LIST_ENTER", "box=" + id + " count=" + count);
+                if (closing || closeNotified) { TraceFlow("LIST_REJECT", "closed page; captured revision preserved"); return; }
                 if (id != BoxFrameA && id != BoxFrameB) { TraceFlow("LIST_REJECT", "unknown box"); return; }
                 selectionRevision++; currentPairValidated=false; // Managed invalidation, including count-one replacement.
                 if (id == BoxFrameA) { callbackCountA = count; if (count != 1) { committedA = null; committedNameA = null; } }
