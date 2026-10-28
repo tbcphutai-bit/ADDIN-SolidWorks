@@ -18,6 +18,9 @@ namespace ADDIN.Commands.BendPlacement
         public int Version { get; set; }
         public string WorkbookSha256 { get; set; }
         public List<BendLimitSelection> Rules { get; set; }
+        // Explicit attestation of completeness, not inferred from an empty list.
+        public string CaseSetScope { get; set; }
+        public ToolReviewProof CaseSetReview { get; set; }
     }
     internal sealed class BendLimitSelection
     {
@@ -35,6 +38,7 @@ namespace ADDIN.Commands.BendPlacement
         public string MachineSystem { get; set; }
         public string MaterialCode { get; set; }
         public string SectionKind { get; set; }
+        public string PoseId { get; set; }
         public double? ThicknessMinMm { get; set; }
         public double? ThicknessMaxMm { get; set; }
         public double? AngleMinDeg { get; set; }
@@ -44,6 +48,7 @@ namespace ADDIN.Commands.BendPlacement
         public double? LMinMm { get; set; }
         public double? LMaxMm { get; set; }
         public ToolReviewProof ApplicabilityReview { get; set; }
+        public ToolReviewProof ReferenceDispositionReview { get; set; }
     }
     internal sealed class WorkbookSourceObject
     {
@@ -68,11 +73,13 @@ namespace ADDIN.Commands.BendPlacement
             internal IReadOnlyList<WorkbookSourceObject> Objects;
             internal IReadOnlyList<BendLimitRuleDraft> Rules;
             internal IReadOnlyList<string> Reasons;
+            internal ToolReviewValidation CaseSetReview;
         }
         internal static Result Read(string workbookPath,string manifestPath,CancellationToken token,string reviewAuthoritiesPath=null)
         {
             string sha=null,mappingSha=null,reviewSha=null,reviewObservations=null;
             var objects=new List<WorkbookSourceObject>();var rules=new List<BendLimitRuleDraft>();var reasons=new List<string>();
+            var caseSet=ToolReviewValidation.Missing("EXCEL_CASE_SET_COMPLETENESS_NOT_REVIEWED");
             try
             {
                 byte[] bytes=PlacementSourceIo.Read(workbookPath,32*1024*1024,token);sha=PlacementSourceIo.Hash(bytes);
@@ -93,6 +100,7 @@ namespace ADDIN.Commands.BendPlacement
                     if(obj==null||string.IsNullOrWhiteSpace(r.FamilyId)||r.ToolIds==null||r.ToolIds.Length==0||r.ToolIds.Any(id=>!CompanyToolIds.All.Contains(id,StringComparer.OrdinalIgnoreCase))||
                         r.ToolIds.Distinct(StringComparer.OrdinalIgnoreCase).Count()!=r.ToolIds.Length)problems.Add("UNMAPPED_LIMIT_RULE");
                     if(obj!=null&&!string.IsNullOrEmpty(r.ExpectedObjectSha256)&&!string.Equals(obj.Sha256,r.ExpectedObjectSha256,StringComparison.OrdinalIgnoreCase))problems.Add("STALE_LIMIT_OBJECT");
+                    if(!ToolDatumEvidence.IsSha256(r.ExpectedObjectSha256))problems.Add("MISSING_EXPECTED_EXCEL_OBJECT_SHA256");
                     double? value=null;
                     // Source transcription and tool applicability are separate facts.
                     // A readable cell may be retained even while its tool family is unknown.
@@ -116,6 +124,7 @@ namespace ADDIN.Commands.BendPlacement
                     }
                     var conditions=new BendExcelCaseConditions(r);
                     ToolReviewValidation approval=ToolReviewValidation.Missing("MISSING_EXCEL_CASE_REVIEW");
+                    var referenceReview=ToolReviewValidation.Missing("EXCEL_REFERENCE_DISPOSITION_NOT_REVIEWED");
                     if(kind==BendLimitKind.MaxBendLength && obj!=null && value.HasValue && problems.Count==0 && conditions.Complete &&
                         r.ApplicabilityReview!=null)
                     {
@@ -123,7 +132,7 @@ namespace ADDIN.Commands.BendPlacement
                         // numerical source limit, catalog identities and ALL W/L
                         // and material applicability conditions. It cannot be
                         // carried over to a changed source workbook or manifest.
-                        string payload=ToolEvidenceCanonical.Hash("BendExcelCaseNumericV1",sha,r.Id,r.FamilyId,kind.ToString(),
+                        string payload=ToolEvidenceCanonical.Hash("BendExcelCaseNumericV2",sha,r.Id,r.FamilyId,kind.ToString(),
                             r.Sheet,r.Locator,obj.Sha256,r.Unit,ToolEvidenceCanonical.Number(value.Value),
                             ToolEvidenceCanonical.Hash(r.ToolIds.OrderBy(x=>x,StringComparer.Ordinal).ToArray()),conditions.Binding);
                         approval=verifier.Verify("BendExcelCaseApplicability",payload,r.ApplicabilityReview,
@@ -133,16 +142,32 @@ namespace ADDIN.Commands.BendPlacement
                         problems.Add("UNVERIFIED_TOOL_FAMILY_MAPPING");
                     if(kind==BendLimitKind.DeepBendClearanceExample)problems.Add("REFERENCE_EXAMPLE_ONLY");
                     if(!conditions.Complete)problems.Add("MISSING_SIGNED_EXCEL_CASE_CONDITIONS");
-                    rules.Add(new BendLimitRuleDraft(r.Id,r.FamilyId,kind,sha,r.Sheet,r.Locator,obj?.Sha256,r.Unit,value,r.ToolIds??new string[0],problems,approval,conditions));
+                    if(kind==BendLimitKind.DeepBendClearanceExample&&obj!=null&&
+                        ToolDatumEvidence.IsSha256(r.ExpectedObjectSha256)&&r.ExpectedObjectSha256==obj.Sha256)
+                        referenceReview=verifier.Verify("BendExcelReferenceDisposition",ReferencePayload(sha,r.Id,r.FamilyId,kind,r.Sheet,r.Locator,obj.Sha256),
+                            r.ReferenceDispositionReview,Path.GetDirectoryName(Path.GetFullPath(manifestPath)),token);
+                    rules.Add(new BendLimitRuleDraft(r.Id,r.FamilyId,kind,sha,r.Sheet,r.Locator,obj?.Sha256,r.Unit,value,r.ToolIds??new string[0],problems,approval,conditions,referenceReview));
                 }
+                if(manifest.CaseSetScope=="AllCheckChanCasesInWorkbook" &&
+                    reasons.Count==0&&rules.Count==manifest.Rules.Count && rules.Count>0 && rules.All(r=>r.FamilyMappingVerified||r.ReviewedInformationalReference))
+                    caseSet=verifier.Verify("BendExcelCaseSetCompleteness",CaseSetPayload(sha,rules),manifest.CaseSetReview,
+                        Path.GetDirectoryName(Path.GetFullPath(manifestPath)),token);
                 reviewObservations=verifier.ObservationFingerprint;
             }
             catch(OperationCanceledException){throw;}
-            catch(Exception ex){rules.Clear();reasons.Add(ex is InvalidDataException&&ex.Message=="STALE_LIMIT_MAPPING"?"STALE_LIMIT_MAPPING":"MISSING_OR_INVALID_LIMIT_SOURCE");reasons.Add("UNMAPPED_LIMIT_RULE");}
-            return new Result {WorkbookSha256=sha,Objects=PlacementLists.Copy(objects),Rules=PlacementLists.Copy(rules),Reasons=PlacementLists.Reasons(reasons),
-                Fingerprint=PlacementSourceIo.Hash((workbookPath??"")+sha+mappingSha+reviewSha+reviewObservations+
+            catch(Exception ex){rules.Clear();reasons.Add(ex is InvalidDataException&&ex.Message=="STALE_LIMIT_MAPPING"?"STALE_LIMIT_MAPPING":"MISSING_OR_INVALID_LIMIT_SOURCE");reasons.Add("UNMAPPED_LIMIT_RULE");
+                BendCheckRunDiagnostics.WriteChanged("BendExcelSource.Read.error",new {workbookPath,manifestPath},ex,token);}
+            return new Result {CaseSetReview=caseSet,WorkbookSha256=sha,Objects=PlacementLists.Copy(objects),Rules=PlacementLists.Copy(rules),Reasons=PlacementLists.Reasons(reasons),
+                Fingerprint=PlacementSourceIo.Hash((workbookPath??"")+sha+mappingSha+reviewSha+reviewObservations+caseSet.Status.ToString()+
                     string.Join("|",reasons)+string.Join("|",rules.Select(r=>r.ApplicabilityReview.Status.ToString()))) };
         }
+        internal static string CaseSetPayload(string workbookSha,IEnumerable<BendLimitRuleDraft> rules) =>
+            ToolEvidenceCanonical.Hash("BendExcelCaseSetV1",workbookSha,"AllCheckChanCasesInWorkbook",
+                ToolEvidenceCanonical.Hash(rules.OrderBy(r=>r.Id,StringComparer.Ordinal).Select(r=>
+                    r.ReviewedInformationalReference?r.ReferenceDispositionReview.PayloadSha256:r.ApplicabilityReview.PayloadSha256).ToArray()));
+        internal static string ReferencePayload(string workbookSha,string id,string family,BendLimitKind kind,string sheet,string locator,string objectSha) =>
+            ToolEvidenceCanonical.Hash("BendExcelInformationalReferenceV1",workbookSha,id,family,kind.ToString(),sheet,locator,objectSha,
+                "ReferenceOnlyNotAnApplicableProductionLimit");
         internal static IReadOnlyList<WorkbookSourceObject> ReadObjects(byte[] bytes,CancellationToken token)
         {
             var result=new List<WorkbookSourceObject>();

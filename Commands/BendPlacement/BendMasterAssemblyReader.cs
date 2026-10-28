@@ -33,6 +33,7 @@ namespace ADDIN.Commands.BendPlacement
     {
         internal static byte[] Read(string path,int limit,CancellationToken token)
         {
+            ToolSourceReadScope.Attempt(path);
             DateTime stamp=File.GetLastWriteTimeUtc(path);
             using(var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
             using(var memory=new MemoryStream())
@@ -41,7 +42,7 @@ namespace ADDIN.Commands.BendPlacement
                 byte[] chunk=new byte[65536];int n;
                 while((n=file.Read(chunk,0,chunk.Length))>0){token.ThrowIfCancellationRequested();memory.Write(chunk,0,n);if(memory.Length>limit)throw new InvalidDataException("Placement source grew beyond read limit.");}
                 if(length!=memory.Length||file.Length!=length||stamp!=File.GetLastWriteTimeUtc(path))throw new IOException("Placement source changed during read.");
-                return memory.ToArray();
+                var bytes=memory.ToArray();ToolSourceReadScope.Observed(path,bytes);return bytes;
             }
         }
         internal static string Hash(byte[] bytes)=>ToolProfileLibraryProvider.Hash(bytes);

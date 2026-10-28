@@ -78,7 +78,8 @@ namespace ADDIN.Commands.BendPlanning
         public bool SimulationOnly { get; }
         public int ToolTypeCount => Steps.Select(s=>s.Transition.ToolId).Distinct(StringComparer.Ordinal).Count();
         public int ToolChangeCount => Enumerable.Range(1,Math.Max(0,Steps.Count-1)).Count(i=>
-            Steps[i-1].Transition.ToolId!=Steps[i].Transition.ToolId ||
+            Steps[i-1].Transition.ToolId!=Steps[i].Transition.ToolId);
+        public int SetupChangeCount => Enumerable.Range(1,Math.Max(0,Steps.Count-1)).Count(i=>
             Steps[i-1].Transition.SetupIdentitySha256!=Steps[i].Transition.SetupIdentitySha256);
         public CollisionStatus Status => invalid() != null ? CollisionStatus.UNKNOWN : Steps.Any(s => s.Status == CollisionStatus.COLLISION) ?
             CollisionStatus.COLLISION : ReachesAllBends && Steps.Count > 0 && Steps.All(s => s.Status == CollisionStatus.CLEAR) ? CollisionStatus.CLEAR : CollisionStatus.UNKNOWN;
@@ -129,7 +130,7 @@ namespace ADDIN.Commands.BendPlanning
         // an unprovided inter-tool changeover movement to produce a fallback.
         public BendSequenceResult PreferredCheckedSequence => !Current ? null : Tools.SelectMany(t=>t.Sequences)
             .Where(s=>s.ReachesAllBends&&s.Status==CollisionStatus.CLEAR)
-            .OrderBy(s=>s.ToolChangeCount).ThenBy(s=>s.ToolTypeCount)
+            .OrderBy(s=>s.ToolChangeCount).ThenBy(s=>s.SetupChangeCount).ThenBy(s=>s.ToolTypeCount)
             .ThenBy(s=>s.ToolId,StringComparer.Ordinal)
             .ThenBy(s=>string.Join(",",s.Steps.Select(step=>step.FeatureId)),StringComparer.Ordinal).FirstOrDefault();
         public int VisitedNodes { get; }

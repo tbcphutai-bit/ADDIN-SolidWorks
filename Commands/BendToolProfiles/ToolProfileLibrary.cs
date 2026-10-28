@@ -60,6 +60,150 @@ namespace ADDIN.Commands.BendTools
             MasterMode=Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")};
     }
 
+    // One read transaction records the bytes actually consumed by every nested
+    // managed reader. No COM object, geometry inference or machine settings enter it.
+    internal sealed class ToolSourceReadScope : IDisposable
+    {
+        [ThreadStatic] private static ToolSourceReadScope active;
+        private readonly ToolSourceReadScope parent;
+        private readonly Dictionary<string,string> files=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        private bool inconsistent;
+        private readonly string environment=ToolProfileSourceSettings.OverrideStamp();
+        private readonly CancellationToken cancellation;
+        internal string ConfigurationKey;
+        internal ToolSourceReadScope(CancellationToken cancellation=default(CancellationToken)) {this.cancellation=cancellation; parent=active; active=this; }
+        internal static void Attempt(string path)
+        {
+            if(active==null||string.IsNullOrWhiteSpace(path))return;
+            string full=Path.GetFullPath(path);
+            if(!active.files.ContainsKey(full))active.files.Add(full,File.Exists(full)?"UNREAD":"MISSING");
+        }
+        // A direct open distinguishes a genuinely absent file from an
+        // unavailable one. File.Exists is only a metadata probe; false can
+        // also mean access was denied and must not certify source absence.
+        internal static void Missing(string path)
+        {
+            if(active==null||string.IsNullOrWhiteSpace(path))return;
+            string full=Path.GetFullPath(path),prior;
+            if(active.files.TryGetValue(full,out prior)&&prior!="MISSING"&&prior!="UNREAD")active.inconsistent=true;
+            active.files[full]="MISSING";
+        }
+        internal static void Unavailable(string path)
+        {
+            if(active==null||string.IsNullOrWhiteSpace(path))return;
+            active.files[Path.GetFullPath(path)]="UNREAD";
+        }
+        internal static void Observed(string path,byte[] bytes)
+        {
+            if(active==null||string.IsNullOrWhiteSpace(path))return;
+            string full=Path.GetFullPath(path),sha=ToolProfileLibraryProvider.Hash(bytes),prior;
+            if(active.files.TryGetValue(full,out prior)&&prior!="UNREAD"&&prior!="MISSING"&&prior!=sha)active.inconsistent=true;
+            active.files[full]=sha;
+        }
+        internal ToolSourceIdentity Seal(CancellationToken token)
+        {
+            var identity=new ToolSourceIdentity(ConfigurationKey,files,inconsistent,environment);
+            try {if(!identity.Validate(token))identity.Invalidate();return identity;}
+            catch {identity.Invalidate();throw;}
+        }
+        internal ToolSourceIdentity Seal() => Seal(cancellation);
+        internal static ToolSourceReadScope Active => active;
+        public void Dispose() { active=parent; }
+    }
+    internal sealed class ToolSourceIdentity
+    {
+        private readonly IReadOnlyDictionary<string,string> files;
+        private readonly List<FileSystemWatcher> watchers=new List<FileSystemWatcher>();
+        private readonly object gate=new object();
+        private readonly string environment;
+        private int current=1;
+        internal string ConfigurationKey { get; }
+        internal string Fingerprint { get; }
+        internal bool Current => Volatile.Read(ref current)==1;
+        internal ToolSourceIdentity(string key,IDictionary<string,string> reads,bool inconsistent,string environment=null)
+        {
+            ConfigurationKey=key;
+            files=new Dictionary<string,string>(reads,StringComparer.OrdinalIgnoreCase);
+            this.environment=environment??ToolProfileSourceSettings.OverrideStamp();
+            Fingerprint=ToolProfileLibraryProvider.Hash(Encoding.UTF8.GetBytes("EffectiveToolSourceV1\n"+key+"\n"+this.environment+"\n"+
+                string.Join("\n",files.OrderBy(f=>f.Key,StringComparer.OrdinalIgnoreCase).Select(f=>f.Key+":"+f.Value))));
+            if(inconsistent||files.Values.Any(v=>v=="UNREAD")){current=0;return;}
+            // Watchers only revoke a lease. Hashing/decoding remains on managed
+            // workers; callbacks never touch WinForms, SOLIDWORKS, or RCWs.
+            try
+            {
+                lock(gate) foreach(string folder in files.Keys.Select(ExistingParent).Where(d=>d!=null).Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    var watcher=new FileSystemWatcher(folder) { IncludeSubdirectories=true,
+                        NotifyFilter=NotifyFilters.LastWrite|NotifyFilters.Size|NotifyFilters.FileName|NotifyFilters.DirectoryName };
+                    watcher.Changed+=Changed;watcher.Created+=Changed;watcher.Deleted+=Changed;
+                    watcher.Renamed+=(s,e)=>{if(Affects(e.OldFullPath)||Affects(e.FullPath))Invalidate();};
+                    watcher.Error+=(s,e)=>Invalidate();
+                    watchers.Add(watcher);watcher.EnableRaisingEvents=true;
+                }
+            }
+            catch(IOException){Invalidate();}
+            catch(UnauthorizedAccessException){Invalidate();}
+            catch(ArgumentException){Invalidate();}
+        }
+        private static string ExistingParent(string path)
+        {
+            string folder=Path.GetDirectoryName(path);
+            while(!string.IsNullOrEmpty(folder)&&!Directory.Exists(folder))folder=Path.GetDirectoryName(folder);
+            return folder;
+        }
+        private bool Affects(string path) => files.Keys.Any(f=>string.Equals(f,path,StringComparison.OrdinalIgnoreCase)||
+            f.StartsWith(path.TrimEnd(Path.DirectorySeparatorChar)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase));
+        private void Changed(object sender,FileSystemEventArgs e) { if(Affects(e.FullPath))Invalidate(); }
+        internal bool Validate(CancellationToken token)
+        {
+            if(!Current||environment!=ToolProfileSourceSettings.OverrideStamp()) { Invalidate();return false; }
+            foreach(var file in files)
+            {
+                token.ThrowIfCancellationRequested();
+                try
+                {
+                    if(file.Value=="MISSING")
+                    {
+                        // A false metadata probe cannot distinguish missing
+                        // from unreadable. Only these open errors prove absence.
+                        try { using(var probe=new FileStream(file.Key,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)) { } }
+                        catch(FileNotFoundException) { continue; }
+                        catch(DirectoryNotFoundException) { continue; }
+                        Invalidate();return false;
+                    }
+                    // Hash bytes, not timestamps: same-size/same-timestamp edits
+                    // must invalidate manifest, workbook and review evidence too.
+                    using(var stream=new FileStream(file.Key,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
+                    using(var hash=SHA256.Create())
+                    {
+                        if(stream.Length>64*1024*1024) { Invalidate();return false; }
+                        var buffer=new byte[65536];int count;long total=0,length=stream.Length;
+                        while((count=stream.Read(buffer,0,buffer.Length))>0)
+                        {
+                            token.ThrowIfCancellationRequested();total+=count;
+                            if(total>64*1024*1024){Invalidate();return false;}
+                            hash.TransformBlock(buffer,0,count,buffer,0);
+                        }
+                        hash.TransformFinalBlock(new byte[0],0,0);
+                        if(stream.Length!=length||total!=length){Invalidate();return false;}
+                        string observed=BitConverter.ToString(hash.Hash).Replace("-","").ToLowerInvariant();
+                        if(observed!=file.Value) { Invalidate();return false; }
+                    }
+                }
+                catch(IOException){Invalidate();return false;}
+                catch(UnauthorizedAccessException){Invalidate();return false;}
+            }
+            if(environment!=ToolProfileSourceSettings.OverrideStamp())Invalidate();
+            return Current;
+        }
+        internal void Invalidate()
+        {
+            Interlocked.Exchange(ref current,0);
+            lock(gate) { foreach(var watcher in watchers)watcher.Dispose();watchers.Clear(); }
+        }
+    }
+
     internal sealed class ToolProfileSourceConfiguration
     {
         public int Version { get; set; } = 1;
@@ -76,6 +220,10 @@ namespace ADDIN.Commands.BendTools
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"ADDIN","bend-tool-dxf-source.json");
         internal ToolProfileSourceSettings() : this(DefaultSettingsPath) { }
         internal ToolProfileSourceSettings(string path) { this.path=Path.GetFullPath(path); }
+
+        internal static readonly string[] OverrideNames={"ADDIN_BEND_TOOL_DXF_DIRECTORY","ADDIN_BEND_TOOL_DXF_MANIFEST",
+            "ADDIN_BEND_TOOL_DATUM_EVIDENCE","ADDIN_BEND_PLACEMENT_CONFIG","ADDIN_BEND_USE_MASTER_PAIRS"};
+        internal static string OverrideStamp() => new JavaScriptSerializer().Serialize(OverrideNames.Select(n=>Environment.GetEnvironmentVariable(n)).ToArray());
 
         // Read only file metadata and process overrides (no source/CAD file read).
         internal static string QuickConfigurationStamp()
@@ -95,11 +243,12 @@ namespace ADDIN.Commands.BendTools
 
         // Only called after the operator previews and explicitly approves.
         // No workbook, DXF, original manifest or other source is modified.
-        internal void SaveApprovedSelection(ToolProfileSourceConfiguration selected)
+        internal void SaveApprovedSelection(ToolProfileSourceConfiguration selected,ToolProfileLibrarySnapshot preview,CancellationToken token=default(CancellationToken))
         {
+            token.ThrowIfCancellationRequested();
             if(selected==null||selected.Version!=1)throw new InvalidDataException("Invalid source selection.");
-            if(!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY")))
-                throw new InvalidOperationException("An environment DXF override is active; local settings cannot take precedence.");
+            if(OverrideNames.Any(n=>Environment.GetEnvironmentVariable(n)!=null))
+                throw new InvalidOperationException("An ADDIN tool-source override is active; remove it explicitly before saving local settings.");
             if(!selected.UseMasterPairsAsLibrary)
             {
                 if(string.IsNullOrWhiteSpace(selected.DirectoryPath)||!Path.IsPathRooted(selected.DirectoryPath)||
@@ -115,17 +264,23 @@ namespace ADDIN.Commands.BendTools
             {
                 string placement=Path.IsPathRooted(selected.PlacementConfigurationPath) ?
                     selected.PlacementConfigurationPath :
-                    (string.IsNullOrWhiteSpace(selected.DirectoryPath) ? null : Path.Combine(selected.DirectoryPath,selected.PlacementConfigurationPath));
+                    Path.Combine(string.IsNullOrWhiteSpace(selected.DirectoryPath)?Path.GetDirectoryName(path):selected.DirectoryPath,
+                        selected.PlacementConfigurationPath);
                 if(string.IsNullOrWhiteSpace(placement)||!File.Exists(placement))
                     throw new FileNotFoundException("Selected placement configuration is missing.",placement);
             }
             if(selected.UseMasterPairsAsLibrary&&string.IsNullOrWhiteSpace(selected.PlacementConfigurationPath))
                 throw new InvalidDataException("Fixed CAD pairs require an explicit placement configuration.");
+            if(preview==null||preview.EffectiveSources==null||preview.SelectionProblem(selected)!=null||
+                preview.EffectiveSources.ConfigurationKey!=ToolProfileLibraryProvider.Hash(Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(selected)))||
+                !preview.EffectiveSources.Validate(token))
+                throw new InvalidDataException("SOURCE_PREVIEW_STALE_OR_NOT_VALIDATED");
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string temporary=path+"."+Guid.NewGuid().ToString("N")+".tmp";
             try
             {
                 File.WriteAllText(temporary,new JavaScriptSerializer().Serialize(selected),new UTF8Encoding(false));
+                token.ThrowIfCancellationRequested();
                 if(File.Exists(path))File.Replace(temporary,path,path+".bak",true);
                 else File.Move(temporary,path);
             }
@@ -137,30 +292,64 @@ namespace ADDIN.Commands.BendTools
                 LocalApplicationData=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),Overrides=BendCheckRunDiagnostics.Overrides()});
             try
             {
-                var loaded=LoadCore();
+                string readState;
+                var loaded=LoadCore(out readState);
                 BendCheckRunDiagnostics.WriteChanged("ToolSourceSettings.Load.end",new {SettingsPath=path,FileExists=File.Exists(path),
-                    loaded.Version,loaded.DirectoryPath,loaded.ManifestPath,loaded.DatumEvidencePath,loaded.PlacementConfigurationPath,loaded.UseMasterPairsAsLibrary});
+                    SourceState=readState,loaded.Version,loaded.DirectoryPath,loaded.ManifestPath,loaded.DatumEvidencePath,loaded.PlacementConfigurationPath,loaded.UseMasterPairsAsLibrary});
                 return loaded;
             }
-            catch(Exception ex){BendCheckRunDiagnostics.WriteChanged("ToolSourceSettings.Load.error",new {SettingsPath=path},ex);throw;}
+            catch(Exception ex)
+            {
+                string code=ex is UnauthorizedAccessException||ex is System.Security.SecurityException?"SOURCE_SETTINGS_ACCESS_DENIED":
+                    ex is InvalidDataException||ex is ArgumentException||ex is FormatException?"SOURCE_SETTINGS_INVALID":
+                    ex is IOException?"SOURCE_SETTINGS_IO_FAILED":"SOURCE_SETTINGS_FAILED";
+                BendCheckRunDiagnostics.WriteChanged("ToolSourceSettings.Load.error",new {SettingsPath=path,SourceState=code,
+                    FileExistsProbe=File.Exists(path),HResult=ex.HResult},ex);
+                // Preserve the original exception and stack in diagnostics and
+                // InnerException while exposing a stable actionable UI reason.
+                throw new InvalidDataException(code+": "+path,ex);
+            }
         }
-        private ToolProfileSourceConfiguration LoadCore()
+        private ToolProfileSourceConfiguration LoadCore(out string readState)
         {
-            string directory=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_DIRECTORY");
-            if (!string.IsNullOrWhiteSpace(directory)) return new ToolProfileSourceConfiguration { DirectoryPath=directory,
-                ManifestPath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DXF_MANIFEST"),
-                DatumEvidencePath=Environment.GetEnvironmentVariable("ADDIN_BEND_TOOL_DATUM_EVIDENCE"),
-                PlacementConfigurationPath=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG"),
-                UseMasterPairsAsLibrary=Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")=="1" };
-            if (!File.Exists(path)) return new ToolProfileSourceConfiguration {PlacementConfigurationPath=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG"),
-                UseMasterPairsAsLibrary=Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS")=="1"};
-            if (new FileInfo(path).Length>65536) throw new InvalidDataException("DXF source settings exceed 64 KB.");
-            var result=new JavaScriptSerializer().Deserialize<ToolProfileSourceConfiguration>(File.ReadAllText(path,Encoding.UTF8));
-            if (result==null || result.Version!=1) throw new InvalidDataException("Unsupported DXF source settings version.");
-            string placement=Environment.GetEnvironmentVariable("ADDIN_BEND_PLACEMENT_CONFIG");
+            ToolSourceReadScope.Attempt(path);
+            byte[] bytes=null;
+            try
+            {
+                // Open directly. File.Exists(false) can also mean access/IO
+                // failure; it is never the gate for approved settings bytes.
+                bytes=BendPlacement.PlacementSourceIo.Read(path,65536,CancellationToken.None);
+                readState="SETTINGS_FILE_READ";
+            }
+            catch(FileNotFoundException) { ToolSourceReadScope.Missing(path);readState="SETTINGS_FILE_MISSING"; }
+            catch(DirectoryNotFoundException) { ToolSourceReadScope.Missing(path);readState="SETTINGS_DIRECTORY_MISSING"; }
+            catch { ToolSourceReadScope.Unavailable(path);throw; }
+            var result=new ToolProfileSourceConfiguration();
+            if(bytes!=null)
+            {
+                result=new JavaScriptSerializer().Deserialize<ToolProfileSourceConfiguration>(Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF'));
+                if(result==null||result.Version!=1)throw new InvalidDataException("Unsupported DXF source settings version.");
+            }
+            // Each explicitly supplied override takes precedence independently;
+            // an absent override must never clear an approved local path/mode.
+            string directory=Environment.GetEnvironmentVariable(OverrideNames[0]);
+            string manifest=Environment.GetEnvironmentVariable(OverrideNames[1]);
+            string datum=Environment.GetEnvironmentVariable(OverrideNames[2]);
+            string placement=Environment.GetEnvironmentVariable(OverrideNames[3]);
+            string master=Environment.GetEnvironmentVariable(OverrideNames[4]);
+            if(!string.IsNullOrWhiteSpace(directory))result.DirectoryPath=directory;
+            if(!string.IsNullOrWhiteSpace(manifest))result.ManifestPath=manifest;
+            if(!string.IsNullOrWhiteSpace(datum))result.DatumEvidencePath=datum;
             if(!string.IsNullOrWhiteSpace(placement))result.PlacementConfigurationPath=placement;
-            string masterMode=Environment.GetEnvironmentVariable("ADDIN_BEND_USE_MASTER_PAIRS");
-            if(masterMode!=null)result.UseMasterPairsAsLibrary=masterMode=="1";
+            if(master!=null)
+            {
+                if(master!="0"&&master!="1")throw new InvalidDataException("ADDIN_BEND_USE_MASTER_PAIRS must be 0 or 1.");
+                result.UseMasterPairsAsLibrary=master=="1";
+            }
+            if(result.UseMasterPairsAsLibrary&&!string.IsNullOrWhiteSpace(result.PlacementConfigurationPath)&&
+                !Path.IsPathRooted(Environment.ExpandEnvironmentVariables(result.PlacementConfigurationPath)))
+                result.PlacementConfigurationPath=BendPlacement.PlacementSourceIo.Resolve(
+                    string.IsNullOrWhiteSpace(result.DirectoryPath)?Path.GetDirectoryName(path):result.DirectoryPath,result.PlacementConfigurationPath);
             return result;
         }
     }
@@ -195,12 +384,15 @@ namespace ADDIN.Commands.BendTools
             (Blocks==null || Blocks.Length==0 || e.Blocks.Any(b=>Blocks.Contains(b,StringComparer.OrdinalIgnoreCase)));
     }
 
-    internal sealed class ToolProfileLibraryProvider
+    internal sealed class ToolProfileLibraryProvider : IDisposable
     {
         private readonly Func<ToolProfileSourceConfiguration> configuration;
         private readonly Dictionary<string,ToolDxfDocument> documents=new Dictionary<string,ToolDxfDocument>(StringComparer.OrdinalIgnoreCase);
         private readonly object gate=new object();
         private ToolProfileLibrarySnapshot previous;
+        private bool disposed;
+        internal void Invalidate() { lock(gate)previous?.Invalidate(); }
+        public void Dispose() { lock(gate){disposed=true;previous?.Invalidate();documents.Clear();} }
         internal ToolProfileLibraryProvider() : this(new ToolProfileSourceSettings().Load) { }
         internal ToolProfileLibraryProvider(Func<ToolProfileSourceConfiguration> configuration) { this.configuration=configuration; }
         internal static string Hash(byte[] bytes)
@@ -210,13 +402,18 @@ namespace ADDIN.Commands.BendTools
         internal ToolProfileLibrarySnapshot Read(CancellationToken cancellation)
         {
             lock (gate)
+            using(var reads=new ToolSourceReadScope(cancellation))
             {
+                if(disposed)throw new ObjectDisposedException(nameof(ToolProfileLibraryProvider));
                 BendCheckRunDiagnostics.WriteChanged("ToolLibrary.Read.begin",token:cancellation);
                 bool fixedCadMode=previous?.UsesFixedCadPairs==true;
                 try
                 {
                     cancellation.ThrowIfCancellationRequested(); var config=configuration();
+                    reads.ConfigurationKey=HashText(new JavaScriptSerializer().Serialize(config));
                     fixedCadMode=config?.UseMasterPairsAsLibrary==true;
+                    if(previous?.Current==true&&previous.EffectiveSources?.ConfigurationKey==reads.ConfigurationKey&&
+                        previous.EffectiveSources.Validate(cancellation))return previous;
                     if (config==null || config.Version!=1) throw new InvalidDataException("Unsupported DXF source settings version.");
                     if(config.UseMasterPairsAsLibrary)return Publish(FixedCadMode(ReadMasterPairs(config,cancellation)));
                     if (string.IsNullOrWhiteSpace(config.DirectoryPath)) return Publish(Failure("DXF source directory is not configured."));
@@ -281,13 +478,33 @@ namespace ADDIN.Commands.BendTools
                 MatchedPairs=snapshot.PlacementSources.Tools.Count(t=>t.CadPair?.Matched==true),
                 ClampVerified=snapshot.PlacementSources.Tools.Count(t=>t.ClampVerified),snapshot.ConfigurationSha256,
                 PlacementReasons=snapshot.PlacementSources.Reasons});
-            if (previous!=null && previous.Current && previous.Fingerprint==snapshot.Fingerprint) return previous;
+            snapshot.EffectiveSources=ToolSourceReadScope.Active?.Seal();
+            snapshot.Fingerprint=HashText(snapshot.Fingerprint+"\n"+snapshot.EffectiveSources?.Fingerprint);
+            if(snapshot.EffectiveSources?.Current==false)
+            {
+                // An unreadable source is reportable as health UNKNOWN, never
+                // as usable partial geometry. Keep inventory display possible.
+                string fingerprint=snapshot.Fingerprint;
+                string error=snapshot.Error??"SOURCE_CHANGED_OR_UNREADABLE_DURING_READ";
+                bool fixedMode=snapshot.UsesFixedCadPairs;
+                snapshot.Invalidate();
+                snapshot=Failure(error);snapshot.UsesFixedCadPairs=fixedMode;snapshot.Fingerprint=fingerprint;
+            }
+            // A stable failure contains zero geometry/certificates. It may be
+            // shared across the publication audit so the recognized bends can
+            // be shown with the actual source error instead of disappearing.
+            if(previous?.Current==true&&previous.Error!=null&&snapshot.Error!=null&&previous.Fingerprint==snapshot.Fingerprint&&
+                previous.Tools.All(t=>!t.Validation.PunchGeometryReadComplete)&&snapshot.Tools.All(t=>!t.Validation.PunchGeometryReadComplete))
+            {snapshot.Invalidate();return previous;}
             previous?.Invalidate(); previous=snapshot; return snapshot;
         }
         private static ToolProfileLibrarySnapshot ReadMasterPairs(ToolProfileSourceConfiguration config,CancellationToken token)
         {
             if(string.IsNullOrWhiteSpace(config.PlacementConfigurationPath))return Failure("Company CAD pairs require an explicit placement configuration.");
-            var placement=BendPlacement.BendPlacementSources.Read(config.PlacementConfigurationPath,token);
+            string root=string.IsNullOrWhiteSpace(config.DirectoryPath)?Path.GetDirectoryName(ToolProfileSourceSettings.DefaultSettingsPath):
+                Path.GetFullPath(Environment.ExpandEnvironmentVariables(config.DirectoryPath));
+            string placementPath=BendPlacement.PlacementSourceIo.Resolve(root,config.PlacementConfigurationPath);
+            var placement=BendPlacement.BendPlacementSources.Read(placementPath,token);
             var tools=new List<CompanyToolProfile>();
             foreach(string id in CompanyToolIds.All)
             {
@@ -301,7 +518,7 @@ namespace ADDIN.Commands.BendTools
                 tools.Add(new CompanyToolProfile {Id=id,Parts=parts.AsReadOnly(),Validation=validation,Datums=pair.MasterDatums});
             }
             var sources=placement.Tools.Select(t=>t.Source).Where(p=>p!=null).GroupBy(p=>p.Path,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).ToArray();
-            string configSha=HashText("FixedCompanyCadPairsV2\n"+Path.GetFullPath(config.PlacementConfigurationPath)+"\n"+ToolGeometryTolerance.Version+"\n"+placement.Fingerprint);
+            string configSha=HashText("FixedCompanyCadPairsV2\n"+placementPath+"\n"+ToolGeometryTolerance.Version+"\n"+placement.Fingerprint);
             return new ToolProfileLibrarySnapshot {ConfigurationSha256=configSha,Fingerprint=configSha,Tools=tools.AsReadOnly(),
                 Sources=Array.AsReadOnly(sources),PlacementSources=placement};
         }
@@ -398,6 +615,7 @@ namespace ADDIN.Commands.BendTools
         }
         private static byte[] ReadBytes(string path, int limit, CancellationToken cancellation)
         {
+            ToolSourceReadScope.Attempt(path);
             var stamp=File.GetLastWriteTimeUtc(path);
             using (var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
             using (var buffer=new MemoryStream())
@@ -411,7 +629,7 @@ namespace ADDIN.Commands.BendTools
                     if (buffer.Length>limit) throw new InvalidDataException("Source file exceeds read limit.");
                 }
                 if (length!=buffer.Length || stream.Length!=length || stamp!=File.GetLastWriteTimeUtc(path)) throw new IOException("Source changed while reading; retry after saving.");
-                return buffer.ToArray();
+                var bytes=buffer.ToArray();ToolSourceReadScope.Observed(path,bytes);return bytes;
             }
         }
         private static string WithinRoot(string root, string file)

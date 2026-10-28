@@ -107,6 +107,14 @@ namespace ADDIN.UI
             return string.Join("; ",raw.Split(new[]{';','\r','\n'},StringSplitOptions.RemoveEmptyEntries)
                 .Select(s=>Reason(s.Trim()).Caption).Distinct());
         }
+        internal static string CaptureBlocker(BatchPartViewModel part)
+        {
+            string reason=part?.RawPartResult?.Reason;
+            if(string.IsNullOrWhiteSpace(reason))
+                reason=string.Join("; ",(part?.Occurrences??new List<BatchOccurrenceViewModel>())
+                    .Select(o=>o.Reason).Where(r=>!string.IsNullOrWhiteSpace(r)).Distinct());
+            return string.IsNullOrWhiteSpace(reason)?"Chưa xác minh được danh sách nếp chấn.":Reasons(reason);
+        }
         internal static string PartReason(BatchPartViewModel part,bool technical=false)
         {
             if(technical)return part.Reason??"";
@@ -139,6 +147,19 @@ namespace ADDIN.UI
 
         private static readonly Dictionary<string,string> additionalReasons=new Dictionary<string,string>(StringComparer.Ordinal) {
             {"DXF source directory is not configured.","Chưa nhận cấu hình nguồn thư viện dao DXF"},
+            {"SOURCE_SETTINGS_ACCESS_DENIED","Không có quyền đọc cấu hình nguồn dao; xem đường dẫn và lỗi quyền trong chẩn đoán"},
+            {"SOURCE_SETTINGS_IO_FAILED","Không mở/đọc được cấu hình nguồn dao; xem lỗi I/O trong chẩn đoán"},
+            {"SOURCE_SETTINGS_INVALID","Cấu hình nguồn dao không hợp lệ; chọn lại nguồn đã được xác nhận"},
+            {"SOURCE_SETTINGS_FAILED","Không đọc được cấu hình nguồn dao; xem loại exception và đường dẫn trong chẩn đoán"},
+            {"LIGHTWEIGHT_NEEDS_EXPLICIT_USER_RESOLVE","Component đang Lightweight. Chuyển sang Resolved trong SOLIDWORKS rồi Refresh"},
+            {"LIGHTWEIGHT_SUBASSEMBLY_SCOPE_UNRESOLVED","Cụm đang Lightweight. Chuyển cụm sang Resolved rồi Refresh"},
+            {"UNKNOWN_ASSEMBLY_BODY_METADATA","Chưa xác minh được body của component; xem chẩn đoán đọc body Assembly"},
+            {"ASSEMBLY_BODY_PROOF_FAILED","Đọc thông tin body Assembly bị lỗi; xem exception trong chẩn đoán"},
+            {"Chưa đọc được body trong Assembly.","Chưa xác minh được body của component; xem chẩn đoán đọc body Assembly"},
+            {"UNLOADED_COMPONENT","Component chưa được nạp. Chuyển sang Resolved rồi Refresh"},
+            {"UNRESOLVED_SUPPRESSION_OR_ID_STATE","Chưa xác minh được trạng thái component; kiểm tra suppression và Resolve rồi Refresh"},
+            {"NON_SHEET_METAL_PART","Component không phải Part sheet metal"},
+            {"UNRECOGNIZED_BEND_INVENTORY","Chưa đối chiếu đủ FeatureId thực của các nếp chấn"},
             {"PLACEMENT_SOURCE_NOT_CONFIGURED","Chưa cấu hình nguồn cặp chày–đầu kẹp và mốc gá"},
             {"MISSING_MASTER_MAPPING","Chưa đọc được ánh xạ cặp chày–đầu kẹp từ CAD"},
             {"MISSING_DATUM_EVIDENCE","Chưa có bằng chứng xác minh mốc dao"},
@@ -171,7 +192,11 @@ namespace ADDIN.UI
             if (code != null && map.TryGetValue(code, out result)) return result;
             if(ReferenceEquals(map,reasonCodes)&&code!=null)
             {
-                string caption;if(additionalReasons.TryGetValue(code,out caption))return new BendUserText(caption,"Nội dung chỉ áp dụng trong phạm vi dữ liệu đã kiểm tra. Xem mã gốc ở chi tiết kỹ thuật.",code);
+                string caption;
+                string key=code;int separator=code.IndexOf(':');
+                if(separator>0)key=code.Substring(0,separator).Trim();
+                if(additionalReasons.TryGetValue(code,out caption)||additionalReasons.TryGetValue(key,out caption))
+                    return new BendUserText(caption,"Nội dung chỉ áp dụng trong phạm vi dữ liệu đã kiểm tra. Xem mã gốc ở chi tiết kỹ thuật.",code);
             }
             // Original code is retained only for technical detail/diagnostics.
             return new BendUserText(ReferenceEquals(map,reasonCodes)?"Thông tin chưa có diễn giải tiếng Việt – xem chi tiết kỹ thuật":"Trạng thái chưa được hỗ trợ – xem chi tiết kỹ thuật",

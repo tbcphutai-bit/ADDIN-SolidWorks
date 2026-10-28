@@ -14,6 +14,8 @@ namespace ADDIN.UI
 {
     internal sealed class BendSection2DScene
     {
+        internal Func<bool> EvidenceCurrent;
+        internal bool Current {get {try{return EvidenceCurrent==null||EvidenceCurrent();}catch{return false;}}}
         internal string PartTitle = "Chưa chọn nếp chấn";
         internal string PartEvidence = "Chưa có mặt cắt CAD cho nếp này.";
         internal string ToolTitle = "Chưa chọn bộ dao";
@@ -181,6 +183,12 @@ namespace ADDIN.UI
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             if (Width < 190 || Height < 180) return;
 
+            if(!scene.Current)
+            {
+                TextRenderer.DrawText(g,"Nguồn đã thay đổi · cần Refresh",statusFont,ClientRectangle,Orange,
+                    TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.WordBreak);
+                return;
+            }
             int pad = 14;
             var top = new Rectangle(pad, 5, Math.Max(1, Width - pad * 2), 28);
             var drawing = new Rectangle(pad, 37, Math.Max(1, Width - pad * 2), Math.Max(40, Height - 81));

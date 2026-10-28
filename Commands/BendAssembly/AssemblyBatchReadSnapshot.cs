@@ -50,6 +50,8 @@ namespace ADDIN.Commands.BendAssembly
         internal int CatalogCount { get; }
         internal int LoadedPunchCount { get; }
         internal int GeometryPairCount { get; }
+        internal int MatchedCadPairCount {get;}
+        internal int CollisionProfileReadyCount {get;}
         internal int VerifiedMountingPairCount { get; }
         internal int ExcelRuleCount { get; }
         internal double ValidationMilliseconds { get; set; }
@@ -60,12 +62,14 @@ namespace ADDIN.Commands.BendAssembly
             Parts = PlacementLists.Copy(source.Parts.Select(p => new AssemblyPartRead(p)));
             ToolPairs = PlacementLists.Copy(source.ToolPairs);
             var library = source.ToolCatalogForDisplay;
-            ToolSourceError = library?.Error;
+            ToolSourceError = library?.SourceProblem;
             ToolSourceFingerprint = library?.Fingerprint;
             CatalogCount = library?.Tools?.Count ?? 0;
             LoadedPunchCount = library?.Tools?.Count(t=>t?.Validation?.PunchGeometryReadComplete==true) ?? 0;
             GeometryPairCount = ToolPairs.Count(t=>t!=null && t.MappingIdentified &&
                 t.Punch?.Curves?.Count>0 && t.Holder?.Curves?.Count>0);
+            MatchedCadPairCount=ToolPairs.Count(t=>t?.CadPair?.Matched==true);
+            CollisionProfileReadyCount=ToolPairs.Count(t=>t?.GeometryCheckReady==true);
             VerifiedMountingPairCount = ToolPairs.Count(t=>t?.ClampVerified==true);
             ExcelRuleCount = library?.PlacementSources?.LimitRules?.Count ?? 0;
         }
@@ -124,6 +128,9 @@ namespace ADDIN.Commands.BendAssembly
     }
     internal sealed class AssemblyProcessPairRead
     {
+        internal string ModelSnapshotId {get;}
+        internal string FrameId {get;}
+        internal string ProcessPayloadSha256 {get;}
         internal CollisionPairKind Pair { get; }
         internal BendProcessPhase Phase { get; }
         internal string SegmentId { get; }
@@ -138,6 +145,7 @@ namespace ADDIN.Commands.BendAssembly
             Pair = source.Pair; Phase = source.Phase; SegmentId = source.SegmentId; Status = source.Status;
             Reasons = source.Reasons; Witness = source.Witness; ToleranceMm = source.ToleranceMm;
             ExpectedContact = source.ExpectedContact; ExpectedContactIntervals = source.ExpectedContactIntervals;
+            ModelSnapshotId=source.ModelSnapshotId;FrameId=source.FrameId;ProcessPayloadSha256=source.ProcessPayloadSha256;
         }
     }
 }

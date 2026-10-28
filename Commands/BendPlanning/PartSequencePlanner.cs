@@ -79,7 +79,7 @@ namespace ADDIN.Commands.BendPlanning
         // Synchronous entry is for managed batch workers, never a COM callback.
         internal PartPlanningResult Run(string source, PlacementModelCapture model, ToolProfileLibrarySnapshot library,
             PartSequenceSpace space = null, SequencePlannerOptions options = null, CancellationToken token = default(CancellationToken),
-            IProgress<SequencePlanningProgress> progress = null, Func<string> externalInvalid = null, Func<string> sharedInvalid = null, Action externalConsume = null)
+            IProgress<SequencePlanningProgress> progress = null, Func<string> externalInvalid = null, Func<string> sharedInvalid = null, Action externalConsume = null, Func<string,int,string> cadAdmission = null)
         {
             options = options ?? new SequencePlannerOptions(); var watch = Stopwatch.StartNew();
             int nodes = 0, queries = 0, hits = 0, misses = 0, stored = 0; string stop = null;
@@ -145,6 +145,8 @@ namespace ADDIN.Commands.BendPlanning
                         {
                             if (stored >= options.MaximumResults) { stop = "SEQUENCE_RESULT_MEMORY_BUDGET_EXCEEDED"; break; }
                             var edge = edges[i];
+                            string admission=cadAdmission?.Invoke(edge.ToolId,edge.FeatureId);
+                            if(admission!=null){unknownFrontier=true;reasons.Add(admission);continue;}
                             string punch = edge.Plan.Segments.First().Punch?.AssemblyCanonical;
                             string holder = edge.Plan.Segments.First().Holder?.AssemblyCanonical;
                             if (node.Setup != null && (node.Setup != edge.SetupIdentitySha256 || node.PunchSource != punch || node.HolderSource != holder))

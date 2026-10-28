@@ -88,6 +88,10 @@ namespace ADDIN.UI
             finally { parent.ResumeLayout(true); }
         }
 
+        private static bool SameSectionFrame(BendWorkFrame a,BendWorkFrame b) => a!=null&&b!=null&&a.FrameId==b.FrameId&&
+            EnvelopeBinding.Vector(a.OriginMm)==EnvelopeBinding.Vector(b.OriginMm)&&EnvelopeBinding.Vector(a.X)==EnvelopeBinding.Vector(b.X)&&
+            EnvelopeBinding.Vector(a.Y)==EnvelopeBinding.Vector(b.Y)&&EnvelopeBinding.Vector(a.BendAxis)==EnvelopeBinding.Vector(b.BendAxis);
+
         private void UxV43ClearSection()
         {
             uxV43SelectionKey = null;
@@ -118,9 +122,10 @@ namespace ADDIN.UI
                 SourceKey = part.SelectionKey,
                 FeatureId = bend.FeatureId,
                 ToolId = tool?.ToolId,
-                ExcelCaseCaption = "Tự dò Excel: chưa có điều kiện/mapping đã duyệt",
-                ExcelCaseSource = BendExcelReferenceV4.WorkbookName,
-                DecisionText = "CHƯA XÁC MINH · Chưa thể xác nhận trường hợp Excel áp dụng"
+                ExcelCaseCaption = BatchCheckOutcome.ExcelText(tool?.ExcelCase),
+                ExcelCaseSource = tool?.ExcelCase?.Evidence??BendExcelReferenceV4.WorkbookName,
+                DecisionText = BatchCheckOutcome.ExcelText(tool?.ExcelCase),
+                EvidenceCurrent = ()=>part.RawPartResult.Current&&(!isRunning)&&tool?.NativeEnvelope?.Current!=false
             };
             // A user-selected family here is a REFERENCE VIEW, not an automatic
             // tool match, not a scored fit and not a production decision.
@@ -135,7 +140,7 @@ namespace ADDIN.UI
                     " · " + family.CellRange;
             }
             if (uxV44EvidenceLabel != null && !uxV44EvidenceLabel.IsDisposed)
-                uxV44EvidenceLabel.Text = "Chưa duyệt Excel → ToolId/W-L · CAD fallback chưa có chứng cứ";
+                uxV44EvidenceLabel.Text = BatchCheckOutcome.ExcelText(tool?.ExcelCase);
             // Only uniform, original final-Part geometry can share an exact
             // work frame with a static axial contact witness.
             string verifiedFrame=null, verifiedSource=null;
@@ -147,7 +152,7 @@ namespace ADDIN.UI
                 var envelopes = (part.RawPartResult.ReviewEnvelopes ?? new SheetEnvelopeCapture[0])
                     .Where(e => e != null && e.Current && e.Binding != null &&
                          e.Binding.FeatureId == bend.FeatureId && e.Binding.Model != null &&
-                         e.Binding.Model.Lease.Current).ToArray();
+                         e.Binding.Model.Lease.Current&&e.Binding.Configuration==part.Configuration).ToArray();
                 if (envelopes.Length == 1)
                 {
                     var env = envelopes[0];
@@ -155,7 +160,8 @@ namespace ADDIN.UI
                     var sections = model.Sections.Where(s => s != null && s.FeatureId == bend.FeatureId).ToArray();
                     if (sections.Length == 1 &&
                         sections[0].Coverage == SheetCoverage.CompleteUniformExtrusion &&
-                        sections[0].Boundary != null && sections[0].Boundary.Count > 0)
+                        sections[0].Boundary != null && sections[0].Boundary.Count > 0 &&
+                        SameSectionFrame(sections[0].Frame,env.Binding.WorkFrame))
                     {
                         data.Part = BendSection2DScene.CopyCurves(sections[0].Boundary);
                         verifiedFrame = env.Binding.FrameId;
@@ -167,7 +173,7 @@ namespace ADDIN.UI
                         // A finite observed slice may be drawn, but NEVER
                         // claimed to prove continuous coverage or manufacturing.
                         var observed = env.ObservedSlices.FirstOrDefault(s => s != null &&
-                            s.Material != null && s.Material.Valid && s.Material.Contours != null &&
+                            s.Material != null && s.Material.Current && s.Material.FrameId==env.Binding.FrameId && s.Material.Valid && s.Material.Contours != null &&
                             s.Material.Contours.Any(c => c?.Boundary?.Count > 0));
                         if (observed != null)
                         {
@@ -203,8 +209,17 @@ namespace ADDIN.UI
                         data.Punch = BendSection2DScene.CopyCurves(cad.Punch.Curves);
                     if (cad?.Holder?.Curves != null)
                         data.Holder = BendSection2DScene.CopyCurves(cad.Holder.Curves);
-                    data.ToolEvidence = "Chưa đăng ký tọa độ gá đã duyệt. " +
-                        "Không được coi cạnh gần dao là va chạm.";
+                    data.ToolEvidence = "Chưa đăng ký tọa độ gá đã duyệt. Không được coi cạnh gần dao là va chạm.";
+                    if(cad?.ClampVerified==true && verifiedFrame!=null &&
+                        tool.RegisteredPunch?.Current==true&&tool.RegisteredHolder?.Current==true&&
+                        tool.RegisteredPunch.Valid&&tool.RegisteredHolder.Valid&&
+                        tool.RegisteredPunch.FrameId==verifiedFrame&&tool.RegisteredHolder.FrameId==verifiedFrame)
+                    {
+                        data.RegisteredPunch=BendSection2DScene.CopyCurves(tool.RegisteredPunch.Contours.SelectMany(c=>c.Boundary));
+                        data.RegisteredHolder=BendSection2DScene.CopyCurves(tool.RegisteredHolder.Contours.SelectMany(c=>c.Boundary));
+                        data.PlacementRegistered=true;
+                        data.ToolEvidence="Mốc gá từ hồ sơ đã duyệt, cùng snapshot / mặt cắt hình học cuối. Hình vẽ chỉ để xem.";
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -214,31 +229,26 @@ namespace ADDIN.UI
                     System.Diagnostics.Trace.WriteLine("[CHECK CHAN TOOL SECTION 2D] " + ex);
                 }
             }
-            // Static collision witnesses are observed numeric points in the
-            // same final-material work frame. A witness is NOT a curve/segment
-            // identifier, so only show red dots, never guessed red line segments.
-            if(tool!=null && tool.CadAssembly?.ClampVerified==true &&
-                !tool.StaticSimulationOnly && tool.GeometricStatus==CollisionStatus.COLLISION &&
-                verifiedFrame!=null && verifiedSource!=null && data.Part.Count>0)
+            // Kernel witnesses identify an interior contact POINT, not a native
+            // edge. No whole-edge red stroke is invented or chosen by proximity.
+            if(tool!=null&&verifiedFrame!=null&&verifiedSource!=null&&data.Part.Count>0)
             {
                 var points=new List<System.Drawing.PointF>();
-                Action<ADDIN.Commands.BendEnvelope.AxialCollisionWitness,string,string> add=(w,frame,sha)=>{
-                    if(w==null || w.ObservedSliceOnly || !string.Equals(frame,verifiedFrame,StringComparison.Ordinal) ||
-                        !string.Equals(sha,verifiedSource,StringComparison.Ordinal) ||
-                        !ToolPoint.Finite(w.PointMm.X) || !ToolPoint.Finite(w.PointMm.Y) ||
-                        Math.Abs(w.PointMm.X)>1e7 || Math.Abs(w.PointMm.Y)>1e7)return;
-                    points.Add(new System.Drawing.PointF((float)w.PointMm.X,(float)w.PointMm.Y));
-                };
-                add(tool.PunchWitness,tool.PunchWitnessFrameId,tool.PunchWitnessSourceSha256);
-                add(tool.HolderWitness,tool.HolderWitnessFrameId,tool.HolderWitnessSourceSha256);
+                if(BatchCheckOutcome.StaticWitness(tool,true))points.Add(new System.Drawing.PointF((float)tool.PunchWitness.PointMm.X,(float)tool.PunchWitness.PointMm.Y));
+                if(BatchCheckOutcome.StaticWitness(tool,false))points.Add(new System.Drawing.PointF((float)tool.HolderWitness.PointMm.X,(float)tool.HolderWitness.PointMm.Y));
                 if(points.Count>0)
                 {
-                    data.VerifiedContactPoints=points.AsReadOnly();
-                    data.ContactPointProven=true;
-                    data.ProofReference="FeatureId "+bend.FeatureId+" / "+tool.ToolId+" / numeric axial";
-                    data.ToolEvidence="Có điểm va chạm số; chưa có danh tính cạnh/đường gá đã duyệt để tô đỏ cạnh.";
+                    data.VerifiedContactPoints=points.AsReadOnly();data.ContactPointProven=true;
+                    data.ProofReference=part.SelectionKey+" / "+part.Configuration+" / FeatureId "+bend.FeatureId+" / "+
+                        tool.ToolId+" / "+verifiedFrame+" / "+verifiedSource+" / "+tool.SourceFingerprint+" / FinalModelObserved";
+                    data.ToolEvidence="Điểm va chạm số trên mặt cắt cuối; chưa có EdgeId để tô đỏ toàn cạnh.";
                 }
             }
+            // A process witness belongs to its registered intermediate state;
+            // it must never be drawn on the finished-Part section by assumption.
+            if(tool!=null&&BatchCheckOutcome.ProcessWitness(tool)&&!data.ContactPointProven)
+                data.ToolEvidence="Có va chạm trong quá trình (xem chi tiết trạng thái); không vẽ điểm đó lên hình học cuối.";
+            if(!part.RawPartResult.Current){UxV43ClearSection();return;}
             uxV43SelectionKey = data.SourceKey;
             uxV43FeatureId = data.FeatureId;
             uxV43ToolId = data.ToolId;

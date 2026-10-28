@@ -69,7 +69,8 @@ namespace ADDIN.Commands.BendTools
     {
         public bool UsesFixedCadPairs { get; internal set; }
         private int current=1;
-        public bool Current => Volatile.Read(ref current)==1;
+        internal ToolSourceIdentity EffectiveSources { get; set; }
+        public bool Current => Volatile.Read(ref current)==1 && EffectiveSources?.Current!=false && PlacementSources?.Current!=false;
         public string Status => "CHUA_XAC_MINH";
         public string Fingerprint { get; internal set; }
         public string ConfigurationSha256 { get; internal set; }
@@ -77,9 +78,23 @@ namespace ADDIN.Commands.BendTools
         public IReadOnlyList<ToolProfileProvenance> Sources { get; internal set; }
         public string Error { get; internal set; }
         public BendPlacement.PlacementSourceSnapshot PlacementSources { get; internal set; } = BendPlacement.PlacementSourceSnapshot.Missing("PLACEMENT_SOURCE_NOT_CONFIGURED");
+        internal string SourceProblem => Error ?? (UsesFixedCadPairs &&
+            PlacementSources.Tools.Count(t=>t.CadPair?.Matched==true)!=CompanyToolIds.All.Count?"FIXED_CAD_PAIR_SOURCE_MAPPING_INCOMPLETE":
+            Tools.Count(t=>t.Validation?.PunchGeometryReadComplete==true)!=CompanyToolIds.All.Count?"PUNCH_SOURCE_LIBRARY_INCOMPLETE":null);
+        internal string SelectionProblem(ToolProfileSourceConfiguration selected)
+        {
+            if(!Current)return "Nguồn thay đổi hoặc hết hiệu lực trong khi đọc; hãy xem lại nguồn.";
+            if(Error!=null)return "Không đọc được nguồn: "+Error;
+            if(Tools.Count!=18||Tools.Count(t=>t.Validation?.PunchGeometryReadComplete==true)!=18)
+                return "Chưa đọc đủ 18 Punch; không lưu lựa chọn như một thư viện hợp lệ.";
+            if(selected.UseMasterPairsAsLibrary&&(!UsesFixedCadPairs||PlacementSources.Tools.Count(t=>t.CadPair?.Matched==true)!=18))
+                return "Chưa đối chiếu đủ 18 cặp Punch–Holder cố định từ Master/manifest.";
+            return null;
+        }
         internal void Invalidate()
         {
             Interlocked.Exchange(ref current,0);
+            EffectiveSources?.Invalidate();
             if (Tools!=null) foreach (var tool in Tools) tool.Datums?.Invalidate();
             PlacementSources?.Invalidate();
         }

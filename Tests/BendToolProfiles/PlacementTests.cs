@@ -254,7 +254,7 @@ internal static partial class ToolProfileTests
         });
 
         Test("Excel-first: unsigned numeric case stays unresolved",()=> {
-            var selection=new BendLimitSelection {MachineSystem="HDS",MaterialCode="ST",SectionKind="U",
+            var selection=new BendLimitSelection {MachineSystem="HDS",MaterialCode="ST",SectionKind="U",PoseId="CONTROLLED_U90",
                 ThicknessMinMm=1,ThicknessMaxMm=3,AngleMinDeg=80,AngleMaxDeg=100,
                 WMinMm=5,WMaxMm=90,LMinMm=5,LMaxMm=90};
             var conditions=new BendExcelCaseConditions(selection);
@@ -263,24 +263,26 @@ internal static partial class ToolProfileTests
                 "金型限界表","cell:B3",new string('b',64),"mm",4200,new[]{CompanyToolIds.All[0]},new string[0],
                 approvedConditions:conditions);
             var measured=new BendExcelObservation {ToolId=CompanyToolIds.All[0],MachineSystem="HDS",
-                MaterialCode="ST",SectionKind="U",ThicknessMm=2,AngleDeg=90,Wmm=30,Lmm=35,
-                BendLengthMm=4300,Current=true};
+                MaterialCode="ST",SectionKind="U",PoseId="CONTROLLED_U90",ThicknessMm=2,AngleDeg=90,Wmm=30,Lmm=35,
+                BendLengthMm=4300,Current=true,SourceBinding=new string('d',64),WorkbookSha256=new string('a',64),
+                Review=new ToolReviewValidation(ToolReviewStatus.VerifiedExternalRecord,"CONTROLLED_MEASUREMENT",new string('d',64),expiry:DateTime.UtcNow.AddHours(1))};
             Check(BendExcelCaseMatcher.Evaluate(draft,measured).Applicability==BendExcelCaseApplicability.MATCH_UNRESOLVED,
                 "Unsigned Excel rule is NOT a certified MAX failure");
         });
         Test("Excel-first: bounded signed case only certifies bend-line length",()=> {
-            var selection=new BendLimitSelection {MachineSystem="HDS",MaterialCode="ST",SectionKind="U",
+            var selection=new BendLimitSelection {MachineSystem="HDS",MaterialCode="ST",SectionKind="U",PoseId="CONTROLLED_U90",
                 ThicknessMinMm=1,ThicknessMaxMm=3,AngleMinDeg=80,AngleMaxDeg=100,
                 WMinMm=5,WMaxMm=90,LMinMm=5,LMaxMm=90};
             var conditions=new BendExcelCaseConditions(selection);
             // Managed fixture: trusted reviewer simulation for matcher logic.
             // Production approval is exclusively through ToolReviewVerifier.
-            var review=new ToolReviewValidation(ToolReviewStatus.VerifiedExternalRecord,"SYNTHETIC_TEST");
+            var review=new ToolReviewValidation(ToolReviewStatus.VerifiedExternalRecord,"SYNTHETIC_TEST",expiry:DateTime.UtcNow.AddHours(1));
             var rule=new BendLimitRuleDraft("R1","SASH",BendLimitKind.MaxBendLength,new string('a',64),
                 "金型限界表","cell:B3",new string('b',64),"mm",4200,new[]{CompanyToolIds.All[0]},new string[0],review,conditions);
             var measured=new BendExcelObservation {ToolId=CompanyToolIds.All[0],MachineSystem="HDS",
-                MaterialCode="ST",SectionKind="U",ThicknessMm=2,AngleDeg=90,Wmm=30,Lmm=35,
-                BendLengthMm=4300,Current=true};
+                MaterialCode="ST",SectionKind="U",PoseId="CONTROLLED_U90",ThicknessMm=2,AngleDeg=90,Wmm=30,Lmm=35,
+                BendLengthMm=4300,Current=true,SourceBinding=new string('d',64),WorkbookSha256=new string('a',64),
+                Review=new ToolReviewValidation(ToolReviewStatus.VerifiedExternalRecord,"CONTROLLED_MEASUREMENT",new string('d',64),expiry:DateTime.UtcNow.AddHours(1))};
             var hit=BendExcelCaseMatcher.Evaluate(rule,measured);
             Check(hit.Applicability==BendExcelCaseApplicability.MATCH_CONFIRMED &&
                 hit.ExceedsCertifiedLength==true,"4300 exceeds signed length 4200");

@@ -11,6 +11,108 @@ using ADDIN.Commands.BendPlacement;
 
 namespace ADDIN.UI
 {
+    internal enum BatchOutcomeState
+    {
+        NOT_RUN,RUNNING,MIN_NG,EXCEL_LIMIT_FAIL,CAD_COLLISION_CONFIRMED,PARTIAL_CLEAR,
+        VERIFIED_FEASIBLE,UNKNOWN_CONFIG,UNKNOWN_COVERAGE,UNKNOWN_MOUNT
+    }
+    // A single deterministic projection. Candidate findings never become a
+    // Part-wide rejection; complete reviewed paths remain scoped evidence.
+    internal sealed class BatchCheckOutcome
+    {
+        internal BatchOutcomeState State {get;}
+        internal string Scope {get;}
+        internal string Caption {get;}
+        internal string Reason {get;}
+        internal string Fingerprint {get;}
+        private BatchCheckOutcome(BatchOutcomeState state,string scope,string caption,string reason,string fingerprint)
+        {State=state;Scope=scope;Caption=caption;Reason=reason;Fingerprint=fingerprint;}
+        internal static string ExcelText(BendExcelCaseResult result)
+        {
+            if(result==null||result.Applicability==BendExcelCaseApplicability.MATCH_UNRESOLVED)
+                return "Excel MAX: chưa xác minh điều kiện áp dụng";
+            if(result.Applicability==BendExcelCaseApplicability.NOT_APPLICABLE_CONFIRMED)
+                return result.AllowsCadFallback?"Excel: đã xác minh không có trường hợp áp dụng; xét CAD":
+                    "Excel: mới loại trừ một trường hợp; chưa cho phép xét CAD thay thế";
+            return result.ExceedsCertifiedLength==true?"Excel: vượt chiều dài chấn đã xác minh":
+                "Excel: đạt giới hạn chiều dài chấn (chưa kết luận va chạm)";
+        }
+        internal static bool StaticWitness(BatchToolCandidateViewModel tool,bool punch)
+        {
+            var env=tool?.NativeEnvelope;
+            if(tool?.CadAssembly?.ClampVerified!=true||tool.StaticSimulationOnly||env?.Current!=true||
+                tool.FeatureId!=env.Binding.FeatureId||string.IsNullOrWhiteSpace(tool.SourceFingerprint))return false;
+            var witness=punch?tool.PunchWitness:tool.HolderWitness;
+            var status=punch?tool.PunchStatus:tool.HolderStatus;
+            var frame=punch?tool.PunchWitnessFrameId:tool.HolderWitnessFrameId;
+            var sha=punch?tool.PunchWitnessSourceSha256:tool.HolderWitnessSourceSha256;
+            return status==CollisionStatus.COLLISION&&witness!=null&&!witness.ObservedSliceOnly&&
+                witness.AxialOccupancyMarginLowerMm>0&&witness.CrossSectionInteriorMarginLowerMm>0&&
+                frame==env.Binding.FrameId&&sha==env.Binding.SourceSha256&&
+                ToolPoint.Finite(witness.PointMm.X)&&ToolPoint.Finite(witness.PointMm.Y)&&ToolPoint.Finite(witness.AxialMm);
+        }
+        internal static bool ProcessWitness(BatchToolCandidateViewModel tool)
+        {
+            var env=tool?.NativeEnvelope;
+            return tool?.CadAssembly?.ClampVerified==true&&!tool.ProcessSimulationOnly&&env?.Current==true&&
+                tool.MotionSegments.Any(s=>s.Status==CollisionStatus.COLLISION&&s.Witness!=null&&
+                    s.Witness.ProcessPayloadSha256==s.ProcessPayloadSha256&&s.ModelSnapshotId==env.Binding.ModelSnapshotId&&
+                    s.FrameId==env.Binding.FrameId&&s.Witness.Parameter>=0&&s.Witness.Parameter<=1&&
+                    s.Witness.Geometry?.ObservedSliceOnly==false&&s.Witness.Geometry.AxialOccupancyMarginLowerMm>0&&
+                    s.Witness.Geometry.CrossSectionInteriorMarginLowerMm>s.ToleranceMm);
+        }
+        internal static BatchCheckOutcome Project(BatchPartViewModel part,BatchBendViewModel bend,BatchToolCandidateViewModel selected,bool running,bool illustration=false)
+        {
+            string fingerprint=part?.ToolSourceFingerprint;
+            Func<BatchOutcomeState,string,string,string,BatchCheckOutcome> result=(state,scope,title,reason)=>new BatchCheckOutcome(state,scope,title,reason,fingerprint);
+            if(running)return result(BatchOutcomeState.RUNNING,"Run","ĐANG KIỂM TRA","Đang đọc dữ liệu và kiểm tra hiệu lực.");
+            if(illustration||part==null)return result(BatchOutcomeState.NOT_RUN,"Run","CHƯA CÓ KẾT QUẢ","Chọn phạm vi rồi bấm Bắt đầu kiểm tra.");
+            if(part.RawPartResult?.Current!=true)return result(BatchOutcomeState.UNKNOWN_CONFIG,"Part","KẾT QUẢ HẾT HIỆU LỰC","Nguồn, cấu hình hoặc tác vụ đã thay đổi; cần Refresh.");
+            if(bend==null||!part.Bends.Contains(bend))
+            {
+                bool knownEmpty=part.NativeInventoryKnown&&part.BendCount==0;
+                string capture=knownEmpty?"Part hiện hành không có nếp chấn được nhận diện.":BendCheckDisplayText.CaptureBlocker(part);
+                // Empty bend lists are exactly where capture/source failures
+                // occur. Keep both blockers visible instead of hiding them
+                // behind a generic coverage message or implying zero bends.
+                if(!string.IsNullOrWhiteSpace(part.ToolSourceError))
+                    capture+=" Nguồn dao: "+BendCheckDisplayText.Reasons(part.ToolSourceError);
+                return result(BatchOutcomeState.UNKNOWN_COVERAGE,"Part",knownEmpty?"CHƯA XÁC MINH CHẤN":"CHƯA ĐỌC ĐƯỢC NẾP CHẤN",capture);
+            }
+            var metadata=part.RawPartResult.BendMetadata.Where(m=>m.FeatureId==bend.FeatureId).ToArray();
+            if(metadata.Length==1&&metadata[0].MinimumStatus=="BelowMinimum")
+                return result(BatchOutcomeState.MIN_NG,"B"+bend.BendIndex,"KHÔNG ĐẠT MIN","Nếp đang chọn không đạt kích thước tối thiểu.");
+            var tool=selected!=null&&bend.ToolCandidates.Contains(selected)?selected:null;
+            if(tool?.ExcelCase?.Applicability==BendExcelCaseApplicability.MATCH_CONFIRMED&&tool.ExcelCase.ExceedsCertifiedLength==true)
+                return result(BatchOutcomeState.EXCEL_LIMIT_FAIL,tool.ToolId+" / B"+bend.BendIndex,"VƯỢT GIỚI HẠN EXCEL","Ứng viên đang chọn vượt chiều dài chấn đã duyệt; chưa kết luận toàn Part.");
+            if(!string.IsNullOrWhiteSpace(part.ToolSourceError)||part.LoadedPunchCount==0)
+                return result(BatchOutcomeState.UNKNOWN_CONFIG,"Part","CHƯA NẠP ĐỦ NGUỒN DAO",part.ToolSourceError??"Chưa đọc được hình học Punch từ nguồn cấu hình.");
+            if(tool!=null&&(StaticWitness(tool,true)||StaticWitness(tool,false)||ProcessWitness(tool)))
+                return result(BatchOutcomeState.CAD_COLLISION_CONFIRMED,tool.ToolId+" / B"+bend.BendIndex,"ỨNG VIÊN VA CHẠM","Có bằng chứng số tại ứng viên đang chọn; chưa kết luận các dao khác hoặc toàn Part.");
+            var plan=part.RawPartResult.Planning;
+            var sequence=plan?.Current==true?plan.PreferredCheckedSequence:null;
+            bool complete=plan?.EvidenceLevel==ADDIN.Commands.BendPlanning.SequenceEvidenceLevel.ReviewedSourceGraph&&
+                !plan.SimulationOnly&&sequence?.ReachesAllBends==true&&!sequence.SimulationOnly&&sequence.Status==CollisionStatus.CLEAR&&
+                part.NativeInventoryKnown&&sequence.Steps.Select(s=>s.FeatureId).OrderBy(id=>id).SequenceEqual(part.Bends.Select(b=>b.FeatureId).OrderBy(id=>id))&&
+                part.Bends.All(b=>{
+                    var min=part.RawPartResult.BendMetadata.Where(m=>m.FeatureId==b.FeatureId).ToArray();
+                    var candidate=b.ToolCandidates.SingleOrDefault(t=>t.ToolId==sequence.ToolId);
+                    return min.Length==1&&(min[0].MinimumStatus=="MeetsMinimum"||min[0].MinimumStatus=="GroovedAccepted")&&
+                        candidate?.CadAssembly?.ClampVerified==true&&candidate.ExcelCase!=null&&
+                        (candidate.ExcelCase.AllowsCadFallback||candidate.ExcelCase.Applicability==BendExcelCaseApplicability.MATCH_CONFIRMED&&candidate.ExcelCase.ExceedsCertifiedLength==false);
+                });
+            if(complete)return result(BatchOutcomeState.VERIFIED_FEASIBLE,"Part / đồ thị đã duyệt","CÓ CHUỖI ĐƯỢC KIỂM TRA","Một chuỗi đầy đủ đạt trong điều kiện nguồn đã duyệt; chưa chứng nhận sản xuất.");
+            if(tool?.CadAssembly?.ClampVerified==true&&(!tool.StaticSimulationOnly&&tool.GeometricStatus==CollisionStatus.CLEAR||
+                !tool.ProcessSimulationOnly&&tool.ProcessStatus==CollisionStatus.CLEAR))
+                return result(BatchOutcomeState.PARTIAL_CLEAR,tool.ToolId+" / B"+bend.BendIndex,"ĐẠT MỘT PHẦN KIỂM TRA","Kết quả của ứng viên; chưa đủ chuỗi cho toàn Part.");
+            if(part.VerifiedMountingPairs==0)return result(BatchOutcomeState.UNKNOWN_MOUNT,"Part","CHƯA XÁC MINH GÁ DAO","Đã có hình học CAD; thiếu bằng chứng mốc gá, vị trí lắp hoặc chiều dài hữu dụng.");
+            return result(BatchOutcomeState.UNKNOWN_COVERAGE,tool?.ToolId??"Part","CHƯA XÁC MINH CHẤN",
+                tool?.ExcelCase?.Applicability==BendExcelCaseApplicability.MATCH_UNRESOLVED?
+                "Thiếu/mâu thuẫn mapping Excel, W/L, vật liệu, máy hoặc tư thế gá; xem chi tiết nguồn.":
+                "Thiếu hình học có bao phủ hoặc trạng thái trước/trong/sau chấn và các chuyển tiếp.");
+        }
+    }
+
     /// <summary>
     /// UI-level view model for an assembly member part group (canonical source/configuration).
     /// </summary>
@@ -32,9 +134,12 @@ namespace ADDIN.UI
         public int ToolCatalogCount { get; set; }
         public int LoadedPunchCount { get; set; }
         public int ReadyGeometryPairs { get; set; }
+        public int MatchedCadPairs {get;set;}
+        public int CollisionProfileReadyPairs {get;set;}
         public int VerifiedMountingPairs { get; set; }
         public int ExcelRuleCount { get; set; }
         public bool HasCandidateCollision { get; set; }
+        public bool NativeInventoryKnown {get;set;}
         public string SourceKey { get; set; }
         public string SelectionKey => RawPartResult?.OccurrenceSetKey ?? SourceKey;
         public bool IsExpanded { get; set; }
@@ -86,6 +191,8 @@ namespace ADDIN.UI
 
     internal sealed class BatchMotionSegmentViewModel
     {
+        internal string ModelSnapshotId,FrameId,ProcessPayloadSha256;
+        internal double ToleranceMm;
         public BendProcessPhase Phase { get; set; }
         public CollisionPairKind Pair { get; set; }
         public string SegmentId { get; set; }
@@ -101,6 +208,10 @@ namespace ADDIN.UI
     internal sealed class BatchToolCandidateViewModel
     {
         public ToolAssemblyProfile CadAssembly { get; set; }
+        internal BendExcelCaseResult ExcelCase {get;set;}
+        internal CollisionMaterial2D RegisteredPunch {get;set;}
+        internal CollisionMaterial2D RegisteredHolder {get;set;}
+        internal string SourceFingerprint {get;set;}
         public SheetEnvelopeCapture NativeEnvelope { get; set; }
         public bool StaticSimulationOnly { get; set; }
         public bool ProcessSimulationOnly { get; set; }
@@ -242,7 +353,8 @@ namespace ADDIN.UI
                 .Concat(read.Parts.Select(p => p.Reason));
             bool interrupted = reasons.Any(r => r != null && (r.Contains("BUDGET") || r.Contains("CANCELLED") ||
                 r.Contains("STALE") || r.Contains("SUPERSEDED"))) || read.Parts.Any(p => !p.Current);
-            bool complete = snapshot.InventoryComplete && !interrupted && parts.All(p => p.Bends.Count == p.BendCount);
+            bool complete = snapshot.InventoryComplete && !interrupted && parts.All(p => p.NativeInventoryKnown &&
+                p.Bends.Count == p.RawPartResult.BendCount && p.Bends.Count == p.BendCount);
             int progress = complete ? 100 : checkedParts > 0 ? 99 : 0;
 
             var diag = new List<string>();
@@ -307,6 +419,8 @@ namespace ADDIN.UI
                     ToolCatalogCount = read.CatalogCount,
                     LoadedPunchCount = read.LoadedPunchCount,
                     ReadyGeometryPairs = read.GeometryPairCount,
+                    MatchedCadPairs=read.MatchedCadPairCount,
+                    CollisionProfileReadyPairs=read.CollisionProfileReadyCount,
                     VerifiedMountingPairs = read.VerifiedMountingPairCount,
                     ExcelRuleCount = read.ExcelRuleCount,
                     RawPartResult = part.Source
@@ -343,14 +457,11 @@ namespace ADDIN.UI
                 // collision queries. Unknown recognition is NOT a verified zero.
                 var nativeIds = part.Source.BendMetadata.Where(m=>m!=null && m.FeatureId>0)
                     .Select(m=>m.FeatureId).Distinct().OrderBy(id=>id).ToArray();
-                var candidateIds = part.StaticCandidates.Select(c=>c.FeatureId)
-                    .Concat(part.ProcessCandidates.Select(c=>c.FeatureId))
-                    .Where(id=>id>0).Distinct().OrderBy(id=>id).ToArray();
-                var featureIds = part.BendCount==0 ? new int[0] :
-                    nativeIds.Length==part.BendCount ? nativeIds :
-                    nativeIds.Concat(candidateIds).Distinct().OrderBy(id=>id).ToArray();
-                if (featureIds.Length != part.BendCount)
-                    partVm.Reason += " UNRECOGNIZED_BEND_INVENTORY: có " + part.BendCount +
+                var featureIds=NativeFeatureInventory(part.Source);
+                partVm.NativeInventoryKnown=part.Source.NativeInventoryKnown;
+                partVm.BendCount=featureIds.Length;
+                if (!part.Source.NativeInventoryKnown || featureIds.Length != part.BendCount)
+                    partVm.Reason += "; UNRECOGNIZED_BEND_INVENTORY: có " + part.BendCount +
                         " nếp báo cáo nhưng chỉ đối chiếu được " + featureIds.Length + " FeatureId.";
                 var staticByFeature = part.StaticCandidates.ToLookup(c => c.FeatureId);
                 var processByFeature = part.ProcessCandidates.ToLookup(c => c.FeatureId);
@@ -384,6 +495,11 @@ namespace ADDIN.UI
 
                         var toolVm = new BatchToolCandidateViewModel
                         {
+                            ExcelCase = part.Source.ExcelResults.TryGetValue(BendExcelApplicabilityAdapter.Key(toolId,featureId),out var excelCase)?excelCase:
+                                new BendExcelCaseResult(BendExcelCaseApplicability.MATCH_UNRESOLVED,null,part.Reason??"NO_CURRENT_EXCEL_MEASUREMENT_BINDING"),
+                            SourceFingerprint=read.ToolSourceFingerprint,
+                            RegisteredPunch=RegisteredMaterial(part.Source,verifiedEnvelope,toolId,featureId,CollisionPairKind.WorkpiecePunch,read.Source.ToolCatalogForDisplay),
+                            RegisteredHolder=RegisteredMaterial(part.Source,verifiedEnvelope,toolId,featureId,CollisionPairKind.WorkpieceHolder,read.Source.ToolCatalogForDisplay),
                             CadAssembly = read.ToolPairs.Where(p=>p!=null && p.Id==toolId).Take(2).Count()==1 ?
                                 read.ToolPairs.First(p=>p!=null && p.Id==toolId) : null,
                             NativeEnvelope = verifiedEnvelope,
@@ -412,7 +528,8 @@ namespace ADDIN.UI
                             MotionSegments = procCand?.PairSegments.Select(s => new BatchMotionSegmentViewModel
                             {
                                 Phase = s.Phase, Pair = s.Pair, SegmentId = s.SegmentId,
-                                Status = s.Status, Reason = string.Join("; ", s.Reasons), Witness = s.Witness
+                                Status = s.Status, Reason = string.Join("; ", s.Reasons), Witness = s.Witness,
+                                ModelSnapshotId=s.ModelSnapshotId,FrameId=s.FrameId,ProcessPayloadSha256=s.ProcessPayloadSha256,ToleranceMm=s.ToleranceMm
                             }).ToList() ?? new List<BatchMotionSegmentViewModel>()
                         };
                         toolVm.MotionPreBend = toolVm.PhaseStatus(BendProcessPhase.PreBend);
@@ -445,6 +562,18 @@ namespace ADDIN.UI
             }
 
             return result;
+        }
+
+        internal static int[] NativeFeatureInventory(AssemblyPartResult part) => part==null?new int[0]:
+            part.BendMetadata.Where(m=>m!=null&&m.FeatureId>0).Select(m=>m.FeatureId)
+                .Concat(part.NativeFeatureIds.Where(id=>id>0)).Distinct().OrderBy(id=>id).ToArray();
+        private static CollisionMaterial2D RegisteredMaterial(AssemblyPartResult part,SheetEnvelopeCapture env,string tool,int feature,CollisionPairKind pair,ToolProfileLibrarySnapshot library)
+        {
+            if(!part.Current||env?.Current!=true)return null;
+            var setups=part.DisplaySetups.Where(s=>s.ToolId==tool&&s.FeatureId==feature&&s.Pair==pair).ToArray();
+            if(setups.Length!=1||!setups[0].AppliesTo(env,library)||setups[0].Review.Status!=ToolReviewStatus.VerifiedExternalRecord||!setups[0].Occupancy.Verified||
+                setups[0].Occupancy.SimulationOnly||setups[0].Occupancy.Material?.FrameId!=env.Binding.FrameId)return null;
+            return setups[0].Occupancy.Material;
         }
 
         private static CollisionStatus Aggregate(IEnumerable<CollisionStatus> values, bool inventoryComplete)
