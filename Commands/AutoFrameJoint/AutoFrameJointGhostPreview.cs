@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -28,6 +28,9 @@ namespace ADDIN.Commands.AutoFrameJoint
         private PreviewSourceState cachedSource;
         private int displayedCandidate;
         private string displayedMessage;
+        // AFJ-R62: presentation belongs to this existing Preview session only.
+        // All bodies share a rigid shift; source geometry and native Cut Plan stay unchanged.
+        private PreviewPresentation presentation;
         // AFJ-PREVIEW-OUTCOME-20261022
         // One exact-source non-actionable result. COM/Boolean failures are never cached.
         private const int RejectedPreviewCacheMilliseconds = 30000;
@@ -131,13 +134,15 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int colorA = ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235));
                 int colorB = ColorTranslator.ToWin32(Color.FromArgb(255, 155, 60));
 
-                int countA = ShowComponent(frameA, colorA, 0.65);
+                presentation = CreateSideBySidePresentation(UnionPreviewBox(ComponentPreviewBox(frameA), ComponentPreviewBox(frameB)));
+                int countA = ShowComponent(frameA, colorA, 0.33, presentation.Shift);
                 ThrowIfClosing();
-                int countB = ShowComponent(frameB, colorB, 0.65);
+                int countB = ShowComponent(frameB, colorB, 0.33, presentation.Shift);
                 ThrowIfClosing();
                 RedrawSafely(); // One redraw after the complete pair, not per body.
+                TracePresentationBounds();
                 message = String.Format(
-                    "Đang xem bản sao trạng thái hiện tại: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
+                    "Bản gốc bên trái; bản sao xanh/cam bên phải: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
                     countA, countB);
                 return true;
             }
@@ -195,7 +200,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 ThrowIfClosing();
                 if (!IsOriginalAssemblyActive())
                 { return RejectInvalidPreview("Assembly đã thay đổi; không cập nhật Preview.", out message); }
-                if (reused && displayedCandidate == candidate)
+                bool samePresentation = reused && IsPresentationCurrent();
+                if (reused && samePresentation && displayedCandidate == candidate)
                 {
                     message = displayedMessage;
                     Trace.WriteLine("[AFJ-R52-PERF] phase=display mode=UNCHANGED no_solve=True no_hide=True no_display3=True");
@@ -263,12 +269,21 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 ThrowIfClosing();
                 phase.Restart();
-                MathTransform shift = CreateWorldShift(0.12);
+                // A camera move invalidates only the presentation, never the qualified solver result.
+                bool redisplayKeep = !reused || !samePresentation;
+                if (reused && !samePresentation)
+                {
+                    string presentationCleanup;
+                    if (!HideDisplayedBodies(false, false, out presentationCleanup))
+                        throw new InvalidOperationException("Không dọn được bản sao Preview: " + presentationCleanup);
+                }
+                if (presentation == null) presentation = CreateSideBySidePresentation(result);
+                MathTransform shift = presentation.Shift;
                 MathTransform inverseA = result.TransformA.Inverse() as MathTransform;
                 MathTransform inverseB = result.TransformB.Inverse() as MathTransform;
                 if (inverseA == null || inverseB == null)
                     throw new InvalidOperationException("Không đảo được hệ tọa độ Part.");
-                if (!reused)
+                if (redisplayKeep)
                 {
                     DisplayCandidateBodies(AfjJointSolver.World(result.A.Kept, result.TransformA),
                         frameA, result.PartA, inverseA, shift,
@@ -294,10 +309,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                 }
                 ThrowIfClosing();
                 RedrawSafely();
-                Trace.WriteLine("[AFJ-R52-PERF] phase=display ms=" + phase.ElapsedMilliseconds + " reuse_keep=" + reused);
+                TracePresentationBounds();
+                Trace.WriteLine("[AFJ-R52-PERF] phase=display ms=" + phase.ElapsedMilliseconds + " reuse_keep=" + !redisplayKeep);
                 message = String.Format(CultureInfo.InvariantCulture,
                     "{0}: Đã kiểm tra B-rep tạm. A bỏ {1:0.###} mm³; B bỏ {2:0.###} mm³. " +
-                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Bản sao nâng Z +120 mm. {5}", result.Plan.RuleId,
+                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Bản gốc bên trái; Preview xanh/cam bên phải, cùng tỷ lệ. Khung nhìn đã thu vừa hai bên. {5}", result.Plan.RuleId,
                     result.A.RemovedVolume * 1e9, result.B.RemovedVolume * 1e9,
                     result.CoverA ? "A" : "B", result.AfterGap * 1000,
                     candidate == 2 ? "Hồng/tím: CUT; xanh/cam: KEEP." : "Đang xem KEEP.");
@@ -547,22 +563,338 @@ namespace ADDIN.Commands.AutoFrameJoint
 
 
 
-        private MathTransform CreateWorldShift(double z)
+        private sealed class PreviewViewStamp
         {
-            MathUtility math = app.GetMathUtility() as MathUtility;
-            if (math == null)
-                throw new InvalidOperationException("Không lấy được MathUtility.");
-            double[] matrix = new double[16] {
-                1,0,0, 0,1,0, 0,0,1,
-                0,0,z, 1, 0,0,0
+            internal ModelView View;
+            internal double Scale;
+            internal double[] Orientation, Translation;
+        }
+
+        private sealed class PreviewPresentation
+        {
+            internal MathTransform Shift;
+            internal double[] OriginalBox, PreviewBox, Delta;
+            internal PreviewViewStamp BeforeView, AppliedView;
+        }
+
+        private PreviewViewStamp CapturePreviewView()
+        {
+            if (!IsOriginalAssemblyActive()) return null;
+            ModelView view = sourceAssembly.ActiveView as ModelView;
+            if (view == null) return null;
+            MathTransform orientation = view.Orientation3;
+            MathVector translation = view.Translation3;
+            double[] o = orientation == null ? null : orientation.ArrayData as double[];
+            double[] t = translation == null ? null : translation.ArrayData as double[];
+            double s = view.Scale2;
+            if (o == null || o.Length != 16 || t == null || t.Length != 3 ||
+                !FinitePreviewValues(o) || !FinitePreviewValues(t) || !AfjTemporaryBoolean.Finite(s) || s <= 0) return null;
+            return new PreviewViewStamp { View = view, Scale = s, Orientation = (double[])o.Clone(), Translation = (double[])t.Clone() };
+        }
+
+        private bool SamePreviewView(PreviewViewStamp a, PreviewViewStamp b)
+        {
+            return a != null && b != null && app.IsSame(a.View, b.View) == (int)swObjectEquality.swObjectSame &&
+                ClosePreviewValues(a.Orientation, b.Orientation) && ClosePreviewValues(a.Translation, b.Translation) &&
+                Math.Abs(a.Scale - b.Scale) <= 1e-10 * Math.Max(1.0, Math.Abs(a.Scale));
+        }
+
+        private bool IsPresentationCurrent()
+        {
+            if (presentation == null) return false;
+            try { return SamePreviewView(presentation.AppliedView, CapturePreviewView()); }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("[AFJ-R62-VIEW] state=INVALID reason=" + ex.Message);
+                return false;
+            }
+        }
+
+        private static bool FinitePreviewValues(double[] values)
+        {
+            return values != null && values.All(AfjTemporaryBoolean.Finite);
+        }
+
+        private static bool ClosePreviewValues(double[] a, double[] b)
+        {
+            if (a == null || b == null || a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+                if (Math.Abs(a[i] - b[i]) > 1e-10 * Math.Max(1.0, Math.Max(Math.Abs(a[i]), Math.Abs(b[i])))) return false;
+            return true;
+        }
+
+        // SOLIDWORKS MathTransform ArrayData: 0..8 rotation, 9..11 translation, 12 scale.
+        // The eight API bounding-box corners are used only for presentation, never as cutters.
+        private static double[] PreviewPoint(double[] p, double[] m)
+        {
+            return new double[] {
+                m[12] * (p[0]*m[0] + p[1]*m[3] + p[2]*m[6]) + m[9],
+                m[12] * (p[0]*m[1] + p[1]*m[4] + p[2]*m[7]) + m[10],
+                m[12] * (p[0]*m[2] + p[1]*m[5] + p[2]*m[8]) + m[11]
             };
-            MathTransform result = math.CreateTransform(matrix) as MathTransform;
-            if (result == null)
-                throw new InvalidOperationException("Không tạo được ghost offset.");
+        }
+
+        private static IEnumerable<double[]> PreviewBoxCorners(double[] box)
+        {
+            for (int mask = 0; mask < 8; mask++)
+                yield return new double[] {box[(mask&1)==0?0:3], box[(mask&2)==0?1:4], box[(mask&4)==0?2:5]};
+        }
+
+        private static bool ValidPreviewBox(double[] box)
+        {
+            return box != null && box.Length == 6 && FinitePreviewValues(box) &&
+                box[0] <= box[3] && box[1] <= box[4] && box[2] <= box[5];
+        }
+
+        private static double[] UnionPreviewBox(double[] a, double[] b)
+        {
+            if (!ValidPreviewBox(b)) throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: không đọc được bounding box trình bày.");
+            if (a == null) return (double[])b.Clone();
+            return new double[] {Math.Min(a[0],b[0]),Math.Min(a[1],b[1]),Math.Min(a[2],b[2]),
+                Math.Max(a[3],b[3]),Math.Max(a[4],b[4]),Math.Max(a[5],b[5])};
+        }
+
+        private static double[] TransformPreviewBox(double[] box, double[] matrix)
+        {
+            if (!ValidPreviewBox(box) || matrix == null || matrix.Length != 16 || !FinitePreviewValues(matrix))
+                throw new InvalidOperationException("PREVIEW_TRANSFORM_UNVERIFIED: không xác minh được hệ tọa độ Preview.");
+            double[] result = null;
+            foreach (double[] p in PreviewBoxCorners(box))
+            {
+                double[] q = PreviewPoint(p, matrix);
+                result = UnionPreviewBox(result, new double[] {q[0],q[1],q[2],q[0],q[1],q[2]});
+            }
             return result;
         }
 
+        private static double[] CandidatePreviewBox(AfjJointSolution result)
+        {
+            double[] box = null;
+            double[] ta = result.TransformA.ArrayData as double[], tb = result.TransformB.ArrayData as double[];
+            foreach (Body2 body in result.A.Kept.Concat(result.A.Removed))
+                box = UnionPreviewBox(box, TransformPreviewBox(body.GetBodyBox() as double[], ta));
+            foreach (Body2 body in result.B.Kept.Concat(result.B.Removed))
+                box = UnionPreviewBox(box, TransformPreviewBox(body.GetBodyBox() as double[], tb));
+            if (!ValidPreviewBox(box)) throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: chưa có Body tạm.");
+            return box;
+        }
 
+        private static double[] ComponentPreviewBox(Component2 component)
+        {
+            MathTransform transform=component.Transform2;
+            double[] matrix=transform==null?null:transform.ArrayData as double[];
+            object ignored;
+            Array bodies=component.GetBodies3((int)swBodyType_e.swSolidBody,out ignored) as Array;
+            if(bodies==null || bodies.Length==0 || bodies.Length>MaxBodiesPerComponent)
+                throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: Component chưa có Solid Body hợp lệ.");
+            double[] box=null;
+            foreach(object value in bodies)
+            {
+                Body2 body=value as Body2;
+                if(body==null) throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: không đọc được Solid Body.");
+                box=UnionPreviewBox(box,TransformPreviewBox(body.GetBodyBox() as double[],matrix));
+            }
+            return box;
+        }
+
+        private PreviewPresentation CreateSideBySidePresentation(AfjJointSolution result)
+        {
+            return CreateSideBySidePresentation(CandidatePreviewBox(result));
+        }
+
+        private PreviewPresentation CreateSideBySidePresentation(double[] candidateBox)
+        {
+            PreviewViewStamp before = CapturePreviewView();
+            if (before == null) throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: chưa đọc được khung nhìn Assembly.");
+            if (before.View.HasPerspective())
+                throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: hãy tắt Perspective để xem bản sao tách cạnh chính xác.");
+            MathTransform projection = before.View.Transform;
+            double[] matrix = projection == null ? null : projection.ArrayData as double[];
+            MathTransform inverse = projection == null ? null : projection.Inverse() as MathTransform;
+            double[] inverseMatrix = inverse == null ? null : inverse.ArrayData as double[];
+            if (matrix == null || inverseMatrix == null)
+                throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: không đảo được phép chiếu màn hình.");
+            AssemblyDoc assembly = sourceAssembly as AssemblyDoc;
+            double[] originalBox = assembly == null ? null : assembly.GetBox(0) as double[];
+            // The complete Assembly bounds are mandatory. A selected-pair fallback
+            // cannot prove that the shifted copy clears other real Components.
+            if (!ValidPreviewBox(originalBox))
+                throw new InvalidOperationException("PREVIEW_ASSEMBLY_BOUNDS_UNVERIFIED: chưa đọc được phạm vi toàn Assembly để tách Preview.");
+            originalBox = UnionPreviewBox(originalBox, candidateBox);
+            double[] originalScreen = TransformPreviewBox(originalBox, matrix);
+            double[] previewScreen = TransformPreviewBox(candidateBox, matrix);
+            // A relative screen-space gap survives fitting and is independent of world axes.
+            double width = originalScreen[3]-originalScreen[0] + previewScreen[3]-previewScreen[0];
+            double gap = Math.Max(32.0, width * 0.075);
+            double dx = originalScreen[3] + gap - previewScreen[0];
+            double dy = (originalScreen[1]+originalScreen[4]-previewScreen[1]-previewScreen[4])*0.5;
+            double[] origin = PreviewPoint(new double[] {0,0,0}, inverseMatrix);
+            double[] target = PreviewPoint(new double[] {dx,dy,0}, inverseMatrix);
+            double[] delta = new double[] {target[0]-origin[0],target[1]-origin[1],target[2]-origin[2]};
+            double[] shiftData = {1,0,0,0,1,0,0,0,1,delta[0],delta[1],delta[2],1,0,0,0};
+            MathUtility math = app.GetMathUtility() as MathUtility;
+            MathTransform shift = math == null ? null : math.CreateTransform(shiftData) as MathTransform;
+            if (shift == null) throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: không tạo được dịch chuyển chung A/B.");
+            var next = new PreviewPresentation {BeforeView=before, Shift=shift, Delta=delta,
+                OriginalBox=originalBox, PreviewBox=TransformPreviewBox(candidateBox, shiftData)};
+            // Store ownership before touching camera so a partially failed native call can be cleaned up.
+            presentation = next;
+            try
+            {
+                ThrowIfClosing();
+                if (!IsOriginalAssemblyActive()) throw new InvalidOperationException("Assembly đổi trước khi đặt Preview.");
+                FitPreviewPresentation(next);
+                next.AppliedView=CapturePreviewView();
+                if (next.AppliedView==null || !ClosePreviewValues(before.Orientation,next.AppliedView.Orientation))
+                    throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: khung nhìn đổi hướng khi thu vừa hai bên.");
+                Trace.WriteLine("[AFJ-R62-VIEW] presentation=SIDE_BY_SIDE camera=PIXEL_RECT_FIT_ONCE common_rigid_delta_m="+
+                    DiagnosticArray(delta)+" original_left=True source_visibility=UNCHANGED actual_visibility=UNVERIFIED");
+                return next;
+            }
+            catch
+            {
+                if (next.AppliedView==null) next.AppliedView=CapturePreviewView();
+                RestorePreviewViewIfOwned();
+                throw;
+            }
+        }
+
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct PreviewPixelPoint { internal int X, Y; }
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError=true)]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool ScreenToClient(IntPtr window, ref PreviewPixelPoint point);
+
+        private static double[] PreviewVisibleClientRectangle(ModelView view)
+        {
+            // ModelView.Transform produces pixels relative to the view HWND.
+            // GetVisibleBox returns SCREEN pixels and excludes the native tree.
+            // Read-only Win32 coordinate conversion establishes one coordinate frame.
+            Array native=view.GetVisibleBox() as Array;
+            if(native==null || native.Length!=4)
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: chưa đọc được vùng nhìn.");
+            double[] screen=native.Cast<object>().Select(Convert.ToDouble).ToArray();
+            if(!FinitePreviewValues(screen) || screen.Any(value=>value<Int32.MinValue || value>Int32.MaxValue))
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: tọa độ vùng nhìn không hợp lệ.");
+            IntPtr window=new IntPtr(view.GetViewHWndx64());
+            var first=new PreviewPixelPoint{X=Convert.ToInt32(screen[0]),Y=Convert.ToInt32(screen[1])};
+            var last=new PreviewPixelPoint{X=Convert.ToInt32(screen[2]),Y=Convert.ToInt32(screen[3])};
+            if(window==IntPtr.Zero || !ScreenToClient(window,ref first) || !ScreenToClient(window,ref last) ||
+                last.X-first.X<64 || last.Y-first.Y<64)
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: chưa xác minh được vùng đồ họa khả dụng.");
+            return new double[]{first.X,first.Y,last.X,last.Y};
+        }
+
+        private void FitPreviewPresentation(PreviewPresentation next)
+        {
+            ModelView view=next.BeforeView.View;
+            if(view==null || view.HasPerspective() || !IsOriginalAssemblyActive())
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: khung nhìn Assembly đã đổi.");
+            double[] viewport=PreviewVisibleClientRectangle(view);
+            double[] combined=UnionPreviewBox(next.OriginalBox,next.PreviewBox);
+            MathTransform projection=view.Transform;
+            double[] projected=TransformPreviewBox(combined,projection==null?null:projection.ArrayData as double[]);
+            double width=Math.Max(1e-9,projected[3]-projected[0]),height=Math.Max(1e-9,projected[4]-projected[1]);
+            const double occupiedFraction=0.84;
+            double factor=occupiedFraction*Math.Min((viewport[2]-viewport[0])/width,(viewport[3]-viewport[1])/height);
+            double scale=view.Scale2*factor;
+            if(!AfjTemporaryBoolean.Finite(factor) || factor<=0 || !AfjTemporaryBoolean.Finite(scale) || scale<=0)
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: chưa tính được tỷ lệ hiển thị.");
+            view.Scale2=scale;
+
+            // Scale2 can move the projected center. Reobserve the exact native
+            // transform before computing the required post-scale translation.
+            projection=view.Transform;
+            MathTransform inverse=projection==null?null:projection.Inverse() as MathTransform;
+            double[] matrix=projection==null?null:projection.ArrayData as double[];
+            double[] inverseMatrix=inverse==null?null:inverse.ArrayData as double[];
+            projected=TransformPreviewBox(combined,matrix);
+            double dx=(viewport[0]+viewport[2]-projected[0]-projected[3])*0.5;
+            double dy=(viewport[1]+viewport[3]-projected[1]-projected[4])*0.5;
+            if(inverseMatrix==null)
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: chưa đảo được phép chiếu sau zoom.");
+            double[] a=PreviewPoint(new double[]{0,0,0},inverseMatrix);
+            double[] b=PreviewPoint(new double[]{dx,dy,0},inverseMatrix);
+            double[] worldDelta=new double[]{b[0]-a[0],b[1]-a[1],b[2]-a[2]};
+            MathTransform orientation=view.Orientation3;
+            double[] orientationData=orientation==null?null:orientation.ArrayData as double[];
+            if(orientationData==null || orientationData.Length!=16 || !FinitePreviewValues(orientationData))
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: hướng khung nhìn không hợp lệ.");
+            double[] zero=PreviewPoint(new double[]{0,0,0},orientationData);
+            double[] oriented=PreviewPoint(worldDelta,orientationData);
+            MathVector translation=view.Translation3;
+            double[] old=translation==null?null:translation.ArrayData as double[];
+            if(old==null || old.Length!=3 || !FinitePreviewValues(old))
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: vị trí khung nhìn không hợp lệ.");
+            MathUtility math=app.GetMathUtility() as MathUtility;
+            double currentScale=view.Scale2;
+            double[] target=new double[3];
+            for(int axis=0;axis<3;axis++)target[axis]=old[axis]+(oriented[axis]-zero[axis])*currentScale;
+            MathVector replacement=math==null?null:math.CreateVector(target) as MathVector;
+            if(replacement==null)
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: chưa đặt được vị trí hiển thị.");
+            view.Translation3=replacement;
+
+            // Do not report a fitted presentation merely because setters returned.
+            // Reproject both boxes into the freshly observed actual native view.
+            viewport=PreviewVisibleClientRectangle(view);
+            projection=view.Transform;
+            matrix=projection==null?null:projection.ArrayData as double[];
+            double[] original=TransformPreviewBox(next.OriginalBox,matrix);
+            double[] preview=TransformPreviewBox(next.PreviewBox,matrix);
+            double[] union=UnionPreviewBox(original,preview);
+            const double tolerance=2.0;
+            bool inside=union[0]>=viewport[0]-tolerance && union[1]>=viewport[1]-tolerance &&
+                union[3]<=viewport[2]+tolerance && union[4]<=viewport[3]+tolerance;
+            bool separated=original[3]<preview[0];
+            Trace.WriteLine("[AFJ-R62-VIEW] native_fit=PROJECTED_CHECK local_viewport_px="+DiagnosticArray(viewport)+
+                " combined_projected_bounds_px="+DiagnosticArray(union)+" in_view="+inside+" separated="+separated+
+                " actual_visibility=UNVERIFIED");
+            if(!inside || !separated)
+                throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: bản sao chưa nằm trọn vùng nhìn; đã dừng hiển thị để tránh Preview ngoài màn hình.");
+        }
+
+        private void TracePresentationBounds()
+        {
+            if (presentation==null) return;
+            try
+            {
+                ModelView view=sourceAssembly.ActiveView as ModelView;
+                double[] matrix=view==null || view.Transform==null?null:view.Transform.ArrayData as double[];
+                if(matrix==null || view.HasPerspective()) return;
+                double[] original=TransformPreviewBox(presentation.OriginalBox,matrix);
+                double[] preview=TransformPreviewBox(presentation.PreviewBox,matrix);
+                Array window=view.GetVisibleBox() as Array;
+                // Bounds estimate is evidence for a layout, not proof of painted pixels or occlusion.
+                Trace.WriteLine("[AFJ-R62-VIEW] original_projected_bounds_px="+DiagnosticArray(original)+
+                    " preview_projected_bounds_px="+DiagnosticArray(preview)+" visible_box_px="+DiagnosticArray(window)+
+                    " nonoverlap_bounds="+(original[3]<preview[0])+" gap_px="+(preview[0]-original[3]).ToString("R",CultureInfo.InvariantCulture)+
+                    " actual_visibility=UNVERIFIED");
+            }
+            catch(Exception ex){Trace.WriteLine("[AFJ-R62-VIEW] bounds=UNVERIFIED reason="+ex.Message);}
+        }
+
+        private void RestorePreviewViewIfOwned()
+        {
+            PreviewPresentation old=presentation;
+            presentation=null;
+            if(old==null) return;
+            try
+            {
+                if(!SamePreviewView(old.AppliedView,CapturePreviewView()))
+                {Trace.WriteLine("[AFJ-R62-VIEW] restore=SKIPPED reason=user_view_or_active_document_changed");return;}
+                MathUtility math=app.GetMathUtility() as MathUtility;
+                MathVector translation=math==null?null:math.CreateVector(old.BeforeView.Translation) as MathVector;
+                MathTransform orientation=math==null?null:math.CreateTransform(old.BeforeView.Orientation) as MathTransform;
+                if(translation==null || orientation==null) throw new InvalidOperationException("view state unavailable");
+                old.BeforeView.View.Orientation3=orientation;
+                old.BeforeView.View.Scale2=old.BeforeView.Scale;
+                old.BeforeView.View.Translation3=translation;
+                Trace.WriteLine("[AFJ-R62-VIEW] restore=APPLIED source_geometry=UNCHANGED");
+            }
+            catch(Exception ex){Trace.WriteLine("[AFJ-R62-VIEW] restore=UNVERIFIED reason="+ex.Message);}
+        }
 
         private static string DiagnosticArray(object value)
         {
@@ -634,9 +966,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                         "Không chuyển ghost từ World XYZ về Part XYZ.");
                 try
                 {
-                    bool isRemoved = transparency < 0.1;
+                    Color previewColor = ColorTranslator.FromWin32(color);
                     local.MaterialPropertyValues2 = new double[] {
-                        isRemoved ? 0.92 : 0.32, 0.35, 0.85,
+                        previewColor.R/255.0, previewColor.G/255.0, previewColor.B/255.0,
                         0.35, 0.65, 0.20, 0.25, transparency, 0.0
                     };
                 }
@@ -697,7 +1029,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
 
         private int ShowComponent(Component2 component, int colorRef,
-                                  double transparency)
+                                  double transparency, MathTransform shift)
         {
             ModelDoc2 part = component.GetModelDoc2() as ModelDoc2;
             if (part == null ||
@@ -716,6 +1048,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                 throw new InvalidOperationException(
                     "Part có quá nhiều body cho Preview thử nghiệm.");
 
+            MathTransform componentWorld = component.Transform2;
+            MathTransform componentInverse = componentWorld == null ? null : componentWorld.Inverse() as MathTransform;
+            if (componentInverse == null || shift == null) throw new InvalidOperationException("Không xác minh được vị trí bản sao.");
             int count = 0;
             foreach (object item in bodies)
             {
@@ -729,6 +1064,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                 if (copy == null || !copy.IsTemporaryBody())
                     throw new InvalidOperationException(
                         "Không tạo được bản sao Temporary Body.");
+
+                // Reuse the same side-by-side presentation as the cut candidate.
+                // Display3(component) applies the occurrence transform after this local conversion.
+                if (!copy.ApplyTransform(componentWorld) || !copy.ApplyTransform(shift) || !copy.ApplyTransform(componentInverse))
+                    throw new InvalidOperationException("Không đặt được bản sao ở cạnh Assembly.");
 
                 // MaterialPropertyValues2: [R,G,B,Ambient,Diffuse,Specular,
                 // Shininess,Transparency,Emission], range 0..1.
@@ -764,7 +1104,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int result = copy.Display3(
                     component, colorRef,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
-                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_OVERLAY status=" + result + " actual_visibility=UNVERIFIED");
+                Trace.WriteLine("[AFJ-R62-VIEW] stage=DISPLAY3_BASELINE_SIDE_BY_SIDE status=" + result + " actual_visibility=UNVERIFIED");
                 if (result != 0)
                     throw new InvalidOperationException(
                         "IBody2.Display3 thất bại, mã lỗi=" + result +
@@ -822,7 +1162,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                     error = "Hide thất bại: " + ex.Message;
                 }
             }
-            if (attempted && redraw) RedrawSafely();
+            // A fit can have happened before the first temporary Body was
+            // registered. Repaint camera restoration even when no Hide was needed.
+            bool restoringPresentation = !removedOnly && shown.Count == 0 && presentation != null;
+            if (!removedOnly && shown.Count == 0) RestorePreviewViewIfOwned();
+            if ((attempted || restoringPresentation) && redraw) RedrawSafely();
             return error == null;
         }
     }
@@ -937,7 +1281,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             string errorName = Enum.IsDefined(typeof(swBodyOperationError_e), code)
                 ? ((swBodyOperationError_e)code).ToString() : "UNKNOWN";
             string operationName = label ?? ((swBodyOperationType_e)operation).ToString();
-            Trace.WriteLine("[AFJ-BOOLEAN] operation=" + operationName +
+            if(code!=(int)swBodyOperationError_e.swBodyOperationNoError||AfjNativeDiagnosticPolicy.Verbose)Trace.WriteLine("[AFJ-BOOLEAN] operation=" + operationName +
                 " code=" + code + " name=" + errorName);
             var result = new List<Body2>();
             if (code != (int)swBodyOperationError_e.swBodyOperationNoError)
@@ -4555,7 +4899,13 @@ namespace ADDIN.Commands.AutoFrameJoint
         // ownership token capture, or while a rollback is already running.
         private void Log(string phase)
         {
-            try { Trace.WriteLine("[AFJ-U-TRANSACTION] " + phase); } catch { }
+            try
+            {
+                if(AfjNativeDiagnosticPolicy.Verbose||
+                    !(phase.EndsWith(".INVARIANTS_BEGIN",StringComparison.Ordinal)||phase.EndsWith(".INVARIANTS_END",StringComparison.Ordinal)))
+                    Trace.WriteLine("[AFJ-U-TRANSACTION] " + phase);
+            }
+            catch { }
             try { if (Sink != null) Sink(phase); } catch { }
         }
         private static double[] CloneTransform(MathTransform transform)
@@ -4767,8 +5117,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                 foreach (var original in state.Original.Values)
                 {
                     FeatureState current;
-                    Need(now.TryGetValue(original.Id, out current) && current.Type == original.Type &&
-                        current.Kind == original.Kind && current.Name == original.Name && current.Suppressed == original.Suppressed,
+                    bool present=now.TryGetValue(original.Id,out current);
+                    bool nativeGeneratedInvalidation=!present&&Journal!=null&&
+                        Journal.IsAcceptedOriginalFoldedProfileInvalidation(state.Model,original.Id);
+                    Need(nativeGeneratedInvalidation||(present && current.Type == original.Type &&
+                        current.Kind == original.Kind && current.Name == original.Name && current.Suppressed == original.Suppressed),
                         "Protected original Feature changed in " + state.Label + "; id="+original.Id+
                         "; before="+original.Type+":"+original.Name+":"+original.Suppressed+
                         "; current="+(current==null?"MISSING":current.Type+":"+current.Name+":"+current.Suppressed));
@@ -4881,6 +5234,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private static void R57Trace(string state,string phase,Exception error=null)
         {
+            if(!AfjNativeDiagnosticPolicy.BoundaryEnabled(state,phase,error))return;
             try
             {
                 Trace.WriteLine("[AFJ-R57-BOUNDARY] state="+state+" phase="+phase+
@@ -4934,7 +5288,15 @@ namespace ADDIN.Commands.AutoFrameJoint
             CheckInvariant("AFTER_FOUR_NATIVE_SKETCHES"); CheckSketches("BEFORE_ANY_CUT"); AcceptStamps();
             foreach (var step in Steps)
             {
-                RequireAcceptedStamps(); CheckInvariant("BEFORE_CUT_" + step.Operation.EvidenceId);
+                // R62_NO_MUTATION_CHECKPOINT_REUSE: the previous iteration's
+                // AFTER_CUT invariant already checked both Parts, Assembly
+                // history and both Bodies after the full Sketch-graph checks.
+                // Only managed iteration and accepted-stamp reads intervene.
+                // Any native update aborts here; never reuse across a factory,
+                // edit context switch, event/callback or model modification.
+                RequireAcceptedStamps();
+                if(Object.ReferenceEquals(step,Steps[0]))CheckInvariant("BEFORE_CUT_" + step.Operation.EvidenceId);
+                else AfjNativeObservationMetrics.Add("Transaction.InvariantCheckpointReuse");
                 string stepPhase="STEP "+Documents[step.Part].Label+" "+step.Operation.EvidenceId;
                 var owned = R57Boundary(stepPhase+".PREPARE_SHEET_SKETCH",()=>R59PrepareStepSketch(step));
                 Need(R57Boundary(stepPhase+".SAME_PART",()=>Same(owned.Part, Documents[step.Part].Model)), "Prepared Sketch/operation Part mapping differs");
@@ -5153,6 +5515,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             var cut=Find(part,createdId);
             Need(cut!=null,"R60 registered native Cut cannot be reacquired after EditAssembly");
             cut.Name = owned.IntendedName + "_Cut";
+            Journal.CaptureNativeCutFoldedProfileInvalidations(part,factoryCheckpoint,cut);
             ConfirmClosed(part,cut,step.Operation.EvidenceId + ":CUT");
             var section=step.Part==(Preview.CoverA?0:1)?Intent.Winner:Intent.Loser;
             Journal.CaptureCutFactoryCompanions(part,factoryCheckpoint,cut,step.Operation.EvidenceId,section.Thickness,section.Radius);
@@ -5162,7 +5525,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Math.Abs(data.GetDepth(true) - spec.Length) < 1e-8 && data.ReverseDirection == reverse && data.NormalCut == normalCut &&
                 !data.BothDirections && !data.FlipSideToCut && data.NormalCut && data.OptimizeGeometry==optimizeGeometry && data.FromType == (int)swExtrudeFrom_e.swExtrudeFrom_SketchPlane,
                 "Native Cut definition differs from reviewed operation");
-            Trace.WriteLine("[AFJ-R59] NATIVE_CUT_KERNEL role="+step.Operation.EvidenceId+" normal="+data.NormalCut+" optimize_geometry="+data.OptimizeGeometry+" end_condition="+data.GetEndCondition(true)+" depth_m="+data.GetDepth(true).ToString("R",CultureInfo.InvariantCulture)+" body_equivalence=PENDING");
+            if(AfjNativeDiagnosticPolicy.Verbose)Trace.WriteLine("[AFJ-R59] NATIVE_CUT_KERNEL role="+step.Operation.EvidenceId+" normal="+data.NormalCut+" optimize_geometry="+data.OptimizeGeometry+" end_condition="+data.GetEndCondition(true)+" depth_m="+data.GetDepth(true).ToString("R",CultureInfo.InvariantCulture)+" body_equivalence=PENDING");
             var freshProfile=Find(part,owned.FeatureId);
             var freshSketch=freshProfile==null?null:freshProfile.GetSpecificFeature2() as Sketch;
             Need(freshSketch!=null,"Post-Cut native Sketch missing");
@@ -5310,12 +5673,14 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Func<double[],double[],double> distance=(x,y)=>Math.Sqrt(x.Zip(y,(xx,yy)=>(xx-yy)*(xx-yy)).Sum());
                 bool matched=Enumerable.Range(0,step.NativeContour.Length).Any(index=>{var x=step.NativeContour[index];var y=step.NativeContour[(index+1)%step.NativeContour.Length];return distance(a,x)<1e-8&&distance(b,y)<1e-8||distance(a,y)<1e-8&&distance(b,x)<1e-8;});
                 if(!matched)unmatched++;
-                Trace.WriteLine("[AFJ-R59] CLOSED_CONTOUR phase="+phase+" role="+step.Operation.EvidenceId+" matched="+matched+" a="+String.Join(",",a.Select(v=>v.ToString("R",CultureInfo.InvariantCulture)))+" b="+String.Join(",",b.Select(v=>v.ToString("R",CultureInfo.InvariantCulture))));
+                if(!matched||AfjNativeDiagnosticPolicy.Verbose)Trace.WriteLine("[AFJ-R59] CLOSED_CONTOUR phase="+phase+" role="+step.Operation.EvidenceId+" matched="+matched+" a="+String.Join(",",a.Select(v=>v.ToString("R",CultureInfo.InvariantCulture)))+" b="+String.Join(",",b.Select(v=>v.ToString("R",CultureInfo.InvariantCulture))));
             }
             Need(unmatched==0,"Closed native Sketch contour moved away from the independently reviewed slice");
         }
         private SketchCheck MeasureSketch(ModelDoc2 part, AfjUParametricSketchWriter.OwnedSketch owned, string phase)
         {
+            using(AfjNativeObservationMetrics.Measure("Transaction.MeasureSketch"))
+            {
             int index = Same(part, Documents[0].Model) ? 0 : 1; var feature = Find(part, owned.FeatureId);
             Need(feature != null && owned.ClosedOwnerVerified, "Cannot resolve closed owned Sketch");
             var sketch = feature.GetSpecificFeature2() as Sketch; Need(sketch != null && !sketch.Is3D(), "Owned 2D Sketch interface unavailable");
@@ -5366,16 +5731,21 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(graphValid,"Owned Sketch constraint/support graph failed after "+phase+" frame="+row.Frame+" role="+row.EvidenceId+" feature_id="+row.FeatureId+
                 " constrained_status="+row.Status+" dangling="+row.Dangling+" overdefining="+row.Overdefining+" reference_type="+row.ReferenceType+" original_support="+row.OriginalSupportOwner+" native_error="+row.Error);
             return row;
+            }
         }
         internal void CheckSketches(string phase)
         {
+            using(AfjNativeObservationMetrics.Measure("Transaction.CheckSketches",true))
+            {
             Need(SketchWriterResult != null && SketchWriterResult.Owned.Count >= 4 && SketchWriterResult.Owned.Select(o=>o.Part.GetPathName()+":"+o.FeatureId).Distinct().Count()==SketchWriterResult.Owned.Count, "Four uncut guide Sketches and all exact owned per-sheet Sketches must remain prepared");
             foreach (var owned in SketchWriterResult.Owned) MeasureSketch(owned.Part, owned, phase);
+            }
         }
         internal void Commit()
         {
             Need(Applied && !Committed && !UnresolvedCreation, "Only a fully applied owned transaction can commit");
             RequireAcceptedStamps(); CheckSketches("BEFORE_COMMIT"); CheckInvariant("BEFORE_COMMIT");
+            Journal.VerifyAcceptedOriginalFoldedProfiles();
             Need(Same(App.ActiveDoc, Assembly) && Same(((AssemblyDoc)Assembly).GetEditTarget(), Assembly) &&
                 Assembly.GetActiveSketch2() == null, "Restore Assembly context before committing");
             Committed = true; Log("COMMITTED_NO_SAVE");
@@ -5627,7 +5997,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         static int RelationChecked(Sketch sketch,int type,params object[] entities)
         {
             var advertised=Allowed(sketch,entities);
-            Trace.WriteLine("[AFJ-R59] RELATION_CHECK requested="+type+" allowed="+String.Join(",",advertised)+" entities="+String.Join(";",entities.Select(e=>e is SketchPoint?"POINT:"+PointId((SketchPoint)e):e is SketchSegment?"SEGMENT:"+SegmentObjectId((SketchSegment)e):e.GetType().FullName)));
+            if(AfjNativeDiagnosticPolicy.Verbose)Trace.WriteLine("[AFJ-R59] RELATION_CHECK requested="+type+" allowed="+String.Join(",",advertised)+" entities="+String.Join(";",entities.Select(e=>e is SketchPoint?"POINT:"+PointId((SketchPoint)e):e is SketchSegment?"SEGMENT:"+SegmentObjectId((SketchSegment)e):e.GetType().FullName)));
             Need(advertised.Contains(type),"native API does not advertise relation "+type);
             var relation=sketch.RelationManager.AddRelation(entities.Select(e=>new DispatchWrapper(e)).ToArray(),type) as SketchRelation;
             Need(relation!=null&&relation.GetRelationType()==type,"native relation failed "+type);return type;
@@ -7024,11 +7394,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                 // Feature, not the native Part Feature with the same ID.
                 var batch=Reacquire(feature,segments.Concat(margin).Concat(bisectorLegs).ToArray(),local.Concat(marginLocal).Concat(legLocalA).ToArray(),local.Skip(1).Concat(new[]{local[0]}).Concat(closureLocal).Concat(legLocalB).ToArray(),Enumerable.Repeat(false,vertexCount).Concat(Enumerable.Repeat(true,3+bisectorLegs.Length)).ToArray(),result);
                 for(int i=0;i<vertexCount;i++)segments[i]=batch.Lines[i];for(int i=0;i<3;i++)margin[i]=batch.Lines[vertexCount+i];for(int i=0;i<bisectorLegs.Length;i++)bisectorLegs[i]=batch.Lines[vertexCount+3+i];sketch=batch.Sketch;CheckPolygon(segments,local);
-                Trace.WriteLine("[AFJ-U-MASTER] CONTEXT_HANDLES_REACQUIRED profile="+vertexCount+" guides="+(3+bisectorLegs.Length)+" single_allowed="+String.Join(",",Allowed(sketch,segments[0])));
+                if(AfjNativeDiagnosticPolicy.Verbose)Trace.WriteLine("[AFJ-U-MASTER] CONTEXT_HANDLES_REACQUIRED profile="+vertexCount+" guides="+(3+bisectorLegs.Length)+" single_allowed="+String.Join(",",Allowed(sketch,segments[0])));
                 Trace.WriteLine("[AFJ-U-MASTER] CONNECT_PROFILE "+DateTime.UtcNow.ToString("o"));
                 for(int i=0;i<vertexCount;i++){var a=LineEnd(segments[i]);var b=LineStart(segments[(i+1)%vertexCount]);if(!Same(app,a,b))AddRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,a,b);}
-                Trace.WriteLine("[AFJ-U-MASTER] FIRST_SEGMENT id="+String.Join(",",((Array)segments[0].GetID()).Cast<object>().Select(Convert.ToString))+" type="+segments[0].GetType()+" construction="+segments[0].ConstructionGeometry+" sketch_id="+((Feature)segments[0].GetSketch()).GetID()+" active_id="+((Feature)sketch).GetID()+" AddToDB="+model.SketchManager.AddToDB);
-                Trace.WriteLine("[AFJ-U-MASTER] ALLOWED_FIRST_SINGLE="+String.Join(",",Allowed(sketch,segments[0]))+" line="+String.Join(",",Allowed(sketch,segments[0] as SketchLine))+" own_context="+String.Join(",",Allowed(sketch,segments[0],nearOwn.Context))+" own_native="+String.Join(",",Allowed(sketch,segments[0],nearOwn.Native))+" line_context="+String.Join(",",Allowed(sketch,segments[0] as SketchLine,nearOwn.Context)));
+                if(AfjNativeDiagnosticPolicy.Verbose)Trace.WriteLine("[AFJ-U-MASTER] FIRST_SEGMENT id="+String.Join(",",((Array)segments[0].GetID()).Cast<object>().Select(Convert.ToString))+" type="+segments[0].GetType()+" construction="+segments[0].ConstructionGeometry+" sketch_id="+((Feature)segments[0].GetSketch()).GetID()+" active_id="+((Feature)sketch).GetID()+" AddToDB="+model.SketchManager.AddToDB);
+                if(AfjNativeDiagnosticPolicy.Verbose)Trace.WriteLine("[AFJ-U-MASTER] ALLOWED_FIRST_SINGLE="+String.Join(",",Allowed(sketch,segments[0]))+" line="+String.Join(",",Allowed(sketch,segments[0] as SketchLine))+" own_context="+String.Join(",",Allowed(sketch,segments[0],nearOwn.Context))+" own_native="+String.Join(",",Allowed(sketch,segments[0],nearOwn.Native))+" line_context="+String.Join(",",Allowed(sketch,segments[0] as SketchLine,nearOwn.Context)));
                 CheckPolygon(segments,local);
                 Trace.WriteLine("[AFJ-U-MASTER] AXIS_RELATIONS "+DateTime.UtcNow.ToString("o"));
                 for(int i=0;i<vertexCount;i++)
@@ -7577,6 +7947,9 @@ namespace ADDIN.Commands.AutoFrameJoint
         private sealed class Scope
         {
             internal readonly Dictionary<int,PassiveReferenceAlias> PassiveReferenceAliases=new Dictionary<int,PassiveReferenceAlias>();
+            internal readonly HashSet<string> PrivateMetadataTokenObservations=new HashSet<string>(StringComparer.Ordinal);
+            internal int PendingLogicalFixedFaceFactoryCutId=-1;
+            internal readonly Dictionary<int,BaselineFoldedProfileGuard> PrivateFoldedProfileGuards=new Dictionary<int,BaselineFoldedProfileGuard>();
             internal readonly Dictionary<int,PassiveFlatPatternGuard> PrivateFlatPatternGuards=new Dictionary<int,PassiveFlatPatternGuard>();
             internal ModelDoc2 Document;
             internal string Label, PrivatePath;
@@ -7647,6 +8020,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 }
             }
             if(before!=null)CaptureOriginalPassiveFlatPatternGuards(scope);
+            if(before!=null)CaptureBaselineFoldedProfileGuards(scope);
             // Baseline keeps primitive rows and private token bytes only.
             // Never query a retained baseline Feature RCW after mutation.
             foreach (Node original in scope.Baseline.Nodes.Values) original.Feature = null;
@@ -8021,9 +8395,14 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private void CheckProtected(Scope scope, Snapshot now, bool exactFinal)
         {
+            var validatedFoldedProfileOwners=new HashSet<long>();
             foreach (var original in scope.Baseline.Nodes.Values)
             {
                 Node live;
+                // Native-generated FlatPattern copies may retire at an exact
+                // registered Cut boundary. Exact rollback still requires ALL
+                // original IDs: this is not a promise of metadata restoration.
+                if(!exactFinal&&IsAcceptedFoldedProfileAbsence(scope,original.Id,now,validatedFoldedProfileOwners))continue;
                 Need(now.Nodes.TryGetValue(original.Id, out live),
                     "Protected original Feature disappeared in " + scope.Label +
                     "; id=" + original.Id + "; type=" + original.Type + "; kind=" + original.Kind +
@@ -8368,6 +8747,9 @@ namespace ADDIN.Commands.AutoFrameJoint
             {
                 Node current;bool present=now.Nodes.TryGetValue(old.Id,out current);
                 if(present&&RowSame(old,current,false))continue;
+                BaselineFoldedProfileGuard baselineGenerated;
+                if(!present&&scope.PrivateFoldedProfileGuards.TryGetValue(old.Id,out baselineGenerated)&&
+                    baselineGenerated.InvalidatedByCutId==cutId&&IsAcceptedFoldedProfileAbsence(scope,old.Id,now))continue;
                 string detail="id="+old.Id+";before="+old.Type+":"+old.Name+":suppressed="+old.Suppressed+
                     ";current="+(present?current.Type+":"+current.Name+":suppressed="+current.Suppressed:"MISSING");
                 Mark("CUT_FACTORY_PRECEDING_DELTA_"+detail);
@@ -8811,10 +9193,384 @@ namespace ADDIN.Commands.AutoFrameJoint
             ValidateDeleteFactoryFlatProfile(passive,current[scope]);
             return scope==deleting.Scope&&deleting.Id==passive.DerivedSourceSketchId&&deleting.Kind=="ProfileFeature";
         }
+
+        // Native folded/flat metadata is generated by SOLIDWORKS, independently
+        // of the authored Cut profile. It is not transaction-owned geometry.
+        // Eligibility is frozen BEFORE the first native Sketch, using native
+        // ownership/parents/token state, never a Feature name or AFJ prefix.
+
+        private Feature ResolveExactSystemMetadataToken(Scope scope,Feature live,byte[] frozen,int id,string type)
+        {
+            // Suppressed native system metadata can produce different COM
+            // wrappers whose IsSame result is false even for identical native
+            // persistent references. Identity here requires the complete
+            // immutable bytes on BOTH freshly acquired objects, plus all native
+            // scalar identity fields. No changed ID/token is rebound or allowed.
+            Need(type=="FlatPattern"||type=="FoldUpDownSketchFolder",
+                "System metadata token identity cannot be used for an authored Sketch or Cut");
+            Need(live!=null&&frozen!=null&&frozen.Length>0&&live.GetID()==id&&live.GetTypeName2()==type&&
+                live.IsSuppressed()&&!live.IsRolledBack()&&
+                String.Equals(scope.PrivatePath,scope.Document.GetPathName(),StringComparison.OrdinalIgnoreCase),
+                "Exact suppressed system metadata live identity/document changed");
+            string name=live.Name,kind=live.GetTypeName2()=="ICE"?live.GetTypeName():live.GetTypeName2();
+            int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(frozen,out state) as Feature;
+            Need((state==0||state==2)&&resolved!=null&&resolved.GetID()==id&&resolved.GetTypeName2()==type&&
+                (resolved.GetTypeName2()=="ICE"?resolved.GetTypeName():resolved.GetTypeName2())==kind&&
+                resolved.Name==name&&resolved.IsSuppressed()&&!resolved.IsRolledBack(),
+                "Exact suppressed system metadata frozen token native ID/type/kind/name/suppression changed");
+            var liveBytes=scope.Document.Extension.GetPersistReference3(live) as byte[];
+            var resolvedBytes=scope.Document.Extension.GetPersistReference3(resolved) as byte[];
+            Need(liveBytes!=null&&resolvedBytes!=null&&liveBytes.SequenceEqual(frozen)&&resolvedBytes.SequenceEqual(frozen),
+                "Exact suppressed system metadata complete persistent bytes changed; rebinding refused");
+            string equality;
+            try{equality=App.IsSame(resolved,live).ToString(CultureInfo.InvariantCulture);}
+            catch(Exception ex){equality="UNAVAILABLE_HRESULT_0x"+ex.HResult.ToString("X8");}
+            string observation=type+":"+id+":"+state+":"+equality;
+            if(scope.PrivateMetadataTokenObservations.Add(observation))
+                Mark("SYSTEM_METADATA_EXACT_PERSIST_IDENTITY scope="+scope.Label+";id="+id+";type="+type+
+                    ";state="+state+";resolved_and_live_full_bytes_equal_frozen=true;rcw_equality_observation="+equality+
+                    ";rcw_equality_is_identity_authority=false;changed_id_or_token_rebound=false");
+            return resolved;
+        }
+
+
+        private sealed class LogicalFlatFixedFace
+        {
+            internal byte[] OriginalToken,AcceptedToken;
+            internal double[] OrientedNormal;
+            internal double PlaneOffset;
+            internal string AcceptedDefinition;
+            internal int AcceptedFactoryCutId=-1;
+        }
+        private double[] LogicalFixedFacePlane(Face2 face)
+        {
+            Need(face!=null,"Logical FlatPattern reference requires an actual native Face2");
+            var surface=face.GetSurface() as Surface;var p=surface==null||!surface.IsPlane()?null:surface.PlaneParams as double[];
+            var normal=face.Normal as double[];
+            Need(p!=null&&p.Length>=6&&p.All(AfjTemporaryBoolean.Finite)&&normal!=null&&normal.Length==3&&normal.All(AfjTemporaryBoolean.Finite),
+                "Logical FlatPattern fixed face is not finite planar native geometry with orientation");
+            double length=Math.Sqrt(normal.Sum(v=>v*v));Need(length>1e-12,"Logical fixed-face normal has zero length");
+            var n=normal.Select(v=>v/length).ToArray();double offset=n[0]*p[3]+n[1]*p[4]+n[2]*p[5];
+            Need(AfjTemporaryBoolean.Finite(offset),"Logical fixed-face plane offset is nonfinite");return n.Concat(new[]{offset}).ToArray();
+        }
+        private void MatchLogicalFixedFacePlane(Face2 face,LogicalFlatFixedFace original)
+        {
+            var plane=LogicalFixedFacePlane(face);
+            Need(plane.Take(3).Select((v,i)=>Math.Abs(v-original.OrientedNormal[i])).Max()<=1e-8&&
+                Math.Abs(plane[3]-original.PlaneOffset)<=1e-8,"Logical fixed-face original plane/orientation changed");
+        }
+        private void LogicalFixedFaceMembership(Scope scope,byte[] currentToken)
+        {
+            var body=AfjNativeCutCommit.CurrentBody(scope.Document);
+            Need(body!=null&&!body.IsTemporaryBody()&&body.IsSheetMetal()&&body.Check2()==0&&
+                (body.Check3==null||body.Check3.Count==0),"Logical fixed-face proof requires one valid current native sheet solid");
+            var faces=body.GetFaces() as Array;Need(faces!=null&&faces.Length>0&&faces.Length<50000,"Logical fixed-face bounded native solid face inventory unavailable");
+            int matches=0;
+            foreach(object value in faces)
+            {
+                var face=value as Face2;Need(face!=null,"Logical fixed-face body has an unresolved native face");
+                var token=scope.Document.Extension.GetPersistReference3(face) as byte[];
+                if(token!=null&&token.SequenceEqual(currentToken))matches++;
+            }
+            Need(matches==1,"Logical fixed face is not uniquely in the actual current Part single sheet solid");
+        }
+        private int LogicalFixedFaceOwner(Scope scope,Snapshot now,Face2 face)
+        {
+            var owner=face.GetFeature() as Feature;Need(owner!=null,"Logical fixed face has no native modeling owner");
+            int id=owner.GetID();Node live=null,old=null;
+            string type=owner.GetTypeName2(),kind=type=="ICE"?owner.GetTypeName():type;
+            Need(now.Nodes.TryGetValue(id,out live)&&live.Type==type&&live.Kind==kind&&live.Name==owner.Name&&
+                !live.Suppressed&&!owner.IsSuppressed()&&!owner.IsRolledBack(),"Logical fixed-face native owner is not in exact current Part inventory");
+            bool baseline=scope.Baseline.Nodes.TryGetValue(id,out old)&&RowSame(old,live,true)&&
+                kind!="FlatPattern"&&kind!="FoldUpDownSketchFolder"&&kind!="SheetMetal"&&kind!="TemplateSheetMetal"&&
+                kind!="ProfileFeature"&&kind!="3DProfileFeature"&&kind!="RefPlane"&&kind!="InContextFeatHolder";
+            var entry=EntryFor(scope,id);
+            bool owned=entry!=null&&!entry.Removed&&entry.Kind=="Cut"&&entry.PrivateToken!=null&&
+                (entry.ClosedIdentityConfirmed||scope.PendingLogicalFixedFaceFactoryCutId==id)&&
+                entry.Role!=null&&entry.Role.StartsWith("SHEET_SLICE:",StringComparison.Ordinal)&&entry.Role.EndsWith(":CUT",StringComparison.Ordinal);
+            Need(baseline||owned,"Logical fixed-face owner is neither an exact original modeling Feature nor a bound registered sheet Cut");
+            if(owned)
+            {
+                int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(entry.PrivateToken,out state) as Feature;
+                var current=scope.Document.Extension.GetPersistReference3(owner) as byte[];
+                var returned=resolved==null?null:scope.Document.Extension.GetPersistReference3(resolved) as byte[];
+                Need(state==0&&resolved!=null&&resolved.GetID()==id&&current!=null&&returned!=null&&
+                    current.SequenceEqual(entry.PrivateToken)&&returned.SequenceEqual(entry.PrivateToken),
+                    "Logical fixed-face registered native Cut owner persistent identity changed");
+            }
+            return id;
+        }
+        private LogicalFlatFixedFace CaptureLogicalFlatFixedFace(Scope scope,Feature flat)
+        {
+            var data=flat.GetDefinition() as FlatPatternFeatureData;Need(data!=null,"Original FlatPattern definition unavailable for logical fixed face");
+            var face=data.FixedFace2 as Face2;if(face==null)return null;
+            var token=scope.Document.Extension.GetPersistReference3(face) as byte[];Need(token!=null&&token.Length>0,"Original logical fixed face persistent reference unavailable");
+            int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(token,out state) as Face2;
+            var returned=resolved==null?null:scope.Document.Extension.GetPersistReference3(resolved) as byte[];
+            Need(state==0&&resolved!=null&&returned!=null&&returned.SequenceEqual(token),"Original logical fixed-face reference cannot roundtrip exactly");
+            var plane=LogicalFixedFacePlane(face);
+            var result=new LogicalFlatFixedFace{OriginalToken=(byte[])token.Clone(),AcceptedToken=(byte[])token.Clone(),
+                OrientedNormal=plane.Take(3).ToArray(),PlaneOffset=plane[3]};
+            MatchLogicalFixedFacePlane(resolved,result);LogicalFixedFaceMembership(scope,token);
+            LogicalFixedFaceOwner(scope,scope.Baseline,face);return result;
+        }
+        private void ExportLogicalFixedFaceProof(Scope scope,PassiveFlatPatternGuard guard,Dictionary<string,object> row)
+        {
+            string directory=System.Environment.GetEnvironmentVariable("AFJ_R62_PROFILE_DIAGNOSTIC_DIRECTORY");
+            if(String.IsNullOrWhiteSpace(directory)||!Path.IsPathRooted(directory)||!Directory.Exists(directory))return;
+            try
+            {
+                row["private_scope"]="R62_LOGICAL_FIXED_FACE_PROOF_NOT_NAME_OR_PLANE_ONLY_IDENTITY";row["document"]=scope.Label;
+                row["flat_id"]=guard.Id;row["utc"]=DateTime.UtcNow.ToString("o");row["raw_persistent_tokens_serialized"]=false;
+                File.WriteAllText(Path.Combine(directory,"r62_logical_fixed_face_"+scope.Label+"_flat_"+guard.Id+"_cut_"+
+                    scope.PendingLogicalFixedFaceFactoryCutId+"_"+Guid.NewGuid().ToString("N")+".private.json"),
+                    new JavaScriptSerializer{MaxJsonLength=Int32.MaxValue}.Serialize(row));
+            }
+            catch(Exception ex){Mark("LOGICAL_FIXED_FACE_PROOF_EXPORT_UNAVAILABLE "+DiagnosticError(ex));}
+        }
+        private void ValidateFlatDefinitionWithLogicalFixedFace(Scope scope,Snapshot now,Feature flat,PassiveFlatPatternGuard guard)
+        {
+            string observed=FlatPatternDefinitionFingerprint(scope,flat);
+            if(observed==guard.DefinitionFingerprint)return;
+            var serializer=new JavaScriptSerializer{MaxJsonLength=Int32.MaxValue};
+            var before=serializer.Deserialize<Dictionary<string,object>>(guard.DefinitionFingerprint);
+            var after=serializer.Deserialize<Dictionary<string,object>>(observed);
+            Need(before.Count==after.Count&&before.Keys.All(after.ContainsKey)&&before.Where(p=>p.Key!="FixedFace2_observation")
+                .All(p=>serializer.Serialize(p.Value)==serializer.Serialize(after[p.Key])),"Original FlatPattern scalar/excluded-face definition changed");
+            Need(guard.LogicalFixedFace!=null,"Fixed-face encoding changed without a qualified original planar native Face2 reference");
+            var logical=guard.LogicalFixedFace;
+            if(!RollingBack&&logical.AcceptedDefinition==observed&&logical.AcceptedFactoryCutId>=0)
+            {
+                AfjNativeObservationMetrics.Add("journal.logical_fixed_face_positive_certificate_reuses");return;
+            }
+            var proof=new Dictionary<string,object>{{"status","UNVERIFIED"},{"pending_native_factory_cut_id",scope.PendingLogicalFixedFaceFactoryCutId},
+                {"all_other_flat_definition_fields_exact",true},{"original_oriented_normal",logical.OrientedNormal},
+                {"original_plane_offset_m",logical.PlaneOffset},{"plane_only_fallback",false},{"cad_save_called",false}};
+            try
+            {
+                Need(!RollingBack&&scope.PendingLogicalFixedFaceFactoryCutId>=0,
+                    "New logical fixed-face encoding was not observed adjacent to an exact registered native Cut factory");
+                var factory=EntryFor(scope,scope.PendingLogicalFixedFaceFactoryCutId);
+                Need(factory!=null&&factory.Kind=="Cut"&&!factory.Removed&&now.Nodes.ContainsKey(factory.Id),"Logical fixed-face transition has no exact bound registered native Cut");
+                var data=flat.GetDefinition() as FlatPatternFeatureData;var current=data==null?null:data.FixedFace2 as Face2;
+                int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(logical.OriginalToken,out state) as Face2;
+                proof["old_face_token_state"]=state;proof["old_face_token_resolved_face2"]=resolved!=null;proof["current_fixed_face2_available"]=current!=null;
+                if(current!=null){proof["current_oriented_plane"]=LogicalFixedFacePlane(current);proof["current_owner"]=ProbeFeature(current.GetFeature() as Feature);}
+                Need(state==0&&resolved!=null&&current!=null,"Original fixed-face reference no longer proves a live current Face2; plane-only fallback refused; state="+state);
+                var resolvedBytes=scope.Document.Extension.GetPersistReference3(resolved) as byte[];
+                var currentBytes=scope.Document.Extension.GetPersistReference3(current) as byte[];
+                proof["old_face_resolution_bytes_equal_current"]=resolvedBytes!=null&&currentBytes!=null&&resolvedBytes.SequenceEqual(currentBytes);
+                Need(resolvedBytes!=null&&currentBytes!=null&&currentBytes.Length>0&&resolvedBytes.SequenceEqual(currentBytes),
+                    "Old logical fixed-face reference does not resolve exact current fixed-face persistent encoding");
+                int currentState;var currentResolved=scope.Document.Extension.GetObjectByPersistReference3(currentBytes,out currentState) as Face2;
+                var returned=currentResolved==null?null:scope.Document.Extension.GetPersistReference3(currentResolved) as byte[];
+                proof["current_face_token_roundtrip_state"]=currentState;
+                Need(currentState==0&&currentResolved!=null&&returned!=null&&returned.SequenceEqual(currentBytes),"Current logical fixed-face reference cannot roundtrip exactly");
+                MatchLogicalFixedFacePlane(resolved,logical);MatchLogicalFixedFacePlane(current,logical);MatchLogicalFixedFacePlane(currentResolved,logical);
+                LogicalFixedFaceMembership(scope,currentBytes);int ownerId=LogicalFixedFaceOwner(scope,now,current);
+                logical.AcceptedToken=(byte[])currentBytes.Clone();logical.AcceptedDefinition=observed;logical.AcceptedFactoryCutId=factory.Id;
+                proof["status"]="API_VERIFIED_OLD_REFERENCE_ALIASES_EXACT_CURRENT_FACE";proof["oriented_plane_preserved"]=true;
+                proof["unique_current_native_sheet_solid_face_membership"]=true;proof["qualified_modeling_owner_id"]=ownerId;
+                proof["encoding_changed_from_original"]=!currentBytes.SequenceEqual(logical.OriginalToken);
+                Mark("LOGICAL_FIXED_FACE_PERSISTENT_ALIAS_VERIFIED scope="+scope.Label+";flat="+guard.Id+";cut="+factory.Id+
+                    ";old_reference_state=0;new_encoding_exact=true;original_oriented_plane=true;current_sheet_body_member=true;owner="+ownerId+
+                    ";all_other_definition_fields_exact=true;plane_only_fallback=false");
+            }
+            catch(Exception ex){proof["error"]=DiagnosticError(ex);throw;}
+            finally{ExportLogicalFixedFaceProof(scope,guard,proof);}
+        }
+
+        private sealed class BaselineFoldedProfileGuard
+        {
+            internal int Id, OwnerId, FlatId, InvalidatedByCutId=-1;
+            internal byte[] ProfileToken, OwnerToken;
+            internal bool OwnerTokenIsRoundtrip;
+            internal string OwnerParents, OwnerOwner;
+        }
+        private string FoldedProfileOwnerKey(Feature feature)
+        {
+            var owner=feature.GetOwnerFeature() as Feature;
+            return owner==null?"NONE":owner.GetID()+"|"+owner.GetTypeName2()+"|"+owner.Name+"|"+owner.IsSuppressed();
+        }
+        private Feature[] FoldedProfileParents(Feature feature)
+        {
+            var raw=feature.GetParents() as Array;
+            Need(raw==null||raw.Length<=MaxParents,"Generated folded profile parent observation bound exceeded");
+            var parents=raw==null?new Feature[0]:raw.Cast<object>().OfType<Feature>().ToArray();
+            Need(raw==null||parents.Length==raw.Length,"Generated folded profile parent is unresolved");
+            Need(parents.Select(parent=>parent.GetID()).Distinct().Count()==parents.Length,
+                "Generated folded profile has duplicate parent identities");
+            return parents;
+        }
+        private void CaptureBaselineFoldedProfileGuards(Scope scope)
+        {
+            if(scope.Label=="ASSEMBLY")return;
+            foreach(var node in scope.Baseline.Nodes.Values.Where(value=>value.Type=="ProfileFeature"&&value.Suppressed))
+            {
+                var owner=node.Feature.GetOwnerFeature() as Feature;
+                if(owner==null||owner.GetTypeName2()!="FoldUpDownSketchFolder")continue;
+                try
+                {
+                    Node ownerNode;
+                    Need(node.Kind=="ProfileFeature"&&!node.Feature.IsRolledBack()&&
+                        node.ParentPath=="SUB/OWNER="+owner.GetID()&&owner.IsSuppressed()&&!owner.IsRolledBack()&&
+                        scope.Baseline.Nodes.TryGetValue(owner.GetID(),out ownerNode)&&ownerNode.Type=="FoldUpDownSketchFolder"&&
+                        ownerNode.Name==owner.Name&&ownerNode.Suppressed,
+                        "Generated folded profile lacks exact suppressed native system folder ownership");
+                    var parents=FoldedProfileParents(node.Feature);
+                    PassiveFlatPatternGuard flat=null;
+                    Need(parents.Length==1&&parents[0].GetTypeName2()=="FlatPattern"&&parents[0].IsSuppressed()&&
+                        !parents[0].IsRolledBack()&&scope.PrivateFlatPatternGuards.TryGetValue(parents[0].GetID(),out flat),
+                        "Generated folded profile must have exactly one frozen suppressed native FlatPattern parent");
+                    var children=node.Feature.GetChildren() as Array;
+                    Need(children==null||children.Length==0,"Generated folded profile has an authored dependent");
+                    var profileToken=scope.Document.Extension.GetPersistReference3(node.Feature) as byte[];
+                    var ownerToken=scope.Document.Extension.GetPersistReference3(owner) as byte[];
+                    Need(profileToken!=null&&profileToken.Length>0&&ownerToken!=null&&ownerToken.Length>0,
+                        "Generated folded profile/folder observation tokens unavailable");
+                    int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(profileToken,out state) as Feature;
+                    Need(state==2&&resolved!=null&&resolved.GetID()==node.Id&&Same(resolved,node.Feature),
+                        "Generated folded profile must roundtrip its exact suppressed native token before mutation");
+                    var resolvedOwner=scope.Document.Extension.GetObjectByPersistReference3(ownerToken,out state) as Feature;
+                    bool ownerRoundtrip=(state==0||state==2)&&resolvedOwner!=null&&
+                        resolvedOwner.GetID()==owner.GetID();
+                    if(ownerRoundtrip)ResolveExactSystemMetadataToken(scope,owner,ownerToken,owner.GetID(),"FoldUpDownSketchFolder");
+                    if(!ownerRoundtrip)
+                    {
+                        // NATIVE_FOLDER_STATE_1_OBSERVATION_ONLY: read-only API
+                        // on both real 4332 Parts established this exact native
+                        // system-folder representation BEFORE any mutation.
+                        // Its non-resolving token is never deletion/ownership
+                        // authority. Freeze the live Part-scoped folder and its
+                        // exact original FlatPattern container instead.
+                        var container=owner.GetOwnerFeature() as Feature;
+                        Need(ownerToken.Length==16&&state==1&&resolvedOwner==null&&FoldedProfileParents(owner).Length==0&&
+                            container!=null&&container.GetTypeName2()=="FlatPattern"&&container.IsSuppressed()&&
+                            container.GetID()==parents[0].GetID(),
+                            "Generated folded profile folder observation is outside the verified native state-1 representation");
+                        ResolveExactSystemMetadataToken(scope,container,flat.PrivateObservationToken,flat.Id,"FlatPattern");
+                        ResolveExactSystemMetadataToken(scope,parents[0],flat.PrivateObservationToken,flat.Id,"FlatPattern");
+                    }
+                    scope.PrivateFoldedProfileGuards.Add(node.Id,new BaselineFoldedProfileGuard{Id=node.Id,
+                        OwnerId=owner.GetID(),FlatId=parents[0].GetID(),ProfileToken=profileToken,OwnerToken=ownerToken,
+                        OwnerTokenIsRoundtrip=ownerRoundtrip,
+                        OwnerParents=FlatPatternParentFingerprint(FoldedProfileParents(owner)),OwnerOwner=FoldedProfileOwnerKey(owner)});
+                    Mark("BASELINE_SYSTEM_FOLDED_PROFILE_FOLDER_AUTHORITY id="+node.Id+";owner_token="+
+                        (ownerRoundtrip?"EXACT_NATIVE_ROUNDTRIP":"NATIVE_FOLDER_STATE_1_OBSERVATION_ONLY")+
+                        ";part_scoped_native_identity_and_original_flat_container_frozen=true");
+                    Mark("BASELINE_SYSTEM_FOLDED_PROFILE_GUARD scope="+scope.Label+";id="+node.Id+
+                        ";system_folder="+owner.GetID()+";flat_pattern="+parents[0].GetID()+";token_state=2;explicit_delete_forbidden=true");
+                }
+                catch(Exception ex)
+                {
+                    // Unsupported metadata stays protected with every ordinary
+                    // baseline identity. No speculative exception is granted.
+                    Mark("BASELINE_SYSTEM_FOLDED_PROFILE_UNSUPPORTED id="+node.Id+";"+DiagnosticError(ex));
+                    throw new InvalidOperationException("SYSTEM_FOLDED_PROFILE_PREFLIGHT_UNVERIFIED: native Cut refused before first Sketch; id="+node.Id,ex);
+                }
+            }
+        }
+        private void ValidateFoldedProfileAuthority(Scope scope,Snapshot now,BaselineFoldedProfileGuard guard)
+        {
+            Node oldOwner=null,owner=null,oldFlat=null,flat=null;
+            Need(scope.Baseline.Nodes.TryGetValue(guard.OwnerId,out oldOwner)&&now.Nodes.TryGetValue(guard.OwnerId,out owner)&&
+                RowSame(oldOwner,owner,true)&&owner.Type=="FoldUpDownSketchFolder"&&owner.Suppressed&&!owner.Feature.IsRolledBack(),
+                "Generated folded profile exact native system folder changed");
+            Need(FoldedProfileOwnerKey(owner.Feature)==guard.OwnerOwner&&
+                FlatPatternParentFingerprint(FoldedProfileParents(owner.Feature))==guard.OwnerParents,
+                "Generated folded profile system folder owner/parents changed");
+            int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(guard.OwnerToken,out state) as Feature;
+            if(guard.OwnerTokenIsRoundtrip)
+                ResolveExactSystemMetadataToken(scope,owner.Feature,guard.OwnerToken,guard.OwnerId,"FoldUpDownSketchFolder");
+            else
+            {
+                var fresh=scope.Document.Extension.GetPersistReference3(owner.Feature) as byte[];
+                Need(guard.OwnerToken.Length==16&&fresh!=null&&fresh.Length==16&&fresh.SequenceEqual(guard.OwnerToken)&&
+                    state==1&&resolved==null&&FoldedProfileParents(owner.Feature).Length==0,
+                    "Generated folded profile native state-1 system folder observation changed");
+                int freshState;var freshResolved=scope.Document.Extension.GetObjectByPersistReference3(fresh,out freshState);
+                Need(freshState==1&&freshResolved==null,"Generated folded profile fresh native folder observation is no longer state 1/null");
+            }
+            Need(scope.Baseline.Nodes.TryGetValue(guard.FlatId,out oldFlat)&&now.Nodes.TryGetValue(guard.FlatId,out flat)&&
+                RowSame(oldFlat,flat,true)&&flat.Type=="FlatPattern"&&flat.Suppressed&&!flat.Feature.IsRolledBack(),
+                "Generated folded profile protected FlatPattern changed");
+            var frozen=scope.PrivateFlatPatternGuards[guard.FlatId];
+            ResolveExactSystemMetadataToken(scope,flat.Feature,frozen.PrivateObservationToken,guard.FlatId,"FlatPattern");
+            Need(FlatPatternParentFingerprint(FoldedProfileParents(flat.Feature))==frozen.ParentFingerprint,
+                "Generated folded profile original FlatPattern native base parents changed");
+            ValidateFlatDefinitionWithLogicalFixedFace(scope,now,flat.Feature,frozen);
+            if(!guard.OwnerTokenIsRoundtrip)
+            {
+                var container=owner.Feature.GetOwnerFeature() as Feature;
+                Need(container!=null&&container.GetTypeName2()=="FlatPattern"&&container.IsSuppressed()&&
+                    container.GetID()==guard.FlatId,
+                    "Generated folded profile native system folder lost its exact original FlatPattern container");
+                ResolveExactSystemMetadataToken(scope,container,frozen.PrivateObservationToken,guard.FlatId,"FlatPattern");
+            }
+        }
+        private bool IsAcceptedFoldedProfileAbsence(Scope scope,int id,Snapshot now,HashSet<long> validatedOwners=null)
+        {
+            BaselineFoldedProfileGuard guard;
+            if(!scope.PrivateFoldedProfileGuards.TryGetValue(id,out guard)||guard.InvalidatedByCutId<0||now.Nodes.ContainsKey(id))return false;
+            long authorityKey=((long)guard.OwnerId<<32)|(uint)guard.FlatId;
+            if(validatedOwners==null||validatedOwners.Add(authorityKey))ValidateFoldedProfileAuthority(scope,now,guard);
+            int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(guard.ProfileToken,out state) as Feature;
+            Need(state==1&&resolved==null,"Accepted generated folded profile is no longer exactly native-deleted; id="+id+";state="+state);
+            return true;
+        }
+        // The transaction's independent tree inventory checks every real
+        // authored baseline node. This query returns only an immutable ledger
+        // decision already proved at a specific native Cut boundary. It never
+        // discovers a new exception or performs a name-based lookup.
+        internal bool IsAcceptedOriginalFoldedProfileInvalidation(ModelDoc2 document,int id)
+        {
+            var scope=Bound(document);BaselineFoldedProfileGuard guard;
+            return scope.PrivateFoldedProfileGuards.TryGetValue(id,out guard)&&guard.InvalidatedByCutId>=0;
+        }
+        internal void VerifyAcceptedOriginalFoldedProfiles()
+        {
+            foreach(var scope in Scopes.Where(s=>s.PrivateFoldedProfileGuards.Values.Any(g=>g.InvalidatedByCutId>=0)))
+                CheckProtected(scope,Read(scope),false);
+        }
+        internal void CaptureNativeCutFoldedProfileInvalidations(ModelDoc2 document,Checkpoint before,Feature registeredCut)
+        {
+            Need(!RollingBack&&registeredCut!=null,"Generated folded profile invalidation requires an exact newly returned native Cut");
+            RequireAssemblyContext();var scope=Bound(document);
+            Need(scope.Label!="ASSEMBLY"&&before!=null&&before.Scope==scope,"Generated folded profile invalidation requires exact Part factory checkpoint");
+            int cutId=registeredCut.GetID();var cut=EntryFor(scope,cutId);var prior=(Snapshot)before.Snapshot;
+            Need(cut!=null&&cut.Kind=="Cut"&&!cut.Removed&&cut.Sequence==before.JournalSequence+1&&Sequence==cut.Sequence&&
+                !prior.Nodes.ContainsKey(cutId)&&!scope.Baseline.Nodes.ContainsKey(cutId),
+                "Generated folded profile invalidation is not adjacent to exactly one registered native Cut factory");
+            if(scope.PrivateFoldedProfileGuards.Count==0)return;
+            scope.PendingLogicalFixedFaceFactoryCutId=cutId;
+            try
+            {
+            var now=Read(scope);Node liveCut;
+            Need(now.Nodes.TryGetValue(cutId,out liveCut)&&liveCut.Type=="Cut"&&Same(liveCut.Feature,registeredCut),
+                "Generated folded profile invalidation has no exact returned live native Cut");
+            var validated=new HashSet<long>();
+            foreach(var guard in scope.PrivateFoldedProfileGuards.Values.Where(g=>prior.Nodes.ContainsKey(g.Id)&&!now.Nodes.ContainsKey(g.Id)))
+            {
+                Need(guard.InvalidatedByCutId<0&&RowSame(scope.Baseline.Nodes[guard.Id],prior.Nodes[guard.Id],true),
+                    "Generated folded profile changed before the exact native Cut factory checkpoint");
+                if(validated.Add(((long)guard.OwnerId<<32)|(uint)guard.FlatId))ValidateFoldedProfileAuthority(scope,now,guard);
+                int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(guard.ProfileToken,out state) as Feature;
+                Need(state==1&&resolved==null,"Native Cut did not establish exact generated folded profile deletion state; id="+guard.Id+";state="+state);
+                guard.InvalidatedByCutId=cutId;
+                Mark("SYSTEM_FOLDED_PROFILE_INVALIDATED_BY_NATIVE_CUT scope="+scope.Label+";id="+guard.Id+
+                    ";cut="+cutId+";system_folder="+guard.OwnerId+";flat_pattern="+guard.FlatId+
+                    ";token_state=1;original_authored_history_still_checked=true;explicit_delete_called=false");
+            }
+            CheckProtected(scope,now,false);
+            }
+            finally{scope.PendingLogicalFixedFaceFactoryCutId=-1;}
+        }
+
         private sealed class PassiveFlatPatternGuard
         {
             internal int Id;
             internal int[] OriginalParentIds;
+            internal LogicalFlatFixedFace LogicalFixedFace;
             internal string DefinitionFingerprint,ParentFingerprint;
             internal byte[] PrivateObservationToken;
         }
@@ -8867,12 +9623,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                     Need(children==null||children.Length==0,"Original suppressed FlatPattern has a dependent before mutation");
                     var bytes=scope.Document.Extension.GetPersistReference3(node.Feature) as byte[];
                     Need(bytes!=null&&bytes.Length>0,"Original suppressed FlatPattern observation token unavailable");
-                    int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(bytes,out state) as Feature;
-                    Need((state==0||state==2)&&resolved!=null&&resolved.GetID()==node.Id&&Same(resolved,node.Feature),
-                        "Original suppressed FlatPattern observation token cannot establish baseline identity");
+                    ResolveExactSystemMetadataToken(scope,node.Feature,bytes,node.Id,"FlatPattern");
                     scope.PrivateFlatPatternGuards.Add(node.Id,new PassiveFlatPatternGuard{Id=node.Id,
                         OriginalParentIds=parents.Select(parent=>parent.GetID()).OrderBy(id=>id).ToArray(),
-                        DefinitionFingerprint=FlatPatternDefinitionFingerprint(scope,node.Feature),
+                        DefinitionFingerprint=FlatPatternDefinitionFingerprint(scope,node.Feature),LogicalFixedFace=CaptureLogicalFlatFixedFace(scope,node.Feature),
                         ParentFingerprint=FlatPatternParentFingerprint(parents),PrivateObservationToken=bytes});
                     Mark("BASELINE_PASSIVE_FLAT_PATTERN_GUARD id="+node.Id+";definition_observed_without_mutation=true;token_is_observation_only=true");
                 }
@@ -8891,11 +9645,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(scope.Baseline.Nodes.TryGetValue(guard.Id,out original)&&snapshot.Nodes.TryGetValue(guard.Id,out live)&&
                 original.Type=="FlatPattern"&&original.Suppressed&&RowSame(original,live,true)&&live.Suppressed&&!live.Feature.IsRolledBack(),
                 "Protected FlatPattern ID/type/name/suppression/order owner changed at source deletion");
-            int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(guard.PrivateObservationToken,out state) as Feature;
-            Need((state==0||state==2)&&resolved!=null&&resolved.GetID()==guard.Id&&Same(resolved,live.Feature),
-                "Protected FlatPattern original observation token changed");
-            Need(FlatPatternDefinitionFingerprint(scope,live.Feature)==guard.DefinitionFingerprint,
-                "Protected FlatPattern original scalar/entity definition changed");
+            ResolveExactSystemMetadataToken(scope,live.Feature,guard.PrivateObservationToken,guard.Id,"FlatPattern");
+            ValidateFlatDefinitionWithLogicalFixedFace(scope,snapshot,live.Feature,guard);
             var raw=live.Feature.GetParents() as Array;
             Need(raw!=null&&raw.Length==guard.OriginalParentIds.Length+(afterSourceDelete?0:1),
                 "Protected FlatPattern has undeclared parents at source deletion");
@@ -9263,6 +10014,28 @@ namespace ADDIN.Commands.AutoFrameJoint
 {
     // PRIVATE R56 profiling: managed counters/timers only; no CAD API calls,
     // geometry changes, cache shortcuts, callbacks, rebuilds or deployment.
+    internal static class AfjNativeDiagnosticPolicy
+    {
+        // Detailed native success probes can be restored before process launch.
+        // Required COM guard reads and structured evidence reports are unchanged.
+        internal static readonly bool Verbose=ReadVerbose();
+        private static bool ReadVerbose()
+        {
+            try{return String.Equals(System.Environment.GetEnvironmentVariable("AFJ_NATIVE_VERBOSE_TRACE"),"1",StringComparison.Ordinal);}
+            catch{return false;}
+        }
+        internal static bool BoundaryEnabled(string state,string phase,Exception error)
+        {
+            if(Verbose||error!=null||state=="FAULT"||state=="RETURN_REGISTERED")return true;
+            return phase!=null&&(phase.EndsWith(".PREPARE_SHEET_SKETCH",StringComparison.Ordinal)||
+                phase.EndsWith(".APPLY_CUT",StringComparison.Ordinal)||
+                phase.EndsWith(".FEATURECUT4_IN_ASSEMBLY_PART_EDIT",StringComparison.Ordinal)||
+                phase.EndsWith(".ENTER_COMPONENT_EDIT",StringComparison.Ordinal)||
+                phase.EndsWith(".RESTORE_ASSEMBLY_EDIT",StringComparison.Ordinal)||
+                phase.EndsWith(".ACTIVATE_DOC3",StringComparison.Ordinal));
+        }
+    }
+
     internal static class AfjNativeObservationMetrics
     {
         // Verbose diagnostics are opt-in for this process. Ordinary Add-in
