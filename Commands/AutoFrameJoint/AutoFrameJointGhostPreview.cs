@@ -4822,6 +4822,22 @@ namespace ADDIN.Commands.AutoFrameJoint
                     running[i] = target.Kept.Single();
                 }
             }
+            // Contact Sketches on either Frame can depend on the finite
+            // mating end-cap geometry. Finish both Frames' contacting slices
+            // before retiring noncontact overhangs. Cross-Part subtraction is
+            // independent, but each Part's exact reviewed target sequence is
+            // mandatory and may never be changed by this scheduling step.
+            var perPartSequence=Enumerable.Range(0,2).Select(partIndex=>Steps.Where(item=>item.Part==partIndex).ToArray()).ToArray();
+            var contactFirst=Steps.Where(item=>!item.Operation.Tools.Single().SheetSlice.TerminalOverhangTrim)
+                .Concat(Steps.Where(item=>item.Operation.Tools.Single().SheetSlice.TerminalOverhangTrim)).ToArray();
+            for(int partIndex=0;partIndex<2;partIndex++)
+            {
+                var sequence=contactFirst.Where(item=>item.Part==partIndex).ToArray();
+                Need(sequence.Length==perPartSequence[partIndex].Length&&sequence.Where((item,index)=>!Object.ReferenceEquals(item,perPartSequence[partIndex][index])).Count()==0,
+                    "R61 contact-before-terminal schedule would change one Part's reviewed sequential targets");
+            }
+            Steps.Clear();Steps.AddRange(contactFirst);
+            Trace.WriteLine("[AFJ-R61] NATIVE_SCHEDULE contacting_slices_both_frames_first=true terminal_overhangs_last=true each_part_target_sequence_unchanged=true");
             Need(Steps.Count > 0 && Steps.Count <= 64 && Steps.Select(s => s.Operation.EvidenceId).Distinct().Count() == Steps.Count && Steps.All(s=>s.Operation.NormalCutIntent && s.Operation.Tools.Single().DepthPolicy=="PER_FOLD_NORMAL_BLIND_T_PLUS_OVERRUN"),
                 "Every admitted operation must be an independent finite NormalCut sheet slice");
             for (int i = 0; i < 2; i++)
@@ -4977,6 +4993,15 @@ namespace ADDIN.Commands.AutoFrameJoint
                     Journal.CaptureSketchFactoryAssemblyContextFeatures(Components[0],Components[1],Prefix,before,owned.Part,owned.FeatureId);
             }
             Need(result.Success&&!result.UnresolvedCreation&&result.ContextRestored,"R59 per-sheet Sketch writer failed: "+result.Error);
+            Need(result.Owned.Count==1&&result.Reports.Count==1,"R61 child Sketch requires one exact owned identity and one native observation report");
+            var exactOwned=result.Owned[0];var exactReport=result.Reports[0];
+            Need(exactOwned.ClosedOwnerVerified&&exactOwned.CallbackReturned&&exactReport.SketchFeatureId==exactOwned.FeatureId&&
+                !String.IsNullOrWhiteSpace(exactOwned.EvidenceId)&&exactOwned.EvidenceId.StartsWith("SHEET_SLICE:",StringComparison.Ordinal)&&
+                String.Equals(exactReport.SketchName,exactOwned.ObservedName,StringComparison.Ordinal),
+                "R61 child report does not match its exact Part-owned closed Sketch identity");
+            Need(String.IsNullOrEmpty(exactReport.SourceEvidenceId)&&!SketchWriterResult.Reports.Any(item=>item.SourceEvidenceId==exactOwned.EvidenceId),
+                "R61 frame-qualified child report semantic identity is already assigned");
+            exactReport.SourceEvidenceId=exactOwned.EvidenceId;
             SketchWriterResult.Owned.AddRange(result.Owned);SketchWriterResult.Reports.AddRange(result.Reports);
             SketchWriterResult.NewPlanes+=result.NewPlanes;SketchWriterResult.Dimensions+=result.Dimensions;SketchWriterResult.Relations+=result.Relations;
             CheckInvariant("R59_AFTER_SHEET_SKETCH");CheckSketches("R59_AFTER_SHEET_SKETCH");AcceptStamps();
@@ -4985,7 +5010,9 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             Activate(Assembly);var assemblyBeforeSliceSketch=Journal.CaptureCheckpoint(Assembly);var tool=step.Operation.Tools.Single();var meta=tool.SheetSlice;
             Need(meta!=null&&tool.DepthPolicy=="PER_FOLD_NORMAL_BLIND_T_PLUS_OVERRUN"&&step.Operation.NormalCutIntent&&Math.Abs(tool.Length-meta.ApiThickness-AfjManufacturingConventions.SheetCutOverrun)<1e-10,"R59 exact one-sheet NormalCut policy required");
-            int ownIndex=step.Part,peerIndex=1-step.Part;var own=Components[ownIndex];var peer=Components[peerIndex];var part=Documents[ownIndex].Model;
+            int ownIndex=step.Part,peerIndex=1-step.Part;
+            R61VerifyTerminalAnchor(meta,ownIndex);
+            var own=Components[ownIndex];var peer=Components[peerIndex];var part=Documents[ownIndex].Model;
             var ownTransform=own.GetTotalTransform(false);var peerTransform=peer.GetTotalTransform(false);
             var live=AfjNativeCutCommit.CurrentBody(part);double cap=AfjJointSolver.Projection(live,meta.UnitAxisNative);
             var polygon=tool.Polygon.Select(point=>{double s=AfjParametricRules.Dot(point,meta.UnitAxisNative);return s>cap?AfjParametricRules.Sub(point,AfjParametricRules.Scale(meta.UnitAxisNative,s-cap)):(double[])point.Clone();}).ToArray();
@@ -5041,7 +5068,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var edges=face.GetEdges() as Array;Need(edges!=null,"R59 own cap edge inventory unavailable");
                 var caps=edges.Cast<object>().OfType<Edge>().Where(edge=>R59ExtendedCapSupports(edge,p0,p1,meta.UnitAxisNative,meta.ApiThickness+apiRadius+AfjManufacturingConventions.SheetCutOverrun)).ToArray();
                 Need(caps.Length==1,"R59 virtual Bend contact bounds lack one actual stock-cap supporting line within measured t+R+0.10mm");
-                var recipe=new AfjUParametricSketchWriter.WallSheetSliceRecipe{EvidenceId=step.Operation.EvidenceId,OwnComponent=own,PeerComponent=peer,OwnSupportFace=face,OwnOppositeFace=ownOpposite,PeerSupportFace=mating,PeerOppositeFace=peerOpposite,PeerSupportPointWorld=matingWitness,PeerGuideFeatureIds=SketchWriterResult.Owned.Where(owned=>Same(owned.Part,Documents[peerIndex].Model)&&owned.CallbackReturned&&owned.ClosedOwnerVerified&&owned.EvidenceId.StartsWith("U_RULE:",StringComparison.Ordinal)).Select(owned=>owned.FeatureId).Distinct().ToArray(),OwnCapEdge=caps[0],ProfileWorld=world,GapGuideStartWorld=mid,GapGuideEndWorld=foot,FrameAxisWorld=R59TransformVector(meta.UnitAxisNative,ownTransform),OwnTransform=(double[])ownTransform.ArrayData,PeerTransform=(double[])peerTransform.ArrayData,Thickness=meta.ApiThickness,PeerThickness=meta.MateThickness,AssemblyFitGap=AfjManufacturingConventions.AssemblyFitGap,LocalSeamGap=localGap,ApiBendRadius=apiRadius,SupportPointWorld=R59TransformPoint(meta.SupportPointNative,ownTransform),ContactLowDatumWorld=meta.ContactLowDatumWorld,ContactHighDatumWorld=meta.ContactHighDatumWorld,ContactLowDatumOffset=meta.ContactLowDatumOffset,ContactHighDatumOffset=meta.ContactHighDatumOffset,ContactLowDatumOnOwnComponent=meta.ContactLowDatumOnOwnComponent,ContactHighDatumOnOwnComponent=meta.ContactHighDatumOnOwnComponent,ContactLowDatumPlaneNormalWorld=meta.ContactLowDatumPlaneNormalWorld,ContactHighDatumPlaneNormalWorld=meta.ContactHighDatumPlaneNormalWorld,ContactLowDatumAdjacentStripIndex=meta.ContactLowDatumAdjacentStripIndex,ContactHighDatumAdjacentStripIndex=meta.ContactHighDatumAdjacentStripIndex};
+                var recipe=new AfjUParametricSketchWriter.WallSheetSliceRecipe{EvidenceId=step.Operation.EvidenceId,TerminalOverhangTrim=meta.TerminalOverhangTrim,TerminalAnchorStripIndex=meta.TerminalAnchorStripIndex,TerminalAnchorSliceId=meta.TerminalAnchorSliceId,TerminalAnchorPathIndices=meta.TerminalAnchorPathIndices==null?null:(int[])meta.TerminalAnchorPathIndices.Clone(),TerminalAxialCutoffNative=meta.ConstantAxialCutoff??Double.NaN,OwnComponent=own,PeerComponent=peer,OwnSupportFace=face,OwnOppositeFace=ownOpposite,PeerSupportFace=mating,PeerOppositeFace=peerOpposite,PeerSupportPointWorld=matingWitness,PeerGuideFeatureIds=SketchWriterResult.Owned.Where(owned=>Same(owned.Part,Documents[peerIndex].Model)&&owned.CallbackReturned&&owned.ClosedOwnerVerified&&owned.EvidenceId.StartsWith("U_RULE:",StringComparison.Ordinal)).Select(owned=>owned.FeatureId).Distinct().ToArray(),OwnCapEdge=caps[0],ProfileWorld=world,GapGuideStartWorld=mid,GapGuideEndWorld=foot,FrameAxisWorld=R59TransformVector(meta.UnitAxisNative,ownTransform),OwnTransform=(double[])ownTransform.ArrayData,PeerTransform=(double[])peerTransform.ArrayData,Thickness=meta.ApiThickness,PeerThickness=meta.MateThickness,AssemblyFitGap=AfjManufacturingConventions.AssemblyFitGap,LocalSeamGap=localGap,ApiBendRadius=apiRadius,SupportPointWorld=R59TransformPoint(meta.SupportPointNative,ownTransform),ContactLowDatumWorld=meta.ContactLowDatumWorld,ContactHighDatumWorld=meta.ContactHighDatumWorld,ContactLowDatumOffset=meta.ContactLowDatumOffset,ContactHighDatumOffset=meta.ContactHighDatumOffset,ContactLowDatumOnOwnComponent=meta.ContactLowDatumOnOwnComponent,ContactHighDatumOnOwnComponent=meta.ContactHighDatumOnOwnComponent,ContactLowDatumPlaneNormalWorld=meta.ContactLowDatumPlaneNormalWorld,ContactHighDatumPlaneNormalWorld=meta.ContactHighDatumPlaneNormalWorld,ContactLowDatumAdjacentStripIndex=meta.ContactLowDatumAdjacentStripIndex,ContactHighDatumAdjacentStripIndex=meta.ContactHighDatumAdjacentStripIndex};
                 var result=AfjUParametricSketchWriter.TryWriteWallSheetSlice(App,Assembly,recipe,ownIds,peerIds,slicePrefix,Register,Log,ConfirmClosed);R59AppendSketchResult(result,assemblyBeforeSliceSketch);return result.Owned.Single();
             }
             Need(meta.Role=="WEB_MITER"||meta.Role=="RETURN_MITER","R59 no arbitrary fallback for an unknown sheet role");
@@ -5049,6 +5076,31 @@ namespace ADDIN.Commands.AutoFrameJoint
             var planar=new AfjUParametricSketchWriter.PlanarSheetSliceRecipe{EvidenceId=step.Operation.EvidenceId,OwnComponent=own,PeerComponent=peer,OwnSupportFace=face,SupportPointWorld=R59TransformPoint(meta.SupportPointNative,ownTransform),GuideFeatureId=guideOwned.FeatureId,GuideFeatureIds=SketchWriterResult.Owned.Where(o=>Same(o.Part,part)&&o.CallbackReturned&&o.ClosedOwnerVerified&&o.EvidenceId.StartsWith("U_RULE:",StringComparison.Ordinal)).Select(o=>o.FeatureId).Distinct().ToArray(),ProfileWorld=polygon.Select(p=>R59TransformPoint(p,ownTransform)).ToArray()};
             var write=AfjUParametricSketchWriter.TryWritePlanarSheetSlice(App,Assembly,planar,ownIds,peerIds,slicePrefix,Register,Log,ConfirmClosed);R59AppendSketchResult(write,assemblyBeforeSliceSketch);return write.Owned.Single();
         }
+        private void R61VerifyTerminalAnchor(AfjSheetSliceMetadata meta,int ownIndex)
+        {
+            if(!meta.TerminalOverhangTrim)return;
+            var slices=ownIndex==0?Intent.SheetSlices.A:Intent.SheetSlices.B;
+            var anchors=slices.Where(item=>!item.TerminalOverhangTrim&&item.SliceId==meta.TerminalAnchorSliceId).ToArray();
+            Need(anchors.Length==1,"R61 terminal trim requires one actual contacted source slice");
+            var anchor=anchors[0];var path=meta.TerminalAnchorPathIndices;
+            Need(anchor.StripIndex==meta.TerminalAnchorStripIndex&&anchor.Side==meta.Side&&anchor.ConstantAxialCutoff.HasValue&&meta.ConstantAxialCutoff.HasValue&&
+                Math.Abs(anchor.ConstantAxialCutoff.Value-meta.ConstantAxialCutoff.Value)<1e-9,
+                "R61 terminal trim does not reproduce its actual contacted anchor endpoint");
+            Need(path!=null&&path.Length>=1&&path.Length<=128&&path[0]==anchor.StripIndex&&path[path.Length-1]==meta.StripIndex&&
+                path.Distinct().Count()==path.Length&&path.Skip(1).Where((index,k)=>Math.Abs(index-path[k])!=1).Count()==0,
+                "R61 terminal endpoint may propagate only along the verified contiguous own profile chain");
+            Func<double[],double[],bool> sameVector=(a,b)=>a!=null&&b!=null&&a.Length==3&&b.Length==3&&a.Where((value,k)=>!AfjTemporaryBoolean.Finite(value)||!AfjTemporaryBoolean.Finite(b[k])||Math.Abs(value-b[k])>1e-9).Count()==0;
+            Need(meta.MateStripIndex==anchor.MateStripIndex&&Math.Abs(meta.MateThickness-anchor.MateThickness)<1e-9&&Math.Abs(meta.RequiredNormalGap-anchor.RequiredNormalGap)<1e-9&&
+                sameVector(meta.MatePlanePointWorld,anchor.MatePlanePointWorld)&&sameVector(meta.MateInwardNormalWorld,anchor.MateInwardNormalWorld)&&
+                sameVector(meta.MateSupportPointWorld,anchor.MateSupportPointWorld)&&sameVector(meta.MateOppositeSupportPointWorld,anchor.MateOppositeSupportPointWorld),
+                "R61 terminal trim lost the actual source anchor paired-skin authority");
+            var axis=R59TransformVector(meta.UnitAxisNative,Components[ownIndex].GetTotalTransform(false));
+            Need(Math.Abs(Math.Abs(AfjParametricRules.Dot(axis,meta.MateInwardNormalWorld))-1)<1e-7,
+                "R61 terminal end plane must be the actual anchor's transverse axial endpoint, never a guessed bevel");
+            Trace.WriteLine("[AFJ-R61] TERMINAL_NATIVE_ANCHOR_VERIFIED strip="+meta.StripIndex+" anchor="+anchor.StripIndex+
+                " path="+String.Join(",",path)+" source_slice="+anchor.SliceId+" cutoff_native_m="+meta.ConstantAxialCutoff.Value.ToString("R",CultureInfo.InvariantCulture));
+        }
+
         private static bool R59ExtendedCapSupports(Edge edge,double[] p0,double[] p1,double[] frameAxis,double maximumExtension)
         {
             var curve=edge==null?null:edge.GetCurve() as Curve;if(curve==null||!curve.IsLine()||maximumExtension<=0)return false;
@@ -5280,7 +5332,14 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Error = error, Warning = warning, ReferenceIsFace = face != null,
                 OriginalSupportOwner = owner != null && Documents[index].Original.ContainsKey(owner.GetID()) };
             int wanted = owned.EvidenceId == "U_RULE:COVER_WEB_WALL" || owned.EvidenceId == "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN" ? 1 : 0;
-            if(owned.EvidenceId.StartsWith("SHEET_SLICE:",StringComparison.Ordinal)){var evidence=SketchWriterResult.Reports.SingleOrDefault(r=>r.SketchFeatureId==owned.FeatureId);Need(evidence!=null&&evidence.Dimensions>=0,"R59 exact child Sketch evidence missing");wanted=evidence.Dimensions;}
+            if(owned.EvidenceId.StartsWith("SHEET_SLICE:",StringComparison.Ordinal))
+            {
+                var evidence=SketchWriterResult.Reports.SingleOrDefault(r=>r.SketchFeatureId==owned.FeatureId&&r.SourceEvidenceId==owned.EvidenceId);
+                Need(evidence!=null&&evidence.Dimensions>=0&&String.Equals(evidence.SketchName,feature.Name,StringComparison.Ordinal)&&
+                    String.Equals(evidence.SketchName,owned.ObservedName,StringComparison.Ordinal),
+                    "R61 exact frame-qualified child Sketch observation is missing or differs from its native Part-owned name");
+                wanted=evidence.Dimensions;
+            }
             SketchChecks.Add(row);
             if(row.Dangling>0)
             {
@@ -5385,6 +5444,9 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal int SketchFeatureId=-1,SupportReferenceType=-1,ConstraintStatus=-1,Relations=-1,Dangling=-1,Overdefining=-1;
             internal int NewPlanes=-1,Dimensions=-1,ExternalReferences=-1;
             internal string SketchName;
+            // A native Feature ID is only unique within its own Part. Retain
+            // the transaction's frame-qualified semantic identity as a scalar.
+            internal string SourceEvidenceId;
             internal int MatingSheetThicknessParameters;
             internal string MatingSheetThicknessDimensionName;
             internal readonly List<PointEvidence> Points=new List<PointEvidence>();
@@ -5998,6 +6060,11 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal sealed class WallSheetSliceRecipe
         {
             internal string EvidenceId;
+            internal bool TerminalOverhangTrim;
+            internal int TerminalAnchorStripIndex=-1;
+            internal string TerminalAnchorSliceId;
+            internal int[] TerminalAnchorPathIndices;
+            internal double TerminalAxialCutoffNative=Double.NaN;
             internal Component2 OwnComponent, PeerComponent;
             internal int[] PeerGuideFeatureIds;
             internal Face2 OwnSupportFace, OwnOppositeFace, PeerSupportFace, PeerOppositeFace;
@@ -6204,6 +6271,25 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private Datum R59MatingFiniteEdgeDatum(WallSheetSliceRecipe r)
         {
+            if(r.TerminalOverhangTrim)
+            {
+                Need(r.TerminalAnchorStripIndex>=0&&!String.IsNullOrWhiteSpace(r.TerminalAnchorSliceId)&&
+                    r.TerminalAnchorPathIndices!=null&&r.TerminalAnchorPathIndices.Length>=1&&AfjTemporaryBoolean.Finite(r.TerminalAxialCutoffNative),
+                    "R61 terminal trim lacks verified adjacent contact-end provenance");
+                var terminalOwnPlane=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);var terminalPeerPlane=R59Plane(_app,r.PeerComponent,r.PeerSupportFace);
+                var ownNormal=Unit(terminalOwnPlane.Take(3).ToArray());var peerNormal=Unit(terminalPeerPlane.Take(3).ToArray());
+                Need(Math.Abs(Dot(Sub(r.GapGuideEndWorld,terminalOwnPlane.Skip(3).ToArray()),ownNormal))<1e-8&&
+                    Math.Abs(Dot(Sub(r.GapGuideEndWorld,terminalPeerPlane.Skip(3).ToArray()),peerNormal))<1e-8&&
+                    Math.Abs(Math.Abs(Dot(peerNormal,Unit(r.FrameAxisWorld)))-1)<1e-7,
+                    "R61 terminal foot must be on both the real own skin plane and actual axial anchor plane");
+                var finiteSkin=R59Datum(r.PeerComponent,r.PeerSupportFace,r.PeerSupportFace,r.PeerSupportPointWorld,
+                    "R61_TERMINAL_ACTUAL_RETAINED_MATING_SKIN_AUTHORITY");
+                var stable=R59StableBaseProfileMatingDatum(r,finiteSkin);
+                Need(stable!=null&&(stable.Native is SketchPoint||stable.Native is SketchSegment),
+                    "R61 terminal endpoint requires actual immutable profile/owned-guide geometry");
+                Trace.WriteLine("[AFJ-R61] TERMINAL_MATING_DATUM finite_paired_skin_authority=true direct_mating_at_target_height=false original_profile_relation=true no_finite_edge_extrapolation_relation=true");
+                return stable;
+            }
             // A 2D Sketch point cannot use Coincident to every perpendicular
             // Face2.  Instead bind to a genuine finite straight edge OF THAT
             // SAME measured mating Face.  Its orthogonal projection into the
@@ -6242,6 +6328,9 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             Need(r!=null&&r.OwnComponent!=null&&r.PeerComponent!=null&&!Same(_app,r.OwnComponent,r.PeerComponent),"R59 two independent Frame occurrences required");
             Need(!String.IsNullOrWhiteSpace(r.EvidenceId)&&r.EvidenceId.StartsWith("SHEET_SLICE:",StringComparison.Ordinal),"R59 unique per-sheet semantic role required");
+            if(r.TerminalOverhangTrim)Need(r.TerminalAnchorStripIndex>=0&&!String.IsNullOrWhiteSpace(r.TerminalAnchorSliceId)&&
+                r.TerminalAnchorPathIndices!=null&&r.TerminalAnchorPathIndices.Length>=1&&AfjTemporaryBoolean.Finite(r.TerminalAxialCutoffNative),
+                "R61 noncontact terminal trim requires verified contact-end chain provenance");
             R59Transform(_app,r.OwnComponent,r.OwnTransform);R59Transform(_app,r.PeerComponent,r.PeerTransform);
             R59SkinPair(_app,r.OwnComponent,r.OwnSupportFace,r.OwnOppositeFace,r.Thickness);
             R59SkinPair(_app,r.PeerComponent,r.PeerSupportFace,r.PeerOppositeFace,r.PeerThickness);
@@ -6504,12 +6593,24 @@ namespace ADDIN.Commands.AutoFrameJoint
                     if(heightWitnesses[hi]!=null)Need(Math.Abs(Dot(Sub(worldHeightSeeds[hi],heightWitnesses[hi]),stripWorld)-offset)<1e-8,"R59 actual transverse datum and signed fit-gap do not reproduce the independently solved contact bound");
                     else Need(Math.Abs(offset)<1e-12,"R59 transverse gap offset lacks a measured native skin witness");
                 }
-                var heightOffsetIndices=Enumerable.Range(0,2).Where(index=>Math.Abs(heightOffsets[index])>1e-12).ToArray();
+                var capLocal0=local(capWorld0);var capLocal1=local(capWorld1);Need(Math.Abs(capLocal0[2])+Math.Abs(capLocal1[2])<1e-8,"R59 native cap endpoints are off the selected skin plane");
+                // Previous contact Cuts may already define the terminal
+                // interval's signed fit-gap endpoint on the remaining cap.
+                // Coordinate equality merely nominates this topology case;
+                // exact native point identity must be proved after creation.
+                var terminalCapTopologyIndices=Enumerable.Range(0,2).Where(index=>r.TerminalOverhangTrim&&
+                    (Norm(Sub(heightSeeds[index],capLocal0))<1e-10||Norm(Sub(heightSeeds[index],capLocal1))<1e-10)).ToArray();
+                var heightOffsetIndices=Enumerable.Range(0,2).Where(index=>Math.Abs(heightOffsets[index])>1e-12&&!terminalCapTopologyIndices.Contains(index)).ToArray();
                 var limit0=R59FindMeasuredHeightDatum(r,sketch,datumSeeds[0],axisX,heightWitnesses[0],r.ContactLowDatumOnOwnComponent,r.ContactLowDatumPlaneNormalWorld,r.ContactLowDatumAdjacentStripIndex);
                 var limit1=R59FindMeasuredHeightDatum(r,sketch,datumSeeds[1],axisX,heightWitnesses[1],r.ContactHighDatumOnOwnComponent,r.ContactHighDatumPlaneNormalWorld,r.ContactHighDatumAdjacentStripIndex);
                 var heightDatumsForThickness=new[]{limit0,limit1};
-                var heightThicknessIndices=Enumerable.Range(0,2).Where(index=>heightDatumsForThickness[index].HeightSheetThickness>1e-10).ToArray();
-                var capLocal0=local(capWorld0);var capLocal1=local(capWorld1);Need(Math.Abs(capLocal0[2])+Math.Abs(capLocal1[2])<1e-8,"R59 native cap endpoints are off the selected skin plane");
+                // A terminal interval can begin exactly at the remaining
+                // stock-cap endpoint produced by the preceding contact Cut.
+                // That child point already has the actual native cap-Vertex
+                // relation. Do not build a redundant peer-height+t constraint;
+                // native point identity is mandatory after line reacquisition.
+                var terminalCapHeightIndices=terminalCapTopologyIndices.Where(index=>heightDatumsForThickness[index].HeightSheetThickness>1e-10).ToArray();
+                var heightThicknessIndices=Enumerable.Range(0,2).Where(index=>heightDatumsForThickness[index].HeightSheetThickness>1e-10&&!terminalCapHeightIndices.Contains(index)).ToArray();
                 bool withGap=r.LocalSeamGap>1e-10;Need(heightOffsetIndices.Length==0||withGap,"UNVERIFIED_RULE: transverse height padding requires the existing losing-member AssemblyFitGap guide");
                 int capIndex=withGap?5:4;int thicknessIndex=capIndex+1+heightOffsetIndices.Length;int heightThicknessStart=thicknessIndex+(withMatingThickness?1:0);var lines=new SketchSegment[heightThicknessStart+heightThicknessIndices.Length];bool oldAdd=_model.SketchManager.AddToDB;
                 try
@@ -6545,6 +6646,18 @@ namespace ADDIN.Commands.AutoFrameJoint
                 bool merged1=Same(_app,LineStart(profile[3]),LineStart(finiteCapLine))||Same(_app,LineStart(profile[3]),LineEnd(finiteCapLine));
                 int independentHeightRelations=0;
                 var mergedHeight=new[]{merged0,merged1};var capPoints=new[]{LineStart(profile[0]),LineStart(profile[3])};var heightDatums=new[]{limit0,limit1};
+                foreach(int index in terminalCapTopologyIndices)
+                {
+                    Need(mergedHeight[index],"R61 terminal height may omit redundant gap/thickness constructions only for an actual identical native cap endpoint");
+                    double signedGap=heightOffsets[index];
+                    if(Math.Abs(signedGap)>1e-12)
+                    {
+                        Need(heightWitnesses[index]!=null&&Math.Abs(Math.Abs(signedGap)-r.AssemblyFitGap)<1e-12&&
+                            Math.Abs(Dot(Sub(worldHeightSeeds[index],heightWitnesses[index]),stripWorld)-signedGap)<1e-8,
+                            "R61 merged terminal cap point does not reproduce its actual finite-skin witness and signed AssemblyFitGap");
+                    }
+                    Trace.WriteLine("[AFJ-R61] TERMINAL_HEIGHT_NATIVE_CAP_POINT height="+index+" actual_point_identity_merged=true native_vertex_coincident_already_verified=true signed_fit_gap_m="+signedGap.ToString("R",CultureInfo.InvariantCulture)+" redundant_gap_and_thickness_constraints_omitted=true");
+                }
                 for(int hi=0;hi<2;hi++)
                 {
                     int gi=Array.IndexOf(heightOffsetIndices,hi);
@@ -9280,6 +9393,10 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal int ContactLowDatumAdjacentStripIndex=-1,ContactHighDatumAdjacentStripIndex=-1;
         internal readonly List<AfjTransverseContactExtension> TransverseExtensions=new List<AfjTransverseContactExtension>();
         internal double? ConstantAxialCutoff;
+        internal bool TerminalOverhangTrim;
+        internal int TerminalAnchorStripIndex=-1;
+        internal string TerminalAnchorSliceId;
+        internal int[] TerminalAnchorPathIndices;
         // Preview geometry only: not another native Cut, not an Extrude depth.
         // Native NormalCut must independently prove this adjacent Bend mapping.
         internal readonly List<AfjToolDefinition> NormalBendRemovalMaps=new List<AfjToolDefinition>();
@@ -9310,10 +9427,26 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal int StripIndex;
         internal Body2 MaskPartCoordinates;
     }
+    internal sealed class AfjTerminalTrimWitness
+    {
+        internal string Frame,RegionId;
+        internal int StripIndex;
+        internal double CutoffNative,Low,High;
+        internal Body2 OutsideMaskPartCoordinates,InsideMaskPartCoordinates;
+    }
+    internal sealed class AfjTerminalBendTrimWitness
+    {
+        internal string Frame,RegionId;
+        internal int FirstStripIndex,SecondStripIndex;
+        internal double CutoffNative;
+        internal Body2 OutsideMaskPartCoordinates;
+    }
     internal sealed class AfjSheetSlicePlanEvidence
     {
         internal readonly List<AfjSheetSliceMetadata> A=new List<AfjSheetSliceMetadata>(), B=new List<AfjSheetSliceMetadata>();
         internal readonly List<AfjSheetKeepWitness> KeepWitnesses=new List<AfjSheetKeepWitness>();
+        internal readonly List<AfjTerminalTrimWitness> TerminalTrimWitnesses=new List<AfjTerminalTrimWitness>();
+        internal readonly List<AfjTerminalBendTrimWitness> TerminalBendTrimWitnesses=new List<AfjTerminalBendTrimWitness>();
         internal readonly List<string> SkippedStrips=new List<string>();
     }
     internal static class AfjPerFoldSheetPlanner
@@ -9635,27 +9768,103 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
             return rows;
         }
-        static void Keep(ISldWorks app,Strip strip,string frame,AfjSheetSlicePlanEvidence evidence,double low,double high)
+        static List<Body2> FiniteMaterialMasks(ISldWorks app,Strip strip,double low,double high,double axialLow,double axialHigh,string purpose)
         {
-            var modeler=app.GetModeler() as Modeler;var math=app.GetMathUtility() as MathUtility;Need(modeler!=null&&math!=null,"KEEP mask modeler unavailable");
+            if(high-low<=1e-7||axialHigh-axialLow<=1e-7)return new List<Body2>();
+            var modeler=app.GetModeler() as Modeler;var math=app.GetMathUtility() as MathUtility;Need(modeler!=null&&math!=null,"finite material mask modeler unavailable");
             var outer=strip.Outer.ICreateSheetBody();var inner=strip.Inner.ICreateSheetBody();
             Need(outer!=null&&inner!=null&&outer.IsTemporaryBody()&&inner.IsTemporaryBody(),"finite original skin sheet copy unavailable");
             var a=modeler.CreateExtrudedBody(outer,math.CreateVector(strip.Normal) as MathVector,strip.Thickness);
             var b=modeler.CreateExtrudedBody(inner,math.CreateVector(Mul(strip.Normal,-1)) as MathVector,strip.Thickness);
             AfjTemporaryBoolean.Validate(a);AfjTemporaryBoolean.Validate(b);int code;
-            var common=AfjTemporaryBoolean.Boolean(a,b,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"PER_FOLD_KEEP:paired_skins");
-            var window=AfjTemporaryBoolean.CreatePrism(app,new AfjToolDefinition{Polygon=new[]{NativePoint(strip,strip.Low-.001,low),NativePoint(strip,strip.High+.001,low),NativePoint(strip,strip.High+.001,high),NativePoint(strip,strip.Low-.001,high)},Direction=strip.Normal,Length=strip.Thickness});
-            var masks=new List<Body2>();foreach(var m in common)foreach(var actual in AfjTemporaryBoolean.Boolean(m,strip.Source,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"PER_FOLD_KEEP:original"))
-                masks.AddRange(AfjTemporaryBoolean.Boolean(actual,window,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"PER_FOLD_KEEP:noncontact_interval"));
-            if(masks.Count==0||AfjTemporaryBoolean.Total(masks)<=1e-12)
-            {evidence.SkippedStrips.Add(frame+":"+strip.Side+":"+strip.Index+":NONCONTACT_RAW_CORNER_HAS_NO_FINITE_PLANAR_STOCK_WITNESS");return;}
-            string region="NONCONTACT_"+strip.Side+"_STRIP_"+strip.Index+"_"+low.ToString("R",System.Globalization.CultureInfo.InvariantCulture)+"_"+high.ToString("R",System.Globalization.CultureInfo.InvariantCulture);
-            foreach(var mask in masks)evidence.KeepWitnesses.Add(new AfjSheetKeepWitness{Frame=frame,RegionId=region,StripIndex=strip.Index,MaskPartCoordinates=mask});
-            evidence.SkippedStrips.Add(frame+":"+strip.Side+":"+strip.Index+":NO_FINITE_MATING_SHEET_CONTACT_KEEP");
+            var common=AfjTemporaryBoolean.Boolean(a,b,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R61_"+purpose+":paired_skins");
+            var window=AfjTemporaryBoolean.CreatePrism(app,new AfjToolDefinition{Polygon=new[]{NativePoint(strip,axialLow,low),NativePoint(strip,axialHigh,low),NativePoint(strip,axialHigh,high),NativePoint(strip,axialLow,high)},Direction=strip.Normal,Length=strip.Thickness});
+            var masks=new List<Body2>();foreach(var m in common)foreach(var actual in AfjTemporaryBoolean.Boolean(m,strip.Source,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R61_"+purpose+":original"))
+                masks.AddRange(AfjTemporaryBoolean.Boolean(actual,window,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R61_"+purpose+":finite_window"));
+            return masks.Where(mask=>AfjTemporaryBoolean.Volume(mask)>1e-13).ToList();
+        }
+        static AfjSheetSliceMetadata TerminalAnchor(Strip[] chain,Strip strip,double low,double high,List<AfjSheetSliceMetadata> existing,out int[] path)
+        {
+            var candidates=existing.Where(m=>!m.TerminalOverhangTrim&&m.Side==strip.Side&&m.Role=="LOCAL_WALL_INTERSECTION"&&m.ConstantAxialCutoff.HasValue&&
+                Enumerable.Range(Math.Min(m.StripIndex,strip.Index),Math.Abs(m.StripIndex-strip.Index)+1).All(i=>chain[i].Side==strip.Side)).ToArray();
+            Need(candidates.Length>0,"noncontact sheet has no actual same-side terminal plane authority; strip="+strip.Index);
+            int steps=candidates.Min(m=>Math.Abs(m.StripIndex-strip.Index));candidates=candidates.Where(m=>Math.Abs(m.StripIndex-strip.Index)==steps).ToArray();
+            if(steps==0)
+            {
+                double distance=candidates.Min(m=>Math.Max(0,Math.Max(m.ContactLow-high,low-m.ContactHigh)));
+                candidates=candidates.Where(m=>Math.Abs(Math.Max(0,Math.Max(m.ContactLow-high,low-m.ContactHigh))-distance)<1e-8).ToArray();
+            }
+            else
+            {
+                // A remote nontouching fold inherits the local terminal datum
+                // at the exact shared-chain end facing it. Several contact cells
+                // may lie on one measured anchor strip at different heights and
+                // axial offsets; their strip index alone is not proximity.
+                // Use only transverse distance to that actual connected endpoint,
+                // never the smallest/largest axial Cut coordinate as a shortcut.
+                Func<AfjSheetSliceMetadata,double> boundaryDistance=m=>strip.Index>m.StripIndex?
+                    Math.Max(0,chain[m.StripIndex].Length-m.ContactHigh):Math.Max(0,m.ContactLow);
+                double distance=candidates.Min(boundaryDistance);
+                candidates=candidates.Where(m=>Math.Abs(boundaryDistance(m)-distance)<1e-8).ToArray();
+                Trace.WriteLine("[AFJ-R61] TERMINAL_ANCHOR_ENDPOINT_NEAREST strip="+strip.Index+" path_steps="+steps+" measured_transverse_distance_m="+distance.ToString("R",CultureInfo.InvariantCulture));
+            }
+            if(candidates.Select(item=>item.ConstantAxialCutoff.Value).Distinct().Count()>1)Trace.WriteLine("[AFJ-R61] TERMINAL_ANCHOR_CANDIDATES strip="+strip.Index+" side="+strip.Side+" low="+low.ToString("R",CultureInfo.InvariantCulture)+" high="+high.ToString("R",CultureInfo.InvariantCulture)+" steps="+steps+" candidates="+String.Join(";",candidates.Select(item=>item.SliceId+" v="+item.ContactLow.ToString("R",CultureInfo.InvariantCulture)+"/"+item.ContactHigh.ToString("R",CultureInfo.InvariantCulture)+" x="+item.ConstantAxialCutoff.Value.ToString("R",CultureInfo.InvariantCulture))));
+            double cutoff=candidates[0].ConstantAxialCutoff.Value;
+            Need(candidates.All(m=>Math.Abs(m.ConstantAxialCutoff.Value-cutoff)<1e-8),"ambiguous neighboring terminal planes; no guessed overhang cut");
+            var chosen=candidates.OrderBy(m=>m.StripIndex).ThenBy(m=>m.SliceId,StringComparer.Ordinal).First();
+            int direction=strip.Index>=chosen.StripIndex?1:-1;path=Enumerable.Range(0,steps+1).Select(i=>chosen.StripIndex+i*direction).ToArray();
+            for(int k=1;k<path.Length;k++)
+            {
+                var left=chain[Math.Min(path[k-1],path[k])];var right=chain[Math.Max(path[k-1],path[k])];
+                Need(Same(left.B,right.A),"terminal plane propagation crosses disconnected profile strips");
+            }
+            Need(Math.Abs(Dot(strip.WorldAxis,chain[chosen.StripIndex].WorldAxis)-1)<1e-7,"terminal anchor frame axes differ");
+            double denominator=Dot(chosen.MateInwardNormalWorld,strip.WorldAxis);
+            Need(Math.Abs(denominator)>.999999,"terminal plane must be perpendicular to the actual Frame axis");
+            double ownPlane=Dot(Sub(chosen.MatePlanePointWorld,strip.WorldBase),chosen.MateInwardNormalWorld)/denominator;
+            double opposite=ownPlane+chosen.MateThickness/denominator;
+            double expected=chosen.CoveringMember?Math.Max(ownPlane,opposite):Math.Min(ownPlane,opposite)-AfjManufacturingConventions.AssemblyFitGap/Math.Abs(denominator);
+            Need(Math.Abs(expected-cutoff)<1e-8,"inherited terminal limit does not match the authoritative actual 0/t mating plane");
+            return chosen;
+        }
+        static void TrimNoncontactEnd(ISldWorks app,Strip[] chain,Strip strip,string frame,bool cover,AfjSheetSlicePlanEvidence evidence,
+            AfjCutPlan plan,List<AfjSheetSliceMetadata> target,double low,double high,int ordinal)
+        {
+            int[] path;var anchor=TerminalAnchor(chain,strip,low,high,target,out path);double cutoff=anchor.ConstantAxialCutoff.Value;
+            Need(cutoff>(strip.Low+strip.High)/2-Eps&&cutoff<strip.High+Eps,"terminal plane is outside the selected end half");
+            var inside=FiniteMaterialMasks(app,strip,low,high,strip.Low-.001,Math.Min(strip.High+.001,cutoff),"TERMINAL_INSIDE_KEEP");
+            foreach(var mask in inside)evidence.KeepWitnesses.Add(new AfjSheetKeepWitness{Frame=frame,RegionId="NONCONTACT_INSIDE_TERMINAL_"+strip.Index+"_"+ordinal,StripIndex=strip.Index,MaskPartCoordinates=mask});
+            var outside=FiniteMaterialMasks(app,strip,low,high,Math.Max(strip.Low-.001,cutoff),strip.High+.001,"TERMINAL_OUTSIDE_REMOVE");
+            if(outside.Count==0||AfjTemporaryBoolean.Total(outside)<=1e-12)
+            {evidence.SkippedStrips.Add(frame+":"+strip.Side+":"+strip.Index+":NO_MATERIAL_BEYOND_VERIFIED_TERMINAL_PLANE");return;}
+            Need(inside.Count>0,"terminal trim has no original retained body-side material witness");
+            string id="SHEET_SLICE:"+frame+":"+strip.Side+":"+strip.Index+":END_TRIM_FROM_"+anchor.StripIndex+"_"+ordinal;
+            var polygon=new[]{NativePoint(strip,cutoff,low),NativePoint(strip,strip.High+.001,low),NativePoint(strip,strip.High+.001,high),NativePoint(strip,cutoff,high)};
+            var meta=new AfjSheetSliceMetadata{SliceId=id,Side=strip.Side,Role="LOCAL_WALL_INTERSECTION",StripIndex=strip.Index,MateStripIndex=anchor.MateStripIndex,
+                ApiThickness=strip.Thickness,ContactLow=low,ContactHigh=high,ConstantAxialCutoff=cutoff,RequiredNormalGap=anchor.RequiredNormalGap,CoveringMember=cover,
+                TerminalOverhangTrim=true,TerminalAnchorStripIndex=anchor.StripIndex,TerminalAnchorSliceId=anchor.SliceId,TerminalAnchorPathIndices=path,
+                SegmentStartNative=strip.A,SegmentEndNative=strip.B,UnitAxisNative=strip.Axis,InwardNormalNative=strip.Normal,SupportPointNative=strip.Support,
+                MatePlanePointWorld=anchor.MatePlanePointWorld,MateInwardNormalWorld=anchor.MateInwardNormalWorld,MateThickness=anchor.MateThickness,
+                MateSupportPointWorld=anchor.MateSupportPointWorld,MateOppositeSupportPointWorld=anchor.MateOppositeSupportPointWorld,PolygonNative=polygon};
+            if(anchor.StripIndex==strip.Index)
+            {
+                if(Math.Abs(low-anchor.ContactHigh)<1e-8){meta.ContactLowDatumWorld=anchor.ContactHighDatumWorld;meta.ContactLowDatumOffset=anchor.ContactHighDatumOffset;meta.ContactLowDatumOnOwnComponent=anchor.ContactHighDatumOnOwnComponent;meta.ContactLowDatumPlaneNormalWorld=anchor.ContactHighDatumPlaneNormalWorld;meta.ContactLowDatumAdjacentStripIndex=anchor.ContactHighDatumAdjacentStripIndex;}
+                if(Math.Abs(high-anchor.ContactLow)<1e-8){meta.ContactHighDatumWorld=anchor.ContactLowDatumWorld;meta.ContactHighDatumOffset=anchor.ContactLowDatumOffset;meta.ContactHighDatumOnOwnComponent=anchor.ContactLowDatumOnOwnComponent;meta.ContactHighDatumPlaneNormalWorld=anchor.ContactLowDatumPlaneNormalWorld;meta.ContactHighDatumAdjacentStripIndex=anchor.ContactLowDatumAdjacentStripIndex;}
+            }
+            var tool=new AfjToolDefinition{Polygon=polygon,Direction=strip.Normal,Length=strip.Thickness+AfjManufacturingConventions.SheetCutOverrun,ApiSheetThickness=strip.Thickness,
+                NominalSheetDepth=strip.Thickness+AfjManufacturingConventions.SheetCutOverrun,DepthPolicy=Policy,SheetSlice=meta};
+            var operation=new AfjCutOperation{EvidenceId=id,Kind=AfjOperationKind.Cut,NormalCutIntent=true,
+                RegionEvidence="R61_TERMINAL_OVERHANG: actual paired sheet skins; inherited connected same-side terminal 0/t plane; body-side KEEP + positive outside original material witnesses; no invented bevel"};
+            operation.Tools.Add(tool);plan.Operations.Add(operation);target.Add(meta);
+            for(int k=0;k<outside.Count;k++)evidence.TerminalTrimWitnesses.Add(new AfjTerminalTrimWitness{Frame=frame,StripIndex=strip.Index,RegionId=id+":OUTSIDE_"+k,
+                CutoffNative=cutoff,Low=low,High=high,OutsideMaskPartCoordinates=outside[k],InsideMaskPartCoordinates=inside[k%inside.Count]});
+            Need(plan.Operations.Count<=64,"terminal slice operation bound exceeded");
+            Trace.WriteLine("[AFJ-R61] TERMINAL_OVERHANG frame="+frame+" strip="+strip.Index+" anchor="+anchor.StripIndex+" cutoff_native_m="+cutoff.ToString("R",CultureInfo.InvariantCulture)+
+                " transverse="+low.ToString("R",CultureInfo.InvariantCulture)+"/"+high.ToString("R",CultureInfo.InvariantCulture)+" outside_original_m3="+AfjTemporaryBoolean.Total(outside).ToString("R",CultureInfo.InvariantCulture)+" retained_inside_m3="+AfjTemporaryBoolean.Total(inside).ToString("R",CultureInfo.InvariantCulture));
         }
         static AfjCutPlan Plan(ISldWorks app,Strip[] own,Strip[] mates,AfjCutPlan guide,bool cover,string frame,AfjSheetSlicePlanEvidence evidence)
         {
-            var result=new AfjCutPlan();var target=frame=="A"?evidence.A:evidence.B;
+            var result=new AfjCutPlan();var target=frame=="A"?evidence.A:evidence.B;var gaps=new Dictionary<int,List<double[]>>();
             foreach(var strip in own)
             {
                 int before=result.Operations.Count;bool encountered=false;var contacted=new List<double[]>();
@@ -9697,11 +9906,15 @@ namespace ADDIN.Commands.AutoFrameJoint
                         RegionEvidence="API_PAIRED_SKINS_AND_FINITE_SAME_SIDE_CONTACT; "+meta.Role+"; no full-profile cutter; NormalCut native Bend result required"};op.Tools.Add(tool);result.Operations.Add(op);target.Add(meta);
                     Need(result.Operations.Count<=64,"slice operation bound exceeded");
                 }
-                double cursor=0;foreach(var interval in contacted.OrderBy(x=>x[0]))
-                {if(interval[0]-cursor>1e-6)Keep(app,strip,frame,evidence,cursor,interval[0]);cursor=Math.Max(cursor,interval[1]);}
-                if(strip.Length-cursor>1e-6)Keep(app,strip,frame,evidence,cursor,strip.Length);
+                var missing=new List<double[]>();double cursor=0;foreach(var interval in contacted.OrderBy(x=>x[0]))
+                {if(interval[0]-cursor>1e-6)missing.Add(new[]{cursor,interval[0]});cursor=Math.Max(cursor,interval[1]);}
+                if(strip.Length-cursor>1e-6)missing.Add(new[]{cursor,strip.Length});gaps[strip.Index]=missing;
                 Trace.WriteLine("[AFJ-R59] STRIP_CONTACT frame="+frame+" strip="+strip.Index+" side="+strip.Side+" mating="+encountered+" slices="+(result.Operations.Count-before));
             }
+            // The contact test decides where a bevel is needed. It does NOT
+            // authorize keeping raw stock beyond the proven terminal plane.
+            foreach(var strip in own)for(int k=0;k<gaps[strip.Index].Count;k++)
+            {var gap=gaps[strip.Index][k];TrimNoncontactEnd(app,own,strip,frame,cover,evidence,result,target,gap[0],gap[1],k);}
             return result;
         }
         sealed class BendCylinder
@@ -9873,7 +10086,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             foreach(var window in windows){Need(window[0]<=cursor+1e-9,"coupled normal contours leave an unplanned angular Bend band");cursor=Math.Max(cursor,window[1]);}
             Need(cursor>=angle-1e-9,"coupled normal contours do not cover their entire contacting Bend sector");
         }
-        static void AssignConstantPlaneBendMaps(ISldWorks app,Strip[] strips,AfjCutPlan plan)
+        static void AssignConstantPlaneBendMaps(ISldWorks app,Strip[] strips,AfjCutPlan plan,string frame,AfjSheetSlicePlanEvidence evidence)
         {
             for(int i=0;i<strips.Length-1;i++)
             {
@@ -9897,6 +10110,25 @@ namespace ADDIN.Commands.AutoFrameJoint
                     var sector=AfjTemporaryBoolean.CreatePrism(app,map);int code;
                     var stock=AfjTemporaryBoolean.Boolean(first.Source,sector,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R59_NORMAL_BEND:actual_stock");
                     Need(stock.Count>0,"constant-plane Bend mapping has no actual finite stock");
+                    if(ma.TerminalOverhangTrim||mb.TerminalOverhangTrim)
+                    {
+                        // A separate native-cylinder sector witness proves that
+                        // the overhang test covers R/R+t material as well as the
+                        // flat paired-skin masks. No plan-result body is used as
+                        // this independent original-material authority.
+                        double cutoff=ma.ConstantAxialCutoff.Value;string region="TERMINAL_BEND_"+first.Index+"_"+second.Index+"_"+cutoff.ToString("R",CultureInfo.InvariantCulture);
+                        if(!evidence.TerminalBendTrimWitnesses.Any(w=>w.Frame==frame&&w.RegionId.StartsWith(region+":",StringComparison.Ordinal)))
+                        {
+                            for(int k=0;k<stock.Count;k++)evidence.TerminalBendTrimWitnesses.Add(new AfjTerminalBendTrimWitness{Frame=frame,RegionId=region+":"+k,
+                                FirstStripIndex=first.Index,SecondStripIndex=second.Index,CutoffNative=cutoff,OutsideMaskPartCoordinates=AfjTemporaryBoolean.Copy(stock[k])});
+                            double begin=first.Low-.001;var shift=Mul(first.Axis,begin-cutoff);
+                            var insideSpec=new AfjToolDefinition{Polygon=map.Polygon.Select(p=>Add(p,shift)).ToArray(),ArcCenters=map.ArcCenters.Select(c=>c==null?null:Add(c,shift)).ToArray(),
+                                Direction=map.Direction,Length=cutoff-begin,DepthPolicy="ORIGINAL_TERMINAL_BEND_BODY_SIDE_KEEP_WITNESS_ONLY"};
+                            var insideSector=AfjTemporaryBoolean.CreatePrism(app,insideSpec);
+                            foreach(var material in AfjTemporaryBoolean.Boolean(first.Source,insideSector,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R61_TERMINAL_BEND:inside_original"))
+                                evidence.KeepWitnesses.Add(new AfjSheetKeepWitness{Frame=frame,RegionId=region+":INSIDE_KEEP",StripIndex=first.Index,MaskPartCoordinates=material});
+                        }
+                    }
                     var prism=AfjTemporaryBoolean.CreatePrism(app,earlyTool);var covered=new List<Body2>();
                     foreach(var material in stock)covered.AddRange(AfjTemporaryBoolean.Boolean(material,prism,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R59_NORMAL_BEND:early_prism_coverage"));
                     double stockVolume=AfjTemporaryBoolean.Total(stock),coveredVolume=AfjTemporaryBoolean.Total(covered);
@@ -9957,7 +10189,21 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Need(kept.Count == 1 && witness.MaskPartCoordinates != null, "single final solid and native KEEP mask required");
                 double missing = AfjTemporaryBoolean.DifferenceVolume(witness.MaskPartCoordinates,kept[0]);
                 Trace.WriteLine("[AFJ-R59] KEEP_VERIFIED frame="+witness.Frame+" strip="+witness.StripIndex+" missing_m3="+missing.ToString("R",CultureInfo.InvariantCulture));
-                Need(missing <= 1e-12, "non-contact sheet material would be removed; "+witness.RegionId);
+                Need(missing <= 1e-12, "non-contact body-side sheet material would be removed; "+witness.RegionId);
+            }
+            foreach(var witness in evidence.TerminalTrimWitnesses)
+            {
+                var kept=witness.Frame=="A"?a.Kept:b.Kept;Need(kept.Count==1&&witness.OutsideMaskPartCoordinates!=null,"terminal outside witness missing");
+                int code;var remaining=AfjTemporaryBoolean.Boolean(witness.OutsideMaskPartCoordinates,kept[0],(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R61_TERMINAL_OVERHANG:remaining");
+                double residue=AfjTemporaryBoolean.Total(remaining);Need(residue<=1e-12,"terminal sheet overhang remains; "+witness.RegionId);
+                Trace.WriteLine("[AFJ-R61] TERMINAL_OVERHANG_VERIFIED frame="+witness.Frame+" strip="+witness.StripIndex+" residual_m3="+residue.ToString("R",CultureInfo.InvariantCulture));
+            }
+            foreach(var witness in evidence.TerminalBendTrimWitnesses)
+            {
+                var kept=witness.Frame=="A"?a.Kept:b.Kept;Need(kept.Count==1&&witness.OutsideMaskPartCoordinates!=null,"terminal Bend outside witness missing");int code;
+                var remaining=AfjTemporaryBoolean.Boolean(witness.OutsideMaskPartCoordinates,kept[0],(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R61_TERMINAL_BEND:remaining");
+                double residue=AfjTemporaryBoolean.Total(remaining);Need(residue<=1e-12,"terminal R/R+t Bend overhang remains; "+witness.RegionId);
+                Trace.WriteLine("[AFJ-R61] TERMINAL_BEND_OVERHANG_VERIFIED frame="+witness.Frame+" strips="+witness.FirstStripIndex+"/"+witness.SecondStripIndex+" residual_m3="+residue.ToString("R",CultureInfo.InvariantCulture));
             }
         }
         internal static void Apply(ISldWorks app,AfjParametricPlan generated,AfjProfile profileA,AfjProfile profileB,Body2 bodyA,Body2 bodyB,MathTransform ta,MathTransform tb,bool coverA)
@@ -9967,11 +10213,11 @@ namespace ADDIN.Commands.AutoFrameJoint
             var b=Read(profileB,bodyB,tb,coverA?generated.OutLoser:generated.OutWinner,coverA?generated.Loser:generated.Winner);
             var evidence=new AfjSheetSlicePlanEvidence();var guides=generated.Plan;
             var planA=Plan(app,a,b,guides.A,coverA,"A",evidence);var planB=Plan(app,b,a,guides.B,!coverA,"B",evidence);
-            AssignConstantPlaneBendMaps(app,a,planA);AssignConstantPlaneBendMaps(app,b,planB);
+            AssignConstantPlaneBendMaps(app,a,planA,"A",evidence);AssignConstantPlaneBendMaps(app,b,planB,"B",evidence);
             Need(planA.Operations.Count+planB.Operations.Count>0,"no member has a qualified local normal sheet Cut");
             generated.GuidePlan=guides;generated.SheetSlices=evidence;
             generated.Plan=new AfjJointPlan{RuleId="ORTHOGONAL_U_PER_FOLD_NORMAL_BLIND",A=planA,B=planB};
-            generated.Derivation+="; PER_FOLD_NORMAL_BLIND: finite same-side paired skins; local contact ranges; untouched non-contact strip witnesses; t+0.10mm each; native NormalCut oracle required";
+            generated.Derivation+="; PER_FOLD_NORMAL_BLIND: finite same-side paired skins; local contact ranges; terminal-overhang trims with retained inside and removed outside witnesses; t+0.10mm each; native NormalCut oracle required";
         }
     }
 }

@@ -1,3 +1,5 @@
+> **R61 — 2026-10-28:** Đã xén phần dư của các nếp không giao: 2354 hiện tại đủ 4 góc/35 Cut, bộ lịch sử 4 góc/38 Cut, 4332 native PMP 12 Cut. Có phép đo riêng phần dư phẳng và Bend R phải hết, vật liệu phía thân phải giữ. Class chính đã chép; người dùng tự rebuild. Xem [kết quả và phạm vi](R61/README.md).
+
 > **R60 — 2026-10-28:** Sửa đường dẫn crash `ActivateDoc3`: Cut trong đúng Component edit, Apply sau native idle. Đã qua lại 4 góc 2354 và native PMP thật của cặp 4332 đảo A/B, có DLL/TaskPane hiện tại làm nền. Hai class đã chép vào source chính; người dùng tự rebuild. Xem [kết quả và phạm vi thực tế](R60/README.md).
 
 > **R59 — 2026-10-28:** Cut từng lớp tôn Normal/Blind=t+0,10 mm: 2354 đủ 4 góc, 33 Cut; 4332 thêm 8 Cut. Source chính đã chép để người dùng tự rebuild; kết quả là API harness, chưa xác nhận DLL/PMP sau rebuild. Xem [bằng chứng và giới hạn](R59/README.md).

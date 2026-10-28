@@ -1,0 +1,326 @@
+{
+  "schema": "AFJ_R61_INPUT_VARIANTS_AND_FAILED_ATTEMPTS_V1",
+  "date": "2026-10-28",
+  "current_user_provided_2354": {
+    "filename": "2354-04-lc-B11-fr04.SLDPRT",
+    "sha256": "5195027BE9E4B75BF1D0A1BD425B5B148968DC36CCF71FCAF400FFF3423F7D05",
+    "observed_last_write_utc": "2026-10-28T04:26:24.2760847Z",
+    "first_r61_host_started_utc": "2026-10-28T06:42:35.6717256Z",
+    "changed_before_r61": true,
+    "change_author": "UNVERIFIED_DO_NOT_ATTRIBUTE_TO_USER_OR_API",
+    "fixture_authority": "EXPLICIT_CURRENT_USER_PROVIDED_2354_MANIFEST"
+  },
+  "historical_2354": {
+    "filename": "2354-04-lc-B11-fr04.SLDPRT",
+    "sha256": "307bfc4f3e255e2727f26ad70a573db1dbd4b5bdc187092ba56501a71046b68f",
+    "fixture_authority": "HISTORICAL_FROZEN_BYTES_RECOVERED_TO_R61_OWNED_FOLDER",
+    "previous_reports_preserved": true
+  },
+  "attempts": [
+    {
+      "label": "r61_native_4332_01",
+      "parent_status": "FAIL_OR_UNVERIFIED_CANDIDATE_NATIVE_PROBE",
+      "reported_status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "last_phase": "CLOSE_ONLY_OWNED_COPIES_NO_SAVE",
+      "mode": "APPLY",
+      "host_exited": false,
+      "host_exit_code": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "wrapper_hresult": "0x80131509",
+      "diagnostic": "System.InvalidOperationException: Candidate native probe failed or is unverified",
+      "pairs": [
+        {
+          "index": 1,
+          "reported_status": "FAIL_OR_UNVERIFIED",
+          "native_apply_success": false,
+          "writer_reported_verified_cut_events": 9,
+          "report_error": "HRESULT=0x80131509 System.InvalidOperationException: AFJ_U_TRANSACTION_UNVERIFIED: R59 per-sheet Sketch writer failed: HRESULT=0x80131509 System.InvalidOperationException: U_GATE2_UNVERIFIED: R59 wall sheet: HRESULT=0x80131509 System.InvalidOperationException: U_GATE2_UNVERIFIED: UNVERIFIED_RULE: original-source height-thickness target merged with an own cap endpoint",
+          "pair_failure_detail": "System.InvalidOperationException: Actual native apply failed: Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+          "rollback": false
+        }
+      ],
+      "qualification": "NOT_A_PASS_RETAINED_FAILED_OR_REFUSED_ATTEMPT"
+    },
+    {
+      "label": "r61_native_2354_01",
+      "parent_status": "FAIL_OR_UNVERIFIED_FINAL_SOURCE_COPY_HASH_AUDIT",
+      "reported_status": "NOT_AVAILABLE",
+      "last_phase": "REFUSED_BEFORE_CAD_OPEN_FROZEN_INPUT_HASH_MISMATCH",
+      "mode": "NOT_AVAILABLE",
+      "host_exited": false,
+      "host_exit_code": "NOT_AVAILABLE",
+      "source_hashes_unchanged": false,
+      "copy_hashes_unchanged": null,
+      "wrapper_hresult": "0x80131509",
+      "diagnostic": "System.InvalidOperationException: Frozen genuine source bytes differ: 2354-04-lc-B11-fr04.SLDPRT",
+      "pairs": [],
+      "qualification": "NOT_A_PASS_RETAINED_FAILED_OR_REFUSED_ATTEMPT"
+    },
+    {
+      "label": "r61_current_2354_02",
+      "parent_status": "FAIL_OR_UNVERIFIED_CANDIDATE_NATIVE_PROBE",
+      "reported_status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "last_phase": "CLOSE_ONLY_OWNED_COPIES_NO_SAVE",
+      "mode": "APPLY",
+      "host_exited": false,
+      "host_exit_code": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "wrapper_hresult": "0x80131509",
+      "diagnostic": "System.InvalidOperationException: Candidate native probe failed or is unverified",
+      "pairs": [
+        {
+          "index": 1,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 5,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 2,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 7,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 3,
+          "reported_status": "FAIL_OR_UNVERIFIED",
+          "native_apply_success": false,
+          "writer_reported_verified_cut_events": 4,
+          "report_error": "HRESULT=0x80131509 System.InvalidOperationException: AFJ_U_TRANSACTION_UNVERIFIED: R59 per-sheet Sketch writer failed: HRESULT=0x80131509 System.InvalidOperationException: U_GATE2_UNVERIFIED: R59 wall sheet: HRESULT=0x80131509 System.InvalidOperationException: U_GATE2_UNVERIFIED: UNVERIFIED_RULE: transverse offset target unexpectedly merged with an existing finite cap Vertex",
+          "pair_failure_detail": "System.InvalidOperationException: Actual native apply failed: Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+          "rollback": false
+        }
+      ],
+      "qualification": "NOT_A_PASS_RETAINED_FAILED_OR_REFUSED_ATTEMPT"
+    },
+    {
+      "label": "r61_current_2354_03",
+      "parent_status": "FAIL_OR_UNVERIFIED_CANDIDATE_NATIVE_PROBE",
+      "reported_status": "RUNNING",
+      "last_phase": "PREOPEN_SELECTED_COPIED_FRAMES_THEN_ASSEMBLY",
+      "mode": "APPLY",
+      "host_exited": true,
+      "host_exit_code": "0xC0000374",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "wrapper_hresult": "0x80131509",
+      "diagnostic": "System.InvalidOperationException: Owned host exited during candidate API probe; no rollback or fallback",
+      "pairs": [],
+      "qualification": "PREOPEN_HOST_EXIT_UNVERIFIED_NOT_SOLVER_QUALIFICATION"
+    },
+    {
+      "label": "r61_current_2354_04",
+      "parent_status": "FAIL_OR_UNVERIFIED_CANDIDATE_NATIVE_PROBE",
+      "reported_status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "last_phase": "CLOSE_ONLY_OWNED_COPIES_NO_SAVE",
+      "mode": "APPLY",
+      "host_exited": false,
+      "host_exit_code": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "wrapper_hresult": "0x80131509",
+      "diagnostic": "System.InvalidOperationException: Candidate native probe failed or is unverified",
+      "pairs": [
+        {
+          "index": 1,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 5,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 2,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 7,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 3,
+          "reported_status": "FAIL_OR_UNVERIFIED",
+          "native_apply_success": false,
+          "writer_reported_verified_cut_events": 10,
+          "report_error": "HRESULT=0x80131509 System.InvalidOperationException: AFJ_U_TRANSACTION_UNVERIFIED: R59 per-sheet Sketch writer failed: HRESULT=0x80131509 System.InvalidOperationException: U_GATE2_UNVERIFIED: R59 wall sheet: HRESULT=0x80131509 System.InvalidOperationException: U_GATE2_UNVERIFIED: UNVERIFIED_RULE: measured mating skin has no finite straight edge whose projected line contains the solved contact foot",
+          "pair_failure_detail": "System.InvalidOperationException: Actual native apply failed: Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+          "rollback": false
+        }
+      ],
+      "qualification": "NOT_A_PASS_RETAINED_FAILED_OR_REFUSED_ATTEMPT"
+    },
+    {
+      "label": "r61_current_2354_05",
+      "parent_status": "FAIL_OR_UNVERIFIED_CANDIDATE_NATIVE_PROBE",
+      "reported_status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "last_phase": "CLOSE_ONLY_OWNED_COPIES_NO_SAVE",
+      "mode": "APPLY",
+      "host_exited": false,
+      "host_exit_code": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "wrapper_hresult": "0x80131509",
+      "diagnostic": "System.InvalidOperationException: Candidate native probe failed or is unverified",
+      "pairs": [
+        {
+          "index": 1,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 5,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 2,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 7,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 3,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 11,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 4,
+          "reported_status": "FAIL_OR_UNVERIFIED",
+          "native_apply_success": null,
+          "writer_reported_verified_cut_events": 0,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "System.InvalidOperationException: Actual Ghost Preview failed: UNVERIFIED_RULE: PER_FOLD_NORMAL_BLIND ambiguous neighboring terminal planes; no guessed overhang cut",
+          "rollback": "NOT_AVAILABLE"
+        }
+      ],
+      "qualification": "NOT_A_PASS_RETAINED_FAILED_OR_REFUSED_ATTEMPT"
+    },
+    {
+      "label": "r61_current_anchor_06",
+      "parent_status": "FAIL_OR_UNVERIFIED_CANDIDATE_NATIVE_PROBE",
+      "reported_status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "last_phase": "CLOSE_ONLY_OWNED_COPIES_NO_SAVE",
+      "mode": "PREVIEW_ONLY",
+      "host_exited": false,
+      "host_exit_code": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "wrapper_hresult": "0x80131509",
+      "diagnostic": "System.InvalidOperationException: Candidate native probe failed or is unverified",
+      "pairs": [
+        {
+          "index": 1,
+          "reported_status": "PASS_PREVIEW_TICKET_UNCHANGED_NATIVE_PARTS_API_HARNESS_ONLY",
+          "native_apply_success": null,
+          "writer_reported_verified_cut_events": 0,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": "NOT_AVAILABLE"
+        },
+        {
+          "index": 2,
+          "reported_status": "PASS_PREVIEW_TICKET_UNCHANGED_NATIVE_PARTS_API_HARNESS_ONLY",
+          "native_apply_success": null,
+          "writer_reported_verified_cut_events": 0,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": "NOT_AVAILABLE"
+        },
+        {
+          "index": 3,
+          "reported_status": "PASS_PREVIEW_TICKET_UNCHANGED_NATIVE_PARTS_API_HARNESS_ONLY",
+          "native_apply_success": null,
+          "writer_reported_verified_cut_events": 0,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": "NOT_AVAILABLE"
+        },
+        {
+          "index": 4,
+          "reported_status": "FAIL_OR_UNVERIFIED",
+          "native_apply_success": null,
+          "writer_reported_verified_cut_events": 0,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "System.InvalidOperationException: Actual Ghost Preview failed: UNVERIFIED_RULE: PER_FOLD_NORMAL_BLIND ambiguous neighboring terminal planes; no guessed overhang cut",
+          "rollback": "NOT_AVAILABLE"
+        }
+      ],
+      "qualification": "PREVIEW_ONLY_ANCHOR_DIAGNOSTIC_NOT_NATIVE_APPLY_QUALIFICATION"
+    },
+    {
+      "label": "r61_current_2354_07",
+      "parent_status": "FAIL_OR_UNVERIFIED_CANDIDATE_NATIVE_PROBE",
+      "reported_status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "last_phase": "CLOSE_ONLY_OWNED_COPIES_NO_SAVE",
+      "mode": "APPLY",
+      "host_exited": false,
+      "host_exit_code": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "wrapper_hresult": "0x80131509",
+      "diagnostic": "System.InvalidOperationException: Candidate native probe failed or is unverified",
+      "pairs": [
+        {
+          "index": 1,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 5,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 2,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 7,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 3,
+          "reported_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+          "native_apply_success": true,
+          "writer_reported_verified_cut_events": 11,
+          "report_error": "NOT_AVAILABLE",
+          "pair_failure_detail": "NOT_AVAILABLE",
+          "rollback": false
+        },
+        {
+          "index": 4,
+          "reported_status": "FAIL_OR_UNVERIFIED",
+          "native_apply_success": false,
+          "writer_reported_verified_cut_events": 10,
+          "report_error": "HRESULT=0x80131509 System.InvalidOperationException: シーケンスに複数の一致する要素が含まれています",
+          "pair_failure_detail": "System.InvalidOperationException: Actual native apply failed: Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+          "rollback": false
+        }
+      ],
+      "qualification": "NOT_A_PASS_RETAINED_FAILED_OR_REFUSED_ATTEMPT"
+    }
+  ],
+  "conclusions": [
+    "A frozen-hash mismatch refuses the test before CAD opens; it does not establish file corruption.",
+    "Current user-provided and recovered historical bytes are separately identified fixtures; neither overwrites the other.",
+    "Current2354 attempt03 host exit0xC0000374 occurred during preopen before corner geometry; underlying native memory-corruption cause remains UNVERIFIED.",
+    "An unverified rollback or exited host is retired; successful NoSave close alone does not establish safe host reuse after native failure.",
+    "Partial reported Cut events in failed attempts do not qualify the final corner or entire Assembly.",
+    "Native API and source/copy disk hash observations remain distinct. No CAD, private paths or full raw logs are published."
+  ]
+}
