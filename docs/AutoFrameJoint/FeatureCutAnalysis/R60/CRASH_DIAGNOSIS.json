@@ -1,0 +1,86 @@
+{
+  "schema": "AFJ_R60_CRASH_DIAGNOSIS_V1",
+  "evidence_level": "OBSERVED_DEBUG_LOG_AND_SOURCE_NOT_NATIVE_DUMP",
+  "crash_log_sha256": "579ecf00e90a42960b028f5ca9f507027ff3f48279c61178d96b7b9ff6a36049",
+  "module": "ADDIN.dll",
+  "installed_dll_sha256": "61463528AC731C2921F033C4088904F02C0DA417C8F148928D8013B8A9E774AB",
+  "installed_dll_mvid": "9423a9df-74e5-4b35-befc-c68db4d08afd",
+  "reported_exception": "0xC0000005",
+  "fault_module": "clr.dll",
+  "read_address": "0x0000000000000010",
+  "pair": {
+    "frame_a": "4332-04-TI-P-1-fr5-3",
+    "frame_b": "4332-04-TI-P-1-fr3a-4"
+  },
+  "last_completed_stage": "ACTIVATE B.GET_TITLE",
+  "last_begun_stage": "ACTIVATE B.ACTIVATE_DOC3",
+  "last_native_stage_utc": "2026-10-28T02:24:31.2695083Z",
+  "first_native_cut_reached": false,
+  "created_guides_before_failure": 4,
+  "created_sheet_sketch_before_failure": 1,
+  "created_sheet_sketch_id": 1938,
+  "per_fold_role": "SHEET_SLICE:B:FAR:0:MATE_2",
+  "preview_api_success": true,
+  "preview_visibility": "UNVERIFIED",
+  "inline_apply_inside_native_afterclose": "SOURCE_AND_LOG_VERIFIED",
+  "native_afterclose_return_logged_before_crash": false,
+  "taskpane_binding_errors_near_failure": true,
+  "taskpane_causality": "INFERRED_POSSIBLE_REENTRANCY_NOT_PROVED",
+  "cad_corruption": "NOT_DEMONSTRATED",
+  "fixes": [
+    {
+      "class": "AutoFrameJointSelectionPage",
+      "change": "Post captured Apply/cleanup to original owner STA message after native AfterClose returns; hold session until settled."
+    },
+    {
+      "class": "AutoFrameJointGhostPreview",
+      "change": "Keep Assembly active; create each native Cut inside exact occurrence edit context; do not ActivateDoc3 the standalone Part."
+    },
+    {
+      "class": "AutoFrameJointGhostPreview",
+      "change": "Verify returned native Cut identity by Part tree object equality when context conversion returns null."
+    }
+  ],
+  "initial_r60_mapping_attempt": {
+    "status": "FAIL_NO_CRASH_NOT_A_PASS",
+    "audit_sha256": "ba1305d2efd990a2b0d5e132ea2f704551cc2ed29a8ef5ed9f9bd463a80a33ac",
+    "exception_hresult": "0x80131509",
+    "reason": "Returned Cut native Part identity unavailable when GetCorresponding2 returned null",
+    "native_factory_returned_feature": true,
+    "native_cut_parameter_readbacks": "NOT_AVAILABLE",
+    "final_body_equivalence": "UNVERIFIED",
+    "rollback": "UNVERIFIED",
+    "source_hashes_unchanged": true,
+    "copy_hashes_unchanged": true,
+    "blank_session_restored": true
+  },
+  "scope_limits": [
+    "Log/source identifies failure boundary and synchronous AfterClose Apply. No native dump/callstack proves clr/TaskPane root cause.",
+    "Direct candidate API harness success does not qualify installed DLL/PMP callbacks.",
+    "Failure rollback remains UNVERIFIED."
+  ],
+  "afterclose_api_contract": "Official OnClose documentation permits supported actions in AfterClose; this report does not assert a universal AfterClose prohibition.",
+  "api_contract_source": "https://help.solidworks.com/2025/English/api/swpublishedapi/SOLIDWORKS.Interop.swpublished~SOLIDWORKS.Interop.swpublished.IPropertyManagerPage2Handler9~OnClose.html",
+  "first_native_pmp_candidate_test": {
+    "status": "FAIL_TIMING_GUARD_NOT_GEOMETRY_PASS",
+    "candidate_ui_sha256": "AB456544710D39D93E2DC96AB21CDBD2DB28B14C1BAD197515A5065409E6A5CF",
+    "afterclose_return_log_before_apply": true,
+    "apply_callback_ran_before_enclosing_close_api_return": true,
+    "reason": "Native Close(true) pumped the posted UI message; a single BeginInvoke did not establish completion of the enclosing close API.",
+    "native_r60_cut_parameters": "NOT_AVAILABLE",
+    "followup": "Use native SOLIDWORKS OnIdleNotify barrier; model work is posted outside the idle callback and held if native command still active."
+  },
+  "native_pmp_startup_guard_attempt": {
+    "status": "NOT_RUN_REFUSED_BEFORE_CAD",
+    "audit_sha256": "c04689abb7d3fb36858c7a2ab3f04404aeb8c21dde2229bef720d3b5a1a75f7a",
+    "phase": "FROZEN_SOURCE_READ_LOCKS_HELD",
+    "exception_hresult": "0x80131509",
+    "reason": "Owned blank test host had the installed background Add-in auto-loaded; candidate-only initial guard refused before opening CAD.",
+    "api_cut_test_executed": false,
+    "cad_copy_created": false,
+    "source_hashes_unchanged": true,
+    "copy_hash_audit": "NOT_APPLICABLE_BEFORE_COPY;RAW_FINAL_COPY_HASH_FAILURE_REFERS_TO_MISSING_NOT_CREATED_COPY",
+    "host_exited": false,
+    "followup": "Explicitly opt in only to the exact user crash DLL identity in a fresh owned blank host with no AFJ session, and preserve it as background subscribers without unload/reload."
+  }
+}

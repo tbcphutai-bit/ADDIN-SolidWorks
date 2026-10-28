@@ -1,0 +1,10 @@
+{
+  "label": "r60_native_4332_02",
+  "phase": "DIRECT_API_CANDIDATE_ONLY",
+  "factory_begin_count": 8,
+  "factory_return_registered_count": 8,
+  "entered_exact_occurrence_count": 8,
+  "restored_assembly_count": 8,
+  "standalone_part_activate_doc3_begin_count": 0,
+  "evidence_level": "OBSERVED_API_BOUNDARY_TRACE_NOT_VISIBLE_UI_PROOF"
+}

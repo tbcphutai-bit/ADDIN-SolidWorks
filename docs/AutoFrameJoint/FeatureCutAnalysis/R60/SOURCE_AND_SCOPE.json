@@ -1,0 +1,99 @@
+{
+  "schema": "AFJ_R60_SOURCE_AND_TEST_SCOPE_V1",
+  "date": "2026-10-28",
+  "ghost_source_sha256": "EF7197D1C7188ECD308076A026B3A9DA17463B732DEA380E44FCB3BDDEF00F46",
+  "main_build": false,
+  "main_deploy": false,
+  "main_project_edited": false,
+  "installed_dll_r59_sha256": "61463528AC731C2921F033C4088904F02C0DA417C8F148928D8013B8A9E774AB",
+  "installed_dll_r59_mvid": "9423a9df-74e5-4b35-befc-c68db4d08afd",
+  "managed_close_tests": {
+    "count": 12,
+    "status": "PASS_MANAGED_ONLY_SIMULATED_IDLE_NO_SOLIDWORKS_API",
+    "api_test": false,
+    "candidate_ui_sha256": "27BE94F7A1D12FB25EB1C90733068259E9326BF6BEAC1340F41C1D0A5F13914E"
+  },
+  "native_direct_api_tests": [
+    {
+      "fixture": "2354",
+      "pairs": 4,
+      "cuts": 33,
+      "sketches": 49,
+      "status": "PASS_DIRECT_CANDIDATE_API_NOT_INSTALLED_ADDIN"
+    },
+    {
+      "fixture": "4332_REVERSED_USER_SELECTION",
+      "pairs": 1,
+      "cuts": 8,
+      "sketches": 12,
+      "keep_regions": 4,
+      "status": "PASS_DIRECT_CANDIDATE_API_NOT_INSTALLED_ADDIN"
+    }
+  ],
+  "native_pmp_test": "PASS_CANDIDATE_NATIVE_PMP_IDLE_4332_REVERSED_PAIR_WITH_EXACT_INSTALLED_BACKGROUND_SUBSCRIBERS",
+  "actual_installed_r60_dll_test": "NOT_RUN_USER_REBUILD_REQUIRED",
+  "actual_visibility": "UNVERIFIED",
+  "rollback": "UNVERIFIED",
+  "direct_api_qualification_selection_page_sha256": "AB456544710D39D93E2DC96AB21CDBD2DB28B14C1BAD197515A5065409E6A5CF",
+  "latest_selection_page_source_sha256": "27BE94F7A1D12FB25EB1C90733068259E9326BF6BEAC1340F41C1D0A5F13914E",
+  "main_source_copy_status": "TWO_NATIVE_QUALIFIED_CLASSES_COPIED_TO_MAIN",
+  "main_source_copy_utc": "2026-10-28T03:11:31.4094623Z",
+  "main_source_copy_files": [
+    {
+      "new": "EF7197D1C7188ECD308076A026B3A9DA17463B732DEA380E44FCB3BDDEF00F46",
+      "old": "036844470F9C779F1A0392EC0AB25ECF6D3BBAFA2B366645C460DD39064E9525",
+      "relative": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs"
+    },
+    {
+      "new": "27BE94F7A1D12FB25EB1C90733068259E9326BF6BEAC1340F41C1D0A5F13914E",
+      "old": "DD1506216EFC372D82220E05FC5B0DEC97898AB8C712910A6FDB6E03B01CD1E7",
+      "relative": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs"
+    }
+  ],
+  "source_main_six_file_compile": "PASS_STANDALONE_ONLY_NOT_MAIN_PROJECT_BUILD",
+  "source_branch_six_file_compile": "PASS_STANDALONE_ONLY_NOT_MAIN_PROJECT_BUILD",
+  "branch_ui_sha256": "63BE05CC70EACCA4763244658B03495E34CC1CC122E6EA22CDACC36D788A146A",
+  "branch_ui_scope": "R60_FIX_REGIONS_APPLIED_WITH_PREEXISTING_BRANCH_LABELS_COMMENTS_CACHE_BEHAVIOR_PRESERVED;NATIVE_PMP_USED_MAIN_CANDIDATE_UI",
+  "installed_dll_unchanged": true,
+  "installed_pdb_unchanged": true,
+  "main_project_unchanged": true,
+  "protected_files": [
+    {
+      "file": "ADDIN.dll",
+      "sha256": "61463528AC731C2921F033C4088904F02C0DA417C8F148928D8013B8A9E774AB"
+    },
+    {
+      "file": "ADDIN.pdb",
+      "sha256": "E15FB8E56F1AB52F934910CA221CBCFEDB83B07FA89C3D9B6BCF78C8192F5261"
+    },
+    {
+      "file": "ADDIN.csproj",
+      "sha256": "771EFCFADD0729DAFD5EBA9B0F589B07164A6C3CA81A0736A45DD005244D7004"
+    },
+    {
+      "file": "AutoFrameJointCommandEntry.cs",
+      "sha256": "4795F987AF95740776F834CC454419BB50D557AB681F989452D6F2E35CDD3002"
+    },
+    {
+      "file": "AutoFrameJointGhostSessionManager.cs",
+      "sha256": "B505CE2611AFFAAA795D2246C8DD19560EE197DAE8E7D79035BB89FC26D01FA1"
+    }
+  ],
+  "native_pmp_cuts": 8,
+  "native_pmp_sketches": 12,
+  "native_pmp_keep_regions": 4,
+  "native_pmp_native_close_returned_before_apply": true,
+  "native_pmp_real_solidworks_idle_before_apply": true,
+  "native_pmp_fake_idle": false,
+  "native_pmp_nested_message_pump": false,
+  "native_pmp_background_loaded_before_copy": true,
+  "native_pmp_candidate_mvid": "8bc29815-5c40-40df-bc74-70551fda957c",
+  "native_pmp_elapsed_ms": 37823,
+  "native_pmp_elapsed_scope": "INCLUDES_NATIVE_PAGE_SELECTION_CLOSE_IDLE_AND_APPLY_NOT_PURE_SOLVER_TIME",
+  "new_cut_counts": {
+    "direct_api_qualification_events": 41,
+    "native_pmp_repeat_4332_events": 8,
+    "sample_inventory_count_unchanged": 43,
+    "historical_before_after_count_unchanged": 42
+  }
+}
