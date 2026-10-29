@@ -1,0 +1,6 @@
+﻿run,pair,status,cuts,sketches,native_apply_ms,gap_mm,interference_m3,max_native_preview_difference_m3,fully_constrained_face_sketches,new_reference_planes,source_and_copy_hashes_unchanged,installed_addin_test
+r65_final_4332_direct_15,4332-04-TI-P-1-fr5-3 x 4332-04-TI-P-1-fr1a-2,PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN,18,22,41689,0.09999999999833059,0,0,True,0,True,False
+r65_final_2354_four_corners_16,2354-04-lc-B11-fr01-1 x 2354-04-lc-B11-fr04-1,PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN,5,9,10137,0.10000000000021103,0,0,True,0,True,False
+r65_final_2354_four_corners_16,2354-04-lc-B11-fr04-1 x 2354-04-lc-B11-fr03-1,PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN,7,11,16734,0.10000000000021103,0,0,True,0,True,False
+r65_final_2354_four_corners_16,2354-04-lc-B11-fr03-1 x 2354-04-lc-B11-fr02-1,PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN,11,15,28492,0.09999999999998899,0,0,True,0,True,False
+r65_final_2354_four_corners_16,2354-04-lc-B11-fr02-1 x 2354-04-lc-B11-fr01-1,PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN,12,16,34246,0.09999999999980143,0,0,True,0,True,False

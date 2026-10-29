@@ -1,0 +1,76 @@
+{
+  "source_sha256": "9CC782AC11E8C17E641514B7B7538A28E5F1C77DEA0F3D09CC0387FAE7284B89",
+  "pairs": [
+    {
+      "pair": "4332-04-TI-P-1-fr5-3 x 4332-04-TI-P-1-fr1a-2",
+      "native_parameters": "DIRECTLY_READ_AFTER_FEATURECUT4",
+      "body_health": "CHECK2_AND_CHECK3_VALID",
+      "native_preview_equivalence": "SYMMETRIC_DIFFERENCE_WITH_INDEPENDENT_SEQUENTIAL_TARGET",
+      "authoritative_history_preserved": true,
+      "system_flat_derivatives_separately_qualified": true,
+      "all_created_sketches_rechecked_after_all_corners": true,
+      "terminal_material_and_bend_witnesses_verified": true,
+      "noncontact_keep_witnesses_verified": true,
+      "all_file_hashes_preserved": true
+    },
+    {
+      "pair": "2354-04-lc-B11-fr01-1 x 2354-04-lc-B11-fr04-1",
+      "native_parameters": "DIRECTLY_READ_AFTER_FEATURECUT4",
+      "body_health": "CHECK2_AND_CHECK3_VALID",
+      "native_preview_equivalence": "SYMMETRIC_DIFFERENCE_WITH_INDEPENDENT_SEQUENTIAL_TARGET",
+      "authoritative_history_preserved": true,
+      "system_flat_derivatives_separately_qualified": true,
+      "all_created_sketches_rechecked_after_all_corners": true,
+      "terminal_material_and_bend_witnesses_verified": true,
+      "noncontact_keep_witnesses_verified": true,
+      "all_file_hashes_preserved": true
+    },
+    {
+      "pair": "2354-04-lc-B11-fr04-1 x 2354-04-lc-B11-fr03-1",
+      "native_parameters": "DIRECTLY_READ_AFTER_FEATURECUT4",
+      "body_health": "CHECK2_AND_CHECK3_VALID",
+      "native_preview_equivalence": "SYMMETRIC_DIFFERENCE_WITH_INDEPENDENT_SEQUENTIAL_TARGET",
+      "authoritative_history_preserved": true,
+      "system_flat_derivatives_separately_qualified": true,
+      "all_created_sketches_rechecked_after_all_corners": true,
+      "terminal_material_and_bend_witnesses_verified": true,
+      "noncontact_keep_witnesses_verified": true,
+      "all_file_hashes_preserved": true
+    },
+    {
+      "pair": "2354-04-lc-B11-fr03-1 x 2354-04-lc-B11-fr02-1",
+      "native_parameters": "DIRECTLY_READ_AFTER_FEATURECUT4",
+      "body_health": "CHECK2_AND_CHECK3_VALID",
+      "native_preview_equivalence": "SYMMETRIC_DIFFERENCE_WITH_INDEPENDENT_SEQUENTIAL_TARGET",
+      "authoritative_history_preserved": true,
+      "system_flat_derivatives_separately_qualified": true,
+      "all_created_sketches_rechecked_after_all_corners": true,
+      "terminal_material_and_bend_witnesses_verified": true,
+      "noncontact_keep_witnesses_verified": true,
+      "all_file_hashes_preserved": true
+    },
+    {
+      "pair": "2354-04-lc-B11-fr02-1 x 2354-04-lc-B11-fr01-1",
+      "native_parameters": "DIRECTLY_READ_AFTER_FEATURECUT4",
+      "body_health": "CHECK2_AND_CHECK3_VALID",
+      "native_preview_equivalence": "SYMMETRIC_DIFFERENCE_WITH_INDEPENDENT_SEQUENTIAL_TARGET",
+      "authoritative_history_preserved": true,
+      "system_flat_derivatives_separately_qualified": true,
+      "all_created_sketches_rechecked_after_all_corners": true,
+      "terminal_material_and_bend_witnesses_verified": true,
+      "noncontact_keep_witnesses_verified": true,
+      "all_file_hashes_preserved": true
+    }
+  ],
+  "distinct_part_documents": 6,
+  "whole_pairs": 5,
+  "generated_cut_events": 53,
+  "generated_sketch_events": 73,
+  "original_43_cut_inventory_unchanged": true,
+  "original_42_before_after_inventory_unchanged": true,
+  "main_build": false,
+  "deployment": false,
+  "cad_save": false,
+  "native_pmp_final_source": "UNVERIFIED_NOT_TESTED",
+  "installed_addin": "UNVERIFIED_USER_REBUILD_REQUIRED"
+}
