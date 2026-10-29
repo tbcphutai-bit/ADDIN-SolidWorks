@@ -19,6 +19,14 @@ namespace ADDIN.Commands.AutoFrameJoint
     public sealed class AutoFrameJointGhostPreview
     {
         private const int MaxBodiesPerComponent = 12;
+        // R66: shared palette for original-body and Cut Preview copies only.
+        private static readonly int PreviewColorA = ColorTranslator.ToWin32(Color.FromArgb(155, 55, 255));
+        private static readonly int PreviewColorB = ColorTranslator.ToWin32(Color.FromArgb(255, 215, 0));
+        private static readonly int RemovedColorA = ColorTranslator.ToWin32(Color.FromArgb(255, 50, 65));
+        private static readonly int RemovedColorB = ColorTranslator.ToWin32(Color.FromArgb(0, 115, 255));
+        private const double KeepPreviewTransparency = 0.10;
+        private const double CutPreviewTransparency = 0.12;
+
 
         private readonly ISldWorks app;
         private readonly ModelDoc2 sourceAssembly;
@@ -131,18 +139,18 @@ namespace ADDIN.Commands.AutoFrameJoint
                 }
 
                 // COLORREF is 0x00BBGGRR, not System.Drawing.Color.ToArgb().
-                int colorA = ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235));
-                int colorB = ColorTranslator.ToWin32(Color.FromArgb(255, 155, 60));
+                int colorA = PreviewColorA;
+                int colorB = PreviewColorB;
 
                 presentation = CreateFrameNormalPresentation(frameA, frameB);
-                int countA = ShowComponent(frameA, colorA, 0.33, presentation.Shift);
+                int countA = ShowComponent(frameA, colorA, KeepPreviewTransparency, presentation.Shift);
                 ThrowIfClosing();
-                int countB = ShowComponent(frameB, colorB, 0.33, presentation.Shift);
+                int countB = ShowComponent(frameB, colorB, KeepPreviewTransparency, presentation.Shift);
                 ThrowIfClosing();
                 RedrawSafely(); // One redraw after the complete pair, not per body.
                 TracePresentationBounds();
                 message = String.Format(
-                    "Bản sao xanh/cam nâng theo pháp tuyến khung, giữ nguyên vị trí dọc/ngang: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
+                    "Bản sao A tím / B vàng nâng theo pháp tuyến khung, giữ nguyên vị trí dọc/ngang: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
                     countA, countB);
                 return true;
             }
@@ -288,19 +296,19 @@ namespace ADDIN.Commands.AutoFrameJoint
                 {
                     DisplayCandidateBodies(AfjJointSolver.World(result.A.Kept, result.TransformA),
                         frameA, result.PartA, inverseA, shift,
-                        ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235)), 0.33, "A_KEEP");
+                        PreviewColorA, KeepPreviewTransparency, "A_KEEP");
                     DisplayCandidateBodies(AfjJointSolver.World(result.B.Kept, result.TransformB),
                         frameB, result.PartB, inverseB, shift,
-                        ColorTranslator.ToWin32(Color.FromArgb(255, 165, 65)), 0.33, "B_KEEP");
+                        PreviewColorB, KeepPreviewTransparency, "B_KEEP");
                 }
                 if (candidate == 2)
                 {
                     DisplayCandidateBodies(AfjJointSolver.World(result.A.Removed, result.TransformA),
                         frameA, result.PartA, inverseA, shift,
-                        ColorTranslator.ToWin32(Color.FromArgb(235, 35, 85)), 0.08, "A_CUT");
+                        RemovedColorA, CutPreviewTransparency, "A_CUT");
                     DisplayCandidateBodies(AfjJointSolver.World(result.B.Removed, result.TransformB),
                         frameB, result.PartB, inverseB, shift,
-                        ColorTranslator.ToWin32(Color.FromArgb(170, 35, 235)), 0.08, "B_CUT");
+                        RemovedColorB, CutPreviewTransparency, "B_CUT");
                 }
                 else if (reused)
                 {
@@ -314,10 +322,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Trace.WriteLine("[AFJ-R52-PERF] phase=display ms=" + phase.ElapsedMilliseconds + " reuse_keep=" + !redisplayKeep);
                 message = String.Format(CultureInfo.InvariantCulture,
                     "{0}: Đã kiểm tra B-rep tạm. A bỏ {1:0.###} mm³; B bỏ {2:0.###} mm³. " +
-                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Preview xanh/cam nâng khỏi mặt phẳng khung, cùng vị trí dọc/ngang và cùng tỷ lệ. {5}", result.Plan.RuleId,
+                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Preview A tím / B vàng nâng khỏi mặt phẳng khung, cùng vị trí dọc/ngang và cùng tỷ lệ. {5}", result.Plan.RuleId,
                     result.A.RemovedVolume * 1e9, result.B.RemovedVolume * 1e9,
                     result.CoverA ? "A" : "B", result.AfterGap * 1000,
-                    candidate == 2 ? "Hồng/tím: CUT; xanh/cam: KEEP." : "Đang xem KEEP.");
+                    candidate == 2 ? "CUT: A đỏ / B xanh dương; KEEP: A tím / B vàng." : "Đang xem KEEP.");
                 if (before != null && after != null)
                 {
                     cachedSolution = result;
@@ -1052,6 +1060,42 @@ namespace ADDIN.Commands.AutoFrameJoint
                 ? "OUTSIDE_WINDOW_ESTIMATE" : "OVERLAPS_WINDOW_ESTIMATE";
         }
 
+        private void ApplyTemporaryPreviewAppearance(Body2 body, int colorRef, double transparency)
+        {
+            if (body == null || !body.IsTemporaryBody())
+                throw new InvalidOperationException("Preview chỉ đổi màu Body tạm.");
+            Color color = ColorTranslator.FromWin32(colorRef);
+            double[] appearance = { color.R / 255.0, color.G / 255.0, color.B / 255.0,
+                0.45, 0.70, 0.10, 0.15, transparency, 0.0 };
+            int paintedFaces = 0, unavailableFaces = 0;
+            try { body.MaterialPropertyValues2 = (double[])appearance.Clone(); }
+            catch (Exception error) { Trace.WriteLine("[AFJ-R66-COLOR] body_appearance=" + error.Message); }
+            // Body2.Copy can retain higher-priority per-face appearances.
+            // Override only faces whose owner is still a temporary Body.
+            try
+            {
+                Array faces = body.GetFaces() as Array;
+                if (faces != null) foreach (Face2 face in faces.Cast<object>().OfType<Face2>())
+                {
+                    ThrowIfClosing();
+                    try
+                    {
+                        Body2 owner = face.GetBody() as Body2;
+                        if (owner == null || !owner.IsTemporaryBody())
+                        { unavailableFaces++; continue; }
+                        face.MaterialPropertyValues = (double[])appearance.Clone();
+                        paintedFaces++;
+                    }
+                    catch (Exception) { unavailableFaces++; }
+                }
+            }
+            catch (Exception error) { Trace.WriteLine("[AFJ-R66-COLOR] face_inventory=" + error.Message); }
+            Trace.WriteLine("[AFJ-R66-COLOR] rgb=" + color.R + "," + color.G + "," + color.B +
+                " transparency=" + transparency.ToString("R", CultureInfo.InvariantCulture) +
+                " temporary_faces=" + paintedFaces + " unavailable_faces=" + unavailableFaces +
+                " source_appearance_changed=False rendered_color=UNVERIFIED");
+        }
+
         private void DisplayCandidateBodies(List<Body2> bodies,
                        Component2 component, ModelDoc2 part,
                        MathTransform inverse, MathTransform shift,
@@ -1069,19 +1113,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 if (!local.ApplyTransform(inverse))
                     throw new InvalidOperationException(
                         "Không chuyển ghost từ World XYZ về Part XYZ.");
-                try
-                {
-                    Color previewColor = ColorTranslator.FromWin32(color);
-                    local.MaterialPropertyValues2 = new double[] {
-                        previewColor.R/255.0, previewColor.G/255.0, previewColor.B/255.0,
-                        0.35, 0.65, 0.20, 0.25, transparency, 0.0
-                    };
-                }
-                catch (Exception colorError)
-                {
-                    Trace.WriteLine("[AFJ-CUT-CANDIDATE] Color: " +
-                                    colorError.Message);
-                }
+                ApplyTemporaryPreviewAppearance(local, color, transparency);
                 // Register first. Hide() cleanup after SOLIDWORKS may partly
                 // display an object, just like original GhostPreview.
                 ThrowIfClosing();
@@ -1175,26 +1207,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 if (!copy.ApplyTransform(componentWorld) || !copy.ApplyTransform(shift) || !copy.ApplyTransform(componentInverse))
                     throw new InvalidOperationException("Không đặt được bản sao phía trên hai chi tiết.");
 
-                // MaterialPropertyValues2: [R,G,B,Ambient,Diffuse,Specular,
-                // Shininess,Transparency,Emission], range 0..1.
-                // Best effort ONLY on copy. If host ignores transparency,
-                // still show ghost in distinct colors.
-                try
-                {
-                    bool isA = colorRef ==
-                        ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235));
-                    copy.MaterialPropertyValues2 = isA
-                        ? new double[] { 0.0, 0.71, 0.92, 0.35, 0.65,
-                                         0.20, 0.25, transparency, 0.0 }
-                        : new double[] { 1.0, 0.61, 0.24, 0.35, 0.65,
-                                         0.20, 0.25, transparency, 0.0 };
-                }
-                catch (Exception appearanceError)
-                {
-                    Trace.WriteLine(
-                        "[AFJ-GHOST] Transparency not available: " +
-                        appearanceError.Message);
-                }
+                ApplyTemporaryPreviewAppearance(copy, colorRef, transparency);
 
                 // Register the COM body BEFORE entering Display3.
                 // If COM throws after a partial draw, cleanup still has a
