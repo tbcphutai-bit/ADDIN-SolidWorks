@@ -1,0 +1,14 @@
+{
+  "candidate_ghost_sha256": "E5921AACEB73F7A064013C04420A4E96E8D55F3E4FCB95D4F3E5D56D1B7D17E6",
+  "previous_local_ghost_sha256": "E83B880C78B37A63A05FF6260AB0D62C85DB3D3C3FE0627D0693E1D97F1B8C8C",
+  "local_source_copy": "COPIED_HASH_VERIFIED",
+  "changed_class": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "installed_dll_sha256_from_user_log_session": "13EB9D37720221644E09DF493EDCEFA082D3709C56DE1BDE26A9660E6C07C3D6",
+  "installed_dll_mvid": "4b90299a-4e1c-4038-aab7-b276c9a469fb",
+  "r63_deployed_to_installed_dll": false,
+  "main_build": false,
+  "deployment": false,
+  "project_modified_by_r63": false,
+  "existing_local_above_pair_preview_preserved": true,
+  "same_pure_layout_inlined_to_avoid_new_project_dependency": true
+}
