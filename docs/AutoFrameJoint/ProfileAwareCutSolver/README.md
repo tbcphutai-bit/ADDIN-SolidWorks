@@ -1,3 +1,5 @@
+> **R70 — 2026-10-29:** Đã nghiên cứu 4458 qua API: 7 Frame, 93 Cut, hai biên dạng nghiêng 2,05° và hai cặp mặt tham chiếu offset 0,10 mm. Có phương pháp cắt từng lớp đề xuất; chưa sửa source hay qualified Cut mới. Xem [bằng chứng và giới hạn](R70/README.md).
+
 > **R68 — 2026-10-29:** Sửa màu Preview bị highlight A/B phủ xanh bằng ngữ cảnh hiển thị độc lập; pixel tím/vàng và vị trí B-rep đã xác minh bằng API. Chỉ class GhostPreview được chép vào source chính; người dùng tự rebuild. Giới hạn PMP/fallback ghi tại [R68](R68/README.md).
 
 > **R61 — 2026-10-28:** Đã xén phần dư của các nếp không giao: 2354 hiện tại đủ 4 góc/35 Cut, bộ lịch sử 4 góc/38 Cut, 4332 native PMP 12 Cut. Có phép đo riêng phần dư phẳng và Bend R phải hết, vật liệu phía thân phải giữ. Class chính đã chép; người dùng tự rebuild. Xem [kết quả và phạm vi](R61/README.md).
