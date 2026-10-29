@@ -134,7 +134,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int colorA = ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235));
                 int colorB = ColorTranslator.ToWin32(Color.FromArgb(255, 155, 60));
 
-                presentation = CreateSideBySidePresentation(UnionPreviewBox(ComponentPreviewBox(frameA), ComponentPreviewBox(frameB)));
+                presentation = CreateAbovePairPresentation(frameA, frameB);
                 int countA = ShowComponent(frameA, colorA, 0.33, presentation.Shift);
                 ThrowIfClosing();
                 int countB = ShowComponent(frameB, colorB, 0.33, presentation.Shift);
@@ -142,7 +142,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 RedrawSafely(); // One redraw after the complete pair, not per body.
                 TracePresentationBounds();
                 message = String.Format(
-                    "Bản gốc bên trái; bản sao xanh/cam bên phải: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
+                    "Bản sao xanh/cam phía trên hai chi tiết gốc: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
                     countA, countB);
                 return true;
             }
@@ -277,7 +277,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     if (!HideDisplayedBodies(false, false, out presentationCleanup))
                         throw new InvalidOperationException("Không dọn được bản sao Preview: " + presentationCleanup);
                 }
-                if (presentation == null) presentation = CreateSideBySidePresentation(result);
+                if (presentation == null) presentation = CreateAbovePairPresentation(frameA, frameB);
                 MathTransform shift = presentation.Shift;
                 MathTransform inverseA = result.TransformA.Inverse() as MathTransform;
                 MathTransform inverseB = result.TransformB.Inverse() as MathTransform;
@@ -313,7 +313,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Trace.WriteLine("[AFJ-R52-PERF] phase=display ms=" + phase.ElapsedMilliseconds + " reuse_keep=" + !redisplayKeep);
                 message = String.Format(CultureInfo.InvariantCulture,
                     "{0}: Đã kiểm tra B-rep tạm. A bỏ {1:0.###} mm³; B bỏ {2:0.###} mm³. " +
-                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Bản gốc bên trái; Preview xanh/cam bên phải, cùng tỷ lệ. Khung nhìn đã thu vừa hai bên. {5}", result.Plan.RuleId,
+                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Preview xanh/cam phía trên hai chi tiết gốc, cùng tỷ lệ và chừa khoảng hở theo chiều cao. {5}", result.Plan.RuleId,
                     result.A.RemovedVolume * 1e9, result.B.RemovedVolume * 1e9,
                     result.CoverA ? "A" : "B", result.AfterGap * 1000,
                     candidate == 2 ? "Hồng/tím: CUT; xanh/cam: KEEP." : "Đang xem KEEP.");
@@ -574,6 +574,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             internal MathTransform Shift;
             internal double[] OriginalBox, PreviewBox, Delta;
+            internal double[][] OriginalPoints, PreviewPoints;
             internal PreviewViewStamp BeforeView, AppliedView;
         }
 
@@ -667,67 +668,92 @@ namespace ADDIN.Commands.AutoFrameJoint
             return result;
         }
 
-        private static double[] CandidatePreviewBox(AfjJointSolution result)
+        private static double[][] ComponentPreviewPoints(Component2 component)
         {
-            double[] box = null;
-            double[] ta = result.TransformA.ArrayData as double[], tb = result.TransformB.ArrayData as double[];
-            foreach (Body2 body in result.A.Kept.Concat(result.A.Removed))
-                box = UnionPreviewBox(box, TransformPreviewBox(body.GetBodyBox() as double[], ta));
-            foreach (Body2 body in result.B.Kept.Concat(result.B.Removed))
-                box = UnionPreviewBox(box, TransformPreviewBox(body.GetBodyBox() as double[], tb));
-            if (!ValidPreviewBox(box)) throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: chưa có Body tạm.");
-            return box;
-        }
-
-        private static double[] ComponentPreviewBox(Component2 component)
-        {
-            MathTransform transform=component.Transform2;
-            double[] matrix=transform==null?null:transform.ArrayData as double[];
+            MathTransform transform = component.Transform2;
+            double[] matrix = transform == null ? null : transform.ArrayData as double[];
+            if (matrix == null || matrix.Length != 16 || !FinitePreviewValues(matrix))
+                throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: chưa đọc được vị trí chi tiết được chọn.");
             object ignored;
-            Array bodies=component.GetBodies3((int)swBodyType_e.swSolidBody,out ignored) as Array;
-            if(bodies==null || bodies.Length==0 || bodies.Length>MaxBodiesPerComponent)
+            Array bodies = component.GetBodies3((int)swBodyType_e.swSolidBody, out ignored) as Array;
+            if (bodies == null || bodies.Length == 0 || bodies.Length > MaxBodiesPerComponent)
                 throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: Component chưa có Solid Body hợp lệ.");
-            double[] box=null;
-            foreach(object value in bodies)
+            var points = new List<double[]>();
+            foreach (object value in bodies)
             {
-                Body2 body=value as Body2;
-                if(body==null) throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: không đọc được Solid Body.");
-                box=UnionPreviewBox(box,TransformPreviewBox(body.GetBodyBox() as double[],matrix));
+                Body2 body = value as Body2;
+                double[] box = body == null ? null : body.GetBodyBox() as double[];
+                if (!ValidPreviewBox(box))
+                    throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: chưa đọc được phạm vi chi tiết được chọn.");
+                foreach (double[] point in PreviewBoxCorners(box)) points.Add(PreviewPoint(point, matrix));
             }
-            return box;
+            return points.ToArray();
         }
 
-        private PreviewPresentation CreateSideBySidePresentation(AfjJointSolution result)
+        private static double[] ProjectPreviewPoints(IEnumerable<double[]> points, double[] matrix)
         {
-            return CreateSideBySidePresentation(CandidatePreviewBox(result));
+            if (matrix == null || matrix.Length != 16 || !FinitePreviewValues(matrix))
+                throw new InvalidOperationException("PREVIEW_TRANSFORM_UNVERIFIED: chưa đọc được phép chiếu Preview.");
+            double[] bounds = null;
+            foreach (double[] point in points)
+            {
+                double[] q = PreviewPoint(point, matrix);
+                bounds = UnionPreviewBox(bounds, new[] { q[0], q[1], q[2], q[0], q[1], q[2] });
+            }
+            if (!ValidPreviewBox(bounds))
+                throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: chưa có điểm hiển thị của hai chi tiết.");
+            return bounds;
         }
 
-        private PreviewPresentation CreateSideBySidePresentation(double[] candidateBox)
+        // Same local Preview layout, contained here to keep this class
+        // compilable without changing project Compile entries.
+        private static double[] AboveSelectedPair(double[] a, double[] b, out double gap)
+        {
+            ValidateAbovePairBox(a); ValidateAbovePairBox(b);
+            double height = Math.Max(a[4] - a[1], b[4] - b[1]);
+            if (height <= 1e-9 || double.IsNaN(height) || double.IsInfinity(height))
+                throw new InvalidOperationException("Chưa xác định được chiều cao hiển thị của hai chi tiết để đặt preview.");
+            gap = height * 0.10;
+            double top = Math.Min(a[1], b[1]), bottom = Math.Max(a[4], b[4]);
+            // A common translation keeps the A/B joint exactly as solved.
+            // After translating, the preview's bottom is top - gap.
+            double shift = top - gap - bottom;
+            if (double.IsNaN(shift) || double.IsInfinity(shift))
+                throw new InvalidOperationException("Chưa tính được khoảng dịch Preview hợp lệ.");
+            return new[] { 0.0, shift, 0.0 };
+        }
+
+        private static void ValidateAbovePairBox(double[] box)
+        {
+            if (box == null || box.Length != 6)
+                throw new ArgumentException("Chưa đọc đủ phạm vi hiển thị của chi tiết.");
+            for (int i = 0; i < 6; i++)
+                if (double.IsNaN(box[i]) || double.IsInfinity(box[i]))
+                    throw new ArgumentException("Phạm vi hiển thị chi tiết không hợp lệ.");
+            if (box[0] > box[3] || box[1] > box[4] || box[2] > box[5])
+                throw new ArgumentException("Phạm vi hiển thị chi tiết không đúng thứ tự.");
+        }
+
+        private PreviewPresentation CreateAbovePairPresentation(Component2 frameA, Component2 frameB)
         {
             PreviewViewStamp before = CapturePreviewView();
             if (before == null) throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: chưa đọc được khung nhìn Assembly.");
             if (before.View.HasPerspective())
-                throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: hãy tắt Perspective để xem bản sao tách cạnh chính xác.");
+                throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: hãy tắt Perspective để đặt bản sao phía trên hai chi tiết.");
             MathTransform projection = before.View.Transform;
             double[] matrix = projection == null ? null : projection.ArrayData as double[];
             MathTransform inverse = projection == null ? null : projection.Inverse() as MathTransform;
             double[] inverseMatrix = inverse == null ? null : inverse.ArrayData as double[];
             if (matrix == null || inverseMatrix == null)
                 throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: không đảo được phép chiếu màn hình.");
-            AssemblyDoc assembly = sourceAssembly as AssemblyDoc;
-            double[] originalBox = assembly == null ? null : assembly.GetBox(0) as double[];
-            // The complete Assembly bounds are mandatory. A selected-pair fallback
-            // cannot prove that the shifted copy clears other real Components.
-            if (!ValidPreviewBox(originalBox))
-                throw new InvalidOperationException("PREVIEW_ASSEMBLY_BOUNDS_UNVERIFIED: chưa đọc được phạm vi toàn Assembly để tách Preview.");
-            originalBox = UnionPreviewBox(originalBox, candidateBox);
-            double[] originalScreen = TransformPreviewBox(originalBox, matrix);
-            double[] previewScreen = TransformPreviewBox(candidateBox, matrix);
-            // A relative screen-space gap survives fitting and is independent of world axes.
-            double width = originalScreen[3]-originalScreen[0] + previewScreen[3]-previewScreen[0];
-            double gap = Math.Max(32.0, width * 0.075);
-            double dx = originalScreen[3] + gap - previewScreen[0];
-            double dy = (originalScreen[1]+originalScreen[4]-previewScreen[1]-previewScreen[4])*0.5;
+            // Project each original body's corners directly. Boxing the complete
+            // Assembly or reboxing the union in world XYZ inflates rotated pairs.
+            double[][] pointsA = ComponentPreviewPoints(frameA), pointsB = ComponentPreviewPoints(frameB);
+            double[] screenA = ProjectPreviewPoints(pointsA, matrix), screenB = ProjectPreviewPoints(pointsB, matrix);
+            double[][] originalPoints = pointsA.Concat(pointsB).ToArray();
+            double gap;
+            double[] screenShift = AboveSelectedPair(screenA, screenB, out gap);
+            double dx = screenShift[0], dy = screenShift[1];
             double[] origin = PreviewPoint(new double[] {0,0,0}, inverseMatrix);
             double[] target = PreviewPoint(new double[] {dx,dy,0}, inverseMatrix);
             double[] delta = new double[] {target[0]-origin[0],target[1]-origin[1],target[2]-origin[2]};
@@ -735,8 +761,11 @@ namespace ADDIN.Commands.AutoFrameJoint
             MathUtility math = app.GetMathUtility() as MathUtility;
             MathTransform shift = math == null ? null : math.CreateTransform(shiftData) as MathTransform;
             if (shift == null) throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: không tạo được dịch chuyển chung A/B.");
+            double[][] previewPoints = originalPoints.Select(point => PreviewPoint(point, shiftData)).ToArray();
+            double[] identity = {1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0};
             var next = new PreviewPresentation {BeforeView=before, Shift=shift, Delta=delta,
-                OriginalBox=originalBox, PreviewBox=TransformPreviewBox(candidateBox, shiftData)};
+                OriginalPoints=originalPoints, PreviewPoints=previewPoints,
+                OriginalBox=ProjectPreviewPoints(originalPoints, identity), PreviewBox=ProjectPreviewPoints(previewPoints, identity)};
             // Store ownership before touching camera so a partially failed native call can be cleaned up.
             presentation = next;
             try
@@ -746,9 +775,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                 FitPreviewPresentation(next);
                 next.AppliedView=CapturePreviewView();
                 if (next.AppliedView==null || !ClosePreviewValues(before.Orientation,next.AppliedView.Orientation))
-                    throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: khung nhìn đổi hướng khi thu vừa hai bên.");
-                Trace.WriteLine("[AFJ-R62-VIEW] presentation=SIDE_BY_SIDE camera=PIXEL_RECT_FIT_ONCE common_rigid_delta_m="+
-                    DiagnosticArray(delta)+" original_left=True source_visibility=UNCHANGED actual_visibility=UNVERIFIED");
+                    throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: khung nhìn đổi hướng khi đặt Preview phía trên.");
+                Trace.WriteLine("[AFJ-R62-VIEW] presentation=ABOVE_SELECTED_PAIR camera=PAIR_PIXEL_FIT_ONCE common_rigid_delta_m="+
+                    DiagnosticArray(delta)+" original_below=True gap_height_fraction=0.10 gap_before_fit_px="+gap.ToString("R",CultureInfo.InvariantCulture)+" source_visibility=UNCHANGED actual_visibility=UNVERIFIED");
                 return next;
             }
             catch
@@ -792,9 +821,9 @@ namespace ADDIN.Commands.AutoFrameJoint
             if(view==null || view.HasPerspective() || !IsOriginalAssemblyActive())
                 throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: khung nhìn Assembly đã đổi.");
             double[] viewport=PreviewVisibleClientRectangle(view);
-            double[] combined=UnionPreviewBox(next.OriginalBox,next.PreviewBox);
+            double[][] combinedPoints=next.OriginalPoints.Concat(next.PreviewPoints).ToArray();
             MathTransform projection=view.Transform;
-            double[] projected=TransformPreviewBox(combined,projection==null?null:projection.ArrayData as double[]);
+            double[] projected=ProjectPreviewPoints(combinedPoints,projection==null?null:projection.ArrayData as double[]);
             double width=Math.Max(1e-9,projected[3]-projected[0]),height=Math.Max(1e-9,projected[4]-projected[1]);
             const double occupiedFraction=0.84;
             double factor=occupiedFraction*Math.Min((viewport[2]-viewport[0])/width,(viewport[3]-viewport[1])/height);
@@ -809,7 +838,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             MathTransform inverse=projection==null?null:projection.Inverse() as MathTransform;
             double[] matrix=projection==null?null:projection.ArrayData as double[];
             double[] inverseMatrix=inverse==null?null:inverse.ArrayData as double[];
-            projected=TransformPreviewBox(combined,matrix);
+            projected=ProjectPreviewPoints(combinedPoints,matrix);
             double dx=(viewport[0]+viewport[2]-projected[0]-projected[3])*0.5;
             double dy=(viewport[1]+viewport[3]-projected[1]-projected[4])*0.5;
             if(inverseMatrix==null)
@@ -841,13 +870,13 @@ namespace ADDIN.Commands.AutoFrameJoint
             viewport=PreviewVisibleClientRectangle(view);
             projection=view.Transform;
             matrix=projection==null?null:projection.ArrayData as double[];
-            double[] original=TransformPreviewBox(next.OriginalBox,matrix);
-            double[] preview=TransformPreviewBox(next.PreviewBox,matrix);
+            double[] original=ProjectPreviewPoints(next.OriginalPoints,matrix);
+            double[] preview=ProjectPreviewPoints(next.PreviewPoints,matrix);
             double[] union=UnionPreviewBox(original,preview);
             const double tolerance=2.0;
             bool inside=union[0]>=viewport[0]-tolerance && union[1]>=viewport[1]-tolerance &&
                 union[3]<=viewport[2]+tolerance && union[4]<=viewport[3]+tolerance;
-            bool separated=original[3]<preview[0];
+            bool separated=preview[4]<original[1];
             Trace.WriteLine("[AFJ-R62-VIEW] native_fit=PROJECTED_CHECK local_viewport_px="+DiagnosticArray(viewport)+
                 " combined_projected_bounds_px="+DiagnosticArray(union)+" in_view="+inside+" separated="+separated+
                 " actual_visibility=UNVERIFIED");
@@ -863,13 +892,13 @@ namespace ADDIN.Commands.AutoFrameJoint
                 ModelView view=sourceAssembly.ActiveView as ModelView;
                 double[] matrix=view==null || view.Transform==null?null:view.Transform.ArrayData as double[];
                 if(matrix==null || view.HasPerspective()) return;
-                double[] original=TransformPreviewBox(presentation.OriginalBox,matrix);
-                double[] preview=TransformPreviewBox(presentation.PreviewBox,matrix);
+                double[] original=ProjectPreviewPoints(presentation.OriginalPoints,matrix);
+                double[] preview=ProjectPreviewPoints(presentation.PreviewPoints,matrix);
                 Array window=view.GetVisibleBox() as Array;
                 // Bounds estimate is evidence for a layout, not proof of painted pixels or occlusion.
                 Trace.WriteLine("[AFJ-R62-VIEW] original_projected_bounds_px="+DiagnosticArray(original)+
                     " preview_projected_bounds_px="+DiagnosticArray(preview)+" visible_box_px="+DiagnosticArray(window)+
-                    " nonoverlap_bounds="+(original[3]<preview[0])+" gap_px="+(preview[0]-original[3]).ToString("R",CultureInfo.InvariantCulture)+
+                    " nonoverlap_bounds="+(preview[4]<original[1])+" gap_px="+(original[1]-preview[4]).ToString("R",CultureInfo.InvariantCulture)+
                     " actual_visibility=UNVERIFIED");
             }
             catch(Exception ex){Trace.WriteLine("[AFJ-R62-VIEW] bounds=UNVERIFIED reason="+ex.Message);}
@@ -1065,10 +1094,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                     throw new InvalidOperationException(
                         "Không tạo được bản sao Temporary Body.");
 
-                // Reuse the same side-by-side presentation as the cut candidate.
+                // Reuse the same above-pair presentation as the cut candidate.
                 // Display3(component) applies the occurrence transform after this local conversion.
                 if (!copy.ApplyTransform(componentWorld) || !copy.ApplyTransform(shift) || !copy.ApplyTransform(componentInverse))
-                    throw new InvalidOperationException("Không đặt được bản sao ở cạnh Assembly.");
+                    throw new InvalidOperationException("Không đặt được bản sao phía trên hai chi tiết.");
 
                 // MaterialPropertyValues2: [R,G,B,Ambient,Diffuse,Specular,
                 // Shininess,Transparency,Emission], range 0..1.
@@ -1104,7 +1133,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int result = copy.Display3(
                     component, colorRef,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
-                Trace.WriteLine("[AFJ-R62-VIEW] stage=DISPLAY3_BASELINE_SIDE_BY_SIDE status=" + result + " actual_visibility=UNVERIFIED");
+                Trace.WriteLine("[AFJ-R62-VIEW] stage=DISPLAY3_BASELINE_ABOVE_PAIR status=" + result + " actual_visibility=UNVERIFIED");
                 if (result != 0)
                     throw new InvalidOperationException(
                         "IBody2.Display3 thất bại, mã lỗi=" + result +
@@ -9384,7 +9413,8 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             internal int Id, OwnerId, FlatId, InvalidatedByCutId=-1;
             internal byte[] ProfileToken, OwnerToken;
-            internal bool OwnerTokenIsRoundtrip;
+            internal bool OwnerTokenIsRoundtrip, ProfileSuppressed;
+            internal int ProfileBeforePersistState;
             internal string OwnerParents, OwnerOwner;
         }
         private string FoldedProfileOwnerKey(Feature feature)
@@ -9405,7 +9435,11 @@ namespace ADDIN.Commands.AutoFrameJoint
         private void CaptureBaselineFoldedProfileGuards(Scope scope)
         {
             if(scope.Label=="ASSEMBLY")return;
-            foreach(var node in scope.Baseline.Nodes.Values.Where(value=>value.Type=="ProfileFeature"&&value.Suppressed))
+            // R63_STATE_QUALIFIED_SYSTEM_PROFILE: suppression is native state,
+            // not proof that an authored Sketch is generated metadata. Eligibility
+            // still requires the exact system folder, sole frozen FlatPattern
+            // parent, no dependents, native 2D Sketch and persistent roundtrip.
+            foreach(var node in scope.Baseline.Nodes.Values.Where(value=>value.Type=="ProfileFeature"))
             {
                 var owner=node.Feature.GetOwnerFeature() as Feature;
                 if(owner==null||owner.GetTypeName2()!="FoldUpDownSketchFolder")continue;
@@ -9424,13 +9458,24 @@ namespace ADDIN.Commands.AutoFrameJoint
                         "Generated folded profile must have exactly one frozen suppressed native FlatPattern parent");
                     var children=node.Feature.GetChildren() as Array;
                     Need(children==null||children.Length==0,"Generated folded profile has an authored dependent");
+                    var nativeSketch=node.Feature.GetSpecificFeature2() as Sketch;
+                    Need(nativeSketch!=null&&!nativeSketch.Is3D(),
+                        "Generated folded profile must be an actual native 2D Sketch");
+                    Need(node.Feature.IsSuppressed()==node.Suppressed,
+                        "Generated folded profile suppression changed during immutable baseline capture");
                     var profileToken=scope.Document.Extension.GetPersistReference3(node.Feature) as byte[];
                     var ownerToken=scope.Document.Extension.GetPersistReference3(owner) as byte[];
                     Need(profileToken!=null&&profileToken.Length>0&&ownerToken!=null&&ownerToken.Length>0,
                         "Generated folded profile/folder observation tokens unavailable");
                     int state;var resolved=scope.Document.Extension.GetObjectByPersistReference3(profileToken,out state) as Feature;
-                    Need(state==2&&resolved!=null&&resolved.GetID()==node.Id&&Same(resolved,node.Feature),
-                        "Generated folded profile must roundtrip its exact suppressed native token before mutation");
+                    int profileState=node.Suppressed?2:0;
+                    Need(state==profileState&&resolved!=null&&resolved.GetID()==node.Id&&
+                        resolved.GetTypeName2()==node.Type&&resolved.Name==node.Name&&
+                        resolved.IsSuppressed()==node.Suppressed&&Same(resolved,node.Feature),
+                        "Generated folded profile must roundtrip its exact native identity and suppression-qualified token before mutation");
+                    var returnedProfileToken=scope.Document.Extension.GetPersistReference3(resolved) as byte[];
+                    Need(returnedProfileToken!=null&&returnedProfileToken.SequenceEqual(profileToken),
+                        "Generated folded profile native token does not roundtrip complete original bytes");
                     var resolvedOwner=scope.Document.Extension.GetObjectByPersistReference3(ownerToken,out state) as Feature;
                     bool ownerRoundtrip=(state==0||state==2)&&resolvedOwner!=null&&
                         resolvedOwner.GetID()==owner.GetID();
@@ -9453,13 +9498,15 @@ namespace ADDIN.Commands.AutoFrameJoint
                     }
                     scope.PrivateFoldedProfileGuards.Add(node.Id,new BaselineFoldedProfileGuard{Id=node.Id,
                         OwnerId=owner.GetID(),FlatId=parents[0].GetID(),ProfileToken=profileToken,OwnerToken=ownerToken,
-                        OwnerTokenIsRoundtrip=ownerRoundtrip,
+                        OwnerTokenIsRoundtrip=ownerRoundtrip,ProfileSuppressed=node.Suppressed,ProfileBeforePersistState=profileState,
                         OwnerParents=FlatPatternParentFingerprint(FoldedProfileParents(owner)),OwnerOwner=FoldedProfileOwnerKey(owner)});
                     Mark("BASELINE_SYSTEM_FOLDED_PROFILE_FOLDER_AUTHORITY id="+node.Id+";owner_token="+
                         (ownerRoundtrip?"EXACT_NATIVE_ROUNDTRIP":"NATIVE_FOLDER_STATE_1_OBSERVATION_ONLY")+
                         ";part_scoped_native_identity_and_original_flat_container_frozen=true");
                     Mark("BASELINE_SYSTEM_FOLDED_PROFILE_GUARD scope="+scope.Label+";id="+node.Id+
-                        ";system_folder="+owner.GetID()+";flat_pattern="+parents[0].GetID()+";token_state=2;explicit_delete_forbidden=true");
+                        ";system_folder="+owner.GetID()+";flat_pattern="+parents[0].GetID()+
+                        ";profile_suppressed="+node.Suppressed+";token_state="+profileState+
+                        ";native_2d_sketch=true;explicit_delete_forbidden=true;state_policy=R63");
                 }
                 catch(Exception ex)
                 {
@@ -9559,7 +9606,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                 guard.InvalidatedByCutId=cutId;
                 Mark("SYSTEM_FOLDED_PROFILE_INVALIDATED_BY_NATIVE_CUT scope="+scope.Label+";id="+guard.Id+
                     ";cut="+cutId+";system_folder="+guard.OwnerId+";flat_pattern="+guard.FlatId+
-                    ";token_state=1;original_authored_history_still_checked=true;explicit_delete_called=false");
+                    ";token_state=1;before_token_state="+guard.ProfileBeforePersistState+
+                    ";before_profile_suppressed="+guard.ProfileSuppressed+
+                    ";original_authored_history_still_checked=true;explicit_delete_called=false;state_policy=R63");
             }
             CheckProtected(scope,now,false);
             }
