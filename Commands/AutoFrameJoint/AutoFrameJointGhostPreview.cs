@@ -134,7 +134,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int colorA = ColorTranslator.ToWin32(Color.FromArgb(0, 180, 235));
                 int colorB = ColorTranslator.ToWin32(Color.FromArgb(255, 155, 60));
 
-                presentation = CreateAbovePairPresentation(frameA, frameB);
+                presentation = CreateFrameNormalPresentation(frameA, frameB);
                 int countA = ShowComponent(frameA, colorA, 0.33, presentation.Shift);
                 ThrowIfClosing();
                 int countB = ShowComponent(frameB, colorB, 0.33, presentation.Shift);
@@ -142,7 +142,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 RedrawSafely(); // One redraw after the complete pair, not per body.
                 TracePresentationBounds();
                 message = String.Format(
-                    "Bản sao xanh/cam phía trên hai chi tiết gốc: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
+                    "Bản sao xanh/cam nâng theo pháp tuyến khung, giữ nguyên vị trí dọc/ngang: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
                     countA, countB);
                 return true;
             }
@@ -269,7 +269,8 @@ namespace ADDIN.Commands.AutoFrameJoint
 
                 ThrowIfClosing();
                 phase.Restart();
-                // A camera move invalidates only the presentation, never the qualified solver result.
+                // A source change replaces the presentation. A camera change
+                // leaves the fixed world lift and temporary body identities intact.
                 bool redisplayKeep = !reused || !samePresentation;
                 if (reused && !samePresentation)
                 {
@@ -277,7 +278,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     if (!HideDisplayedBodies(false, false, out presentationCleanup))
                         throw new InvalidOperationException("Không dọn được bản sao Preview: " + presentationCleanup);
                 }
-                if (presentation == null) presentation = CreateAbovePairPresentation(frameA, frameB);
+                if (presentation == null) presentation = CreateFrameNormalPresentation(frameA, frameB, result);
                 MathTransform shift = presentation.Shift;
                 MathTransform inverseA = result.TransformA.Inverse() as MathTransform;
                 MathTransform inverseB = result.TransformB.Inverse() as MathTransform;
@@ -313,7 +314,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Trace.WriteLine("[AFJ-R52-PERF] phase=display ms=" + phase.ElapsedMilliseconds + " reuse_keep=" + !redisplayKeep);
                 message = String.Format(CultureInfo.InvariantCulture,
                     "{0}: Đã kiểm tra B-rep tạm. A bỏ {1:0.###} mm³; B bỏ {2:0.###} mm³. " +
-                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Preview xanh/cam phía trên hai chi tiết gốc, cùng tỷ lệ và chừa khoảng hở theo chiều cao. {5}", result.Plan.RuleId,
+                    "Frame ngắn {3} che; khe hở {4:0.###} mm. Preview xanh/cam nâng khỏi mặt phẳng khung, cùng vị trí dọc/ngang và cùng tỷ lệ. {5}", result.Plan.RuleId,
                     result.A.RemovedVolume * 1e9, result.B.RemovedVolume * 1e9,
                     result.CoverA ? "A" : "B", result.AfterGap * 1000,
                     candidate == 2 ? "Hồng/tím: CUT; xanh/cam: KEEP." : "Đang xem KEEP.");
@@ -574,6 +575,8 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             internal MathTransform Shift;
             internal double[] OriginalBox, PreviewBox, Delta;
+            internal double[] Normal,AxisA,AxisB;
+            internal double LiftDistance,DisplayClearance,OriginalNormalMin,OriginalNormalMax,PreviewNormalMin,PreviewNormalMax;
             internal double[][] OriginalPoints, PreviewPoints;
             internal PreviewViewStamp BeforeView, AppliedView;
         }
@@ -602,13 +605,13 @@ namespace ADDIN.Commands.AutoFrameJoint
 
         private bool IsPresentationCurrent()
         {
-            if (presentation == null) return false;
-            try { return SamePreviewView(presentation.AppliedView, CapturePreviewView()); }
-            catch (Exception ex)
-            {
-                Trace.WriteLine("[AFJ-R62-VIEW] state=INVALID reason=" + ex.Message);
-                return false;
-            }
+            // R64_FIXED_WORLD_PRESENTATION: this method is reached only after
+            // the exact source pair/configuration/body/transform stamp matches.
+            // A user orbit, pan or zoom changes the camera, not the world-space
+            // normal lift. Keep the same displayed temporary bodies and shift.
+            return presentation != null && presentation.Shift != null &&
+                presentation.Delta != null && presentation.Delta.Length == 3 &&
+                FinitePreviewValues(presentation.Delta) && IsOriginalAssemblyActive();
         }
 
         private static bool FinitePreviewValues(double[] values)
@@ -705,89 +708,154 @@ namespace ADDIN.Commands.AutoFrameJoint
             return bounds;
         }
 
-        // Same local Preview layout, contained here to keep this class
-        // compilable without changing project Compile entries.
-        private static double[] AboveSelectedPair(double[] a, double[] b, out double gap)
+        private static double[] PreviewUnitVector(double[] vector)
         {
-            ValidateAbovePairBox(a); ValidateAbovePairBox(b);
-            double height = Math.Max(a[4] - a[1], b[4] - b[1]);
-            if (height <= 1e-9 || double.IsNaN(height) || double.IsInfinity(height))
-                throw new InvalidOperationException("Chưa xác định được chiều cao hiển thị của hai chi tiết để đặt preview.");
-            gap = height * 0.10;
-            double top = Math.Min(a[1], b[1]), bottom = Math.Max(a[4], b[4]);
-            // A common translation keeps the A/B joint exactly as solved.
-            // After translating, the preview's bottom is top - gap.
-            double shift = top - gap - bottom;
-            if (double.IsNaN(shift) || double.IsInfinity(shift))
-                throw new InvalidOperationException("Chưa tính được khoảng dịch Preview hợp lệ.");
-            return new[] { 0.0, shift, 0.0 };
+            if(vector==null||vector.Length!=3||!FinitePreviewValues(vector))
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: chưa đọc được hướng Frame từ API.");
+            double length=Math.Sqrt(vector.Sum(value=>value*value));
+            if(!AfjTemporaryBoolean.Finite(length)||length<=1e-10)
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: hướng Frame không hợp lệ.");
+            return vector.Select(value=>value/length).ToArray();
         }
 
-        private static void ValidateAbovePairBox(double[] box)
+        private static double PreviewDot(double[] a,double[] b)
+        {return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+
+        private static double[] PreviewWorldVector(double[] vector,MathTransform transform)
         {
-            if (box == null || box.Length != 6)
-                throw new ArgumentException("Chưa đọc đủ phạm vi hiển thị của chi tiết.");
-            for (int i = 0; i < 6; i++)
-                if (double.IsNaN(box[i]) || double.IsInfinity(box[i]))
-                    throw new ArgumentException("Phạm vi hiển thị chi tiết không hợp lệ.");
-            if (box[0] > box[3] || box[1] > box[4] || box[2] > box[5])
-                throw new ArgumentException("Phạm vi hiển thị chi tiết không đúng thứ tự.");
+            double[] matrix=transform==null?null:transform.ArrayData as double[];
+            if(matrix==null||matrix.Length!=16||!FinitePreviewValues(matrix))
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: chưa đọc được transform Frame.");
+            double[] origin=PreviewPoint(new double[]{0,0,0},matrix),tip=PreviewPoint(vector,matrix);
+            return PreviewUnitVector(new double[]{tip[0]-origin[0],tip[1]-origin[1],tip[2]-origin[2]});
         }
 
-        private PreviewPresentation CreateAbovePairPresentation(Component2 frameA, Component2 frameB)
+        private static double[] PreviewCanonicalFrameNormal(double[] axisA,double[] axisB)
         {
-            PreviewViewStamp before = CapturePreviewView();
-            if (before == null) throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: chưa đọc được khung nhìn Assembly.");
-            if (before.View.HasPerspective())
-                throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: hãy tắt Perspective để đặt bản sao phía trên hai chi tiết.");
-            MathTransform projection = before.View.Transform;
-            double[] matrix = projection == null ? null : projection.ArrayData as double[];
-            MathTransform inverse = projection == null ? null : projection.Inverse() as MathTransform;
-            double[] inverseMatrix = inverse == null ? null : inverse.ArrayData as double[];
-            if (matrix == null || inverseMatrix == null)
-                throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: không đảo được phép chiếu màn hình.");
-            // Project each original body's corners directly. Boxing the complete
-            // Assembly or reboxing the union in world XYZ inflates rotated pairs.
-            double[][] pointsA = ComponentPreviewPoints(frameA), pointsB = ComponentPreviewPoints(frameB);
-            double[] screenA = ProjectPreviewPoints(pointsA, matrix), screenB = ProjectPreviewPoints(pointsB, matrix);
-            double[][] originalPoints = pointsA.Concat(pointsB).ToArray();
-            double gap;
-            double[] screenShift = AboveSelectedPair(screenA, screenB, out gap);
-            double dx = screenShift[0], dy = screenShift[1];
-            double[] origin = PreviewPoint(new double[] {0,0,0}, inverseMatrix);
-            double[] target = PreviewPoint(new double[] {dx,dy,0}, inverseMatrix);
-            double[] delta = new double[] {target[0]-origin[0],target[1]-origin[1],target[2]-origin[2]};
-            double[] shiftData = {1,0,0,0,1,0,0,0,1,delta[0],delta[1],delta[2],1,0,0,0};
-            MathUtility math = app.GetMathUtility() as MathUtility;
-            MathTransform shift = math == null ? null : math.CreateTransform(shiftData) as MathTransform;
-            if (shift == null) throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: không tạo được dịch chuyển chung A/B.");
-            double[][] previewPoints = originalPoints.Select(point => PreviewPoint(point, shiftData)).ToArray();
-            double[] identity = {1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0};
-            var next = new PreviewPresentation {BeforeView=before, Shift=shift, Delta=delta,
-                OriginalPoints=originalPoints, PreviewPoints=previewPoints,
-                OriginalBox=ProjectPreviewPoints(originalPoints, identity), PreviewBox=ProjectPreviewPoints(previewPoints, identity)};
-            // Store ownership before touching camera so a partially failed native call can be cleaned up.
-            presentation = next;
+            double[] a=PreviewUnitVector(axisA),b=PreviewUnitVector(axisB);
+            if(Math.Abs(PreviewDot(a,b))>1e-7)
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: hai trục Frame API chưa vuông góc.");
+            double[] n=PreviewUnitVector(new double[]{a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]});
+            // Canonical physical side: largest-magnitude world component positive.
+            // A/B swapping and reversing an extrusion axis cannot flip the lift.
+            int dominant=0;
+            for(int index=1;index<3;index++)if(Math.Abs(n[index])>Math.Abs(n[dominant])+1e-12)dominant=index;
+            if(n[dominant]<0)n=n.Select(value=>-value).ToArray();
+            if(Math.Abs(PreviewDot(n,a))>1e-8||Math.Abs(PreviewDot(n,b))>1e-8)
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: pháp tuyến chưa vuông góc với hai trục API.");
+            return n;
+        }
+
+        private static double[] PreviewNativeNormalExtents(Body2 body,MathTransform transform,double[] worldNormal)
+        {
+            MathTransform inverse=transform==null?null:transform.Inverse() as MathTransform;
+            double[] nativeNormal=PreviewWorldVector(worldNormal,inverse);
+            double[] matrix=transform.ArrayData as double[];
+            double minX,minY,minZ,maxX,maxY,maxZ;
+            if(body==null||!body.GetExtremePoint(-nativeNormal[0],-nativeNormal[1],-nativeNormal[2],out minX,out minY,out minZ)||
+                !body.GetExtremePoint(nativeNormal[0],nativeNormal[1],nativeNormal[2],out maxX,out maxY,out maxZ))
+                throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: chưa đo được bề dày không gian theo pháp tuyến khung.");
+            double minimum=PreviewDot(PreviewPoint(new double[]{minX,minY,minZ},matrix),worldNormal);
+            double maximum=PreviewDot(PreviewPoint(new double[]{maxX,maxY,maxZ},matrix),worldNormal);
+            if(!AfjTemporaryBoolean.Finite(minimum)||!AfjTemporaryBoolean.Finite(maximum)||maximum<minimum)
+                throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: khoảng đo pháp tuyến không hợp lệ.");
+            return new double[]{minimum,maximum};
+        }
+
+        private static double[][] PreviewNativeBodyPoints(Body2 body,MathTransform transform)
+        {
+            double[] box=body==null?null:body.GetBodyBox() as double[];
+            double[] matrix=transform==null?null:transform.ArrayData as double[];
+            if(!ValidPreviewBox(box)||matrix==null||matrix.Length!=16||!FinitePreviewValues(matrix))
+                throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: chưa đọc được phạm vi Body trình bày.");
+            return PreviewBoxCorners(box).Select(point=>PreviewPoint(point,matrix)).ToArray();
+        }
+
+        private PreviewPresentation CreateFrameNormalPresentation(Component2 frameA,Component2 frameB)
+        {
+            // Read the actual BaseFlange profile Sketch and aligned R/R+t Bend
+            // evidence. Presentation never guesses a Frame axis from a box.
+            ModelDoc2 partA,partB;MathTransform transformA,transformB;
+            Body2 bodyA=AfjJointSolver.NativeBody(frameA,out partA,out transformA);
+            Body2 bodyB=AfjJointSolver.NativeBody(frameB,out partB,out transformB);
+            AfjProfile profileA=AfjProfileAnalyzer.Analyze(partA,bodyA),profileB=AfjProfileAnalyzer.Analyze(partB,bodyB);
+            return CreateFrameNormalPresentation(bodyA,bodyB,transformA,transformB,
+                PreviewWorldVector(profileA.Axis,transformA),PreviewWorldVector(profileB.Axis,transformB),null);
+        }
+
+        private PreviewPresentation CreateFrameNormalPresentation(Component2 frameA,Component2 frameB,AfjJointSolution reviewed)
+        {
+            if(reviewed==null||reviewed.ReviewedIntent==null)
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: chưa có Cut Plan đã xác minh.");
+            ModelDoc2 partA,partB;MathTransform transformA,transformB;
+            Body2 bodyA=AfjJointSolver.NativeBody(frameA,out partA,out transformA);
+            Body2 bodyB=AfjJointSolver.NativeBody(frameB,out partB,out transformB);
+            if(app.IsSame(partA,reviewed.PartA)!=(int)swObjectEquality.swObjectSame||
+                app.IsSame(partB,reviewed.PartB)!=(int)swObjectEquality.swObjectSame||
+                !ClosePreviewValues(transformA.ArrayData as double[],reviewed.TransformA.ArrayData as double[])||
+                !ClosePreviewValues(transformB.ArrayData as double[],reviewed.TransformB.ArrayData as double[]))
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: vị trí Frame khác Cut Plan đã xem.");
+            AfjParametricPlan plan=reviewed.ReviewedIntent;
+            return CreateFrameNormalPresentation(bodyA,bodyB,transformA,transformB,
+                reviewed.CoverA?plan.OutWinner:plan.OutLoser,reviewed.CoverA?plan.OutLoser:plan.OutWinner,plan.Depth);
+        }
+
+        private PreviewPresentation CreateFrameNormalPresentation(Body2 bodyA,Body2 bodyB,
+            MathTransform transformA,MathTransform transformB,double[] worldAxisA,double[] worldAxisB,double[] reviewedDepth)
+        {
+            PreviewViewStamp before=CapturePreviewView();
+            if(before==null||before.View.HasPerspective())
+                throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: cần khung nhìn Assembly trực giao để thu vừa Preview.");
+            double[] axisA=PreviewUnitVector(worldAxisA),axisB=PreviewUnitVector(worldAxisB);
+            double[] normal=PreviewCanonicalFrameNormal(axisA,axisB);
+            if(reviewedDepth!=null&&Math.Abs(Math.Abs(PreviewDot(normal,PreviewUnitVector(reviewedDepth)))-1)>1e-7)
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: pháp tuyến không khớp mặt phẳng Web đã xác minh.");
+            double[] extentA=PreviewNativeNormalExtents(bodyA,transformA,normal),extentB=PreviewNativeNormalExtents(bodyB,transformB,normal);
+            double minimum=Math.Min(extentA[0],extentB[0]),maximum=Math.Max(extentA[1],extentB[1]);
+            double span=maximum-minimum;
+            if(!AfjTemporaryBoolean.Finite(span)||span<=1e-7)
+                throw new InvalidOperationException("PREVIEW_BOUNDS_UNVERIFIED: chiều cao Body theo pháp tuyến chưa hợp lệ.");
+            // Presentation clearance only. This is neither AssemblyFitGap nor
+            // SheetCutOverrun and never changes the manufacturing Cut Plan.
+            double clearance=Math.Max(0.005,span*0.10),distance=span+clearance;
+            double[] delta=normal.Select(value=>value*distance).ToArray();
+            if(Math.Abs(PreviewDot(delta,axisA))>1e-8||Math.Abs(PreviewDot(delta,axisB))>1e-8)
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: bản sao bị lệch dọc hoặc ngang Frame.");
+            double[] shiftData={1,0,0,0,1,0,0,0,1,delta[0],delta[1],delta[2],1,0,0,0};
+            MathUtility math=app.GetMathUtility() as MathUtility;
+            MathTransform shift=math==null?null:math.CreateTransform(shiftData) as MathTransform;
+            if(shift==null)throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: chưa tạo được nâng theo pháp tuyến khung.");
+            double[][] originalPoints=PreviewNativeBodyPoints(bodyA,transformA).Concat(PreviewNativeBodyPoints(bodyB,transformB)).ToArray();
+            double[][] previewPoints=originalPoints.Select(point=>PreviewPoint(point,shiftData)).ToArray();
+            double[] identity={1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0};
+            var next=new PreviewPresentation{BeforeView=before,Shift=shift,Delta=delta,Normal=normal,
+                AxisA=axisA,AxisB=axisB,LiftDistance=distance,DisplayClearance=clearance,
+                OriginalNormalMin=minimum,OriginalNormalMax=maximum,PreviewNormalMin=minimum+distance,PreviewNormalMax=maximum+distance,
+                OriginalPoints=originalPoints,PreviewPoints=previewPoints,
+                OriginalBox=ProjectPreviewPoints(originalPoints,identity),PreviewBox=ProjectPreviewPoints(previewPoints,identity)};
+            presentation=next;
             try
             {
                 ThrowIfClosing();
-                if (!IsOriginalAssemblyActive()) throw new InvalidOperationException("Assembly đổi trước khi đặt Preview.");
-                FitPreviewPresentation(next);
-                next.AppliedView=CapturePreviewView();
-                if (next.AppliedView==null || !ClosePreviewValues(before.Orientation,next.AppliedView.Orientation))
-                    throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: khung nhìn đổi hướng khi đặt Preview phía trên.");
-                Trace.WriteLine("[AFJ-R62-VIEW] presentation=ABOVE_SELECTED_PAIR camera=PAIR_PIXEL_FIT_ONCE common_rigid_delta_m="+
-                    DiagnosticArray(delta)+" original_below=True gap_height_fraction=0.10 gap_before_fit_px="+gap.ToString("R",CultureInfo.InvariantCulture)+" source_visibility=UNCHANGED actual_visibility=UNVERIFIED");
+                if(!IsOriginalAssemblyActive())throw new InvalidOperationException("Assembly đổi trước khi đặt Preview.");
+                FitPreviewPresentation(next);next.AppliedView=CapturePreviewView();
+                if(next.AppliedView==null||!ClosePreviewValues(before.Orientation,next.AppliedView.Orientation))
+                    throw new InvalidOperationException("PREVIEW_VIEW_UNVERIFIED: khung nhìn đổi hướng khi thu vừa.");
+                Trace.WriteLine("[AFJ-R64-VIEW] presentation=FRAME_NORMAL_LIFT fixed_world_position=True normal_world="+DiagnosticArray(normal)+
+                    " axis_A_world="+DiagnosticArray(axisA)+" axis_B_world="+DiagnosticArray(axisB)+" common_rigid_delta_m="+DiagnosticArray(delta)+
+                    " lift_m="+distance.ToString("R",CultureInfo.InvariantCulture)+" display_clearance_m="+clearance.ToString("R",CultureInfo.InvariantCulture)+
+                    " in_plane_A_delta_m="+PreviewDot(delta,axisA).ToString("R",CultureInfo.InvariantCulture)+
+                    " in_plane_B_delta_m="+PreviewDot(delta,axisB).ToString("R",CultureInfo.InvariantCulture)+
+                    " actual_native_normal_gap_m="+(next.PreviewNormalMin-next.OriginalNormalMax).ToString("R",CultureInfo.InvariantCulture)+
+                    " axis_evidence=API_BASE_PROFILE_SKETCH_AND_BREP_BENDS camera_used_for_normal=False actual_visibility=UNVERIFIED");
                 return next;
             }
             catch
             {
-                if (next.AppliedView==null) next.AppliedView=CapturePreviewView();
-                RestorePreviewViewIfOwned();
-                throw;
+                if(next.AppliedView==null)next.AppliedView=CapturePreviewView();
+                RestorePreviewViewIfOwned();throw;
             }
         }
-
 
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
         private struct PreviewPixelPoint { internal int X, Y; }
@@ -876,11 +944,17 @@ namespace ADDIN.Commands.AutoFrameJoint
             const double tolerance=2.0;
             bool inside=union[0]>=viewport[0]-tolerance && union[1]>=viewport[1]-tolerance &&
                 union[3]<=viewport[2]+tolerance && union[4]<=viewport[3]+tolerance;
-            bool separated=preview[4]<original[1];
-            Trace.WriteLine("[AFJ-R62-VIEW] native_fit=PROJECTED_CHECK local_viewport_px="+DiagnosticArray(viewport)+
-                " combined_projected_bounds_px="+DiagnosticArray(union)+" in_view="+inside+" separated="+separated+
+            // Projection overlap is valid when looking along the physical lift
+            // normal. It must never change the lift into a camera-space offset.
+            // The creator independently proves separation along the frame normal;
+            // this fit verifies only that the projected pair is inside the view.
+            bool projectedBoundsSeparate=preview[4]<original[1] || original[4]<preview[1] ||
+                preview[3]<original[0] || original[3]<preview[0];
+            Trace.WriteLine("[AFJ-R64-VIEW] native_fit=PROJECTED_CHECK local_viewport_px="+DiagnosticArray(viewport)+
+                " combined_projected_bounds_px="+DiagnosticArray(union)+" in_view="+inside+
+                " projected_bounds_separate="+projectedBoundsSeparate+" layout_authority=FIXED_FRAME_NORMAL"+
                 " actual_visibility=UNVERIFIED");
-            if(!inside || !separated)
+            if(!inside)
                 throw new InvalidOperationException("PREVIEW_VIEWPORT_UNVERIFIED: bản sao chưa nằm trọn vùng nhìn; đã dừng hiển thị để tránh Preview ngoài màn hình.");
         }
 
@@ -898,8 +972,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                 // Bounds estimate is evidence for a layout, not proof of painted pixels or occlusion.
                 Trace.WriteLine("[AFJ-R62-VIEW] original_projected_bounds_px="+DiagnosticArray(original)+
                     " preview_projected_bounds_px="+DiagnosticArray(preview)+" visible_box_px="+DiagnosticArray(window)+
-                    " nonoverlap_bounds="+(preview[4]<original[1])+" gap_px="+(original[1]-preview[4]).ToString("R",CultureInfo.InvariantCulture)+
-                    " actual_visibility=UNVERIFIED");
+                    " projected_bounds_separate="+(preview[4]<original[1] || original[4]<preview[1] ||
+                        preview[3]<original[0] || original[3]<preview[0])+
+                    " fixed_world_delta_m="+DiagnosticArray(presentation.Delta)+
+                    " camera_does_not_reposition_preview=True actual_visibility=UNVERIFIED");
             }
             catch(Exception ex){Trace.WriteLine("[AFJ-R62-VIEW] bounds=UNVERIFIED reason="+ex.Message);}
         }
