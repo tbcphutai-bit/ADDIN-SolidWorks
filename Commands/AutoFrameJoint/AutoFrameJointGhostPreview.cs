@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -39,6 +39,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         // AFJ-R62: presentation belongs to this existing Preview session only.
         // All bodies share a rigid shift; source geometry and native Cut Plan stay unchanged.
         private PreviewPresentation presentation;
+        private PreviewDisplayContext displayContext;
         // AFJ-PREVIEW-OUTCOME-20261022
         // One exact-source non-actionable result. COM/Boolean failures are never cached.
         private const int RejectedPreviewCacheMilliseconds = 30000;
@@ -54,12 +55,14 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal readonly Body2 Copy;
             internal readonly ModelDoc2 Part;
             internal readonly bool IsRemoved;
+            internal readonly Component2 DisplayComponent;
 
-            internal ShownBody(Body2 copy, ModelDoc2 part, bool isRemoved = false)
+            internal ShownBody(Body2 copy, ModelDoc2 part, Component2 displayComponent, bool isRemoved = false)
             {
                 Copy = copy;
                 Part = part;
                 IsRemoved = isRemoved;
+                DisplayComponent = displayComponent;
             }
         }
 
@@ -143,6 +146,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 int colorB = PreviewColorB;
 
                 presentation = CreateFrameNormalPresentation(frameA, frameB);
+                displayContext = CreatePreviewDisplayContext(frameA, frameB);
                 int countA = ShowComponent(frameA, colorA, KeepPreviewTransparency, presentation.Shift);
                 ThrowIfClosing();
                 int countB = ShowComponent(frameB, colorB, KeepPreviewTransparency, presentation.Shift);
@@ -151,7 +155,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 TracePresentationBounds();
                 message = String.Format(
                     "Bản sao A tím / B vàng nâng theo pháp tuyến khung, giữ nguyên vị trí dọc/ngang: {0} body A + {1} body B. CHƯA MÔ PHỎNG VẾT CẮT MỚI.",
-                    countA, countB);
+                    countA, countB) + PreviewColorWarning();
                 return true;
             }
             catch (Exception ex)
@@ -208,7 +212,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 ThrowIfClosing();
                 if (!IsOriginalAssemblyActive())
                 { return RejectInvalidPreview("Assembly đã thay đổi; không cập nhật Preview.", out message); }
-                bool samePresentation = reused && IsPresentationCurrent();
+                bool samePresentation = reused && IsPresentationCurrent() && IsDisplayContextCurrent();
                 if (reused && samePresentation && displayedCandidate == candidate)
                 {
                     message = displayedMessage;
@@ -288,26 +292,23 @@ namespace ADDIN.Commands.AutoFrameJoint
                 }
                 if (presentation == null) presentation = CreateFrameNormalPresentation(frameA, frameB, result);
                 MathTransform shift = presentation.Shift;
-                MathTransform inverseA = result.TransformA.Inverse() as MathTransform;
-                MathTransform inverseB = result.TransformB.Inverse() as MathTransform;
-                if (inverseA == null || inverseB == null)
-                    throw new InvalidOperationException("Không đảo được hệ tọa độ Part.");
+                if (displayContext == null) displayContext = CreatePreviewDisplayContext(frameA, frameB);
                 if (redisplayKeep)
                 {
                     DisplayCandidateBodies(AfjJointSolver.World(result.A.Kept, result.TransformA),
-                        frameA, result.PartA, inverseA, shift,
+                        shift,
                         PreviewColorA, KeepPreviewTransparency, "A_KEEP");
                     DisplayCandidateBodies(AfjJointSolver.World(result.B.Kept, result.TransformB),
-                        frameB, result.PartB, inverseB, shift,
+                        shift,
                         PreviewColorB, KeepPreviewTransparency, "B_KEEP");
                 }
                 if (candidate == 2)
                 {
                     DisplayCandidateBodies(AfjJointSolver.World(result.A.Removed, result.TransformA),
-                        frameA, result.PartA, inverseA, shift,
+                        shift,
                         RemovedColorA, CutPreviewTransparency, "A_CUT");
                     DisplayCandidateBodies(AfjJointSolver.World(result.B.Removed, result.TransformB),
-                        frameB, result.PartB, inverseB, shift,
+                        shift,
                         RemovedColorB, CutPreviewTransparency, "B_CUT");
                 }
                 else if (reused)
@@ -326,6 +327,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     result.A.RemovedVolume * 1e9, result.B.RemovedVolume * 1e9,
                     result.CoverA ? "A" : "B", result.AfterGap * 1000,
                     candidate == 2 ? "CUT: A đỏ / B xanh dương; KEEP: A tím / B vàng." : "Đang xem KEEP.");
+                message += PreviewColorWarning();
                 if (before != null && after != null)
                 {
                     cachedSolution = result;
@@ -1060,6 +1062,89 @@ namespace ADDIN.Commands.AutoFrameJoint
                 ? "OUTSIDE_WINDOW_ESTIMATE" : "OVERLAPS_WINDOW_ESTIMATE";
         }
 
+        private sealed class PreviewDisplayContext
+        {
+            internal Component2 Component;
+            internal ModelDoc2 Part;
+            internal MathTransform Inverse;
+            internal double[] Transform;
+            internal bool ColorIndependent;
+            internal string Configuration;
+        }
+
+        private bool IsDisplayOccurrenceSelected(Component2 component)
+        {
+            SelectionMgr selection = sourceAssembly.SelectionManager as SelectionMgr;
+            if (selection == null) throw new InvalidOperationException("Không đọc được trạng thái lựa chọn Preview.");
+            int count = selection.GetSelectedObjectCount2(-1);
+            for (int i = 1; i <= count; i++)
+            {
+                Component2 selected = selection.GetSelectedObject6(i, -1) as Component2;
+                if (selected == null) selected = selection.GetSelectedObjectsComponent4(i, -1) as Component2;
+                if (selected != null && app.IsSame(component, selected) == (int)swObjectEquality.swObjectSame) return true;
+            }
+            return false;
+        }
+
+        private PreviewDisplayContext CreatePreviewDisplayContext(Component2 frameA, Component2 frameB)
+        {
+            // A selected Display3 context overrides even temporary face appearances with selection blue.
+            // Borrow a resolved, visible top-level occurrence only as the render coordinate system.
+            // Do not add a component, alter native appearance, clear selection, or modify preferences.
+            Array occurrences = ((AssemblyDoc)sourceAssembly).GetComponents(true) as Array;
+            var candidates = occurrences == null ? new List<Component2>() :
+                occurrences.Cast<object>().OfType<Component2>().OrderBy(c => c.Name2, StringComparer.Ordinal).ToList();
+            foreach (Component2 component in candidates)
+            {
+                if (app.IsSame(component, frameA) == 1 || app.IsSame(component, frameB) == 1) continue;
+                if (component.GetParent() != null || component.IsSuppressed() || component.IsHidden(false)) continue;
+                ModelDoc2 part = component.GetModelDoc2() as ModelDoc2;
+                if (part == null || part.GetType() != (int)swDocumentTypes_e.swDocPART || IsDisplayOccurrenceSelected(component)) continue;
+                return CaptureDisplayContext(component, part, true);
+            }
+            // A two-component assembly may have no independent display occurrence.
+            // Keep its geometry preview available and explicitly report the color limitation.
+            return CaptureDisplayContext(frameA, frameA.GetModelDoc2() as ModelDoc2, !IsDisplayOccurrenceSelected(frameA));
+        }
+
+        private PreviewDisplayContext CaptureDisplayContext(Component2 component, ModelDoc2 part, bool independent)
+        {
+            MathTransform transform = component.GetTotalTransform(false);
+            MathTransform inverse = transform == null ? null : transform.Inverse() as MathTransform;
+            double[] data = transform == null ? null : transform.ArrayData as double[];
+            if (part == null || inverse == null || data == null || data.Length != 16 || data.Any(x => Double.IsNaN(x) || Double.IsInfinity(x)))
+                throw new InvalidOperationException("Không xác minh được hệ tọa độ hiển thị Preview.");
+            Trace.WriteLine("[AFJ-R68-COLOR] context=existing_occurrence independent_from_selection=" + independent +
+                " source_appearance_changed=False selection_changed=False");
+            return new PreviewDisplayContext { Component = component, Part = part, Inverse = inverse,
+                Transform = (double[])data.Clone(), ColorIndependent = independent,
+                Configuration = component.ReferencedConfiguration };
+        }
+
+        private bool IsDisplayContextCurrent()
+        {
+            if (displayContext == null) return false;
+            try
+            {
+                Component2 component = displayContext.Component;
+                if (component.IsSuppressed() || component.IsHidden(false) ||
+                    !String.Equals(component.ReferencedConfiguration, displayContext.Configuration, StringComparison.Ordinal) ||
+                    app.IsSame(component.GetModelDoc2(), displayContext.Part) != 1 ||
+                    IsDisplayOccurrenceSelected(component) == displayContext.ColorIndependent) return false;
+                MathTransform transform = component.GetTotalTransform(false);
+                double[] data = transform == null ? null : transform.ArrayData as double[];
+                return data != null && data.Length == 16 && !data.Where((x, i) =>
+                    Double.IsNaN(x) || Double.IsInfinity(x) || Math.Abs(x - displayContext.Transform[i]) > 1e-10).Any();
+            }
+            catch (Exception) { return false; }
+        }
+
+        private string PreviewColorWarning()
+        {
+            return displayContext != null && !displayContext.ColorIndependent ?
+                " COLOR_UNVERIFIED: Assembly không có Component hiển thị độc lập; highlight A/B có thể phủ màu Preview." : "";
+        }
+
         private void ApplyTemporaryPreviewAppearance(Body2 body, int colorRef, double transparency)
         {
             if (body == null || !body.IsTemporaryBody())
@@ -1097,29 +1182,27 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
 
         private void DisplayCandidateBodies(List<Body2> bodies,
-                       Component2 component, ModelDoc2 part,
-                       MathTransform inverse, MathTransform shift,
+                       MathTransform shift,
                        int color, double transparency, string group)
         {
             foreach (Body2 world in bodies)
             {
                 ThrowIfClosing();
-                // Display3(component) places local solid in Assembly.
-                // world+shift --> inverse component --> Display3(component).
+                // Keep world placement; the display context is independent of A/B selection.
+                // world + common shift -> inverse display occurrence -> Display3 occurrence.
                 Body2 local = CopyBody(world);
                 if (!local.ApplyTransform(shift))
                     throw new InvalidOperationException("Không đặt được vị trí Preview.");
                 TraceProjectedPreview(local, group);
-                if (!local.ApplyTransform(inverse))
-                    throw new InvalidOperationException(
-                        "Không chuyển ghost từ World XYZ về Part XYZ.");
+                if (!local.ApplyTransform(displayContext.Inverse))
+                    throw new InvalidOperationException("Không chuyển Preview về ngữ cảnh hiển thị.");
                 ApplyTemporaryPreviewAppearance(local, color, transparency);
                 // Register first. Hide() cleanup after SOLIDWORKS may partly
                 // display an object, just like original GhostPreview.
                 ThrowIfClosing();
-                shown.Add(new ShownBody(local, part, group.EndsWith("_CUT", StringComparison.Ordinal)));
-                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_BEGIN group=" + group + " temporary=" + local.IsTemporaryBody() + " context=selected_component");
-                int status = local.Display3(component, color,
+                shown.Add(new ShownBody(local, displayContext.Part, displayContext.Component, group.EndsWith("_CUT", StringComparison.Ordinal)));
+                Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_BEGIN group=" + group + " temporary=" + local.IsTemporaryBody() + " context=preview_display_occurrence color_independent=" + displayContext.ColorIndependent);
+                int status = local.Display3(displayContext.Component, color,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
                 Trace.WriteLine("[AFJ-R52] stage=DISPLAY3_END group=" + group + " status=" + status + " tracked=" + shown.Count + " actual_visibility=UNVERIFIED");
                 if (status != 0)
@@ -1186,8 +1269,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                     "Part có quá nhiều body cho Preview thử nghiệm.");
 
             MathTransform componentWorld = component.Transform2;
-            MathTransform componentInverse = componentWorld == null ? null : componentWorld.Inverse() as MathTransform;
-            if (componentInverse == null || shift == null) throw new InvalidOperationException("Không xác minh được vị trí bản sao.");
+            if (componentWorld == null || shift == null || displayContext == null)
+                throw new InvalidOperationException("Không xác minh được vị trí bản sao.");
             int count = 0;
             foreach (object item in bodies)
             {
@@ -1202,9 +1285,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                     throw new InvalidOperationException(
                         "Không tạo được bản sao Temporary Body.");
 
-                // Reuse the same above-pair presentation as the cut candidate.
-                // Display3(component) applies the occurrence transform after this local conversion.
-                if (!copy.ApplyTransform(componentWorld) || !copy.ApplyTransform(shift) || !copy.ApplyTransform(componentInverse))
+                // Render in a non-selected occurrence; never change A/B marks or source materials.
+                if (!copy.ApplyTransform(componentWorld) || !copy.ApplyTransform(shift) || !copy.ApplyTransform(displayContext.Inverse))
                     throw new InvalidOperationException("Không đặt được bản sao phía trên hai chi tiết.");
 
                 ApplyTemporaryPreviewAppearance(copy, colorRef, transparency);
@@ -1213,14 +1295,13 @@ namespace ADDIN.Commands.AutoFrameJoint
                 // If COM throws after a partial draw, cleanup still has a
                 // strong reference to the possibly displayed body.
                 ThrowIfClosing();
-                ShownBody tracked = new ShownBody(copy, part);
+                ShownBody tracked = new ShownBody(copy, displayContext.Part, displayContext.Component);
                 shown.Add(tracked);
 
                 // Non-selectable preview avoids swModifyBlock.
-                // Display in the selected Component context; do not apply
-                // another component transform.
+                // The display occurrence supplies only a coordinate system, not source geometry.
                 int result = copy.Display3(
-                    component, colorRef,
+                    displayContext.Component, colorRef,
                     (int)swTempBodySelectOptions_e.swTempBodySelectOptionNone);
                 Trace.WriteLine("[AFJ-R62-VIEW] stage=DISPLAY3_BASELINE_ABOVE_PAIR status=" + result + " actual_visibility=UNVERIFIED");
                 if (result != 0)
@@ -1283,7 +1364,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             // A fit can have happened before the first temporary Body was
             // registered. Repaint camera restoration even when no Hide was needed.
             bool restoringPresentation = !removedOnly && shown.Count == 0 && presentation != null;
-            if (!removedOnly && shown.Count == 0) RestorePreviewViewIfOwned();
+            if (!removedOnly && shown.Count == 0) { displayContext = null; RestorePreviewViewIfOwned(); }
             if ((attempted || restoringPresentation) && redraw) RedrawSafely();
             return error == null;
         }
