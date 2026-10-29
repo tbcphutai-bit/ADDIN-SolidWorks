@@ -1,0 +1,30 @@
+{
+  "rule_id": "FORMED_SHEET_PER_STRIP_ANGLED_CONTACT",
+  "status": "INFERRED_RULE_DESIGN_FROM_API_AND_BREP_REFERENCE_NOT_IMPLEMENTED_NOT_NATIVE_QUALIFIED",
+  "reference_assembly": "4458-02-TI-b2.SLDASM",
+  "angle_policy": "MEASURE_NATIVE_GRAPH_AND_FINITE_SKINS_NEVER_HARDCODE_2_05_OR_90",
+  "reference_tilt_deg": 2.05,
+  "sheet_cut_overrun_m": 0.0001,
+  "assembly_fit_gap_m": 0.0001,
+  "normal_cut_required": true,
+  "end_condition_policy": "BLIND_PER_SINGLE_SHEET",
+  "depth_policy": "API_THICKNESS_PLUS_SHEET_CUT_OVERRUN",
+  "cover_policy": "SHORTER_ACTUAL_BREP_AXIS_SPAN_COVERS",
+  "exposed_edge_policy": "ALLOW_CUT_AND_REPORT_MEASURED_UNCOVERED_REGION",
+  "sketch_policy": {
+    "support": "EXISTING_NATIVE_PLANAR_FACE2",
+    "references": "COINCIDENT_AND_OTHER_PROVEN_GEOMETRIC_RELATIONS_TO_FINITE_NATIVE_OR_OWNED_GUIDES",
+    "dimensions": "MINIMIZE_DO_NOT_DIM_EACH_VERTEX",
+    "convert_entities": false,
+    "new_reference_planes": false
+  },
+  "boundary": "P(s,v,w)=B+s*a+v*u+w*n; s(v,w)=(d+sigma*g-M.B-v*M.u-w*M.n)/(M.a)",
+  "normal_cut_projection": "Choose a keep-safe/remove-safe contour envelope over actual material thickness only when the required clearance and cover can be satisfied; otherwise UNVERIFIED_RULE.",
+  "finite_authority": "Clip each piecewise boundary by actual finite mating face/stock and selected corner; supporting-plane separation alone is insufficient.",
+  "validation": "Per-strip approved removal cells plus protected remote/opposite-end KEEP witnesses. Do not simply disable SelectedEnd.",
+  "new_native_cut_before_after": false,
+  "new_temporary_boolean_qualified": false,
+  "new_preview_qualified": false,
+  "new_four_corner_qualified": false,
+  "scope": "Research design only; existing A/B command chain and source unchanged."
+}
