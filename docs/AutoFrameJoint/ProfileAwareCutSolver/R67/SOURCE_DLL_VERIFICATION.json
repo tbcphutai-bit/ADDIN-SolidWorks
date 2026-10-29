@@ -1,0 +1,24 @@
+{
+  "inspection": "REFLECTION_ONLY_NO_COM_NO_PRODUCT_CODE_EXECUTED",
+  "loaded_log_mvid": "dcc0c708-a37e-4b8a-a84c-589bf2af6aa1",
+  "disk_dll_mvid": "dcc0c708-a37e-4b8a-a84c-589bf2af6aa1",
+  "disk_dll_sha256": "21D4315986784380096262026A9D15E9956FC311639140AEA17427808774A544",
+  "dll_write_utc": "2026-10-29T06:21:10.1312229Z",
+  "compiled_method_counts": {
+    "CreateFrameNormalPresentation": 3,
+    "ApplyTemporaryPreviewAppearance": 0,
+    "CertifyConstantGuideRectangle": 0,
+    "AssignStandaloneConstantNormalBendMaps": 0,
+    "AssignPiecewiseGuideNormalBendMaps": 0,
+    "ExactRadialRuledRemoval": 0
+  },
+  "current_main_ghost_sha256": "8DA46874294E61F2A61CE5921F3C28A3F1564254A6587442D8B502AE8CEC9F41",
+  "main_ghost_write_utc": "2026-10-29T07:02:42.6735456Z",
+  "source_compile_item": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "diagnosis": "LOADED_AND_DISK_DLL_CONTAIN_R64_BUT_LACK_R65_AND_R66",
+  "main_build": false,
+  "deployment": false,
+  "source_class_modified_this_revision": false,
+  "project_modified": false,
+  "original_cad_modified": false
+}
