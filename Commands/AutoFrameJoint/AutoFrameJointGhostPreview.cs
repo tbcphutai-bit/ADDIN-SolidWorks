@@ -12321,6 +12321,8 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal int[][] MeasuredEquivalentFamilyPairs;
         internal int MeasuredTerminalAnchorStripIndex=-1;
         internal bool MeasuredTerminalInherited;
+        internal bool MeasuredStraightEndCompletion,MeasuredEndGapBeforeAnchor;
+        internal double MeasuredEndAnchorLow,MeasuredEndAnchorHigh,MeasuredEndSharedBoundary;
         internal double MeasuredSelectedCellLow,MeasuredSelectedCellHigh;
         internal double SelectedAxialLow, SelectedAxialHigh;
         internal double AffineAxialBoundaryIntercept, AffineAxialBoundarySlope, OwnThicknessEnvelopeShift;
@@ -13800,7 +13802,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var matches=declared.Where(meta=>meta.MeasuredContactAuthority&&meta.StripIndex==strip.Index&&meta.MateStripIndex==mate.Index&&
                     meta.MeasuredFamilyOwnStripIndex==cell.FamilyOwn.Index&&meta.MeasuredFamilyMateStripIndex==cell.FamilyMate.Index&&
                     Math.Abs(meta.MeasuredSelectedCellLow-cell.Low)<Eps&&Math.Abs(meta.MeasuredSelectedCellHigh-cell.High)<Eps&&
-                    meta.MeasuredTerminalInherited==cell.Terminal&&SameMeasuredEntryPartitionIdentity(cell,meta)&&
+                    meta.MeasuredTerminalInherited==cell.Terminal&&SameStraightEndCompletion(cell,meta)&&SameMeasuredEntryPartitionIdentity(cell,meta)&&
                     meta.MeasuredTerminalAnchorStripIndex==(cell.TerminalAnchor==null?-1:cell.TerminalAnchor.Index)).ToArray();
                 Need(matches.Length<=1,"selected finite contact cell was declared multiple times");
                 Need(volume<=1e-13||matches.Length==1,"UNVERIFIED_R71_MISSING_POSITIVE_SELECTED_CELL frame="+frame+
@@ -13820,6 +13822,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             // mate plane. This rejects an otherwise valid but wrong inner wall.
             var selectedCells=SelectedMeasuredCells(app,own,mates,cover,peerCoverResult);
             VerifyMeasuredCellCompleteness(app,selectedCells,cover,frame,declared);
+            VerifyStraightEndCompleteness(app,selectedCells,cover,frame,result.Kept.Single(),declared);
             foreach(var operation in plan.Operations)
             {
                 Need(operation!=null&&operation.Tools.Count==1&&operation.Kind==AfjOperationKind.Cut&&operation.NormalCutIntent,"one Normal Cut per measured cell required");
@@ -13835,10 +13838,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var selected=selectedCells.Where(c=>c.Own==strip&&c.Mate==mate&&c.FamilyOwn.Index==meta.MeasuredFamilyOwnStripIndex&&
                     c.FamilyMate.Index==meta.MeasuredFamilyMateStripIndex&&Math.Abs(c.Low-meta.MeasuredSelectedCellLow)<Eps&&
                     Math.Abs(c.High-meta.MeasuredSelectedCellHigh)<Eps&&SameMeasuredEntryPartitionIdentity(c,meta)&&
-                    c.Terminal==meta.MeasuredTerminalInherited&&c.FreeEnd==meta.MeasuredTerminalFreeEnd&&
+                    c.Terminal==meta.MeasuredTerminalInherited&&c.FreeEnd==meta.MeasuredTerminalFreeEnd&&SameStraightEndCompletion(c,meta)&&
                     (c.TerminalAnchor==null?-1:c.TerminalAnchor.Index)==meta.MeasuredTerminalAnchorStripIndex).ToArray();
                 Need(selected.Length==1,"measured operation is not the independently selected finite connectivity/envelope cell");
-                var cell=selected[0];VerifyMeasuredEntryPartitionMetadata(cell,meta,frame);VerifySecondaryObstructionMetadata(cell,meta,cover);Need(MeasuredFamiliesKey(meta.MeasuredEquivalentFamilyPairs)==MeasuredFamiliesKey(MeasuredCellFamilies(cell)),
+                var cell=selected[0];VerifyStraightEndCompletionSource(selectedCells,cell,meta,cover);VerifyMeasuredEntryPartitionMetadata(cell,meta,frame);VerifySecondaryObstructionMetadata(cell,meta,cover);Need(MeasuredFamiliesKey(meta.MeasuredEquivalentFamilyPairs)==MeasuredFamiliesKey(MeasuredCellFamilies(cell)),
                     "measured equivalent-family proofs changed under independent native graph re-read");double low=cell.Low,high=cell.High,a=cell.A,b=cell.B;bool coplanar=cell.Coplanar;
                 if(cell.Terminal)
                 {
@@ -14141,6 +14144,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 meta.MeasuredFamilyOwnStripIndex=cell.FamilyOwn.Index;meta.MeasuredFamilyMateStripIndex=cell.FamilyMate.Index;
                 meta.MeasuredEquivalentFamilyPairs=MeasuredCellFamilies(cell).Select(pair=>(int[])pair.Clone()).ToArray();
                 meta.MeasuredTerminalInherited=cell.Terminal;meta.MeasuredTerminalAnchorStripIndex=cell.TerminalAnchor==null?-1:cell.TerminalAnchor.Index;
+                meta.MeasuredStraightEndCompletion=cell.StraightEndCompletion;meta.MeasuredEndGapBeforeAnchor=cell.EndGapBeforeAnchor;
+                meta.MeasuredEndAnchorLow=cell.EndAnchorLow;meta.MeasuredEndAnchorHigh=cell.EndAnchorHigh;meta.MeasuredEndSharedBoundary=cell.EndSharedBoundary;
                 meta.MeasuredSelectedCellLow=low;meta.MeasuredSelectedCellHigh=high;
                 meta.ContactLowDatumWorld=cell.LowDatum;meta.ContactHighDatumWorld=cell.HighDatum;
                 meta.ContactLowDatumOnOwnComponent=cell.LowDatumOnOwn;meta.ContactHighDatumOnOwnComponent=cell.HighDatumOnOwn;
@@ -14187,8 +14192,11 @@ namespace ADDIN.Commands.AutoFrameJoint
             meta.ApprovedFlatRemovalMasks.AddRange(AfjTemporaryBoolean.Boolean(own.Source,prism,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R71_APPROVED_FINITE_CONTACT_CELL"));
             if(meta.ApprovedFlatRemovalMasks.Count==0||AfjTemporaryBoolean.Total(meta.ApprovedFlatRemovalMasks)<=1e-13)return;
             var op=new AfjCutOperation{EvidenceId=id,Kind=AfjOperationKind.Cut,NormalCutIntent=true,
-                RegionEvidence="R71_MEASURED_FINITE_NATIVE_SKINS: "+meta.Role+"; actual affine boundary and finite original material witness; Native NormalCut match required"};
+                RegionEvidence=cell!=null&&cell.StraightEndCompletion?
+                    "R73_STRAIGHT_END_COMPLETION: same own sheet; constant physical contact end; original free-edge inside KEEP/outside CUT; no noncontact bevel; Native NormalCut match required":
+                    "R71_MEASURED_FINITE_NATIVE_SKINS: "+meta.Role+"; actual affine boundary and finite original material witness; Native NormalCut match required"};
             op.Tools.Add(tool);result.Operations.Add(op);(frame=="A"?evidence.A:evidence.B).Add(meta);
+            if(cell!=null)RecordStraightEndCompletion(app,cell,meta,evidence,frame,cover);
             Need(result.Operations.Count<=64,"measured sheet operation bound exceeded");
             Trace.WriteLine("[AFJ-R71] CONTACT_CELL frame="+frame+" own="+own.Index+" mate="+mate.Index+" role="+meta.Role+" v="+low.ToString("R",CultureInfo.InvariantCulture)+"/"+high.ToString("R",CultureInfo.InvariantCulture)+" x_a="+meta.AffineAxialBoundaryIntercept.ToString("R",CultureInfo.InvariantCulture)+" x_b="+meta.AffineAxialBoundarySlope.ToString("R",CultureInfo.InvariantCulture)+" normal_envelope_shift="+meta.OwnThicknessEnvelopeShift.ToString("R",CultureInfo.InvariantCulture));
         }
@@ -14198,6 +14206,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal Strip Own,Mate,FamilyOwn,FamilyMate,TerminalAnchor;
             internal double Low,High,A,B;
             internal bool Coplanar,Terminal,FreeEnd;
+            internal bool StraightEndCompletion,EndGapBeforeAnchor;
+            internal double EndAnchorLow,EndAnchorHigh,EndSharedBoundary;
             internal int[] InheritedPath;
             internal double[] FreePoint,FreeNormal;
             internal double[] LowDatum,HighDatum;
@@ -14507,6 +14517,8 @@ static void TraceMeasuredEnvelopeTie(Strip strip,bool cover,double lo,double hi,
             var copy=new MeasuredCell{Own=source.Own,Mate=source.Mate,FamilyOwn=source.FamilyOwn,FamilyMate=source.FamilyMate,
                 TerminalAnchor=source.TerminalAnchor,Low=source.Low,High=source.High,A=source.A,B=source.B,
                 Coplanar=source.Coplanar,Terminal=source.Terminal,FreeEnd=source.FreeEnd,
+                StraightEndCompletion=source.StraightEndCompletion,EndGapBeforeAnchor=source.EndGapBeforeAnchor,
+                EndAnchorLow=source.EndAnchorLow,EndAnchorHigh=source.EndAnchorHigh,EndSharedBoundary=source.EndSharedBoundary,
                 InheritedPath=source.InheritedPath==null?null:(int[])source.InheritedPath.Clone(),
                 FreePoint=source.FreePoint==null?null:(double[])source.FreePoint.Clone(),FreeNormal=source.FreeNormal==null?null:(double[])source.FreeNormal.Clone(),
                 LowDatum=source.LowDatum==null?null:(double[])source.LowDatum.Clone(),HighDatum=source.HighDatum==null?null:(double[])source.HighDatum.Clone(),
@@ -14623,6 +14635,134 @@ static void TraceMeasuredEnvelopeTie(Strip strip,bool cover,double lo,double hi,
             var adjacent=side==0?own.Previous:own.Next;var choice=side==0?previous:next;
             Need(meta.MeasuredEntryAdjacentStripIndex==adjacent.Index,"miter entry operation changed its actual adjacent Bend identity");
             return choice;
+        }
+
+        // A nonintersecting free-edge band needs no bevel. It does not grant
+        // permission to keep raw stock beyond its adjacent measured end cap.
+        static List<MeasuredCell> AddSameSheetEndCompletions(ISldWorks app,Strip[] own,List<MeasuredCell> selected,bool cover)
+        {
+            var result=new List<MeasuredCell>(selected);
+            foreach(var strip in own)
+            {
+                var source=selected.Where(c=>c.Own==strip).ToArray();
+                var missing=new List<double[]>();double cursor=0;
+                foreach(var c in source.OrderBy(c=>c.Low))
+                {
+                    double lo=Math.Max(0,c.Low),hi=Math.Min(strip.Length,c.High);
+                    if(hi<=lo)continue;
+                    if(lo>cursor+1e-6)missing.Add(new[]{cursor,lo});cursor=Math.Max(cursor,hi);
+                }
+                if(strip.Length>cursor+1e-6)missing.Add(new[]{cursor,strip.Length});
+                foreach(var gap in missing)
+                {
+                    double lo=gap[0],hi=gap[1];
+                    bool lowFree=Math.Abs(lo)<Eps&&strip.Previous==null;
+                    bool highFree=Math.Abs(hi-strip.Length)<Eps&&strip.Next==null;
+                    if(lowFree==highFree)continue;
+                    var candidates=source.Where(c=>!c.Coplanar&&!c.Terminal&&!c.FreeEnd&&!c.SecondaryObstruction&&
+                        !c.StraightEndCompletion&&Math.Abs(c.B)<1e-10&&
+                        (lowFree?Math.Abs(c.Low-hi)<Eps:Math.Abs(c.High-lo)<Eps)).ToArray();
+                    if(candidates.Length==0)continue;
+                    var anchor=candidates[0];
+                    Need(candidates.All(c=>SameMeasuredEnvelopeAuthority(anchor,c,cover,lo,hi)),
+                        "UNVERIFIED_SAME_SHEET_END_COMPLETION_MULTIPLE_PHYSICAL_AUTHORITIES");
+                    double cutoff=CellCutoff(anchor,cover);
+                    Need(cutoff>(strip.Low+strip.High)/2-Eps&&cutoff<strip.High+Eps,
+                        "straight end completion crosses protected opposite member half");
+                    var outside=FiniteMaterialMasks(app,strip,lo,hi,Math.Max(strip.Low-.001,cutoff),strip.High+.001,
+                        "R73_DERIVED_FREE_GAP_OUTSIDE");
+                    if(AfjTemporaryBoolean.Total(outside)<=1e-12)continue;
+                    var inside=FiniteMaterialMasks(app,strip,lo,hi,strip.Low-.001,Math.Min(strip.High+.001,cutoff),
+                        "R73_DERIVED_FREE_GAP_INSIDE");
+                    Need(AfjTemporaryBoolean.Total(inside)>1e-13,"straight end completion lacks original body-side material");
+                    var completion=CloneMeasuredMiterCell(anchor);
+                    completion.Low=lo;completion.High=hi;completion.StraightEndCompletion=true;
+                    completion.EndAnchorLow=anchor.Low;completion.EndAnchorHigh=anchor.High;
+                    completion.EndSharedBoundary=lowFree?hi:lo;completion.EndGapBeforeAnchor=lowFree;
+                    completion.Extensions.Clear();
+                    ClearMeasuredBoundaryDatum(completion,true);ClearMeasuredBoundaryDatum(completion,false);
+                    if(lowFree)CopyMeasuredBoundaryDatum(completion,anchor,false,true);
+                    else CopyMeasuredBoundaryDatum(completion,anchor,true,false);
+                    result.Add(completion);
+                    Trace.WriteLine("[AFJ-R73] STRAIGHT_END_COMPLETION_SELECTED own="+strip.Index+" mate="+anchor.Mate.Index+
+                        " v_m="+MeasuredTieNumber(lo)+"/"+MeasuredTieNumber(hi)+" anchor_v_m="+MeasuredTieNumber(anchor.Low)+"/"+MeasuredTieNumber(anchor.High)+
+                        " cutoff_m="+MeasuredTieNumber(cutoff)+" outside_original_m3="+MeasuredTieNumber(AfjTemporaryBoolean.Total(outside))+
+                        " policy=SAME_OWN_SHEET_CONSTANT_CONTACT_END;FREE_EDGE_BAND;NO_NEW_BEVEL;NATIVE_NORMAL_ORACLE_REQUIRED");
+                }
+            }
+            Need(result.Count<=64,"straight end completions exceed native operation bound");return result;
+        }
+
+        static bool SameStraightEndCompletion(MeasuredCell cell,AfjSheetSliceMetadata meta)
+        {
+            if(cell.StraightEndCompletion!=meta.MeasuredStraightEndCompletion)return false;
+            if(!cell.StraightEndCompletion)return !meta.MeasuredEndGapBeforeAnchor&&
+                Math.Abs(meta.MeasuredEndAnchorLow)+Math.Abs(meta.MeasuredEndAnchorHigh)+Math.Abs(meta.MeasuredEndSharedBoundary)<1e-12;
+            return meta.MeasuredEndGapBeforeAnchor==cell.EndGapBeforeAnchor&&
+                Math.Abs(meta.MeasuredEndAnchorLow-cell.EndAnchorLow)<1e-12&&Math.Abs(meta.MeasuredEndAnchorHigh-cell.EndAnchorHigh)<1e-12&&
+                Math.Abs(meta.MeasuredEndSharedBoundary-cell.EndSharedBoundary)<1e-12;
+        }
+
+        static void VerifyStraightEndCompletionSource(List<MeasuredCell> selected,MeasuredCell cell,AfjSheetSliceMetadata meta,bool cover)
+        {
+            Need(SameStraightEndCompletion(cell,meta),"straight end completion source metadata changed");
+            if(!cell.StraightEndCompletion)return;
+            var candidates=selected.Where(c=>!c.StraightEndCompletion&&!c.Coplanar&&!c.Terminal&&!c.FreeEnd&&!c.SecondaryObstruction&&
+                c.Own==cell.Own&&c.Mate==cell.Mate&&Math.Abs(c.B)<1e-10&&
+                Math.Abs(c.Low-cell.EndAnchorLow)<Eps&&Math.Abs(c.High-cell.EndAnchorHigh)<Eps&&
+                (cell.EndGapBeforeAnchor?Math.Abs(c.Low-cell.High)<Eps:Math.Abs(c.High-cell.Low)<Eps)).ToArray();
+            Need(candidates.Length==1,"straight end completion lacks its unique freshly rederived physical same-sheet contact");
+            var anchor=candidates[0];
+            Need(Math.Abs(CellCutoff(anchor,cover)-CellCutoff(cell,cover))<1e-10&&
+                MeasuredFamiliesKey(MeasuredCellFamilies(anchor))==MeasuredFamiliesKey(MeasuredCellFamilies(cell))&&
+                (cell.EndGapBeforeAnchor?cell.Own.Previous==null&&Math.Abs(cell.Low)<Eps:
+                    cell.Own.Next==null&&Math.Abs(cell.High-cell.Own.Length)<Eps),
+                "straight end completion changed its actual shared source station or free-edge path");
+        }
+
+        static void RecordStraightEndCompletion(ISldWorks app,MeasuredCell cell,AfjSheetSliceMetadata meta,
+            AfjSheetSlicePlanEvidence evidence,string frame,bool cover)
+        {
+            if(!cell.StraightEndCompletion)return;
+            var own=cell.Own;double cutoff=CellCutoff(cell,cover);
+            var outside=FiniteMaterialMasks(app,own,cell.Low,cell.High,Math.Max(own.Low-.001,cutoff),own.High+.001,"R73_END_OUTSIDE_WITNESS");
+            var inside=FiniteMaterialMasks(app,own,cell.Low,cell.High,own.Low-.001,Math.Min(own.High+.001,cutoff),"R73_END_INSIDE_WITNESS");
+            Need(outside.Count>0&&AfjTemporaryBoolean.Total(outside)>1e-12&&inside.Count>0,
+                "positive straight end completion has no original paired-flat inside/outside witnesses");
+            for(int i=0;i<outside.Count;i++)evidence.TerminalTrimWitnesses.Add(new AfjTerminalTrimWitness{
+                Frame=frame,StripIndex=own.Index,RegionId=meta.SliceId+":STRAIGHT_END_OUTSIDE_"+i,
+                CutoffNative=cutoff,Low=cell.Low,High=cell.High,OutsideMaskPartCoordinates=outside[i],
+                InsideMaskPartCoordinates=inside[i%inside.Count]});
+        }
+
+        static void VerifyStraightEndCompleteness(ISldWorks app,List<MeasuredCell> independentlySelected,bool cover,
+            string frame,Body2 finalKept,List<AfjSheetSliceMetadata> declared)
+        {
+            int required=0;
+            foreach(var cell in independentlySelected.Where(c=>c.StraightEndCompletion))
+            {
+                required++;var own=cell.Own;double cutoff=CellCutoff(cell,cover);
+                var matches=declared.Where(m=>m.StripIndex==own.Index&&m.MateStripIndex==cell.Mate.Index&&
+                    Math.Abs(m.MeasuredSelectedCellLow-cell.Low)<Eps&&Math.Abs(m.MeasuredSelectedCellHigh-cell.High)<Eps&&
+                    SameStraightEndCompletion(cell,m)).ToArray();
+                Need(matches.Length==1,"UNVERIFIED_MISSING_STRAIGHT_END_COMPLETION");
+                VerifyStraightEndCompletionSource(independentlySelected,cell,matches[0],cover);
+                var outside=FiniteMaterialMasks(app,own,cell.Low,cell.High,Math.Max(own.Low-.001,cutoff),own.High+.001,"R73_FRESH_END_OUTSIDE");
+                var inside=FiniteMaterialMasks(app,own,cell.Low,cell.High,own.Low-.001,Math.Min(own.High+.001,cutoff),"R73_FRESH_END_INSIDE");
+                double original=AfjTemporaryBoolean.Total(outside),residue=0,missing=0;int code;
+                Need(original>1e-12&&inside.Count>0,"fresh straight end completeness lost positive original tail and body-side witnesses");
+                foreach(var body in outside)residue+=AfjTemporaryBoolean.Total(AfjTemporaryBoolean.Boolean(body,finalKept,
+                    (int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R73_FRESH_END_RESIDUE"));
+                foreach(var body in inside)missing+=AfjTemporaryBoolean.DifferenceVolume(body,finalKept);
+                Need(residue<=1e-12&&missing<=1e-12,"UNVERIFIED_STRAIGHT_END_TAIL_OR_INSIDE_MATERIAL_CHANGED");
+                Trace.WriteLine("[AFJ-R73] STRAIGHT_END_COMPLETENESS_VERIFIED frame="+frame+" strip="+own.Index+
+                    " v_m="+MeasuredTieNumber(cell.Low)+"/"+MeasuredTieNumber(cell.High)+" outside_original_m3="+MeasuredTieNumber(original)+
+                    " residual_m3="+MeasuredTieNumber(residue)+" inside_missing_m3="+MeasuredTieNumber(missing));
+            }
+            Need(declared.Count(m=>m.MeasuredStraightEndCompletion)==required,
+                "declared straight end completion count differs from independently derived positive free-gap ends");
+            Trace.WriteLine("[AFJ-R73] STRAIGHT_END_COMPLETENESS_COUNT frame="+frame+" expected="+required+" declared="+declared.Count(m=>m.MeasuredStraightEndCompletion)+
+                " scope=EXACT_SAME_SHEET_PARTIAL_FREE_EDGE_GAPS_NOT_A_GLOBAL_ALL_PROFILE_END_GUARANTEE");
         }
 
         static List<MeasuredCell> SelectedMeasuredCells(ISldWorks app,Strip[] own,Strip[] mates,bool cover,AfjBooleanResult peerCoverResult=null)
@@ -14760,6 +14900,7 @@ static void TraceMeasuredEnvelopeTie(Strip strip,bool cover,double lo,double hi,
                 }
             }
             selected=selected.SelectMany(PartitionSecondaryEntryCell).ToList();
+            selected=AddSameSheetEndCompletions(app,own,selected,cover);
             Need(selected.Count<=64,"measured qualified contact cell count exceeds bounded native plan");return selected;
         }
         static AfjCutPlan PlanMeasured(ISldWorks app,Strip[] own,Strip[] mates,bool cover,string frame,AfjCutPlan guides,AfjSheetSlicePlanEvidence evidence,AfjBooleanResult peerCoverResult=null)

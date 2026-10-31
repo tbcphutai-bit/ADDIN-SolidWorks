@@ -1,0 +1,17 @@
+{
+  "status": "UNVERIFIED_DESIGN_DIRECTION_NOT_FIXED",
+  "dataset": "2222",
+  "selected_A": "2222-04-TI-b4-fr6-1",
+  "selected_B": "2222-04-TI-b4-fr5-1",
+  "user_clarification": "Correct member end; cover face or stepped trim is reversed.",
+  "current_cover": "fr6 covers fr5, based on current physical axial length",
+  "source_contains_preexisting_AFJ_cuts_on_fr6": 9,
+  "preexisting_cuts_are_independent_authored_design_oracle": false,
+  "selection_order_cause_excluded_by_actual_target_symmetric_difference": true,
+  "selection_order_target_difference_A_m3": 0,
+  "selection_order_target_difference_B_m3": 0,
+  "global_axis_or_cover_flip_applied": false,
+  "pending_physical_intent": "Confirm fr6 still covers fr5 with different fold step, or explicit exception fr5 covers fr6.",
+  "mechanical_api_pass_is_design_direction_approval": false,
+  "comparison_note": "Runtime uses oriented plan outgoing axes; an earlier harness axis field used raw profile axes. A raw sign difference alone is not a Cut-direction defect."
+}
