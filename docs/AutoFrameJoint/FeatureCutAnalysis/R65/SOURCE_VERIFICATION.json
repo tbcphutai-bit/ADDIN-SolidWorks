@@ -1,0 +1,24 @@
+{
+  "baseline_sha256": "83B686B398F18D13A7800CEA0C869A5F92A3136555E77FF07631160656424C67",
+  "final_ghost_sha256": "9CC782AC11E8C17E641514B7B7538A28E5F1C77DEA0F3D09CC0387FAE7284B89",
+  "main_source_status": "COPIED_HASH_VERIFIED",
+  "changed_class": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "unchanged_classes": [
+    "AutoFrameJointCommandEntry",
+    "AutoFrameJointGhostSessionManager",
+    "AutoFrameJointSelectionPage"
+  ],
+  "journal_identical_to_R64": true,
+  "rollback_candidate_experiments_in_final": false,
+  "main_build": false,
+  "deployment": false,
+  "installed_dll_sha256": "7936136DBA793006226E102A24BE7098FFD3CF72901B78EC7F9C6513EFEC5C4D",
+  "installed_dll_mvid": "bc0de01f-891f-4f01-aa42-96c84a32172f",
+  "r65_installed_dll": "NO_AGENT_BUILD_USER_REBUILD_REQUIRED",
+  "agent_project_edited": false,
+  "concurrent_project_change_preserved": true,
+  "pdb_absent_before_source_copy": true,
+  "absent_pdb_not_recreated": true,
+  "independent_compile_actual_main_sources": "PASS_NO_MAIN_PROJECT_BUILD",
+  "copied_main_ghost_sha256": "9CC782AC11E8C17E641514B7B7538A28E5F1C77DEA0F3D09CC0387FAE7284B89"
+}

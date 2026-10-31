@@ -1,0 +1,20 @@
+{
+  "status": "COPIED_EXACT_FOUR_CORNER_API_VERIFIED_SOURCE_ONLY",
+  "utc": "2026-10-30T06:31:59.2801080Z",
+  "before_sha256": "B56D83128310C0A3AF0549507B6E371FEC28C160888147A78EDB9CA73864A095",
+  "after_sha256": "B29462871487F1F8D802DAA1F08EA81A4B375489ED542EB6D9D989C5C8730766",
+  "diagnostic_mvid": "889f1d27-0cfe-49dd-a8c7-d7d65d495382",
+  "diagnostic_sha256": "D0303565E738B2C9E59FEEEB676439EB57C27072AF715DA2A911185853E9E2BF",
+  "main_build": false,
+  "deployment": false,
+  "project_dll_pdb_unchanged": true,
+  "installed_addin_test": false,
+  "user_manual_rebuild_required": true,
+  "source_relative_path": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "other_afj_classes_unchanged": true,
+  "api_native_corners": 4,
+  "api_generated_cuts": 44,
+  "api_created_sketches": 52,
+  "baseline_deployed_main_dll_mvid": "acfcf5e1-e2ba-4a96-90bf-2fdd5690ed97",
+  "api_evidence_level": "API_VERIFIED_AND_GEOMETRY_VERIFIED_FOR_RECORDED_CASES_ONLY"
+}

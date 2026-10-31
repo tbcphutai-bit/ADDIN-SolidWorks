@@ -1,0 +1,219 @@
+{
+  "schema_version": "1.0",
+  "evidence_level": "API_VERIFIED_NATIVE_COPY_HARNESS",
+  "scope": "TWO_CONSTRUCTION_LINES_CONTEXT_MATRIX_ONLY",
+  "status": "MATRIX_COMPLETED_WITH_LINE_CREATION_FAILURE",
+  "diagnostic_finding": "REACQUIRE_SEGMENT_FROM_ORIGINAL_ASSEMBLY_SKETCH_FEATURE_GETSPECIFICFEATURE2_BEFORE_RELATION_OR_SELECTION",
+  "actual_pair": {
+    "frame_a": "2354-fr03",
+    "frame_b": "2354-fr04",
+    "diagnostic_sketch_target": "2354-fr04"
+  },
+  "source_result_sha256": "580fafbcb4b7c2f55e3f1a9470b72a4815dfebd3d1b7f8b493796d4ab44217a9",
+  "helper_source": {
+    "file": "evidence/AfjLineContextMatrixProbe.cs.txt",
+    "sha256": "3b3e63162ec6a38482b84a50943a9e1bc67c597df67568db591291001e615a6e"
+  },
+  "started_utc": "2026-10-22T16:09:55.2118533Z",
+  "completed_utc": "2026-10-22T16:10:18.1656926Z",
+  "solidworks_revision": "32.5.0",
+  "standalone_harness_mvid": "60495910-fc75-4cdd-9fe1-06843348da42",
+  "installed_addin_test": false,
+  "solver_run": false,
+  "cut_created": false,
+  "save_api_called": false,
+  "rebuild_api_called": false,
+  "coordinate_context": "ASSEMBLY_WORLD_TO_TARGET_PART_TO_SKETCH",
+  "line_creations": [
+    {
+      "Manager": "ASSEMBLY_MANAGER",
+      "Status": "NATIVE_LINE_CREATED",
+      "Construction": true,
+      "SegmentType": 0
+    },
+    {
+      "Manager": "PART_MANAGER",
+      "Status": "CREATION_FAILED",
+      "Construction": false,
+      "SegmentType": -1,
+      "failure_reason": "CreateLine returned null",
+      "exception_hresult": "0x80131509"
+    }
+  ],
+  "selection_and_relation_matrix": [
+    {
+      "relation_manager": "ASSEMBLY_ACTIVE_SKETCH",
+      "input_handle_route": "ASSEMBLY_CREATED_DIRECT",
+      "array_pack": "DISPATCH_WRAPPER_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 0,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "ASSEMBLY_ACTIVE_SKETCH",
+      "input_handle_route": "ASSEMBLY_CREATED_DIRECT",
+      "array_pack": "RAW_OBJECT_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 0,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "ASSEMBLY_ACTIVE_SKETCH",
+      "input_handle_route": "PART_EXTENSION_GET_CORRESPONDING_ASM_LINE",
+      "array_pack": "DISPATCH_WRAPPER_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 0,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "ASSEMBLY_ACTIVE_SKETCH",
+      "input_handle_route": "REACQUIRED_NATIVE_OWNED_SEGMENT_0,1",
+      "array_pack": "DISPATCH_WRAPPER_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [
+        4,
+        5,
+        17
+      ],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 1,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "ASSEMBLY_ACTIVE_SKETCH",
+      "input_handle_route": "COMPONENT_GET_CORRESPONDING_REACQUIRED_NATIVE_OWNED_SEGMENT_0,1",
+      "array_pack": "DISPATCH_WRAPPER_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [
+        4,
+        5,
+        17
+      ],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 1,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "OWNED_FEATURE_SPECIFIC_SKETCH",
+      "input_handle_route": "ASSEMBLY_CREATED_DIRECT",
+      "array_pack": "DISPATCH_WRAPPER_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 0,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "OWNED_FEATURE_SPECIFIC_SKETCH",
+      "input_handle_route": "ASSEMBLY_CREATED_DIRECT",
+      "array_pack": "RAW_OBJECT_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 0,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "OWNED_FEATURE_SPECIFIC_SKETCH",
+      "input_handle_route": "PART_EXTENSION_GET_CORRESPONDING_ASM_LINE",
+      "array_pack": "DISPATCH_WRAPPER_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 0,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "OWNED_FEATURE_SPECIFIC_SKETCH",
+      "input_handle_route": "REACQUIRED_NATIVE_OWNED_SEGMENT_0,1",
+      "array_pack": "DISPATCH_WRAPPER_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [
+        4,
+        5,
+        17
+      ],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 1,
+      "part_selection_count": 1
+    },
+    {
+      "relation_manager": "OWNED_FEATURE_SPECIFIC_SKETCH",
+      "input_handle_route": "COMPONENT_GET_CORRESPONDING_REACQUIRED_NATIVE_OWNED_SEGMENT_0,1",
+      "array_pack": "DISPATCH_WRAPPER_ARRAY",
+      "status": "NATIVE_QUERY_COMPLETED",
+      "allowed_native_relation_types": [
+        4,
+        5,
+        17
+      ],
+      "native_constraint_status_at_query": 2,
+      "native_relation_count_at_query": 0,
+      "select4_returned": true,
+      "assembly_selection_count": 1,
+      "part_selection_count": 1
+    }
+  ],
+  "single_horizontal": {
+    "Requested": true,
+    "Attempted": true,
+    "NativeRelationCreated": true,
+    "Manager": "ASSEMBLY_ACTIVE_SKETCH",
+    "Input": "REACQUIRED_NATIVE_OWNED_SEGMENT_0,1",
+    "Reason": "NATIVE_HORIZONTAL_TYPE_AND_COUNT_READBACK",
+    "RelationType": 4,
+    "CountBefore": 0,
+    "CountAfter": 1
+  },
+  "single_horizontal_definition_entity_count": 1,
+  "target_sketch": {
+    "owned_in_target_part": true,
+    "support_reference_type": 2,
+    "new_reference_planes": 0,
+    "dimensions": 0,
+    "new_sketch_count": 1,
+    "new_underconstrained_sketch_count": 1,
+    "full_sketch_fully_defined": false
+  },
+  "solid_body_after_diagnostic": {
+    "symmetric_difference_from_before_m3": 0,
+    "geometry_preserved": true
+  },
+  "protection": {
+    "assembly_edit_context_restored": true,
+    "blank_session_restored": true,
+    "source_file_hashes_unchanged": true,
+    "copy_file_hashes_unchanged": true
+  },
+  "important_context_detail": "OWNED_FEATURE_SPECIFIC_SKETCH comes from QueryInterface of the original active Assembly-context Sketch to Feature and then GetSpecificFeature2. It is not a Feature reacquired later by enumerating the native Part tree. Matching segment IDs alone did not prove correct document context.",
+  "limitations": [
+    "Part-manager CreateLine returned null in this experiment.",
+    "The direct Assembly-created segment returned Select4=true but did not populate the Assembly selection list.",
+    "One actual Horizontal relation type4/count0-to1 was verified; the diagnostic Sketch remains underconstrained.",
+    "This is not a full cover profile, native Cut, parameter-follow test, integrated Add-in fix, or reopen/hang resolution."
+  ]
+}

@@ -1,0 +1,2091 @@
+{
+  "part": {
+    "file": "4114-04-HN-C07-12_New.SLDPRT",
+    "sha256_before": "126a7a288bab23a18389157ca4da405b1163ec5e10c8f7b12106d4bfef3006e2",
+    "sha256_after": "126a7a288bab23a18389157ca4da405b1163ec5e10c8f7b12106d4bfef3006e2",
+    "source_hash_unchanged": true,
+    "title": "4114-04-HN-C07-12_New",
+    "document_type": 1,
+    "path_matches_request": true,
+    "read_only": true,
+    "open_errors": 0,
+    "open_warnings": 0,
+    "configuration": "ﾃﾞﾌｫﾙﾄ",
+    "all_configuration_names": [
+      "ﾃﾞﾌｫﾙﾄ",
+      "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN"
+    ],
+    "top_level_feature_count": 32,
+    "unique_tree_node_count": 56,
+    "explicit_cut_count": 1,
+    "sheet_metal": [
+      {
+        "BendRadius": 0.0001,
+        "Thickness": 0.0023,
+        "BendAllowanceType": 1,
+        "BendTableFile": "REDACTED_LOCAL_PATH",
+        "KFactor": 0.5,
+        "BendAllowance": 0,
+        "UseAutoRelief": true,
+        "AutoReliefType": 2,
+        "ReliefRatio": 0,
+        "UseMaterialSheetMetalParameters": false
+      }
+    ],
+    "bodies": [
+      {
+        "name": "とめつぎﾌﾗﾝｼﾞ1",
+        "box_m": [
+          2.939152317953648e-19,
+          -0.07500000000000001,
+          -0.1144,
+          0.0133,
+          0.015,
+          0.002400000000000036
+        ],
+        "spans_mm": [
+          13.299999999999999,
+          90.00000000000001,
+          116.80000000000004
+        ],
+        "face_count": 56,
+        "volume_mm3": 29884.629285675117,
+        "surface_area_mm2": 27154.46220479839
+      }
+    ],
+    "save_flag_before_read": false,
+    "save_flag_after_read": true
+  },
+  "feature_tree": [
+    {
+      "index": 1,
+      "relation": "top_level",
+      "name": "Configuration Comments",
+      "type": "ConfigCommentsFolder",
+      "legacy_type": "ConfigCommentsFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 2,
+      "relation": "top_level",
+      "name": "お気に入り",
+      "type": "FavoriteFolder",
+      "legacy_type": "FavoriteFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 3,
+      "relation": "top_level",
+      "name": "履歴",
+      "type": "HistoryFolder",
+      "legacy_type": "HistoryFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 4,
+      "relation": "top_level",
+      "name": "選択ｾｯﾄ",
+      "type": "SelectionSetFolder",
+      "legacy_type": "SelectionSetFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 5,
+      "relation": "top_level",
+      "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+      "type": "DocsFolder",
+      "legacy_type": "DocsFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 6,
+      "relation": "top_level",
+      "name": "ｱﾉﾃｰﾄ ｱｲﾃﾑ",
+      "type": "DetailCabinet",
+      "legacy_type": "DetailCabinet",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "Notes",
+          "type": "NotesAreaFtrFolder",
+          "legacy_type": "NotesAreaFtrFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "注記領域",
+          "type": "AnnotationViewFeat",
+          "legacy_type": "AnnotationViewFeat",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "Notes1___EndTag___",
+          "type": "NotesAreaFtrFolder",
+          "legacy_type": "NotesAreaFtrFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "relation": "top_level",
+      "name": "Markups",
+      "type": "InkMarkupFolder",
+      "legacy_type": "InkMarkupFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 8,
+      "relation": "top_level",
+      "name": "照明とｶﾒﾗ",
+      "type": "EnvFolder",
+      "legacy_type": "EnvFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ｱﾝﾋﾞｴﾝﾄ",
+          "type": "AmbientLight",
+          "legacy_type": "AmbientLight",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "指向性1",
+          "type": "DirectionLight",
+          "legacy_type": "DirectionLight",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "指向性2",
+          "type": "DirectionLight",
+          "legacy_type": "DirectionLight",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 4,
+          "relation": "subfeature",
+          "name": "指向性3",
+          "type": "DirectionLight",
+          "legacy_type": "DirectionLight",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 5,
+          "relation": "subfeature",
+          "name": "指向性4",
+          "type": "DirectionLight",
+          "legacy_type": "DirectionLight",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "relation": "top_level",
+      "name": "ｾﾝｻｰ",
+      "type": "SensorFolder",
+      "legacy_type": "SensorFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 10,
+      "relation": "top_level",
+      "name": "ｿﾘｯﾄﾞ ﾎﾞﾃﾞｨ",
+      "type": "SolidBodyFolder",
+      "legacy_type": "SolidBodyFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ｶｯﾄ-ﾘｽﾄ-ｱｲﾃﾑ1",
+          "type": "CutListFolder",
+          "legacy_type": "CutListFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "relation": "top_level",
+      "name": "ｻｰﾌｪｽ ﾎﾞﾃﾞｨ（複数）",
+      "type": "SurfaceBodyFolder",
+      "legacy_type": "SurfaceBodyFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 12,
+      "relation": "top_level",
+      "name": "ｺﾒﾝﾄ",
+      "type": "CommentsFolder",
+      "legacy_type": "CommentsFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 13,
+      "relation": "top_level",
+      "name": "関係式",
+      "type": "EqnFolder",
+      "legacy_type": "EqnFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 14,
+      "relation": "top_level",
+      "name": "NSD-",
+      "type": "MaterialFolder",
+      "legacy_type": "MaterialFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 15,
+      "relation": "top_level",
+      "name": "正面",
+      "type": "RefPlane",
+      "legacy_type": "RefPlane",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "原点",
+          "type": "OriginProfileFeature"
+        },
+        {
+          "feature_name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 16,
+      "relation": "top_level",
+      "name": "平面",
+      "type": "RefPlane",
+      "legacy_type": "RefPlane",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [
+        {
+          "feature_name": "X軸",
+          "type": "RefAxis"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 17,
+      "relation": "top_level",
+      "name": "右側面",
+      "type": "RefPlane",
+      "legacy_type": "RefPlane",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [
+        {
+          "feature_name": "左側面",
+          "type": "RefPlane"
+        },
+        {
+          "feature_name": "X軸",
+          "type": "RefAxis"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 18,
+      "relation": "top_level",
+      "name": "原点",
+      "type": "OriginProfileFeature",
+      "legacy_type": "OriginProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "正面",
+          "type": "RefPlane"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 0,
+        "construction_segment_count": 0,
+        "contour_count_api": 0,
+        "region_count_api": 0,
+        "endpoint_graph_closed_inferred": false,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": null,
+        "model_bounds_mm": null,
+        "sketch_normal_model": [
+          0,
+          0,
+          1
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 19,
+      "relation": "top_level",
+      "name": "X軸",
+      "type": "RefAxis",
+      "legacy_type": "RefAxis",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "右側面",
+          "type": "RefPlane"
+        },
+        {
+          "feature_name": "平面",
+          "type": "RefPlane"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "左側面",
+          "type": "RefPlane"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 20,
+      "relation": "top_level",
+      "name": "左側面",
+      "type": "RefPlane",
+      "legacy_type": "RefPlane",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "X軸",
+          "type": "RefAxis"
+        },
+        {
+          "feature_name": "右側面",
+          "type": "RefPlane"
+        }
+      ],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 21,
+      "relation": "top_level",
+      "name": "ｽｹｯﾁ1",
+      "type": "ProfileFeature",
+      "legacy_type": "ProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "正面",
+          "type": "RefPlane"
+        },
+        {
+          "feature_name": "原点",
+          "type": "OriginProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 5,
+        "construction_segment_count": 0,
+        "contour_count_api": 1,
+        "region_count_api": 0,
+        "endpoint_graph_closed_inferred": false,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": [
+          0,
+          -75.00000000000001,
+          0,
+          11.0,
+          15.0,
+          0
+        ],
+        "model_bounds_mm": [
+          0,
+          -75.00000000000001,
+          0,
+          11.0,
+          15.0,
+          0
+        ],
+        "sketch_normal_model": [
+          0,
+          0,
+          1
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 22,
+      "relation": "top_level",
+      "name": "板金12",
+      "type": "SheetMetal",
+      "legacy_type": "SheetMetal",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "板金",
+          "type": "TemplateSheetMetal"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ12",
+          "type": "FlatPattern"
+        },
+        {
+          "feature_name": "とめつぎﾌﾗﾝｼﾞ1",
+          "type": "SMMiteredFlange"
+        },
+        {
+          "feature_name": "ｴｯｼﾞ-ﾌﾗﾝｼﾞ1",
+          "type": "EdgeFlange"
+        }
+      ],
+      "definition": {
+        "ISheetMetalFeatureData": {
+          "BendRadius": 0.0001,
+          "Thickness": 0.0023,
+          "BendAllowanceType": 1,
+          "BendTableFile": "REDACTED_LOCAL_PATH",
+          "KFactor": 0.5,
+          "BendAllowance": 0,
+          "UseAutoRelief": true,
+          "AutoReliefType": 2,
+          "ReliefRatio": 0,
+          "UseMaterialSheetMetalParameters": false
+        }
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 23,
+      "relation": "top_level",
+      "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+      "type": "SMBaseFlange",
+      "legacy_type": "SMBaseFlange",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "板金",
+          "type": "TemplateSheetMetal"
+        },
+        {
+          "feature_name": "板金12",
+          "type": "SheetMetal"
+        },
+        {
+          "feature_name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "正面",
+          "type": "RefPlane"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｽｹｯﾁ10",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ｶｯﾄ - 押し出し1",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "平面1",
+          "type": "RefPlane"
+        },
+        {
+          "feature_name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ12",
+          "type": "FlatPattern"
+        },
+        {
+          "feature_name": "とめつぎﾌﾗﾝｼﾞ1",
+          "type": "SMMiteredFlange"
+        },
+        {
+          "feature_name": "ｽｹｯﾁ6",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ｴｯｼﾞ-ﾌﾗﾝｼﾞ1",
+          "type": "EdgeFlange"
+        }
+      ],
+      "definition": {
+        "IBaseFlangeFeatureData": {
+          "OffsetDirections": 1,
+          "D1OffsetType": 1,
+          "D2OffsetType": 1,
+          "D1OffsetDistance": 0.112,
+          "D2OffsetDistance": 0.001,
+          "Thickness": 0.0023,
+          "ReverseThickness": true,
+          "BendRadius": 0.0001,
+          "ReverseDirection": true,
+          "D1ReverseOffset": false,
+          "D2ReverseOffset": true,
+          "UseGaugeTable": false,
+          "GaugeTablePath": "",
+          "ThicknessTableName": null,
+          "TableThickness": 0,
+          "OverrideThickness": false,
+          "TableRadius": 0,
+          "OverrideRadius": false,
+          "KFactor": 0.5,
+          "OverrideKFactor": false,
+          "TableKFactor": 0,
+          "UseMaterialSheetMetalParameters": false,
+          "UseDefaultBendAllowance": false,
+          "OverrideDefaultSheetMetalParameters": false,
+          "UseDefaultBendRelief": true,
+          "ReliefType": 2,
+          "UseReliefRatio": true,
+          "ReliefRatio": 0,
+          "ReliefWidth": 0,
+          "ReliefDepth": 0,
+          "D1EndConditionType": 1,
+          "D1EndConditionDistance": 0.112,
+          "D2EndConditionType": 1,
+          "D2EndConditionDistance": 0.001,
+          "SymmetricThickness": false
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "正面",
+              "type": "RefPlane"
+            },
+            {
+              "feature_name": "原点",
+              "type": "OriginProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 5,
+            "construction_segment_count": 0,
+            "contour_count_api": 1,
+            "region_count_api": 0,
+            "endpoint_graph_closed_inferred": false,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              0,
+              -75.00000000000001,
+              0,
+              11.0,
+              15.0,
+              0
+            ],
+            "model_bounds_mm": [
+              0,
+              -75.00000000000001,
+              0,
+              11.0,
+              15.0,
+              0
+            ],
+            "sketch_normal_model": [
+              0,
+              0,
+              1
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ1",
+          "type": "SketchBend",
+          "legacy_type": "SketchBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｽｹｯﾁ10",
+              "type": "ProfileFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ2",
+          "type": "SketchBend",
+          "legacy_type": "SketchBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 4,
+          "relation": "subfeature",
+          "name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ3",
+          "type": "SketchBend",
+          "legacy_type": "SketchBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 5,
+          "relation": "subfeature",
+          "name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ4",
+          "type": "SketchBend",
+          "legacy_type": "SketchBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 24,
+      "relation": "top_level",
+      "name": "ｶｯﾄ-ﾘｽﾄ-ｱｲﾃﾑ1",
+      "type": "CutListFolder",
+      "legacy_type": "CutListFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 25,
+      "relation": "top_level",
+      "name": "ｽｹｯﾁ6",
+      "type": "ProfileFeature",
+      "legacy_type": "ProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｶｯﾄ - 押し出し1",
+          "type": "ICE"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 2,
+        "construction_segment_count": 0,
+        "contour_count_api": 2,
+        "region_count_api": 3,
+        "endpoint_graph_closed_inferred": true,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": [
+          27.900000000000002,
+          -27.100000000000005,
+          0,
+          84.10000000000001,
+          -22.899999999999995,
+          0
+        ],
+        "model_bounds_mm": [
+          2.3000000000000025,
+          -27.100000000000005,
+          -84.10000000000001,
+          2.3000000000000034,
+          -22.899999999999995,
+          -27.900000000000002
+        ],
+        "sketch_normal_model": [
+          1,
+          1.224646799147353e-16,
+          0
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 26,
+      "relation": "top_level",
+      "name": "ｶｯﾄ - 押し出し1",
+      "type": "ICE",
+      "legacy_type": "Cut",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ｽｹｯﾁ6",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [],
+      "definition": {
+        "IExtrudeFeatureData2": {
+          "ReverseDirection": false,
+          "BothDirections": false,
+          "FlipSideToCut": false,
+          "ThinWallType": -1,
+          "CapEnds": false,
+          "CapThickness": 0,
+          "Merge": true,
+          "FeatureScope": true,
+          "AutoSelect": false,
+          "FromType": 0,
+          "FromOffsetDistance": 0,
+          "FromOffsetReverse": false,
+          "LinkToThickness": true,
+          "AssemblyFeatureScope": true,
+          "AutoSelectComponents": true,
+          "PropagateFeatureToParts": false,
+          "NormalCut": true,
+          "OptimizeGeometry": false
+        },
+        "extrude": {
+          "end_condition_forward": 0,
+          "end_condition_reverse": 0,
+          "depth_forward_m": 0.0023,
+          "depth_reverse_m": 0.01,
+          "draft_forward_enabled": false,
+          "draft_reverse_enabled": false,
+          "draft_forward_rad": 0,
+          "draft_reverse_rad": 0,
+          "draft_outward_forward": false,
+          "draft_outward_reverse": false,
+          "reverse_offset_forward": false,
+          "reverse_offset_reverse": false,
+          "is_thin": false,
+          "scope_body_count": -1
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ｽｹｯﾁ6",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｶｯﾄ - 押し出し1",
+              "type": "ICE"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 2,
+            "construction_segment_count": 0,
+            "contour_count_api": 2,
+            "region_count_api": 3,
+            "endpoint_graph_closed_inferred": true,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              27.900000000000002,
+              -27.100000000000005,
+              0,
+              84.10000000000001,
+              -22.899999999999995,
+              0
+            ],
+            "model_bounds_mm": [
+              2.3000000000000025,
+              -27.100000000000005,
+              -84.10000000000001,
+              2.3000000000000034,
+              -22.899999999999995,
+              -27.900000000000002
+            ],
+            "sketch_normal_model": [
+              1,
+              1.224646799147353e-16,
+              0
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 27,
+      "relation": "top_level",
+      "name": "ｴｯｼﾞ-ﾌﾗﾝｼﾞ1",
+      "type": "EdgeFlange",
+      "legacy_type": "EdgeFlange",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "板金",
+          "type": "TemplateSheetMetal"
+        },
+        {
+          "feature_name": "板金12",
+          "type": "SheetMetal"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ｽｹｯﾁ9",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [],
+      "definition": {
+        "IEdgeFlangeFeatureData": {
+          "UseDefaultBendRadius": true,
+          "BendRadius": 0.0001,
+          "BendAngle": 1.5707963267949,
+          "OffsetType": 1,
+          "ReverseOffset": false,
+          "OffsetDistance": 0.0127,
+          "OffsetDimType": 3,
+          "PositionType": 3,
+          "UsePositionTrimSideBends": false,
+          "UsePositionOffset": false,
+          "PositionOffsetType": 1,
+          "PositionOffsetDistance": 0.01,
+          "ReversePositionOffset": false,
+          "AutoReliefType": 2,
+          "UseReliefRatio": true,
+          "ReliefRatio": 0,
+          "ReliefWidth": 0.0001,
+          "ReliefDepth": 0,
+          "ReliefTearType": 1,
+          "UseDefaultBendAllowance": true,
+          "UseDefaultBendRelief": true,
+          "GapDistance": 0.001,
+          "LockAngle": true,
+          "PerpendicularToFace": false,
+          "NormalToFlangePlane": true
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ｽｹｯﾁ9",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｴｯｼﾞ-ﾌﾗﾝｼﾞ1",
+              "type": "EdgeFlange"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 4,
+            "construction_segment_count": 0,
+            "contour_count_api": 1,
+            "region_count_api": 1,
+            "endpoint_graph_closed_inferred": true,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              2.4,
+              0,
+              0,
+              47.6,
+              10.4,
+              0
+            ],
+            "model_bounds_mm": [
+              2.3000000000000003,
+              -47.6,
+              0.0,
+              12.700000000000005,
+              -2.399999999999998,
+              3.631140592396859e-14
+            ],
+            "sketch_normal_model": [
+              -3.4914813388431334e-15,
+              -4.019969896742997e-31,
+              1
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "ｴｯｼﾞﾍﾞﾝﾄﾞ1",
+          "type": "OneBend",
+          "legacy_type": "OneBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ｴｯｼﾞ-ﾌﾗﾝｼﾞ1",
+              "type": "EdgeFlange"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 28,
+      "relation": "top_level",
+      "name": "平面1",
+      "type": "RefPlane",
+      "legacy_type": "RefPlane",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｽｹｯﾁ10",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "とめつぎﾌﾗﾝｼﾞ1",
+          "type": "SMMiteredFlange"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 29,
+      "relation": "top_level",
+      "name": "ｽｹｯﾁ10",
+      "type": "ProfileFeature",
+      "legacy_type": "ProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "平面1",
+          "type": "RefPlane"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ1",
+          "type": "SketchBend"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "とめつぎﾌﾗﾝｼﾞ1",
+          "type": "SMMiteredFlange"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 1,
+        "construction_segment_count": 0,
+        "contour_count_api": 1,
+        "region_count_api": 0,
+        "endpoint_graph_closed_inferred": false,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": [
+          0,
+          0,
+          0,
+          6.699999999999999,
+          0,
+          0
+        ],
+        "model_bounds_mm": [
+          2.3000000000000056,
+          -47.6,
+          -112.0,
+          9.000000000000005,
+          -47.6,
+          -112.0
+        ],
+        "sketch_normal_model": [
+          1.2246467991473532e-16,
+          -1,
+          0
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 30,
+      "relation": "top_level",
+      "name": "とめつぎﾌﾗﾝｼﾞ1",
+      "type": "SMMiteredFlange",
+      "legacy_type": "SMMiteredFlange",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "板金",
+          "type": "TemplateSheetMetal"
+        },
+        {
+          "feature_name": "板金12",
+          "type": "SheetMetal"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ｽｹｯﾁ10",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "平面1",
+          "type": "RefPlane"
+        }
+      ],
+      "children": [],
+      "definition": {
+        "IMiterFlangeFeatureData": {
+          "UseDefaultBendRadius": true,
+          "BendRadius": 0.0001,
+          "PositionType": 3,
+          "UsePositionTrimSideBends": false,
+          "GapDistance": 0.00025,
+          "StartOffset": 0,
+          "EndOffset": 0,
+          "ReliefType": -1,
+          "UseReliefRatio": true,
+          "ReliefRatio": 0,
+          "ReliefWidth": 0,
+          "ReliefDepth": 0,
+          "UseDefaultBendAllowance": true,
+          "UseDefaultBendRelief": true
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ｽｹｯﾁ10",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "平面1",
+              "type": "RefPlane"
+            },
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            },
+            {
+              "feature_name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ1",
+              "type": "SketchBend"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "とめつぎﾌﾗﾝｼﾞ1",
+              "type": "SMMiteredFlange"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 1,
+            "construction_segment_count": 0,
+            "contour_count_api": 1,
+            "region_count_api": 0,
+            "endpoint_graph_closed_inferred": false,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              0,
+              0,
+              0,
+              6.699999999999999,
+              0,
+              0
+            ],
+            "model_bounds_mm": [
+              2.3000000000000056,
+              -47.6,
+              -112.0,
+              9.000000000000005,
+              -47.6,
+              -112.0
+            ],
+            "sketch_normal_model": [
+              1.2246467991473532e-16,
+              -1,
+              0
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "とめつぎﾍﾞﾝﾄﾞ1",
+          "type": "SketchBend",
+          "legacy_type": "SketchBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "とめつぎﾌﾗﾝｼﾞ1",
+              "type": "SMMiteredFlange"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 31,
+      "relation": "top_level",
+      "name": "ADDIN_VCut_Bend_890",
+      "type": "Attribute",
+      "legacy_type": "Attribute",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          false
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 32,
+      "relation": "top_level",
+      "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ12",
+      "type": "FlatPattern",
+      "legacy_type": "FlatPattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": true,
+      "suppressed_by_config": {
+        "ﾃﾞﾌｫﾙﾄ": [
+          true
+        ],
+        "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "板金",
+          "type": "TemplateSheetMetal"
+        },
+        {
+          "feature_name": "板金12",
+          "type": "SheetMetal"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ﾍﾞﾝﾄﾞ-ﾗｲﾝ2",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 0,
+            "construction_segment_count": 2,
+            "contour_count_api": 0,
+            "region_count_api": 0,
+            "endpoint_graph_closed_inferred": false,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": null,
+            "model_bounds_mm": null,
+            "sketch_normal_model": [
+              1,
+              1.2246467991473532e-16,
+              0
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "境界ﾎﾞｯｸｽ2",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": true,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              true
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 0,
+            "construction_segment_count": 4,
+            "contour_count_api": 0,
+            "region_count_api": 0,
+            "endpoint_graph_closed_inferred": false,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": null,
+            "model_bounds_mm": null,
+            "sketch_normal_model": [
+              1,
+              1.2246467991473532e-16,
+              0
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ1>1",
+          "type": "UiBend",
+          "legacy_type": "UiBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ1",
+              "type": "SketchBend"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 4,
+          "relation": "subfeature",
+          "name": "ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ2>1",
+          "type": "UiBend",
+          "legacy_type": "UiBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ2",
+              "type": "SketchBend"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 5,
+          "relation": "subfeature",
+          "name": "ｽｹｯﾁ変換1",
+          "type": "FoldUpDownSketchFolder",
+          "legacy_type": "FoldUpDownSketchFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": true,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              true
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 6,
+          "relation": "subfeature",
+          "name": "ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ3>2",
+          "type": "UiBend",
+          "legacy_type": "UiBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ3",
+              "type": "SketchBend"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 7,
+          "relation": "subfeature",
+          "name": "ﾌﾗｯﾄ-<ﾍﾞｰｽﾍﾞﾝﾄﾞ4>2",
+          "type": "UiBend",
+          "legacy_type": "UiBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽﾍﾞﾝﾄﾞ4",
+              "type": "SketchBend"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 8,
+          "relation": "subfeature",
+          "name": "ﾌﾗｯﾄ-<ｴｯｼﾞﾍﾞﾝﾄﾞ1>1",
+          "type": "UiBend",
+          "legacy_type": "UiBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ｴｯｼﾞﾍﾞﾝﾄﾞ1",
+              "type": "OneBend"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 9,
+          "relation": "subfeature",
+          "name": "ﾌﾗｯﾄ-<とめつぎﾍﾞﾝﾄﾞ1>1",
+          "type": "UiBend",
+          "legacy_type": "UiBend",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "ﾃﾞﾌｫﾙﾄ": [
+              false
+            ],
+            "ﾃﾞﾌｫﾙﾄSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "とめつぎﾍﾞﾝﾄﾞ1",
+              "type": "SketchBend"
+            }
+          ],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    }
+  ]
+}

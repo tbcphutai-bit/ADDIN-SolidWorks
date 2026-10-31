@@ -1,0 +1,19 @@
+{
+  "scope": "Exact raw qualified branch source compared with staged repository text; no binary exported",
+  "files": [
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "qualified_working_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+      "repository_blob_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+      "repository_blob_id": "ff71b5212293320f7bfa3fc81a15e229e04a2ab9",
+      "normalization": "IDENTICAL_BYTES"
+    },
+    {
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "qualified_working_sha256": "e614e97f6aaeec37f61385a58b5f12a44904ab40dffa2e0a250d24b22f76d737",
+      "repository_blob_sha256": "e614e97f6aaeec37f61385a58b5f12a44904ab40dffa2e0a250d24b22f76d737",
+      "repository_blob_id": "a7caa2876f721a9bf8cf0168af5b198d49d4f460",
+      "normalization": "IDENTICAL_BYTES"
+    }
+  ]
+}

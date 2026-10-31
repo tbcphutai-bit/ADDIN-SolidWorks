@@ -1,0 +1,40 @@
+{
+  "files": [
+    {
+      "file": "COMPILATION.json",
+      "sha256": "07d76addf9993b025c8faa2caaa8e4152112e4ffb7860f514e2b523e9b93aeb7"
+    },
+    {
+      "file": "LOG_EVIDENCE.md",
+      "sha256": "d0c3a69b47ac99f4c07e3856f29dc568687973c9632e5f680807e38867668865"
+    },
+    {
+      "file": "LOG_SUMMARY.json",
+      "sha256": "9ebc064b445380c3cf0364738f022050c786c43bf2c4b227e0661350f02056e0"
+    },
+    {
+      "file": "MAIN_SOURCE_UPDATE.json",
+      "sha256": "ac4fe7e2dc5343a321f820ba39491a02cb1734202b7df228e121eafeeef14036"
+    },
+    {
+      "file": "MANAGED_CLOSE_git.json",
+      "sha256": "398505b79736d702e1d8576c90da53f26a9067f790c7c15e8637cc28f1b459c6"
+    },
+    {
+      "file": "MANAGED_CLOSE_local.json",
+      "sha256": "398505b79736d702e1d8576c90da53f26a9067f790c7c15e8637cc28f1b459c6"
+    },
+    {
+      "file": "MANAGED_CLOSE_old.json",
+      "sha256": "c92bab24f50c58f460e2a92685e455bab58199619e630e6e407e058eb2579cf8"
+    },
+    {
+      "file": "README.md",
+      "sha256": "7188d98e2403325b3be22fe784ebfb9b33d7f474b8d53917417a97284c9df105"
+    },
+    {
+      "file": "SOURCE_PATCH_MANIFEST.json",
+      "sha256": "23970c6cd367f042d29f9e15b0e35b41e831f755fd86354f6f717f106c1b3f4f"
+    }
+  ]
+}

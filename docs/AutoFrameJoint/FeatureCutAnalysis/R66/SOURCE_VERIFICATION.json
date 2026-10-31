@@ -1,0 +1,35 @@
+{
+  "source_sha256": "8DA46874294E61F2A61CE5921F3C28A3F1564254A6587442D8B502AE8CEC9F41",
+  "scope": "TEMPORARY_PREVIEW_APPEARANCE_ONLY",
+  "keep_a_rgb": [
+    155,
+    55,
+    255
+  ],
+  "keep_b_rgb": [
+    255,
+    215,
+    0
+  ],
+  "keep_transparency": 0.1,
+  "cut_a_rgb": [
+    255,
+    50,
+    65
+  ],
+  "cut_b_rgb": [
+    0,
+    115,
+    255
+  ],
+  "cut_transparency": 0.12,
+  "body_and_face_temporary_owner_guard": true,
+  "manufacturing_code_unchanged": true,
+  "independent_compile": "PASS",
+  "native_api_tested": false,
+  "rendered_color_verified": false,
+  "main_source_copy": "HASH_VERIFIED",
+  "main_build": false,
+  "deployment": false,
+  "source_part_appearance_changed": false
+}

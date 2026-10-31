@@ -1,0 +1,10 @@
+test,status,evidence_and_limits
+NATIVE_READONLY_INPUT,PASS_API_VERIFIED,"7 detailed Frames, 24 contained files; no main Add-in"
+CUT_FEATURE_INVENTORY,PASS_API_VERIFIED,93 native Cut records including 14 suppressed
+MEASURED_PROFILE_TILT,PASS_GEOMETRY_VERIFIED,2.05 degrees in reused b1-fr2/fr3
+REFERENCE_CAP_PEER_PLANE_OFFSETS,PASS_GEOMETRY_VERIFIED_PLANAR_SUPPORTS_ONLY,Two pairs; 0.10 / 2.10 mm
+AFFINE_BOUNDARY_REFERENCE_MATH,PASS_MATH_ONLY,Two cap Sketch/plane cases; no new CAD operation
+NEW_NATIVE_CUT_BEFORE_AFTER,NOT_RUN,No historical ThroughAll-to-Blind native replay
+NEW_PER_LAYER_BOOLEAN,NOT_RUN,No new cutter B-rep qualified
+NEW_PREVIEW_OR_FOUR_CORNERS,NOT_RUN,Existing Add-in not invoked
+SOURCE_COPY_HASHES,PASS,24 original and copied file hashes unchanged

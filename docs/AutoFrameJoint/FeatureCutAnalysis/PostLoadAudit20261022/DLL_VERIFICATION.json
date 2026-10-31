@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "audit_scope": "READ_ONLY_DISK_METADATA_PLUS_SELECTED_USER_RUNTIME_LOG",
+  "source_repository": "tbcphutai-bit/ADDIN-SolidWorks",
+  "source_pr": 45,
+  "source_commit": "90876693d34fbaf6b13f0570b548ba7f6b946547",
+  "file_basename": "ADDIN.dll",
+  "disk_last_write_local": "2026-10-22 21:57:29 Asia/Bangkok",
+  "disk_mvid": "420dfcfc-a6ee-4861-ae82-f54d916e32e4",
+  "user_runtime_mvid": "420dfcfc-a6ee-4861-ae82-f54d916e32e4",
+  "runtime_mvid_matches_disk_mvid": true,
+  "runtime_evidence": {
+    "source": "USER_PROVIDED_DEBUG_LOG",
+    "sha256": "8697387082fe82f0cc71adfc4a36734d5138a0a36dde5c39967af511bf54f838",
+    "line_count": 683,
+    "loaded_identity_line": 81,
+    "command_identity_line": 249
+  },
+  "dll_sha256": "242d1773792740ae8e0cafcf89cf6bc2ef74c66e34b3902f777af6a9d2af5a45",
+  "pdb_sha256": "a95d8cfbfd1d6be8fe3cc4718f8b8182b2e027014910419642965cef43a7c45e",
+  "codeview_guid": "40e0912e-8baf-41a5-98b1-f419eba866e0",
+  "codeview_age": 1,
+  "pdb_guid_age_matches_dll": true,
+  "native_pdb_source_checksum_proof": "NOT_AVAILABLE_WITH_EXISTING_C13_PARSER_NOT_A_MISMATCH",
+  "il_comparison": {
+    "reader": "Mono.Cecil metadata only; no Add-in execution",
+    "comparison_target": "independently compiled actual-local-source managed harness",
+    "normalization": "NOP and short-opcode differences ignored; calls/literals/operands/control-flow targets retained",
+    "afj_type_count": 94,
+    "method_count": 459,
+    "matched_methods": 459,
+    "missing_methods": 0,
+    "mismatched_methods": 0
+  },
+  "source_hash_audit": {
+    "changed_local_classes_match_exact_applied_baseline": true,
+    "other_three_afj_sources_and_project_match_protected_baseline": true,
+    "three_changed_local_classes_vs_pr45": "COMMENTS_AND_BLANK_LINES_ONLY",
+    "source_drift_detected": false
+  },
+  "actual_runtime_route": {
+    "rule": "ORTHOGONAL_U_TALLER_COVER",
+    "representation": "FIXED_PLANE_PRISM",
+    "folded_face_attached_writer_used": false
+  },
+  "both_writer_paths_exist_in_binary": true,
+  "main_build_or_deploy_by_auditor": false,
+  "original_source_or_project_modified_by_auditor": false,
+  "installed_part_open_hang_cause": "UNVERIFIED"
+}

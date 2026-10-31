@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0",
+  "evidence_level": "API_VERIFIED_NATIVE_COPY_HARNESS",
+  "scope": "FOUR_ISOLATED_U_CRITICAL_SKETCH_POINTS_ONLY",
+  "status": "PASS_NATIVE_FOUR_CRITICAL_POINTS_ONLY_NO_CUT_NO_FOLLOW_TEST",
+  "actual_pair": {
+    "frame_a": "2354-fr03",
+    "frame_b": "2354-fr04",
+    "short_cover_frame": "2354-fr04",
+    "rule": "ORTHOGONAL_U_TALLER_COVER"
+  },
+  "source_result_sha256": "80044f7b38cf04271877b78cba38e6db0746252ca2b779cba30b79795cc94e1c",
+  "started_utc": "2026-10-22T15:40:39.8272037Z",
+  "completed_utc": "2026-10-22T15:42:15.3434842Z",
+  "solidworks_revision": "32.5.0",
+  "standalone_harness_mvid": "bd7c05f3-7942-42f9-b183-02fdf22de88e",
+  "installed_addin_test": false,
+  "cut_created": false,
+  "save_api_called": false,
+  "coordinate_context": "ASSEMBLY_WORLD_TO_TARGET_PART_TO_SKETCH",
+  "result": {
+    "critical_point_count": 4,
+    "native_constrained_status": 3,
+    "native_status_meaning": "FULLY_CONSTRAINED",
+    "direct_relation_count": 8,
+    "dangling_relations": 0,
+    "overdefining_relations": 0,
+    "driving_dimensions": 0,
+    "new_reference_planes": 0,
+    "observable_external_reference_count": 6,
+    "target_part_sketch_owner_verified": true,
+    "assembly_edit_context_restored": true,
+    "maximum_seed_displacement_m": 4.336808689942018e-19
+  },
+  "points": [
+    {
+      "role": "P1_CLAMPED_MASTER_NEAR",
+      "direct_native_relation_types": [
+        9,
+        9
+      ],
+      "relation_name": "COINCIDENT",
+      "seed_displacement_m": 4.336808689942018e-19,
+      "first_datum": {
+        "kind": "ACTUAL_NATIVE_FINITE_EDGE",
+        "role": "SHORT_NEAR_WEB_BEND_TANGENT",
+        "finite_trim": true,
+        "trim_distance": 4.440894216082489e-16
+      },
+      "second_datum": {
+        "kind": "ACTUAL_NATIVE_FACE_UNDERLYING_PLANE",
+        "role": "LONG_INNER_NEAR_WALL_PLANE",
+        "finite_trim": false,
+        "trim_distance": 0.0025999999999999986
+      }
+    },
+    {
+      "role": "P2_MASTER_FAR",
+      "direct_native_relation_types": [
+        9,
+        9
+      ],
+      "relation_name": "COINCIDENT",
+      "seed_displacement_m": 4.336808689942018e-19,
+      "first_datum": {
+        "kind": "ACTUAL_NATIVE_FINITE_EDGE",
+        "role": "SHORT_FAR_WEB_BEND_TANGENT",
+        "finite_trim": true,
+        "trim_distance": 4.57756885287843e-16
+      },
+      "second_datum": {
+        "kind": "ACTUAL_NATIVE_FINITE_EDGE",
+        "role": "LONG_FAR_WEB_BEND_TANGENT",
+        "finite_trim": true,
+        "trim_distance": 0
+      }
+    },
+    {
+      "role": "P3_INNER_FAR_WALL_TANGENT",
+      "direct_native_relation_types": [
+        9,
+        9
+      ],
+      "relation_name": "COINCIDENT",
+      "seed_displacement_m": 4.336808689942018e-19,
+      "first_datum": {
+        "kind": "ACTUAL_NATIVE_FACE_UNDERLYING_PLANE",
+        "role": "SHORT_INNER_FAR_WALL_PLANE",
+        "finite_trim": false,
+        "trim_distance": 0.0025999999999999994
+      },
+      "second_datum": {
+        "kind": "ACTUAL_NATIVE_FINITE_EDGE",
+        "role": "LONG_FAR_WEB_BEND_TANGENT",
+        "finite_trim": true,
+        "trim_distance": 0
+      }
+    },
+    {
+      "role": "P4_OUTER_WALL_INTERSECTION",
+      "direct_native_relation_types": [
+        9,
+        9
+      ],
+      "relation_name": "COINCIDENT",
+      "seed_displacement_m": 4.336808689942018e-19,
+      "first_datum": {
+        "kind": "ACTUAL_NATIVE_FACE_UNDERLYING_PLANE",
+        "role": "SHORT_INNER_FAR_WALL_PLANE",
+        "finite_trim": false,
+        "trim_distance": 0.0025999999999999994
+      },
+      "second_datum": {
+        "kind": "ACTUAL_NATIVE_FACE_UNDERLYING_PLANE",
+        "role": "LONG_OUTER_FAR_WALL_PLANE",
+        "finite_trim": false,
+        "trim_distance": 0.0025999999999999977
+      }
+    }
+  ],
+  "file_protection": {
+    "source_file_hashes_unchanged": true,
+    "copy_file_hashes_unchanged": true,
+    "blank_session_restored": true
+  },
+  "limitations": {
+    "full_closed_cover_profile": "NOT_TESTED_IN_THIS_RUN",
+    "native_cut_from_geometric_master": "NOT_CREATED",
+    "parameter_follow_test": "NOT_RUN_IN_THIS_RUN",
+    "reference_cycle_safety_after_cuts": "UNVERIFIED",
+    "loser_and_bend_relief_sketches": "NOT_TESTED_IN_THIS_RUN",
+    "model_regeneration_and_reopen_of_final_cut": "NOT_TESTED_IN_THIS_RUN",
+    "installed_addin_part_open_hang": "UNVERIFIED"
+  },
+  "evidence_interpretation": "Native Face constraints can associate with the underlying support plane while the point is outside the finite trimmed Face. finite_trim=false is retained explicitly; it is not a trimmed-face contact claim."
+}

@@ -1,0 +1,51 @@
+{
+  "report_date": "2026-10-23",
+  "status": "UNEXPECTED_ORIGINAL_ASSEMBLY_HASH_CHANGE_CAUSE_UNVERIFIED",
+  "scope": "PACK_AND_GO_COPY_PREPARATION_ONLY_NOT_FEATURE_WRITER",
+  "assembly_basename": "2354-02-lc-B11.SLDASM",
+  "observed_local_time": "2026-10-23 13:45:54 Asia/Bangkok",
+  "source_models_opened_read_only": 6,
+  "source_save_api_called": false,
+  "modeling_or_rebuild_api_called": false,
+  "pack_and_go_save_api_called": true,
+  "pack_save_statuses": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "source_hashes_unchanged": false,
+  "changed_source_file_count": 1,
+  "unchanged_source_part_count": 5,
+  "assembly_before_sha256": "8f528a6b3de428da1008013a56e59220e23638c1fea29dba69bca96934afd2c0",
+  "assembly_after_sha256": "c1815b3fdbad8cef752a450fa7aef6385c2278c663e27ff303748be8aca0f0bb",
+  "assembly_length_before_bytes": 113534,
+  "assembly_length_after_bytes": 113340,
+  "user_confirmed_did_not_save": true,
+  "observed_file_preserved_privately": true,
+  "exact_before_hash_backup_found": false,
+  "original_restored_or_overwritten": false,
+  "backup_archive_entry_tested": true,
+  "backup_archive_matches_before_hash": false,
+  "blank_session_restored": true,
+  "root_cause": "UNVERIFIED",
+  "evidence_levels": {
+    "read_only_and_api_calls": "API_VERIFIED",
+    "disk_hash_change": "FILE_HASH_VERIFIED",
+    "user_save_action": "USER_CONFIRMED_NO_SAVE",
+    "causation": "UNVERIFIED"
+  },
+  "private_evidence_sha256": {
+    "pack_receipt": "3179678fa5dd2f0c9487e4b0cd74def7b921d18a5488f3b094df239e67a7258e",
+    "recovery_inventory": "a9a22c37b238a5453c6c2bb2927c96213bf2ebb734f5f78d191dd1042c2342aa"
+  },
+  "publication_excludes": [
+    "CAD",
+    "ZIP",
+    "private_paths",
+    "persistence_tokens",
+    "machine_logs"
+  ]
+}

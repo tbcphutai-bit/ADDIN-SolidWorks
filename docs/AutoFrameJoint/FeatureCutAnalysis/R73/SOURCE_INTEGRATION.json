@@ -1,0 +1,44 @@
+{
+  "status": "COPIED_R73_STRAIGHT_END_FIX_ONLY;2222_COVER_STEP_DIRECTION_NOT_RESOLVED",
+  "utc": "2026-10-31T08:30:24.1478125Z",
+  "source_relative": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "working_crlf_sha256": "993DE2344FD675747F24292DF2FD4D368414DC42815B380FCA50A1112823162F",
+  "git_lf_sha256": "7CE93A51A7EC01B04BB62D380E130A4163D3E72B634E8B1CE91EDDB0C77724F2",
+  "baseline_working_sha256": "93B73678BB508BD7CFB68BAF8984AFB5316CE3759959574A4640678E5C273543",
+  "qualified_runs": [
+    {
+      "binary_sha256": "922EC001491299EAE4D00E82A78DA964EB4C6D7FFA9F7F9E561CF1A2A1FD71C1",
+      "run": "final2222_04",
+      "mvid": "ab506106-c450-4d01-9abe-ebbe178019a9",
+      "native_cuts": 22,
+      "sketches": 33,
+      "label": "R73_FINAL2222_04"
+    },
+    {
+      "binary_sha256": "97816A4AE766596210E7D0644EBF74A86BBCB3D279E508C5C554C70F8F101B6C",
+      "run": "straight2354_02",
+      "mvid": "045923ff-52a7-469a-9ed8-5719e46ee476",
+      "native_cuts": 7,
+      "sketches": 9,
+      "label": "R73_STRAIGHT01"
+    },
+    {
+      "binary_sha256": "3088172ED6C8E989F8DCA062718211BC8767D0420CED1FA1F6374BA314B82D07",
+      "run": "regression4458_03",
+      "mvid": "3e5141c4-b57a-4418-9c09-044f601ebee0",
+      "native_cuts": 44,
+      "sketches": 52,
+      "label": "R73_REG03"
+    }
+  ],
+  "main_build": false,
+  "deployment": false,
+  "installed_addin_test": false,
+  "other_five_sources_project_dll_pdb_unchanged": true,
+  "user_manual_rebuild_required": true,
+  "repository_six_source_compile": "PASS_INDEPENDENT_CSHARP73_COMPILE_ONLY_NOT_API_OR_MAIN_BUILD",
+  "repository_diagnostic_binary_sha256": "7452715D4A46A9D2A2CF405F01C6E16944A3BB53AD89D258584E66FCD43A664F",
+  "repository_baseline_note": "API qualification uses frozen main-local six-source baseline. Existing repository differences in other entry/UI files were preserved; repository six-source combination compiled independently. Only GhostPreview changed.",
+  "unchanged_user_dll_mvid": "11993f6f-4540-4df2-93e5-18398398d64e",
+  "unchanged_user_dll_sha256": "3A4A047395CB76555EDCE968C5260905C1E5B101FE591186CF112BE037CEE277"
+}

@@ -1,0 +1,67 @@
+"""Private gate-1 source transform: no file writes, COM, build or deployment.
+
+Import patch(source); then compile a DETACHED harness candidate. Requires the
+existing native end-face helper. Set AllowWebFaceOffsetProbe=True and signed
+WebFaceOffsetNormalSign=+1/-1 in the copied-CAD harness only. It is intentionally
+not a production solver completion: native constraints may remain underdefined.
+"""
+from pathlib import Path
+
+_HELPER=Path(__file__).with_name("WebFaceOffsetWriter.cs.txt").read_text(encoding="utf-8")
+_MARK="AFJ-U-WEB-FACE-OFFSET-PROBE-20261022"
+
+def _once(source,old,new):
+    if source.count(old)!=1:
+        raise ValueError("Expected one source anchor: "+old[:100])
+    return source.replace(old,new,1)
+
+def patch(source):
+    if _MARK in source:return source
+    start="        private static Feature WriteTool(ISldWorks app, PartEdit edit, AfjToolDefinition spec,"
+    end="        private static void ApplyPart(ISldWorks app, PartEdit edit, AfjCutPlan plan,"
+    if source.count(start)!=1 or source.count(end)!=1:raise ValueError("Unexpected native writer baseline")
+    begin=source.index(start);finish=source.index(end,begin)
+    if "CreatePlaneFixed2" not in source[begin:finish]:raise ValueError("Expected legacy fixed-plane writer")
+    source=source[:begin]+_HELPER+"\n"+source[finish:]
+    source=_once(source,"internal readonly HashSet<int> OwnedIds = new HashSet<int>();",
+        "internal readonly HashSet<int> OwnedIds = new HashSet<int>();\n"
+        "            internal readonly List<AfjWebFaceSketchEvidence> WebFaceSketches=new List<AfjWebFaceSketchEvidence>();\n"
+        "            internal AfjWebFaceSketchEvidence LastWebFaceSketch;")
+    source=_once(source,'public string NativeRepresentation = "FIXED_PLANE_PRISM";',
+        'public string NativeRepresentation = "FIXED_PLANE_PRISM";\n'
+        '        public bool WebFaceProbeOnly,WebFaceSketchFullyDefined,WebFacePostCutPlaneVerified;\n'
+        '        public int WebFaceOwnFrameRelations=-1,WebFaceClosureRelations=-1,WebFaceFromType=-1;\n'
+        '        public double WebFaceFromOffsetMetres;\n'
+        '        public bool WebFaceFromOffsetReverse;\n'
+        '        public string WebFaceRelationQualification;')
+    source=_once(source,"                    report.Cuts.Add(evidence);",'''                    if(!endSection)
+                    {
+                        var web=edit.LastWebFaceSketch;
+                        if(web==null)throw new InvalidOperationException("WEB_FACE: per-Cut probe evidence missing");
+                        evidence.NativeRepresentation="PROBE_EXISTING_WEB_FACE_OFFSET";evidence.WebFaceProbeOnly=true;
+                        evidence.SketchName=web.Name;evidence.SketchSupport="EXISTING_OUTER_WEB_FACE";
+                        evidence.SketchReferenceType=web.ReferenceType;evidence.SketchConstrainedStatus=web.Status;
+                        evidence.SketchRelationCount=web.Relations;evidence.SketchDrivingDimensions=web.Dimensions;evidence.NewReferencePlanes=web.NewPlanes;
+                        evidence.WebFaceOwnFrameRelations=web.OwnFrameRelations;evidence.WebFaceClosureRelations=web.ClosureRelations;
+                        evidence.WebFaceFromType=web.FromType;evidence.WebFaceFromOffsetMetres=web.Offset;evidence.WebFaceFromOffsetReverse=web.OffsetReverse;
+                        evidence.WebFaceSketchFullyDefined=web.FullyDefined;evidence.WebFacePostCutPlaneVerified=web.PostCutPlaneVerified;
+                        evidence.WebFaceRelationQualification=web.Qualification;
+                    }
+                    report.Cuts.Add(evidence);''')
+    source=_once(source,'                VerifyEndFaceSketches(app,edit,"part_final");',
+        '                VerifyEndFaceSketches(app,edit,"part_final");\n                VerifyWebFaceSketches(app,edit,"part_final");')
+    source=_once(source,'                VerifyEndFaceSketches(app,b,"both_parts_final");',
+        '                VerifyEndFaceSketches(app,b,"both_parts_final");\n'
+        '                VerifyWebFaceSketches(app,a,"both_parts_final");\n'
+        '                VerifyWebFaceSketches(app,b,"both_parts_final");')
+    source=_once(source,'                report.Status = "APPLY_VERIFIED";',
+        '                report.Status = report.Cuts.Any(c=>c.WebFaceProbeOnly)?"PROBE_NATIVE_BREP_MATCH_GEOMETRIC_INTENT_UNQUALIFIED":"APPLY_VERIFIED";')
+    source=_once(source,'                message = "Đã tạo " + report.Cuts.Count + " Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi.";',
+        '                message = report.Cuts.Any(c=>c.WebFaceProbeOnly)?"PRIVATE PROBE: native body matched; geometric intent remains unqualified, do not publish or save this probe." : '
+        '"Đã tạo " + report.Cuts.Count + " Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi.";')
+    assert "CreatePlaneFixed2" not in source[source.index("internal static class AfjNativeCutCommit"):]
+    assert "swConstraintType_FIXED" not in _HELPER and "SketchUseEdge" not in _HELPER
+    assert "AddHorizontalDimension" not in _HELPER and "AddVerticalDimension" not in _HELPER
+    return source
+
+if __name__=="__main__":raise SystemExit("Import patch(source); do not patch production source directly.")

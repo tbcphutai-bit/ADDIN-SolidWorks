@@ -1,0 +1,29 @@
+{
+  "native_suite_rows_complete": 8,
+  "native_suite_preview_cleanup_complete": 8,
+  "next_harness_initial_result": "No case executed; unhandled startup exception",
+  "windows_application_error": {
+    "local_time": "2026-10-22T06:53:40+07:00",
+    "event_id": 1000,
+    "application": "SLDWORKS.exe",
+    "application_version": "32.5.0.48",
+    "module": "ucrtbase.dll",
+    "exception_code": "0xC0000409"
+  },
+  "observed_rot_probe": {
+    "attached": false,
+    "exception_type": "System.Runtime.InteropServices.COMException",
+    "hresult": "0x800401E3",
+    "message": "操作を利用できません (HRESULT からの例外:0x800401E3 (MK_E_UNAVAILABLE))",
+    "stack_trace": "   場所 System.Runtime.InteropServices.Marshal.GetActiveObject(Guid& rclsid, IntPtr reserved, Object& ppunk)\r\n   場所 System.Runtime.InteropServices.Marshal.GetActiveObject(String progID)\r\n   場所 ComFinalStatus.Main(String[] args)",
+    "solidworks_monikers": []
+  },
+  "recovery_connection": {
+    "single_activation": false,
+    "revision": "32.5.0",
+    "user_control": true,
+    "user_control_background": true
+  },
+  "cause": "UNVERIFIED; next harness was started before previous shell confirmed exit. No causation asserted. No original CAD save.",
+  "production_stability": "UNVERIFIED"
+}

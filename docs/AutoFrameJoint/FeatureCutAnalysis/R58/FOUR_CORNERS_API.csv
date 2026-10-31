@@ -1,0 +1,5 @@
+"corner","frame_a","frame_b","status","new_cuts","new_sketches","new_planes","native_close_issued","native_close_returned","native_apply_verified","native_after_close_observed","final_gap_mm","final_overlap_m3","final_intersection_code","visible_preview"
+"1","fr01","fr04","PASS_INSTALLED_NATIVE_PMP_CLOSE_AND_FINAL_BREP","4","4","0","True","True","True","True","0.1000000000000445","0","0","UNVERIFIED"
+"2","fr04","fr03","PASS_INSTALLED_NATIVE_PMP_CLOSE_AND_FINAL_BREP","4","4","0","True","True","True","True","0.09999999999976694","0","0","UNVERIFIED"
+"3","fr03","fr02","PASS_INSTALLED_NATIVE_PMP_CLOSE_AND_FINAL_BREP","4","4","0","True","True","True","True","0.09999999999975306","0","0","UNVERIFIED"
+"4","fr02","fr01","PASS_INSTALLED_NATIVE_PMP_CLOSE_AND_FINAL_BREP","4","4","0","True","True","True","True","0.09999999999991427","0","0","UNVERIFIED"
