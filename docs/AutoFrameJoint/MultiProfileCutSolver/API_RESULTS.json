@@ -1,0 +1,3885 @@
+{
+  "schema_version": "1.0",
+  "report_date": "2026-10-22",
+  "repository": "tbcphutai-bit/ADDIN-SolidWorks",
+  "evidence_levels": {
+    "API_VERIFIED": "Observed native SOLIDWORKS parameter, feature or constraint state.",
+    "GEOMETRY_VERIFIED": "Native B-rep/body comparison, gap, overlap or probe measurement.",
+    "INFERRED": "Derived semantics or interpretation; not a native API observation."
+  },
+  "user_policy": {
+    "short_frame_priority": true,
+    "assembly_fit_gap_mm": 0.1,
+    "sheet_cut_overrun_mm": 0.1,
+    "partial_cover_allowed_with_explicit_exposure_report": true
+  },
+  "new_rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+  "positive_native_writer_case": {
+    "run_id": "native_end2354_multi_02",
+    "pair": "2354 fr02 x fr01",
+    "actual_cut_count": 2,
+    "new_reference_plane_count": 0,
+    "driving_dimension_count": 0,
+    "sketch_constraint_statuses": [
+      3,
+      3
+    ],
+    "sketch_relation_counts": [
+      34,
+      16
+    ],
+    "final_symmetric_a_m3": 0,
+    "final_symmetric_b_m3": 0,
+    "gap_m": 9.999999999973919e-05,
+    "overlap_m3": 0,
+    "parameter_evidence": "API_VERIFIED",
+    "shape_evidence": "GEOMETRY_VERIFIED",
+    "installed_addin": false
+  },
+  "base_chain_topology": {
+    "short_frame_strips": 6,
+    "short_frame_turns": 5,
+    "long_frame_strips": 3,
+    "long_frame_turns": 2,
+    "graph_evidence": "DERIVED_FROM_API_BASE_SKETCH",
+    "native_skin_bend_checks": "PASSED_FOR_CITED_2354_SOLVER_RUN",
+    "coordinates_published": false
+  },
+  "long_cut_exposure_probe": {
+    "status": "GEOMETRY_VERIFIED_PROBE_SECTION",
+    "total_area_m2": 0.0003646028752058651,
+    "covered_area_m2": 0.00033462509946378683,
+    "exposed_area_m2": 2.9977775742078255e-05,
+    "method": "Actual long Cut cap; Boolean probe at gap+t_short/2; delta 0.00001 m; volume/delta is section coverage, not all-angle occlusion.",
+    "band_coordinates": "NOT_AVAILABLE_IN_CITED_RUN_EXPORT"
+  },
+  "managed_controls_snapshot": {
+    "scope": "Actual six source files after exact-baseline patches to three classes; UI source unchanged. Detached compile/control tests, not main DLL build.",
+    "total_per_variant": 89,
+    "passed_per_variant": 89,
+    "variants": [
+      {
+        "variant": "branch",
+        "status": "PASS_MANAGED_CONTRACT",
+        "total": 89,
+        "passed": 89,
+        "interface_access_inside_selection_callbacks": 0,
+        "real_api_or_body2": "NOT_RUN",
+        "installed_addin_test": "NOT_RUN",
+        "source_result_sha256": "0b7de1228788944b31c5d8ee38a6a491ecb1397912544ef4a4e38d42a5ba06e2"
+      },
+      {
+        "variant": "local",
+        "status": "PASS_MANAGED_CONTRACT",
+        "total": 89,
+        "passed": 89,
+        "interface_access_inside_selection_callbacks": 0,
+        "real_api_or_body2": "NOT_RUN",
+        "installed_addin_test": "NOT_RUN",
+        "source_result_sha256": "0b7de1228788944b31c5d8ee38a6a491ecb1397912544ef4a4e38d42a5ba06e2"
+      }
+    ],
+    "native_api_or_body2": "NOT_RUN",
+    "installed_addin": "NOT_RUN",
+    "interface_reads_in_selection_callbacks": 0
+  },
+  "pending": {
+    "new_installed_addin_ok": "NOT_RUN",
+    "legacy_u_face_relation_rewrite": "NOT_DONE",
+    "cross_end_adapter_candidate_integration": "NOT_INTEGRATED_UNDO_QUALIFICATION_FAILED",
+    "generic_new_writer_rollback": "PASS_TWO_PART_GEOMETRY_AND_TREE_RESTORATION_FOR_REVERSED_2354_NOT_UNDO_STACK_OR_DIRTY_STATE",
+    "flat_pattern": "NOT_RUN",
+    "complete_two_part_cycle_qualification": "NOT_RUN",
+    "source_dll_commit_audit": "SOURCE_AUDIT_COMPLETE_MAIN_DLL_NOT_REBUILT_OR_DEPLOYED",
+    "cross_end_undo_qualification": "FAIL_FINISH_RECORDING_FALSE_RETRY_FALSE_RECORDING_STILL_OPEN_UNDO_NOT_ATTEMPTED",
+    "direct_other_frame_parameter_follow": "PASS_ONE_COPY_ONLY_UNMATED_TRANSLATION_DIRECT_RELATION_ONLY_NO_CUT",
+    "1618_fr1_fr2_extreme_witness_candidate": "PASS_NATIVE_COPY_TWO_CUTS_FOR_75_65_MM_INCLINED_PROFILE",
+    "latest_stale_preview_case": "PASS_FRESH_SESSION_EXPECTED_PREVIEW_STALE_REFUSAL_ZERO_CUTS_PRIOR_RPC_FAILURE_RETAINED",
+    "t2_positive_apply": "FAIL_SHARED_PART_GUARD_NO_AUTOMATIC_PART_INDEPENDENCE",
+    "public_backend_preview_sequence": "PASS_NATIVE_API_REAL_PUBLIC_MANAGER_P1_P1_P2_P1_NOT_INSTALLED_UI",
+    "legacy_2354_final_regression": "PASS_NATIVE_API_FOUR_LEGACY_U_TALLER_CUTS_NOT_NEW_SKETCH_REQUIREMENT"
+  },
+  "records": [
+    {
+      "run_id": "native_end2354_multi_02",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS",
+      "source_result_sha256": "1d13eeea5020b92e8159a6cabcdb72a297648089801929879797cf59b2f85c2b",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_ms": 1067,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 40483,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999973919e-05,
+        "solver_overlap_m3": 0,
+        "coverage_warning": "BUTT: Frame ngắn ưu tiên che. Mặt cắt Frame dài 364.603 mm²; còn hở 29.978 mm² theo lát kiểm tra B-rep tại giữa bề dày Frame ngắn.",
+        "assembly_active_after_solve": 1,
+        "apply_ms": 44404,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "Error": null,
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 9.999999999973919e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "FOLDED_RULE:SHORT_AXIAL_COVER",
+              "FeatureName": "AFJ_6ba0a688_A_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.14500000000000002,
+              "RemovedCubicMetres": 5.568104226212629e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.14700000000000002,
+              "NativeActualDepthMetres": 0.14500000000000002,
+              "SketchName": "AFJ_6ba0a688_A_01_Profile",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 34,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 11,
+              "NativeEndBoundaryEdges": 24,
+              "NativeEndArcs": 10,
+              "NativeVertexRelations": 24,
+              "NativeTangentRelations": 10,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchSupportOwnerId": 512,
+              "SketchFacePersistResolveState": 1,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "FOLDED_RULE:LONG_AXIAL_BUTT",
+              "FeatureName": "AFJ_6ba0a688_B_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.22310000000000008,
+              "RemovedCubicMetres": 8.134290145842864e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.22509999999999986,
+              "NativeActualDepthMetres": 0.22310000000000008,
+              "SketchName": "AFJ_6ba0a688_B_01_Profile",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 16,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 5,
+              "NativeEndBoundaryEdges": 12,
+              "NativeEndArcs": 4,
+              "NativeVertexRelations": 12,
+              "NativeTangentRelations": 4,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchSupportOwnerId": 512,
+              "SketchFacePersistResolveState": 1,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            }
+          ],
+          "Rollback": []
+        },
+        "returned_success": true,
+        "message": "Đã tạo 2 Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi.",
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "copy_hash_changes": []
+      }
+    },
+    {
+      "run_id": "native_cross2354_multi_02",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS",
+      "source_result_sha256": "ece15a74018aa82058024b45737a8c5c06e843780731b90318123b984064d330",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_ms": 1032,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 36777,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999973919e-05,
+        "solver_overlap_m3": 0,
+        "coverage_warning": "BUTT: Frame ngắn ưu tiên che. Mặt cắt Frame dài 364.603 mm²; còn hở 29.978 mm² theo lát kiểm tra B-rep tại giữa bề dày Frame ngắn.",
+        "assembly_active_after_solve": 1,
+        "apply_ms": 48445,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "Error": null,
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 9.999999999973919e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "FOLDED_RULE:SHORT_AXIAL_COVER",
+              "FeatureName": "AFJ_82a86853_A_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.14500000000000002,
+              "RemovedCubicMetres": 5.568104226212628e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.14700000000000002,
+              "NativeActualDepthMetres": 0.14500000000000002,
+              "SketchName": "AFJ_82a86853_A_01_Profile",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 34,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 11,
+              "NativeEndBoundaryEdges": 24,
+              "NativeEndArcs": 10,
+              "NativeVertexRelations": 24,
+              "NativeTangentRelations": 10,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchSupportOwnerId": 512,
+              "SketchFacePersistResolveState": 1,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "FOLDED_RULE:LONG_AXIAL_BUTT",
+              "FeatureName": "AFJ_82a86853_B_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.22310000000000008,
+              "RemovedCubicMetres": 8.134290145842864e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.22509999999999986,
+              "NativeActualDepthMetres": 0.22310000000000008,
+              "SketchName": "AFJ_82a86853_B_01_Profile",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 16,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 5,
+              "NativeEndBoundaryEdges": 12,
+              "NativeEndArcs": 4,
+              "NativeVertexRelations": 12,
+              "NativeTangentRelations": 4,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchSupportOwnerId": 512,
+              "SketchFacePersistResolveState": 1,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            }
+          ],
+          "Rollback": []
+        },
+        "returned_success": true,
+        "message": "Đã tạo 2 Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi.",
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "cross_frame_end_reference_test": {
+          "scope": "COPY_ONLY_CROSS_FRAME_END_CONDITION",
+          "no_convert": true,
+          "sketch_dimension_creation_calls": 0,
+          "main_addin_build": false,
+          "end_references": [
+            {
+              "feature": "AFJ_82a86853_A_01_Cut",
+              "end_condition": 4,
+              "reference_type": 3,
+              "reference_nonnull": true,
+              "reference_face_type": true,
+              "gap_m": 0,
+              "native_offset_m": 0,
+              "reverse_offset": false,
+              "translate_surface": false,
+              "native_error": 0,
+              "geometry_equivalence": "CALLER_MUST_VERIFY",
+              "parameter_follow_test": "NOT_RUN",
+              "two_part_cycle_test": "NOT_RUN"
+            },
+            {
+              "feature": "AFJ_82a86853_B_01_Cut",
+              "end_condition": 5,
+              "reference_type": 3,
+              "reference_nonnull": true,
+              "reference_face_type": true,
+              "gap_m": 0.0001,
+              "native_offset_m": 0.0001,
+              "reverse_offset": true,
+              "translate_surface": true,
+              "native_error": 0,
+              "geometry_equivalence": "CALLER_MUST_VERIFY",
+              "parameter_follow_test": "NOT_RUN",
+              "two_part_cycle_test": "NOT_RUN"
+            }
+          ],
+          "after_both_links": {
+            "symmetric_a_m3": 0,
+            "symmetric_b_m3": 0
+          },
+          "copy_assembly_rebuild_ok": true,
+          "after_copy_rebuild": {
+            "symmetric_a_m3": 0,
+            "symmetric_b_m3": 0
+          },
+          "copy_length_plus_10mm_rebuild_ok": true,
+          "modified_long_stock_length_m": 3.21,
+          "after_stock_length_plus_10mm": {
+            "symmetric_a_m3": 0,
+            "symmetric_b_m3": 0
+          },
+          "copy_restore_rebuild_ok": true,
+          "after_stock_length_restored": {
+            "symmetric_a_m3": 0,
+            "symmetric_b_m3": 0
+          },
+          "status": "PASS_NATIVE_CROSS_FRAME_END_AND_STOCK_FOLLOW"
+        },
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "copy_hash_changes": []
+      }
+    },
+    {
+      "run_id": "native_end2354_multi_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS",
+      "source_result_sha256": "a4a1c94a757281f84a9549405b69377be6004abf0eabbbec358c68a1244226e5",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "assembly_active_after_solve": 1,
+        "apply": {
+          "Status": "REJECTED_OR_ROLLED_BACK",
+          "Error": "HRESULT=0x80131509 System.InvalidOperationException: END_SECTION_UNVERIFIED: native Frame references/constraints failed after post_cut; status=3 dangling=0 over=0 dimensions=0\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.VerifyEndFaceSketches(ISldWorks app, PartEdit edit, String stage)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.WriteEndFaceSection(ISldWorks app, PartEdit edit, AfjToolDefinition planTool, String suffix, Boolean& reverse, Double& actualDepth, AfjEndFaceSectionEvidence& evidence)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.ApplyPart(ISldWorks app, PartEdit edit, AfjCutPlan plan, Body2 expected, String frame, AfjNativeApplyReport report)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)",
+          "RollbackVerified": true,
+          "SaveApiCalled": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [],
+          "Rollback": [
+            "AFJ_a2dec0bf_A: OWNED_FEATURES_REMOVED_GEOMETRY_AND_TREE_RESTORED"
+          ]
+        },
+        "returned_success": false,
+        "message": "Chưa áp dụng Cut; hình học hai Part được giữ hoặc hoàn tác. END_SECTION_UNVERIFIED: native Frame references/constraints failed after post_cut; status=3 dangling=0 over=0 dimensions=0",
+        "status": "FAIL",
+        "error": "System.InvalidOperationException: Expected actual Cut-Extrude features\r\n   場所 NativeApplyHarness.Assert(Boolean value, String text)\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "hresult": "0x80131509",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "copy_hash_changes": []
+      }
+    },
+    {
+      "run_id": "native_cross2354_multi_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS",
+      "source_result_sha256": "bc08da5fc92372df404cd545bead1c4b9f58b9f0a273f793d5aebbb886c80eb5",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_ms": 1144,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 36526,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999973919e-05,
+        "solver_overlap_m3": 0,
+        "coverage_warning": "BUTT: Frame ngắn ưu tiên che. Mặt cắt Frame dài 364.603 mm²; còn hở 29.978 mm² theo lát kiểm tra B-rep tại giữa bề dày Frame ngắn.",
+        "assembly_active_after_solve": 1,
+        "apply_ms": 46567,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "Error": null,
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 9.999999999973919e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "FOLDED_RULE:SHORT_AXIAL_COVER",
+              "FeatureName": "AFJ_cb540ec7_A_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.14500000000000002,
+              "RemovedCubicMetres": 5.568104226212631e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.14700000000000002,
+              "NativeActualDepthMetres": 0.14500000000000002,
+              "SketchName": "AFJ_cb540ec7_A_01_Profile",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 34,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 11,
+              "NativeEndBoundaryEdges": 24,
+              "NativeEndArcs": 10,
+              "NativeVertexRelations": 24,
+              "NativeTangentRelations": 10,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchSupportOwnerId": 512,
+              "SketchFacePersistResolveState": 1,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "FOLDED_RULE:LONG_AXIAL_BUTT",
+              "FeatureName": "AFJ_cb540ec7_B_01_Cut",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.22310000000000008,
+              "RemovedCubicMetres": 8.134290145842864e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.22509999999999986,
+              "NativeActualDepthMetres": 0.22310000000000008,
+              "SketchName": "AFJ_cb540ec7_B_01_Profile",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 16,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 5,
+              "NativeEndBoundaryEdges": 12,
+              "NativeEndArcs": 4,
+              "NativeVertexRelations": 12,
+              "NativeTangentRelations": 4,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchSupportOwnerId": 512,
+              "SketchFacePersistResolveState": 1,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            }
+          ],
+          "Rollback": []
+        },
+        "returned_success": true,
+        "message": "Đã tạo 2 Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi.",
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "FAIL",
+        "error": "System.InvalidOperationException: END_REF: persisted other-Frame reference readback is null\r\n   場所 GeometryEndReferenceAdapter.Apply(ISldWorks app, ModelDoc2 assembly, Component2 target, Component2 other, Feature cut, Face2 originalOtherFace, Double gap)\r\n   場所 NativeApplyHarness.LinkEnds(ISldWorks app, ModelDoc2 model, Component2 a, Component2 b, AfjJointSolution solution, AfjNativeApplyReport report)\r\n   場所 NativeApplyHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "hresult": "0x80131509",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "copy_hash_changes": []
+      }
+    },
+    {
+      "run_id": "geometry2354_multi_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS",
+      "source_result_sha256": "5e8a313bf1884a6065fab32745e6f0642d163d5e49b289441b08e18abd89ede1",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "gap_m": 9.999999999973919e-05,
+        "interference_m3": 0,
+        "removed_a_m3": 5.5681042262126285e-05,
+        "removed_b_m3": 8.134290145842865e-05,
+        "length_a_m": 0.955,
+        "length_b_m": 3.2,
+        "short_cover_a": true,
+        "graph_a": "GEOMETRY_COORDINATES_OMITTED_FROM_PUBLIC_REPORT",
+        "graph_b": "GEOMETRY_COORDINATES_OMITTED_FROM_PUBLIC_REPORT",
+        "coverage_warning": "BUTT / PARTIAL_COVER_POSSIBLE: Frame ngắn được ưu tiên che; cắt giáp đầu theo mặt vật lý. Có thể còn cạnh hở; chưa xác minh diện tích che kín.",
+        "operations_a": 1,
+        "operations_b": 1,
+        "status": "PASS_NATIVE_GEOMETRY",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "copy_hash_changes": []
+      }
+    },
+    {
+      "run_id": "geometry1618_fr3fr4_03",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS",
+      "source_result_sha256": "fec532e3434492a2503411e6c5d79ea323943fa2b4889ff4f18d1e083d4aa730",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "native_writer_called": false,
+        "phase_timings_ms": {
+          "revision": 0,
+          "input_hashes": 5,
+          "copy_files": 4,
+          "pre_open_guard": 0,
+          "open_assembly": 1282,
+          "activate_assembly": 20,
+          "component_inventory": 178,
+          "copy_source_bodies": 353,
+          "solve_geometry": 21349,
+          "copy_hashes_before_close": 3,
+          "close_test_copies": 96,
+          "input_hashes_after_close": 4,
+          "copy_hashes_after_close": 3
+        },
+        "revision": "32.5.0",
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "status": "FAIL",
+        "error": "System.InvalidOperationException: UNVERIFIED_RULE: folded profile cutoff is not on the selected end half\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjFoldedButtRules.Fail(String reason)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjFoldedButtRules.Cut(Section section, Body2 body, MathTransform transform, Double[] outgoing, Double[] origin, Double cutoff, String id)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjFoldedButtRules.Generate(AfjProfile pa, AfjProfile pb, Body2 ba, Body2 bb, MathTransform ta, MathTransform tb, Boolean coverA, Double gap)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.Generate(AfjProfile profileA, AfjProfile profileB, Body2 bodyA, Body2 bodyB, MathTransform ta, MathTransform tb, Boolean aCovers, Double webGap)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointRuleLibrary.Create(AfjProfile a, AfjProfile b, Body2 ba, Body2 bb, MathTransform ta, MathTransform tb, Boolean aCovers)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 NativeGeometryHarness.<>c__DisplayClass7_1.<Case>b__14()\r\n   場所 NativeGeometryHarness.Time[T](Dictionary`2 row, String phase, Func`1 action)\r\n   場所 NativeGeometryHarness.Case(ISldWorks app, String input, String root, String name, String suffixA, String suffixB)",
+        "hresult": "0x80131509",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "copy_hash_changes": [],
+        "case_total_ms": 26863
+      }
+    },
+    {
+      "run_id": "direct_relations2354_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_DIRECT_RELATION_PROBE",
+      "source_result_sha256": "054b65d0127c6079b9f10482254c97c5712016e542dabdac4f108c4f64670c87",
+      "record": {
+        "native_api": true,
+        "scope": "DIRECT_OTHER_FRAME_RELATIONS_ONLY",
+        "cut_created": false,
+        "convert_entities_called": false,
+        "dimensions_created": 0,
+        "fixed_relations_created": 0,
+        "save_api_called": false,
+        "parameter_follow_test": "NOT_RUN",
+        "open_error": 0,
+        "open_warning": 0,
+        "edit_result": 0,
+        "edit_information": 0,
+        "status": "FAIL_OR_UNVERIFIED",
+        "error": "System.InvalidOperationException: Owned sketch missing from FeatureManager\r\n   場所 GeometryReferenceProbe.SketchFeature(ModelDoc2 p, ISldWorks sw, Sketch s)\r\n   場所 GeometryReferenceProbe.Main(String[] args)",
+        "hresult": "0x80131509",
+        "session_blank_after_cleanup": true,
+        "input_hashes_unchanged": true,
+        "copy_hashes_unchanged": true
+      }
+    },
+    {
+      "run_id": "direct_relations2354_02",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_DIRECT_RELATION_PROBE",
+      "source_result_sha256": "66dd8bf723633f40e7b9a51f3f939b244c37bf9bb4cb2f1b2d1b01890ab201fb",
+      "record": {
+        "native_api": true,
+        "scope": "DIRECT_OTHER_FRAME_RELATIONS_ONLY",
+        "cut_created": false,
+        "convert_entities_called": false,
+        "dimensions_created": 0,
+        "fixed_relations_created": 0,
+        "save_api_called": false,
+        "parameter_follow_test": "NOT_RUN",
+        "open_error": 0,
+        "open_warning": 0,
+        "stage": "CREATE_PART_SKETCH",
+        "part_tree_before": [
+          {
+            "id": 71,
+            "name": "Configuration Comments",
+            "type": "ConfigCommentsFolder"
+          },
+          {
+            "id": 18,
+            "name": "Favorites",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 19,
+            "name": "History",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 20,
+            "name": "Selection Sets",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 14,
+            "name": "Sensors",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 12,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 1,
+            "name": "Annotations",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 23,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 2,
+            "name": "Lights and Cameras",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 10,
+            "name": "Solid Bodies",
+            "type": "SolidBodyFolder"
+          },
+          {
+            "id": 9,
+            "name": "Surface Bodies",
+            "type": "SurfaceBodyFolder"
+          },
+          {
+            "id": 13,
+            "name": "Comments",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 15,
+            "name": "Equations",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 11,
+            "name": "A3003-",
+            "type": "MaterialFolder"
+          },
+          {
+            "id": 3,
+            "name": "Front",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "Top",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "Right",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "Origin",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 477,
+            "name": "ｽｹｯﾁ1",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 501,
+            "name": "板金19",
+            "type": "SheetMetal"
+          },
+          {
+            "id": 512,
+            "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+            "type": "SMBaseFlange"
+          },
+          {
+            "id": 535,
+            "name": "Sheet<1>",
+            "type": "CutListFolder"
+          },
+          {
+            "id": 678,
+            "name": "ｽｹｯﾁ2",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 685,
+            "name": "ｶｯﾄ - 押し出し1",
+            "type": "Cut"
+          },
+          {
+            "id": 696,
+            "name": "平面2",
+            "type": "RefPlane"
+          },
+          {
+            "id": 721,
+            "name": "ｽｹｯﾁ8",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 729,
+            "name": "ｶｯﾄ - 押し出し3",
+            "type": "Cut"
+          },
+          {
+            "id": 731,
+            "name": "ｽｹｯﾁ9",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 739,
+            "name": "ｶｯﾄ - 押し出し4",
+            "type": "Cut"
+          },
+          {
+            "id": 511,
+            "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+            "type": "FlatPattern"
+          }
+        ],
+        "assembly_tree_before": [
+          {
+            "id": 25,
+            "name": "お気に入り",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 26,
+            "name": "履歴",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 27,
+            "name": "選択ｾｯﾄ",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 24,
+            "name": "ｾﾝｻｰ",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 8,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 2,
+            "name": "ｱﾉﾃｰﾄ ｱｲﾃﾑ",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 137,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 7,
+            "name": "照明とｶﾒﾗ",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 256,
+            "name": "Simulation",
+            "type": "AEMSimFeature"
+          },
+          {
+            "id": 9,
+            "name": "ｺﾒﾝﾄ",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 23,
+            "name": "関係式",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 3,
+            "name": "正面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "平面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "右側面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "原点",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 257,
+            "name": "AFJ_PAIR_2354-04-lc-B11-1-1",
+            "type": "Reference"
+          },
+          {
+            "id": 258,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr01-1",
+            "type": "Reference"
+          },
+          {
+            "id": 267,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr02-1",
+            "type": "Reference"
+          },
+          {
+            "id": 280,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr03-1",
+            "type": "Reference"
+          },
+          {
+            "id": 290,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr04-1",
+            "type": "Reference"
+          },
+          {
+            "id": 10,
+            "name": "合致",
+            "type": "MateGroup"
+          },
+          {
+            "id": 424,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ1",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 425,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ2",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 435,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ4",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 437,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ6",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 438,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ7",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 439,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ8",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 440,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ9",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 441,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ10",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 443,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ12",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 446,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ15",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 447,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ16",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 448,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ17",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 449,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ18",
+            "type": "InContextFeatHolder"
+          }
+        ],
+        "edit_result": 0,
+        "edit_information": 0,
+        "part_active_sketch_nonnull": false,
+        "assembly_active_sketch_nonnull": false,
+        "active_sketch_context_equality": -1,
+        "status": "FAIL_OR_UNVERIFIED",
+        "error": "System.InvalidOperationException: Expected face-attached 2D sketch\r\n   場所 GeometryReferenceProbeV2.Require(Boolean b, String reason)\r\n   場所 GeometryReferenceProbeV2.Main(String[] args)",
+        "hresult": "0x80131509",
+        "session_blank_after_cleanup": true,
+        "input_hashes_unchanged": true,
+        "copy_hashes_unchanged": true
+      }
+    },
+    {
+      "run_id": "direct_relations2354_03",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_DIRECT_RELATION_PROBE",
+      "source_result_sha256": "833cf72019be1d77e1d46a58aeb825b6d4e0980e8f249abf2a5e0c441edd366d",
+      "record": {
+        "native_api": true,
+        "scope": "DIRECT_OTHER_FRAME_RELATIONS_ONLY",
+        "cut_created": false,
+        "convert_entities_called": false,
+        "dimensions_created": 0,
+        "fixed_relations_created": 0,
+        "save_api_called": false,
+        "parameter_follow_test": "NOT_RUN",
+        "open_error": 0,
+        "open_warning": 0,
+        "stage": "CLOSE_SKETCH",
+        "part_tree_before": [
+          {
+            "id": 71,
+            "name": "Configuration Comments",
+            "type": "ConfigCommentsFolder"
+          },
+          {
+            "id": 18,
+            "name": "Favorites",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 19,
+            "name": "History",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 20,
+            "name": "Selection Sets",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 14,
+            "name": "Sensors",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 12,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 1,
+            "name": "Annotations",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 23,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 2,
+            "name": "Lights and Cameras",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 10,
+            "name": "Solid Bodies",
+            "type": "SolidBodyFolder"
+          },
+          {
+            "id": 9,
+            "name": "Surface Bodies",
+            "type": "SurfaceBodyFolder"
+          },
+          {
+            "id": 13,
+            "name": "Comments",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 15,
+            "name": "Equations",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 11,
+            "name": "A3003-",
+            "type": "MaterialFolder"
+          },
+          {
+            "id": 3,
+            "name": "Front",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "Top",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "Right",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "Origin",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 477,
+            "name": "ｽｹｯﾁ1",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 501,
+            "name": "板金19",
+            "type": "SheetMetal"
+          },
+          {
+            "id": 512,
+            "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+            "type": "SMBaseFlange"
+          },
+          {
+            "id": 535,
+            "name": "Sheet<1>",
+            "type": "CutListFolder"
+          },
+          {
+            "id": 678,
+            "name": "ｽｹｯﾁ2",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 685,
+            "name": "ｶｯﾄ - 押し出し1",
+            "type": "Cut"
+          },
+          {
+            "id": 696,
+            "name": "平面2",
+            "type": "RefPlane"
+          },
+          {
+            "id": 721,
+            "name": "ｽｹｯﾁ8",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 729,
+            "name": "ｶｯﾄ - 押し出し3",
+            "type": "Cut"
+          },
+          {
+            "id": 731,
+            "name": "ｽｹｯﾁ9",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 739,
+            "name": "ｶｯﾄ - 押し出し4",
+            "type": "Cut"
+          },
+          {
+            "id": 511,
+            "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+            "type": "FlatPattern"
+          }
+        ],
+        "assembly_tree_before": [
+          {
+            "id": 25,
+            "name": "お気に入り",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 26,
+            "name": "履歴",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 27,
+            "name": "選択ｾｯﾄ",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 24,
+            "name": "ｾﾝｻｰ",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 8,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 2,
+            "name": "ｱﾉﾃｰﾄ ｱｲﾃﾑ",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 137,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 7,
+            "name": "照明とｶﾒﾗ",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 256,
+            "name": "Simulation",
+            "type": "AEMSimFeature"
+          },
+          {
+            "id": 9,
+            "name": "ｺﾒﾝﾄ",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 23,
+            "name": "関係式",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 3,
+            "name": "正面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "平面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "右側面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "原点",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 257,
+            "name": "AFJ_PAIR_2354-04-lc-B11-1-1",
+            "type": "Reference"
+          },
+          {
+            "id": 258,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr01-1",
+            "type": "Reference"
+          },
+          {
+            "id": 267,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr02-1",
+            "type": "Reference"
+          },
+          {
+            "id": 280,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr03-1",
+            "type": "Reference"
+          },
+          {
+            "id": 290,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr04-1",
+            "type": "Reference"
+          },
+          {
+            "id": 10,
+            "name": "合致",
+            "type": "MateGroup"
+          },
+          {
+            "id": 424,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ1",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 425,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ2",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 435,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ4",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 437,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ6",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 438,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ7",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 439,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ8",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 440,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ9",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 441,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ10",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 443,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ12",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 446,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ15",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 447,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ16",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 448,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ17",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 449,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ18",
+            "type": "InContextFeatHolder"
+          }
+        ],
+        "edit_result": 0,
+        "edit_information": 0,
+        "part_active_sketch_nonnull": false,
+        "assembly_active_sketch_nonnull": true,
+        "active_sketch_context_equality": -1,
+        "sketch_feature_query_interface_nonnull": true,
+        "sketch_qi_feature_id": 741,
+        "sketch_qi_feature_name": "ｽｹｯﾁ10",
+        "part_tree_during_sketch_edit": [
+          {
+            "id": 71,
+            "name": "Configuration Comments",
+            "type": "ConfigCommentsFolder"
+          },
+          {
+            "id": 18,
+            "name": "Favorites",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 19,
+            "name": "History",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 20,
+            "name": "Selection Sets",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 14,
+            "name": "Sensors",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 12,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 1,
+            "name": "Annotations",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 23,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 2,
+            "name": "Lights and Cameras",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 10,
+            "name": "Solid Bodies",
+            "type": "SolidBodyFolder"
+          },
+          {
+            "id": 9,
+            "name": "Surface Bodies",
+            "type": "SurfaceBodyFolder"
+          },
+          {
+            "id": 13,
+            "name": "Comments",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 15,
+            "name": "Equations",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 11,
+            "name": "A3003-",
+            "type": "MaterialFolder"
+          },
+          {
+            "id": 3,
+            "name": "Front",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "Top",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "Right",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "Origin",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 477,
+            "name": "ｽｹｯﾁ1",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 501,
+            "name": "板金19",
+            "type": "SheetMetal"
+          },
+          {
+            "id": 512,
+            "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+            "type": "SMBaseFlange"
+          },
+          {
+            "id": 535,
+            "name": "Sheet<1>",
+            "type": "CutListFolder"
+          },
+          {
+            "id": 678,
+            "name": "ｽｹｯﾁ2",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 685,
+            "name": "ｶｯﾄ - 押し出し1",
+            "type": "Cut"
+          },
+          {
+            "id": 696,
+            "name": "平面2",
+            "type": "RefPlane"
+          },
+          {
+            "id": 721,
+            "name": "ｽｹｯﾁ8",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 729,
+            "name": "ｶｯﾄ - 押し出し3",
+            "type": "Cut"
+          },
+          {
+            "id": 731,
+            "name": "ｽｹｯﾁ9",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 739,
+            "name": "ｶｯﾄ - 押し出し4",
+            "type": "Cut"
+          },
+          {
+            "id": 741,
+            "name": "ｽｹｯﾁ10",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 511,
+            "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+            "type": "FlatPattern"
+          }
+        ],
+        "assembly_tree_during_sketch_edit": [
+          {
+            "id": 25,
+            "name": "お気に入り",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 26,
+            "name": "履歴",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 27,
+            "name": "選択ｾｯﾄ",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 24,
+            "name": "ｾﾝｻｰ",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 8,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 2,
+            "name": "ｱﾉﾃｰﾄ ｱｲﾃﾑ",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 137,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 7,
+            "name": "照明とｶﾒﾗ",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 256,
+            "name": "Simulation",
+            "type": "AEMSimFeature"
+          },
+          {
+            "id": 9,
+            "name": "ｺﾒﾝﾄ",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 23,
+            "name": "関係式",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 3,
+            "name": "正面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "平面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "右側面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "原点",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 257,
+            "name": "AFJ_PAIR_2354-04-lc-B11-1-1",
+            "type": "Reference"
+          },
+          {
+            "id": 258,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr01-1",
+            "type": "Reference"
+          },
+          {
+            "id": 267,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr02-1",
+            "type": "Reference"
+          },
+          {
+            "id": 280,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr03-1",
+            "type": "Reference"
+          },
+          {
+            "id": 290,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr04-1",
+            "type": "Reference"
+          },
+          {
+            "id": 10,
+            "name": "合致",
+            "type": "MateGroup"
+          },
+          {
+            "id": 424,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ1",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 425,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ2",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 435,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ4",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 437,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ6",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 438,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ7",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 439,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ8",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 440,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ9",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 441,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ10",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 443,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ12",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 446,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ15",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 447,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ16",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 448,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ17",
+            "type": "InContextFeatHolder"
+          },
+          {
+            "id": 449,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ18",
+            "type": "InContextFeatHolder"
+          }
+        ],
+        "support_reference_type": 2,
+        "reference_same_assembly_support": 1,
+        "reference_same_native_support": 1,
+        "model_to_sketch": [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "world_input_planar": false,
+        "part_input_planar": true,
+        "world_input_sketch_points": [
+          [
+            -0.1124,
+            -0.15000000000000036,
+            -0.0029999999999999966
+          ],
+          [
+            -0.1124,
+            3.05,
+            -0.003000000000000041
+          ]
+        ],
+        "part_input_sketch_points": [
+          [
+            0.2124,
+            0.15300000000000033,
+            -1.5742615544489524e-16
+          ],
+          [
+            0.2124,
+            -3.0469999999999997,
+            -1.5742615544489524e-16
+          ]
+        ],
+        "chosen_sketch_input_context": "NATIVE_PART",
+        "experiment": "face_point",
+        "projected_vertex_depth_m": -4.336808689942018e-19,
+        "other_plane_world_parameters": [
+          1,
+          0,
+          0,
+          -0.0475,
+          -0.15000000000000036,
+          -0.0029999999999999966
+        ],
+        "allowed_point_face": [
+          12,
+          9
+        ],
+        "allowed_point_native_edge": [
+          12,
+          9,
+          40
+        ],
+        "allowed_point_edge_face": [
+          13
+        ],
+        "created_relations": [
+          {
+            "type": 9,
+            "entity_types": [
+              3,
+              2
+            ]
+          },
+          {
+            "type": 9,
+            "entity_types": [
+              3,
+              2
+            ]
+          }
+        ],
+        "constraint_status": 3,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "relation_count": 2,
+        "part_tree_after_sketch_close": [
+          {
+            "id": 71,
+            "name": "Configuration Comments",
+            "type": "ConfigCommentsFolder"
+          },
+          {
+            "id": 18,
+            "name": "Favorites",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 19,
+            "name": "History",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 20,
+            "name": "Selection Sets",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 14,
+            "name": "Sensors",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 12,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 1,
+            "name": "Annotations",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 23,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 2,
+            "name": "Lights and Cameras",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 10,
+            "name": "Solid Bodies",
+            "type": "SolidBodyFolder"
+          },
+          {
+            "id": 9,
+            "name": "Surface Bodies",
+            "type": "SurfaceBodyFolder"
+          },
+          {
+            "id": 13,
+            "name": "Comments",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 15,
+            "name": "Equations",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 11,
+            "name": "A3003-",
+            "type": "MaterialFolder"
+          },
+          {
+            "id": 3,
+            "name": "Front",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "Top",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "Right",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "Origin",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 477,
+            "name": "ｽｹｯﾁ1",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 501,
+            "name": "板金19",
+            "type": "SheetMetal"
+          },
+          {
+            "id": 512,
+            "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+            "type": "SMBaseFlange"
+          },
+          {
+            "id": 535,
+            "name": "Sheet<1>",
+            "type": "CutListFolder"
+          },
+          {
+            "id": 678,
+            "name": "ｽｹｯﾁ2",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 685,
+            "name": "ｶｯﾄ - 押し出し1",
+            "type": "Cut"
+          },
+          {
+            "id": 696,
+            "name": "平面2",
+            "type": "RefPlane"
+          },
+          {
+            "id": 721,
+            "name": "ｽｹｯﾁ8",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 729,
+            "name": "ｶｯﾄ - 押し出し3",
+            "type": "Cut"
+          },
+          {
+            "id": 731,
+            "name": "ｽｹｯﾁ9",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 739,
+            "name": "ｶｯﾄ - 押し出し4",
+            "type": "Cut"
+          },
+          {
+            "id": 741,
+            "name": "ｽｹｯﾁ10",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 511,
+            "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+            "type": "FlatPattern"
+          }
+        ],
+        "assembly_tree_after_sketch_close": [
+          {
+            "id": 25,
+            "name": "お気に入り",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 26,
+            "name": "履歴",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 27,
+            "name": "選択ｾｯﾄ",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 24,
+            "name": "ｾﾝｻｰ",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 8,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 2,
+            "name": "ｱﾉﾃｰﾄ ｱｲﾃﾑ",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 137,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 7,
+            "name": "照明とｶﾒﾗ",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 256,
+            "name": "Simulation",
+            "type": "AEMSimFeature"
+          },
+          {
+            "id": 9,
+            "name": "ｺﾒﾝﾄ",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 23,
+            "name": "関係式",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 3,
+            "name": "正面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "平面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "右側面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "原点",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 257,
+            "name": "AFJ_PAIR_2354-04-lc-B11-1-1",
+            "type": "Reference"
+          },
+          {
+            "id": 258,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr01-1",
+            "type": "Reference"
+          },
+          {
+            "id": 267,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr02-1",
+            "type": "Reference"
+          },
+          {
+            "id": 280,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr03-1",
+            "type": "Reference"
+          },
+          {
+            "id": 290,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr04-1",
+            "type": "Reference"
+          },
+          {
+            "id": 10,
+            "name": "合致",
+            "type": "MateGroup"
+          },
+          {
+            "id": 450,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ19",
+            "type": "InContextFeatHolder"
+          }
+        ],
+        "part_tree_after_edit_assembly": [
+          {
+            "id": 71,
+            "name": "Configuration Comments",
+            "type": "ConfigCommentsFolder"
+          },
+          {
+            "id": 18,
+            "name": "Favorites",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 19,
+            "name": "History",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 20,
+            "name": "Selection Sets",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 14,
+            "name": "Sensors",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 12,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 1,
+            "name": "Annotations",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 23,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 2,
+            "name": "Lights and Cameras",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 10,
+            "name": "Solid Bodies",
+            "type": "SolidBodyFolder"
+          },
+          {
+            "id": 9,
+            "name": "Surface Bodies",
+            "type": "SurfaceBodyFolder"
+          },
+          {
+            "id": 13,
+            "name": "Comments",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 15,
+            "name": "Equations",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 11,
+            "name": "A3003-",
+            "type": "MaterialFolder"
+          },
+          {
+            "id": 3,
+            "name": "Front",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "Top",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "Right",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "Origin",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 477,
+            "name": "ｽｹｯﾁ1",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 501,
+            "name": "板金19",
+            "type": "SheetMetal"
+          },
+          {
+            "id": 512,
+            "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+            "type": "SMBaseFlange"
+          },
+          {
+            "id": 535,
+            "name": "Sheet<1>",
+            "type": "CutListFolder"
+          },
+          {
+            "id": 678,
+            "name": "ｽｹｯﾁ2",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 685,
+            "name": "ｶｯﾄ - 押し出し1",
+            "type": "Cut"
+          },
+          {
+            "id": 696,
+            "name": "平面2",
+            "type": "RefPlane"
+          },
+          {
+            "id": 721,
+            "name": "ｽｹｯﾁ8",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 729,
+            "name": "ｶｯﾄ - 押し出し3",
+            "type": "Cut"
+          },
+          {
+            "id": 731,
+            "name": "ｽｹｯﾁ9",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 739,
+            "name": "ｶｯﾄ - 押し出し4",
+            "type": "Cut"
+          },
+          {
+            "id": 741,
+            "name": "ｽｹｯﾁ10",
+            "type": "ProfileFeature"
+          },
+          {
+            "id": 511,
+            "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+            "type": "FlatPattern"
+          }
+        ],
+        "assembly_tree_after_edit_assembly": [
+          {
+            "id": 25,
+            "name": "お気に入り",
+            "type": "FavoriteFolder"
+          },
+          {
+            "id": 26,
+            "name": "履歴",
+            "type": "HistoryFolder"
+          },
+          {
+            "id": 27,
+            "name": "選択ｾｯﾄ",
+            "type": "SelectionSetFolder"
+          },
+          {
+            "id": 24,
+            "name": "ｾﾝｻｰ",
+            "type": "SensorFolder"
+          },
+          {
+            "id": 8,
+            "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+            "type": "DocsFolder"
+          },
+          {
+            "id": 2,
+            "name": "ｱﾉﾃｰﾄ ｱｲﾃﾑ",
+            "type": "DetailCabinet"
+          },
+          {
+            "id": 137,
+            "name": "Markups",
+            "type": "InkMarkupFolder"
+          },
+          {
+            "id": 7,
+            "name": "照明とｶﾒﾗ",
+            "type": "EnvFolder"
+          },
+          {
+            "id": 256,
+            "name": "Simulation",
+            "type": "AEMSimFeature"
+          },
+          {
+            "id": 9,
+            "name": "ｺﾒﾝﾄ",
+            "type": "CommentsFolder"
+          },
+          {
+            "id": 23,
+            "name": "関係式",
+            "type": "EqnFolder"
+          },
+          {
+            "id": 3,
+            "name": "正面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 4,
+            "name": "平面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 5,
+            "name": "右側面",
+            "type": "RefPlane"
+          },
+          {
+            "id": 6,
+            "name": "原点",
+            "type": "OriginProfileFeature"
+          },
+          {
+            "id": 257,
+            "name": "AFJ_PAIR_2354-04-lc-B11-1-1",
+            "type": "Reference"
+          },
+          {
+            "id": 258,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr01-1",
+            "type": "Reference"
+          },
+          {
+            "id": 267,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr02-1",
+            "type": "Reference"
+          },
+          {
+            "id": 280,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr03-1",
+            "type": "Reference"
+          },
+          {
+            "id": 290,
+            "name": "AFJ_PAIR_2354-04-lc-B11-fr04-1",
+            "type": "Reference"
+          },
+          {
+            "id": 10,
+            "name": "合致",
+            "type": "MateGroup"
+          },
+          {
+            "id": 450,
+            "name": "前後関係使用ﾌｨｰﾁｬｰ19",
+            "type": "InContextFeatHolder"
+          }
+        ],
+        "new_part_feature_ids": [
+          741
+        ],
+        "sketch_owner_verified": true,
+        "edit_context_restored": false,
+        "external_file_reference_count": 5,
+        "status": "FAIL_OR_UNVERIFIED",
+        "error": "System.InvalidOperationException: Assembly edit context not restored\r\n   場所 GeometryReferenceProbeV3.Require(Boolean b, String reason)\r\n   場所 GeometryReferenceProbeV3.Main(String[] args)",
+        "hresult": "0x80131509",
+        "session_blank_after_cleanup": true,
+        "input_hashes_unchanged": true,
+        "copy_hashes_unchanged": true
+      }
+    },
+    {
+      "run_id": "user_installed_log_20261022_1603",
+      "evidence_kind": "USER_SUPPLIED_INSTALLED_ADDIN_LOG",
+      "record": {
+        "pair": "2354 fr04 x fr03",
+        "installed_addin": true,
+        "new_folded_candidate_test": false,
+        "loaded_module": "ADDIN.dll",
+        "mvid": "7b2281d4-7e60-4636-b312-d3dabcd5b3df",
+        "preview_solver_ms": 257,
+        "preview_display_ms": 26,
+        "preview_total_ms": 291,
+        "display3_statuses": [
+          0,
+          0
+        ],
+        "cut_features_verified": 4,
+        "cut_shape_differences_m3": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "apply_status": "APPLY_VERIFIED",
+        "after_close_including_notification_ms": 8318,
+        "hide_end_count": 2,
+        "native_ok_executed": true,
+        "user_visible_preview": "NOT_VERIFIED_BY_LOG",
+        "process_exit": "0xffffffff",
+        "process_exit_cause": "UNVERIFIED"
+      }
+    },
+    {
+      "run_id": "geometry1618_fr3fr4_stock_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_GEOMETRY_STOCK_SUPPRESSED",
+      "source_result_sha256": "24c4da1c43c2501c58994acbe8603c446620cebcfd19a216d90031919d578827",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "native_writer_called": false,
+        "phase_timings_ms": {
+          "revision": 0,
+          "input_hashes": 5,
+          "copy_files": 7,
+          "pre_open_guard": 0,
+          "open_assembly": 1275,
+          "activate_assembly": 26,
+          "component_inventory": 165,
+          "stock_copy_setup": 5944,
+          "copy_source_bodies": 59,
+          "solve_geometry": 43237,
+          "kept_face_inventory": 6,
+          "copy_hashes_before_close": 3,
+          "close_test_copies": 509,
+          "input_hashes_after_close": 4,
+          "copy_hashes_after_close": 3
+        },
+        "revision": "32.5.0",
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "stock_setup": [
+          {
+            "component": "AFJ_PAIR_1618-04-bh-A6-fr3-1",
+            "state": "ALL_EXISTING_CUTS_SUPPRESSED_ON_DISPOSABLE_COPY",
+            "feature_names": [
+              "ｶｯﾄ - 押し出し110",
+              "ｶｯﾄ - 押し出し1",
+              "ｶｯﾄ - 押し出し116",
+              "ｶｯﾄ - 押し出し114",
+              "ｶｯﾄ - 押し出し115",
+              "ｶｯﾄ - 押し出し117",
+              "ｶｯﾄ - 押し出し119"
+            ]
+          },
+          {
+            "component": "AFJ_PAIR_1618-04-bh-A6-fr4-2",
+            "state": "ALL_EXISTING_CUTS_SUPPRESSED_ON_DISPOSABLE_COPY",
+            "feature_names": [
+              "ｶｯﾄ - 押し出し14",
+              "ｶｯﾄ - 押し出し3",
+              "ｶｯﾄ - 押し出し1",
+              "ｶｯﾄ - 押し出し15",
+              "ｶｯﾄ - 押し出し16"
+            ]
+          }
+        ],
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "gap_m": 0.00010000000000021103,
+        "interference_m3": 0,
+        "removed_a_m3": 2.308394135769278e-05,
+        "removed_b_m3": 8.494202862819129e-05,
+        "length_a_m": 3.6,
+        "length_b_m": 2,
+        "short_cover_a": false,
+        "graph_a": "GEOMETRY_COORDINATES_OMITTED_FROM_PUBLIC_REPORT",
+        "graph_b": "GEOMETRY_COORDINATES_OMITTED_FROM_PUBLIC_REPORT",
+        "coverage_warning": "BUTT: Frame ngắn ưu tiên che. Mặt cắt Frame dài 330.479 mm²; còn hở 127.444 mm² theo lát kiểm tra B-rep tại giữa bề dày Frame ngắn.",
+        "operations_a": 1,
+        "operations_b": 1,
+        "kept_body_count_a": 1,
+        "kept_body_count_b": 1,
+        "removed_body_count_a": 1,
+        "removed_body_count_b": 1,
+        "kept_face_count_a": [
+          36
+        ],
+        "kept_face_count_b": [
+          24
+        ],
+        "coverage_measurement_status": "GEOMETRY_VERIFIED_PROBE_SECTION",
+        "coverage_measurement_detail": "Actual long Cut cap; probe at AssemblyFitGap + t_short/2; delta=0.00001 m; area from Boolean volume/delta. This is section coverage, not all-angle visual occlusion.",
+        "long_cut_total_area_m2": 0.00033047875959474343,
+        "long_cut_covered_area_m2": 0.0002030346582140172,
+        "long_cut_exposed_area_m2": 0.00012744410138072624,
+        "long_cut_exposed_band_direction_world": [
+          -1.2490009027033014e-16,
+          -1,
+          -3.642919299551295e-17
+        ],
+        "long_cut_exposed_band_min_m": -0.03160000000000036,
+        "long_cut_exposed_band_max_m": -0.0030000000000003674,
+        "status": "PASS_NATIVE_GEOMETRY",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "copy_hash_changes": [],
+        "case_total_ms": 52362
+      }
+    },
+    {
+      "run_id": "native_cross_end_undo_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "4a6e433118b3ce63a2867208e71499db4d559e58e009484b1575b6c7468d92b7",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "33.5.0",
+        "open_ms": 1252,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 29289,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999973919e-05,
+        "solver_overlap_m3": 0,
+        "apply_ms": 49861,
+        "returned_success": true,
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "FAIL",
+        "hresult": "0x80131509",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "Error": null,
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 9.999999999973919e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "FOLDED_RULE:SHORT_AXIAL_COVER",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.14500000000000002,
+              "RemovedCubicMetres": 5.5681042262126305e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.14700000000000002,
+              "NativeActualDepthMetres": 0.14500000000000002,
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 34,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 11,
+              "NativeEndBoundaryEdges": 24,
+              "NativeEndArcs": 10,
+              "NativeVertexRelations": 24,
+              "NativeTangentRelations": 10,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "FOLDED_RULE:LONG_AXIAL_BUTT",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.22310000000000008,
+              "RemovedCubicMetres": 8.134290145842868e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.22509999999999986,
+              "NativeActualDepthMetres": 0.22310000000000008,
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 16,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 5,
+              "NativeEndBoundaryEdges": 12,
+              "NativeEndArcs": 4,
+              "NativeVertexRelations": 12,
+              "NativeTangentRelations": 4,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            }
+          ]
+        },
+        "cross_frame_end_reference_undo_test": {
+          "scope": "COPY_ONLY_CROSS_FRAME_END_UNDO",
+          "save_api_called": false,
+          "new_sketches_in_link_phase": 0,
+          "undo_calls": 0,
+          "finish_recording_returned": false,
+          "finish_recording_retry_returned": false,
+          "status": "FAIL_NATIVE_OWNED_END_REFERENCE_UNDO",
+          "hresult": "0x80131509",
+          "recording_still_open": true,
+          "group_finished": false
+        },
+        "failure_summary": "Owned Assembly Undo recording did not finalize; no Undo was attempted.",
+        "integration_status": "NOT_QUALIFIED_NOT_INTEGRATED"
+      }
+    },
+    {
+      "run_id": "native1618_fr3fr4_stock_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "4b6fde15d7150bb36af5e9a62fae52919294d5ba6469674abaf7f56612417cd6",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "33.5.0",
+        "open_ms": 1313,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 35913,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 0.00010000000000021103,
+        "solver_overlap_m3": 0,
+        "apply_ms": 57463,
+        "returned_success": true,
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "Error": null,
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 0.00010000000000021103,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "FOLDED_RULE:LONG_AXIAL_BUTT",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.06984999999999975,
+              "RemovedCubicMetres": 2.308394135769278e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.07184999999999975,
+              "NativeActualDepthMetres": 0.06984999999999975,
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 34,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 11,
+              "NativeEndBoundaryEdges": 24,
+              "NativeEndArcs": 10,
+              "NativeVertexRelations": 24,
+              "NativeTangentRelations": 10,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "FOLDED_RULE:SHORT_AXIAL_COVER",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.4022499999999992,
+              "RemovedCubicMetres": 8.494202862819128e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "EndFaceSketchEvidenceAvailable": true,
+              "EndFaceSketchLaterFeaturesVerified": true,
+              "PlanCutterLengthMetres": 0.4042499999999992,
+              "NativeActualDepthMetres": 0.4022499999999992,
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 22,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeEndCapFaces": 7,
+              "NativeEndBoundaryEdges": 16,
+              "NativeEndArcs": 6,
+              "NativeVertexRelations": 16,
+              "NativeTangentRelations": 6,
+              "NativeClosureRelations": 0,
+              "SketchReferenceQualification": "HISTORY_FACE_PARENT_AND_UNCHANGED_SKETCH_PLANE",
+              "SketchObservedReferenceType": 0,
+              "SketchObservedReferenceIsFace": false,
+              "SketchSupportOwnerInParents": true,
+              "SketchPlaneVerified": true
+            }
+          ]
+        },
+        "stock_setup": "EXISTING_CUTS_SUPPRESSED_ONLY_ON_DISPOSABLE_COPIES"
+      }
+    },
+    {
+      "run_id": "direct_relations2354_follow_02",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_DIRECT_RELATION_COPY_PROBE_SELECTED_PARAMETERS",
+      "source_result_sha256": "7af31945e79d98a04f51fc1882ad9d79a44685611a0c4c177597a6407fbdc696",
+      "record": {
+        "native_api": true,
+        "scope": "DIRECT_OTHER_FRAME_RELATIONS_ONLY",
+        "cut_created": false,
+        "convert_entities_called": false,
+        "dimensions_created": 0,
+        "fixed_relations_created": 0,
+        "save_api_called": false,
+        "parameter_follow_test": "NOT_RUN",
+        "open_error": 0,
+        "open_warning": 0,
+        "support_reference_type": 2,
+        "experiment": "face_point_follow",
+        "created_relations": [
+          {
+            "type": 9,
+            "entity_types": [
+              3,
+              2
+            ]
+          },
+          {
+            "type": 9,
+            "entity_types": [
+              3,
+              2
+            ]
+          }
+        ],
+        "constraint_status": 3,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "relation_count": 2,
+        "sketch_owner_verified": true,
+        "edit_context_restored": true,
+        "external_file_reference_count": 5,
+        "parameter_follow_move_m": 0.001,
+        "other_component_was_fixed": false,
+        "moved_rebuild_returned": true,
+        "restore_rebuild_returned": true,
+        "parameter_transform_and_point_restored": true,
+        "status": "FAIL_OR_UNVERIFIED",
+        "hresult": "0x80131509",
+        "session_blank_after_cleanup": true,
+        "input_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "failure_summary": "Requested copied-component translation was not applied; assembly mates reset it on rebuild. Parameter-follow behavior was not established.",
+        "requested_transform_applied": false,
+        "complete_parameter_follow_qualified": false
+      }
+    },
+    {
+      "run_id": "direct_relations2354_follow_free_02",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_DIRECT_RELATION_COPY_FOLLOW_SELECTED_PARAMETERS",
+      "source_result_sha256": "03f4ce205e02f9e3995ace94657e8f5284bf7f46c8317e9af4c449adb2efd567",
+      "record": {
+        "native_api": true,
+        "scope": "DIRECT_OTHER_FRAME_RELATIONS_ONLY",
+        "cut_created": false,
+        "convert_entities_called": false,
+        "dimensions_created": 0,
+        "fixed_relations_created": 0,
+        "save_api_called": false,
+        "parameter_follow_test": "PASS_NATIVE_COPY_UNMATED_TRANSLATION_AND_ALL_STATE_RESTORED",
+        "open_error": 0,
+        "open_warning": 0,
+        "support_reference_type": 2,
+        "reference_same_assembly_support": 1,
+        "reference_same_native_support": 1,
+        "experiment": "face_point_follow",
+        "created_relations": [
+          {
+            "type": 9,
+            "entity_types": [
+              3,
+              2
+            ]
+          },
+          {
+            "type": 9,
+            "entity_types": [
+              3,
+              2
+            ]
+          }
+        ],
+        "constraint_status": 3,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "relation_count": 2,
+        "sketch_owner_verified": true,
+        "edit_context_restored": true,
+        "external_file_reference_count": 5,
+        "other_component_was_fixed": false,
+        "mate_setup_scope": "ALL_ASSEMBLY_MATES_ON_CONTAINED_DISPOSABLE_COPY_ONLY",
+        "parameter_follow_move_m": 0.001,
+        "copy_other_released_from_fixed": false,
+        "copy_mate_setup_rebuild_returned": true,
+        "moved_rebuild_returned": true,
+        "restore_free_rebuild_returned": true,
+        "free_transform_and_point_restored": true,
+        "restore_mates_rebuild_returned": true,
+        "copy_mate_states_restored": true,
+        "copy_fixed_state_restored": true,
+        "parameter_transform_and_point_restored": true,
+        "status": "PASS_NATIVE_DIRECT_GEOMETRY_FOLLOW",
+        "session_blank_after_cleanup": true,
+        "input_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "original_mate_state_count": 35,
+        "temporarily_suppressed_mate_count": 33,
+        "requested_component_translation_retained_after_rebuild": true,
+        "own_component_pose_unchanged": true,
+        "exact_native_sketch_point_id_reacquired_and_followed": true,
+        "translation_match_tolerance_m": 1e-08,
+        "point_match_tolerance_m": 1e-07,
+        "observed_other_translation_mm": 1.0000000000000009,
+        "observed_sketch_point_translation_mm": 1.000000000000112
+      }
+    },
+    {
+      "run_id": "native3615_t1_stock_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "e86847eee9660c5291c74f7e28e5add7d7413935a8d496324ba419f218736d02",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "33.5.0",
+        "open_ms": 1108,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 19893,
+        "rule": "ORTHOGONAL_U_COVER",
+        "solver_gap_m": 9.999999999991944e-05,
+        "solver_overlap_m3": 0,
+        "apply_ms": 26446,
+        "returned_success": true,
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 9.999999999991944e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:COVER_WEB_WALL",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.032200000000000006,
+              "RemovedCubicMetres": 5.287047893248802e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FIXED_PLANE_PRISM",
+              "EndFaceSketchEvidenceAvailable": false,
+              "NativeActualDepthMetres": 0.032200000000000006,
+              "SketchConstrainedStatus": -1,
+              "SketchRelationCount": -1,
+              "SketchDrivingDimensions": -1,
+              "NewReferencePlanes": -1
+            },
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:NORMAL_BEND_CAP",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0021999999999999997,
+              "RemovedCubicMetres": 6.832739114625259e-09,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FIXED_PLANE_PRISM",
+              "EndFaceSketchEvidenceAvailable": false,
+              "NativeActualDepthMetres": 0.0021999999999999997,
+              "SketchConstrainedStatus": -1,
+              "SketchRelationCount": -1,
+              "SketchDrivingDimensions": -1,
+              "NewReferencePlanes": -1
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.032200000000000006,
+              "RemovedCubicMetres": 0.00024247301539081663,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FIXED_PLANE_PRISM",
+              "EndFaceSketchEvidenceAvailable": false,
+              "NativeActualDepthMetres": 0.032200000000000006,
+              "SketchConstrainedStatus": -1,
+              "SketchRelationCount": -1,
+              "SketchDrivingDimensions": -1,
+              "NewReferencePlanes": -1
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:FAR_BEND_CLEARANCE",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0022999999999999995,
+              "RemovedCubicMetres": 5.164385191763766e-10,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FIXED_PLANE_PRISM",
+              "EndFaceSketchEvidenceAvailable": false,
+              "NativeActualDepthMetres": 0.0022999999999999995,
+              "SketchConstrainedStatus": -1,
+              "SketchRelationCount": -1,
+              "SketchDrivingDimensions": -1,
+              "NewReferencePlanes": -1
+            }
+          ]
+        },
+        "qualification_limit": "LEGACY_U_FIXED_PLANE_PRISM_WRITER_NOT_NEW_FACE_ATTACHED_DIRECT_RELATION_WRITER"
+      }
+    },
+    {
+      "run_id": "native3615_t2_shared_scope_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "52789d9cb4116fe5dbf2ddf0e9ffb6c572f5c135b95a7416b5e2c61dd99c2f89",
+      "record": {
+        "case": "shared_part_rejected",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "33.5.0",
+        "open_ms": 1069,
+        "open_error": 0,
+        "open_warning": 64,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 21030,
+        "rule": "ORTHOGONAL_U_COVER",
+        "solver_gap_m": 0.00010000000000054323,
+        "solver_overlap_m3": 0,
+        "apply_ms": 273,
+        "returned_success": false,
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "REJECTED_OR_ROLLED_BACK",
+          "RollbackVerified": true,
+          "SaveApiCalled": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": []
+        },
+        "expected_refusal": "SHARED_PART",
+        "native_history_changes": 0,
+        "qualification_limit": "EXPECTED_SHARED_PART_PREFLIGHT_REFUSAL_NOT_A_SUCCESSFUL_CUT_APPLICATION"
+      }
+    },
+    {
+      "run_id": "native1618_fr1fr2_stock_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "30f38e22e8c61177506da03032c55e9ad0e05acebc02a73d10e5f364bd9414be",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "33.5.0",
+        "open_ms": 1231,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "status": "FAIL",
+        "hresult": "0x80131509",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Cuts": []
+        },
+        "failure_summary": "UNVERIFIED_RULE: folded profile extreme has no actual planar support face",
+        "writer_called": false,
+        "new_extreme_face_vertex_edge_witness_candidate": "FOLLOWUP_PASS_NATIVE_API_native1618_fr1fr2_stock_boundary_01_ORIGINAL_RUN_REMAINS_FAIL"
+      }
+    },
+    {
+      "run_id": "native2354_reverse_and_rollback_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "11dfa3895ae05d31c31cf546a9df99134cd518c37fc92b7ffde3fa9e9b373515",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "33.5.0",
+        "open_ms": 1128,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 30914,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999973919e-05,
+        "solver_overlap_m3": 0,
+        "apply_ms": 52457,
+        "returned_success": true,
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 9.999999999973919e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "FOLDED_RULE:LONG_AXIAL_BUTT",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.22310000000000008,
+              "RemovedCubicMetres": 8.134290145842864e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 16,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeVertexRelations": 12,
+              "NativeTangentRelations": 4
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "FOLDED_RULE:SHORT_AXIAL_COVER",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.14500000000000002,
+              "RemovedCubicMetres": 5.5681042262126285e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 34,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeVertexRelations": 24,
+              "NativeTangentRelations": 10
+            }
+          ]
+        },
+        "selection_order": "REVERSED_A_B",
+        "qualification_limit": "NATIVE_COPY_HARNESS_NOT_INSTALLED_ADDIN"
+      }
+    },
+    {
+      "run_id": "native2354_reverse_and_rollback_01",
+      "case_index": 1,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "11dfa3895ae05d31c31cf546a9df99134cd518c37fc92b7ffde3fa9e9b373515",
+      "record": {
+        "case": "rollback_after_both_parts",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "33.5.0",
+        "open_ms": 1148,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 31127,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999973919e-05,
+        "solver_overlap_m3": 0,
+        "apply_ms": 51212,
+        "returned_success": false,
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "REJECTED_OR_ROLLED_BACK",
+          "RollbackVerified": true,
+          "SaveApiCalled": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "FOLDED_RULE:LONG_AXIAL_BUTT",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.22310000000000008,
+              "RemovedCubicMetres": 8.134290145842866e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 16,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeVertexRelations": 12,
+              "NativeTangentRelations": 4
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "FOLDED_RULE:SHORT_AXIAL_COVER",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.14500000000000002,
+              "RemovedCubicMetres": 5.568104226212629e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 34,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeVertexRelations": 24,
+              "NativeTangentRelations": 10
+            }
+          ]
+        },
+        "qualification": "EXPECTED_FAILURE_AFTER_TWO_NATIVE_CUTS_THEN_TWO_PART_GEOMETRY_AND_TREES_RESTORED",
+        "cuts_created_then_removed": 2,
+        "two_part_geometry_and_feature_trees_restored": true,
+        "undo_stack_or_save_dirty_state_qualified": false,
+        "cross_end_adapter_involved": false
+      }
+    },
+    {
+      "run_id": "native2354_reverse_and_rollback_01",
+      "case_index": 2,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "11dfa3895ae05d31c31cf546a9df99134cd518c37fc92b7ffde3fa9e9b373515",
+      "record": {
+        "case": "stale_preview_rejected",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "33.5.0",
+        "open_ms": 1151,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "status": "FAIL",
+        "hresult": "0x80010105",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Cuts": []
+        },
+        "failure_summary": "Feature.GetTypeName2 failed with RPC_E_SERVERFAULT during initial history query before solver; stale-ticket behavior was not tested.",
+        "failure_phase": "PRE_SOLVER_FEATURE_HISTORY_QUERY",
+        "solver_called": false,
+        "writer_called": false,
+        "stale_rejection_qualified": false
+      }
+    },
+    {
+      "run_id": "native1618_fr1fr2_stock_boundary_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "c0068fa37a3e63bc547030d259c1e96fb029ea0220457586871fe910b923796f",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_ms": 2693,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 36614,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999983633e-05,
+        "solver_overlap_m3": 0,
+        "apply_ms": 37336,
+        "returned_success": true,
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 9.999999999983633e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "FOLDED_RULE:LONG_AXIAL_BUTT",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.06984999999999997,
+              "RemovedCubicMetres": 1.6781346300095974e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 22,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeVertexRelations": 16,
+              "NativeTangentRelations": 6
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "FOLDED_RULE:SHORT_AXIAL_COVER",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": false,
+              "DepthMetres": 0.4405831981329711,
+              "RemovedCubicMetres": 7.93541023814398e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FACE_ATTACHED_NATIVE_END_SECTION",
+              "SketchSupport": "EXISTING_SELECTED_END_FACE",
+              "SketchReferenceType": 2,
+              "SketchConstrainedStatus": 3,
+              "SketchRelationCount": 16,
+              "SketchDrivingDimensions": 0,
+              "NewReferencePlanes": 0,
+              "NativeVertexRelations": 12,
+              "NativeTangentRelations": 4
+            }
+          ]
+        },
+        "native_support_witnesses": [
+          {
+            "kind": "PLANAR_FACE_SUPPORT",
+            "minimum": true,
+            "extreme_on_trimmed_face": true,
+            "trimmed_face_witnesses": 4,
+            "planar_support_faces": 1,
+            "vertex_support_witnesses": 0,
+            "edge_support_witnesses": -1,
+            "associative_cut_reference": false
+          },
+          {
+            "kind": "NATIVE_VERTEX_BOUNDARY_SUPPORT",
+            "minimum": false,
+            "extreme_on_trimmed_face": true,
+            "trimmed_face_witnesses": 3,
+            "planar_support_faces": 0,
+            "vertex_support_witnesses": 2,
+            "edge_support_witnesses": -1,
+            "associative_cut_reference": false
+          }
+        ],
+        "long_cut_exposure": {
+          "total_m2": 0.0002406450271625001,
+          "covered_m2": 0.00021752765765369097,
+          "exposed_m2": 2.3117369508809146e-05
+        },
+        "support_witness_evidence": "API_VERIFIED_AND_NATIVE_BREP_BOUNDARY_CHECKED_NOT_BOUNDING_BOX",
+        "widths_mm": [
+          75,
+          65
+        ],
+        "stock_setup": "EXISTING_CUTS_SUPPRESSED_ONLY_ON_DISPOSABLE_COPIES"
+      }
+    },
+    {
+      "run_id": "native3615_t2_scoped_stock_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_COPY_HARNESS_SELECTED_PARAMETERS",
+      "source_result_sha256": "f99cf57f0c014f4bd33c315bb9218e192cc42dda72325d31bb3058c527190944",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_ms": 993,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 26338,
+        "rule": "ORTHOGONAL_U_COVER",
+        "solver_gap_m": 0.00010000000000054323,
+        "solver_overlap_m3": 0,
+        "apply_ms": 275,
+        "returned_success": false,
+        "status": "FAIL",
+        "hresult": "0x80131509",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "REJECTED_OR_ROLLED_BACK",
+          "RollbackVerified": true,
+          "SaveApiCalled": false,
+          "GapMetres": 0,
+          "InterferenceCubicMetres": 0,
+          "Cuts": []
+        },
+        "failure_summary": "Positive Cut attempt refused SHARED_PART even with duplicate occurrences suppressed on disposable copy. No automatic Part independence is implemented.",
+        "actual_cut_count": 0,
+        "qualification_limit": "EXPECTED_REFUSAL_PREVIOUS_RUN_STILL_PASS_BUT_THIS_POSITIVE_APPLY_ATTEMPT_FAIL"
+      }
+    },
+    {
+      "run_id": "public2354_folded_boundary_01",
+      "case_index": 0,
+      "evidence_kind": "REAL_PUBLIC_SESSION_MANAGER_NATIVE_API_SELECTED_PARAMETERS",
+      "source_result_sha256": "ba66f3ec2327f714b9b3f4de1059caac0ff9c9c1ad1ff69b395b4d615511832a",
+      "record": {
+        "case": "public_preview_then_apply",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_ms": 1156,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999973919e-05,
+        "solver_overlap_m3": 0,
+        "public_preview_display3": true,
+        "visual_visibility_confirmation": "UNVERIFIED_NO_INSTALLED_UI_OR_SCREEN_INSPECTION",
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "public_manager_closed": true,
+        "public_cleanup_message": "Không có Temporary Body còn chờ dọn.",
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "public_preview_passes": [
+          {
+            "mode": 1,
+            "elapsed_ms": 38260,
+            "api_returned_success": true
+          },
+          {
+            "mode": 1,
+            "elapsed_ms": 287,
+            "api_returned_success": true
+          },
+          {
+            "mode": 2,
+            "elapsed_ms": 739,
+            "api_returned_success": true
+          },
+          {
+            "mode": 1,
+            "elapsed_ms": 429,
+            "api_returned_success": true
+          }
+        ],
+        "path": "REAL_PUBLIC_SESSION_MANAGER_AND_GHOST_PREVIEW_WITH_NATIVE_API_COMPILED_SOURCE_NOT_INSTALLED_UI",
+        "public_preview_cache_hits": 3,
+        "public_preview_solver_runs": 1,
+        "public_preview_solver_ms": 37369,
+        "public_apply_native_cut_count": 2,
+        "native_writer_ms": 48873,
+        "unchanged_p1_no_solve_hide_display3": true,
+        "p2_reuses_keep_and_adds_cut_bodies": true,
+        "return_p1_hides_cut_only_keeps_keep": true,
+        "display3_success_count": 4,
+        "display3_all_status_zero": true,
+        "close_cleanup_body_count_remaining": 0,
+        "independent_preliminary_solve_ms": 38658,
+        "log_source_sha256": "b286b909a7bff7a8781ecbb666bf2bad01b0d762bb9ac84e71e823a90cbb2456"
+      }
+    },
+    {
+      "run_id": "native2354_fr04fr03_boundary_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_LEGACY_REGRESSION_SELECTED_PARAMETERS",
+      "source_result_sha256": "4464961f6e0ccaa44ccacc996142ef1cc83382cd584e9aebd67b51b2d9ab96d6",
+      "record": {
+        "case": "positive",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_ms": 1077,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 20154,
+        "rule": "ORTHOGONAL_U_TALLER_COVER",
+        "solver_gap_m": 9.999999999976694e-05,
+        "solver_overlap_m3": 0,
+        "apply_ms": 24761,
+        "returned_success": true,
+        "final_symmetric_a_m3": 0,
+        "final_symmetric_b_m3": 0,
+        "repeat_ticket": "REJECTED_OR_ROLLED_BACK",
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "APPLY_VERIFIED",
+          "RollbackVerified": false,
+          "SaveApiCalled": false,
+          "GapMetres": 9.999999999976694e-05,
+          "InterferenceCubicMetres": 0,
+          "Cuts": [
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:COVER_WEB_WALL",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.060200000000000004,
+              "RemovedCubicMetres": 7.174026935599262e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FIXED_PLANE_PRISM",
+              "EndFaceSketchEvidenceAvailable": false,
+              "NativeActualDepthMetres": 0.060200000000000004,
+              "SketchConstrainedStatus": -1,
+              "SketchRelationCount": -1,
+              "SketchDrivingDimensions": -1,
+              "NewReferencePlanes": -1
+            },
+            {
+              "Frame": "A",
+              "EvidenceId": "U_RULE:NORMAL_BEND_CAP",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0026999999999999997,
+              "RemovedCubicMetres": 1.3128324823542243e-08,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FIXED_PLANE_PRISM",
+              "EndFaceSketchEvidenceAvailable": false,
+              "NativeActualDepthMetres": 0.0026999999999999997,
+              "SketchConstrainedStatus": -1,
+              "SketchRelationCount": -1,
+              "SketchDrivingDimensions": -1,
+              "NewReferencePlanes": -1
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "FORMED_PROFILE_ENVELOPE",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.04220000000000001,
+              "RemovedCubicMetres": 6.866490951705345e-05,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FIXED_PLANE_PRISM",
+              "EndFaceSketchEvidenceAvailable": false,
+              "NativeActualDepthMetres": 0.04220000000000001,
+              "SketchConstrainedStatus": -1,
+              "SketchRelationCount": -1,
+              "SketchDrivingDimensions": -1,
+              "NewReferencePlanes": -1
+            },
+            {
+              "Frame": "B",
+              "EvidenceId": "U_RULE:FAR_BEND_CLEARANCE",
+              "FeatureType": "ICE",
+              "UnderlyingType": "Cut",
+              "DepthPolicy": "BEND_NORMAL_RELIEF",
+              "EndCondition": 0,
+              "NormalCut": false,
+              "FlipSideToCut": false,
+              "ReverseDirection": true,
+              "DepthMetres": 0.0027999999999999995,
+              "RemovedCubicMetres": 7.844872207149655e-10,
+              "SymmetricDifferenceCubicMetres": 0,
+              "NativeRepresentation": "FIXED_PLANE_PRISM",
+              "EndFaceSketchEvidenceAvailable": false,
+              "NativeActualDepthMetres": 0.0027999999999999995,
+              "SketchConstrainedStatus": -1,
+              "SketchRelationCount": -1,
+              "SketchDrivingDimensions": -1,
+              "NewReferencePlanes": -1
+            }
+          ]
+        },
+        "qualification_limit": "LEGACY_U_TALLER_FIXED_PLANE_PRISM_NOT_NEW_FACE_ATTACHED_DIRECT_RELATION_WRITER"
+      }
+    },
+    {
+      "run_id": "native2354_stale_boundary_01",
+      "case_index": 0,
+      "evidence_kind": "NATIVE_EXPECTED_STALE_TICKET_REFUSAL_SELECTED_PARAMETERS",
+      "source_result_sha256": "83e5774d01e1db9d08836255fb30bb53e00ae91d497700963031310fe424c922",
+      "record": {
+        "case": "stale_preview_rejected",
+        "installed_addin": false,
+        "native_solidworks_api": true,
+        "save_api_called_by_harness": false,
+        "revision": "32.5.0",
+        "open_ms": 1138,
+        "open_error": 0,
+        "open_warning": 0,
+        "activation_error": 0,
+        "assembly_activation_equality": 1,
+        "solve_ms": 35487,
+        "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+        "solver_gap_m": 9.999999999973919e-05,
+        "solver_overlap_m3": 0,
+        "apply_ms": 27,
+        "returned_success": false,
+        "status": "PASS_NATIVE_API",
+        "copy_file_hashes_unchanged_before_close": true,
+        "source_file_hashes_unchanged": true,
+        "copy_file_hashes_unchanged": true,
+        "apply": {
+          "Status": "REJECTED_OR_ROLLED_BACK",
+          "refusal_reason": "PREVIEW_STALE",
+          "RollbackVerified": true,
+          "SaveApiCalled": false,
+          "actual_cut_count": 0,
+          "actual_gap": "NOT_MEASURED_EARLY_REFUSAL",
+          "actual_interference": "NOT_MEASURED_EARLY_REFUSAL",
+          "dto_gap_and_interference_zero_mean": "DEFAULT_UNMEASURED_NOT_GEOMETRY_RESULT"
+        },
+        "qualification": "PASS_EXPECTED_STALE_TICKET_REFUSAL_NOT_APPLY_SUCCESS",
+        "original_bodies_unchanged": true,
+        "temporary_gap_scope": "SOLVER_CANDIDATE_ONLY_NOT_ORIGINAL_OR_APPLIED_BODY"
+      }
+    }
+  ],
+  "publication_sanitization": {
+    "raw_cad_brep_binaries_included": false,
+    "local_machine_paths_removed": true,
+    "persistence_reference_byte_values": "TOKEN_REDACTED; entire values removed, including potential UTF-16 embedded local names",
+    "profile_geometry_coordinates": "OMITTED; graph counts only in public summary",
+    "raw_hashes": "Evidence-file SHA256 only, for provenance"
+  },
+  "additional_geometry_case": {
+    "run_id": "geometry1618_fr3fr4_stock_01",
+    "pair": "1618 fr3 x fr4",
+    "stock_setup": "EXISTING_CUTS_SUPPRESSED_ONLY_ON_DISPOSABLE_COPIES",
+    "frame_a_strip_count": 6,
+    "frame_b_strip_count": 4,
+    "short_cover_a": false,
+    "gap_m": 0.00010000000000021103,
+    "overlap_m3": 0,
+    "removed_a_m3": 2.308394135769278e-05,
+    "removed_b_m3": 8.494202862819129e-05,
+    "total_long_cut_area_m2": 0.00033047875959474343,
+    "exposed_long_cut_area_m2": 0.00012744410138072624,
+    "native_writer_called": false,
+    "actual_native_cuts": 0,
+    "source_hashes_unchanged": true,
+    "copy_hashes_unchanged": true
+  },
+  "additional_native_writer_case": {
+    "run_id": "native1618_fr3fr4_stock_01",
+    "pair": "1618 fr3 x fr4 stock copies",
+    "status": "PASS_NATIVE_API",
+    "actual_cuts": 2,
+    "sketch_constraint_statuses": [
+      3,
+      3
+    ],
+    "sketch_relation_counts": [
+      34,
+      22
+    ],
+    "driving_dimensions": 0,
+    "new_reference_planes": 0,
+    "native_vertex_relations": [
+      24,
+      16
+    ],
+    "native_tangent_relations": [
+      10,
+      6
+    ],
+    "native_vs_plan_symmetric_difference_m3": [
+      0,
+      0
+    ],
+    "gap_m": 0.00010000000000021103,
+    "overlap_m3": 0,
+    "source_hashes_unchanged": true,
+    "copy_hashes_unchanged": true,
+    "installed_addin": false,
+    "stock_setup": "EXISTING_CUTS_SUPPRESSED_ONLY_ON_DISPOSABLE_COPIES"
+  },
+  "direct_other_frame_follow_positive_case": {
+    "run_id": "direct_relations2354_follow_free_02",
+    "status": "PASS_NATIVE_DIRECT_GEOMETRY_FOLLOW",
+    "scope": "DIRECT_RELATION_ONLY_NO_CUT",
+    "translation_mm": 1,
+    "exact_point_reacquired": true,
+    "own_pose_unchanged": true,
+    "original_mate_states": 35,
+    "temporarily_suppressed_mates": 33,
+    "all_state_restored": true,
+    "cut_created": false,
+    "installed_addin": false
+  },
+  "unequal_primary_width_examples": [
+    {
+      "pair": "1618 fr1 x fr2",
+      "primary_widths_mm": [
+        75,
+        65
+      ],
+      "current_generic_native_test": "PASS_NATIVE_API_TWO_CUTS_WITH_NATIVE_VERTEX_BOUNDARY_SUPPORT",
+      "archived_original_replay": "EXACT_POSE_REPLAY_SYMMETRIC_DIFFERENCE_ZERO_NOT_NEW_FIT_GAP_RULE"
+    },
+    {
+      "pair": "1618 fr1 x fr4",
+      "primary_widths_mm": [
+        75,
+        65
+      ],
+      "current_generic_native_test": "NOT_RUN"
+    },
+    {
+      "pair": "2354 fr02 x fr01",
+      "primary_widths_mm": [
+        55,
+        70
+      ],
+      "current_generic_native_test": "PASS_TWO_NATIVE_CUTS_BUTT_WITH_EXPOSURE"
+    },
+    {
+      "pair": "1618 fr3 x fr4",
+      "primary_widths_mm": [
+        65,
+        65
+      ],
+      "current_generic_native_test": "PASS_STOCK_COPY_NOT_UNEQUAL_WIDTH"
+    }
+  ],
+  "additional_native_3615_cases": {
+    "t1_stock": {
+      "run_id": "native3615_t1_stock_01",
+      "status": "PASS_NATIVE_API",
+      "actual_cuts": 4,
+      "gap_mm": 0.09999999999991944,
+      "overlap_m3": 0,
+      "symmetric_difference_m3": [
+        0,
+        0
+      ],
+      "writer": "LEGACY_FIXED_PLANE_PRISM",
+      "new_sketch_requirement_qualified": false
+    },
+    "t2_shared_part": {
+      "run_id": "native3615_t2_shared_scope_01",
+      "status": "PASS_EXPECTED_SHARED_PART_REFUSAL",
+      "actual_cuts": 0,
+      "history_changes": 0,
+      "apply_succeeded": false,
+      "temporary_solver_gap_mm": 0.10000000000054322,
+      "temporary_solver_overlap_m3": 0
+    }
+  },
+  "native_revision_note": "Per-record revision is authoritative. Cited runs include 32.5.0 and 33.5.0 sessions; one session failure does not erase earlier completed rows.",
+  "boundary_support_positive_case": {
+    "run_id": "native1618_fr1fr2_stock_boundary_01",
+    "pair": "1618 fr1 x fr2 stock copies",
+    "primary_widths_mm": [
+      75,
+      65
+    ],
+    "rule": "ORTHOGONAL_FOLDED_SHORT_COVER_BUTT",
+    "gap_mm": 0.09999999999983633,
+    "overlap_m3": 0,
+    "symmetric_difference_m3": [
+      0,
+      0
+    ],
+    "actual_cuts": 2,
+    "relations": [
+      22,
+      16
+    ],
+    "native_vertex_relations": [
+      16,
+      12
+    ],
+    "native_tangent_relations": [
+      6,
+      4
+    ],
+    "sketch_constraint_status": [
+      3,
+      3
+    ],
+    "driving_dimensions": 0,
+    "new_planes": 0,
+    "long_cut_total_area_mm2": 240.6450271625001,
+    "long_cut_exposed_area_mm2": 23.117369508809148,
+    "witness_kind": [
+      "PLANAR_FACE_SUPPORT",
+      "NATIVE_VERTEX_BOUNDARY_SUPPORT"
+    ],
+    "edge_witness_branch": "NOT_EXERCISED_IN_THIS_POSITIVE_CASE",
+    "associative_cut_end_reference": false,
+    "installed_addin": false
+  },
+  "source_commit_sha": "90876693d34fbaf6b13f0570b548ba7f6b946547",
+  "source_branch": "feat/afj-multi-profile-cut-preview-20261022",
+  "public_preview_boundary_positive_case": {
+    "run_id": "public2354_folded_boundary_01",
+    "status": "PASS_NATIVE_API",
+    "installed_addin": false,
+    "public_manager_used": true,
+    "preview_modes": [
+      1,
+      1,
+      2,
+      1
+    ],
+    "elapsed_ms": [
+      38260,
+      287,
+      739,
+      429
+    ],
+    "public_solver_calls": 1,
+    "public_solver_ms": 37369,
+    "later_cache_hits": 3,
+    "actual_apply_cuts": 2,
+    "native_vs_plan_delta_m3": [
+      0,
+      0
+    ],
+    "manager_closed": true,
+    "temporary_bodies_remaining": 0,
+    "actual_visibility": "UNVERIFIED_NO_INSTALLED_UI_OR_SCREEN_INSPECTION"
+  },
+  "report_status": "SOURCE_APPLIED_MAIN_DLL_NOT_REBUILT",
+  "legacy_u_regression_positive_case": {
+    "run_id": "native2354_fr04fr03_boundary_01",
+    "pair": "2354 fr04 x fr03",
+    "rule": "ORTHOGONAL_U_TALLER_COVER",
+    "actual_cuts": 4,
+    "gap_mm": 0.09999999999976694,
+    "overlap_m3": 0,
+    "native_vs_plan_delta_m3": [
+      0,
+      0
+    ],
+    "native_representation": "FIXED_PLANE_PRISM",
+    "new_sketch_requirement": "NOT_MET",
+    "installed_addin": false
+  },
+  "stale_ticket_positive_case": {
+    "run_id": "native2354_stale_boundary_01",
+    "status": "PASS_EXPECTED_STALE_REFUSAL",
+    "cuts": 0,
+    "returned_success": false,
+    "report_reason": "PREVIEW_STALE",
+    "original_bodies_unchanged": true,
+    "gap_after_refusal": "NOT_MEASURED",
+    "input_copy_hashes_unchanged": true,
+    "installed_addin": false
+  }
+}

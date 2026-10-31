@@ -1,0 +1,15 @@
+# Limits and remaining verification
+
+- Native API harness only. Installed Add-in UI, Preview visibility and UI smoothness remain UNVERIFIED. API Display3 success is not a visual PASS.
+- Final source15 2354 cold Preview measured 29211–64001 ms; cached P1 repetition 187–297 ms. Native Apply measured 390430–436173 ms in the cross-process harness. Cold analysis and Apply remain slow in that environment. Cached speed and reduced diagnostic logging do not prove a fast first Solve or installed UI performance.
+- Exact-source15 raw 4332 status: **PASS_NATIVE_API_HARNESS**. Historical source12 first-pair PASS is separate; its rejected second fixture is not a solver success.
+- Finished 4332 local Wall/Lip miter cells and existing added end stock are not generalized by the whole-depth Web footprint. Local Face2 sliver/native-mask experiments are not delivered as production solver code. Unclassified outside-cell/Bend removal remains UNVERIFIED.
+- Zero difference against a code-derived reviewed target is not an independent manufacturing-equivalence comparison with the 25 authored finished-reference Cuts. That equivalence remains UNVERIFIED.
+- Agreement of two interior stock-section witnesses is bounded evidence, not a proof of every longitudinal feature variation. Added material crossing both sample stations still needs separate geometric classification before claiming a universal rule.
+- No new end flange, material-adding feature or Edge Flange is created. The removed-versus-sweep added-stock guard applies only to `GeneralFoldFootprint`, using the two 35%/65% samples. It rejects removal outside that measured sweep; it does not guarantee arbitrary added stock is protected or refused in every legacy/plain-U case.
+- The fr04 baseline already contains three AFJ features: an older Plane, Sketch and Cut. They remain protected and unchanged. Zero new Planes counts this run's creations; it does not mean the preexisting tree contains no Plane.
+- The current qualified family is orthogonal formed U sections with the stated physical/native construction. Arbitrary angles, equal-length cover ambiguity, unsupported topology, alternative forming axes or missing paired Bend evidence remain `UNVERIFIED_RULE`.
+- 1618, 3615 and the completed 2216 width-mismatch reference were not rerun under source15 in this package. Earlier evidence remains historical evidence; no new PASS is invented.
+- Authored Cut direction-2 values require the native BothDirections activation flag. The production Apply report does not independently record BothDirections for generated Cuts; it records D1 and actual NormalCut/Flip/Reverse scalars. Reference command inventory is separate from these generated tests.
+- Exposed-edge area is measured only by the stated axial-cap probes. Diagonal Web edges, all high-fold edges and all viewing directions are not fully covered by those area measurements.
+- No direct installed Add-in regression test, automatic main Add-in Build/Deploy or merge was performed by the agent.

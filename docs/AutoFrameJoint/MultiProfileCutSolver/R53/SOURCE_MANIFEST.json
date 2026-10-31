@@ -1,0 +1,29 @@
+[
+  {
+    "file": "AutoFrameJointGhostPreview.cs",
+    "sha256": "0325bc542c7633d61524d1f867b228a3a627bbe9039d737b85951a9be8490f56",
+    "role": "route_input"
+  },
+  {
+    "file": "AfjNativeUTransaction.R53.cs",
+    "sha256": "c716f3a9fcfc1381418353eb07bf0ea527c3c2369e27ce3c0493397e3494eef5",
+    "role": "embedded_helper_input"
+  },
+  {
+    "file": "AfjUParametricSketchWriter.R53.cs",
+    "sha256": "7321f3128727d2503dbbda2065a9dbfa70ffb5aefb9779a04bf10c9c39486e81",
+    "role": "embedded_helper_input"
+  },
+  {
+    "file": "UOwnedFeatureJournal.R53.cs",
+    "sha256": "ba597636470c964e766799357c2b3a4598b86bcea9f40e4a459d651b8ff0b454",
+    "role": "embedded_helper_input"
+  },
+  {
+    "file": "AutoFrameJointGhostPreview.cs",
+    "sha256": "cc7fc64ab6b5a6d51cbf5e5ef6b59bd1d15f509d29af262d2e173a52cb92b68c",
+    "role": "delivered_existing_file",
+    "native_tested_sha256": "2bc61527c5aea88efe145eeb6262fedb0a3445967238116cff35239024529d55",
+    "delivery_difference": "Removed one redundant LF at EOF only; no C# token or logic change"
+  }
+]

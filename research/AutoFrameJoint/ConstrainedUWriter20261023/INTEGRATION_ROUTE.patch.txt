@@ -1,0 +1,155 @@
+--- a/Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs
++++ b/Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs
+@@ -1255,6 +1255,8 @@
+     internal sealed class AfjJointSolution
+     {
+         internal AfjJointPlan Plan;
++        // Exact construction intent from the reviewed Solve, never regenerated on OK.
++        internal AfjParametricPlan ReviewedIntent;
+         internal AfjBooleanResult A, B;
+         internal ModelDoc2 PartA, PartB;
+         internal MathTransform TransformA, TransformB;
+@@ -1380,7 +1382,7 @@
+             AfjParametricPlan generated=AfjJointRuleLibrary.Create(pfa, pfb, a, b, ta, tb, coverA);
+             var result=new AfjJointSolution
+             {
+-                Plan=generated.Plan, PartA=pa, PartB=pb, TransformA=ta, TransformB=tb, LengthA=la, LengthB=lb, CoverA=coverA, CoverageWarning=generated.CoverageWarning, ProfileGraphAJson=generated.Folded==null?null:(coverA?generated.Folded.Winner.GraphJson:generated.Folded.Loser.GraphJson), ProfileGraphBJson=generated.Folded==null?null:(coverA?generated.Folded.Loser.GraphJson:generated.Folded.Winner.GraphJson)
++                Plan=generated.Plan, ReviewedIntent=generated, PartA=pa, PartB=pb, TransformA=ta, TransformB=tb, LengthA=la, LengthB=lb, CoverA=coverA, CoverageWarning=generated.CoverageWarning, ProfileGraphAJson=generated.Folded==null?null:(coverA?generated.Folded.Winner.GraphJson:generated.Folded.Loser.GraphJson), ProfileGraphBJson=generated.Folded==null?null:(coverA?generated.Folded.Loser.GraphJson:generated.Folded.Winner.GraphJson)
+             }
+             ;
+             result.A=AfjTemporaryBoolean.Execute(sw, a, generated.Plan.A);
+@@ -2119,6 +2121,19 @@
+     /// </summary>
+     internal static class AfjNativeCutCommit
+     {
++        // PRIVATE qualification gate, never controlled by a runtime user setting.
++        private static bool ConstrainedURouteQualified
++        {
++            get
++            {
++#if AFJ_U_LINKED_WRITER_HARNESS
++                return true;
++#else
++                return false;
++#endif
++            }
++        }
++
+         private sealed class PartEdit
+         {
+             internal ModelDoc2 Part;
+@@ -2875,6 +2890,7 @@
+             report = new AfjNativeApplyReport();
+             message = "Chưa áp dụng Cut.";
+             PartEdit a = null, b = null;
++            AfjNativeUTransaction constrainedU = null;
+             bool apiAllowed = false;
+             try
+             {
+@@ -2888,6 +2904,14 @@
+                 var result = ticket.Preview;
+                 if (result.Plan==null || (result.Plan.RuleId!="ORTHOGONAL_U_COVER" && result.Plan.RuleId!="ORTHOGONAL_U_TALLER_COVER" && result.Plan.RuleId!=AfjFoldedButtRules.RuleId))
+                     throw new InvalidOperationException("UNVERIFIED_RULE: native Cut writer has no qualified rule mapping");
++                bool uRule = result.Plan.RuleId == "ORTHOGONAL_U_COVER" || result.Plan.RuleId == "ORTHOGONAL_U_TALLER_COVER";
++                // The existing U rule never falls through to the free-Sketch/plane writer.
++                // This private candidate stays disabled until its exact native transaction
++                // and global rollback have passed qualification. Harness opt-in is compile-time.
++                if (uRule && !ConstrainedURouteQualified)
++                    throw new InvalidOperationException("UNVERIFIED_APPLY: constrained U writer qualification is pending; no native Cut was created");
++                if (uRule && (result.ReviewedIntent == null || !Object.ReferenceEquals(result.ReviewedIntent.Plan, result.Plan)))
++                    throw new InvalidOperationException("UNVERIFIED_APPLY: exact reviewed U intent is unavailable; create a new Preview");
+                 var activeAssembly = app.ActiveDoc as ModelDoc2;
+                 Trace.WriteLine("[AFJ-APPLY] PREFLIGHT active=" + (activeAssembly==null?"NONE":activeAssembly.GetTitle()) + " bound=" + assembly.GetTitle() +
+                     " assembly_equality=" + app.IsSame(activeAssembly,assembly) + " part_equality=" + app.IsSame(result.PartA,result.PartB));
+@@ -2901,29 +2925,52 @@
+                 PreflightPart(app, assembly, ticket.FrameA, result.PartA);
+                 PreflightPart(app, assembly, ticket.FrameB, result.PartB);
+                 string run = "AFJ_" + Guid.NewGuid().ToString("N").Substring(0,8);
+-                a = new PartEdit { Part=result.PartA, Before=ticket.BeforeA, Tree=Tree(result.PartA), SheetMetal=CurrentBody(result.PartA).IsSheetMetal(), Prefix=run+"_A" };
+-                b = new PartEdit { Part=result.PartB, Before=ticket.BeforeB, Tree=Tree(result.PartB), SheetMetal=CurrentBody(result.PartB).IsSheetMetal(), Prefix=run+"_B" };
+                 if (!ticket.IsSourceCurrent()) throw new InvalidOperationException("PREVIEW_STALE: source changed before mutation");
+-                ApplyPart(app, a, result.Plan.A, result.A.Kept.Single(), "A", report);
+-                ApplyPart(app, b, result.Plan.B, result.B.Kept.Single(), "B", report);
++                if (uRule)
++                {
++                    // Assign the transaction before Apply: even the first native Sketch
++                    // can mutate history and fail before a closed Sketch is returned.
++                    constrainedU = new AfjNativeUTransaction(app, assembly, ticket,
++                        result.ReviewedIntent, report, run, phase => Trace.WriteLine("[AFJ-APPLY] U " + phase));
++                    constrainedU.Apply();
++                }
++                else
++                {
++                    // Preserve the existing qualified folded writer and its rollback.
++                    a = new PartEdit { Part=result.PartA, Before=ticket.BeforeA, Tree=Tree(result.PartA), SheetMetal=CurrentBody(result.PartA).IsSheetMetal(), Prefix=run+"_A" };
++                    b = new PartEdit { Part=result.PartB, Before=ticket.BeforeB, Tree=Tree(result.PartB), SheetMetal=CurrentBody(result.PartB).IsSheetMetal(), Prefix=run+"_B" };
++                    ApplyPart(app, a, result.Plan.A, result.A.Kept.Single(), "A", report);
++                    ApplyPart(app, b, result.Plan.B, result.B.Kept.Single(), "B", report);
++                }
+                 Activate(app, assembly);
+                 double[] actualA = ticket.FrameA.GetTotalTransform(false).ArrayData as double[];
+                 double[] actualB = ticket.FrameB.GetTotalTransform(false).ArrayData as double[];
+                 double[] oldA = result.TransformA.ArrayData as double[], oldB = result.TransformB.ArrayData as double[];
+-                if (actualA==null || actualB==null || actualA.Length!=16 || actualB.Length!=16 ||
++                if (actualA==null || actualB==null || oldA==null || oldB==null || actualA.Length!=16 || actualB.Length!=16 || oldA.Length!=16 || oldB.Length!=16 ||
+                     actualA.Where((x,i)=>!AfjTemporaryBoolean.Finite(x)||Math.Abs(x-oldA[i])>1e-10).Any() ||
+                     actualB.Where((x,i)=>!AfjTemporaryBoolean.Finite(x)||Math.Abs(x-oldB[i])>1e-10).Any())
+                     throw new InvalidOperationException("APPLY: component placement changed from reviewed Preview");
+-                VerifyBody(CurrentBody(a.Part),result.A.Kept.Single());
+-                VerifyBody(CurrentBody(b.Part),result.B.Kept.Single());
+-                VerifyEndFaceSketches(app,a,"both_parts_final");
+-                VerifyEndFaceSketches(app,b,"both_parts_final");
+-                var wa = AfjJointSolver.World(new[]{AfjTemporaryBoolean.Copy(CurrentBody(a.Part))}, result.TransformA);
+-                var wb = AfjJointSolver.World(new[]{AfjTemporaryBoolean.Copy(CurrentBody(b.Part))}, result.TransformB);
++                VerifyBody(CurrentBody(result.PartA),result.A.Kept.Single());
++                VerifyBody(CurrentBody(result.PartB),result.B.Kept.Single());
++                if (constrainedU == null)
++                {
++                    VerifyEndFaceSketches(app,a,"both_parts_final");
++                    VerifyEndFaceSketches(app,b,"both_parts_final");
++                }
++                else constrainedU.CheckSketches("TRY_APPLY_FINAL_BODY_AND_PLACEMENT");
++                var wa = AfjJointSolver.World(new[]{AfjTemporaryBoolean.Copy(CurrentBody(result.PartA))}, result.TransformA);
++                var wb = AfjJointSolver.World(new[]{AfjTemporaryBoolean.Copy(CurrentBody(result.PartB))}, result.TransformB);
+                 report.InterferenceCubicMetres = AfjJointSolver.Overlap(wa, wb);
+                 report.GapMetres = AfjJointSolver.Gap(assembly, wa, wb);
+                 if (report.InterferenceCubicMetres>1e-12 || Math.Abs(report.GapMetres-AfjManufacturingConventions.AssemblyFitGap)>1e-6)
+                     throw new InvalidOperationException("APPLY: native pair failed overlap/fit-gap validation");
++                if (constrainedU != null)
++                {
++                    if (!Same(app, app.ActiveDoc, assembly) ||
++                        !Same(app, ((AssemblyDoc)assembly).GetEditTarget(), assembly) || assembly.GetActiveSketch2()!=null)
++                        throw new InvalidOperationException("APPLY: Assembly edit context was not restored before commit");
++                    constrainedU.Commit();
++                }
+                 report.Status = "APPLY_VERIFIED";
+                 message = "Đã tạo " + report.Cuts.Count + " Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi.";
+                 return true;
+@@ -2932,9 +2979,24 @@
+             {
+                 report.Error = "HRESULT=0x" + ex.HResult.ToString("X8") + " " + ex;
+                 Trace.WriteLine("[AFJ-APPLY] " + report.Error);
+-                bool rb = b == null || Rollback(app,b,report);
+-                bool ra = a == null || Rollback(app,a,report);
+-                report.RollbackVerified = rb && ra;
++                if (constrainedU != null)
++                {
++                    // Exactly one global rollback owns this branch. Never also invoke
++                    // independent per-Part rollback across the linked Sketch graph.
++                    try { report.RollbackVerified = constrainedU.Rollback().Verified; }
++                    catch (Exception rollbackError)
++                    {
++                        report.RollbackVerified = false;
++                        report.Rollback.Add("CONSTRAINED_U_GLOBAL_JOURNAL ROLLBACK_UNVERIFIED " + rollbackError);
++                        Trace.WriteLine("[AFJ-APPLY] U ROLLBACK_FAILED " + rollbackError);
++                    }
++                }
++                else
++                {
++                    bool rb = b == null || Rollback(app,b,report);
++                    bool ra = a == null || Rollback(app,a,report);
++                    report.RollbackVerified = rb && ra;
++                }
+                 report.Status = report.RollbackVerified ? "REJECTED_OR_ROLLED_BACK" : "ROLLBACK_UNVERIFIED";
+                 message = report.RollbackVerified ? "Chưa áp dụng Cut; hình học hai Part được giữ hoặc hoàn tác. " + ex.Message
+                     : "Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.";

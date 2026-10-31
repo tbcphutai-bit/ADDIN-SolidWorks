@@ -1,0 +1,43 @@
+{
+  "status": "MAIN_GHOST_ONLY_INSTALLED_FINAL15_NO_ADDIN_BUILD_OR_DEPLOY",
+  "source_sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+  "before_source_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+  "installed_utc": "2026-10-25T05:11:48.2208626Z",
+  "install_audit_sha256": "4deb6aa54c7c6be41534af5c749587f47c12052b6b21feac66af3fc2a5d73852",
+  "source_changed": [
+    "AutoFrameJointGhostPreview.cs"
+  ],
+  "protected_main_files_unchanged": true,
+  "branch_and_head_unchanged": true,
+  "main_project_build": false,
+  "deployment": false,
+  "actual_six_main_sources_detached_compile_status": "PASS_DETACHED_ACTUAL_SIX_SOURCE_COMPILE_ONLY",
+  "detached_compile_audit_sha256": "5ab9838608dd5702bc948dcecac39229ca883b0ffe267e6b00d7b94cb6e60b47",
+  "actual_six_main_source_hashes": [
+    {
+      "sha256": "4795f987af95740776f834cc454419bb50d557ab681f989452d6f2e35cdd3002",
+      "name": "AutoFrameJointCommandEntry.cs"
+    },
+    {
+      "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "name": "AutoFrameJointGeometryMath.cs"
+    },
+    {
+      "sha256": "b505ce2611affaaa795d2246c8dd19560ee197dae8e7d79035bb89fc26d01fa1",
+      "name": "AutoFrameJointGhostSessionManager.cs"
+    },
+    {
+      "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "name": "AutoFrameJointReadOnlyProbe.cs"
+    },
+    {
+      "sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+      "name": "AutoFrameJointGhostPreview.cs"
+    },
+    {
+      "sha256": "dd1506216efc372d82220e05fc5b0dec97898ab8c712910a6fdb6e03b01cd1e7",
+      "name": "AutoFrameJointSelectionPage.cs"
+    }
+  ],
+  "loaded_dll_contains_r56": "NOT_ESTABLISHED_USER_MANUAL_REBUILD_REQUIRED"
+}

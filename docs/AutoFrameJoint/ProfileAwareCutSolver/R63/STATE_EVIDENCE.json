@@ -1,0 +1,97 @@
+{
+  "scope": "R63_PREMUTATION_SYSTEM_GENERATED_PROFILE_STRUCTURE_ONLY",
+  "rows": [
+    {
+      "id": 2018,
+      "name": "ｽｹｯﾁ13-1",
+      "suppressed": true,
+      "rolled_back": false,
+      "token_length": 20,
+      "token_state": 2,
+      "resolved_nonnull": true,
+      "token_roundtrip_equal": true,
+      "native_same": 1,
+      "owner": "688|FoldUpDownSketchFolder|ｽｹｯﾁ変換1|True",
+      "parents": [
+        "668|FlatPattern|ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ9|True"
+      ],
+      "children": [],
+      "native_2d_sketch_available": true,
+      "segment_count": 14,
+      "frame": "A",
+      "evidence": "API_VERIFIED_READ_BEFORE_ANY_NATIVE_CUT"
+    },
+    {
+      "id": 2019,
+      "name": "a-1",
+      "suppressed": false,
+      "rolled_back": false,
+      "token_length": 20,
+      "token_state": 0,
+      "resolved_nonnull": true,
+      "token_roundtrip_equal": true,
+      "native_same": 1,
+      "owner": "688|FoldUpDownSketchFolder|ｽｹｯﾁ変換1|True",
+      "parents": [
+        "668|FlatPattern|ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ9|True"
+      ],
+      "children": [],
+      "native_2d_sketch_available": true,
+      "segment_count": 2,
+      "frame": "A",
+      "evidence": "API_VERIFIED_READ_BEFORE_ANY_NATIVE_CUT"
+    },
+    {
+      "id": 2020,
+      "name": "ｽｹｯﾁ45-1",
+      "suppressed": true,
+      "rolled_back": false,
+      "token_length": 20,
+      "token_state": 2,
+      "resolved_nonnull": true,
+      "token_roundtrip_equal": true,
+      "native_same": 1,
+      "owner": "688|FoldUpDownSketchFolder|ｽｹｯﾁ変換1|True",
+      "parents": [
+        "668|FlatPattern|ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ9|True"
+      ],
+      "children": [],
+      "native_2d_sketch_available": true,
+      "segment_count": 3,
+      "frame": "A",
+      "evidence": "API_VERIFIED_READ_BEFORE_ANY_NATIVE_CUT"
+    },
+    {
+      "id": 2021,
+      "name": "ｽｹｯﾁ51-1",
+      "suppressed": false,
+      "rolled_back": false,
+      "token_length": 20,
+      "token_state": 0,
+      "resolved_nonnull": true,
+      "token_roundtrip_equal": true,
+      "native_same": 1,
+      "owner": "688|FoldUpDownSketchFolder|ｽｹｯﾁ変換1|True",
+      "parents": [
+        "668|FlatPattern|ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ9|True"
+      ],
+      "children": [],
+      "native_2d_sketch_available": true,
+      "segment_count": 3,
+      "frame": "A",
+      "evidence": "API_VERIFIED_READ_BEFORE_ANY_NATIVE_CUT"
+    }
+  ],
+  "name_used_for_classification": false,
+  "ordinary_authored_sketch_cut_checks_retained": true,
+  "eligible_native_profile_states": {
+    "suppressed_true": 2,
+    "suppressed_false": 0
+  },
+  "native_post_factory_invalidation_required": {
+    "old_profile_token_state": 1,
+    "old_profile_token_result": null,
+    "only_after_exact_registered_native_cut": true
+  },
+  "no_persistent_token_payloads_exported": true
+}

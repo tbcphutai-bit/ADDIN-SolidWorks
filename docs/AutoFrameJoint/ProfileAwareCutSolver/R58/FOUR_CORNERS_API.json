@@ -1,0 +1,535 @@
+{
+  "report": "R58_FOUR_CORNERS_ACTUAL_INSTALLED_API",
+  "status": "PASS_INSTALLED_NATIVE_PMP_FOUR_CORNERS_SAME_IN_MEMORY_COPIES_CAD_FIRST_LOAD_ORDER",
+  "crashRootCauseStatus": "UNRESOLVED",
+  "sourceChangedForPass": false,
+  "qualifiedScope": "SAME_IN_MEMORY_DISPOSABLE_COPIES_CAD_FIRST_LOAD_ORDER",
+  "sourcePrivateAuditSha256": "8FFBF58806364EE7277EE990A0C8249F03E12F62DB6FF730AED3C6A91DBF7F29",
+  "mainDll": {
+    "sha256": "F22D57943B23D6FF17B6A17EB68E95424A604EAB9F082C180B8162A034FB44C7",
+    "mvid": "472fc9a6-5298-4ceb-a696-86bc9a0658fe",
+    "sameProcessAcrossFourCorners": true,
+    "nativeMainStaAcrossFourCorners": true,
+    "appDomain": "DefaultDomain"
+  },
+  "completedCornerCount": 4,
+  "generatedNativeCuts": 16,
+  "generatedNativeSketches": 16,
+  "generatedReferencePlanes": 0,
+  "authoredReferenceDataSeparate": {
+    "authoredFeatureCuts": 43,
+    "authoredCutsWithBeforeAfter": 42,
+    "generatedCutsNotAddedToAuthoredCounts": true
+  },
+  "corners": [
+    {
+      "corner": 1,
+      "frameA": "fr01",
+      "frameB": "fr04",
+      "status": "PASS_INSTALLED_NATIVE_PMP_CLOSE_AND_FINAL_BREP",
+      "apiEvidenceLevel": "API_VERIFIED",
+      "geometryEvidenceLevel": "GEOMETRY_VERIFIED",
+      "actualNewCuts": 4,
+      "actualNewSketches": 4,
+      "newReferencePlanes": 0,
+      "nativeCloseIssued": true,
+      "nativeCloseReturned": true,
+      "nativeApplyVerified": true,
+      "nativeAfterCloseObserved": true,
+      "sameLoadedAssemblyProved": true,
+      "appDomain": "DefaultDomain",
+      "nativeMainStaVerified": true,
+      "applySummary": [
+        "[AFJ-APPLY] END status=APPLY_VERIFIED cuts=4 rollback=False saveApiCalled=False"
+      ],
+      "finalGapM": 0.0001000000000000445,
+      "finalGapMm": 0.1000000000000445,
+      "finalOverlapM3": 0,
+      "finalIntersectionCode": 0,
+      "eventProof": [
+        {
+          "phase": "HOST_IDENTITY_PROVED",
+          "utc": "2026-10-26T01:03:53.8682059Z",
+          "elapsedMs": 56,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PMP_PAIR_READY",
+          "utc": "2026-10-26T01:03:54.9866801Z",
+          "elapsedMs": 1175,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PREVIEW_HANDLER107_BEGIN",
+          "utc": "2026-10-26T01:03:55.0026759Z",
+          "elapsedMs": 1191,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PREVIEW_TICKET_CURRENT",
+          "utc": "2026-10-26T01:03:55.0331984Z",
+          "elapsedMs": 1221,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "NATIVE_PAGE_CLOSE_TRUE_BEGIN",
+          "utc": "2026-10-26T01:03:55.1092049Z",
+          "elapsedMs": 1298,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "NATIVE_PAGE_CLOSE_TRUE_RETURN",
+          "utc": "2026-10-26T01:04:02.124526Z",
+          "elapsedMs": 8313,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "END",
+          "utc": "2026-10-26T01:04:02.1426663Z",
+          "elapsedMs": 8331,
+          "managedThread": 1,
+          "nativeThread": 24608
+        }
+      ]
+    },
+    {
+      "corner": 2,
+      "frameA": "fr04",
+      "frameB": "fr03",
+      "status": "PASS_INSTALLED_NATIVE_PMP_CLOSE_AND_FINAL_BREP",
+      "apiEvidenceLevel": "API_VERIFIED",
+      "geometryEvidenceLevel": "GEOMETRY_VERIFIED",
+      "actualNewCuts": 4,
+      "actualNewSketches": 4,
+      "newReferencePlanes": 0,
+      "nativeCloseIssued": true,
+      "nativeCloseReturned": true,
+      "nativeApplyVerified": true,
+      "nativeAfterCloseObserved": true,
+      "sameLoadedAssemblyProved": true,
+      "appDomain": "DefaultDomain",
+      "nativeMainStaVerified": true,
+      "applySummary": [
+        "[AFJ-APPLY] END status=APPLY_VERIFIED cuts=4 rollback=False saveApiCalled=False"
+      ],
+      "finalGapM": 9.999999999976694E-05,
+      "finalGapMm": 0.09999999999976694,
+      "finalOverlapM3": 0,
+      "finalIntersectionCode": 0,
+      "eventProof": [
+        {
+          "phase": "HOST_IDENTITY_PROVED",
+          "utc": "2026-10-26T01:13:07.3537132Z",
+          "elapsedMs": 40,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PMP_PAIR_READY",
+          "utc": "2026-10-26T01:13:07.9572026Z",
+          "elapsedMs": 643,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PREVIEW_HANDLER107_BEGIN",
+          "utc": "2026-10-26T01:13:07.966692Z",
+          "elapsedMs": 653,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PREVIEW_TICKET_CURRENT",
+          "utc": "2026-10-26T01:13:08.0399986Z",
+          "elapsedMs": 727,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "NATIVE_PAGE_CLOSE_TRUE_BEGIN",
+          "utc": "2026-10-26T01:13:08.1256919Z",
+          "elapsedMs": 812,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "NATIVE_PAGE_CLOSE_TRUE_RETURN",
+          "utc": "2026-10-26T01:13:15.6501417Z",
+          "elapsedMs": 8337,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "END",
+          "utc": "2026-10-26T01:13:15.6681038Z",
+          "elapsedMs": 8354,
+          "managedThread": 1,
+          "nativeThread": 24608
+        }
+      ]
+    },
+    {
+      "corner": 3,
+      "frameA": "fr03",
+      "frameB": "fr02",
+      "status": "PASS_INSTALLED_NATIVE_PMP_CLOSE_AND_FINAL_BREP",
+      "apiEvidenceLevel": "API_VERIFIED",
+      "geometryEvidenceLevel": "GEOMETRY_VERIFIED",
+      "actualNewCuts": 4,
+      "actualNewSketches": 4,
+      "newReferencePlanes": 0,
+      "nativeCloseIssued": true,
+      "nativeCloseReturned": true,
+      "nativeApplyVerified": true,
+      "nativeAfterCloseObserved": true,
+      "sameLoadedAssemblyProved": true,
+      "appDomain": "DefaultDomain",
+      "nativeMainStaVerified": true,
+      "applySummary": [
+        "[AFJ-APPLY] END status=APPLY_VERIFIED cuts=4 rollback=False saveApiCalled=False"
+      ],
+      "finalGapM": 9.999999999975306E-05,
+      "finalGapMm": 0.09999999999975306,
+      "finalOverlapM3": 0,
+      "finalIntersectionCode": 0,
+      "eventProof": [
+        {
+          "phase": "HOST_IDENTITY_PROVED",
+          "utc": "2026-10-26T01:13:21.4327837Z",
+          "elapsedMs": 48,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PMP_PAIR_READY",
+          "utc": "2026-10-26T01:13:22.1753612Z",
+          "elapsedMs": 791,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PREVIEW_HANDLER107_BEGIN",
+          "utc": "2026-10-26T01:13:22.1893539Z",
+          "elapsedMs": 804,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PREVIEW_TICKET_CURRENT",
+          "utc": "2026-10-26T01:13:22.2229065Z",
+          "elapsedMs": 838,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "NATIVE_PAGE_CLOSE_TRUE_BEGIN",
+          "utc": "2026-10-26T01:13:22.3143329Z",
+          "elapsedMs": 929,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "NATIVE_PAGE_CLOSE_TRUE_RETURN",
+          "utc": "2026-10-26T01:13:30.5588003Z",
+          "elapsedMs": 9174,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "END",
+          "utc": "2026-10-26T01:13:30.5730283Z",
+          "elapsedMs": 9188,
+          "managedThread": 1,
+          "nativeThread": 24608
+        }
+      ]
+    },
+    {
+      "corner": 4,
+      "frameA": "fr02",
+      "frameB": "fr01",
+      "status": "PASS_INSTALLED_NATIVE_PMP_CLOSE_AND_FINAL_BREP",
+      "apiEvidenceLevel": "API_VERIFIED",
+      "geometryEvidenceLevel": "GEOMETRY_VERIFIED",
+      "actualNewCuts": 4,
+      "actualNewSketches": 4,
+      "newReferencePlanes": 0,
+      "nativeCloseIssued": true,
+      "nativeCloseReturned": true,
+      "nativeApplyVerified": true,
+      "nativeAfterCloseObserved": true,
+      "sameLoadedAssemblyProved": true,
+      "appDomain": "DefaultDomain",
+      "nativeMainStaVerified": true,
+      "applySummary": [
+        "[AFJ-APPLY] END status=APPLY_VERIFIED cuts=4 rollback=False saveApiCalled=False"
+      ],
+      "finalGapM": 9.999999999991427E-05,
+      "finalGapMm": 0.09999999999991427,
+      "finalOverlapM3": 0,
+      "finalIntersectionCode": 0,
+      "eventProof": [
+        {
+          "phase": "HOST_IDENTITY_PROVED",
+          "utc": "2026-10-26T01:13:54.3549518Z",
+          "elapsedMs": 52,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PMP_PAIR_READY",
+          "utc": "2026-10-26T01:13:55.1835285Z",
+          "elapsedMs": 881,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PREVIEW_HANDLER107_BEGIN",
+          "utc": "2026-10-26T01:13:55.1961105Z",
+          "elapsedMs": 893,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "PREVIEW_TICKET_CURRENT",
+          "utc": "2026-10-26T01:13:55.2261528Z",
+          "elapsedMs": 923,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "NATIVE_PAGE_CLOSE_TRUE_BEGIN",
+          "utc": "2026-10-26T01:13:55.318039Z",
+          "elapsedMs": 1015,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "NATIVE_PAGE_CLOSE_TRUE_RETURN",
+          "utc": "2026-10-26T01:14:04.5173533Z",
+          "elapsedMs": 10214,
+          "managedThread": 1,
+          "nativeThread": 24608
+        },
+        {
+          "phase": "END",
+          "utc": "2026-10-26T01:14:04.5352776Z",
+          "elapsedMs": 10232,
+          "managedThread": 1,
+          "nativeThread": 24608
+        }
+      ]
+    }
+  ],
+  "finalAll16SketchRechecks": [
+    {
+      "frame": "fr01",
+      "nativeSketchFeatureId": 727,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr01",
+      "nativeSketchFeatureId": 729,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr01",
+      "nativeSketchFeatureId": 744,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr01",
+      "nativeSketchFeatureId": 746,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr02",
+      "nativeSketchFeatureId": 741,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr02",
+      "nativeSketchFeatureId": 743,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr02",
+      "nativeSketchFeatureId": 758,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr02",
+      "nativeSketchFeatureId": 760,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr03",
+      "nativeSketchFeatureId": 781,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr03",
+      "nativeSketchFeatureId": 783,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr03",
+      "nativeSketchFeatureId": 798,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr03",
+      "nativeSketchFeatureId": 800,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr04",
+      "nativeSketchFeatureId": 811,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr04",
+      "nativeSketchFeatureId": 813,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr04",
+      "nativeSketchFeatureId": 828,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    },
+    {
+      "frame": "fr04",
+      "nativeSketchFeatureId": 830,
+      "constraintStatus": 3,
+      "danglingRelations": 0,
+      "overdefiningRelations": 0,
+      "referenceType": 2,
+      "nativeFace2": true
+    }
+  ],
+  "finalChecks": {
+    "all16FullyConstrained": true,
+    "all16NoDanglingOrOverdefining": true,
+    "all16ReferenceNativeFace2": true,
+    "all4GapsApproximately0_1Mm": true,
+    "all4OverlapM3Zero": true,
+    "all4IntersectionCodesZero": true,
+    "unresolvedPassiveSheetMetalIndependentObservations": 0,
+    "boundedTopRepeatObservations": 0,
+    "finalDiskAuditComplete": true,
+    "sourceHashesUnchanged": true,
+    "copyHashesUnchanged": true,
+    "mainDllHashUnchanged": true,
+    "macroPendingAtParentExit": false
+  },
+  "trigger": "EXISTING_ONBUTTONPRESS_107_API_SIMULATED;REAL_NATIVE_PROPERTYMANAGERPAGE2_CLOSE_TRUE",
+  "visiblePreview": "UNVERIFIED",
+  "smoothness": "UNVERIFIED",
+  "normalMainFirstStartupCrashFreedom": "UNVERIFIED",
+  "authoredManufacturingEquivalence": "UNVERIFIED",
+  "flatPatternEquivalence": "UNVERIFIED",
+  "mainAddinBuildCalled": false,
+  "deployCalled": false,
+  "mergeCalled": false,
+  "cleanup": [
+    {
+      "case": "RUN09_PARTIAL_API_SERVERFAULT_HOST",
+      "status": "OWNED_COPIES_CLOSED_NO_SAVE_BLANK_HOST_EXITED",
+      "copiedDocumentsClosed": 2,
+      "closeDocApiUsed": true,
+      "saveCalled": false,
+      "rebuildCalled": false,
+      "exitAppCalled": true,
+      "blankHostVerifiedBeforeExit": true,
+      "ownedHostExited": true,
+      "ownedHostExitCode": 0,
+      "processKillCalled": false,
+      "sixSourcesAndSixCopiesHashesUnchanged": true,
+      "completedUtc": "2026-10-26T01:19:39.3741306Z",
+      "privateCleanupProofSha256": "776FC6FD9E887CD361A9826BC9F3962C42A34FB191654516AD9B3AD4A450D039"
+    },
+    {
+      "case": "RUN10_FOUR_CORNER_SUCCESS_HOST",
+      "status": "OWNED_COPIES_CLOSED_NO_SAVE_BLANK_HOST_EXITED",
+      "copiedDocumentsClosed": 6,
+      "closeDocApiUsed": true,
+      "saveCalled": false,
+      "rebuildCalled": false,
+      "exitAppCalled": true,
+      "blankHostVerifiedBeforeExit": true,
+      "ownedHostExited": true,
+      "ownedHostExitCode": 0,
+      "processKillCalled": false,
+      "sixSourcesAndSixCopiesHashesUnchanged": true,
+      "completedUtc": "2026-10-26T01:19:56.2294187Z",
+      "privateCleanupProofSha256": "F1F1911B3A8ADE4186A2CB4835E652E5B2AC56DE41F1DB995E1B9C8B7557BD78"
+    }
+  ],
+  "faceSupportQualification": "Creation-time support is an existing Part Face2 before its corner; final16 rechecks verify native Face2/reference type2/full constraint3/zero invalid relations, not one persistent pre-loop face identity."
+}

@@ -1,0 +1,212 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.Commands.AutoFrameJoint;
+
+class NativeGeometryHarness
+{
+ static JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength=Int32.MaxValue, RecursionLimit=160 };
+ static Dictionary<string,object> D(params object[] values){var d=new Dictionary<string,object>();for(int i=0;i<values.Length;i+=2)d[(string)values[i]]=values[i+1];return d;}
+ // AFJ-NATIVE-GEOMETRY-TIMING-20261022
+ static T Time<T>(Dictionary<string,object> row,string phase,Func<T> action)
+ {
+  string begin="[AFJ-HARNESS-PERF] phase="+phase+" event=BEGIN utc="+DateTime.UtcNow.ToString("o");
+  Trace.WriteLine(begin);Console.WriteLine(begin);var timer=Stopwatch.StartNew();
+  try{return action();}
+  finally
+  {
+   object value;Dictionary<string,long> timings;
+   if(!row.TryGetValue("phase_timings_ms",out value)){timings=new Dictionary<string,long>();row["phase_timings_ms"]=timings;}
+   else timings=(Dictionary<string,long>)value;
+   timings[phase]=timer.ElapsedMilliseconds;
+   string end="[AFJ-HARNESS-PERF] phase="+phase+" event=END ms="+timer.ElapsedMilliseconds;
+   Trace.WriteLine(end);Console.WriteLine(end);
+  }
+ }
+ static string Hash(string file){using(var algorithm=SHA256.Create())using(var input=new FileStream(file,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))return BitConverter.ToString(algorithm.ComputeHash(input)).Replace("-","").ToLowerInvariant();}
+ static void Assert(bool value,string text){if(!value)throw new InvalidOperationException(text);}
+ static string[] Tree(ModelDoc2 part)
+ {var rows=new List<string>();for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature)rows.Add(f.GetTypeName2()+"|"+f.Name+"|"+f.IsSuppressed());return rows.ToArray();}
+ static object StockBeforeCuts(ISldWorks app,ModelDoc2 model,Component2 a,Component2 b)
+ {
+  var rows=new List<object>();
+  foreach(var c in new[]{a,b})
+  {
+   var part=(ModelDoc2)c.GetModelDoc2();int activation=0;
+   app.ActivateDoc3(part.GetTitle(),false,(int)swRebuildOnActivation_e.swDontRebuildActiveDoc,ref activation);
+   Assert(app.IsSame(app.ActiveDoc,part)==(int)swObjectEquality.swObjectSame,"Cannot activate copied stock Part");
+   if(part.ConfigurationManager.ActiveConfiguration.Name!=c.ReferencedConfiguration)Assert(part.ShowConfiguration2(c.ReferencedConfiguration),"Cannot activate folded copy configuration");
+   var cuts=new List<Feature>();
+   for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature)
+    if(f.GetTypeName2()=="Cut"||(f.GetTypeName2()=="ICE"&&f.GetTypeName()=="Cut"))cuts.Add(f);
+   foreach(Feature f in cuts)
+   {bool ok=f.SetSuppression2((int)swFeatureSuppressionAction_e.swSuppressFeature,(int)swInConfigurationOpts_e.swThisConfiguration,null);Assert(ok&&f.IsSuppressed(),"Copy-only stock setup could not suppress "+f.Name);}
+   rows.Add(D("component",c.Name2,"state","ALL_EXISTING_CUTS_SUPPRESSED_ON_DISPOSABLE_COPY","feature_names",cuts.Select(f=>f.Name).ToArray()));
+  }
+  int error=0;app.ActivateDoc3(model.GetTitle(),false,(int)swRebuildOnActivation_e.swDontRebuildActiveDoc,ref error);
+  Assert(app.IsSame(app.ActiveDoc,model)==(int)swObjectEquality.swObjectSame,"Copied assembly not active after stock setup");
+  return rows;
+ }
+ static object Case(ISldWorks app,string input,string root,string name,string suffixA,string suffixB)
+ {
+  var row=D("case",name,"installed_addin",false,"native_solidworks_api",true,"save_api_called_by_harness",false,"native_writer_called",false);
+  var caseTimer=Stopwatch.StartNew();
+  row["revision"]=Time(row,"revision",()=>app.RevisionNumber());
+  string folder=Path.Combine(root,name);Directory.CreateDirectory(folder);
+  var sources=Directory.GetFiles(input).Where(p=>new[]{".sldprt",".sldasm"}.Contains(Path.GetExtension(p).ToLowerInvariant())).ToArray();
+  Assert(sources.Length>2,"Private pair files missing");
+  var original=Time(row,"input_hashes",()=>sources.ToDictionary(p=>p,Hash));
+  Time(row,"copy_files",()=>{foreach(string source in sources)File.Copy(source,Path.Combine(folder,Path.GetFileName(source)),false);return true;});
+  string assemblyPath=Directory.GetFiles(folder,"*.SLDASM").Single();
+  Time(row,"pre_open_guard",()=>{Assert(app.GetOpenDocumentByName(assemblyPath)==null,"Test copy is already open");return true;});
+  ModelDoc2 model=null;var parts=new List<ModelDoc2>();var stamps=new List<int>();var trees=new List<string[]>();
+  try
+  {
+   int error=0,warning=0;
+   model=Time(row,"open_assembly",()=>app.OpenDoc6(assemblyPath,(int)swDocumentTypes_e.swDocASSEMBLY,(int)swOpenDocOptions_e.swOpenDocOptions_Silent,"",ref error,ref warning) as ModelDoc2);
+   row["open_error"]=error;row["open_warning"]=warning;
+   Assert(model!=null,"OpenDoc6 returned null; not a damaged-file conclusion");
+   int activeError=0;var activated=Time(row,"activate_assembly",()=>app.ActivateDoc3(model.GetTitle(),false,(int)swRebuildOnActivation_e.swDontRebuildActiveDoc,ref activeError));
+   row["activation_error"]=activeError;row["assembly_activation_equality"]=app.IsSame(model,activated);
+   var components=Time(row,"component_inventory",()=>((Array)((AssemblyDoc)model).GetComponents(false)).Cast<Component2>().ToArray());
+   foreach(var component in components)
+   {
+    var reference=component.GetModelDoc2() as ModelDoc2;
+    Assert(reference!=null&&Path.GetFullPath(reference.GetPathName()).StartsWith(Path.GetFullPath(folder)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase),"Assembly reference escaped new disposable copy folder");
+   }
+   Component2 a=components.Single(c=>c.Name2.EndsWith(suffixA,StringComparison.OrdinalIgnoreCase));
+   Component2 b=components.Single(c=>c.Name2.EndsWith(suffixB,StringComparison.OrdinalIgnoreCase));
+   if(System.Environment.GetEnvironmentVariable("AFJ_TEST_STOCK_BEFORE_CUTS")=="1")row["stock_setup"]=Time(row,"stock_copy_setup",()=>StockBeforeCuts(app,model,a,b));
+   if(System.Environment.GetEnvironmentVariable("AFJ_TEST_SUPPRESS_OTHER_OCCURRENCES")=="1")
+   {
+    var suppressed=new List<object>();
+    foreach(var c in components)
+    {
+     if(app.IsSame(c,a)==(int)swObjectEquality.swObjectSame||app.IsSame(c,b)==(int)swObjectEquality.swObjectSame)continue;
+     if(!AfjNativeCutCommit.SameReferencePath(c.GetPathName(),a.GetPathName())&&!AfjNativeCutCommit.SameReferencePath(c.GetPathName(),b.GetPathName()))continue;
+     int code=c.SetSuppression2((int)swComponentSuppressionState_e.swComponentSuppressed);
+     Assert(c.IsSuppressed(),"Cannot suppress duplicate occurrence on test copy");
+     suppressed.Add(D("component",c.Name2,"suppression_result",code,"model_document_null",c.GetModelDoc2()==null));
+    }
+    row["suppressed_other_occurrences"]=suppressed;
+   }
+   ModelDoc2 pa=null,pb=null;MathTransform ta=null,tb=null;Body2 beforeA=null,beforeB=null;
+   Time(row,"copy_source_bodies",()=>{beforeA=AfjJointSolver.NativeBody(a,out pa,out ta);beforeB=AfjJointSolver.NativeBody(b,out pb,out tb);return true;});
+   parts.Add(pa);parts.Add(pb);
+   stamps.AddRange(parts.Select(p=>p.GetUpdateStamp()));trees.AddRange(parts.Select(Tree));
+   foreach(var part in parts)Assert(Path.GetFullPath(part.GetPathName()).StartsWith(Path.GetFullPath(folder)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase),"Reference escaped new disposable copy folder");
+   var solution=Time(row,"solve_geometry",()=>AfjJointSolver.Solve(app,model,a,b));
+   Assert(name!="unsupported_current","Input unexpectedly produced a supported geometry result");
+   row["rule"]=solution.Plan.RuleId;row["gap_m"]=solution.AfterGap;row["interference_m3"]=solution.AfterOverlap;
+   row["removed_a_m3"]=solution.A.RemovedVolume;row["removed_b_m3"]=solution.B.RemovedVolume;
+   row["length_a_m"]=solution.LengthA;row["length_b_m"]=solution.LengthB;row["short_cover_a"]=solution.CoverA;
+   row["graph_a"]=solution.ProfileGraphAJson;row["graph_b"]=solution.ProfileGraphBJson;row["coverage_warning"]=solution.CoverageWarning;
+   row["operations_a"]=solution.Plan.A.Operations.Count;row["operations_b"]=solution.Plan.B.Operations.Count;
+   row["kept_body_count_a"]=solution.A.Kept.Count;row["kept_body_count_b"]=solution.B.Kept.Count;
+   row["removed_body_count_a"]=solution.A.Removed.Count;row["removed_body_count_b"]=solution.B.Removed.Count;
+   row["kept_face_count_a"]=Time(row,"kept_face_inventory",()=>solution.A.Kept.Select(body=>body.GetFaceCount()).ToArray());
+   row["kept_face_count_b"]=solution.B.Kept.Select(body=>body.GetFaceCount()).ToArray();
+   row["coverage_measurement_status"]=solution.CoverageMeasurementStatus;
+   row["coverage_measurement_detail"]=solution.CoverageMeasurementDetail;
+   row["long_cut_total_area_m2"]=solution.LongCutTotalAreaSquareMetres;
+   row["long_cut_covered_area_m2"]=solution.LongCutCoveredAreaSquareMetres;
+   row["long_cut_exposed_area_m2"]=solution.LongCutExposedAreaSquareMetres;
+   row["long_cut_exposed_band_direction_world"]=solution.LongCutExposedBandDirectionWorld;
+   row["long_cut_exposed_band_min_m"]=solution.LongCutExposedBandMinimumMetres;
+   row["long_cut_exposed_band_max_m"]=solution.LongCutExposedBandMaximumMetres;
+   row["status"]="PASS_NATIVE_GEOMETRY";return row;
+  }
+  catch(Exception ex)
+  {
+   row["status"]="FAIL";row["error"]=ex.ToString();row["hresult"]="0x"+ex.HResult.ToString("X8");
+   if(name=="unsupported_current"&&ex.Message.StartsWith("UNVERIFIED_RULE",StringComparison.Ordinal)&&parts.Count==2)
+   {bool unchanged=parts.Select((p,i)=>p.GetUpdateStamp()==stamps[i]&&Tree(p).SequenceEqual(trees[i])).All(v=>v);row["no_part_history_change"]=unchanged;row["native_writer_called"]=false;if(unchanged)row["status"]="PASS_NATIVE_REFUSAL";}
+  }
+  finally
+  {
+   try{row["copy_file_hashes_unchanged_before_close"]=Time(row,"copy_hashes_before_close",()=>sources.All(p=>Hash(Path.Combine(folder,Path.GetFileName(p)))==original[p]));}catch(Exception ex){row["preclose_hash_error"]=ex.ToString();}
+   var ownedPaths=new List<string>();
+   for(ModelDoc2 d=app.GetFirstDocument() as ModelDoc2;d!=null;d=d.GetNext() as ModelDoc2)
+   {string path=d.GetPathName();if(!String.IsNullOrEmpty(path)&&Path.GetFullPath(path).StartsWith(Path.GetFullPath(folder)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))ownedPaths.Add(path);}
+   Time(row,"close_test_copies",()=>{
+    foreach(string path in ownedPaths.OrderBy(p=>Path.GetExtension(p).Equals(".SLDASM",StringComparison.OrdinalIgnoreCase)?0:1))
+     try{if(app.GetOpenDocumentByName(path)!=null)app.CloseDoc(path);}catch(Exception ex){row["close_error"]=ex.ToString();}
+    return true;
+   });
+   row["source_file_hashes_unchanged"]=Time(row,"input_hashes_after_close",()=>original.All(p=>Hash(p.Key)==p.Value));
+   row["copy_file_hashes_unchanged"]=Time(row,"copy_hashes_after_close",()=>sources.All(p=>Hash(Path.Combine(folder,Path.GetFileName(p)))==original[p]));
+   row["copy_hash_changes"]=sources.Where(p=>Hash(Path.Combine(folder,Path.GetFileName(p)))!=original[p]).Select(p=>D("file",Path.GetFileName(p),"before_sha256",original[p],"after_sha256",Hash(Path.Combine(folder,Path.GetFileName(p))))).ToArray();
+   row["case_total_ms"]=caseTimer.ElapsedMilliseconds;
+   Trace.WriteLine("[AFJ-HARNESS-PERF] phase=case_total event=END ms="+caseTimer.ElapsedMilliseconds);
+   File.WriteAllText(Path.Combine(folder,"result.private.json"),json.Serialize(row));
+  }
+  return row;
+ }
+ [STAThread]static int Main(string[] args)
+ {
+  string root=Path.GetFullPath(args[0]);Directory.CreateDirectory(root);
+  Trace.Listeners.Add(new TextWriterTraceListener(Path.Combine(root,"native_geometry.private.log")));Trace.AutoFlush=true;
+  var rows=new List<object>();
+  string[] cases=args.Length>4?args[4].Split(','):new[]{"positive"};
+  Assert(cases.All(v=>new[]{"positive","unsupported_current"}.Contains(v)),"Unknown native case");
+  ISldWorks app=null;bool ownsSession=false;
+  var sessionTimings=D("installed_addin",false,"native_writer_called",false);var sessionTimer=Stopwatch.StartNew();
+  ModelDoc2 originalActive=null;var originalDocs=new List<ModelDoc2>();
+  var originalStamps=new List<int>();var originalDirty=new List<bool>();
+  try
+  {
+   if(System.Environment.GetEnvironmentVariable("AFJ_CREATE_TEST_SW")=="1")
+   {
+    int[] prior=Process.GetProcessesByName("SLDWORKS").Select(p=>p.Id).OrderBy(p=>p).ToArray();
+    Assert(prior.Length<=3,"Too many existing SOLIDWORKS processes; refusing additional activation");
+    string allowed=System.Environment.GetEnvironmentVariable("AFJ_EXPECTED_EXISTING_SW_PIDS")??"";
+    Assert(String.Join(",",prior)==allowed,"SOLIDWORKS process inventory changed; refusing additional activation");
+    Console.WriteLine("AUTHORIZED_OWNED_SESSION_ACTIVATION; apartment="+System.Threading.Thread.CurrentThread.GetApartmentState());
+    app=Time(sessionTimings,"com_activation",()=>(ISldWorks)Activator.CreateInstance(Type.GetTypeFromProgID("SldWorks.Application.32",true)));
+    ownsSession=!prior.Contains(app.GetProcessID());
+    app.Visible=true;app.UserControl=true;
+    Console.WriteLine("DIRECT_COM_SESSION pid="+app.GetProcessID()+"; newlyCreated="+ownsSession+"; revision="+app.RevisionNumber()+"; documents="+app.GetDocumentCount());
+   }
+   else app=Time(sessionTimings,"rot_attach",()=>HarnessConnection.AttachVisible());
+   if(System.Environment.GetEnvironmentVariable("AFJ_REQUIRE_BLANK_SESSION")=="1")Assert(app.GetDocumentCount()==0,"Isolated test session must be blank before testing");
+   int commandId;string pmTitle;bool commandUi;
+   app.GetRunningCommandInfo(out commandId,out pmTitle,out commandUi);
+   Assert(!commandUi&&!app.CommandInProgress,"An active native command prevents isolated copy testing");
+   originalActive=app.ActiveDoc as ModelDoc2;
+   for(ModelDoc2 d=app.GetFirstDocument() as ModelDoc2;d!=null;d=d.GetNext() as ModelDoc2)
+   {originalDocs.Add(d);originalStamps.Add(d.GetUpdateStamp());originalDirty.Add(d.GetSaveFlag());}
+   Console.WriteLine("PRESERVING_EXISTING_DOCUMENTS count="+originalDocs.Count);
+   string a=args.Length>2?args[2]:"-fr04-1",b=args.Length>3?args[3]:"-fr03-1";
+   foreach(string name in cases)
+   {
+    var row=(Dictionary<string,object>)Case(app,args[1],root,name,a,b);rows.Add(row);
+    if(!((string)row["status"]).StartsWith("PASS_NATIVE",StringComparison.Ordinal))break;
+   }
+   GC.KeepAlive(app);
+  }
+  catch(Exception ex){rows.Add(D("status","API_UNAVAILABLE_OR_SETUP_FAILED","error",ex.ToString(),"hresult","0x"+ex.HResult.ToString("X8")));}
+  finally
+  {
+   if(app!=null&&originalDocs.Count>0)try
+   {
+    if(originalActive!=null){int activateError=0;var restored=app.ActivateDoc3(originalActive.GetTitle(),false,(int)swRebuildOnActivation_e.swDontRebuildActiveDoc,ref activateError);Assert((activateError&~(int)swActivateDocError_e.swDocNeedsRebuildWarning)==0&&app.IsSame(restored,originalActive)==(int)swObjectEquality.swObjectSame,"Could not restore previous active document");}
+    bool preserved=originalDocs.Select((d,i)=>app.IsSame(d,app.GetOpenDocumentByName(d.GetPathName()))==1&&d.GetUpdateStamp()==originalStamps[i]&&d.GetSaveFlag()==originalDirty[i]).All(v=>v);
+    foreach(var value in rows.Cast<Dictionary<string,object>>())value["preexisting_documents_preserved"]=preserved;
+    if(!preserved)rows.Add(D("status","PREEXISTING_STATE_CHANGED_UNVERIFIED"));
+   }catch(Exception ex){rows.Add(D("status","PREEXISTING_STATE_CHECK_FAILED","error",ex.ToString()));}
+   if(ownsSession&&app!=null)try{if(app.GetDocumentCount()==0){Console.WriteLine("CLOSING_OWNED_EMPTY_SESSION pid="+app.GetProcessID());app.ExitApp();}}catch(Exception ex){Console.WriteLine("OWNED_SESSION_CLEANUP "+ex);}
+   sessionTimings["session_total_ms"]=sessionTimer.ElapsedMilliseconds;
+   File.WriteAllText(Path.Combine(root,"native_geometry_session.private.json"),json.Serialize(sessionTimings));
+   File.WriteAllText(Path.Combine(root,"native_geometry_results.private.json"),json.Serialize(rows));
+   GC.KeepAlive(app);
+  }
+  Console.WriteLine(json.Serialize(rows));
+  return rows.Count==cases.Length&&rows.Cast<Dictionary<string,object>>().All(r=>((string)r["status"]).StartsWith("PASS_NATIVE",StringComparison.Ordinal))?0:1;
+ }
+}

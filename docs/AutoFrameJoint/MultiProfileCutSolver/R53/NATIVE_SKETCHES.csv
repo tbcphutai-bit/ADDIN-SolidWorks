@@ -1,0 +1,9 @@
+evidence_id,frame,feature_id,name,status,relations,dangling,overdefining,dimensions,original_face_reference,profile_segment_count,construction_segment_count
+R53-EQUAL-14,A,745,AFJ_6828292f_Loser,3,36,0,0,1,True,NOT_AVAILABLE,NOT_AVAILABLE
+R53-EQUAL-14,A,747,AFJ_6828292f_LongFarRelief,3,10,0,0,0,True,NOT_AVAILABLE,NOT_AVAILABLE
+R53-EQUAL-14,B,756,AFJ_6828292f_Cover,3,28,0,0,1,True,NOT_AVAILABLE,NOT_AVAILABLE
+R53-EQUAL-14,B,758,AFJ_6828292f_ShortRelief,3,6,0,0,0,True,NOT_AVAILABLE,NOT_AVAILABLE
+R53-WIDER-COVER-03,A,745,AFJ_bdf178bb_Loser,3,36,0,0,1,True,8,6
+R53-WIDER-COVER-03,A,747,AFJ_bdf178bb_LongFarRelief,3,10,0,0,0,True,4,1
+R53-WIDER-COVER-03,B,756,AFJ_bdf178bb_Cover,3,32,0,0,1,True,9,5
+R53-WIDER-COVER-03,B,758,AFJ_bdf178bb_ShortRelief,3,6,0,0,0,True,4,0

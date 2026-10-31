@@ -1,0 +1,365 @@
+{
+  "scope": "API_VERIFIED_AND_GEOMETRY_VERIFIED_PRESENTATION_ONLY",
+  "source_sha256": "83B686B398F18D13A7800CEA0C869A5F92A3136555E77FF07631160656424C67",
+  "manufacturing_code_tail_unchanged": true,
+  "runs": [
+    {
+      "run": "FRAME_4332",
+      "baseline": {
+        "phase": "BASELINE_A_B",
+        "status": "API_AND_GEOMETRY_VERIFIED_FIXED_NORMAL_LIFT",
+        "normal_world": [
+          1,
+          -1.531977669721889e-16,
+          -3.6139439964916206e-15
+        ],
+        "world_delta_m": [
+          0.15509999999999996,
+          -2.3760973657386494e-17,
+          -5.605227138558502e-16
+        ],
+        "axis_a_world": [
+          -3.613946018757871e-15,
+          3.60885493759142e-15,
+          -1
+        ],
+        "axis_b_world": [
+          -1.5319744866419799e-16,
+          -1,
+          -3.613429000459688e-15
+        ],
+        "in_plane_slip_a_m": 3.1365349553214036e-22,
+        "in_plane_slip_b_m": 4.9369571417929264e-23,
+        "lift_distance_m": 0.15509999999999996,
+        "display_clearance_m": 0.014099999999999996,
+        "original_normal_min_m": -0.14089999999999997,
+        "original_normal_max_m": 9.99999999999985e-05,
+        "actual_displayed_keep_min_m": 0.014199999999999987,
+        "actual_displayed_normal_gap_m": 0.01409999999999999,
+        "displayed_keep_body_count": 2,
+        "cad_modified": false,
+        "manufacturing_gap_changed": false
+      },
+      "cut_preview": {
+        "phase": "CUT_PREVIEW",
+        "status": "API_AND_GEOMETRY_VERIFIED_FIXED_NORMAL_LIFT",
+        "normal_world": [
+          1,
+          -1.531977669721889e-16,
+          -3.6139439964916206e-15
+        ],
+        "world_delta_m": [
+          0.15509999999999996,
+          -2.3760973657386494e-17,
+          -5.605227138558502e-16
+        ],
+        "axis_a_world": [
+          -3.613946018757871e-15,
+          3.60885493759142e-15,
+          -1
+        ],
+        "axis_b_world": [
+          -1.5319744866419799e-16,
+          -1,
+          -3.613429000459688e-15
+        ],
+        "in_plane_slip_a_m": 3.1365349553214036e-22,
+        "in_plane_slip_b_m": 4.9369571417929264e-23,
+        "lift_distance_m": 0.15509999999999996,
+        "display_clearance_m": 0.014099999999999996,
+        "original_normal_min_m": -0.14089999999999997,
+        "original_normal_max_m": 9.99999999999985e-05,
+        "actual_displayed_keep_min_m": 0.014199999999999987,
+        "actual_displayed_normal_gap_m": 0.01409999999999999,
+        "displayed_keep_body_count": 2,
+        "cad_modified": false,
+        "manufacturing_gap_changed": false
+      },
+      "swapped_baseline": {
+        "phase": "BASELINE_B_A",
+        "status": "API_AND_GEOMETRY_VERIFIED_FIXED_NORMAL_LIFT",
+        "normal_world": [
+          1,
+          -1.531977669721889e-16,
+          -3.6139439964916206e-15
+        ],
+        "world_delta_m": [
+          0.15509999999999996,
+          -2.3760973657386494e-17,
+          -5.605227138558502e-16
+        ],
+        "axis_a_world": [
+          -1.5319744866419799e-16,
+          -1,
+          -3.613429000459688e-15
+        ],
+        "axis_b_world": [
+          -3.613946018757871e-15,
+          3.60885493759142e-15,
+          -1
+        ],
+        "in_plane_slip_a_m": 4.9369571417929264e-23,
+        "in_plane_slip_b_m": 3.1365349553214036e-22,
+        "lift_distance_m": 0.15509999999999996,
+        "display_clearance_m": 0.014099999999999996,
+        "original_normal_min_m": -0.14089999999999997,
+        "original_normal_max_m": 9.99999999999985e-05,
+        "actual_displayed_keep_min_m": 0.014199999999999987,
+        "actual_displayed_normal_gap_m": 0.01409999999999999,
+        "displayed_keep_body_count": 2,
+        "cad_modified": false,
+        "manufacturing_gap_changed": false
+      },
+      "orbit": {
+        "success": true,
+        "elapsed_ms": 1,
+        "additional_solver_calls": 0,
+        "additional_hide_calls": 0,
+        "additional_display_calls": 0,
+        "additional_fit_calls": 0,
+        "actual_orientation_changed": true,
+        "world_delta_unchanged": true,
+        "same_temporary_body_identities": true,
+        "maximum_body_box_delta_m": 0
+      },
+      "camera_cleanup_verified": true,
+      "native_part_features_added": 0,
+      "source_and_copy_hashes_unchanged": true,
+      "bitmap_api_exported": true,
+      "bitmap_cad_private_not_published": true
+    },
+    {
+      "run": "FRAME_2354",
+      "baseline": {
+        "phase": "BASELINE_A_B",
+        "status": "API_AND_GEOMETRY_VERIFIED_FIXED_NORMAL_LIFT",
+        "normal_world": [
+          0,
+          1.3877787807814457e-17,
+          1
+        ],
+        "world_delta_m": [
+          0,
+          9.159339953157542e-19,
+          0.066
+        ],
+        "axis_a_world": [
+          1,
+          0,
+          0
+        ],
+        "axis_b_world": [
+          0,
+          1,
+          -1.3877787807814457e-17
+        ],
+        "in_plane_slip_a_m": 0,
+        "in_plane_slip_b_m": 0,
+        "lift_distance_m": 0.066,
+        "display_clearance_m": 0.006,
+        "original_normal_min_m": -0.063,
+        "original_normal_max_m": -0.0030000000000000035,
+        "actual_displayed_keep_min_m": 0.003000000000000002,
+        "actual_displayed_normal_gap_m": 0.006000000000000005,
+        "displayed_keep_body_count": 2,
+        "cad_modified": false,
+        "manufacturing_gap_changed": false
+      },
+      "cut_preview": {
+        "phase": "CUT_PREVIEW",
+        "status": "API_AND_GEOMETRY_VERIFIED_FIXED_NORMAL_LIFT",
+        "normal_world": [
+          0,
+          1.3877787807814457e-17,
+          1
+        ],
+        "world_delta_m": [
+          0,
+          9.159339953157542e-19,
+          0.066
+        ],
+        "axis_a_world": [
+          1,
+          0,
+          0
+        ],
+        "axis_b_world": [
+          0,
+          1,
+          -1.3877787807814457e-17
+        ],
+        "in_plane_slip_a_m": 0,
+        "in_plane_slip_b_m": 0,
+        "lift_distance_m": 0.066,
+        "display_clearance_m": 0.006,
+        "original_normal_min_m": -0.063,
+        "original_normal_max_m": -0.0030000000000000035,
+        "actual_displayed_keep_min_m": 0.003000000000000002,
+        "actual_displayed_normal_gap_m": 0.006000000000000005,
+        "displayed_keep_body_count": 2,
+        "cad_modified": false,
+        "manufacturing_gap_changed": false
+      },
+      "swapped_baseline": {
+        "phase": "BASELINE_B_A",
+        "status": "API_AND_GEOMETRY_VERIFIED_FIXED_NORMAL_LIFT",
+        "normal_world": [
+          0,
+          1.3877787807814457e-17,
+          1
+        ],
+        "world_delta_m": [
+          0,
+          9.159339953157542e-19,
+          0.066
+        ],
+        "axis_a_world": [
+          0,
+          1,
+          -1.3877787807814457e-17
+        ],
+        "axis_b_world": [
+          1,
+          0,
+          0
+        ],
+        "in_plane_slip_a_m": 0,
+        "in_plane_slip_b_m": 0,
+        "lift_distance_m": 0.066,
+        "display_clearance_m": 0.006,
+        "original_normal_min_m": -0.063,
+        "original_normal_max_m": -0.0030000000000000035,
+        "actual_displayed_keep_min_m": 0.003000000000000002,
+        "actual_displayed_normal_gap_m": 0.006000000000000005,
+        "displayed_keep_body_count": 2,
+        "cad_modified": false,
+        "manufacturing_gap_changed": false
+      },
+      "orbit": {
+        "success": true,
+        "elapsed_ms": 1,
+        "additional_solver_calls": 0,
+        "additional_hide_calls": 0,
+        "additional_display_calls": 0,
+        "additional_fit_calls": 0,
+        "actual_orientation_changed": true,
+        "world_delta_unchanged": true,
+        "same_temporary_body_identities": true,
+        "maximum_body_box_delta_m": 0
+      },
+      "camera_cleanup_verified": true,
+      "native_part_features_added": 0,
+      "source_and_copy_hashes_unchanged": true,
+      "bitmap_api_exported": true,
+      "bitmap_cad_private_not_published": true
+    }
+  ],
+  "centered_camera_diagnostic": {
+    "run": "FRAME_2354_CENTERED_ORBIT_DIAGNOSTIC",
+    "pair": "2354-04-lc-B11-fr04-1 x 2354-04-lc-B11-fr03-1",
+    "status": "PASS_PREVIEW_API_AND_GEOMETRY_ONLY",
+    "candidate_sha256": "1b1a81945d6ceef11d96ded2a4567a5c9dd59dac91b8e8b21efc8bc9d4972921",
+    "diagnostic_camera": {
+      "scope": "DIAGNOSTIC_USER_CAMERA_ACTION_NOT_GHOST_FIT",
+      "pre_orbit_projected_bounds_px": [
+        525.9004442007121,
+        54.40000000000032,
+        -220.8521024989139,
+        811.0995557992882,
+        625.6000000000003,
+        146.414482642437
+      ],
+      "after_orbit_before_pan_bounds_px": [
+        147.34166444551505,
+        2091.6692823117187,
+        615.4724354988775,
+        453.9307094139843,
+        2765.716137305174,
+        792.8510789977955
+      ],
+      "center_preserving_pan_px": [
+        367.86381307025044,
+        -2088.692709808446
+      ],
+      "after_orbit_and_pan_bounds_px": [
+        515.2054775157657,
+        2.9765725032719956,
+        615.4724354988778,
+        821.7945224842349,
+        677.0234274967273,
+        792.8510789977958
+      ],
+      "center_error_px": [
+        1.7053025658242404e-13,
+        6.252776074688882e-13
+      ],
+      "source_or_temporary_body_transformed": false
+    },
+    "orbit": {
+      "success": true,
+      "elapsed_ms": 1,
+      "additional_solver_calls": 0,
+      "additional_hide_calls": 0,
+      "additional_display_calls": 0,
+      "additional_fit_calls": 0,
+      "actual_orientation_changed": true,
+      "world_delta_unchanged": true,
+      "same_temporary_body_identities": true,
+      "maximum_body_box_delta_m": 0
+    },
+    "mode_stability": {
+      "evidence": "API_VERIFIED_ACTUAL_BODY_IDENTITY_AND_NATIVE_BOUNDS",
+      "view_rotation_degrees": 20,
+      "scale_factor": 1.075,
+      "actual_orientation_changed": true,
+      "world_delta_m": [
+        0,
+        9.159339953157542e-19,
+        0.066
+      ],
+      "world_delta_unchanged": true,
+      "p1_p2_p1_kept_body_identities_preserved": true,
+      "maximum_body_box_delta_m": 0,
+      "additional_solve_calls": 0,
+      "additional_refit_calls": 0,
+      "cleanup_must_preserve_user_orbit": true,
+      "orbit_center_preserved_by_explicit_user_camera_pan": true,
+      "ghost_refit_used_for_orbit": false
+    },
+    "pre_and_post_orbit_bitmaps_exported": true,
+    "bitmaps_inspected_by_root": true,
+    "pixel_observation": "Source and lifted temporary Preview are painted before and after centered orbit. A chosen orbit may clip extents; no claim of automatic fit after user camera movement.",
+    "camera_diagnostic_only_not_production_change": true,
+    "source_and_copy_hashes_unchanged": true,
+    "native_part_features_added": 0,
+    "cad_images_private_not_published": true,
+    "native_cut_tested": false,
+    "installed_addin_tested": false
+  },
+  "separate_native_cut_user_log": {
+    "evidence_level": "USER_LOG_OBSERVED_NOT_NEW_API_TEST",
+    "pair": "4332 fr5-3 x fr1a-2",
+    "logged_dll_mvid": "01b2c548-9d78-455b-bc89-4ea63c59071d",
+    "logged_presentation": "R62_SCREEN_UP_NOT_R64_WORLD_NORMAL",
+    "failing_role": "SHEET_SLICE:B:FAR:6:MATE_3",
+    "symmetric_difference_m3": 1.1010070009921585e-07,
+    "exception_hresult": "0x80131509",
+    "exception_reason": "Native Cut differs from independent sequential target",
+    "rollback_status": "ROLLBACK_UNVERIFIED",
+    "r64_fixes_this_native_failure": false,
+    "native_fix_status": "UNVERIFIED_PENDING_SEPARATE_R65_API_WORK",
+    "process_exit_code": 0,
+    "crash_established": false
+  },
+  "pure_math": {
+    "Status": "PASS_COMPILED_PURE_MATH_ONLY_NOT_NATIVE_API",
+    "Orientations": 36,
+    "Assertions": 252,
+    "RejectedInvalidAxes": 3,
+    "MaxInPlaneDriftMetres": 2.220446049250313e-16,
+    "MaxCanonicalSwapDelta": 0,
+    "CameraDependency": false,
+    "ComCalled": false,
+    "NativeBRepOrDisplayTested": false
+  }
+}

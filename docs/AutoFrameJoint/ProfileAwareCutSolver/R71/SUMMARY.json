@@ -1,0 +1,521 @@
+{
+  "schema": "AFJ_R71_PUBLIC_EXACT_RUN_1",
+  "status": "PASS_FOUR_CORNERS_API_HARNESS_ONLY",
+  "input_audit_sha256": "C96E01473FA10FA685317E14B0261EFC6C3730968533DD40AE56FC7421790D26",
+  "input_top_status": "PASS_APPLY_4_PAIRS_SAME_ASSEMBLY_API_HARNESS_ONLY_NOT_INSTALLED_ADDIN",
+  "created_utc": "2026-10-30T06:33:51.084898+00:00",
+  "started_utc": "2026-10-30T06:25:14.7982338Z",
+  "completed_utc": "2026-10-30T06:29:40.3231234Z",
+  "measured_wall_elapsed_seconds": 265.52489,
+  "assembly_sample_basename": "4458-02-TI-b2.SLDASM",
+  "required_corner_count": 4,
+  "captured_corner_count": 4,
+  "qualified_corner_count": 4,
+  "native_cut_count": 44,
+  "native_cut_pass_count": 44,
+  "final_cumulative_sketch_count": 52,
+  "source_snapshot_bytes_unchanged": true,
+  "copy_disk_bytes_unchanged": true,
+  "owned_blank_session_restored": true,
+  "installed_addin_test": false,
+  "user_ui_test": "UNVERIFIED",
+  "actual_preview_visibility": "UNVERIFIED",
+  "reference_comparison_result": "DIFFERENCES",
+  "reference_comparison_is_optional": true,
+  "failures": [],
+  "rules": [
+    "Per-sheet finite measured contacts define the eligible cut regions.",
+    "Every native Cut uses Blind depth t + 0.10 mm and NormalCut=true; AssemblyFitGap is a separate in-plane fit parameter.",
+    "Terminal entry-face choice uses actual R or R+t as measured for the selected entry face.",
+    "Bend removal uses exact eligible inner/outer-radius (Ri/Ro) radial windows plus measured adjacent-flat carryover.",
+    "The approximately 2.05 degree source endpoint uses a projection helper for the measured finite endpoint datum.",
+    "Sketches remain supported by a persistent actual existing Face2. No new reference planes, Convert Entities, or Fixed relations are permitted.",
+    "Native and Preview B-reps must have symmetric difference <= 1e-12 m3; created sketches must read Full3 (status 3) after every corner and at the cumulative final check."
+  ],
+  "limitations": [
+    "Evidence is from the API harness only. Installed Add-in behavior, selection/PMP callbacks, user UI behavior, and actual rendered Preview visibility are UNVERIFIED.",
+    "This report qualifies only the exact four corner pairs, prepared stock, candidate hashes, and captured run stated here; it does not establish a solution for all geometries.",
+    "The terminal bend projection rule is UNVERIFIED for turns greater than 90 degrees.",
+    "Exposed-edge coverage for angled profiles remains UNVERIFIED unless explicitly measured. A successful native Cut/Preview parity check does not establish that every exposed edge is covered.",
+    "Failure-path rollback is UNVERIFIED unless a captured rollback check explicitly verifies it; this report does not establish a general rollback fix.",
+    "Prepared stock uses explicit reviewed native Cut-ID suppression and bounded BaseFlange D1 edits on disposable copies. fr1 and fr4 require both ends. Suppression can affect dependent holes/patterns; unchanged production hole preservation is not claimed.",
+    "The completed original reference is an optional comparison. DIFFERENCES are reported explicitly and are not a PASS against that reference.",
+    "No original CAD, private machine paths, usernames, raw profile coordinates, persistent reference tokens, or body binaries are included in these generated files.",
+    "Elapsed times are captured API timings and wall-clock duration; no speedup or UI responsiveness is inferred."
+  ],
+  "candidate_source_hash_evidence": {
+    "candidate_binary_sha256": "D0303565E738B2C9E59FEEEB676439EB57C27072AF715DA2A911185853E9E2BF",
+    "parent_audit_sha256": "E44C180F6F67F316645E1EEE7C79FE017C9D7AA0F7F5C3768E11B24A133B7BCD",
+    "compile_audit_sha256": "15CD65CDC9CC98EE40C2D6F6A706C95F24A3A71DC2DBCDF7A47DCEA420D2E1E9",
+    "candidate_compile_parent_hashes_match": true,
+    "parent_output_matches_exact_run": true,
+    "compile_inputs": [
+      {
+        "source_basename": "AutoFrameJointCommandEntry.cs",
+        "compile_sha256": "4795F987AF95740776F834CC454419BB50D557AB681F989452D6F2E35CDD3002",
+        "current_sha256": "4795F987AF95740776F834CC454419BB50D557AB681F989452D6F2E35CDD3002",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "AutoFrameJointGeometryMath.cs",
+        "compile_sha256": "8678133EE61C94FB0D1262A33585803579760CB3B0F088C3BDC71142F04980F5",
+        "current_sha256": "8678133EE61C94FB0D1262A33585803579760CB3B0F088C3BDC71142F04980F5",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "AutoFrameJointGhostSessionManager.cs",
+        "compile_sha256": "B505CE2611AFFAAA795D2246C8DD19560EE197DAE8E7D79035BB89FC26D01FA1",
+        "current_sha256": "B505CE2611AFFAAA795D2246C8DD19560EE197DAE8E7D79035BB89FC26D01FA1",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "AutoFrameJointReadOnlyProbe.cs",
+        "compile_sha256": "5B233792C7EA6D9042EDDBDD2E5529BE52DAD354392BD8699BA2981CD6EF4A9B",
+        "current_sha256": "5B233792C7EA6D9042EDDBDD2E5529BE52DAD354392BD8699BA2981CD6EF4A9B",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "AutoFrameJointGhostPreview.cs",
+        "compile_sha256": "B29462871487F1F8D802DAA1F08EA81A4B375489ED542EB6D9D989C5C8730766",
+        "current_sha256": "B29462871487F1F8D802DAA1F08EA81A4B375489ED542EB6D9D989C5C8730766",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "AutoFrameJointSelectionPage.cs",
+        "compile_sha256": "27BE94F7A1D12FB25EB1C90733068259E9326BF6BEAC1340F41C1D0A5F13914E",
+        "current_sha256": "27BE94F7A1D12FB25EB1C90733068259E9326BF6BEAC1340F41C1D0A5F13914E",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "R59DirectCandidateProbe.cs",
+        "compile_sha256": "435DCC779AE3D8B1C5612CFC83BC73BDC40E1834AC67F865150BF04D26DF2EBB",
+        "current_sha256": "435DCC779AE3D8B1C5612CFC83BC73BDC40E1834AC67F865150BF04D26DF2EBB",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "R60PmpCloseProbe.cs",
+        "compile_sha256": "6D825E73710886B210BE9E2496E81695491DFAAEDB7D89AFCE7617116A20E069",
+        "current_sha256": "6D825E73710886B210BE9E2496E81695491DFAAEDB7D89AFCE7617116A20E069",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "R61TerminalTrimProbe.cs",
+        "compile_sha256": "ADFFEE43D8E19E472A25D405784800AC468FCBEAC0D4067D57413D59D94A52C9",
+        "current_sha256": "ADFFEE43D8E19E472A25D405784800AC468FCBEAC0D4067D57413D59D94A52C9",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "R62PresentationProbe.cs",
+        "compile_sha256": "954FC7DFA977B10AD30BC0C802119949B4492317FA1F5128E4F68BDA69282FC3",
+        "current_sha256": "954FC7DFA977B10AD30BC0C802119949B4492317FA1F5128E4F68BDA69282FC3",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "R64LiftGeometryProbe.cs",
+        "compile_sha256": "B6D0A16BADF0B548E69CF930AA7929697C9261A84C85184742ADCAD407103427",
+        "current_sha256": "B6D0A16BADF0B548E69CF930AA7929697C9261A84C85184742ADCAD407103427",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "R71FixturePreparation.cs",
+        "compile_sha256": "780FB98D69DFF10BB31EDC3FC5FA2EA52EA1A3E0C3A413DB8D9ADC9BDC210B42",
+        "current_sha256": "780FB98D69DFF10BB31EDC3FC5FA2EA52EA1A3E0C3A413DB8D9ADC9BDC210B42",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "R71BoundedStockPreparation.cs",
+        "compile_sha256": "8701A31BA001A7EA5213EA387FF10982401105C0EAF42C21CD63AD50D67FC042",
+        "current_sha256": "8701A31BA001A7EA5213EA387FF10982401105C0EAF42C21CD63AD50D67FC042",
+        "matches_compile_input": true
+      },
+      {
+        "source_basename": "R71_ALLFOUR99.Bridge.cs",
+        "compile_sha256": "93AC82A6D58A94C131420C47F48ED43AD4BBC9C6B6B9146D01EECB2255909577",
+        "current_sha256": "93AC82A6D58A94C131420C47F48ED43AD4BBC9C6B6B9146D01EECB2255909577",
+        "matches_compile_input": true
+      }
+    ],
+    "all_current_source_hashes_match_compile": true,
+    "original_byte_proof_audit_sha256": "7014B7755F442B6495DADAA5119B3CE4F3C060EF26673153CA9F8EA3A2B16BFD",
+    "original_byte_proof_status": "PASS_SNAPSHOT_API_AND_ORIGINAL_SHARED_READ_BYTE_AUDIT",
+    "original_bytes_unchanged": true,
+    "original_before_matches_frozen_manifest": true,
+    "snapshot_matches_frozen_manifest": true
+  },
+  "source_cad_hashes_before": [
+    {
+      "sample_basename": "4458-02-TI-b2.SLDASM",
+      "sha256": "3062F0E2D505093CDD9E7BB2309B3842CD939F2E69EEB21CA8EFD5837706A4BC"
+    },
+    {
+      "sample_basename": "4458-04-TI-AD09-3-wf1.SLDPRT",
+      "sha256": "9E11EA5EB116176C21377A75F4BAF7A162F2081D807C6EEC475EF3F2988F38D5"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-13.SLDPRT",
+      "sha256": "EA6FFD9E4CF23DABA92D4FABE21420BDB5ABCD2BDD49CD7D467C7094CA424033"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-14.SLDPRT",
+      "sha256": "F1D9010A28D0E5725107FC1FAA1A7C2D410C23059FC626BF1F75247FA5681565"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-15.SLDPRT",
+      "sha256": "5CD5942006485E9A3CEFCCA3C7C11855B7AF5185370871B56C96BC6256BC4EFD"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-16.SLDPRT",
+      "sha256": "4CE21484A9802EB161BEE37769BCB742E6AEC40D383F636C54A82D29CC7D16A1"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-18.SLDPRT",
+      "sha256": "E350D91C8CE2D2B31962A2EE6FCB419B53A5B5DF39A82BF78F327B47EA8767F0"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-21.SLDPRT",
+      "sha256": "1B2E4D8B08C4A2160BE75563C280F3FCDC66D70122F89A366DCB36F310499E13"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-fr2.SLDPRT",
+      "sha256": "80F890E263C81FCD3DF06AAEAD3ACB319607F1679425AC9366D8326A318CCDE1"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-fr3.SLDPRT",
+      "sha256": "FF31EADA62AB3624A6C93196D3B23D9D0F4499767DCCF3B9103B241E4F571CDC"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-hks1.SLDPRT",
+      "sha256": "095D2EEB4EF469FECCB138D5DBE8B235DD7983E6C71F5FF166A39B2685402DBD"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-ks1.SLDPRT",
+      "sha256": "E8C24EDD18F878B29DD351C5854C0B8AA19834AEB2DD63C1BEF0196BE70F5EF7"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-u1.SLDPRT",
+      "sha256": "15B326F689CF7CCFCD1868379EF8FB04DED07C741E43F157799EA2E14B38B25B"
+    },
+    {
+      "sample_basename": "4458-04-TI-b1-z1.SLDPRT",
+      "sha256": "752E28196982F79781B59F9479A013C982C4589D16276928FC2A8F757A1C9CAD"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-fr1.SLDPRT",
+      "sha256": "BA06263FB6D0F4BD5BF07B263269E505A2E98A98F8BD04D1B1377AE7E79DF214"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-fr4.SLDPRT",
+      "sha256": "FB758A658393A91AB6D83C5F088CAAB5B79B1B367BE1C91DEF908E68AA204D27"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-fr5.SLDPRT",
+      "sha256": "5818CED8D7E98BFA4256FDE28582F47E805AFEA1B80BF6259AE47262A4E8FE65"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-fr6.SLDPRT",
+      "sha256": "77CB25064C4F77F639C14B032D1E40340C2E4C4B4F4DA0E3EE4D1BAA93932C87"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-framegoc.SLDPRT",
+      "sha256": "D62D3E5CF5171AA620325A6EE5A028B8000DBF2587F396732E97897F070D8E50"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-ks2.sldprt",
+      "sha256": "CDF644E47994AAB512737D5D2B94C7AC41A25194F73104F8378716B03D8209C6"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-lt1.sldprt",
+      "sha256": "7BEE244D9B515D4B8A2796ECD8E7347869022D4B65B75F532574469DB95A71BB"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-lt2.sldprt",
+      "sha256": "3F127246814E4368750F0C5B416CDB97777EFC02BEFEB8436882DF5C2FA4C260"
+    },
+    {
+      "sample_basename": "4458-04-TI-b2-nakabone.SLDPRT",
+      "sha256": "84E6916089EC03AAD4EBAE954628B4BE030E29D95036286DDB9762AB762E73A3"
+    },
+    {
+      "sample_basename": "4458-04-TI-断面-wf1.SLDPRT",
+      "sha256": "0EA65C5824F2C54A939EECD0229B40AB75E9803E3A442CD1DCD39135EF0DA491"
+    }
+  ],
+  "historical_original_inventory": {
+    "status": "HISTORICAL_READ_ONLY_INVENTORY_ONLY",
+    "audit_sha256": "88161E99EB15463ABA10C8301FE77E251CF52C7AF95286A35AFC95E2D4638A8D",
+    "detailed_part_count": 7,
+    "native_cut_count": 93,
+    "all_native_cuts_normal_cut_true": true,
+    "historical_counts_not_inferred": true,
+    "note": "These measured historical inventory counts are separate from generated candidate Cut events. Earlier 15/43/42 historical observations are not reasserted or changed by this report."
+  },
+  "prepared_stock": [
+    {
+      "part": "4458-04-TI-b1-fr3.SLDPRT",
+      "status": "QUALIFIED_EXPLICIT_STOCK_SUPERSET_WITH_BOUNDED_SUPPRESSION_NOT_NEW_CUT_PASS",
+      "explicit_suppressed_cut_ids": [
+        923,
+        938,
+        1194,
+        1249,
+        1257
+      ],
+      "both_native_ends": false,
+      "baseflange_d1_mm": 2446.000000000025,
+      "declared_padding_mm": 25.0,
+      "selected_end_extension_mm": 24.99999999999991,
+      "both_end_extensions_mm": [],
+      "bounded_envelope_verified": true,
+      "other_base_fields_equal": true,
+      "far_end_cut_identities_preserved": true,
+      "far_end_preservation_applicability": "REQUIRED_OPPOSITE_END",
+      "reference_material_missing_m3": 0
+    },
+    {
+      "part": "4458-04-TI-b2-fr4.SLDPRT",
+      "status": "QUALIFIED_EXPLICIT_STOCK_SUPERSET_WITH_BOUNDED_SUPPRESSION_NOT_NEW_CUT_PASS",
+      "explicit_suppressed_cut_ids": [
+        810,
+        885,
+        901,
+        1024,
+        1044,
+        1052
+      ],
+      "both_native_ends": true,
+      "baseflange_d1_mm": 1080.939999999996,
+      "declared_padding_mm": 25.0,
+      "selected_end_extension_mm": null,
+      "both_end_extensions_mm": [
+        84.35076887850573,
+        25.00000000000002
+      ],
+      "bounded_envelope_verified": true,
+      "other_base_fields_equal": true,
+      "far_end_cut_identities_preserved": null,
+      "far_end_preservation_applicability": "N_A_BOTH_ENDS",
+      "reference_material_missing_m3": 0
+    },
+    {
+      "part": "4458-04-TI-b2-fr5.SLDPRT",
+      "status": "QUALIFIED_EXPLICIT_STOCK_SUPERSET_WITH_BOUNDED_SUPPRESSION_NOT_NEW_CUT_PASS",
+      "explicit_suppressed_cut_ids": [
+        1006,
+        1021,
+        1047,
+        1562
+      ],
+      "both_native_ends": false,
+      "baseflange_d1_mm": 2446.000000000017,
+      "declared_padding_mm": 25.0,
+      "selected_end_extension_mm": 24.99999999999991,
+      "both_end_extensions_mm": [],
+      "bounded_envelope_verified": true,
+      "other_base_fields_equal": true,
+      "far_end_cut_identities_preserved": true,
+      "far_end_preservation_applicability": "REQUIRED_OPPOSITE_END",
+      "reference_material_missing_m3": 0
+    },
+    {
+      "part": "4458-04-TI-b2-fr1.SLDPRT",
+      "status": "QUALIFIED_EXPLICIT_STOCK_SUPERSET_WITH_BOUNDED_SUPPRESSION_NOT_NEW_CUT_PASS",
+      "explicit_suppressed_cut_ids": [
+        700,
+        710,
+        723,
+        772,
+        785,
+        1004
+      ],
+      "both_native_ends": true,
+      "baseflange_d1_mm": 1080.94000000001,
+      "declared_padding_mm": 25.0,
+      "selected_end_extension_mm": null,
+      "both_end_extensions_mm": [
+        25.00000000000002,
+        84.35076887885317
+      ],
+      "bounded_envelope_verified": true,
+      "other_base_fields_equal": true,
+      "far_end_cut_identities_preserved": null,
+      "far_end_preservation_applicability": "N_A_BOTH_ENDS",
+      "reference_material_missing_m3": 0
+    },
+    {
+      "part": "4458-04-TI-b1-fr2.SLDPRT",
+      "status": "QUALIFIED_EXPLICIT_STOCK_SUPERSET_WITH_BOUNDED_SUPPRESSION_NOT_NEW_CUT_PASS",
+      "explicit_suppressed_cut_ids": [
+        847,
+        862,
+        878,
+        1194,
+        1299
+      ],
+      "both_native_ends": false,
+      "baseflange_d1_mm": 2040.9999999999968,
+      "declared_padding_mm": 25.0,
+      "selected_end_extension_mm": 24.99999999999991,
+      "both_end_extensions_mm": [],
+      "bounded_envelope_verified": true,
+      "other_base_fields_equal": true,
+      "far_end_cut_identities_preserved": true,
+      "far_end_preservation_applicability": "REQUIRED_OPPOSITE_END",
+      "reference_material_missing_m3": 0
+    },
+    {
+      "part": "4458-04-TI-b2-fr6.SLDPRT",
+      "status": "QUALIFIED_EXPLICIT_STOCK_SUPERSET_WITH_BOUNDED_SUPPRESSION_NOT_NEW_CUT_PASS",
+      "explicit_suppressed_cut_ids": [
+        955,
+        971,
+        983
+      ],
+      "both_native_ends": false,
+      "baseflange_d1_mm": 2962.799999999975,
+      "declared_padding_mm": 25.0,
+      "selected_end_extension_mm": 1135.8999999999612,
+      "both_end_extensions_mm": [],
+      "bounded_envelope_verified": true,
+      "other_base_fields_equal": true,
+      "far_end_cut_identities_preserved": true,
+      "far_end_preservation_applicability": "REQUIRED_OPPOSITE_END",
+      "reference_material_missing_m3": 0
+    }
+  ],
+  "optional_completed_reference_comparisons": [
+    {
+      "part": "4458-04-TI-b1-fr3.SLDPRT",
+      "required": false,
+      "result": "DIFFERENT",
+      "symmetric_difference_m3": 1.6175178216597467e-06,
+      "actual_minus_reference_m3": 1.6175040323461415e-06,
+      "reference_minus_actual_m3": 1.3789313605143344e-11
+    },
+    {
+      "part": "4458-04-TI-b2-fr4.SLDPRT",
+      "required": false,
+      "result": "DIFFERENT",
+      "symmetric_difference_m3": 1.073894572566598e-06,
+      "actual_minus_reference_m3": 5.239380098818299e-07,
+      "reference_minus_actual_m3": 5.499565626847681e-07
+    },
+    {
+      "part": "4458-04-TI-b2-fr5.SLDPRT",
+      "required": false,
+      "result": "DIFFERENT",
+      "symmetric_difference_m3": 1.7687870050804466e-06,
+      "actual_minus_reference_m3": 7.740864147736901e-07,
+      "reference_minus_actual_m3": 9.947005903067566e-07
+    },
+    {
+      "part": "4458-04-TI-b2-fr1.SLDPRT",
+      "required": false,
+      "result": "DIFFERENT",
+      "symmetric_difference_m3": 2.3267915182030717e-06,
+      "actual_minus_reference_m3": 2.3225072950163317e-06,
+      "reference_minus_actual_m3": 4.284223186739848e-09
+    },
+    {
+      "part": "4458-04-TI-b1-fr2.SLDPRT",
+      "required": false,
+      "result": "DIFFERENT",
+      "symmetric_difference_m3": 5.079200329177983e-06,
+      "actual_minus_reference_m3": 4.476676694768314e-06,
+      "reference_minus_actual_m3": 6.025236344096686e-07
+    },
+    {
+      "part": "4458-04-TI-b2-fr6.SLDPRT",
+      "required": false,
+      "result": "DIFFERENT",
+      "symmetric_difference_m3": 4.072686817028895e-06,
+      "actual_minus_reference_m3": 1.914077116637151e-06,
+      "reference_minus_actual_m3": 2.1586097003917434e-06
+    }
+  ],
+  "corners": [
+    {
+      "corner": "C1",
+      "pair": "4458-04-TI-b2-fr4-1 x 4458-04-TI-b1-fr3-3",
+      "pair_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+      "qualification": "PASS",
+      "planned_cut_count": 10,
+      "native_cut_count": 10,
+      "native_cut_pass_count": 10,
+      "preview_gap_mm": 0.09999999999976694,
+      "preview_interference_m3": 0,
+      "native_gap_mm": 0.09999999999250023,
+      "native_interference_m3": 0,
+      "preview_call_count": 4,
+      "preview_total_elapsed_ms": 12214,
+      "native_apply_elapsed_ms": 26363,
+      "exposed_edge_measurement_status": "UNVERIFIED_MEASURED_ANGLED_EXPOSED_EDGES",
+      "exposed_area_m2": null,
+      "failure_path_rollback": "NOT_EXERCISED_ON_SUCCESS",
+      "cumulative_sketch_count_after_corner": 12,
+      "failures": ""
+    },
+    {
+      "corner": "C2",
+      "pair": "4458-04-TI-b2-fr4-1 x 4458-04-TI-b2-fr5-1",
+      "pair_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+      "qualification": "PASS",
+      "planned_cut_count": 13,
+      "native_cut_count": 13,
+      "native_cut_pass_count": 13,
+      "preview_gap_mm": 0.09999999999887876,
+      "preview_interference_m3": 0,
+      "native_gap_mm": 0.09999999999932285,
+      "native_interference_m3": 0,
+      "preview_call_count": 4,
+      "preview_total_elapsed_ms": 15123,
+      "native_apply_elapsed_ms": 47037,
+      "exposed_edge_measurement_status": "UNVERIFIED_MEASURED_ANGLED_EXPOSED_EDGES",
+      "exposed_area_m2": null,
+      "failure_path_rollback": "NOT_EXERCISED_ON_SUCCESS",
+      "cumulative_sketch_count_after_corner": 27,
+      "failures": ""
+    },
+    {
+      "corner": "C3",
+      "pair": "4458-04-TI-b2-fr1-1 x 4458-04-TI-b1-fr2-2",
+      "pair_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+      "qualification": "PASS",
+      "planned_cut_count": 9,
+      "native_cut_count": 9,
+      "native_cut_pass_count": 9,
+      "preview_gap_mm": 0.09999999999987796,
+      "preview_interference_m3": 0,
+      "native_gap_mm": 0.09999999999987796,
+      "native_interference_m3": 0,
+      "preview_call_count": 4,
+      "preview_total_elapsed_ms": 12433,
+      "native_apply_elapsed_ms": 34741,
+      "exposed_edge_measurement_status": "UNVERIFIED_MEASURED_ANGLED_EXPOSED_EDGES",
+      "exposed_area_m2": null,
+      "failure_path_rollback": "NOT_EXERCISED_ON_SUCCESS",
+      "cumulative_sketch_count_after_corner": 38,
+      "failures": ""
+    },
+    {
+      "corner": "C4",
+      "pair": "4458-04-TI-b2-fr1-1 x 4458-04-TI-b2-fr6-1",
+      "pair_status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+      "qualification": "PASS",
+      "planned_cut_count": 12,
+      "native_cut_count": 12,
+      "native_cut_pass_count": 12,
+      "preview_gap_mm": 0.09999999999987796,
+      "preview_interference_m3": 0,
+      "native_gap_mm": 0.09999999999904581,
+      "native_interference_m3": 0,
+      "preview_call_count": 4,
+      "preview_total_elapsed_ms": 16192,
+      "native_apply_elapsed_ms": 65367,
+      "exposed_edge_measurement_status": "UNVERIFIED_MEASURED_ANGLED_EXPOSED_EDGES",
+      "exposed_area_m2": null,
+      "failure_path_rollback": "NOT_EXERCISED_ON_SUCCESS",
+      "cumulative_sketch_count_after_corner": 52,
+      "failures": ""
+    }
+  ]
+}

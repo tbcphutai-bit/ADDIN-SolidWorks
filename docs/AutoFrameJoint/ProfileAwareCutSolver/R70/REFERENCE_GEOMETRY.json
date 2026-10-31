@@ -1,0 +1,228 @@
+{
+  "summary": {
+    "scope": "READ_ONLY_REFERENCE_STUDY_NOT_NEW_RULE_QUALIFICATION",
+    "detailed_frame_parts": 7,
+    "source_files_copied": 24,
+    "cut_feature_records": 93,
+    "active_cut_features": 79,
+    "suppressed_cut_features": 14,
+    "normal_cut_true": 93,
+    "flip_side_to_cut_true": 10,
+    "end_condition_1_counts_including_suppressed": {
+      "ThroughAllBoth": 17,
+      "UpToVertex": 9,
+      "Blind": 55,
+      "ThroughAll": 11,
+      "UpToSurface": 1
+    },
+    "blind_depth_mm_counts_including_suppressed": {
+      "2.0": 43,
+      "10.0": 4,
+      "2.1": 8
+    },
+    "blind_t_plus_0_10mm_features": 8,
+    "parent_sketch_records": 98,
+    "unique_parent_sketches_by_part_and_id": 93,
+    "parent_constraint_record_counts": {
+      "2": 3,
+      "3": 95
+    },
+    "unique_parent_constraint_counts": {
+      "2": 3,
+      "3": 90
+    },
+    "parent_reference_kind_record_counts": {
+      "Face2": 93,
+      "NULL": 5
+    },
+    "single_circle_cut_profile_features": 26,
+    "active_single_circle_cut_profile_with_final_cylinder_owner": 21,
+    "single_circle_role_caveat": "Geometry distinguishes these from polygon/open-line corner candidates; no before/after material localization is claimed.",
+    "parent_sketch_caveat": "Parent records may include auxiliary source sketches; relation type9=Coincident, constrained_status2=UnderConstrained,3=FullyConstrained. No selected-contour claim.",
+    "all_base_thickness_m": [
+      0.002
+    ],
+    "all_base_radius_m": [
+      0.0001
+    ],
+    "main_addin_loaded": false,
+    "cad_save_called": false,
+    "rebuild_called": false,
+    "source_write_locks_held": true,
+    "source_hashes_unchanged": true,
+    "copy_hashes_unchanged": true,
+    "blank_session_restored": true,
+    "new_cut_before_after_qualified_count": 0
+  },
+  "angled_native_profile_segments": [
+    {
+      "part": "4458-04-TI-b1-fr2.SLDPRT",
+      "base_feature_id": 808,
+      "base_sketch_id": 768,
+      "segment_id": [
+        0,
+        1
+      ],
+      "delta_sketch_xy_m": [
+        0.144,
+        0.005154411621033262
+      ],
+      "measured_angle_from_sketch_x_deg": 2.0499999999916967,
+      "evidence_level": "API_NATIVE_SKETCH_GEOMETRY_DERIVED_ANGLE",
+      "sheet_thickness_m": 0.002,
+      "bend_radius_m": 0.0001
+    },
+    {
+      "part": "4458-04-TI-b1-fr3.SLDPRT",
+      "base_feature_id": 808,
+      "base_sketch_id": 768,
+      "segment_id": [
+        0,
+        1
+      ],
+      "delta_sketch_xy_m": [
+        0.144,
+        0.005154411621033774
+      ],
+      "measured_angle_from_sketch_x_deg": 2.0499999999919005,
+      "evidence_level": "API_NATIVE_SKETCH_GEOMETRY_DERIVED_ANGLE",
+      "sheet_thickness_m": 0.002,
+      "bend_radius_m": 0.0001
+    }
+  ],
+  "sloped_cut_peer_support_pairs": [
+    {
+      "evidence_level": "GEOMETRY_VERIFIED_PLANAR_SUPPORT_OFFSETS",
+      "cut_part": "4458-04-TI-b2-fr1.SLDPRT",
+      "cut_occurrence": "4458-04-TI-b2-fr1-1",
+      "cut_feature_id": 710,
+      "cut_feature_name": "ｶｯﾄ - 押し出し2",
+      "cut_parameters": {
+        "end_condition_1": 9,
+        "end_condition_2": 1,
+        "depth_1_m": 0.002,
+        "depth_2_m": 0.01,
+        "reverse_direction": false,
+        "normal_cut": true,
+        "flip_side_to_cut": true,
+        "from_type": 0,
+        "from_offset_m": 0,
+        "from_offset_reverse": false
+      },
+      "cut_face_owner_type": "Cut",
+      "cut_face_area_m2": 0.0002837816228133705,
+      "cut_plane_normal_world": [
+        -0.03577161632520504,
+        -0.9993599909269344,
+        -3.883293651356942e-16
+      ],
+      "cut_plane_support_world_m": -1.4776897172456995,
+      "peer_part": "4458-04-TI-b1-fr2.SLDPRT",
+      "peer_occurrence": "4458-04-TI-b1-fr2-2",
+      "parallel_original_skin_faces": [
+        {
+          "owner_feature_id": 808,
+          "owner_feature_type": "SMBaseFlange",
+          "normal_world": [
+            0.0357716163252047,
+            0.9993599909269345,
+            7.911735086858548e-18
+          ],
+          "plane_support_world_m": 1.4777897172456986,
+          "normal_alignment": -1.0000000000000002,
+          "area_m2": 0.2453650583779778,
+          "perpendicular_analytic_plane_distance_m": 9.999999999910081e-05
+        },
+        {
+          "owner_feature_id": 808,
+          "owner_feature_type": "SMBaseFlange",
+          "normal_world": [
+            0.0357716163252047,
+            0.9993599909269344,
+            7.911735086858544e-18
+          ],
+          "plane_support_world_m": 1.4797897172456984,
+          "normal_alignment": -1.0,
+          "area_m2": 0.2453650583779753,
+          "perpendicular_analytic_plane_distance_m": 0.0020999999999988805
+        }
+      ],
+      "paired_skin_plane_separation_m": 0.0019999999999997797,
+      "calculation": "For rigid occurrence transform R,T: n_world=R*n_native, p_world=R*p_native+T, d=n_world dot p_world; distance=abs(d_cut-sign(n_cut dot n_peer)*d_peer). Input PlaneParams=[nx,ny,nz,px,py,pz].",
+      "meaning": "Final Cut-owned sloped face follows actual peer sloped skin supports with 0.10 mm normal separation from nearer support; the opposite support is another 2.00 mm away.",
+      "limits": [
+        "This is analytic planar support separation, not full finite Face2 nearest-distance, overlap, or complete assembly-clearance proof.",
+        "The surface parameter point is on the infinite plane and need not lie inside its trimmed finite face.",
+        "No suppression/replay or new Cut before/after/native-rule qualification was performed.",
+        "Historical ThroughAll/ThroughAllBoth settings are observed reference metadata, not the new per-sheet Blind manufacturing policy."
+      ]
+    },
+    {
+      "evidence_level": "GEOMETRY_VERIFIED_PLANAR_SUPPORT_OFFSETS",
+      "cut_part": "4458-04-TI-b2-fr4.SLDPRT",
+      "cut_occurrence": "4458-04-TI-b2-fr4-1",
+      "cut_feature_id": 1024,
+      "cut_feature_name": "ｶｯﾄ - 押し出し14",
+      "cut_parameters": {
+        "end_condition_1": 1,
+        "end_condition_2": 1,
+        "depth_1_m": 0.002,
+        "depth_2_m": 0.01,
+        "reverse_direction": false,
+        "normal_cut": true,
+        "flip_side_to_cut": false,
+        "from_type": 0,
+        "from_offset_m": 0,
+        "from_offset_reverse": false
+      },
+      "cut_face_owner_type": "Cut",
+      "cut_face_area_m2": 0.0002837816228133701,
+      "cut_plane_normal_world": [
+        2.5784845304339626e-16,
+        0.9993599909269343,
+        0.03577161632520744
+      ],
+      "cut_plane_support_world_m": 1.5222177084694735,
+      "peer_part": "4458-04-TI-b1-fr3.SLDPRT",
+      "peer_occurrence": "4458-04-TI-b1-fr3-3",
+      "parallel_original_skin_faces": [
+        {
+          "owner_feature_id": 808,
+          "owner_feature_type": "SMBaseFlange",
+          "normal_world": [
+            -2.861548305146077e-17,
+            0.9993599909269343,
+            0.03577161632520831
+          ],
+          "plane_support_world_m": 1.5223177084698163,
+          "normal_alignment": 1.0,
+          "area_m2": 0.04592154449963588,
+          "perpendicular_analytic_plane_distance_m": 0.00010000000034282586
+        },
+        {
+          "owner_feature_id": 808,
+          "owner_feature_type": "SMBaseFlange",
+          "normal_world": [
+            -2.861548305146077e-17,
+            0.9993599909269343,
+            0.03577161632520831
+          ],
+          "plane_support_world_m": 1.524317708469816,
+          "normal_alignment": 1.0,
+          "area_m2": 0.045921544499636695,
+          "perpendicular_analytic_plane_distance_m": 0.0021000000003426056
+        }
+      ],
+      "paired_skin_plane_separation_m": 0.0019999999999997797,
+      "calculation": "For rigid occurrence transform R,T: n_world=R*n_native, p_world=R*p_native+T, d=n_world dot p_world; distance=abs(d_cut-sign(n_cut dot n_peer)*d_peer). Input PlaneParams=[nx,ny,nz,px,py,pz].",
+      "meaning": "Final Cut-owned sloped face follows actual peer sloped skin supports with 0.10 mm normal separation from nearer support; the opposite support is another 2.00 mm away.",
+      "limits": [
+        "This is analytic planar support separation, not full finite Face2 nearest-distance, overlap, or complete assembly-clearance proof.",
+        "The surface parameter point is on the infinite plane and need not lie inside its trimmed finite face.",
+        "No suppression/replay or new Cut before/after/native-rule qualification was performed.",
+        "Historical ThroughAll/ThroughAllBoth settings are observed reference metadata, not the new per-sheet Blind manufacturing policy."
+      ]
+    }
+  ],
+  "new_method_status": "PROPOSED_FROM_REFERENCE_GEOMETRY_NOT_IMPLEMENTED_NOT_NATIVE_QUALIFIED"
+}
