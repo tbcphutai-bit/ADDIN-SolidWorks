@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -185,6 +185,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                                         int candidate, out string message)
         {
             Trace.WriteLine("[AFJ-R52] stage=GHOST_ENTER candidate=" + candidate + " busy=" + busy);
+            Trace.WriteLine("[AFJ-R72] SOURCE=PLANAR_MEASURED_SHEET_NORMAL_BLIND native_entry_partitions=True MVID="+typeof(AutoFrameJointGhostPreview).Assembly.ManifestModule.ModuleVersionId);
             message = "Chưa tạo preview vết cắt.";
             if (busy || closeRequested) { message = "Preview đang xử lý hoặc đang đóng."; return false; }
             if (candidate != 1 && candidate != 2)
@@ -743,8 +744,9 @@ namespace ADDIN.Commands.AutoFrameJoint
         private static double[] PreviewCanonicalFrameNormal(double[] axisA,double[] axisB)
         {
             double[] a=PreviewUnitVector(axisA),b=PreviewUnitVector(axisB);
-            if(Math.Abs(PreviewDot(a,b))>1e-7)
-                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: hai trục Frame API chưa vuông góc.");
+            double axisDot=PreviewDot(a,b);
+            if(1-axisDot*axisDot<1e-8)
+                throw new InvalidOperationException("PREVIEW_PLANE_UNVERIFIED: hai trục Frame song song hoặc gần suy biến.");
             double[] n=PreviewUnitVector(new double[]{a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]});
             // Canonical physical side: largest-magnitude world component positive.
             // A/B swapping and reversing an extrusion axis cannot flip the lift.
@@ -2065,7 +2067,7 @@ namespace ADDIN.Commands.AutoFrameJoint
     {
         internal static AfjParametricPlan Create(AfjProfile a, AfjProfile b, Body2 ba, Body2 bb, MathTransform ta, MathTransform tb, bool aCovers)
         {
-            if (AfjMeasuredContactRules.RequiresMeasuredContact(a, b))
+            if (AfjMeasuredContactRules.RequiresMeasuredContact(a, b, ta, tb))
                 return AfjMeasuredContactRules.Generate(a, b, ba, bb, ta, tb, aCovers);
             return AfjParametricRules.Generate(a, b, ba, bb, ta, tb, aCovers, AfjParametricRules.AssemblyGap);
         }
@@ -2075,7 +2077,7 @@ namespace ADDIN.Commands.AutoFrameJoint
     // canonical U cutter. All actual tools are created from paired native skins.
     internal static class AfjMeasuredContactRules
     {
-        internal const string RuleId="ORTHOGONAL_MEASURED_SHEET_NORMAL_BLIND";
+        internal const string RuleId="PLANAR_MEASURED_SHEET_NORMAL_BLIND";
         static double Dot(double[] a,double[] b){return AfjParametricRules.Dot(a,b);}
         static double[] Add(double[] a,double[] b){return AfjParametricRules.Add(a,b);}
         static double[] Sub(double[] a,double[] b){return AfjParametricRules.Sub(a,b);}
@@ -2097,8 +2099,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
             return false;
         }
-        internal static bool RequiresMeasuredContact(AfjProfile a,AfjProfile b)
-        {return Angled(a)||Angled(b)||AfjFoldedButtRules.Ordered(a).Length>3||AfjFoldedButtRules.Ordered(b).Length>3;}
+        internal static bool RequiresMeasuredContact(AfjProfile a,AfjProfile b,MathTransform ta,MathTransform tb)
+        {return Math.Abs(Dot(Vector(a.Axis,ta),Vector(b.Axis,tb)))>1e-7||Angled(a)||Angled(b)||AfjFoldedButtRules.Ordered(a).Length>3||AfjFoldedButtRules.Ordered(b).Length>3;}
         static double Support(Body2 body,MathTransform t,double[] world)
         {
             var native=Vector(world,(MathTransform)t.Inverse());double x,y,z;
@@ -2130,7 +2132,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal static AfjParametricPlan Generate(AfjProfile a,AfjProfile b,Body2 ba,Body2 bb,MathTransform ta,MathTransform tb,bool aCovers)
         {
             var axisA=Vector(a.Axis,ta);var axisB=Vector(b.Axis,tb);
-            Need(Math.Abs(Dot(axisA,axisB))<1e-7,"only orthogonal member axes have native reference evidence");
+            double axisDot=Dot(axisA,axisB);Need(1-axisDot*axisDot>1e-8,"parallel or ill-conditioned member-axis intersection");
             var ga=AfjFoldedButtRules.Audit(a,ba,ta);var gb=AfjFoldedButtRules.Audit(b,bb,tb);
             var outA=Outward(a,ba,ta,bb,tb);var outB=Outward(b,bb,tb,ba,ta);
             var ha=Holder(ga,ta);var hb=Holder(gb,tb);
@@ -2139,7 +2141,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             var origin=(double[])ga.Origin.Clone();
             double alongA=(-Support(bb,tb,Mul(outA,-1))+Support(bb,tb,outA))/2;
             double alongB=(-Support(ba,ta,Mul(outB,-1))+Support(ba,ta,outB))/2;
-            origin=Add(origin,Add(Mul(outA,alongA-Dot(origin,outA)),Mul(outB,alongB-Dot(origin,outB))));
+            double c=Dot(outA,outB),ra=alongA-Dot(origin,outA),rb=alongB-Dot(origin,outB),det=1-c*c;
+            origin=Add(origin,Add(Mul(outA,(ra-c*rb)/det),Mul(outB,(rb-c*ra)/det)));
             Trace.WriteLine("[AFJ-R71] MEASURED_PROFILE_CONTACT strips_A="+ga.Ordered.Length+" strips_B="+gb.Ordered.Length+" canonical_u_guide=False angle_source=API_BASE_SKETCH_AND_PAIRED_NATIVE_SKINS");
             return new AfjParametricPlan { Plan=new AfjJointPlan {RuleId=RuleId},MeasuredContactOnly=true,GeneralFoldFootprint=true,
                 Winner=aCovers?ha:hb,Loser=aCovers?hb:ha,OutWinner=aCovers?outA:outB,OutLoser=aCovers?outB:outA,
@@ -2553,10 +2556,13 @@ namespace ADDIN.Commands.AutoFrameJoint
         {
             var result=new List<JointWebCandidate>();
             double[] ownAxis=Unit(WorldVector(profile.Axis,transform));
+            var transverse=Sub(mateAxis,Scale(ownAxis,Dot(mateAxis,ownAxis)));
+            if(Dot(transverse,transverse)<1e-8)return result.ToArray();
+            transverse=Unit(transverse);
             foreach(double[] line in WebCandidates(profile))
             {
                 double[] a=P(line,0),b=P(line,1),direction=Unit(WorldVector(Sub(b,a),transform));
-                if(Math.Abs(Dot(direction,mateAxis))<.999999||Math.Abs(Dot(direction,ownAxis))>1e-7)continue;
+                if(Math.Abs(Dot(direction,transverse))<.999999||Math.Abs(Dot(direction,ownAxis))>1e-7)continue;
                 double[] wall=profile.Lines.Single(other=>other!=line&&OtherEnd(other,a)!=null);
                 double[] depth=Unit(WorldVector(Sub(OtherEnd(wall,a),a),transform));
                 if(Math.Abs(Dot(depth,ownAxis))>1e-7||Math.Abs(Dot(depth,direction))>1e-7)continue;
@@ -2610,8 +2616,9 @@ namespace ADDIN.Commands.AutoFrameJoint
             // section may contain multiple lines with two outward Walls (2216
             // is an example); the longest line is not necessarily the joint Web.
             double[] axisA=Unit(WorldVector(profileA.Axis,ta)),axisB=Unit(WorldVector(profileB.Axis,tb));
-            if(Math.Abs(Dot(axisA,axisB))>1e-7)
-                throw new InvalidOperationException("UNVERIFIED_RULE: pair-context Web selection currently requires orthogonal native axes");
+            double cosine=Dot(axisA,axisB);
+            if(1-cosine*cosine<1e-8)
+                throw new InvalidOperationException("UNVERIFIED_RULE: pair-context Web selection requires nonparallel native axes");
             var candidatesA=JointWebCandidates(profileA,ta,axisB);var candidatesB=JointWebCandidates(profileB,tb,axisA);
             var skinsA=JointWebSkins(bodyA,ta);var skinsB=JointWebSkins(bodyB,tb);
             var matches=new List<Tuple<JointWebCandidate,JointWebCandidate>>();
@@ -5124,6 +5131,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal AfjCutOperation Operation;
             internal Body2 Before, Target;
             internal double[][] NativeContour;
+            internal bool NativeObliqueCap;
+            internal bool NativeProjectedCap;
             internal double Removed;
         }
         private sealed class RawCreation
@@ -5217,11 +5226,19 @@ namespace ADDIN.Commands.AutoFrameJoint
             if (intent.MeasuredContactOnly) foreach (var step in Steps)
             {
                 var metadata = step.Operation.Tools.Single().SheetSlice;
+                if(metadata.MeasuredEntryPartition) {
+                    Need(!String.IsNullOrWhiteSpace(metadata.MidpointEvidenceId)&&metadata.MidpointEvidenceId.StartsWith("MEASURED_MIDPOINT:",StringComparison.Ordinal),"Partition requires original profile midpoint guide");
+                    RequiredMeasuredGuideKeys.Add(step.Part+":"+metadata.MidpointEvidenceId);
+                }
                 if (metadata.Role != "RETURN_MITER") continue;
                 Need(metadata.MeasuredContactAuthority && !String.IsNullOrWhiteSpace(metadata.GuideEvidenceId) &&
                     metadata.GuideEvidenceId.StartsWith("MEASURED_MITER:", StringComparison.Ordinal),
                     "Measured miter slice lacks its exact finite-geometry guide identity");
                 RequiredMeasuredGuideKeys.Add(step.Part + ":" + metadata.GuideEvidenceId);
+                if(metadata.MeasuredEntryPartition) {
+                    Need(!String.IsNullOrWhiteSpace(metadata.MidpointEvidenceId)&&metadata.MidpointEvidenceId.StartsWith("MEASURED_MIDPOINT:",StringComparison.Ordinal),"Partition lacks its original profile midpoint guide");
+                    RequiredMeasuredGuideKeys.Add(step.Part+":"+metadata.MidpointEvidenceId);
+                }
             }
             Need(ticket.IsSourceCurrent != null && ticket.IsSourceCurrent(), "PREVIEW_STALE before first mutation");
             CheckInvariant("BEFORE_JOURNAL");
@@ -5664,6 +5681,29 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Loser=intent.Loser,Winner=intent.Winner,SeamNear=intent.SeamNear,SeamFar=intent.SeamFar,Derivation=intent.Derivation,
                 CoverageWarning=intent.CoverageWarning,GeneralFoldFootprint=intent.GeneralFoldFootprint,MeasuredContactOnly=intent.MeasuredContactOnly,Folded=null};
         }
+        private static bool R72GuidePointEqual(double[] a,double[] b)
+        { return a==null||b==null?a==b:a.Length==b.Length&&a.Zip(b,(x,y)=>Math.Abs(x-y)<1e-10).All(v=>v); }
+        private static bool R72SameMidpointSource(AfjSheetSliceMetadata a,AfjSheetSliceMetadata b)
+        {
+            return a!=null&&b!=null&&a.StripIndex==b.StripIndex&&a.MidpointEvidenceId==b.MidpointEvidenceId&&
+                Math.Abs(a.ApiThickness-b.ApiThickness)<1e-12&&R72GuidePointEqual(a.SupportPointNative,b.SupportPointNative)&&
+                R72GuidePointEqual(a.InwardNormalNative,b.InwardNormalNative)&&R72GuidePointEqual(a.SegmentStartNative,b.SegmentStartNative)&&
+                R72GuidePointEqual(a.SegmentEndNative,b.SegmentEndNative)&&R72GuidePointEqual(a.UnitAxisNative,b.UnitAxisNative);
+        }
+        private static bool R72SameCanonicalGuide(AfjSheetSliceMetadata a,AfjSheetSliceMetadata b)
+        {
+            if(a==null||b==null||a.StripIndex!=b.StripIndex||a.MateStripIndex!=b.MateStripIndex||
+                a.GuideEvidenceId!=b.GuideEvidenceId||Math.Abs(a.ApiThickness-b.ApiThickness)>1e-12||Math.Abs(a.MateThickness-b.MateThickness)>1e-12)return false;
+            var aa=new[]{a.SupportPointNative,a.InwardNormalNative,a.SegmentStartNative,a.SegmentEndNative,a.UnitAxisNative,
+                a.MiterNearWorld,a.MiterFarWorld,a.MiterCornerWorld,a.MiterOwnNearProfileWorld,a.MiterOwnFarProfileWorld,
+                a.MiterMateNearProfileWorld,a.MiterMateFarProfileWorld,a.MiterOwnNearTangencyWorld,a.MiterOwnFarTangencyWorld,
+                a.MiterMateNearTangencyWorld,a.MiterMateFarTangencyWorld,a.MiterOwnAxisWorld,a.MiterMateAxisWorld};
+            var bb=new[]{b.SupportPointNative,b.InwardNormalNative,b.SegmentStartNative,b.SegmentEndNative,b.UnitAxisNative,
+                b.MiterNearWorld,b.MiterFarWorld,b.MiterCornerWorld,b.MiterOwnNearProfileWorld,b.MiterOwnFarProfileWorld,
+                b.MiterMateNearProfileWorld,b.MiterMateFarProfileWorld,b.MiterOwnNearTangencyWorld,b.MiterOwnFarTangencyWorld,
+                b.MiterMateNearTangencyWorld,b.MiterMateFarTangencyWorld,b.MiterOwnAxisWorld,b.MiterMateAxisWorld};
+            return aa.Zip(bb,R72GuidePointEqual).All(v=>v);
+        }
         private void R71PrepareMeasuredGuides()
         {
             Need(Intent.MeasuredContactOnly && !MeasuredGuidesPrepared && SketchWriterResult == null,
@@ -5679,7 +5719,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             {
                 RequireAcceptedStamps(); Activate(Assembly);
                 var first = group.First(); var meta = first.Operation.Tools.Single().SheetSlice;
-                Need(group.All(step => step.Part == first.Part && Object.ReferenceEquals(step.Operation.Tools.Single().SheetSlice, meta)),
+                Need(group.All(step => step.Part == first.Part && R72SameCanonicalGuide(step.Operation.Tools.Single().SheetSlice, meta)),
                     "One measured guide identity must refer to one exact reviewed geometric slice");
                 var own = Components[first.Part]; var peer = Components[1 - first.Part];
                 var ownTransform = own.GetTotalTransform(false); var peerTransform = peer.GetTotalTransform(false);
@@ -5693,16 +5733,36 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var recipe = new AfjUParametricSketchWriter.MeasuredMiterGuideRecipe { EvidenceId = meta.GuideEvidenceId,
                     OwnComponent = own, PeerComponent = peer, OwnSupportFace = face, PeerSupportFace = peerFace,
                     OwnNearTangencyWorld = meta.MiterOwnNearTangencyWorld, OwnFarTangencyWorld = meta.MiterOwnFarTangencyWorld,
-                    MateFarTangencyWorld = meta.MiterMateFarTangencyWorld, NearWorld = meta.MiterNearWorld,
+                    MateFarTangencyWorld = meta.MiterMateFarTangencyWorld, MateNearTangencyWorld=meta.MiterMateNearTangencyWorld, NearWorld = meta.MiterNearWorld,
                     FarWorld = meta.MiterFarWorld, CornerWorld = meta.MiterCornerWorld,
                     OwnAxisWorld = meta.MiterOwnAxisWorld, MateAxisWorld = meta.MiterMateAxisWorld,
                     OwnNearProfileWorld=meta.MiterOwnNearProfileWorld,OwnFarProfileWorld=meta.MiterOwnFarProfileWorld,
-                    MateFarProfileWorld=meta.MiterMateFarProfileWorld };
+                    MateFarProfileWorld=meta.MiterMateFarProfileWorld, MateNearProfileWorld=meta.MiterMateNearProfileWorld };
                 var result = AfjUParametricSketchWriter.TryWriteMeasuredMiterGuide(App, Assembly, recipe,
                     AfjNativeFeatureTraversal.Union(Documents[first.Part].Model).Select(feature => feature.GetID()),
                     AfjNativeFeatureTraversal.Union(Documents[1 - first.Part].Model).Select(feature => feature.GetID()),
                     Prefix + "_G" + (sequence++).ToString("D2"), Register, Log, ConfirmClosed);
                 R71AppendGuideResult(result, checkpoint, first.Part, meta.GuideEvidenceId);
+            }
+            foreach(var group in Steps.Where(step=>step.Operation.Tools.Single().SheetSlice.MeasuredEntryPartition)
+                .GroupBy(step=>step.Part+":"+step.Operation.Tools.Single().SheetSlice.MidpointEvidenceId,StringComparer.Ordinal))
+            {
+                RequireAcceptedStamps();Activate(Assembly);
+                var first=group.First();var meta=first.Operation.Tools.Single().SheetSlice;
+                Need(group.All(step=>step.Part==first.Part&&R72SameMidpointSource(step.Operation.Tools.Single().SheetSlice,meta)&&
+                    step.Operation.Tools.Single().SheetSlice.MidpointEvidenceId==meta.MidpointEvidenceId),"Midpoint guide source identity conflict");
+                var own=Components[first.Part];var peer=Components[1-first.Part];var transform=own.GetTotalTransform(false);
+                var face=R59Skin(Documents[first.Part].Model,meta.SupportPointNative,meta.InwardNormalNative);
+                var recipe=new AfjUParametricSketchWriter.MeasuredMiterGuideRecipe { MidpointOnly=true,EvidenceId=meta.MidpointEvidenceId,
+                    OwnComponent=own,PeerComponent=peer,OwnSupportFace=face,
+                    OwnNearTangencyWorld=R59TransformPoint(meta.SupportPointNative,transform),
+                    OwnNearProfileWorld=R59TransformPoint(meta.SegmentStartNative,transform),OwnFarProfileWorld=R59TransformPoint(meta.SegmentEndNative,transform) };
+                var checkpoint=Journal.CaptureCheckpoint(Assembly);
+                var result=AfjUParametricSketchWriter.TryWriteMeasuredMiterGuide(App,Assembly,recipe,
+                    AfjNativeFeatureTraversal.Union(Documents[first.Part].Model).Select(feature=>feature.GetID()),
+                    AfjNativeFeatureTraversal.Union(Documents[1-first.Part].Model).Select(feature=>feature.GetID()),
+                    Prefix+"_G"+(sequence++).ToString("D2"),Register,Log,ConfirmClosed);
+                R71AppendGuideResult(result,checkpoint,first.Part,meta.MidpointEvidenceId);
             }
             Need(SketchWriterResult.Owned.Count == RequiredMeasuredGuideKeys.Count,
                 "Every measured guide must have one exact Part-owned native identity");
@@ -5803,12 +5863,20 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Need(AfjTemporaryBoolean.Finite(skinCap)&&skinCap<=cap+1e-8,"Live finite sheet cap is outside the current Body");cap=skinCap;
             }
             var polygon=tool.Polygon.Select(point=>{double s=AfjParametricRules.Dot(point,meta.UnitAxisNative);return s>cap?AfjParametricRules.Sub(point,AfjParametricRules.Scale(meta.UnitAxisNative,s-cap)):(double[])point.Clone();}).ToArray();
+            // Preserve the already certified axial contour. An actual
+            // oblique cap supplies projected geometric references only.
+            var closureSection=ownIndex==(Preview.CoverA?0:1)?Intent.Winner:Intent.Loser;
+            Need(closureSection!=null,"R72 actual profile R unavailable for projected cap reference");
+            var projectedCapCandidate=R72SelectProjectedCapIfNeeded(meta,face,polygon,closureSection.Radius);
+            step.NativeObliqueCap=false;
             step.NativeContour=polygon.Select(point=>(double[])point.Clone()).ToArray();
             // The native contour may close exactly on the real stock cap while
             // a temporary cutter closes outside it. Prove material equivalence.
             var closedTool=new AfjToolDefinition{Polygon=polygon,Direction=tool.Direction,Length=tool.Length,DepthPolicy=tool.DepthPolicy,ApiSheetThickness=tool.ApiSheetThickness,NominalSheetDepth=tool.NominalSheetDepth,SheetSlice=tool.SheetSlice};var closedOp=new AfjCutOperation{Kind=AfjOperationKind.Cut,NormalCutIntent=true,EvidenceId="R59_NATIVE_CLOSURE_MATERIAL_PROOF"};closedOp.Tools.Add(closedTool);var closedPlan=new AfjCutPlan();closedPlan.Operations.Add(closedOp);
             var closedResult=AfjTemporaryBoolean.Execute(App,AfjTemporaryBoolean.Copy(step.Before),closedPlan);
             Need(closedResult.Kept.Count==1&&AfjNativeCutCommit.SymmetricDifference(closedResult.Kept.Single(),step.Target)<=1e-12,"R59 native stock-cap closure changes reviewed removal");
+            step.NativeProjectedCap=projectedCapCandidate!=null;
+            if(step.NativeProjectedCap)Trace.WriteLine("[AFJ-R72] PROJECTED_CAP_ORIGINAL_CONTOUR_CERTIFIED original_contour_unchanged=True current_material_target_symmetric_difference_within_1e12=True native_normal_cut_shape_match=REQUIRED");
             var ownIds=AfjNativeFeatureTraversal.Union(part).Select(f=>f.GetID()).ToArray();var peerIds=AfjNativeFeatureTraversal.Union(Documents[peerIndex].Model).Select(f=>f.GetID()).ToArray();
             string slicePrefix=Prefix+"_S"+Steps.IndexOf(step).ToString("D2");
             if(Intent.MeasuredContactOnly)
@@ -5855,9 +5923,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var ownOpposite=R59Skin(part,AfjParametricRules.Add(meta.SupportPointNative,AfjParametricRules.Scale(meta.InwardNormalNative,meta.ApiThickness)),meta.InwardNormalNative);
                 double apiRadius=(ownIndex==(Preview.CoverA?0:1)?Intent.Winner:Intent.Loser).Radius;
                 var edges=face.GetEdges() as Array;Need(edges!=null,"R59 own cap edge inventory unavailable");
-                var caps=edges.Cast<object>().OfType<Edge>().Where(edge=>R59ExtendedCapSupports(edge,p0,p1,meta.UnitAxisNative,meta.ApiThickness+apiRadius+AfjManufacturingConventions.SheetCutOverrun)).ToArray();
+                var caps=edges.Cast<object>().OfType<Edge>().Where(edge=>step.NativeProjectedCap?R72ProjectedCapSupports(face,edge,p0,p1,meta.UnitAxisNative,u,meta.ApiThickness+apiRadius+AfjManufacturingConventions.SheetCutOverrun):R59ExtendedCapSupports(edge,p0,p1,meta.UnitAxisNative,meta.ApiThickness+apiRadius+AfjManufacturingConventions.SheetCutOverrun)).ToArray();
                 Need(caps.Length==1,"R59 virtual Bend contact bounds lack one actual stock-cap supporting line within measured t+R+0.10mm");
-                var recipe=new AfjUParametricSketchWriter.WallSheetSliceRecipe{EvidenceId=step.Operation.EvidenceId,TerminalOverhangTrim=meta.TerminalOverhangTrim,TerminalAnchorStripIndex=meta.TerminalAnchorStripIndex,TerminalAnchorSliceId=meta.TerminalAnchorSliceId,TerminalAnchorPathIndices=meta.TerminalAnchorPathIndices==null?null:(int[])meta.TerminalAnchorPathIndices.Clone(),TerminalAxialCutoffNative=meta.ConstantAxialCutoff??Double.NaN,OwnComponent=own,PeerComponent=peer,OwnSupportFace=face,OwnOppositeFace=ownOpposite,PeerSupportFace=mating,PeerOppositeFace=peerOpposite,PeerSupportPointWorld=matingWitness,PeerGuideFeatureIds=SketchWriterResult.Owned.Where(owned=>Same(owned.Part,Documents[peerIndex].Model)&&owned.CallbackReturned&&owned.ClosedOwnerVerified&&owned.EvidenceId.StartsWith("U_RULE:",StringComparison.Ordinal)).Select(owned=>owned.FeatureId).Distinct().ToArray(),OwnCapEdge=caps[0],ProfileWorld=world,GapGuideStartWorld=mid,GapGuideEndWorld=foot,FrameAxisWorld=R59TransformVector(meta.UnitAxisNative,ownTransform),OwnTransform=(double[])ownTransform.ArrayData,PeerTransform=(double[])peerTransform.ArrayData,Thickness=meta.ApiThickness,PeerThickness=meta.MateThickness,AssemblyFitGap=AfjManufacturingConventions.AssemblyFitGap,LocalSeamGap=localGap,ApiBendRadius=apiRadius,SupportPointWorld=R59TransformPoint(meta.SupportPointNative,ownTransform),ContactLowDatumWorld=meta.ContactLowDatumWorld,ContactHighDatumWorld=meta.ContactHighDatumWorld,ContactLowDatumOffset=meta.ContactLowDatumOffset,ContactHighDatumOffset=meta.ContactHighDatumOffset,ContactLowDatumOnOwnComponent=meta.ContactLowDatumOnOwnComponent,ContactHighDatumOnOwnComponent=meta.ContactHighDatumOnOwnComponent,ContactLowDatumPlaneNormalWorld=meta.ContactLowDatumPlaneNormalWorld,ContactHighDatumPlaneNormalWorld=meta.ContactHighDatumPlaneNormalWorld,ContactLowDatumAdjacentStripIndex=meta.ContactLowDatumAdjacentStripIndex,ContactHighDatumAdjacentStripIndex=meta.ContactHighDatumAdjacentStripIndex};
+                var recipe=new AfjUParametricSketchWriter.WallSheetSliceRecipe{NativeObliqueCap=step.NativeObliqueCap,NativeProjectedCap=step.NativeProjectedCap,EvidenceId=step.Operation.EvidenceId,TerminalOverhangTrim=meta.TerminalOverhangTrim,TerminalAnchorStripIndex=meta.TerminalAnchorStripIndex,TerminalAnchorSliceId=meta.TerminalAnchorSliceId,TerminalAnchorPathIndices=meta.TerminalAnchorPathIndices==null?null:(int[])meta.TerminalAnchorPathIndices.Clone(),TerminalAxialCutoffNative=meta.ConstantAxialCutoff??Double.NaN,OwnComponent=own,PeerComponent=peer,OwnSupportFace=face,OwnOppositeFace=ownOpposite,PeerSupportFace=mating,PeerOppositeFace=peerOpposite,PeerSupportPointWorld=matingWitness,PeerGuideFeatureIds=SketchWriterResult.Owned.Where(owned=>Same(owned.Part,Documents[peerIndex].Model)&&owned.CallbackReturned&&owned.ClosedOwnerVerified&&owned.EvidenceId.StartsWith("U_RULE:",StringComparison.Ordinal)).Select(owned=>owned.FeatureId).Distinct().ToArray(),OwnCapEdge=caps[0],ProfileWorld=world,GapGuideStartWorld=mid,GapGuideEndWorld=foot,FrameAxisWorld=R59TransformVector(meta.UnitAxisNative,ownTransform),OwnTransform=(double[])ownTransform.ArrayData,PeerTransform=(double[])peerTransform.ArrayData,Thickness=meta.ApiThickness,PeerThickness=meta.MateThickness,AssemblyFitGap=AfjManufacturingConventions.AssemblyFitGap,LocalSeamGap=localGap,ApiBendRadius=apiRadius,SupportPointWorld=R59TransformPoint(meta.SupportPointNative,ownTransform),ContactLowDatumWorld=meta.ContactLowDatumWorld,ContactHighDatumWorld=meta.ContactHighDatumWorld,ContactLowDatumOffset=meta.ContactLowDatumOffset,ContactHighDatumOffset=meta.ContactHighDatumOffset,ContactLowDatumOnOwnComponent=meta.ContactLowDatumOnOwnComponent,ContactHighDatumOnOwnComponent=meta.ContactHighDatumOnOwnComponent,ContactLowDatumPlaneNormalWorld=meta.ContactLowDatumPlaneNormalWorld,ContactHighDatumPlaneNormalWorld=meta.ContactHighDatumPlaneNormalWorld,ContactLowDatumAdjacentStripIndex=meta.ContactLowDatumAdjacentStripIndex,ContactHighDatumAdjacentStripIndex=meta.ContactHighDatumAdjacentStripIndex};
                 var result=AfjUParametricSketchWriter.TryWriteWallSheetSlice(App,Assembly,recipe,ownIds,peerIds,slicePrefix,Register,Log,ConfirmClosed);R59AppendSketchResult(result,assemblyBeforeSliceSketch);return result.Owned.Single();
             }
             Need(meta.Role=="WEB_MITER"||meta.Role=="RETURN_MITER","R59 no arbitrary fallback for an unknown sheet role");
@@ -6007,21 +6075,33 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(ownSection!=null && peerSection!=null && peerSection.Axis!=null,
                 "Measured native immutable profile axes are unavailable");
             var edges=face.GetEdges() as Array;Need(edges!=null,"Measured native own stock-cap edges unavailable");
-            var caps=edges.Cast<object>().OfType<Edge>().Where(edge=>R59ExtendedCapSupports(edge,p0,p1,meta.UnitAxisNative,
-                meta.ApiThickness+ownSection.Radius+AfjManufacturingConventions.SheetCutOverrun)).ToArray();
+            var caps=edges.Cast<object>().OfType<Edge>().Where(edge=>step.NativeProjectedCap?R72ProjectedCapSupports(face,edge,p0,p1,meta.UnitAxisNative,u,meta.ApiThickness+ownSection.Radius+AfjManufacturingConventions.SheetCutOverrun):R59ExtendedCapSupports(edge,p0,p1,meta.UnitAxisNative,meta.ApiThickness+ownSection.Radius+AfjManufacturingConventions.SheetCutOverrun)).ToArray();
+            if(caps.Length!=1) {
+                Trace.WriteLine("[AFJ-R72] CAP_SUPPORT_DIAGNOSTIC slice="+meta.SliceId+" hits="+caps.Length+" p0="+String.Join(",",p0.Select(v=>v.ToString("R",CultureInfo.InvariantCulture)))+" p1="+String.Join(",",p1.Select(v=>v.ToString("R",CultureInfo.InvariantCulture))));
+                foreach(Edge edge in edges.Cast<object>().OfType<Edge>()) {
+                    var av=edge.GetStartVertex() as Vertex;var bv=edge.GetEndVertex() as Vertex;if(av==null||bv==null)continue;
+                    Trace.WriteLine("[AFJ-R72] CAP_EDGE_DIAGNOSTIC a="+String.Join(",",((double[])av.GetPoint()).Select(v=>v.ToString("R",CultureInfo.InvariantCulture)))+" b="+String.Join(",",((double[])bv.GetPoint()).Select(v=>v.ToString("R",CultureInfo.InvariantCulture))));
+                }
+            }
             Need(caps.Length==1,"Measured native contact cell lacks one actual finite stock-cap support within t+R+0.10mm");
             Trace.WriteLine("[AFJ-R71] MEASURED_NATIVE_SLICE_AUTHORITY role="+meta.Role+" slice="+meta.SliceId+
                 " raw_0_t_finite_witnesses=true physical_min_gap_m="+meta.RequiredNormalGap.ToString("R",CultureInfo.InvariantCulture)+
                 " projected_contour_gap_m="+projectedGap.ToString("R",CultureInfo.InvariantCulture)+
                 " normal_coupling="+coupling.ToString("R",CultureInfo.InvariantCulture)+" own_miter_guide="+(miterGuide!=null));
+            var midpointGuide=meta.MeasuredEntryPartition?SketchWriterResult.Owned.SingleOrDefault(owned=>Same(owned.Part,part)&&
+                owned.EvidenceId==meta.MidpointEvidenceId&&owned.CallbackReturned&&owned.ClosedOwnerVerified):null;
+            Need(!meta.MeasuredEntryPartition||midpointGuide!=null,"Measured partition lost exact closed native midpoint guide");
             var recipe=new AfjUParametricSketchWriter.WallSheetSliceRecipe {
+                NativeObliqueCap=step.NativeObliqueCap,NativeProjectedCap=step.NativeProjectedCap,
+                MeasuredMidpointGuideFeatureId=midpointGuide==null?-1:midpointGuide.FeatureId,
+                MeasuredMidpointWorld=midpointGuide==null?null:R59TransformPoint(AfjParametricRules.Scale(AfjParametricRules.Add(meta.SegmentStartNative,meta.SegmentEndNative),.5),ownTransform),
                 EvidenceId=step.Operation.EvidenceId,MeasuredFiniteCell=true,OwnComponent=own,PeerComponent=peer,
                 MeasuredTerminalEntryVerified=meta.EntrySkinVerified,EntryNormalEnvelopeDepth=meta.EntryNormalEnvelopeDepth,UsePairedSkinClearance=meta.OppositeEntrySkin,
                 OwnSupportFace=face,OwnOppositeFace=ownOpposite,PeerSupportFace=mating,PeerOppositeFace=oppositeHits[0],
                 PeerSupportPointWorld=matingWitness,OwnCapEdge=caps[0],ProfileWorld=world,
                 GapGuideStartWorld=mid,GapGuideEndWorld=foot,FrameAxisWorld=R59TransformVector(meta.UnitAxisNative,ownTransform),
                 MateAxisWorld=AfjParametricRules.Unit(peerSection.Axis),OwnTransform=(double[])ownTransform.ArrayData,PeerTransform=(double[])peerTransform.ArrayData,
-                RequireCoupledNormalPierce=meta.MeasuredTerminalFreeEnd||meta.OppositeEntrySkin||miterGuide==null && Math.Abs(coupling)>1e-7,ExpectedProjectedContourGap=projectedGap,
+                RequireCoupledNormalPierce=meta.MeasuredTerminalFreeEnd||miterGuide==null && (meta.OppositeEntrySkin||Math.Abs(coupling)>1e-7),ExpectedProjectedContourGap=projectedGap,
                 MeasuredTerminalFreeEnd=meta.MeasuredTerminalFreeEnd,MeasuredFreeEndWorld=meta.MeasuredFreeEndWorld,MeasuredFreeEndNormalWorld=meta.MeasuredFreeEndNormalWorld,
                 MeasuredTerminalInherited=meta.MeasuredTerminalInherited,MeasuredTerminalAnchorStripIndex=meta.MeasuredTerminalAnchorStripIndex,
                 Thickness=meta.ApiThickness,PeerThickness=meta.MateThickness,AssemblyFitGap=AfjManufacturingConventions.AssemblyFitGap,
@@ -6068,6 +6148,140 @@ namespace ADDIN.Commands.AutoFrameJoint
                 " path="+String.Join(",",path)+" source_slice="+anchor.SliceId+" cutoff_native_m="+meta.ConstantAxialCutoff.Value.ToString("R",CultureInfo.InvariantCulture));
         }
 
+        // PRIVATE proposal. Replaces native OUTER closure only after an exact
+        // current-material certificate. It never changes the reviewed seam,
+        // sheet depth/direction, Bend/flat maps or any original/native Part.
+        private sealed class R72LiveCapClosure
+        {
+            internal double[][] Polygon;
+            internal Edge Support;
+            internal double[] Low,High,Witness;
+            internal double EdgeProjection,LowTransverseExtension,HighTransverseExtension;
+            internal double ForecastOutside,ForecastMissing,ForecastSymmetricDifference;
+        }
+        private static bool R72CapFinite(double[] p)
+        {return p!=null&&p.Length==3&&p.All(AfjTemporaryBoolean.Finite);}
+        private static double R72CapNorm(double[] p)
+        {return Math.Sqrt(AfjParametricRules.Dot(p,p));}
+        private R72LiveCapClosure R72ProposeLiveCapClosure(Step step,AfjSheetSliceMetadata meta,Face2 face,double[][] polygon,double apiRadius)
+        {
+            if(!Intent.MeasuredContactOnly||!meta.MeasuredContactAuthority||
+                (meta.Role!="LOCAL_WALL_INTERSECTION"&&meta.Role!="RETURN_MITER"))return null;
+            Need(step!=null&&step.Before!=null&&step.Target!=null&&face!=null&&polygon!=null&&polygon.Length==4&&polygon.All(R72CapFinite),
+                "R72 live-cap proposal requires current verified body and finite four-point reviewed contour");
+            Need(R72CapFinite(meta.UnitAxisNative)&&R72CapFinite(meta.SegmentStartNative)&&R72CapFinite(meta.SegmentEndNative)&&
+                AfjTemporaryBoolean.Finite(apiRadius)&&apiRadius>=0&&AfjTemporaryBoolean.Finite(meta.ApiThickness)&&meta.ApiThickness>0,
+                "R72 cap closure lacks actual finite axis/strip/t/R");
+            var axis=AfjParametricRules.Unit(meta.UnitAxisNative);
+            var u=AfjParametricRules.Unit(AfjParametricRules.Sub(meta.SegmentEndNative,meta.SegmentStartNative));
+            Need(Math.Abs(AfjParametricRules.Dot(axis,u))<1e-7,"R72 cap closure strip ordinate must be transverse to its actual Frame axis");
+            var plane=R59NativePlane(face);Need(plane!=null&&plane.Length==6,"R72 exact own support Face must remain planar");
+            var normal=AfjParametricRules.Unit(plane.Take(3).ToArray());var planePoint=plane.Skip(3).ToArray();
+            Need(polygon.All(p=>Math.Abs(AfjParametricRules.Dot(AfjParametricRules.Sub(p,planePoint),normal))<1e-8),"R72 reviewed contour left its actual own skin plane");
+            double extension=meta.ApiThickness+apiRadius+AfjManufacturingConventions.SheetCutOverrun;
+            Need(AfjTemporaryBoolean.Finite(extension)&&extension>0,"R72 actual transverse t+R+overrun bound unavailable");
+            Func<double[],double> ordinate=p=>AfjParametricRules.Dot(AfjParametricRules.Sub(p,meta.SegmentStartNative),u);
+            Func<double[],double> axial=p=>AfjParametricRules.Dot(p,axis);
+            var ordered=Enumerable.Range(0,4).OrderBy(i=>ordinate(polygon[i])).ThenBy(i=>axial(polygon[i])).ToArray();
+            var low=ordered.Take(2).OrderBy(i=>axial(polygon[i])).ToArray();var high=ordered.Skip(2).OrderBy(i=>axial(polygon[i])).ToArray();
+            int q0=low[0],p0=low[1],q1=high[0],p1=high[1];double h0=ordinate(polygon[p0]),h1=ordinate(polygon[p1]);
+            Need(h1-h0>1e-9&&Math.Abs(ordinate(polygon[q0])-h0)<1e-8&&Math.Abs(ordinate(polygon[q1])-h1)<1e-8&&
+                axial(polygon[p0])-axial(polygon[q0])>1e-9&&axial(polygon[p1])-axial(polygon[q1])>1e-9,
+                "R72 reviewed cell cannot be uniquely partitioned into unchanged seam and outer closure");
+            var raw=face.GetEdges() as Array;Need(raw!=null&&raw.Length<=64,"R72 bounded live support Face edge inventory required");var edges=raw.Cast<object>().OfType<Edge>().ToArray();
+            var legacy=edges.Where(edge=>R59ExtendedCapSupports(edge,polygon[p0],polygon[p1],axis,extension)).ToArray();
+            if(legacy.Length==1)return null;
+            Need(legacy.Length==0,"R72 cannot reclose an already ambiguous genuine stock-cap line");
+            var originalTool=step.Operation.Tools.Single();Need(originalTool.ArcCenters==null||originalTool.ArcCenters.All(c=>c==null),"R72 oblique outer closure is restricted to the exact reviewed straight-edge sheet cell");
+            var accepted=new List<R72LiveCapClosure>();
+            foreach(var edge in edges)
+            {
+                var curve=edge.GetCurve() as Curve;if(curve==null||!curve.IsLine())continue;
+                var av=edge.GetStartVertex() as Vertex;var bv=edge.GetEndVertex() as Vertex;if(av==null||bv==null)continue;
+                var a=av.GetPoint() as double[];var b=bv.GetPoint() as double[];if(!R72CapFinite(a)||!R72CapFinite(b))continue;
+                var d=AfjParametricRules.Sub(b,a);double length=R72CapNorm(d);if(!AfjTemporaryBoolean.Finite(length)||length<1e-9)continue;
+                var direction=AfjParametricRules.Scale(d,1/length);double projected=AfjParametricRules.Dot(direction,u),projection=Math.Abs(projected);
+                if(!AfjTemporaryBoolean.Finite(projection)||projection<1e-5)continue; // not an actual across-strip boundary
+                var adjacent=edge.GetTwoAdjacentFaces2() as Array;if(adjacent==null||!adjacent.Cast<object>().OfType<Face2>().Any(f=>Same(f,face)))continue;
+                if(Math.Abs(AfjParametricRules.Dot(AfjParametricRules.Sub(a,planePoint),normal))>1e-8||
+                    Math.Abs(AfjParametricRules.Dot(AfjParametricRules.Sub(b,planePoint),normal))>1e-8)continue;
+                double ha=ordinate(a),hb=ordinate(b),edgeLow=Math.Min(ha,hb),edgeHigh=Math.Max(ha,hb);
+                double overlapLow=Math.Max(edgeLow,h0),overlapHigh=Math.Min(edgeHigh,h1);if(overlapHigh-overlapLow<1e-9)continue;
+                double lowExtension=Math.Max(0,Math.Max(edgeLow-h0,h0-edgeHigh));
+                double highExtension=Math.Max(0,Math.Max(edgeLow-h1,h1-edgeHigh));
+                if(lowExtension>extension+1e-8||highExtension>extension+1e-8)continue;
+                double du=AfjParametricRules.Dot(d,u);if(!AfjTemporaryBoolean.Finite(du)||Math.Abs(du)<1e-9)continue;
+                var c0=AfjParametricRules.Add(a,AfjParametricRules.Scale(d,(h0-ha)/du));
+                var c1=AfjParametricRules.Add(a,AfjParametricRules.Scale(d,(h1-ha)/du));
+                if(!R72CapFinite(c0)||!R72CapFinite(c1)||axial(c0)-axial(polygon[q0])<=1e-9||axial(c1)-axial(polygon[q1])<=1e-9)continue;
+                // A real interior witness proves finite native authority; only
+                // the two separately certified transverse endpoints extend it.
+                var witness=AfjParametricRules.Add(a,AfjParametricRules.Scale(d,((overlapLow+overlapHigh)*.5-ha)/du));
+                if(!R72CapFinite(witness)||!R59InsideEdge(edge,witness)||!R59Inside(face,witness))continue;
+                var candidate=polygon.Select(p=>(double[])p.Clone()).ToArray();candidate[p0]=c0;candidate[p1]=c1;
+                // The other two reviewed seam vertices are untouched. Execute
+                // retains the original NormalCut Bend/adjacent-flat forecasts.
+                var proposedTool=new AfjToolDefinition{Polygon=candidate,Direction=(double[])originalTool.Direction.Clone(),Length=originalTool.Length,
+                    DepthPolicy=originalTool.DepthPolicy,ApiSheetThickness=originalTool.ApiSheetThickness,NominalSheetDepth=originalTool.NominalSheetDepth,SheetSlice=originalTool.SheetSlice};
+                var operation=new AfjCutOperation{Kind=step.Operation.Kind,NormalCutIntent=step.Operation.NormalCutIntent,
+                    OptimizeGeometryIntent=step.Operation.OptimizeGeometryIntent,EvidenceId="R72_LIVE_CAP_CLOSURE_FORECAST_CERTIFICATE"};operation.Tools.Add(proposedTool);var plan=new AfjCutPlan();plan.Operations.Add(operation);
+                var forecast=AfjTemporaryBoolean.Execute(App,AfjTemporaryBoolean.Copy(step.Before),plan);
+                if(forecast.Kept.Count!=1)continue;
+                double outside=AfjTemporaryBoolean.DifferenceVolume(forecast.Kept.Single(),step.Target);
+                double missing=AfjTemporaryBoolean.DifferenceVolume(step.Target,forecast.Kept.Single());
+                double symmetric=AfjNativeCutCommit.SymmetricDifference(forecast.Kept.Single(),step.Target);
+                Need(AfjTemporaryBoolean.Finite(outside)&&AfjTemporaryBoolean.Finite(missing)&&AfjTemporaryBoolean.Finite(symmetric),"R72 closure certificate produced nonfinite material differences");
+                if(outside>1e-12||missing>1e-12||symmetric>1e-12)
+                {
+                    Trace.WriteLine("[AFJ-R72] LIVE_CAP_CLOSURE_REJECTED slice="+meta.SliceId+" outside_m3="+outside.ToString("R",CultureInfo.InvariantCulture)+" missing_m3="+missing.ToString("R",CultureInfo.InvariantCulture)+" symmetric_m3="+symmetric.ToString("R",CultureInfo.InvariantCulture));continue;
+                }
+                var owners=adjacent.Cast<object>().OfType<Face2>().Select(f=>f.GetFeature() as Feature).Where(f=>f!=null).Select(f=>f.GetID()).Distinct().ToArray();
+                Trace.WriteLine("[AFJ-R72] LIVE_CAP_CLOSURE_FORECAST_CERTIFIED slice="+meta.SliceId+" adjacent_face_owner_ids="+String.Join(",",owners)+
+                    " cap_a="+String.Join(",",a.Select(v=>v.ToString("R",CultureInfo.InvariantCulture)))+" cap_b="+String.Join(",",b.Select(v=>v.ToString("R",CultureInfo.InvariantCulture)))+
+                    " cap_low="+String.Join(",",c0.Select(v=>v.ToString("R",CultureInfo.InvariantCulture)))+" cap_high="+String.Join(",",c1.Select(v=>v.ToString("R",CultureInfo.InvariantCulture)))+
+                    " projection="+projection.ToString("R",CultureInfo.InvariantCulture)+" low_transverse_extension_m="+lowExtension.ToString("R",CultureInfo.InvariantCulture)+" high_transverse_extension_m="+highExtension.ToString("R",CultureInfo.InvariantCulture)+
+                    " edge_length_extension_limit_m="+(extension/projection).ToString("R",CultureInfo.InvariantCulture)+" outside_m3="+outside.ToString("R",CultureInfo.InvariantCulture)+" missing_m3="+missing.ToString("R",CultureInfo.InvariantCulture)+" symmetric_m3="+symmetric.ToString("R",CultureInfo.InvariantCulture)+" native_normal_cut_shape_match=REQUIRED");
+                accepted.Add(new R72LiveCapClosure{Polygon=candidate,Support=edge,Low=c0,High=c1,Witness=witness,EdgeProjection=projection,
+                    LowTransverseExtension=lowExtension,HighTransverseExtension=highExtension,ForecastOutside=outside,ForecastMissing=missing,ForecastSymmetricDifference=symmetric});
+            }
+            // Do not pick a convenient nearest/parallel cap. Multiple native
+            // qualifying edges remain ambiguous in this bounded proposal.
+            Need(accepted.Count==1,"R72 prior-cut skin has no unique actual finite cap line with unchanged reviewed current-material forecast");return accepted[0];
+        }
+
+        private bool R72ProjectedCapSupports(Face2 face,Edge edge,double[] p0,double[] p1,double[] axis,double[] u,double extension)
+        {
+            if(face==null||edge==null||!R72CapFinite(p0)||!R72CapFinite(p1)||!AfjTemporaryBoolean.Finite(extension)||extension<=0)return false;
+            var curve=edge.GetCurve() as Curve;if(curve==null||!curve.IsLine())return false;
+            var av=edge.GetStartVertex() as Vertex;var bv=edge.GetEndVertex() as Vertex;var a=av==null?null:av.GetPoint() as double[];var b=bv==null?null:bv.GetPoint() as double[];
+            if(!R72CapFinite(a)||!R72CapFinite(b))return false;axis=AfjParametricRules.Unit(axis);u=AfjParametricRules.Unit(u);
+            var d=AfjParametricRules.Sub(b,a);double length=R72CapNorm(d);if(length<1e-9||Math.Abs(AfjParametricRules.Dot(d,u))/length<1e-5)return false;
+            var adjacent=edge.GetTwoAdjacentFaces2() as Array;if(adjacent==null||!adjacent.Cast<object>().OfType<Face2>().Any(f=>Same(f,face)))return false;
+            double station=AfjParametricRules.Dot(p0,axis);if(Math.Abs(AfjParametricRules.Dot(p1,axis)-station)>1e-8||Math.Abs(Math.Max(AfjParametricRules.Dot(a,axis),AfjParametricRules.Dot(b,axis))-station)>1e-8)return false;
+            var plane=R59NativePlane(face);if(plane==null)return false;var n=AfjParametricRules.Unit(plane.Take(3).ToArray());var origin=plane.Skip(3).ToArray();
+            if(new[]{a,b,p0,p1}.Any(p=>Math.Abs(AfjParametricRules.Dot(AfjParametricRules.Sub(p,origin),n))>1e-8))return false;
+            double ha=AfjParametricRules.Dot(a,u),hb=AfjParametricRules.Dot(b,u),lo=Math.Min(ha,hb),hi=Math.Max(ha,hb),h0=AfjParametricRules.Dot(p0,u),h1=AfjParametricRules.Dot(p1,u);
+            if(Math.Min(hi,Math.Max(h0,h1))-Math.Max(lo,Math.Min(h0,h1))<1e-9)return false;
+            if(new[]{h0,h1}.Any(h=>h<lo-extension-1e-8||h>hi+extension+1e-8))return false;
+            var midpoint=AfjParametricRules.Scale(AfjParametricRules.Add(a,b),.5);return R59InsideEdge(edge,midpoint)&&R59Inside(face,midpoint);
+        }
+        private Edge R72SelectProjectedCapIfNeeded(AfjSheetSliceMetadata meta,Face2 face,double[][] polygon,double radius)
+        {
+            if(!Intent.MeasuredContactOnly||!meta.MeasuredContactAuthority||(meta.Role!="LOCAL_WALL_INTERSECTION"&&meta.Role!="RETURN_MITER"))return null;
+            Need(polygon!=null&&polygon.Length==4&&polygon.All(R72CapFinite),"R72 projected cap requires exact unchanged finite axial contour");
+            var axis=AfjParametricRules.Unit(meta.UnitAxisNative);var u=AfjParametricRules.Unit(AfjParametricRules.Sub(meta.SegmentEndNative,meta.SegmentStartNative));
+            Need(Math.Abs(AfjParametricRules.Dot(axis,u))<1e-8,"R72 actual strip ordinate must be transverse to Frame axis");
+            var low=polygon.OrderBy(p=>AfjParametricRules.Dot(p,u)).Take(2).OrderBy(p=>AfjParametricRules.Dot(p,axis)).ToArray();
+            var high=polygon.OrderByDescending(p=>AfjParametricRules.Dot(p,u)).Take(2).OrderBy(p=>AfjParametricRules.Dot(p,axis)).ToArray();
+            var p0=low[1];var p1=high[1];double extension=meta.ApiThickness+radius+AfjManufacturingConventions.SheetCutOverrun;
+            var raw=face.GetEdges() as Array;Need(raw!=null&&raw.Length<=64,"R72 bounded actual projected cap edge inventory required");var edges=raw.Cast<object>().OfType<Edge>().ToArray();
+            var legacy=edges.Where(edge=>R59ExtendedCapSupports(edge,p0,p1,axis,extension)).ToArray();if(legacy.Length==1)return null;Need(legacy.Length==0,"R72 existing native cap is ambiguous");
+            Need(!meta.MeasuredTerminalFreeEnd,"UNVERIFIED_PROJECTED_CAP_TERMINAL_FREE_END: separate native Pierce direction qualification required");
+            var candidates=edges.Where(edge=>R72ProjectedCapSupports(face,edge,p0,p1,axis,u,extension)).ToArray();
+            Need(candidates.Length==1,"R72 unchanged axial contour lacks one actual finite cap whose max-axis Vertex supplies its exact station");
+            Trace.WriteLine("[AFJ-R72] PROJECTED_CAP_FINITE_AUTHORITY slice="+meta.SliceId+" original_axial_contour_unchanged=True source_max_vertex_station_verified=True transverse_interval_within_api_t_R_overrun=True finite_edge_and_skin_witness=True material_certificate=PENDING");return candidates[0];
+        }
+
         private static bool R59ExtendedCapSupports(Edge edge,double[] p0,double[] p1,double[] frameAxis,double maximumExtension)
         {
             var curve=edge==null?null:edge.GetCurve() as Curve;if(curve==null||!curve.IsLine()||maximumExtension<=0)return false;
@@ -6075,7 +6289,11 @@ namespace ADDIN.Commands.AutoFrameJoint
             var a=av==null?null:av.GetPoint() as double[];var b=bv==null?null:bv.GetPoint() as double[];
             if(a==null||b==null||a.Length!=3||b.Length!=3)return false;
             var delta=AfjParametricRules.Sub(b,a);double length=Math.Sqrt(AfjParametricRules.Dot(delta,delta));if(length<1e-9)return false;
-            var direction=AfjParametricRules.Scale(delta,1/length);if(Math.Abs(AfjParametricRules.Dot(direction,frameAxis))>1e-7)return false;
+            var direction=AfjParametricRules.Scale(delta,1/length);
+            var span=AfjParametricRules.Sub(p1,p0);span=AfjParametricRules.Sub(span,AfjParametricRules.Scale(frameAxis,AfjParametricRules.Dot(span,frameAxis)));
+            double spanLength=Math.Sqrt(AfjParametricRules.Dot(span,span));if(spanLength<1e-9)return false;
+            double projection=Math.Abs(AfjParametricRules.Dot(direction,AfjParametricRules.Scale(span,1/spanLength)));if(projection<1e-5)return false;
+            maximumExtension/=projection;
             foreach(var point in new[]{p0,p1})
             {
                 double along=AfjParametricRules.Dot(AfjParametricRules.Sub(point,a),direction);
@@ -6308,15 +6526,15 @@ namespace ADDIN.Commands.AutoFrameJoint
                 OriginalSupportOwner = owner != null && Documents[index].Original.ContainsKey(owner.GetID()) };
             int wanted = owned.EvidenceId == "U_RULE:COVER_WEB_WALL" || owned.EvidenceId == "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN" ? 1 : 0;
             if(owned.EvidenceId.StartsWith("SHEET_SLICE:",StringComparison.Ordinal)||
-                owned.EvidenceId.StartsWith("MEASURED_MITER:",StringComparison.Ordinal))
+                (owned.EvidenceId.StartsWith("MEASURED_MITER:",StringComparison.Ordinal)||owned.EvidenceId.StartsWith("MEASURED_MIDPOINT:",StringComparison.Ordinal)))
             {
                 var evidence=SketchWriterResult.Reports.SingleOrDefault(r=>r.SketchFeatureId==owned.FeatureId&&r.SourceEvidenceId==owned.EvidenceId);
                 Need(evidence!=null&&evidence.Dimensions>=0&&String.Equals(evidence.SketchName,feature.Name,StringComparison.Ordinal)&&
                     String.Equals(evidence.SketchName,owned.ObservedName,StringComparison.Ordinal),
                     "Exact frame-qualified child/guide Sketch observation is missing or differs from its native Part-owned name");
                 wanted=evidence.Dimensions;
-                if(owned.EvidenceId.StartsWith("MEASURED_MITER:",StringComparison.Ordinal))
-                    Need(wanted==0&&evidence.Status=="PASS_NATIVE_R71_MEASURED_MITER_GUIDE",
+                if(owned.EvidenceId.StartsWith("MEASURED_MITER:",StringComparison.Ordinal)||owned.EvidenceId.StartsWith("MEASURED_MIDPOINT:",StringComparison.Ordinal))
+                    Need(wanted==0&&evidence.Status==(owned.EvidenceId.StartsWith("MEASURED_MIDPOINT:",StringComparison.Ordinal)?"PASS_NATIVE_R72_MEASURED_MIDPOINT_GUIDE":"PASS_NATIVE_R71_MEASURED_MITER_GUIDE"),
                         "Measured miter guide lost its native geometric zero-dimension proof");
             }
             SketchChecks.Add(row);
@@ -6358,7 +6576,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             else
             {
                 Need(MeasuredGuidesPrepared,"Measured native guide batch is incomplete");
-                var keys=new HashSet<string>(SketchWriterResult.Owned.Where(item=>item.EvidenceId.StartsWith("MEASURED_MITER:",StringComparison.Ordinal))
+                var keys=new HashSet<string>(SketchWriterResult.Owned.Where(item=>item.EvidenceId.StartsWith("MEASURED_MITER:",StringComparison.Ordinal)||item.EvidenceId.StartsWith("MEASURED_MIDPOINT:",StringComparison.Ordinal))
                     .Select(item=>(Same(item.Part,Documents[0].Model)?0:Same(item.Part,Documents[1].Model)?1:-1)+":"+item.EvidenceId),StringComparer.Ordinal);
                 Need(keys.SetEquals(RequiredMeasuredGuideKeys),"Measured guide inventory differs from exact reviewed miter requirements");
             }
@@ -6416,6 +6634,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal bool SeedOnFiniteTrim;
             internal double ClosestDistance;
             internal double MatingSheetOffsetDistance;
+            internal bool MatingProjectedThickness;
             internal bool MatingAxialPointRelation,MatingPierceRequired;
             internal double[] MatingPiercePointWorld;
             internal Datum MatingSecondPierce;
@@ -6814,6 +7033,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         private string IntendedName(string role)
         {
             if(role!=null&&role.StartsWith("SHEET_SLICE:",StringComparison.Ordinal))return _prefix+"_Sheet";
+            if(role!=null&&role.StartsWith("MEASURED_MIDPOINT:",StringComparison.Ordinal))return _prefix+"_MidpointGuide";
             if(role!=null&&role.StartsWith("MEASURED_MITER:",StringComparison.Ordinal))return _prefix+"_MiterGuide";
             switch(role)
             {
@@ -7068,6 +7288,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal string EvidenceId;
             internal bool RequireCoupledNormalPierce;
             internal bool MeasuredFiniteCell;
+            internal bool NativeObliqueCap;
+            internal bool NativeProjectedCap;
             internal bool MeasuredTerminalFreeEnd;
             internal double[] MeasuredFreeEndWorld,MeasuredFreeEndNormalWorld;
             internal bool MeasuredTerminalInherited;
@@ -7075,6 +7297,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal double ExpectedProjectedContourGap=Double.NaN;
             internal double[] MateAxisWorld;
             internal int MeasuredMiterGuideFeatureId=-1;
+            internal int MeasuredMidpointGuideFeatureId=-1;
+            internal double[] MeasuredMidpointWorld;
             internal double[] MeasuredMiterNearWorld,MeasuredMiterFarWorld;
             internal bool TerminalOverhangTrim;
             internal int TerminalAnchorStripIndex=-1;
@@ -7143,6 +7367,29 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(expected!=null&&expected.Length==16&&live!=null&&live.Length==16&&expected.All(AfjTemporaryBoolean.Finite)&&
                 !live.Where((v,i)=>!AfjTemporaryBoolean.Finite(v)||Math.Abs(v-expected[i])>1e-10).Any(),"R59 occurrence transform changed");
         }
+        private static bool R72ExactMidpointDefinition(ISldWorks app,Datum datum,object entity)
+        {
+            if(datum==null||datum.Kind!="R72_NATIVE_FULLY_CONSTRAINED_OWNED_MIDPOINT_POINT"||!(entity is SketchPoint)||!(datum.Native is SketchPoint))return false;
+            var part=datum.Component.GetModelDoc2() as ModelDoc2;var model=app.ActiveDoc as ModelDoc2;
+            if(part==null||model==null)return false;
+            var actual=(model.Extension.GetCorresponding2(entity) as SketchPoint)??(part.Extension.GetCorresponding2(entity) as SketchPoint)??(SketchPoint)entity;
+            var expected=(model.Extension.GetCorresponding2(datum.Native) as SketchPoint)??(part.Extension.GetCorresponding2(datum.Native) as SketchPoint)??(SketchPoint)datum.Native;
+            if(PointId(actual)!=PointId(expected))return false;
+            var actualOwner=actual.GetSketch() as Feature;var expectedOwner=expected.GetSketch() as Feature;
+            var owner=FindFeature(part,datum.OwnerFeatureId);var source=owner==null?null:owner.GetSpecificFeature2() as Sketch;
+            if(actualOwner==null||expectedOwner==null||owner==null||actualOwner.GetID()!=datum.OwnerFeatureId||expectedOwner.GetID()!=datum.OwnerFeatureId||
+                source==null||source.Is3D()||source.GetConstrainedStatus()!=(int)swConstrainedStatus_e.swFullyConstrained)return false;
+            actualOwner=(model.Extension.GetCorresponding2(actualOwner) as Feature)??actualOwner;
+            expectedOwner=(model.Extension.GetCorresponding2(expectedOwner) as Feature)??expectedOwner;
+            var token=part.Extension.GetPersistReference3(owner) as byte[];
+            var a=part.Extension.GetPersistReference3(actualOwner) as byte[];var b=part.Extension.GetPersistReference3(expectedOwner) as byte[];
+            int state=-1;var resolved=token==null?null:part.Extension.GetObjectByPersistReference3(token,out state) as Feature;
+            bool verified=token!=null&&token.Length>0&&a!=null&&b!=null&&state==0&&resolved!=null&&resolved.GetID()==datum.OwnerFeatureId&&
+                part.Extension.IsSamePersistentID(token,a)==1&&part.Extension.IsSamePersistentID(token,b)==1&&
+                Norm(Sub(new[]{actual.X,actual.Y,actual.Z},new[]{expected.X,expected.Y,expected.Z}))<1e-8;
+            Trace.WriteLine("[AFJ-R72] MIDPOINT_RELATION_NATIVE_OWNER_IDENTITY guide="+datum.OwnerFeatureId+" scoped_point_id="+PointId(actual)+" resolved_state="+state+" exact="+verified);
+            return verified;
+        }
         private static void R59External(Sketch sketch,int kind,object local,Datum datum,SketchReport report,ISldWorks app)
         {
             Need(Allowed(sketch,local,datum.Context).Contains(kind),"R59 requested geometric relation is not advertised: "+datum.Role);
@@ -7170,7 +7417,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     catch(Exception ex){Trace.WriteLine("[AFJ-R59] RELATION_VERTEX_PERSIST role="+datum.Role+" error="+ex.GetType().Name+" hr="+ex.HResult.ToString("X8"));}
                 }
             }
-            Need(definition!=null&&definition.Cast<object>().Any(e=>Same(app,e,datum.Context)||Same(app,e,datum.Native)),"R59 relation did not bind the actual Frame datum");
+            Need(definition!=null&&definition.Cast<object>().Any(e=>Same(app,e,datum.Context)||Same(app,e,datum.Native)||R72ExactMidpointDefinition(app,datum,e)),"R59 relation did not bind the actual Frame datum");
             report.MasterDefinitionIdentitiesVerified++;
         }
         private static double R71DrawingGap(WallSheetSliceRecipe r)
@@ -7339,6 +7586,11 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private static double[] R71Cross(double[] a,double[] b)
         {return new[]{a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};}
+        private static double[] R72WallTransverse(WallSheetSliceRecipe r)
+        {
+            var axis=Unit(r.FrameAxisWorld);var delta=Sub(r.ProfileWorld[3],r.ProfileWorld[0]);
+            return Unit(Sub(delta,Mul(axis,Dot(delta,axis))));
+        }
         private double[] R71WallMatingPlane(WallSheetSliceRecipe r)
         {
             if(r.MeasuredTerminalFreeEnd)
@@ -7354,10 +7606,12 @@ namespace ADDIN.Commands.AutoFrameJoint
                 "R71 measured miter requires its original fully constrained guide endpoints");
             var own=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);var ownNormal=Unit(own.Take(3).ToArray());
             var direction=Unit(Sub(r.MeasuredMiterFarWorld,r.MeasuredMiterNearWorld));
+            double separation=Dot(Sub(r.MeasuredMiterNearWorld,own.Skip(3).ToArray()),ownNormal);
             Need(Math.Abs(Dot(direction,ownNormal))<1e-8&&
-                Math.Abs(Dot(Sub(r.MeasuredMiterNearWorld,own.Skip(3).ToArray()),ownNormal))<1e-8,
-                "R71 measured miter guide does not lie on the actual own sheet plane");
-            return Unit(R71Cross(direction,ownNormal)).Concat(r.MeasuredMiterNearWorld).ToArray();
+                (Math.Abs(separation)<1e-8||r.UsePairedSkinClearance&&Math.Abs(Math.Abs(separation)-r.Thickness)<1e-8),
+                "Measured miter guide is not parallel to the certified 0/t entry skin");
+            var projected=Sub(r.MeasuredMiterNearWorld,Mul(ownNormal,separation));
+            return Unit(R71Cross(direction,ownNormal)).Concat(projected).ToArray();
         }
         private Datum R71OwnedMiterDatum(WallSheetSliceRecipe r)
         {
@@ -7370,10 +7624,14 @@ namespace ADDIN.Commands.AutoFrameJoint
                 guide.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&
                 guide.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0,
                 "R71 miter source guide lost native geometric constraint proof");
+            var ownPlane=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);var ownNormal=Unit(ownPlane.Take(3).ToArray());
+            double separation=Dot(Sub(r.MeasuredMiterNearWorld,ownPlane.Skip(3).ToArray()),ownNormal);
+            Need(Math.Abs(separation)<1e-8||r.UsePairedSkinClearance&&Math.Abs(Math.Abs(separation)-r.Thickness)<1e-8,"Owned guide not on certified parallel 0/t skin");
+            var projectedNear=Sub(r.MeasuredMiterNearWorld,Mul(ownNormal,separation));
             var delta=Sub(r.MeasuredMiterFarWorld,r.MeasuredMiterNearWorld);double length2=Dot(delta,delta);
-            double along=Dot(Sub(r.GapGuideEndWorld,r.MeasuredMiterNearWorld),delta)/length2;
+            double along=Dot(Sub(r.GapGuideEndWorld,projectedNear),delta)/length2;
             Need(along>=-1e-8&&along<=1+1e-8&&
-                Norm(Sub(Add(r.MeasuredMiterNearWorld,Mul(delta,along)),r.GapGuideEndWorld))<1e-8,
+                Norm(Sub(Add(projectedNear,Mul(delta,along)),r.GapGuideEndWorld))<1e-8,
                 "R71 miter gap foot is outside its exact finite owned bisector");
             var context=r.OwnComponent.GetCorresponding(line);
             Need(context is SketchSegment,"R71 measured miter guide occurrence context unavailable");
@@ -7510,6 +7768,62 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
             throw new InvalidOperationException("UNVERIFIED_RULE: mating skin lacks a persistent original-profile or owned-guide construction; do not anchor to a stock end that later cuts remove");
         }
+        private Datum R72OwnedGuideMatingAxialDatum(WallSheetSliceRecipe r)
+        {
+            var axis=Unit(r.FrameAxisWorld);var own=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);
+            var mate=R59Plane(_app,r.PeerComponent,r.PeerSupportFace);var n=Unit(own.Take(3).ToArray());var m=Unit(mate.Take(3).ToArray());
+            var o=own.Skip(3).ToArray();var p=mate.Skip(3).ToArray();double den=Dot(axis,m);
+            var seam=R71MeasuredContactSeamDirection(r);var cap=(r.NativeObliqueCap||r.NativeProjectedCap)?R72WallTransverse(r):Unit(Sub(R59VertexWorld(_app,r.OwnComponent,r.OwnCapEdge.GetEndVertex() as Vertex),
+                R59VertexWorld(_app,r.OwnComponent,r.OwnCapEdge.GetStartVertex() as Vertex)));
+            if(Math.Abs(den)<1e-5||Math.Abs(Math.Abs(Dot(seam,cap))-1)>1e-8)return null;
+            var part=r.PeerComponent.GetModelDoc2() as ModelDoc2;var ids=r.PeerGuideFeatureIds??new int[0];
+            Need(ids.Length<=4&&ids.Distinct().Count()==ids.Length,"Explicit bounded peer measured-guide IDs required");
+            var choices=new List<Datum>();var seen=new List<SketchPoint>();
+            foreach(int id in ids)
+            {
+                Need(OriginalIds(part).Contains(id),"Measured guide is outside the exact pre-child native history");
+                var f=FindFeature(part,id);var sk=f==null?null:f.GetSpecificFeature2() as Sketch;
+                Need(f!=null&&f.Name.StartsWith("AFJ_",StringComparison.Ordinal)&&sk!=null&&!sk.Is3D()&&
+                    sk.GetConstrainedStatus()==(int)swConstrainedStatus_e.swFullyConstrained&&
+                    sk.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&
+                    sk.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0,
+                    "Actual measured source guide must retain its native full3 geometric graph");
+                var inverse=sk.ModelToSketchTransform.Inverse() as MathTransform;Need(inverse!=null,"Measured guide transform missing");
+                var raw=sk.GetSketchSegments() as Array;Need(raw!=null&&raw.Length<256,"Bounded measured guide lines required");
+                foreach(var line in raw.Cast<object>().OfType<SketchLine>())foreach(var endpoint in new[]{line.GetStartPoint2() as SketchPoint,line.GetEndPoint2() as SketchPoint})
+                {
+                    if(endpoint==null||seen.Any(x=>Same(_app,x,endpoint)))continue;seen.Add(endpoint);
+                    var world=World(_app,Point(_app,new[]{endpoint.X,endpoint.Y,endpoint.Z},inverse),r.PeerComponent);
+                    if(Math.Abs(Dot(Sub(world,o),n))>1e-8)continue;
+                    double planeOffset=Dot(Sub(world,p),m);
+                    if(Math.Abs(planeOffset)>1e-8&&Math.Abs(Math.Abs(planeOffset)-r.PeerThickness)>1e-8)continue;
+                    double delta=Dot(Sub(world,r.GapGuideEndWorld),axis);
+                    if(Math.Abs(delta-planeOffset/den)>1e-8)continue;
+                    var context=r.PeerComponent.GetCorresponding(endpoint);Need(context is SketchPoint,"Exact measured-guide point occurrence missing");
+                    var token=part.Extension.GetPersistReference3(endpoint) as byte[];Need(token!=null&&token.Length>0,"Measured guide point persistent identity unavailable");
+                    int state;var resolved=part.Extension.GetObjectByPersistReference3(token,out state);
+                    Need(state==0&&resolved is SketchPoint&&Same(_app,resolved,endpoint),"Measured guide point persistent identity changed");
+                    double amount=Math.Abs(delta);
+                    choices.Add(new Datum{Component=r.PeerComponent,Native=endpoint,Context=context,OwnerFeatureId=id,
+                        Role="R72_MEASURED_BOUNDARY_CORNER_FOR_ACTUAL_MATING_PLANE_AXIAL_ORDINATE",Kind="FULL3_OWNED_MEASURED_GUIDE_NATIVE_POINT",
+                        SeedWorld=r.PeerSupportPointWorld,SeedOnFiniteTrim=true,MatingAxialPointRelation=true,
+                        MatingProjectedThickness=true,MatingSheetOffsetDistance=amount<1e-8?0:amount,
+                        MatingSheetOffsetEndWorld=amount<1e-8?null:Add(r.GapGuideEndWorld,Mul(axis,delta))});
+                    Trace.WriteLine("[AFJ-R72] OWNED_GUIDE_MATING_POINT guide="+id+" source_plane_offset_m="+planeOffset.ToString("R",CultureInfo.InvariantCulture)+
+                        " derived_axial_offset_m="+delta.ToString("R",CultureInfo.InvariantCulture)+" actual_axis_dot_mate_normal="+den.ToString("R",CultureInfo.InvariantCulture)+
+                        " full3_source=True persistent_state=0 finite_actual_mating_skin_authority_retained=True");
+                }
+            }
+            if(choices.Count==0)return null;
+            double best=choices.Min(c=>c.MatingSheetOffsetDistance);var picked=choices.Where(c=>Math.Abs(c.MatingSheetOffsetDistance-best)<1e-8).ToArray();
+            Func<Datum,double> signedOffset=c=>c.MatingSheetOffsetEndWorld==null?0:Dot(Sub(c.MatingSheetOffsetEndWorld,r.GapGuideEndWorld),axis);
+            Need(picked.All(c=>Math.Abs(signedOffset(c)-signedOffset(picked[0]))<1e-8),"Measured source guides specify conflicting axial ordinates");
+            // Distinct guide corners can share the identical mating-plane axial
+            // ordinate. Only that ordinate is constrained; every candidate has
+            // independently satisfied the same exact 0/t plane equation above.
+            return picked[0];
+        }
+
         private Datum R59MatingFiniteEdgeDatum(WallSheetSliceRecipe r)
         {
             if(r.MeasuredTerminalFreeEnd)return R71TerminalFreeEdgeDatum(r);
@@ -7528,6 +7842,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                     Trace.WriteLine("[AFJ-R71] MEASURED_ORTHOGONAL_MATING_AXIAL_SOURCE finite_actual_skin_witness=True whole_original_0_t_profile_required=True no_stock_edge_extrapolation=True");
                     return R59StableBaseProfileMatingDatum(r,null);
                 }
+            }
+            if(r.MeasuredFiniteCell&&r.RequireCoupledNormalPierce&&r.MateAxisWorld!=null&&
+                Math.Abs(Dot(Unit(r.FrameAxisWorld),Unit(r.MateAxisWorld)))>1e-7)
+            {
+                var stableGuide=R72OwnedGuideMatingAxialDatum(r);if(stableGuide!=null)return stableGuide;
             }
             if(r.RequireCoupledNormalPierce)return R71CoupledPierceDatum(r);
             if(r.TerminalOverhangTrim)
@@ -7583,6 +7902,21 @@ namespace ADDIN.Commands.AutoFrameJoint
             Trace.WriteLine("[AFJ-R59] MATING_EDGE_PROJECTION exact_mating_face=true finite_range=true offset_m="+bestOffset.ToString("R",CultureInfo.InvariantCulture));
             var finite=R59Datum(r.PeerComponent,selected,r.PeerSupportFace,selectedWitness,"MATING_FACE_FINITE_EDGE_PROJECTED_TO_OWN_SKIN");return R59StableBaseProfileMatingDatum(r,finite);
         }
+        private double[][] R72ProjectedCapReference(WallSheetSliceRecipe r,double[] actualA,double[] actualB)
+        {
+            if(!r.NativeProjectedCap)return new[]{actualA,actualB};
+            Need(!r.NativeObliqueCap&&r.MeasuredFiniteCell&&!r.MeasuredTerminalFreeEnd,"R72 projected cap requires certified unchanged measured contour and no unqualified free-end Pierce route");
+            var axis=Unit(r.FrameAxisWorld);var u=R72WallTransverse(r);var own=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);var n=Unit(own.Take(3).ToArray());var o=own.Skip(3).ToArray();
+            double station=Dot(r.ProfileWorld[0],axis);Need(Math.Abs(Dot(r.ProfileWorld[3],axis)-station)<1e-8&&Math.Abs(Math.Max(Dot(actualA,axis),Dot(actualB,axis))-station)<1e-8,"Projected cap station differs from actual maximum-axis native Vertex");
+            Need(new[]{actualA,actualB,r.ProfileWorld[0],r.ProfileWorld[3]}.All(p=>p!=null&&p.Length==3&&p.All(AfjTemporaryBoolean.Finite)&&Math.Abs(Dot(Sub(p,o),n))<1e-8),"Projected cap endpoints must remain on exact own skin plane");
+            var projectedA=Add(actualA,Mul(axis,station-Dot(actualA,axis)));var projectedB=Add(actualB,Mul(axis,station-Dot(actualB,axis)));var delta=Sub(projectedB,projectedA);
+            Need(Norm(delta)>1e-9&&Math.Abs(Math.Abs(Dot(Unit(delta),u))-1)<1e-8&&Math.Abs(Dot(delta,axis))<1e-8,"Actual cap projection has no finite genuinely transverse span");
+            double low=Math.Min(Dot(actualA,u),Dot(actualB,u)),high=Math.Max(Dot(actualA,u),Dot(actualB,u));double extension=r.Thickness+r.ApiBendRadius+AfjManufacturingConventions.SheetCutOverrun;
+            Need(new[]{r.ProfileWorld[0],r.ProfileWorld[3]}.All(p=>Dot(p,u)>=low-extension-1e-8&&Dot(p,u)<=high+extension+1e-8),"Projected cap corner exceeds actual finite endpoint height span plus API t+R+overrun");
+            R59Datum(r.OwnComponent,r.OwnCapEdge,r.OwnSupportFace,Mul(Add(actualA,actualB),.5),"FINITE_ACTUAL_EDGE_AUTHORITY_FOR_AXIAL_CAP_PROJECTION");
+            return new[]{projectedA,projectedB};
+        }
+
         private void R59ValidateWallRecipe(WallSheetSliceRecipe r)
         {
             Need(r!=null&&r.OwnComponent!=null&&r.PeerComponent!=null&&!Same(_app,r.OwnComponent,r.PeerComponent),"R59 two independent Frame occurrences required");
@@ -7600,8 +7934,10 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(r.FrameAxisWorld!=null&&r.FrameAxisWorld.Length==3&&Math.Abs(Dot(Unit(r.FrameAxisWorld),n))<1e-8,"R59 measured Frame axis must lie in own sheet plane");
             Need(r.OwnCapEdge!=null&&(r.OwnCapEdge.GetCurve() as Curve)!=null&&((Curve)r.OwnCapEdge.GetCurve()).IsLine(),"R59 actual finite straight stock cap required");
             var adjacent=r.OwnCapEdge.GetTwoAdjacentFaces2() as Array;Need(adjacent!=null&&adjacent.Cast<object>().OfType<Face2>().Any(f=>Same(_app,f,r.OwnSupportFace)),"R59 cap is not an edge of the chosen sheet Face");
-            var capA=R59VertexWorld(_app,r.OwnComponent,r.OwnCapEdge.GetStartVertex() as Vertex);var capB=R59VertexWorld(_app,r.OwnComponent,r.OwnCapEdge.GetEndVertex() as Vertex);
-            var capDirection=Unit(Sub(capB,capA));Need(Math.Abs(Dot(capDirection,Unit(r.FrameAxisWorld)))<1e-7,"R59 stock cap must be transverse to its measured Frame axis");
+            var actualCapA=R59VertexWorld(_app,r.OwnComponent,r.OwnCapEdge.GetStartVertex() as Vertex);var actualCapB=R59VertexWorld(_app,r.OwnComponent,r.OwnCapEdge.GetEndVertex() as Vertex);
+            var capReference=R72ProjectedCapReference(r,actualCapA,actualCapB);var capA=capReference[0];var capB=capReference[1];
+            var capDirection=Unit(Sub(capB,capA));double capProjection=Math.Abs(Dot(capDirection,R72WallTransverse(r)));
+            Need(capProjection>1e-5&&(r.NativeObliqueCap||Math.Abs(Dot(capDirection,Unit(r.FrameAxisWorld)))<1e-7),"Native cap must cross the exact measured strip with certified oblique material closure");
             var seamDirection=R71MeasuredContactSeamDirection(r);
             var mateNormal=Unit(peer.Take(3).ToArray());var matePoint=peer.Skip(3).ToArray();
             double firstOffset=Dot(Sub(p[1],matePoint),mateNormal),lastOffset=Dot(Sub(p[2],matePoint),mateNormal);
@@ -7651,16 +7987,19 @@ namespace ADDIN.Commands.AutoFrameJoint
             foreach(var seed in p)
             {
                 Need(Math.Abs(Dot(Sub(seed,origin),n))<1e-8,"R59 slice contour is off the chosen sheet plane");
+                bool outer=Norm(Sub(seed,p[0]))<1e-10||Norm(Sub(seed,p[3]))<1e-10;
+                if(r.NativeProjectedCap&&outer)continue; // max-Vertex station + finite source-height certificate above; unchanged material proof in transaction
                 var native=Point(_app,seed,inverse);var closest=r.OwnSupportFace.GetClosestPointOn(native[0],native[1],native[2]) as double[];
-                Need(closest!=null&&closest.Length>=3&&Norm(Sub(World(_app,closest.Take(3).ToArray(),r.OwnComponent),seed))<=capExtension+1e-8,"R59 virtual Bend-neighborhood contour is farther than measured t+R+0.10mm from its actual planar sheet skin");
+                double finiteLimit=r.NativeObliqueCap&&outer?capExtension/capProjection:capExtension;
+                Need(closest!=null&&closest.Length>=3&&Norm(Sub(World(_app,closest.Take(3).ToArray(),r.OwnComponent),seed))<=finiteLimit+1e-8,"Native contour lies outside its certified actual t+R+overrun transverse neighborhood");
             }
             double capLength=Norm(Sub(capB,capA));
             foreach(var seed in new[]{p[0],p[3]})
             {
                 double along=Dot(Sub(seed,capA),capDirection);var onLine=Add(capA,Mul(capDirection,along));
-                Need(Norm(Sub(seed,onLine))<1e-8&&along>=-capExtension-1e-8&&along<=capLength+capExtension+1e-8,"R59 old virtual corner is not on the measured cap supporting line within native t+R+0.10mm extension");
+                Need(Norm(Sub(seed,onLine))<1e-8&&along>=-capExtension/capProjection-1e-8&&along<=capLength+capExtension/capProjection+1e-8,"R59 old virtual corner is not on the measured cap supporting line within native t+R+0.10mm extension");
             }
-            R59Datum(r.OwnComponent,r.OwnCapEdge,r.OwnSupportFace,Mul(Add(capA,capB),.5),"FINITE_ACTUAL_CAP_MIDPOINT");
+            R59Datum(r.OwnComponent,r.OwnCapEdge,r.OwnSupportFace,Mul(Add(actualCapA,actualCapB),.5),"FINITE_ACTUAL_CAP_MIDPOINT");
             Need(r.GapGuideStartWorld!=null&&r.GapGuideEndWorld!=null&&Norm(Sub(r.GapGuideStartWorld,Mul(Add(p[1],p[2]),.5)))<1e-8&&
                 Math.Abs(Norm(Sub(r.GapGuideEndWorld,r.GapGuideStartWorld))-R71DrawingGap(r))<1e-8&&(R71DrawingGap(r)<1e-10||Math.Abs(Dot(Unit(Sub(r.GapGuideEndWorld,r.GapGuideStartWorld)),seamDirection))<1e-8),
                 "R59 independently solved manufacturing gap guide differs from mating geometry");
@@ -7697,7 +8036,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             var heightPlane=R59Plane(_app,component,actualFace);
             var nO=Unit(ownPlane.Take(3).ToArray());var pO=ownPlane.Skip(3).ToArray();
             var nH=Unit(heightPlane.Take(3).ToArray());var pH=heightPlane.Skip(3).ToArray();
-            var pOther=otherPlane.Skip(3).ToArray();var u=Unit(Sub(r.ProfileWorld[3],r.ProfileWorld[0]));
+            var pOther=otherPlane.Skip(3).ToArray();var u=R72WallTransverse(r);
             double denominator=Dot(u,nH),otherSupport=Dot(Sub(pOther,pO),nO);
             Need(Math.Abs(denominator)>1e-7&&Math.Abs(Dot(u,nO))<1e-8&&
                 Math.Abs(Dot(Unit(r.FrameAxisWorld),nH))<1e-8&&
@@ -7814,8 +8153,148 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
             throw new InvalidOperationException("UNVERIFIED_RULE: exact transverse skin has no persistent original-profile 0/t plane construction; do not use stock-end Vertex");
         }
+        private bool R72SameOwnedSketchEntity(object actual,object expected,Sketch owner)
+        {
+            if(actual==null||expected==null||owner==null)return false;
+            // Relation definitions are Part-native even while the active
+            // Sketch was acquired in Assembly edit context. Normalize the
+            // API correspondence before comparing durable owner identities.
+            actual=_model.Extension.GetCorresponding2(actual)??_longPart.Extension.GetCorresponding2(actual)??actual;
+            expected=_model.Extension.GetCorresponding2(expected)??_longPart.Extension.GetCorresponding2(expected)??expected;
+            owner=(_model.Extension.GetCorresponding2(owner) as Sketch)??(_longPart.Extension.GetCorresponding2(owner) as Sketch)??owner;
+            Sketch a,b;bool ids;
+            if(actual is SketchPoint&&expected is SketchPoint) {
+                ids=PointId((SketchPoint)actual)==PointId((SketchPoint)expected);a=((SketchPoint)actual).GetSketch();b=((SketchPoint)expected).GetSketch();
+            } else if(actual is SketchSegment&&expected is SketchSegment) {
+                ids=SegmentObjectId((SketchSegment)actual)==SegmentObjectId((SketchSegment)expected);a=((SketchSegment)actual).GetSketch();b=((SketchSegment)expected).GetSketch();
+            } else return false;
+            var fa=a as Feature;var fb=b as Feature;var fo=owner as Feature;
+            if(!ids||fa==null||fb==null||fo==null||fa.GetID()!=fo.GetID()||fb.GetID()!=fo.GetID())return false;
+            var token=_longPart.Extension.GetPersistReference3(fo) as byte[];
+            var ta=_longPart.Extension.GetPersistReference3(fa) as byte[];var tb=_longPart.Extension.GetPersistReference3(fb) as byte[];
+            return token!=null&&token.Length>0&&ta!=null&&tb!=null&&
+                _longPart.Extension.IsSamePersistentID(token,ta)==1&&_longPart.Extension.IsSamePersistentID(token,tb)==1;
+        }
+        private bool R72SamePendingSketchEntity(object actual,object expected,Sketch owner)
+        {
+            // Pending Assembly-edit entities and native definition entities
+            // have different persistent-reference contexts. Match their native
+            // entity IDs within this exact active owned Sketch, then repeat
+            // the durable Part-native definition proof after Sketch closure.
+            var active=_model.SketchManager.ActiveSketch;var af=active as Feature;var of=owner as Feature;
+            if(af==null||of==null||af.GetID()!=of.GetID()||!Same(_app,_assembly.GetEditTarget(),_longPart)||
+                !Same(_app,_assembly.GetEditTargetComponent(),_longFrame))return false;
+            if(actual is SketchPoint&&expected is SketchPoint) {
+                var a=(SketchPoint)actual;var b=(SketchPoint)expected;var sa=a.GetSketch() as Feature;var sb=b.GetSketch() as Feature;
+                return PointId(a)==PointId(b)&&sa!=null&&sb!=null&&sa.GetID()==of.GetID()&&sb.GetID()==of.GetID();
+            }
+            if(actual is SketchSegment&&expected is SketchSegment) {
+                var a=(SketchSegment)actual;var b=(SketchSegment)expected;var sa=a.GetSketch() as Feature;var sb=b.GetSketch() as Feature;
+                return SegmentObjectId(a)==SegmentObjectId(b)&&sa!=null&&sb!=null&&sa.GetID()==of.GetID()&&sb.GetID()==of.GetID();
+            }
+            return false;
+        }
+        private Datum R72OwnedMidpointHeightDatum(WallSheetSliceRecipe r,Sketch child,double[] seedSketch,bool axisX)
+        {
+            if(r.MeasuredMidpointGuideFeatureId<0)return null;
+            Need(r.MeasuredFiniteCell&&r.MeasuredMidpointWorld!=null&&r.MeasuredMidpointWorld.Length==3&&
+                r.MeasuredMidpointWorld.All(AfjTemporaryBoolean.Finite)&&child!=null&&!child.Is3D()&&
+                seedSketch!=null&&seedSketch.Length==3&&seedSketch.All(AfjTemporaryBoolean.Finite),
+                "R72 midpoint height requires its exact measured recipe and native 2D child");
+            var ownInverse=r.OwnComponent.GetTotalTransform(false).Inverse() as MathTransform;
+            Need(ownInverse!=null,"R72 midpoint height occurrence inverse unavailable");
+            Func<double[],double[]> local=w=>Point(_app,Point(_app,w,ownInverse),child.ModelToSketchTransform);
+            var expectedMidpointLocal=local(r.MeasuredMidpointWorld);int ordinate=axisX?1:0;
+            if(Math.Abs(seedSketch[ordinate]-expectedMidpointLocal[ordinate])>1e-8)return null;
+            Need(Math.Abs(seedSketch[2])<1e-8&&r.FrameAxisWorld!=null&&r.FrameAxisWorld.Length==3&&r.FrameAxisWorld.All(AfjTemporaryBoolean.Finite),
+                "R72 midpoint height target must lie on the actual child plane with a measured Frame axis");
+            var axis=Unit(Sub(local(Add(r.MeasuredMidpointWorld,Unit(r.FrameAxisWorld))),expectedMidpointLocal));
+            Need(Math.Abs(Math.Abs(axis[axisX?0:1])-1)<1e-7&&Math.Abs(axis[ordinate])<1e-7,
+                "R72 midpoint height must constrain only the transverse child coordinate");
+            Need(OriginalIds(_longPart).Contains(r.MeasuredMidpointGuideFeatureId),"R72 midpoint guide is not in the caller's exact pre-child history");
+            var feature=FindFeature(_longPart,r.MeasuredMidpointGuideFeatureId);var guide=feature==null?null:feature.GetSpecificFeature2() as Sketch;
+            Need(feature!=null&&feature.Name.StartsWith("AFJ_",StringComparison.Ordinal)&&guide!=null&&!guide.Is3D()&&
+                guide.GetConstrainedStatus()==(int)swConstrainedStatus_e.swFullyConstrained&&
+                guide.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&
+                guide.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0,
+                "R72 exact owned midpoint source is not a closed native fully constrained 2D guide");
+            int referenceType=0;var reference=guide.GetReferenceEntity(ref referenceType);
+            var supportFace=reference as Face2;var supportOwner=supportFace==null?null:supportFace.GetFeature() as Feature;
+            Need(referenceType==2&&supportFace!=null&&supportOwner!=null&&OriginalIds(_longPart).Contains(supportOwner.GetID()),
+                "R72 midpoint guide lost its actual original Face2 support owner");
+            var sourceInverse=guide.ModelToSketchTransform.Inverse() as MathTransform;Need(sourceInverse!=null,"R72 native midpoint source transform unavailable");
+            Func<SketchPoint,double[]> world=p=>World(_app,Point(_app,new[]{p.X,p.Y,p.Z},sourceInverse),r.OwnComponent);
+            var sourceOrigin=World(_app,Point(_app,new double[3],sourceInverse),r.OwnComponent);
+            var sourceNormal=Unit(Sub(World(_app,Point(_app,new[]{0d,0d,1d},sourceInverse),r.OwnComponent),sourceOrigin));
+            var ownPlane=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);var ownNormal=Unit(ownPlane.Take(3).ToArray());var ownOrigin=ownPlane.Skip(3).ToArray();
+            double planeDepth=Dot(Sub(sourceOrigin,ownOrigin),ownNormal);
+            Need(Math.Abs(Math.Abs(Dot(sourceNormal,ownNormal))-1)<1e-7&&
+                (Math.Abs(planeDepth)<1e-8||r.MeasuredTerminalEntryVerified&&r.UsePairedSkinClearance&&Math.Abs(Math.Abs(planeDepth)-r.Thickness)<1e-8),
+                "R72 midpoint source must be on the actual canonical own skin or its independently paired opposite entry skin");
+            var rawSegments=guide.GetSketchSegments() as Array;Need(rawSegments!=null&&rawSegments.Length==1,"R72 midpoint source must have one exact construction profile line");
+            var line=rawSegments.Cast<object>().OfType<SketchSegment>().SingleOrDefault();
+            Need(line is SketchLine&&line.ConstructionGeometry,"R72 midpoint source line is not the native construction geometry");
+            var firstPoint=SegmentStart(line);var secondPoint=SegmentEnd(line);var firstWorld=world(firstPoint);var secondWorld=world(secondPoint);
+            Need(Norm(Sub(secondWorld,firstWorld))>1e-7,"R72 midpoint original-profile construction line is degenerate");
+            var actualMidpointWorld=Mul(Add(firstWorld,secondWorld),.5);
+            Need(Norm(Sub(actualMidpointWorld,r.MeasuredMidpointWorld))<1e-8,
+                "R72 midpoint recipe changed the exact midpoint of its original native source line");
+            var rawPoints=guide.GetSketchPoints2() as Array;Need(rawPoints!=null&&rawPoints.Length<=16,"R72 bounded owned midpoint native point inventory unavailable");
+            var points=rawPoints.Cast<object>().OfType<SketchPoint>().Where(p=>!Same(_app,p,firstPoint)&&!Same(_app,p,secondPoint)&&
+                Norm(Sub(world(p),actualMidpointWorld))<1e-8).ToArray();
+            Need(points.Length==1,"R72 owned source lacks exactly one standalone actual midpoint SketchPoint");
+            var midpoint=points[0];var rawRelations=guide.RelationManager.GetRelations((int)swSketchRelationFilterType_e.swAll) as Array;
+            Need(rawRelations!=null,"R72 owned midpoint relation definitions unavailable");
+            var relations=rawRelations.Cast<object>().OfType<SketchRelation>().ToArray();
+            Need(relations.Any(relation=>{
+                if(relation.GetRelationType()!=(int)swConstraintType_e.swConstraintType_ATMIDDLE)return false;
+                var definition=relation.GetDefinitionEntities2() as Array;return definition!=null&&
+                    definition.Cast<object>().Any(e=>R72SameOwnedSketchEntity(e,midpoint,guide))&&definition.Cast<object>().Any(e=>R72SameOwnedSketchEntity(e,line,guide));
+            }),"R72 owned midpoint point is not natively constrained ATMIDDLE to the actual source line");
+            // Recover both immutable source points independently. An equal
+            // coordinate on an unrelated fully constrained guide cannot qualify.
+            var sourcePlane=sourceNormal.Concat(sourceOrigin).ToArray();
+            var first=R71OriginalProfileCorner(r.OwnComponent,firstWorld,sourcePlane,"R72_MIDPOINT_HEIGHT_ORIGINAL_PROFILE_FIRST_POINT");
+            var second=R71OriginalProfileCorner(r.OwnComponent,secondWorld,sourcePlane,"R72_MIDPOINT_HEIGHT_ORIGINAL_PROFILE_SECOND_POINT");
+            Need(first.OwnerFeatureId==second.OwnerFeatureId&&!Same(_app,first.Native,second.Native),
+                "R72 midpoint height source lost its distinct original base-profile endpoint identities");
+            var endpoints=new[]{firstPoint,secondPoint};var sources=new[]{first,second};
+            for(int i=0;i<2;i++)
+            {
+                var endpoint=endpoints[i];var datum=sources[i];
+                Need(relations.Any(relation=>{
+                    if(relation.GetRelationType()!=(int)swConstraintType_e.swConstraintType_COINCIDENT)return false;
+                    var definition=relation.GetDefinitionEntities2() as Array;return definition!=null&&
+                        definition.Cast<object>().Any(e=>R72SameOwnedSketchEntity(e,endpoint,guide))&&
+                        definition.Cast<object>().Any(e=>datum.Native is SketchPoint&&R72SameOwnedSketchEntity(e,datum.Native,((SketchPoint)datum.Native).GetSketch()));
+                }),"R72 midpoint height source endpoint is not Coincident to the actual original native profile point");
+            }
+            Need(relations.All(relation=>relation.GetRelationType()==(int)swConstraintType_e.swConstraintType_COINCIDENT||
+                relation.GetRelationType()==(int)swConstraintType_e.swConstraintType_ATMIDDLE),"R72 midpoint height source contains an unsupported native constraint");
+            Need(feature.GetFirstDisplayDimension()==null,"R72 midpoint height source contains a copied dimension");
+            var actualMidpointLocal=local(world(midpoint));
+            Need(Math.Abs(actualMidpointLocal[ordinate]-seedSketch[ordinate])<1e-8&&
+                Math.Abs(Math.Abs(actualMidpointLocal[2])-Math.Abs(planeDepth))<1e-8,
+                "R72 actual owned midpoint does not project to the independently selected transverse boundary");
+            midpoint=(_model.Extension.GetCorresponding2(midpoint) as SketchPoint)??(_longPart.Extension.GetCorresponding2(midpoint) as SketchPoint)??midpoint;
+            var context=r.OwnComponent.GetCorresponding(midpoint);Need(context is SketchPoint,"R72 owned midpoint occurrence point correspondence unavailable");
+            var projectedMidpoint=Sub(actualMidpointWorld,Mul(ownNormal,Dot(Sub(actualMidpointWorld,ownOrigin),ownNormal)));
+            Trace.WriteLine("[AFJ-R72] OWNED_MIDPOINT_HEIGHT_DATUM guide="+feature.GetID()+" point="+PointId(midpoint)+
+                " native_ATMIDDLE_definition=True original_profile_endpoint_identities=2 projected_skin_depth_m="+Math.Abs(planeDepth).ToString("R",CultureInfo.InvariantCulture)+
+                " relation="+(axisX?"HORIZPOINTS":"VERTPOINTS")+" only_transverse_coordinate=True copied_dimension=False");
+            return new Datum{Component=r.OwnComponent,Native=midpoint,Context=context,OwnerFeatureId=feature.GetID(),
+                Role="R72_OWNED_ORIGINAL_PROFILE_MIDPOINT_TRANSVERSE_ORDINATE",Kind="R72_NATIVE_FULLY_CONSTRAINED_OWNED_MIDPOINT_POINT",
+                PlaneWorld=sourcePlane,SeedWorld=projectedMidpoint,SeedOnFiniteTrim=true,HeightSheetThickness=0,HeightSourceSeedSketch=(double[])seedSketch.Clone()};
+        }
+
         private Datum R59FindMeasuredHeightDatum(WallSheetSliceRecipe r,Sketch sketch,double[] seedSketch,bool axisX,double[] measuredWorld,bool onOwnComponent,double[] measuredPlaneNormalWorld,int adjacentStripIndex)
         {
+            var midpoint=R72OwnedMidpointHeightDatum(r,sketch,seedSketch,axisX);
+            if(midpoint!=null) {
+                Need(measuredWorld==null&&!onOwnComponent&&measuredPlaneNormalWorld==null&&adjacentStripIndex<0,"Midpoint cannot replace a conflicting physical skin authority");
+                return midpoint;
+            }
+
             if(measuredWorld==null)
             {
                 Need(!onOwnComponent&&measuredPlaneNormalWorld==null&&adjacentStripIndex<0,"R59 authoritative boundary skin lacks its actual finite measured witness");
@@ -7824,7 +8303,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(!onOwnComponent||(measuredPlaneNormalWorld!=null&&measuredPlaneNormalWorld.Length==3&&measuredPlaneNormalWorld.All(AfjTemporaryBoolean.Finite)&&adjacentStripIndex>=0),
                 "R59 own adjacent-skin boundary requires explicit measured plane normal and neighboring strip authority");
             Need(measuredWorld.Length==3&&measuredWorld.All(AfjTemporaryBoolean.Finite),"R59 actual transverse skin witness is invalid");
-            var strip=Unit(Sub(r.ProfileWorld[3],r.ProfileWorld[0]));
+            var strip=R72WallTransverse(r);
             var ownInverse=r.OwnComponent.GetTotalTransform(false).Inverse() as MathTransform;
             var ownPlane=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);
             var ownNormal=Unit(ownPlane.Take(3).ToArray());var ownOrigin=ownPlane.Skip(3).ToArray();
@@ -7855,6 +8334,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         private Datum R59FindHeightDatum(WallSheetSliceRecipe r,Sketch sketch,double[] seedSketch,bool axisX)
         {
+            var midpoint=R72OwnedMidpointHeightDatum(r,sketch,seedSketch,axisX);if(midpoint!=null)return midpoint;
             // Native finite endpoint witnesses, including the peer's bend-height
             // limits, let a PARTIAL wall stop at contact height. No invented
             // height dimension and no extension to the non-contact upper wall.
@@ -7879,7 +8359,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                             // actual sheet plane. Establish finite live plane
                             // authority at this vertex, then use the immutable
                             // original base-profile ordinate and 0/t geometry.
-                            var strip=Unit(Sub(r.ProfileWorld[3],r.ProfileWorld[0]));
+                            var strip=R72WallTransverse(r);
                             var part=component.GetModelDoc2() as ModelDoc2;
                             var peerInverse=component.GetTotalTransform(false).Inverse() as MathTransform;
                             var nativeWitness=Point(_app,world,peerInverse);
@@ -7979,10 +8459,12 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var supportToken=part.Extension.GetPersistReference3(support.Native) as byte[];
                 Need(supportToken!=null&&supportToken.Length>0,"R71 original Face2 durable reference unavailable before Sketch mutation");
                 var capVertex0=r.OwnCapEdge.GetStartVertex() as Vertex;var capVertex1=r.OwnCapEdge.GetEndVertex() as Vertex;
-                var capWorld0=R59VertexWorld(_app,r.OwnComponent,capVertex0);var capWorld1=R59VertexWorld(_app,r.OwnComponent,capVertex1);
-                var cap=R59Datum(r.OwnComponent,r.OwnCapEdge,r.OwnSupportFace,Mul(Add(capWorld0,capWorld1),.5),"OWN_EXISTING_END_CAP_EDGE");
-                var capEndpoint0=R59Datum(r.OwnComponent,capVertex0,r.OwnSupportFace,capWorld0,"FINITE_OWN_CAP_ENDPOINT_0");
-                var capEndpoint1=R59Datum(r.OwnComponent,capVertex1,r.OwnSupportFace,capWorld1,"FINITE_OWN_CAP_ENDPOINT_1");
+                var actualCapWorld0=R59VertexWorld(_app,r.OwnComponent,capVertex0);var actualCapWorld1=R59VertexWorld(_app,r.OwnComponent,capVertex1);
+                var cap=R59Datum(r.OwnComponent,r.OwnCapEdge,r.OwnSupportFace,Mul(Add(actualCapWorld0,actualCapWorld1),.5),"OWN_EXISTING_END_CAP_EDGE");
+                var capEndpoint0=R59Datum(r.OwnComponent,capVertex0,r.OwnSupportFace,actualCapWorld0,"FINITE_OWN_CAP_ENDPOINT_0");
+                var capEndpoint1=R59Datum(r.OwnComponent,capVertex1,r.OwnSupportFace,actualCapWorld1,"FINITE_OWN_CAP_ENDPOINT_1");
+                var projectedCap=R72ProjectedCapReference(r,actualCapWorld0,actualCapWorld1);var capWorld0=projectedCap[0];var capWorld1=projectedCap[1];
+                var capAxisVertex=Dot(actualCapWorld0,Unit(r.FrameAxisWorld))>=Dot(actualCapWorld1,Unit(r.FrameAxisWorld))?capEndpoint0:capEndpoint1;
                 var mate=R59MatingFiniteEdgeDatum(r);
                 _model.ClearSelection2(true);Need(r.OwnComponent.Select4(false,null,false),"R59 target selection failed");int info=0;_assembly.EditPart2(true,false,ref info);
                 Need(Same(_app,_assembly.GetEditTarget(),part)&&Same(_app,_assembly.GetEditTargetComponent(),r.OwnComponent),"R59 exact Part edit failed");
@@ -8014,7 +8496,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Need(!mate.MatingPierceRequired||(r.RequireCoupledNormalPierce&&!withMatingThickness&&pierceStart!=null&&pierceEnd!=null&&
                     Math.Abs(pierceStart[2])+Math.Abs(pierceEnd[2])<1e-8&&Norm(Sub(pierceEnd,pierceStart))>1e-7),
                     "R71 finite Pierce native plane intersection is missing, degenerate, or incompatible with copied sheet-offset references");
-                Need(!withMatingThickness||(Math.Abs(mate.MatingSheetOffsetDistance-r.PeerThickness)<1e-8&&mate.MatingSheetOffsetEndWorld!=null),"R59 mating thickness parameter lacks actual API paired-skin authority");
+                var matingPlaneForThickness=R71WallMatingPlane(r);
+                double expectedMatingThickness=mate.MatingProjectedThickness?r.PeerThickness/Math.Abs(Dot(Unit(r.FrameAxisWorld),Unit(matingPlaneForThickness.Take(3).ToArray()))):r.PeerThickness;
+                Need(!withMatingThickness||(Math.Abs(mate.MatingSheetOffsetDistance-expectedMatingThickness)<1e-8&&mate.MatingSheetOffsetEndWorld!=null),"R59 mating thickness parameter lacks actual API paired-skin authority");
                 var thicknessEnd=withMatingThickness?local(mate.MatingSheetOffsetEndWorld):null;
                 row.MatingSheetThicknessParameters=withMatingThickness?1:0;
                 Need(q.Concat(new[]{ga,gb}).All(v=>Math.Abs(v[2])<1e-8),"R59 independently computed slice is not on native Face2 plane");
@@ -8023,7 +8507,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var heightOffsets=new[]{r.ContactLowDatumOffset,r.ContactHighDatumOffset};
                 var heightWitnesses=new[]{r.ContactLowDatumWorld,r.ContactHighDatumWorld};
                 var heightSeeds=new[]{q[0],q[3]};var worldHeightSeeds=new[]{p[0],p[3]};
-                var stripWorld=Unit(Sub(p[3],p[0]));var stripSketch=Unit(Sub(q[3],q[0]));
+                var stripWorld=R72WallTransverse(r);var heightDelta=Sub(q[3],q[0]);var stripSketch=Unit(Sub(heightDelta,Mul(axis,Dot(heightDelta,axis))));
                 var datumSeeds=heightSeeds.Select((seed,index)=>Sub(seed,Mul(stripSketch,heightOffsets[index]))).ToArray();
                 for(int hi=0;hi<2;hi++)
                 {
@@ -8051,6 +8535,29 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var limit0=R59FindMeasuredHeightDatum(r,sketch,datumSeeds[0],axisX,heightWitnesses[0],r.ContactLowDatumOnOwnComponent,r.ContactLowDatumPlaneNormalWorld,r.ContactLowDatumAdjacentStripIndex);
                 var limit1=R59FindMeasuredHeightDatum(r,sketch,datumSeeds[1],axisX,heightWitnesses[1],r.ContactHighDatumOnOwnComponent,r.ContactHighDatumPlaneNormalWorld,r.ContactHighDatumAdjacentStripIndex);
                 var heightDatumsForThickness=new[]{limit0,limit1};
+                double nativeCapProjection=Math.Abs(Dot(Unit(Sub(capLocal1,capLocal0)),stripSketch));
+                Need(nativeCapProjection>1e-5,"Native cap has no finite transverse height support");
+                if(r.NativeObliqueCap) {
+                    Need(heightOffsetIndices.Length==0,"UNVERIFIED_OBLIQUE_CAP_TRANSVERSE_PADDING: requires a separately verified projected gap construction");
+                    for(int hi=0;hi<heightDatumsForThickness.Length;hi++) {
+                        var datum=heightDatumsForThickness[hi];if(datum.HeightSheetThickness<=1e-10)continue;
+                        var source=datum.HeightSourceSeedSketch;var capDelta=Sub(capLocal1,capLocal0);
+                        Need(source!=null&&source.Length==3&&source.All(AfjTemporaryBoolean.Finite),"Oblique cap height source seed is unavailable");
+                        double signedTransverseOffset=Dot(Sub(source,datumSeeds[hi]),stripSketch);
+                        Need(Math.Abs(Math.Abs(signedTransverseOffset)-datum.HeightSheetThickness)<1e-8,
+                            "Actual source height ordinate differs from its certified transverse sheet offset");
+                        double lambda=Dot(Sub(source,capLocal0),stripSketch)/Dot(capDelta,stripSketch);
+                        var projectedSource=Add(capLocal0,Mul(capDelta,lambda));var projectedDelta=Sub(projectedSource,datumSeeds[hi]);
+                        double derivedProjectedHeightThickness=datum.HeightSheetThickness/nativeCapProjection;
+                        Need(projectedSource.All(AfjTemporaryBoolean.Finite)&&Math.Abs(projectedSource[2])<1e-8&&
+                            Math.Abs(Dot(Sub(projectedSource,source),stripSketch))<1e-8&&
+                            Math.Abs(Dot(projectedDelta,stripSketch)-signedTransverseOffset)<1e-8&&
+                            Math.Abs(Norm(projectedDelta)-derivedProjectedHeightThickness)<1e-8&&
+                            Norm(Sub(projectedDelta,Mul(Unit(capDelta),Dot(projectedDelta,Unit(capDelta)))))<1e-8,
+                            "Reintersected native cap height seed does not preserve source ordinate and projected physical guide length");
+                        datum.HeightSourceSeedSketch=projectedSource;
+                    }
+                }
                 // A terminal interval can begin exactly at the remaining
                 // stock-cap endpoint produced by the preceding contact Cut.
                 // That child point already has the actual native cap-Vertex
@@ -8087,8 +8594,25 @@ namespace ADDIN.Commands.AutoFrameJoint
                 for(int i=0;i<4;i++)if(!Same(_app,LineEnd(profile[i]),LineStart(profile[(i+1)%4])))AddRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,LineEnd(profile[i]),LineStart(profile[(i+1)%4]));
                 int heightRelation=axisX?(int)swConstraintType_e.swConstraintType_HORIZPOINTS:(int)swConstraintType_e.swConstraintType_VERTPOINTS;
                 int matingRelation=mate.MatingAxialPointRelation?(axisX?(int)swConstraintType_e.swConstraintType_VERTPOINTS:(int)swConstraintType_e.swConstraintType_HORIZPOINTS):(int)swConstraintType_e.swConstraintType_COINCIDENT;
-                R59External(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,LineStart(finiteCapLine),capEndpoint0,row,_app);
-                R59External(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,LineEnd(finiteCapLine),capEndpoint1,row,_app);
+                int extraCapReferenceCount=0,seamExternalReferenceDelta=0;int capReferenceBefore=row.MasterDefinitionIdentitiesVerified;
+                if(r.NativeProjectedCap)
+                {
+                    int axialCoordinateRelation=axisX?(int)swConstraintType_e.swConstraintType_VERTPOINTS:(int)swConstraintType_e.swConstraintType_HORIZPOINTS;
+                    R59External(sketch,axialCoordinateRelation,LineStart(finiteCapLine),capAxisVertex,row,_app);
+                    R59External(sketch,heightRelation,LineStart(finiteCapLine),capEndpoint0,row,_app);
+                    R59External(sketch,axialCoordinateRelation,LineEnd(finiteCapLine),capAxisVertex,row,_app);
+                    R59External(sketch,heightRelation,LineEnd(finiteCapLine),capEndpoint1,row,_app);
+                    Need(row.MasterDefinitionIdentitiesVerified-capReferenceBefore==4,"Projected cap requires all four actual native Vertex coordinate definition identities");
+                    extraCapReferenceCount=2;
+                    Need(Norm(Sub(new[]{LineStart(finiteCapLine).X,LineStart(finiteCapLine).Y,LineStart(finiteCapLine).Z},capLocal0))<1e-8&&Norm(Sub(new[]{LineEnd(finiteCapLine).X,LineEnd(finiteCapLine).Y,LineEnd(finiteCapLine).Z},capLocal1))<1e-8,"Four native Vertex coordinate relations moved the exact projected cap construction");
+                    row.Scope="R72_UNCHANGED_AXIAL_CONTOUR_PROJECTED_CAP_FOUR_NATIVE_VERTEX_COORDINATE_RELATIONS";
+                    Trace.WriteLine("[AFJ-R72] PROJECTED_CAP_VERTEX_COORDINATES_VERIFIED actual_max_axis_vertex=True actual_endpoint_heights=True external_definition_identities=4 no_convert_or_angle_dimension=True final_full3=REQUIRED");
+                }
+                else
+                {
+                    R59External(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,LineStart(finiteCapLine),capEndpoint0,row,_app);
+                    R59External(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,LineEnd(finiteCapLine),capEndpoint1,row,_app);
+                }
                 // CreateLine can merge identical native Sketch endpoints even
                 // with AddToDB. An endpoint is intrinsically on its own cap
                 // line and is already constrained by the verified native cap
@@ -8108,7 +8632,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                             Math.Abs(Dot(Sub(worldHeightSeeds[index],heightWitnesses[index]),stripWorld)-signedGap)<1e-8,
                             "R61 merged terminal cap point does not reproduce its actual finite-skin witness and signed AssemblyFitGap");
                     }
-                    Trace.WriteLine("[AFJ-R61] TERMINAL_HEIGHT_NATIVE_CAP_POINT height="+index+" actual_point_identity_merged=true native_vertex_coincident_already_verified=true signed_fit_gap_m="+signedGap.ToString("R",CultureInfo.InvariantCulture)+" redundant_gap_and_thickness_constraints_omitted=true");
+                    Trace.WriteLine("[AFJ-R61] TERMINAL_HEIGHT_NATIVE_CAP_POINT height="+index+" actual_point_identity_merged=true cap_reference_definition="+(r.NativeProjectedCap?"FOUR_NATIVE_VERTEX_COORDINATE_RELATIONS":"TWO_NATIVE_VERTEX_COINCIDENT_RELATIONS")+" signed_fit_gap_m="+signedGap.ToString("R",CultureInfo.InvariantCulture)+" redundant_gap_and_thickness_constraints_omitted=true");
                 }
                 for(int hi=0;hi<2;hi++)
                 {
@@ -8141,7 +8665,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                 if(mate.MatingPierceRequired)
                     AddRelation(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,profile[1],batch.Lines[pierceIndex]);
                 else if(Math.Abs(Math.Abs(Dot(measuredSeam,measuredCap))-1)<1e-8)
-                    R59External(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,profile[1],cap,row,_app);
+                {
+                    if(r.NativeProjectedCap){AddRelation(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,profile[1],finiteCapLine);seamExternalReferenceDelta=-1;}
+                    else R59External(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,profile[1],cap,row,_app);
+                }
                 else
                 {
                     Need(!mate.MatingAxialPointRelation&&(mate.Native is SketchSegment||mate.Native is Edge),
@@ -8205,7 +8732,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                     AddRelation(sketch,(int)swConstraintType_e.swConstraintType_PERPENDICULAR,thicknessGuide,profile[1]);
                 }
                 var heightThicknessDimensions=new List<int>();var thicknessMasters=new List<SketchSegment>();var thicknessValues=new List<double>();
-                if(withMatingThickness){thicknessMasters.Add(thicknessGuide);thicknessValues.Add(r.PeerThickness);}
+                if(withMatingThickness){thicknessMasters.Add(thicknessGuide);thicknessValues.Add(expectedMatingThickness);}
                 for(int gi=0;gi<heightThicknessIndices.Length;gi++)
                 {
                     int hi=heightThicknessIndices[gi];var heightThicknessGuide=batch.Lines[heightThicknessStart+gi];int gapIndex=Array.IndexOf(heightOffsetIndices,hi);
@@ -8216,9 +8743,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                     if(!endMerged)AddRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,LineEnd(heightThicknessGuide),finiteCapLine);
                     R59External(sketch,heightRelation,LineEnd(heightThicknessGuide),heightDatums[hi],row,_app);
                     AddRelation(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,heightThicknessGuide,finiteCapLine);
-                    double required=heightDatums[hi].HeightSheetThickness;int master=thicknessValues.FindIndex(value=>Math.Abs(value-required)<1e-8);
+                    double derivedProjectedHeightThickness=heightDatums[hi].HeightSheetThickness/(r.NativeObliqueCap?nativeCapProjection:1);int master=thicknessValues.FindIndex(value=>Math.Abs(value-derivedProjectedHeightThickness)<1e-8);
                     if(master>=0)AddRelation(sketch,(int)swConstraintType_e.swConstraintType_SAMELENGTH,heightThicknessGuide,thicknessMasters[master]);
-                    else {thicknessValues.Add(required);thicknessMasters.Add(heightThicknessGuide);heightThicknessDimensions.Add(gi);row.MatingSheetThicknessParameters++;}
+                    else {thicknessValues.Add(derivedProjectedHeightThickness);thicknessMasters.Add(heightThicknessGuide);heightThicknessDimensions.Add(gi);row.MatingSheetThicknessParameters++;}
                 }
                 CheckPolygon(profile,q);row.GapValue=drawingGap;row.RequiredNormalGap=r.LocalSeamGap;row.ProjectedClearanceValue=drawingGap;
                 if(r.RequireCoupledNormalPierce)row.Scope="R71_FINITE_COUPLED_NORMAL_PIERCE_WITH_DERIVED_PROJECTED_CLEARANCE";
@@ -8248,22 +8775,37 @@ namespace ADDIN.Commands.AutoFrameJoint
                     _model.ClearSelection2(true);Need(thicknessGuide.Select4(false,null),"R59 verified sheet-thickness guide selection failed");
                     var display=_model.AddDimension2(mate.MatingSheetOffsetEndWorld[0],mate.MatingSheetOffsetEndWorld[1],mate.MatingSheetOffsetEndWorld[2]) as DisplayDimension;
                     var dimension=display==null?null:display.GetDimension2(0) as Dimension;
-                    Need(dimension!=null&&dimension.DrivenState==(int)swDimensionDrivenState_e.swDimensionDriving&&Math.Abs(Math.Abs(dimension.SystemValue)-r.PeerThickness)<1e-8,"R59 API sheet-thickness parameter readback differs from genuine paired skins");
-                    dimension.Name="AFJ_MatingSheetThickness";row.MatingSheetThicknessDimensionName=dimension.FullName;
+                    Need(dimension!=null&&dimension.DrivenState==(int)swDimensionDrivenState_e.swDimensionDriving&&Math.Abs(Math.Abs(dimension.SystemValue)-expectedMatingThickness)<1e-8,"Actual paired-sheet projected thickness parameter readback differs");
+                    dimension.Name=mate.MatingProjectedThickness?"AFJ_ProjectedMatingSheetThickness":"AFJ_MatingSheetThickness";row.MatingSheetThicknessDimensionName=dimension.FullName;
                     _app.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate,oldPref);prefRead=false;
                     Need(Norm(Sub(new[]{LineStart(thicknessGuide).X,LineStart(thicknessGuide).Y,LineStart(thicknessGuide).Z},gb))<1e-8&&Norm(Sub(new[]{LineEnd(thicknessGuide).X,LineEnd(thicknessGuide).Y,LineEnd(thicknessGuide).Z},thicknessEnd))<1e-8,"R59 sheet-thickness construction changed the independently solved mating plane");
                 }
                 foreach(int gi in heightThicknessDimensions)
                 {
-                    int hi=heightThicknessIndices[gi];var heightThicknessGuide=batch.Lines[heightThicknessStart+gi];double actualThickness=heightDatums[hi].HeightSheetThickness;
+                    int hi=heightThicknessIndices[gi];var heightThicknessGuide=batch.Lines[heightThicknessStart+gi];double actualTransverseSheetOffset=heightDatums[hi].HeightSheetThickness;
+                    double derivedProjectedHeightThickness=actualTransverseSheetOffset/(r.NativeObliqueCap?nativeCapProjection:1);
                     oldPref=_app.GetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate);prefRead=true;_app.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate,false);
                     _model.ClearSelection2(true);Need(heightThicknessGuide.Select4(false,null),"R59 contact sheet-thickness guide selection failed");
-                    var annotation=Add(r.ProfileWorld[hi==0?0:3],Mul(stripWorld,actualThickness));var display=_model.AddDimension2(annotation[0],annotation[1],annotation[2]) as DisplayDimension;var dimension=display==null?null:display.GetDimension2(0) as Dimension;
-                    Need(dimension!=null&&dimension.DrivenState==(int)swDimensionDrivenState_e.swDimensionDriving&&Math.Abs(Math.Abs(dimension.SystemValue)-actualThickness)<1e-8,"R59 stable height sheet-thickness parameter differs from actual API paired skin");dimension.Name=(Math.Abs(actualThickness-r.Thickness)<1e-8||Math.Abs(actualThickness-r.PeerThickness)<1e-8?
-                        "AFJ_ContactSheetThickness_":"AFJ_ProjectedAdjacentSheetOffset_")+hi;
+                    var annotation=Add(r.ProfileWorld[hi==0?0:3],Mul(stripWorld,actualTransverseSheetOffset));var display=_model.AddDimension2(annotation[0],annotation[1],annotation[2]) as DisplayDimension;var dimension=display==null?null:display.GetDimension2(0) as Dimension;
+                    Need(dimension!=null&&dimension.DrivenState==(int)swDimensionDrivenState_e.swDimensionDriving&&Math.Abs(Math.Abs(dimension.SystemValue)-derivedProjectedHeightThickness)<1e-8,
+                        "Stable height guide dimension does not reproduce its derived physical length from actual paired skins and native cap projection");
+                    dimension.Name=r.NativeObliqueCap?"AFJ_ProjectedCapHeightThickness_"+hi:
+                        (Math.Abs(actualTransverseSheetOffset-r.Thickness)<1e-8||Math.Abs(actualTransverseSheetOffset-r.PeerThickness)<1e-8?"AFJ_ContactSheetThickness_":"AFJ_ProjectedAdjacentSheetOffset_")+hi;
+                    Trace.WriteLine("[AFJ-R72] PROJECTED_CAP_HEIGHT_PARAMETER api_own_thickness_m="+r.Thickness.ToString("R",CultureInfo.InvariantCulture)+
+                        " api_peer_thickness_m="+r.PeerThickness.ToString("R",CultureInfo.InvariantCulture)+" certified_transverse_sheet_offset_m="+actualTransverseSheetOffset.ToString("R",CultureInfo.InvariantCulture)+
+                        " cap_projection="+(r.NativeObliqueCap?nativeCapProjection:1).ToString("R",CultureInfo.InvariantCulture)+" derived_projected_height_thickness_m="+derivedProjectedHeightThickness.ToString("R",CultureInfo.InvariantCulture)+
+                        " observed_native_dimension_length_m="+Math.Abs(dimension.SystemValue).ToString("R",CultureInfo.InvariantCulture));
                     _app.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate,oldPref);prefRead=false;
                 }
-                foreach(int gi in Enumerable.Range(0,heightThicknessIndices.Length)){int hi=heightThicknessIndices[gi];var line=batch.Lines[heightThicknessStart+gi];Need(Norm(Sub(new[]{LineStart(line).X,LineStart(line).Y,LineStart(line).Z},datumSeeds[hi]))<1e-8&&Norm(Sub(new[]{LineEnd(line).X,LineEnd(line).Y,LineEnd(line).Z},heightDatums[hi].HeightSourceSeedSketch))<1e-8,"R59 original height-thickness chain moved the independent contact boundary");}
+                foreach(int gi in Enumerable.Range(0,heightThicknessIndices.Length)){
+                    int hi=heightThicknessIndices[gi];var line=batch.Lines[heightThicknessStart+gi];var a=new[]{LineStart(line).X,LineStart(line).Y,LineStart(line).Z};var b=new[]{LineEnd(line).X,LineEnd(line).Y,LineEnd(line).Z};
+                    Need(Norm(Sub(a,datumSeeds[hi]))<1e-8&&Norm(Sub(b,heightDatums[hi].HeightSourceSeedSketch))<1e-8,"Original height-thickness chain moved the independent contact boundary");
+                    double derivedProjectedHeightThickness=heightDatums[hi].HeightSheetThickness/(r.NativeObliqueCap?nativeCapProjection:1);var delta=Sub(b,a);
+                    Need(Math.Abs(Norm(delta)-derivedProjectedHeightThickness)<1e-8&&
+                        Math.Abs(Math.Abs(Dot(delta,stripSketch))-heightDatums[hi].HeightSheetThickness)<1e-8,
+                        "Observed native height guide does not preserve both physical projected length and actual source transverse offset");
+                    if(r.NativeObliqueCap){var direction=Unit(Sub(capLocal1,capLocal0));Need(Norm(Sub(delta,Mul(direction,Dot(delta,direction))))<1e-8,"Observed projected height guide left its actual native cap line");}
+                }
                 if(withEntryOffset)
                 {
                     var entryLine=batch.Lines[projectedEntryIndex];
@@ -8303,7 +8845,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Need(supportClosest!=null&&supportClosest.Length>=3&&Norm(Sub(supportClosest.Take(3).ToArray(),supportLocal))<1e-8,"R71 resolved exact support lost finite Face2 witness");
                 row.Dimensions=0;for(DisplayDimension d=closed.GetFirstDisplayDimension() as DisplayDimension;d!=null;d=closed.GetNextDisplayDimension(d) as DisplayDimension)Need(++row.Dimensions<64,"R59 sketch dimension bound exceeded");
                 row.NewPlanes=Planes(part)-beforePlanes;row.NoNewPlanes=row.NewPlanes==0;row.ContextRestored=Same(_app,_assembly.GetEditTarget(),_model);row.ExternalReferences=part.Extension.ListExternalFileReferencesCount();
-                Need(row.Dimensions==(withGap?1:0)+row.MatingSheetThicknessParameters+row.TransverseFitGapParameters+row.ProjectedEntrySkinOffsetParameters&&row.NoNewPlanes&&row.ContextRestored&&row.MasterDefinitionIdentitiesVerified==4+independentHeightRelations+(mate.MatingSourceLineExtended?1:0),"R59 native merged-endpoint/height reference proof or manufacturing parameter/Plane count incomplete");row.Status="PASS_NATIVE_R59_WALL_SHEET_SKETCH";
+                Need(row.Dimensions==(withGap?1:0)+row.MatingSheetThicknessParameters+row.TransverseFitGapParameters+row.ProjectedEntrySkinOffsetParameters&&row.NoNewPlanes&&row.ContextRestored&&row.MasterDefinitionIdentitiesVerified==4+extraCapReferenceCount+seamExternalReferenceDelta+independentHeightRelations+(mate.MatingSourceLineExtended?1:0),"R59 native merged-endpoint/height reference proof or manufacturing parameter/Plane count incomplete");row.Status="PASS_NATIVE_R59_WALL_SHEET_SKETCH";
             }
             catch(Exception ex){row.Status="FAIL_OR_UNVERIFIED";row.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;}
             finally{if(prefRead)try{_app.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate,oldPref);}catch(Exception ex){row.Status="FAIL_OR_UNVERIFIED";row.Error+=" PREFERENCE_RESTORE "+ex;}}
@@ -8312,12 +8854,13 @@ namespace ADDIN.Commands.AutoFrameJoint
 
         internal sealed class MeasuredMiterGuideRecipe
         {
+            internal bool MidpointOnly;
             internal string EvidenceId;
             internal Component2 OwnComponent,PeerComponent;
             internal Face2 OwnSupportFace,PeerSupportFace;
-            internal double[] OwnNearTangencyWorld,OwnFarTangencyWorld,MateFarTangencyWorld;
+            internal double[] OwnNearTangencyWorld,OwnFarTangencyWorld,MateFarTangencyWorld,MateNearTangencyWorld;
             internal double[] NearWorld,FarWorld,CornerWorld,OwnAxisWorld,MateAxisWorld;
-            internal double[] OwnNearProfileWorld,OwnFarProfileWorld,MateFarProfileWorld;
+            internal double[] OwnNearProfileWorld,OwnFarProfileWorld,MateFarProfileWorld,MateNearProfileWorld;
         }
         private Edge R71FiniteAxisEdge(Component2 component,Face2 face,double[] witness,double[] axis,string role)
         {
@@ -8380,11 +8923,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var assembly=assemblyModel as AssemblyDoc;var own=recipe.OwnComponent.GetModelDoc2() as ModelDoc2;var peer=recipe.PeerComponent.GetModelDoc2() as ModelDoc2;
                 Need(assembly!=null&&own!=null&&peer!=null&&!Same(app,own,peer)&&Same(app,app.ActiveDoc,assemblyModel)&&Same(app,assembly.GetEditTarget(),assemblyModel),"R71 exact source pair outside edit required");
                 Need(assemblyModel.SketchManager.ActiveSketch==null&&own.SketchManager.ActiveSketch==null&&peer.SketchManager.ActiveSketch==null,"R71 measured guide cannot replace an active Sketch");
-                Need(recipe.EvidenceId!=null&&recipe.EvidenceId.StartsWith("MEASURED_MITER:",StringComparison.Ordinal)&&uniqueGuidePrefix!=null&&uniqueGuidePrefix.StartsWith("AFJ_",StringComparison.Ordinal)&&uniqueGuidePrefix.Length<=48,"R71 bounded semantic guide role/prefix required");
+                Need(recipe.EvidenceId!=null&&recipe.EvidenceId.StartsWith(recipe.MidpointOnly?"MEASURED_MIDPOINT:":"MEASURED_MITER:",StringComparison.Ordinal)&&uniqueGuidePrefix!=null&&uniqueGuidePrefix.StartsWith("AFJ_",StringComparison.Ordinal)&&uniqueGuidePrefix.Length<=48,"R71 bounded semantic guide role/prefix required");
                 writer=new AfjUParametricSketchWriter{_app=app,_model=assemblyModel,_assembly=assembly,_longPart=own,_shortPart=peer,_longFrame=recipe.OwnComponent,_shortFrame=recipe.PeerComponent,_longOriginal=CloneOriginal(ownOriginalFeatureIds),_shortOriginal=CloneOriginal(peerOriginalFeatureIds),_prefix=uniqueGuidePrefix,_register=registerOwnedFeature,_confirmClosed=confirmClosedFeature,_stageSink=stageSink,_output=output};
                 output.NativeApi=true;output.RunPrefix=uniqueGuidePrefix;writer.ValidateTransactionHistory();writer.BeginNativeDatumRole(recipe.EvidenceId);
                 Need(!AfjNativeFeatureTraversal.Union(own).Any(f=>f.Name==writer.IntendedName(recipe.EvidenceId)),"R71 guide prefix collides with protected history");
-                var row=writer.R71WriteMeasuredMiterGuide(recipe);output.Reports.Add(row);Need(row.Status=="PASS_NATIVE_R71_MEASURED_MITER_GUIDE","R71 measured miter guide: "+row.Error);
+                var row=recipe.MidpointOnly?writer.R72WriteMeasuredMidpointGuide(recipe):writer.R71WriteMeasuredMiterGuide(recipe);output.Reports.Add(row);Need(row.Status==(recipe.MidpointOnly?"PASS_NATIVE_R72_MEASURED_MIDPOINT_GUIDE":"PASS_NATIVE_R71_MEASURED_MITER_GUIDE"),"R71 measured miter guide: "+row.Error);
                 writer.ValidateTransactionHistory();Need(output.Owned.Count==1&&output.Owned.All(o=>o.CallbackReturned&&o.ClosedOwnerVerified),"R71 one registered closed miter guide required");
                 output.NewPlanes=row.NewPlanes;output.Dimensions=row.Dimensions;output.Relations=row.Relations;output.ContextRestored=Same(app,assembly.GetEditTarget(),assemblyModel);
                 Need(output.NewPlanes==0&&output.Dimensions==0&&output.ContextRestored&&!output.UnresolvedCreation,"R71 geometric guide proof incomplete");
@@ -8398,6 +8941,127 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
             return output;
         }
+        private SketchReport R72WriteMeasuredMidpointGuide(MeasuredMiterGuideRecipe r)
+        {
+            var row=new SketchReport{Scope="R72_NATIVE_ORIGINAL_PROFILE_MIDPOINT_FACE2_ZERO_DIM_ZERO_PLANE",SourceEvidenceId=r.EvidenceId};
+            try
+            {
+                var part=_longPart;var beforeIds=Ids(part);int beforePlanes=Planes(part);
+                Need(r.EvidenceId!=null&&r.EvidenceId.StartsWith("MEASURED_MIDPOINT:",StringComparison.Ordinal),"R72 exact midpoint semantic role required");
+                var values=new[]{r.OwnNearProfileWorld,r.OwnFarProfileWorld,r.OwnNearTangencyWorld};
+                Need(values.All(v=>v!=null&&v.Length==3&&v.All(AfjTemporaryBoolean.Finite)),"R72 midpoint original endpoints and finite support witness required");
+                Need(Norm(Sub(r.OwnFarProfileWorld,r.OwnNearProfileWorld))>1e-7,"R72 original midpoint profile line is degenerate");
+                var ownPlane=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);
+                var first=R71OriginalProfileCorner(r.OwnComponent,r.OwnNearProfileWorld,ownPlane,"R72_NATIVE_MIDPOINT_ORIGINAL_PROFILE_FIRST_POINT");
+                var second=R71OriginalProfileCorner(r.OwnComponent,r.OwnFarProfileWorld,ownPlane,"R72_NATIVE_MIDPOINT_ORIGINAL_PROFILE_SECOND_POINT");
+                Need(!Same(_app,first.Native,second.Native)&&first.OwnerFeatureId==second.OwnerFeatureId,
+                    "R72 midpoint endpoints must be distinct actual points of one original base-profile Sketch");
+                var support=R59Datum(r.OwnComponent,r.OwnSupportFace,r.OwnSupportFace,r.OwnNearTangencyWorld,"R72_OWN_EXISTING_MIDPOINT_FACE_SUPPORT");
+                var supportToken=part.Extension.GetPersistReference3(support.Native) as byte[];
+                Need(supportToken!=null&&supportToken.Length>0,"R72 original midpoint support Face2 durable reference unavailable before Sketch mutation");
+                _model.ClearSelection2(true);Need(r.OwnComponent.Select4(false,null,false),"R72 midpoint target selection failed");int info=0;_assembly.EditPart2(true,false,ref info);
+                Need(Same(_app,_assembly.GetEditTarget(),part)&&Same(_app,_assembly.GetEditTargetComponent(),r.OwnComponent),"R72 midpoint exact Part edit failed");
+                _model.ClearSelection2(true);Need(((IEntity)support.Context).Select4(false,null),"R72 existing midpoint Face2 selection failed");
+                var sketch=OpenOwnedSketch(part,r.OwnComponent,r.EvidenceId);var feature=sketch as Feature;
+                Need(feature!=null&&!sketch.Is3D(),"R72 native 2D midpoint guide unavailable");
+                row.NativeApi=true;row.SketchFeatureId=feature.GetID();int rt=0;var reference=sketch.GetReferenceEntity(ref rt);row.SupportReferenceType=rt;
+                row.OwnSupportVerified=rt==2&&reference is Face2&&(Same(_app,reference,support.Native)||Same(_app,reference,support.Context));
+                Need(row.OwnSupportVerified,"R72 midpoint guide is not attached to actual existing Face2");
+                var inverse=r.OwnComponent.GetTotalTransform(false).Inverse() as MathTransform;
+                Need(inverse!=null,"R72 midpoint occurrence inverse unavailable");
+                Func<double[],double[]> local=w=>Point(_app,Point(_app,w,inverse),sketch.ModelToSketchTransform);
+                var a=local(r.OwnNearProfileWorld);var b=local(r.OwnFarProfileWorld);var midpoint=Mul(Add(a,b),.5);
+                var midpointWorld=Mul(Add(r.OwnNearProfileWorld,r.OwnFarProfileWorld),.5);
+                Need(new[]{a,b,midpoint}.All(v=>Math.Abs(v[2])<1e-8),"R72 original-profile midpoint seeds lie outside the existing own Face2 plane");
+                SketchSegment line=null;bool add=_model.SketchManager.AddToDB;
+                try
+                {
+                    _model.SketchManager.AddToDB=true;
+                    line=_model.SketchManager.CreateLine(a[0],a[1],0,b[0],b[1],0);
+                    Need(line!=null,"R72 midpoint construction line creation failed");line.ConstructionGeometry=true;
+                    Need(_model.SketchManager.CreatePoint(midpoint[0],midpoint[1],0)!=null,"R72 standalone midpoint creation failed");
+                }
+                finally{_model.SketchManager.AddToDB=add;}
+                var batch=Reacquire(feature,new[]{line},new[]{a},new[]{b},new[]{true},row);sketch=batch.Sketch;line=batch.Lines[0];
+                R59External(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(line),first,row,_app);
+                R59External(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentEnd(line),second,row,_app);
+                Need(Norm(Sub(new[]{SegmentStart(line).X,SegmentStart(line).Y,SegmentStart(line).Z},a))<1e-8&&
+                    Norm(Sub(new[]{SegmentEnd(line).X,SegmentEnd(line).Y,SegmentEnd(line).Z},b))<1e-8,
+                    "R72 actual original-profile endpoint relations moved the measured construction line");
+                // Source endpoint binding may replace point wrappers. Re-read the
+                // exact active Assembly Sketch; never relate the initial CreatePoint RCW.
+                var rawPoints=sketch.GetSketchPoints2() as Array;
+                Need(rawPoints!=null&&rawPoints.Length<=16,"R72 bounded active midpoint point inventory unavailable");
+                var activePoints=rawPoints.Cast<object>().OfType<SketchPoint>().ToArray();
+                var hits=activePoints.Where(p=>Norm(Sub(new[]{p.X,p.Y,p.Z},midpoint))<1e-8&&
+                    !Same(_app,p,SegmentStart(line))&&!Same(_app,p,SegmentEnd(line))).ToArray();
+                Need(hits.Length==1,"R72 exact native standalone midpoint is missing or ambiguous after source binding");
+                var middle=hits[0];string midpointId=PointId(middle);row.ReacquiredIsolatedPointCount++;row.ReacquiredIsolatedPointIds.Add(midpointId);
+                Need(Allowed(sketch,middle,line).Contains((int)swConstraintType_e.swConstraintType_ATMIDDLE),"R72 native midpoint relation is not advertised");
+                var midpointRelation=sketch.RelationManager.AddRelation(new[]{new DispatchWrapper(middle),new DispatchWrapper(line)},(int)swConstraintType_e.swConstraintType_ATMIDDLE) as SketchRelation;
+                Need(midpointRelation!=null&&midpointRelation.GetRelationType()==(int)swConstraintType_e.swConstraintType_ATMIDDLE,"R72 native geometric midpoint relation creation failed");
+                var midpointDefinitions=midpointRelation.GetDefinitionEntities2() as Array;
+                Need(midpointDefinitions!=null&&midpointDefinitions.Cast<object>().Any(e=>R72SamePendingSketchEntity(e,middle,sketch))&&
+                    midpointDefinitions.Cast<object>().Any(e=>R72SamePendingSketchEntity(e,line,sketch)),"R72 midpoint relation does not bind the actual standalone point and source construction line");
+                row.ConstraintStatus=sketch.GetConstrainedStatus();row.Relations=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+                row.Dangling=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling);row.Overdefining=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining);
+                Need(row.ConstraintStatus==(int)swConstrainedStatus_e.swFullyConstrained&&row.Dangling==0&&row.Overdefining==0&&row.MasterDefinitionIdentitiesVerified==2,
+                    "R72 actual original-profile midpoint guide is not native full3 with both external source identities");
+                Need(Norm(Sub(new[]{middle.X,middle.Y,middle.Z},midpoint))<1e-8,"R72 native midpoint relation changed the independently derived midpoint");
+                row.SeedGeometryUnchanged=true;_model.SketchManager.InsertSketch(true);_assembly.EditAssembly();var closed=FindFeature(part,row.SketchFeatureId);
+                Need(closed!=null&&!beforeIds.Contains(closed.GetID()),"R72 registered native midpoint guide ownership missing");
+                NameOwned(part,closed,r.EvidenceId);row.SketchName=closed.Name;row.SketchOwnerVerified=true;var final=closed.GetSpecificFeature2() as Sketch;
+                Need(final!=null&&!final.Is3D()&&final.GetConstrainedStatus()==(int)swConstrainedStatus_e.swFullyConstrained&&
+                    final.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&
+                    final.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0,"R72 closed midpoint guide lost native full3 constraints");
+                var finalSegments=final.GetSketchSegments() as Array;Need(finalSegments!=null&&finalSegments.Length==1,"R72 closed midpoint guide must have exactly one original-profile construction line");
+                var finalLine=finalSegments.Cast<object>().OfType<SketchSegment>().SingleOrDefault();
+                Need(finalLine is SketchLine&&finalLine.ConstructionGeometry&&SegmentObjectId(finalLine)==batch.Ids[0]&&
+                    Norm(Sub(new[]{SegmentStart(finalLine).X,SegmentStart(finalLine).Y,SegmentStart(finalLine).Z},a))<1e-8&&
+                    Norm(Sub(new[]{SegmentEnd(finalLine).X,SegmentEnd(finalLine).Y,SegmentEnd(finalLine).Z},b))<1e-8,
+                    "R72 closed midpoint source line changed its native identity or original-profile geometry");
+                var finalRawPoints=final.GetSketchPoints2() as Array;Need(finalRawPoints!=null&&finalRawPoints.Length<=16,"R72 bounded closed midpoint point inventory unavailable");
+                var finalPoints=finalRawPoints.Cast<object>().OfType<SketchPoint>().ToArray();
+                var finalMidpoints=finalPoints.Where(p=>Norm(Sub(new[]{p.X,p.Y,p.Z},midpoint))<1e-8&&
+                    !Same(_app,p,SegmentStart(finalLine))&&!Same(_app,p,SegmentEnd(finalLine))).ToArray();
+                Need(finalMidpoints.Length==1&&PointId(finalMidpoints[0])==midpointId,"R72 closed midpoint lost its exact standalone native point identity");
+                var finalMiddle=finalMidpoints[0];var finalRelations=final.RelationManager.GetRelations((int)swSketchRelationFilterType_e.swAll) as Array;
+                Need(finalRelations!=null&&finalRelations.Cast<object>().OfType<SketchRelation>().Any(relation=>{
+                    if(relation.GetRelationType()!=(int)swConstraintType_e.swConstraintType_ATMIDDLE)return false;
+                    var definition=relation.GetDefinitionEntities2() as Array;return definition!=null&&
+                        definition.Cast<object>().Any(e=>R72SameOwnedSketchEntity(e,finalMiddle,final))&&definition.Cast<object>().Any(e=>R72SameOwnedSketchEntity(e,finalLine,final));
+                }),"R72 closed midpoint lost the actual native point/construction-line ATMIDDLE definition");
+                row.AllPointsFullyConstrained=true;
+                row.Points.Add(new PointEvidence{Role="R72_ORIGINAL_PROFILE_GEOMETRIC_MIDPOINT",PointId=midpointId,ExpectedWorld=midpointWorld,
+                    ExpectedSketch=midpoint,ObservedSketch=new[]{finalMiddle.X,finalMiddle.Y,finalMiddle.Z},First=first,Second=second,
+                    FirstRelationType=(int)swConstraintType_e.swConstraintType_ATMIDDLE,Qualification="CLOSED_NATIVE_FULL3_POINT_AT_ORIGINAL_PROFILE_LINE_MIDPOINT"});
+                rt=0;reference=final.GetReferenceEntity(ref rt);
+                int supportState=-1;var liveSupport=part.Extension.GetObjectByPersistReference3(supportToken,out supportState) as Face2;
+                var liveOwner=liveSupport==null?null:liveSupport.GetFeature() as Feature;
+                object liveContext=liveSupport==null?null:r.OwnComponent.GetCorrespondingEntity(liveSupport);
+                var liveToken=liveSupport==null?null:part.Extension.GetPersistReference3(liveSupport) as byte[];
+                bool exactSupport=rt==2&&reference is Face2&&supportState==0&&liveOwner!=null&&liveOwner.GetID()==support.OwnerFeatureId&&
+                    liveToken!=null&&part.Extension.IsSamePersistentID(supportToken,liveToken)==1&&
+                    (Same(_app,reference,liveSupport)||liveContext is Face2&&Same(_app,((IEntity)liveContext).GetComponent(),r.OwnComponent)&&Same(_app,reference,liveContext));
+                Trace.WriteLine("[AFJ-R72] CLOSED_SUPPORT_DURABLE_ID role="+r.EvidenceId+" writer=MEASURED_MIDPOINT_GUIDE before_token_bytes="+supportToken.Length+
+                    " resolve_state="+supportState+" original_owner="+support.OwnerFeatureId+" actual_owner="+(liveOwner==null?-1:liveOwner.GetID())+" exact_native_or_occurrence_identity="+exactSupport);
+                Need(exactSupport,"R72 closed MEASURED_MIDPOINT_GUIDE lost exact persistent original Face2 support");RequireOriginalDatum(r.OwnComponent,liveOwner.GetID());
+                var supportInverse=r.OwnComponent.GetTotalTransform(false).Inverse() as MathTransform;
+                Need(supportInverse!=null,"R72 exact midpoint support occurrence inverse unavailable after Sketch closure");
+                var supportLocal=Point(_app,r.OwnNearTangencyWorld,supportInverse);var supportClosest=liveSupport.GetClosestPointOn(supportLocal[0],supportLocal[1],supportLocal[2]) as double[];
+                Need(supportClosest!=null&&supportClosest.Length>=3&&Norm(Sub(supportClosest.Take(3).ToArray(),supportLocal))<1e-8,
+                    "R72 resolved exact original MEASURED_MIDPOINT_GUIDE support lost its finite Face2 witness");
+                row.Dimensions=0;for(DisplayDimension d=closed.GetFirstDisplayDimension() as DisplayDimension;d!=null;d=closed.GetNextDisplayDimension(d) as DisplayDimension)Need(++row.Dimensions<64,"R72 midpoint guide dimension bound");
+                row.NewPlanes=Planes(part)-beforePlanes;row.NoNewPlanes=row.NewPlanes==0;row.NoDimensions=row.Dimensions==0;
+                row.ContextRestored=Same(_app,_assembly.GetEditTarget(),_model);row.ExternalReferences=part.Extension.ListExternalFileReferencesCount();
+                Need(row.NoDimensions&&row.NoNewPlanes&&row.ContextRestored&&row.MasterDefinitionIdentitiesVerified==2&&row.AllPointsFullyConstrained,
+                    "R72 midpoint guide requires two actual original-point sources, closed native full3, zero dimensions and no new Plane");
+                row.Status="PASS_NATIVE_R72_MEASURED_MIDPOINT_GUIDE";
+            }
+            catch(Exception ex){row.Status="FAIL_OR_UNVERIFIED";row.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;}
+            return row;
+        }
+
         private SketchReport R71WriteMeasuredMiterGuide(MeasuredMiterGuideRecipe r)
         {
             var row=new SketchReport{Scope="R71_NATIVE_ZERO_SKIN_PROFILE_CORNER_BISECTOR_EQUAL_LEGS_FACE2_ZERO_DIM_ZERO_PLANE",SourceEvidenceId=r.EvidenceId};
@@ -8407,15 +9071,28 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var values=new[]{r.OwnNearTangencyWorld,r.OwnFarTangencyWorld,r.MateFarTangencyWorld,r.NearWorld,r.FarWorld,r.CornerWorld,r.OwnAxisWorld,r.MateAxisWorld,
                     r.OwnNearProfileWorld,r.OwnFarProfileWorld,r.MateFarProfileWorld};
                 Need(values.All(v=>v!=null&&v.Length==3&&v.All(AfjTemporaryBoolean.Finite)),"R71 measured miter finite vectors required");
-                var a=Unit(r.OwnAxisWorld);var b=Unit(r.MateAxisWorld);Need(Math.Abs(Dot(a,b))<1e-8,"R71 equal-leg miter requires measured orthogonal frame axes");
+                var a=Unit(r.OwnAxisWorld);var b=Unit(r.MateAxisWorld);double cosine=Dot(a,b);bool oblique=Math.Abs(cosine)>1e-7;
+                Need(1-cosine*cosine>1e-8,"Measured miter requires well-conditioned nonparallel frame axes");
+                if(oblique){Need(r.MateNearTangencyWorld!=null&&r.MateNearProfileWorld!=null,"Oblique miter requires the fourth actual near-side source");row.Scope="R72_NATIVE_FOUR_PROFILE_BOUNDARY_INTERSECTIONS_FACE2_ZERO_DIM_ZERO_PLANE";}
                 var ownPlane=R59Plane(_app,r.OwnComponent,r.OwnSupportFace);var peerPlane=R59Plane(_app,r.PeerComponent,r.PeerSupportFace);var normal=Unit(ownPlane.Take(3).ToArray());
                 Need(Math.Abs(Math.Abs(Dot(normal,Unit(peerPlane.Take(3).ToArray())))-1)<1e-8&&
                     Math.Abs(Dot(Sub(ownPlane.Skip(3).ToArray(),peerPlane.Skip(3).ToArray()),normal))<1e-8&&
                     Math.Abs(Dot(a,normal))<1e-8&&Math.Abs(Dot(b,normal))<1e-8,"R71 guide requires actual coplanar own/peer skin supports");
-                Need(Norm(Sub(r.CornerWorld,Add(r.NearWorld,Mul(a,Dot(Sub(r.FarWorld,r.NearWorld),a)))))<1e-8&&
+                if(!oblique){Need(Norm(Sub(r.CornerWorld,Add(r.NearWorld,Mul(a,Dot(Sub(r.FarWorld,r.NearWorld),a)))))<1e-8&&
                     Norm(Sub(r.CornerWorld,r.NearWorld))>1e-7&&Math.Abs(Norm(Sub(r.CornerWorld,r.NearWorld))-Norm(Sub(r.FarWorld,r.CornerWorld)))<1e-8,
                     "R71 measured triangle does not reproduce a nondegenerate equal-leg bisector");
-                Need(Math.Abs(Math.Abs(Dot(Unit(Sub(r.FarWorld,r.CornerWorld)),b))-1)<1e-8,"R71 measured second miter leg does not follow actual mating axis");
+                Need(Math.Abs(Math.Abs(Dot(Unit(Sub(r.FarWorld,r.CornerWorld)),b))-1)<1e-8,"R71 measured second miter leg does not follow actual mating axis");}
+                else
+                {
+                    var corners=new[]{r.NearWorld,r.FarWorld};var ownSources=new[]{r.OwnNearProfileWorld,r.OwnFarProfileWorld};var peerSources=new[]{r.MateNearProfileWorld,r.MateFarProfileWorld};
+                    for(int j=0;j<2;j++)
+                    {
+                        var da=Sub(corners[j],ownSources[j]);var db=Sub(corners[j],peerSources[j]);
+                        Need(Norm(Sub(da,Mul(a,Dot(da,a))))<1e-8&&Norm(Sub(db,Mul(b,Dot(db,b))))<1e-8,
+                            "Oblique miter endpoint does not reproduce both original profile supporting-line intersections");
+                    }
+                    Need(Norm(Sub(r.FarWorld,r.NearWorld))>1e-7,"Oblique miter has coincident native corner seeds");
+                }
                 var ownNear=R71FiniteAxisEdge(r.OwnComponent,r.OwnSupportFace,r.OwnNearTangencyWorld,a,"OWN_NEAR");
                 var ownFar=R71FiniteAxisEdge(r.OwnComponent,r.OwnSupportFace,r.OwnFarTangencyWorld,a,"OWN_FAR");
                 var mateFar=R71FiniteAxisEdge(r.PeerComponent,r.PeerSupportFace,r.MateFarTangencyWorld,b,"MATE_FAR");
@@ -8423,6 +9100,13 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var nearAxis=R59Datum(r.OwnComponent,ownNear,r.OwnSupportFace,r.OwnNearTangencyWorld,"R71_FINITE_OWN_NEAR_AXIS");
                 var farOwn=R59Datum(r.OwnComponent,ownFar,r.OwnSupportFace,r.OwnFarTangencyWorld,"R71_FINITE_OWN_FAR_AXIS");
                 var farMate=R59Datum(r.PeerComponent,mateFar,r.PeerSupportFace,r.MateFarTangencyWorld,"R71_FINITE_MATE_FAR_AXIS");
+                Datum peerNearAxis=null,peerNearSource=null;
+                if(oblique)
+                {
+                    var peerNearEdge=R71FiniteAxisEdge(r.PeerComponent,r.PeerSupportFace,r.MateNearTangencyWorld,b,"MATE_NEAR");
+                    peerNearAxis=R59Datum(r.PeerComponent,peerNearEdge,r.PeerSupportFace,r.MateNearTangencyWorld,"R72_FINITE_MATE_NEAR_AXIS");
+                    peerNearSource=R71OriginalProfileCorner(r.PeerComponent,r.MateNearProfileWorld,ownPlane,"R72_NATIVE_MATE_NEAR_ZERO_SKIN_PROFILE_POINT");
+                }
                 var near=R71OriginalProfileCorner(r.OwnComponent,r.OwnNearProfileWorld,ownPlane,"R71_NATIVE_OWN_NEAR_ZERO_SKIN_PROFILE_POINT");
                 var ownSource=R71OriginalProfileCorner(r.OwnComponent,r.OwnFarProfileWorld,ownPlane,"R71_NATIVE_OWN_FAR_ZERO_SKIN_PROFILE_POINT");
                 var mateSource=R71OriginalProfileCorner(r.PeerComponent,r.MateFarProfileWorld,ownPlane,"R71_NATIVE_MATE_FAR_ZERO_SKIN_PROFILE_POINT");
@@ -8440,13 +9124,27 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var n=local(r.NearWorld);var f=local(r.FarWorld);var k=local(r.CornerWorld);
                 var nearSource=local(r.OwnNearProfileWorld);var farSource=local(r.OwnFarProfileWorld);var peerSource=local(r.MateFarProfileWorld);
                 Need(new[]{n,f,k,nearSource,farSource,peerSource}.All(v=>Math.Abs(v[2])<1e-8),"R71 virtual zero-skin guide seeds lie outside actual own Face2 plane");
-                var starts=new[]{n,n,k,nearSource,farSource,peerSource};var ends=new[]{f,k,f,n,f,f};var flags=new[]{true,true,true,true,true,true};
+                var peerNearSeed=oblique?local(r.MateNearProfileWorld):null;
+                var starts=oblique?new[]{n,nearSource,peerNearSeed,farSource,peerSource}:new[]{n,n,k,nearSource,farSource,peerSource};
+                var ends=oblique?new[]{f,n,n,f,f}:new[]{f,k,f,n,f,f};var flags=Enumerable.Repeat(true,starts.Length).ToArray();
                 Need(Enumerable.Range(0,starts.Length).All(i=>Norm(Sub(starts[i],ends[i]))>1e-7),"R71 virtual zero-skin construction has a zero-length source leg");
-                var lines=new SketchSegment[6];bool add=_model.SketchManager.AddToDB;
+                var lines=new SketchSegment[starts.Length];bool add=_model.SketchManager.AddToDB;
                 try{_model.SketchManager.AddToDB=true;for(int i=0;i<lines.Length;i++){lines[i]=_model.SketchManager.CreateLine(starts[i][0],starts[i][1],0,ends[i][0],ends[i][1],0);Need(lines[i]!=null,"R71 guide line creation failed");lines[i].ConstructionGeometry=true;}}
                 finally{_model.SketchManager.AddToDB=add;}
                 var batch=Reacquire(feature,lines,starts,ends,flags,row);sketch=batch.Sketch;lines=batch.Lines;
                 Action<SketchPoint,SketchPoint> merge=(x,y)=>{if(!Same(_app,x,y))AddRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,x,y);};
+                if(oblique)
+                {
+                    merge(SegmentEnd(lines[1]),SegmentStart(lines[0]));merge(SegmentEnd(lines[2]),SegmentStart(lines[0]));
+                    merge(SegmentEnd(lines[3]),SegmentEnd(lines[0]));merge(SegmentEnd(lines[4]),SegmentEnd(lines[0]));
+                    var sourceDatums=new[]{near,peerNearSource,ownSource,mateSource};var axes=new[]{nearAxis,peerNearAxis,farOwn,farMate};
+                    for(int j=0;j<4;j++)
+                    {
+                        R59External(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,SegmentStart(lines[j+1]),sourceDatums[j],row,_app);
+                        R59External(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,lines[j+1],axes[j],row,_app);
+                    }
+                }
+                else {
                 merge(SegmentStart(lines[0]),SegmentStart(lines[1]));merge(SegmentEnd(lines[1]),SegmentStart(lines[2]));
                 merge(SegmentEnd(lines[2]),SegmentEnd(lines[0]));merge(SegmentEnd(lines[3]),SegmentStart(lines[0]));
                 merge(SegmentEnd(lines[4]),SegmentEnd(lines[0]));merge(SegmentEnd(lines[5]),SegmentEnd(lines[0]));
@@ -8458,11 +9156,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                 R59External(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,lines[5],farMate,row,_app);
                 AddRelation(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,lines[1],lines[4]);
                 AddRelation(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,lines[2],lines[5]);
-                AddRelation(sketch,(int)swConstraintType_e.swConstraintType_SAMELENGTH,lines[1],lines[2]);
+                AddRelation(sketch,(int)swConstraintType_e.swConstraintType_SAMELENGTH,lines[1],lines[2]);}
                 for(int i=0;i<lines.Length;i++)Need(Norm(Sub(new[]{SegmentStart(lines[i]).X,SegmentStart(lines[i]).Y,SegmentStart(lines[i]).Z},starts[i]))<1e-8&&Norm(Sub(new[]{SegmentEnd(lines[i]).X,SegmentEnd(lines[i]).Y,SegmentEnd(lines[i]).Z},ends[i]))<1e-8,
                     "R71 native virtual-corner relations changed independently derived zero-skin geometry");
                 row.ConstraintStatus=sketch.GetConstrainedStatus();row.Relations=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);row.Dangling=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling);row.Overdefining=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining);
-                Need(row.ConstraintStatus==(int)swConstrainedStatus_e.swFullyConstrained&&row.Dangling==0&&row.Overdefining==0&&row.MasterDefinitionIdentitiesVerified==6,"R71 actual virtual zero-skin bisector guide is not valid native full3");
+                Need(row.ConstraintStatus==(int)swConstrainedStatus_e.swFullyConstrained&&row.Dangling==0&&row.Overdefining==0&&row.MasterDefinitionIdentitiesVerified==(oblique?8:6),"Actual virtual zero-skin boundary guide is not valid native full3");
                 row.SeedGeometryUnchanged=true;row.AllPointsFullyConstrained=true;_model.SketchManager.InsertSketch(true);_assembly.EditAssembly();var closed=FindFeature(part,row.SketchFeatureId);
                 Need(closed!=null&&!beforeIds.Contains(closed.GetID()),"R71 registered native guide ownership missing");NameOwned(part,closed,r.EvidenceId);row.SketchName=closed.Name;row.SketchOwnerVerified=true;var final=closed.GetSpecificFeature2() as Sketch;
                 Need(final!=null&&final.GetConstrainedStatus()==(int)swConstrainedStatus_e.swFullyConstrained&&final.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&final.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0,"R71 closed native guide lost constraints");
@@ -11601,19 +12299,36 @@ namespace ADDIN.Commands.AutoFrameJoint
         internal int EntryAdjacentStripIndex=-1;
         internal double[] EntryPointNative,EntryNormalNative;
 
+        // Native midpoint guide owns the computational boundary of two entry cuts.
+        internal bool MeasuredEntryPartition;
+        internal int MeasuredEntryPartitionSide=-1,MeasuredEntryAdjacentStripIndex=-1;
+        internal double MeasuredEntryMidpoint;
+        internal string MidpointEvidenceId;
+        internal bool MeasuredSecondaryObstruction;
+        internal int[][] MeasuredSecondaryAnchorProofs,MeasuredSecondaryPeerPaths;
+        internal double MeasuredSecondaryWitnessVolume;
+        internal double MeasuredSecondaryFlatLow,MeasuredSecondaryFlatHigh;
+        internal int[] MeasuredSecondaryBendAdjacent;
+        internal double[] MeasuredSecondaryBendWitnessVolumes;
+        internal int[] MeasuredSecondaryGapAdjacent;
+        internal double[] MeasuredSecondaryGapDistances,MeasuredSecondaryGapBounds;
+        internal double[][] MeasuredSecondaryFullAnnulusProofs;
         internal int[] MeasuredInheritedPath;
         internal bool MeasuredTerminalFreeEnd;
         internal double[] MeasuredFreeEndWorld,MeasuredFreeEndNormalWorld;
         // R71 connectivity qualification, independently re-read before mutation.
         internal int MeasuredFamilyOwnStripIndex=-1,MeasuredFamilyMateStripIndex=-1;
+        internal int[][] MeasuredEquivalentFamilyPairs;
         internal int MeasuredTerminalAnchorStripIndex=-1;
         internal bool MeasuredTerminalInherited;
         internal double MeasuredSelectedCellLow,MeasuredSelectedCellHigh;
         internal double SelectedAxialLow, SelectedAxialHigh;
         internal double AffineAxialBoundaryIntercept, AffineAxialBoundarySlope, OwnThicknessEnvelopeShift;
         internal double[] MiterOwnNearTangencyWorld, MiterOwnFarTangencyWorld, MiterMateFarTangencyWorld;
+        internal double[] MiterMateNearTangencyWorld;
         internal double[] MiterFarWorld, MiterNearWorld, MiterCornerWorld, MiterOwnAxisWorld, MiterMateAxisWorld;
         internal double[] MiterOwnNearProfileWorld,MiterOwnFarProfileWorld,MiterMateFarProfileWorld;
+        internal double[] MiterMateNearProfileWorld;
         internal readonly List<Body2> ApprovedFlatRemovalMasks = new List<Body2>();
         // R71 target hypothesis: t+.1 normal overrun must not pre-cut an
         // adjacent flat layer. Every mask is actual paired finite 0/t material;
@@ -11897,6 +12612,19 @@ namespace ADDIN.Commands.AutoFrameJoint
                 double origin=Dot(Sub(mate.WorldPlanePoint,own.WorldPlanePoint),own.WorldNormal);
                 double other=origin+mate.Thickness*Dot(mate.WorldNormal,own.WorldNormal);
                 if(Math.Min(own.Thickness,Math.Max(origin,other))-Math.Max(0,Math.Min(origin,other))<=Eps)return false;
+                if(Math.Abs(Dot(own.WorldAxis,mate.WorldAxis))>1e-7)
+                {
+                    // Exact finite footprint in the own axial/transverse frame.
+                    // Both peer coordinates depend on both own coordinates.
+                    var footprint=new List<double[]>{new[]{own.Low,0.0},new[]{own.High,0.0},new[]{own.High,own.Length},new[]{own.Low,own.Length}};
+                    var relative=Sub(own.WorldBase,mate.WorldBase);
+                    double ax=Dot(own.WorldAxis,mate.WorldAxis),av=Dot(own.WorldU,mate.WorldAxis),a0=Dot(relative,mate.WorldAxis);
+                    double tx=Dot(own.WorldAxis,mate.WorldU),tv=Dot(own.WorldU,mate.WorldU),t0=Dot(relative,mate.WorldU);
+                    footprint=Clip(footprint,ax,av,mate.Low-a0,true);footprint=Clip(footprint,ax,av,mate.High-a0,false);
+                    footprint=Clip(footprint,tx,tv,-t0,true);footprint=Clip(footprint,tx,tv,mate.Length-t0,false);
+                    if(footprint.Count<3||Area(footprint)<=1e-12)return false;
+                    low=footprint.Min(q=>q[1]);high=footprint.Max(q=>q[1]);coplanar=true;return high-low>Eps;
+                }
                 double mateLow=Dot(Sub(mate.WorldPlanePoint,own.WorldBase),own.WorldAxis);
                 double mateHigh=mateLow+mate.Length*Dot(mate.WorldU,own.WorldAxis);
                 if(Math.Min(own.High,Math.Max(mateLow,mateHigh))-Math.Max(own.Low,Math.Min(mateLow,mateHigh))<=Eps)return false;
@@ -12821,7 +13549,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             var adjacent=chain[adjacentIndex];double denominator=Dot(adjacent.Normal,own.U);
             Need(Math.Abs(denominator)>1e-7,"adjacent measured skin cannot define a transverse bound");
             double support=Dot(adjacent.A,adjacent.Normal)+adjacent.Thickness;
-            var independentlyMeasuredEntry=MeasuredTerminalEntry(own);
+            var independentlyMeasuredEntry=MeasuredOperationEntry(own,meta);
             double independentlyMeasuredEntryOffset=independentlyMeasuredEntry.Applicable&&independentlyMeasuredEntry.Opposite?own.Thickness:0;
             double expected=(support-Dot(Add(own.A,Mul(own.Normal,independentlyMeasuredEntryOffset)),adjacent.Normal))/denominator;
             Need(Math.Abs(final-expected)<Eps&&Plane(adjacent.Inner,adjacent.Normal,support),"extended contour bound differs from actual paired adjacent skin");
@@ -12840,6 +13568,10 @@ namespace ADDIN.Commands.AutoFrameJoint
                     "measured miter lacks its owned finite tangency construction");
                 Need(Dot(own.WorldNormal,mate.WorldNormal)>.999999&&Math.Abs(Dot(Sub(mate.WorldPlanePoint,own.WorldPlanePoint),own.WorldNormal))<Eps,
                     "miter no longer has the same aligned actual 0/t skin pair");
+                if(Math.Abs(Dot(own.WorldAxis,mate.WorldAxis))>1e-7)
+                    NonOrthogonalMeasuredBoundary(own,mate,meta,cover,out intercept,out slope);
+                else
+                {
                 var verified=new AfjSheetSliceMetadata();MeasuredMiter(own,mate,cover,0,own.Length,verified);
                 Need(Same(meta.MiterFarWorld,verified.MiterFarWorld)&&Same(meta.MiterNearWorld,verified.MiterNearWorld)&&
                     Same(meta.MiterOwnNearProfileWorld,verified.MiterOwnNearProfileWorld)&&Same(meta.MiterOwnFarProfileWorld,verified.MiterOwnFarProfileWorld)&&
@@ -12849,6 +13581,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 intercept=verified.AffineAxialBoundaryIntercept;
                 if(!cover)intercept-=AfjManufacturingConventions.AssemblyFitGap/Math.Abs(denominator);
                 slope=verified.AffineAxialBoundarySlope;
+                }
                 Need(Math.Abs(meta.OwnThicknessEnvelopeShift)<Eps,"coplanar miter has an unexplained through-thickness shift");
             }
             else
@@ -13055,7 +13788,11 @@ namespace ADDIN.Commands.AutoFrameJoint
                     var expected=new AfjToolDefinition{Polygon=polygon.Select(q=>NativePoint(strip,q[0],q[1])).ToArray(),Direction=strip.Normal,
                         Length=strip.Thickness+AfjManufacturingConventions.SheetCutOverrun,ApiSheetThickness=strip.Thickness,
                         NominalSheetDepth=strip.Thickness+AfjManufacturingConventions.SheetCutOverrun,DepthPolicy=Policy};
-                    ApplyTerminalEntryGeometry(strip,expected,MeasuredTerminalEntry(strip));
+                    var independentlySelectedEntry=new AfjSheetSliceMetadata{MeasuredEntryPartition=cell.EntryPartition,
+                        MeasuredEntryPartitionSide=cell.EntryPartitionSide,MeasuredEntryAdjacentStripIndex=cell.EntryAdjacentStripIndex,
+                        MeasuredEntryMidpoint=cell.EntryMidpoint,MeasuredSecondaryObstruction=cell.SecondaryObstruction,
+                        MeasuredSecondaryBendAdjacent=cell.SecondaryBendAdjacent,MeasuredSecondaryBendWitnessVolumes=cell.SecondaryBendWitnessVolumes};
+                    ApplyTerminalEntryGeometry(strip,expected,MeasuredOperationEntry(strip,independentlySelectedEntry));
                     int code;var positive=AfjTemporaryBoolean.Boolean(strip.Source,AfjTemporaryBoolean.CreatePrism(app,expected),
                         (int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R71_INDEPENDENT_POSITIVE_SELECTED_CELL");
                     volume=AfjTemporaryBoolean.Total(positive);
@@ -13063,7 +13800,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                 var matches=declared.Where(meta=>meta.MeasuredContactAuthority&&meta.StripIndex==strip.Index&&meta.MateStripIndex==mate.Index&&
                     meta.MeasuredFamilyOwnStripIndex==cell.FamilyOwn.Index&&meta.MeasuredFamilyMateStripIndex==cell.FamilyMate.Index&&
                     Math.Abs(meta.MeasuredSelectedCellLow-cell.Low)<Eps&&Math.Abs(meta.MeasuredSelectedCellHigh-cell.High)<Eps&&
-                    meta.MeasuredTerminalInherited==cell.Terminal&&
+                    meta.MeasuredTerminalInherited==cell.Terminal&&SameMeasuredEntryPartitionIdentity(cell,meta)&&
                     meta.MeasuredTerminalAnchorStripIndex==(cell.TerminalAnchor==null?-1:cell.TerminalAnchor.Index)).ToArray();
                 Need(matches.Length<=1,"selected finite contact cell was declared multiple times");
                 Need(volume<=1e-13||matches.Length==1,"UNVERIFIED_R71_MISSING_POSITIVE_SELECTED_CELL frame="+frame+
@@ -13074,14 +13811,14 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
         }
         static void VerifyMeasuredMember(ISldWorks app,Strip[] own,Strip[] mates,bool cover,string frame,AfjCutPlan plan,
-            List<AfjSheetSliceMetadata> declared,AfjBooleanResult result)
+            List<AfjSheetSliceMetadata> declared,AfjBooleanResult result,AfjBooleanResult peerCoverResult=null)
         {
             Need(result!=null&&result.Kept.Count==1&&plan!=null&&plan.Operations.Count<=64,"one measured KEEP solid and a bounded reviewed cell plan required");
             var allowed=new List<Body2>();var seen=new HashSet<AfjSheetSliceMetadata>();
             var directNativeBendStock=new Dictionary<string,List<Body2>>(StringComparer.Ordinal);
             // Re-read the full competing contact graph, not just each declared
             // mate plane. This rejects an otherwise valid but wrong inner wall.
-            var selectedCells=SelectedMeasuredCells(own,mates,cover);
+            var selectedCells=SelectedMeasuredCells(app,own,mates,cover,peerCoverResult);
             VerifyMeasuredCellCompleteness(app,selectedCells,cover,frame,declared);
             foreach(var operation in plan.Operations)
             {
@@ -13097,10 +13834,12 @@ namespace ADDIN.Commands.AutoFrameJoint
                     "measured cell frame/material/selected-stock identity changed");
                 var selected=selectedCells.Where(c=>c.Own==strip&&c.Mate==mate&&c.FamilyOwn.Index==meta.MeasuredFamilyOwnStripIndex&&
                     c.FamilyMate.Index==meta.MeasuredFamilyMateStripIndex&&Math.Abs(c.Low-meta.MeasuredSelectedCellLow)<Eps&&
-                    Math.Abs(c.High-meta.MeasuredSelectedCellHigh)<Eps&&c.Terminal==meta.MeasuredTerminalInherited&&c.FreeEnd==meta.MeasuredTerminalFreeEnd&&
+                    Math.Abs(c.High-meta.MeasuredSelectedCellHigh)<Eps&&SameMeasuredEntryPartitionIdentity(c,meta)&&
+                    c.Terminal==meta.MeasuredTerminalInherited&&c.FreeEnd==meta.MeasuredTerminalFreeEnd&&
                     (c.TerminalAnchor==null?-1:c.TerminalAnchor.Index)==meta.MeasuredTerminalAnchorStripIndex).ToArray();
                 Need(selected.Length==1,"measured operation is not the independently selected finite connectivity/envelope cell");
-                var cell=selected[0];double low=cell.Low,high=cell.High,a=cell.A,b=cell.B;bool coplanar=cell.Coplanar;
+                var cell=selected[0];VerifyMeasuredEntryPartitionMetadata(cell,meta,frame);VerifySecondaryObstructionMetadata(cell,meta,cover);Need(MeasuredFamiliesKey(meta.MeasuredEquivalentFamilyPairs)==MeasuredFamiliesKey(MeasuredCellFamilies(cell)),
+                    "measured equivalent-family proofs changed under independent native graph re-read");double low=cell.Low,high=cell.High,a=cell.A,b=cell.B;bool coplanar=cell.Coplanar;
                 if(cell.Terminal)
                 {
                     Need(cell.TerminalAnchor!=null&&cell.InheritedPath!=null&&cell.InheritedPath.Length>=2&&
@@ -13162,8 +13901,18 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(ga!=null&&gb!=null&&ga.SourceBody!=null&&gb.SourceBody!=null,"original native strip graphs required for independent validation");
             var aa=Read(ga.Profile,ga.SourceBody,ta,coverA?generated.OutWinner:generated.OutLoser,coverA?generated.Winner:generated.Loser,true);
             var bb=Read(gb.Profile,gb.SourceBody,tb,coverA?generated.OutLoser:generated.OutWinner,coverA?generated.Loser:generated.Winner,true);
-            VerifyMeasuredMember(app,aa,bb,coverA,"A",generated.Plan.A,generated.SheetSlices.A,a);
-            VerifyMeasuredMember(app,bb,aa,!coverA,"B",generated.Plan.B,generated.SheetSlices.B,b);
+            // Validate the independent covering authority first. Only its
+            // actual retained result may witness secondary losing cells.
+            if(coverA)
+            {
+                VerifyMeasuredMember(app,aa,bb,true,"A",generated.Plan.A,generated.SheetSlices.A,a);
+                VerifyMeasuredMember(app,bb,aa,false,"B",generated.Plan.B,generated.SheetSlices.B,b,a);
+            }
+            else
+            {
+                VerifyMeasuredMember(app,bb,aa,true,"B",generated.Plan.B,generated.SheetSlices.B,b);
+                VerifyMeasuredMember(app,aa,bb,false,"A",generated.Plan.A,generated.SheetSlices.A,a,b);
+            }
             VerifyKeeps(generated.SheetSlices,a,b);
             generated.MeasuredContactValidated=true;
         }
@@ -13222,10 +13971,116 @@ namespace ADDIN.Commands.AutoFrameJoint
             Need(Norm(Sub(Sub(point,edge.A),Mul(direction,coordinate)))<Eps&&coordinate>=-Eps&&coordinate<=length+Eps,
                 role+" lies outside its actual finite tangency edge");
         }
+
+        // R72: intersect actual virtual zero-skin longitudinal profile lines.
+        // The two member axes form an oblique basis, never an orthogonal one.
+        static double[] NonOrthogonalMiterIntersection(Strip own,Strip mate,double[] ownProfile,double[] mateProfile,string role,bool finiteStock)
+        {
+            var a=own.WorldAxis;var b=mate.WorldAxis;double c=Dot(a,b),determinant=1-c*c;
+            Need(determinant>Tiny,"nonorthogonal miter has parallel or ill-conditioned member axes");
+            var d=Sub(mateProfile,ownProfile);double da=Dot(d,a),db=Dot(d,b);
+            double lambda=(da-c*db)/determinant,mu=(c*da-db)/determinant;
+            var fromOwn=Add(ownProfile,Mul(a,lambda));var fromMate=Add(mateProfile,Mul(b,mu));
+            Need(fromOwn.All(AfjTemporaryBoolean.Finite)&&fromMate.All(AfjTemporaryBoolean.Finite)&&Norm(Sub(fromOwn,fromMate))<Eps,
+                role+" zero-skin longitudinal lines do not have a verified world intersection");
+            Need(Math.Abs(Dot(Sub(fromOwn,own.WorldPlanePoint),own.WorldNormal))<Eps&&
+                Math.Abs(Dot(Sub(fromOwn,mate.WorldPlanePoint),mate.WorldNormal))<Eps,
+                role+" intersection leaves an actual paired zero-skin plane");
+            if(finiteStock)
+            {
+                double ownAxial=Dot(Sub(fromOwn,own.WorldBase),a),mateAxial=Dot(Sub(fromOwn,mate.WorldBase),b);
+                Need(ownAxial>=own.Low-Eps&&ownAxial<=own.High+Eps&&mateAxial>=mate.Low-Eps&&mateAxial<=mate.High+Eps,
+                    role+" intersection lies outside a selected member's actual axial stock support");
+            }
+            return fromOwn;
+        }
+        static double[] NonOrthogonalMiterNormal(Strip own,double[] near,double[] far)
+        {
+            var seam=Sub(far,near);Need(Norm(seam)>Eps,"nonorthogonal miter has coincident near/far endpoints");
+            var raw=Cross(seam,own.WorldNormal);Need(Norm(raw)>Eps,"nonorthogonal miter has no in-plane seam normal");
+            var normal=Unit(raw);if(Dot(normal,own.WorldAxis)<0)normal=Mul(normal,-1);
+            Need(Dot(normal,own.WorldAxis)>Eps,"nonorthogonal miter cannot define an axial end boundary");
+            return normal;
+        }
+        static List<double[]> NonOrthogonalMeasuredMiter(Strip own,Strip mate,bool cover,double low,double high,AfjSheetSliceMetadata meta)
+        {
+            double c=Dot(own.WorldAxis,mate.WorldAxis);Need(1-c*c>Tiny,"nonorthogonal planar miter requires distinct in-plane member axes");
+            Need(own.Previous!=null&&own.Next!=null&&mate.Previous!=null&&mate.Next!=null,
+                "measured miter needs two actual formed bends on each paired zero skin");
+            MeasuredNativeBend(own.Previous,own);MeasuredNativeBend(own,own.Next);
+            MeasuredNativeBend(mate.Previous,mate);MeasuredNativeBend(mate,mate.Next);
+            var ownTransverse=Unit(Sub(mate.WorldAxis,Mul(own.WorldAxis,c)));
+            var mateTransverse=Unit(Sub(own.WorldAxis,Mul(mate.WorldAxis,c)));
+            var ownEnds=new[]{own.WorldPlanePoint,Add(own.WorldPlanePoint,Mul(own.WorldU,own.Length))};
+            var mateEnds=new[]{mate.WorldPlanePoint,Add(mate.WorldPlanePoint,Mul(mate.WorldU,mate.Length))};
+            var ownNearProfile=ownEnds.OrderBy(q=>Dot(q,ownTransverse)).First();
+            var ownFarProfile=ownEnds.OrderByDescending(q=>Dot(q,ownTransverse)).First();
+            var mateNearProfile=mateEnds.OrderBy(q=>Dot(q,mateTransverse)).First();
+            var mateFarProfile=mateEnds.OrderByDescending(q=>Dot(q,mateTransverse)).First();
+            Need(Dot(Sub(ownFarProfile,ownNearProfile),ownTransverse)>Eps&&Dot(Sub(mateFarProfile,mateNearProfile),mateTransverse)>Eps,
+                "nonorthogonal miter has no positive transverse profile width");
+            var ownNear=LongEdge(own,ownTransverse,false);var ownFar=LongEdge(own,ownTransverse,true);
+            var mateNear=LongEdge(mate,mateTransverse,false);var mateFar=LongEdge(mate,mateTransverse,true);
+            var near=NonOrthogonalMiterIntersection(own,mate,ownNearProfile,mateNearProfile,"near-near",true);
+            var far=NonOrthogonalMiterIntersection(own,mate,ownFarProfile,mateFarProfile,"far-far",true);
+            var corner=NonOrthogonalMiterIntersection(own,mate,ownNearProfile,mateFarProfile,"report-only near-far corner",false);
+            var normal=NonOrthogonalMiterNormal(own,near,far);double denominator=Dot(normal,own.WorldAxis),support=Dot(normal,near);
+            double a=(support-Dot(normal,own.WorldBase))/denominator,b=-Dot(normal,own.WorldU)/denominator;
+            meta.MiterOwnNearTangencyWorld=ownNear.Middle;meta.MiterOwnFarTangencyWorld=ownFar.Middle;
+            meta.MiterMateNearTangencyWorld=mateNear.Middle;meta.MiterMateFarTangencyWorld=mateFar.Middle;
+            meta.MiterOwnNearProfileWorld=ownNearProfile;meta.MiterOwnFarProfileWorld=ownFarProfile;
+            meta.MiterMateNearProfileWorld=mateNearProfile;meta.MiterMateFarProfileWorld=mateFarProfile;
+            meta.MiterNearWorld=near;meta.MiterFarWorld=far;meta.MiterCornerWorld=corner;
+            meta.MiterOwnAxisWorld=own.WorldAxis;meta.MiterMateAxisWorld=mate.WorldAxis;
+            meta.AffineAxialBoundaryIntercept=a;meta.AffineAxialBoundarySlope=b;
+            double shift=cover?0:-AfjManufacturingConventions.AssemblyFitGap/Math.Abs(denominator);
+            return Clip(new List<double[]>{new[]{own.Low,low},new[]{own.High+.001,low},new[]{own.High+.001,high},new[]{own.Low,high}},1,-b,a+shift,true);
+        }
+        // Re-read all profile/tangency identities and independently reconstruct
+        // the two corner intersections; no saved seam or angle bisector is trusted.
+        static void NonOrthogonalMeasuredBoundary(Strip own,Strip mate,AfjSheetSliceMetadata meta,bool cover,out double intercept,out double slope)
+        {
+            Need(meta.MiterMateNearProfileWorld!=null&&meta.MiterMateNearTangencyWorld!=null&&
+                meta.MiterOwnNearProfileWorld!=null&&meta.MiterOwnFarProfileWorld!=null&&meta.MiterMateFarProfileWorld!=null&&
+                meta.MiterOwnNearTangencyWorld!=null&&meta.MiterOwnFarTangencyWorld!=null&&meta.MiterMateFarTangencyWorld!=null&&
+                meta.MiterOwnAxisWorld!=null&&meta.MiterMateAxisWorld!=null&&meta.MiterCornerWorld!=null,
+                "nonorthogonal miter lacks both members' complete near/far zero-skin datums");
+            Need(own.Previous!=null&&own.Next!=null&&mate.Previous!=null&&mate.Next!=null,
+                "nonorthogonal miter lost its paired formed-bend topology");
+            MeasuredNativeBend(own.Previous,own);MeasuredNativeBend(own,own.Next);
+            MeasuredNativeBend(mate.Previous,mate);MeasuredNativeBend(mate,mate.Next);
+            double c=Dot(own.WorldAxis,mate.WorldAxis);Need(1-c*c>Tiny,"independent miter has parallel or ill-conditioned member axes");
+            var ownTransverse=Unit(Sub(mate.WorldAxis,Mul(own.WorldAxis,c)));
+            var mateTransverse=Unit(Sub(own.WorldAxis,Mul(mate.WorldAxis,c)));
+            var ownProfiles=new[]{own.WorldPlanePoint,Add(own.WorldPlanePoint,Mul(own.WorldU,own.Length))}.OrderBy(q=>Dot(q,ownTransverse)).ToArray();
+            var mateProfiles=new[]{mate.WorldPlanePoint,Add(mate.WorldPlanePoint,Mul(mate.WorldU,mate.Length))}.OrderBy(q=>Dot(q,mateTransverse)).ToArray();
+            Need(Dot(Sub(ownProfiles[1],ownProfiles[0]),ownTransverse)>Eps&&Dot(Sub(mateProfiles[1],mateProfiles[0]),mateTransverse)>Eps,
+                "independent miter has no positive transverse profile width");
+            var near=NonOrthogonalMiterIntersection(own,mate,ownProfiles[0],mateProfiles[0],"independent near-near",true);
+            var far=NonOrthogonalMiterIntersection(own,mate,ownProfiles[1],mateProfiles[1],"independent far-far",true);
+            var corner=NonOrthogonalMiterIntersection(own,mate,ownProfiles[0],mateProfiles[1],"independent report-only corner",false);
+            Need(Same(meta.MiterNearWorld,near)&&Same(meta.MiterFarWorld,far)&&Same(meta.MiterCornerWorld,corner)&&
+                Same(meta.MiterOwnNearProfileWorld,ownProfiles[0])&&Same(meta.MiterOwnFarProfileWorld,ownProfiles[1])&&
+                Same(meta.MiterMateNearProfileWorld,mateProfiles[0])&&Same(meta.MiterMateFarProfileWorld,mateProfiles[1])&&
+                Same(meta.MiterOwnNearTangencyWorld,LongEdge(own,ownTransverse,false).Middle)&&
+                Same(meta.MiterOwnFarTangencyWorld,LongEdge(own,ownTransverse,true).Middle)&&
+                Same(meta.MiterMateNearTangencyWorld,LongEdge(mate,mateTransverse,false).Middle)&&
+                Same(meta.MiterMateFarTangencyWorld,LongEdge(mate,mateTransverse,true).Middle)&&
+                Same(meta.MiterOwnAxisWorld,own.WorldAxis)&&Same(meta.MiterMateAxisWorld,mate.WorldAxis),
+                "nonorthogonal miter changed its independently re-read finite zero-skin profile/tangency identity");
+            var seam=Sub(far,near);Need(Norm(seam)>Eps,"independent miter has coincident endpoints");
+            var raw=Cross(seam,own.WorldNormal);Need(Norm(raw)>Eps,"independent miter has no actual seam normal");
+            var normal=Unit(raw);if(Dot(normal,own.WorldAxis)<0)normal=Mul(normal,-1);
+            double denominator=Dot(normal,own.WorldAxis);Need(denominator>Eps,"independent seam cannot define an axial end boundary");
+            intercept=(Dot(normal,near)-Dot(normal,own.WorldBase))/denominator;
+            slope=-Dot(normal,own.WorldU)/denominator;
+            if(!cover)intercept-=AfjManufacturingConventions.AssemblyFitGap/Math.Abs(denominator);
+        }
         static List<double[]> MeasuredMiter(Strip own,Strip mate,bool cover,double low,double high,AfjSheetSliceMetadata meta)
         {
             Need(Dot(own.WorldNormal,mate.WorldNormal)>.999999&&Math.Abs(Dot(Sub(mate.WorldPlanePoint,own.WorldPlanePoint),own.WorldNormal))<Eps,
                 "coplanar miter requires one aligned actual 0/t skin pair; opposite-side layers are not guessed");
+            if(Math.Abs(Dot(own.WorldAxis,mate.WorldAxis))>1e-7)return NonOrthogonalMeasuredMiter(own,mate,cover,low,high,meta);
             Need(Math.Abs(Dot(own.WorldAxis,mate.WorldAxis))<Eps&&Math.Abs(Dot(own.WorldU,mate.WorldAxis))>.999999,
                 "measured planar miter needs orthogonal in-plane member axes");
             Need(own.Previous!=null&&own.Next!=null&&mate.Previous!=null&&mate.Next!=null,
@@ -13268,11 +14123,29 @@ namespace ADDIN.Commands.AutoFrameJoint
                 MateSupportPointWorld=Point(mate.Support,mate.Transform),MateOppositeSupportPointWorld=Point(Add(mate.Support,Mul(mate.Normal,mate.Thickness)),mate.Transform) };
             if(cell!=null)
             {
+                meta.MeasuredEntryPartition=cell.EntryPartition;meta.MeasuredEntryPartitionSide=cell.EntryPartitionSide;
+                meta.MeasuredEntryAdjacentStripIndex=cell.EntryAdjacentStripIndex;meta.MeasuredEntryMidpoint=cell.EntryMidpoint;
+                meta.MidpointEvidenceId=cell.EntryPartition?"MEASURED_MIDPOINT:"+frame+":"+own.Index:null;
+                meta.MeasuredSecondaryObstruction=cell.SecondaryObstruction;
+                meta.MeasuredSecondaryAnchorProofs=cell.SecondaryAnchorProofs==null?null:cell.SecondaryAnchorProofs.Select(p=>(int[])p.Clone()).ToArray();
+                meta.MeasuredSecondaryPeerPaths=cell.SecondaryPeerPaths==null?null:cell.SecondaryPeerPaths.Select(p=>(int[])p.Clone()).ToArray();
+                meta.MeasuredSecondaryWitnessVolume=cell.SecondaryWitnessVolume;
+                meta.MeasuredSecondaryFlatLow=cell.SecondaryFlatLow;meta.MeasuredSecondaryFlatHigh=cell.SecondaryFlatHigh;
+                meta.MeasuredSecondaryBendAdjacent=cell.SecondaryBendAdjacent==null?null:(int[])cell.SecondaryBendAdjacent.Clone();
+                meta.MeasuredSecondaryBendWitnessVolumes=cell.SecondaryBendWitnessVolumes==null?null:(double[])cell.SecondaryBendWitnessVolumes.Clone();
+                meta.MeasuredSecondaryGapAdjacent=cell.SecondaryGapAdjacent==null?null:(int[])cell.SecondaryGapAdjacent.Clone();
+                meta.MeasuredSecondaryGapDistances=cell.SecondaryGapDistances==null?null:(double[])cell.SecondaryGapDistances.Clone();
+                meta.MeasuredSecondaryGapBounds=cell.SecondaryGapBounds==null?null:(double[])cell.SecondaryGapBounds.Clone();
+                meta.MeasuredSecondaryFullAnnulusProofs=cell.SecondaryFullAnnulusProofs==null?null:cell.SecondaryFullAnnulusProofs.Select(p=>p==null?null:(double[])p.Clone()).ToArray();
                 meta.MeasuredInheritedPath=cell.InheritedPath;meta.MeasuredTerminalFreeEnd=cell.FreeEnd;meta.MeasuredFreeEndWorld=cell.FreePoint;meta.MeasuredFreeEndNormalWorld=cell.FreeNormal;
                 meta.MeasuredFamilyOwnStripIndex=cell.FamilyOwn.Index;meta.MeasuredFamilyMateStripIndex=cell.FamilyMate.Index;
+                meta.MeasuredEquivalentFamilyPairs=MeasuredCellFamilies(cell).Select(pair=>(int[])pair.Clone()).ToArray();
                 meta.MeasuredTerminalInherited=cell.Terminal;meta.MeasuredTerminalAnchorStripIndex=cell.TerminalAnchor==null?-1:cell.TerminalAnchor.Index;
                 meta.MeasuredSelectedCellLow=low;meta.MeasuredSelectedCellHigh=high;
                 meta.ContactLowDatumWorld=cell.LowDatum;meta.ContactHighDatumWorld=cell.HighDatum;
+                meta.ContactLowDatumOnOwnComponent=cell.LowDatumOnOwn;meta.ContactHighDatumOnOwnComponent=cell.HighDatumOnOwn;
+                meta.ContactLowDatumPlaneNormalWorld=cell.LowDatumNormal;meta.ContactHighDatumPlaneNormalWorld=cell.HighDatumNormal;
+                meta.ContactLowDatumAdjacentStripIndex=cell.LowDatumAdjacent;meta.ContactHighDatumAdjacentStripIndex=cell.HighDatumAdjacent;
                 meta.ContactLowDatumOffset=cell.LowOffset;meta.ContactHighDatumOffset=cell.HighOffset;
                 meta.TransverseExtensions.AddRange(cell.Extensions);
             }
@@ -13281,9 +14154,11 @@ namespace ADDIN.Commands.AutoFrameJoint
             {
                 polygon=MeasuredMiter(own,mate,cover,low,high,meta);
                 meta.GuideEvidenceId="MEASURED_MITER:"+frame+":"+own.Index+":"+mate.Index;
-                meta.GuideEvidenceIds=new[]{meta.GuideEvidenceId};
-                var guidePolygon=Clip(new List<double[]>{new[]{own.Low,low},new[]{own.High+.001,low},new[]{own.High+.001,high},new[]{own.Low,high}},1,-meta.AffineAxialBoundarySlope,meta.AffineAxialBoundaryIntercept,true);
-                if(guidePolygon.Count>=3)
+                meta.GuideEvidenceIds=String.IsNullOrWhiteSpace(meta.MidpointEvidenceId)?new[]{meta.GuideEvidenceId}:new[]{meta.GuideEvidenceId,meta.MidpointEvidenceId};
+                // Every partition shares the original whole-wall miter datum.
+                double guideLow=meta.MeasuredEntryPartition?0:low,guideHigh=meta.MeasuredEntryPartition?own.Length:high;
+                var guidePolygon=Clip(new List<double[]>{new[]{own.Low,guideLow},new[]{own.High+.001,guideLow},new[]{own.High+.001,guideHigh},new[]{own.Low,guideHigh}},1,-meta.AffineAxialBoundarySlope,meta.AffineAxialBoundaryIntercept,true);
+                if(guidePolygon.Count>=3&&!guides.Operations.Any(existingGuide=>existingGuide.EvidenceId==meta.GuideEvidenceId))
                 {
                     var guide=new AfjCutOperation{EvidenceId=meta.GuideEvidenceId,Kind=AfjOperationKind.Cut,NormalCutIntent=true,RegionEvidence="MEASURED_FINITE_NATIVE_TANGENCY_EDGE_BISECTOR_DATUM_ONLY"};
                     guide.Tools.Add(new AfjToolDefinition{Polygon=guidePolygon.Select(p=>NativePoint(own,p[0],p[1])).ToArray(),Direction=own.Normal,Length=own.Thickness+AfjManufacturingConventions.SheetCutOverrun,
@@ -13328,6 +14203,22 @@ namespace ADDIN.Commands.AutoFrameJoint
             internal double[] LowDatum,HighDatum;
             internal double LowOffset,HighOffset;
             internal readonly List<AfjTransverseContactExtension> Extensions=new List<AfjTransverseContactExtension>();
+            internal int[][] EquivalentFamilies;
+            internal bool EntryPartition;
+            internal int EntryPartitionSide=-1,EntryAdjacentStripIndex=-1;
+            internal double EntryMidpoint;
+            internal bool SecondaryObstruction;
+            internal int[][] SecondaryAnchorProofs,SecondaryPeerPaths;
+            internal double SecondaryWitnessVolume;
+            internal double SecondaryFlatLow,SecondaryFlatHigh;
+            internal int[] SecondaryBendAdjacent;
+            internal double[] SecondaryBendWitnessVolumes;
+            internal int[] SecondaryGapAdjacent;
+            internal double[] SecondaryGapDistances,SecondaryGapBounds;
+            internal double[][] SecondaryFullAnnulusProofs;
+            internal bool LowDatumOnOwn,HighDatumOnOwn;
+            internal double[] LowDatumNormal,HighDatumNormal;
+            internal int LowDatumAdjacent=-1,HighDatumAdjacent=-1;
         }
         sealed class MeasuredFamily
         {
@@ -13378,7 +14269,9 @@ namespace ADDIN.Commands.AutoFrameJoint
                     var guide=new AfjSheetSliceMetadata();MeasuredMiter(wall,peer,cover,low,high,guide);
                     var family=new MeasuredFamily{Own=wall,Mate=peer,Guide=guide,Low=low,High=high};
                     var pending=new List<Strip>();
-                    var normal=Unit(Sub(wall.WorldAxis,peer.WorldAxis));double support=Dot(normal,guide.MiterFarWorld);
+                    var normal=Math.Abs(Dot(wall.WorldAxis,peer.WorldAxis))>1e-7?
+                        NonOrthogonalMiterNormal(wall,guide.MiterNearWorld,guide.MiterFarWorld):Unit(Sub(wall.WorldAxis,peer.WorldAxis));
+                    double support=Dot(normal,guide.MiterFarWorld);
                     foreach(var adjacent in new[]{wall.Previous,wall.Next})
                     {
                         double[] shared=adjacent.Index<wall.Index?wall.A:wall.B;
@@ -13510,7 +14403,229 @@ namespace ADDIN.Commands.AutoFrameJoint
                     " cutoff="+cutoff.ToString("R",CultureInfo.InvariantCulture)+" paired_finite_free_edges=2 material_witnesses="+witnesses);
             }
         }
-        static List<MeasuredCell> SelectedMeasuredCells(Strip[] own,Strip[] mates,bool cover)
+// Insert inside AfjPerFoldSheetPlanner. Read-only diagnostics; preserves rejection.
+static string MeasuredTieNumber(double x)
+{ return x.ToString("R",CultureInfo.InvariantCulture); }
+static string MeasuredTieVector(double[] x)
+{ return x==null?"null":string.Join(",",x.Select(MeasuredTieNumber).ToArray()); }
+static int MeasuredTieIndex(Strip s) { return s==null?-1:s.Index; }
+static void TraceMeasuredEnvelopeTie(Strip strip,bool cover,double lo,double hi,MeasuredCell[] active)
+{
+    double mid=(lo+hi)*.5;
+    var rows=active.Select(c=>new { Cell=c, K=CellCutoff(c,cover) }).ToArray();
+    double extreme=cover?rows.Max(r=>r.K+r.Cell.B*mid):rows.Min(r=>r.K+r.Cell.B*mid);
+    Trace.WriteLine("[AFJ-R72] EQUAL_ENVELOPE_BEGIN own="+strip.Index+" cover="+cover+
+        " v="+MeasuredTieNumber(lo)+"/"+MeasuredTieNumber(hi)+" active="+rows.Length+
+        " midpoint_extreme="+MeasuredTieNumber(extreme));
+    foreach(var r in rows)
+    {
+        var c=r.Cell;var m=c.Mate;
+        double den=Dot(m.WorldNormal,strip.WorldAxis),p0=Dot(m.WorldPlanePoint,m.WorldNormal);
+        Trace.WriteLine("[AFJ-R72] EQUAL_ENVELOPE_ROW own="+strip.Index+" mate="+m.Index+
+            " family_own="+MeasuredTieIndex(c.FamilyOwn)+" family_mate="+MeasuredTieIndex(c.FamilyMate)+
+            " terminal="+c.Terminal+" free="+c.FreeEnd+" terminal_anchor="+MeasuredTieIndex(c.TerminalAnchor)+
+            " path="+(c.InheritedPath==null?"null":string.Join(",",c.InheritedPath.Select(x=>x.ToString(CultureInfo.InvariantCulture)).ToArray()))+
+            " raw_v="+MeasuredTieNumber(c.Low)+"/"+MeasuredTieNumber(c.High)+
+            " plane_a="+MeasuredTieNumber(c.A)+" plane_b="+MeasuredTieNumber(c.B)+" cutoff_a="+MeasuredTieNumber(r.K)+
+            " cutoff_lo="+MeasuredTieNumber(r.K+c.B*lo)+" cutoff_hi="+MeasuredTieNumber(r.K+c.B*hi)+
+            " midpoint_residual="+MeasuredTieNumber(r.K+c.B*mid-extreme)+
+            " den="+MeasuredTieNumber(den)+" mate_t="+MeasuredTieNumber(m.Thickness)+
+            " mate_plane_normal="+MeasuredTieVector(m.WorldNormal)+" mate_plane_point="+MeasuredTieVector(m.WorldPlanePoint)+
+            " mate_oriented_slab="+MeasuredTieNumber(p0)+"/"+MeasuredTieNumber(p0+m.Thickness)+
+            " mate_base="+MeasuredTieVector(m.WorldBase)+" mate_u="+MeasuredTieVector(m.WorldU)+
+            " mate_axis="+MeasuredTieVector(m.WorldAxis)+" mate_length="+MeasuredTieNumber(m.Length)+
+            " mate_axial="+MeasuredTieNumber(m.Low)+"/"+MeasuredTieNumber(m.High)+
+            " mate_previous="+MeasuredTieIndex(m.Previous)+" mate_next="+MeasuredTieIndex(m.Next)+
+            " free_point="+MeasuredTieVector(c.FreePoint)+" free_normal="+MeasuredTieVector(c.FreeNormal)+
+            " low_datum="+MeasuredTieVector(c.LowDatum)+" low_offset="+MeasuredTieNumber(c.LowOffset)+
+            " high_datum="+MeasuredTieVector(c.HighDatum)+" high_offset="+MeasuredTieNumber(c.HighOffset)+
+            " extension_count="+c.Extensions.Count);
+        foreach(var e in c.Extensions)
+            Trace.WriteLine("[AFJ-R72] EQUAL_ENVELOPE_EXTENSION own="+strip.Index+" mate="+m.Index+
+                " family_own="+MeasuredTieIndex(c.FamilyOwn)+" family_mate="+MeasuredTieIndex(c.FamilyMate)+
+                " crossing="+e.CrossingMateStripIndex+" anchored="+e.AnchoredMateStripIndex+
+                " physical_v="+MeasuredTieNumber(e.PhysicalBandLow)+"/"+MeasuredTieNumber(e.PhysicalBandHigh)+
+                " expanded_v="+MeasuredTieNumber(e.ExpandedBandLow)+"/"+MeasuredTieNumber(e.ExpandedBandHigh)+
+                " low_skin="+MeasuredTieVector(e.LowSkinDatumWorld)+" high_skin="+MeasuredTieVector(e.HighSkinDatumWorld)+
+                " witnesses="+e.FiniteMaterialWitnesses+" bend_verified="+e.ActualAdjacentBendPairVerified);
+    }
+    Trace.WriteLine("[AFJ-R72] EQUAL_ENVELOPE_END own="+strip.Index);
+}
+
+
+        static int[][] MeasuredCellFamilies(MeasuredCell c)
+        {return c.EquivalentFamilies??new[]{new[]{c.FamilyOwn.Index,c.FamilyMate.Index}};}
+        static string MeasuredFamiliesKey(int[][] pairs)
+        {
+            Need(pairs!=null&&pairs.Length>0&&pairs.Length<=64&&pairs.All(p=>p!=null&&p.Length==2&&p.All(i=>i>=0)),"bounded actual family authority pairs required");
+            var keys=pairs.Select(p=>p[0]+":"+p[1]).OrderBy(v=>v,StringComparer.Ordinal).ToArray();
+            Need(keys.Distinct().Count()==keys.Length,"duplicate family proof is not an independent authority");return String.Join(";",keys);
+        }
+        static bool SameMeasuredOptionalVector(double[] a,double[] b)
+        {return a==null||b==null?a==null&&b==null:Norm(Sub(a,b))<1e-10;}
+        static bool SameMeasuredOptionalPath(int[] a,int[] b)
+        {return a==null||b==null?a==null&&b==null:a.SequenceEqual(b);}
+        static bool SameMeasuredExtensions(MeasuredCell a,MeasuredCell b)
+        {
+            if(a.Extensions.Count!=b.Extensions.Count)return false;
+            for(int k=0;k<a.Extensions.Count;k++)
+            {
+                var x=a.Extensions[k];var y=b.Extensions[k];
+                if(x.CrossingMateStripIndex!=y.CrossingMateStripIndex||x.AnchoredMateStripIndex!=y.AnchoredMateStripIndex||
+                    x.FiniteMaterialWitnesses!=y.FiniteMaterialWitnesses||x.ActualAdjacentBendPairVerified!=y.ActualAdjacentBendPairVerified||
+                    Math.Abs(x.PhysicalBandLow-y.PhysicalBandLow)>1e-10||Math.Abs(x.PhysicalBandHigh-y.PhysicalBandHigh)>1e-10||
+                    Math.Abs(x.ExpandedBandLow-y.ExpandedBandLow)>1e-10||Math.Abs(x.ExpandedBandHigh-y.ExpandedBandHigh)>1e-10||
+                    Math.Abs(x.AssemblyGap-y.AssemblyGap)>1e-12||!SameMeasuredOptionalVector(x.LowSkinDatumWorld,y.LowSkinDatumWorld)||
+                    !SameMeasuredOptionalVector(x.HighSkinDatumWorld,y.HighSkinDatumWorld))return false;
+            }
+            return true;
+        }
+        static bool SameMeasuredEnvelopeAuthority(MeasuredCell a,MeasuredCell b,bool cover,double lo,double hi)
+        {
+            // Distinct connected two-bend families can independently prove the
+            // SAME physical own/mate sheet operation. Keep both proofs, never
+            // identify different native mates just by a matching box or offset.
+            if(!SameSecondaryGapCertificate(a,b)||!SameSecondaryBendCertificate(a,b)||a.SecondaryObstruction!=b.SecondaryObstruction||
+                SecondaryProofKey(a.SecondaryAnchorProofs,a.SecondaryPeerPaths)!=SecondaryProofKey(b.SecondaryAnchorProofs,b.SecondaryPeerPaths)||
+                a.Own!=b.Own||a.Mate!=b.Mate||a.Coplanar!=b.Coplanar||a.Terminal!=b.Terminal||a.FreeEnd!=b.FreeEnd||
+                a.TerminalAnchor!=b.TerminalAnchor||!SameMeasuredOptionalPath(a.InheritedPath,b.InheritedPath)||
+                !SameMeasuredOptionalVector(a.FreePoint,b.FreePoint)||!SameMeasuredOptionalVector(a.FreeNormal,b.FreeNormal)||
+                Math.Abs(a.Low-b.Low)>1e-10||Math.Abs(a.High-b.High)>1e-10||
+                !SameMeasuredOptionalVector(a.LowDatum,b.LowDatum)||!SameMeasuredOptionalVector(a.HighDatum,b.HighDatum)||
+                a.LowDatumOnOwn!=b.LowDatumOnOwn||a.HighDatumOnOwn!=b.HighDatumOnOwn||
+                a.LowDatumAdjacent!=b.LowDatumAdjacent||a.HighDatumAdjacent!=b.HighDatumAdjacent||
+                !SameMeasuredOptionalVector(a.LowDatumNormal,b.LowDatumNormal)||!SameMeasuredOptionalVector(a.HighDatumNormal,b.HighDatumNormal)||
+                Math.Abs(a.LowOffset-b.LowOffset)>1e-12||Math.Abs(a.HighOffset-b.HighOffset)>1e-12||!SameMeasuredExtensions(a,b))return false;
+            double x=CellCutoff(a,cover)-CellCutoff(b,cover),m=a.B-b.B;
+            return Math.Abs(x+m*lo)<1e-10&&Math.Abs(x+m*hi)<1e-10;
+        }
+        // One operation starts on the actual outer tangency skin for its own
+        // adjacent Bend. A midpoint partitions the finite computational domain;
+        // it does not alter the measured whole-wall miter or its fit-gap offset.
+        static MeasuredCell CloneMeasuredMiterCell(MeasuredCell source)
+        {
+            var copy=new MeasuredCell{Own=source.Own,Mate=source.Mate,FamilyOwn=source.FamilyOwn,FamilyMate=source.FamilyMate,
+                TerminalAnchor=source.TerminalAnchor,Low=source.Low,High=source.High,A=source.A,B=source.B,
+                Coplanar=source.Coplanar,Terminal=source.Terminal,FreeEnd=source.FreeEnd,
+                InheritedPath=source.InheritedPath==null?null:(int[])source.InheritedPath.Clone(),
+                FreePoint=source.FreePoint==null?null:(double[])source.FreePoint.Clone(),FreeNormal=source.FreeNormal==null?null:(double[])source.FreeNormal.Clone(),
+                LowDatum=source.LowDatum==null?null:(double[])source.LowDatum.Clone(),HighDatum=source.HighDatum==null?null:(double[])source.HighDatum.Clone(),
+                LowOffset=source.LowOffset,HighOffset=source.HighOffset,
+                EquivalentFamilies=source.EquivalentFamilies==null?null:source.EquivalentFamilies.Select(p=>(int[])p.Clone()).ToArray(),
+                SecondaryObstruction=source.SecondaryObstruction,
+                SecondaryAnchorProofs=source.SecondaryAnchorProofs==null?null:source.SecondaryAnchorProofs.Select(p=>(int[])p.Clone()).ToArray(),
+                SecondaryPeerPaths=source.SecondaryPeerPaths==null?null:source.SecondaryPeerPaths.Select(p=>(int[])p.Clone()).ToArray(),
+                SecondaryWitnessVolume=source.SecondaryWitnessVolume,SecondaryFlatLow=source.SecondaryFlatLow,SecondaryFlatHigh=source.SecondaryFlatHigh,
+                SecondaryBendAdjacent=source.SecondaryBendAdjacent==null?null:(int[])source.SecondaryBendAdjacent.Clone(),
+                SecondaryBendWitnessVolumes=source.SecondaryBendWitnessVolumes==null?null:(double[])source.SecondaryBendWitnessVolumes.Clone(),
+                SecondaryGapAdjacent=source.SecondaryGapAdjacent==null?null:(int[])source.SecondaryGapAdjacent.Clone(),
+                SecondaryGapDistances=source.SecondaryGapDistances==null?null:(double[])source.SecondaryGapDistances.Clone(),
+                SecondaryGapBounds=source.SecondaryGapBounds==null?null:(double[])source.SecondaryGapBounds.Clone(),
+                SecondaryFullAnnulusProofs=source.SecondaryFullAnnulusProofs==null?null:source.SecondaryFullAnnulusProofs.Select(p=>p==null?null:(double[])p.Clone()).ToArray(),
+                LowDatumOnOwn=source.LowDatumOnOwn,HighDatumOnOwn=source.HighDatumOnOwn,
+                LowDatumNormal=source.LowDatumNormal==null?null:(double[])source.LowDatumNormal.Clone(),
+                HighDatumNormal=source.HighDatumNormal==null?null:(double[])source.HighDatumNormal.Clone(),
+                LowDatumAdjacent=source.LowDatumAdjacent,HighDatumAdjacent=source.HighDatumAdjacent,
+                EntryPartition=source.EntryPartition,EntryPartitionSide=source.EntryPartitionSide,
+                EntryAdjacentStripIndex=source.EntryAdjacentStripIndex,EntryMidpoint=source.EntryMidpoint};
+            copy.Extensions.AddRange(source.Extensions);return copy;
+        }
+        static IEnumerable<MeasuredCell> PartitionMeasuredMiterCell(MeasuredCell source)
+        {
+            Need(source!=null&&source.Coplanar&&!source.Terminal&&!source.FreeEnd&&!source.SecondaryObstruction,
+                "coplanar miter partition requires its original central measured contact cell");
+            var own=source.Own;
+            Need(own.Previous!=null&&own.Next!=null,"coplanar miter partition lost its two actual adjacent Bends");
+            var previous=MeasuredBendEntry(own,own.Previous);var next=MeasuredBendEntry(own,own.Next);
+            Need(previous.Applicable&&next.Applicable,"coplanar miter entry needs two measured native Ri/Ro tangency pairs");
+            if(previous.Opposite==next.Opposite)
+            {
+                var unsplit=CloneMeasuredMiterCell(source);unsplit.EntryAdjacentStripIndex=own.Previous.Index;
+                return new[]{unsplit};
+            }
+            // The source profile line itself supplies both endpoints. No Bend
+            // tangency inset, tolerance offset or copied dimension sets this split.
+            Need(Math.Abs(source.Low)<Eps&&Math.Abs(source.High-own.Length)<Eps,
+                "opposite-entry miter partition requires its complete original 0..Length profile domain");
+            double midpoint=own.Length/2;
+            Need(midpoint>source.Low&&midpoint<source.High,"native profile midpoint is outside its original miter contact");
+            var low=CloneMeasuredMiterCell(source);var high=CloneMeasuredMiterCell(source);
+            low.High=midpoint;high.Low=midpoint;
+            low.EntryPartition=high.EntryPartition=true;low.EntryPartitionSide=0;high.EntryPartitionSide=1;
+            low.EntryAdjacentStripIndex=own.Previous.Index;high.EntryAdjacentStripIndex=own.Next.Index;
+            low.EntryMidpoint=high.EntryMidpoint=midpoint;
+            // These are computational boundaries backed by the owned native
+            // midpoint guide. They are not fabricated native Face2 datums.
+            low.HighDatum=null;low.HighOffset=0;low.HighDatumOnOwn=false;low.HighDatumNormal=null;low.HighDatumAdjacent=-1;
+            high.LowDatum=null;high.LowOffset=0;high.LowDatumOnOwn=false;high.LowDatumNormal=null;high.LowDatumAdjacent=-1;
+            Trace.WriteLine("[AFJ-R72] COPLANAR_MITER_ENTRY_PARTITION strip="+own.Index+" mate="+source.Mate.Index+
+                " midpoint_m="+midpoint.ToString("R",CultureInfo.InvariantCulture)+" low_entry_adjacent="+own.Previous.Index+
+                " high_entry_adjacent="+own.Next.Index+" low_opposite="+previous.Opposite+" high_opposite="+next.Opposite+
+                " boundary=ORIGINAL_PROFILE_LINE_GEOMETRIC_MIDPOINT whole_miter_and_fit_gap_unchanged=True blind_t_plus_point_1_unchanged=True");
+            return new[]{low,high};
+        }
+        static IEnumerable<MeasuredCell> PartitionSecondaryEntryCell(MeasuredCell source)
+        {
+            if(!source.SecondaryObstruction||source.Own.Previous==null||source.Own.Next==null)return new[]{source};
+            var own=source.Own;
+            bool low=source.SecondaryGapAdjacent!=null&&source.SecondaryGapAdjacent[0]>=0||source.SecondaryBendAdjacent!=null&&source.SecondaryBendAdjacent[0]>=0;
+            bool high=source.SecondaryGapAdjacent!=null&&source.SecondaryGapAdjacent[1]>=0||source.SecondaryBendAdjacent!=null&&source.SecondaryBendAdjacent[1]>=0;
+            if(!low||!high)return new[]{source};
+            var previous=MeasuredBendEntry(own,own.Previous);var next=MeasuredBendEntry(own,own.Next);
+            Need(previous.Applicable&&next.Applicable,"Secondary entry lost certified native Ri/Ro pairs");
+            if(previous.Opposite==next.Opposite) { var one=CloneMeasuredMiterCell(source);one.EntryAdjacentStripIndex=own.Previous.Index;return new[]{one}; }
+            double midpoint=own.Length/2;
+            Need(source.Low<midpoint-Eps&&source.High>midpoint+Eps,"UNVERIFIED_SECONDARY_ENTRY_PARTITION: original midpoint outside the certified two-Bend interval");
+            var a=CloneMeasuredMiterCell(source);var b=CloneMeasuredMiterCell(source);a.High=midpoint;b.Low=midpoint;
+            a.EntryPartition=b.EntryPartition=true;a.EntryPartitionSide=0;b.EntryPartitionSide=1;
+            a.EntryAdjacentStripIndex=own.Previous.Index;b.EntryAdjacentStripIndex=own.Next.Index;a.EntryMidpoint=b.EntryMidpoint=midpoint;
+            ClearMeasuredBoundaryDatum(a,false);ClearMeasuredBoundaryDatum(b,true);
+            Trace.WriteLine("[AFJ-R72] SECONDARY_TWO_BEND_ENTRY_PARTITION own="+own.Index+" mate="+source.Mate.Index+" original_midpoint_m="+MeasuredTieNumber(midpoint)+" low_opposite="+previous.Opposite+" high_opposite="+next.Opposite);
+            return new[]{a,b};
+        }
+        static bool SameMeasuredEntryPartitionIdentity(MeasuredCell cell,AfjSheetSliceMetadata meta)
+        {
+            return meta.MeasuredEntryPartition==cell.EntryPartition&&meta.MeasuredEntryPartitionSide==cell.EntryPartitionSide&&
+                meta.MeasuredEntryAdjacentStripIndex==cell.EntryAdjacentStripIndex&&
+                Math.Abs(meta.MeasuredEntryMidpoint-cell.EntryMidpoint)<1e-12;
+        }
+        static void VerifyMeasuredEntryPartitionMetadata(MeasuredCell cell,AfjSheetSliceMetadata meta,string frame)
+        {
+            Need(SameMeasuredEntryPartitionIdentity(cell,meta),"miter operation changed its independently selected per-Bend entry partition");
+            if(!cell.EntryPartition)
+            {
+                Need(String.IsNullOrWhiteSpace(meta.MidpointEvidenceId),"unsplit measured cell carries an unsupported midpoint guide");return;
+            }
+            Need((cell.Coplanar&&meta.Role=="RETURN_MITER"||cell.SecondaryObstruction&&!cell.Coplanar&&meta.MeasuredSecondaryObstruction)&&cell.EntryPartitionSide>=0&&cell.EntryPartitionSide<=1&&
+                meta.MidpointEvidenceId=="MEASURED_MIDPOINT:"+frame+":"+cell.Own.Index&&
+                Math.Abs(cell.EntryMidpoint-cell.Own.Length/2)<1e-12&&
+                Math.Abs(cell.EntryPartitionSide==0?meta.ContactHigh-cell.EntryMidpoint:meta.ContactLow-cell.EntryMidpoint)<1e-12,
+                "miter partition lost its exact original-profile midpoint and shared native guide identity");
+            bool boundaryIsLow=cell.EntryPartitionSide==1;
+            Need((boundaryIsLow?meta.ContactLowDatumWorld:meta.ContactHighDatumWorld)==null&&
+                (boundaryIsLow?meta.ContactLowDatumPlaneNormalWorld:meta.ContactHighDatumPlaneNormalWorld)==null&&
+                !(boundaryIsLow?meta.ContactLowDatumOnOwnComponent:meta.ContactHighDatumOnOwnComponent)&&
+                (boundaryIsLow?meta.ContactLowDatumAdjacentStripIndex:meta.ContactHighDatumAdjacentStripIndex)==-1&&
+                Math.Abs(boundaryIsLow?meta.ContactLowDatumOffset:meta.ContactHighDatumOffset)<1e-12,
+                "computational midpoint was replaced with an unsupported skin datum");
+        }
+        static MeasuredTerminalEntryChoice MeasuredSheetOperationEntry(Strip own,AfjSheetSliceMetadata meta)
+        {
+            Need(meta!=null&&meta.MeasuredEntryAdjacentStripIndex>=0&&own.Previous!=null&&own.Next!=null,
+                "miter operation entry lost its original two-Bend wall");
+            var previous=MeasuredBendEntry(own,own.Previous);var next=MeasuredBendEntry(own,own.Next);
+            Need(previous.Applicable&&next.Applicable,"miter operation entry lost its independently measured Ri/Ro pair");
+            bool split=previous.Opposite!=next.Opposite;
+            Need(meta.MeasuredEntryPartition==split,"operation entry must split exactly when its actual certified Bend entry skins differ");
+            int side=split?meta.MeasuredEntryPartitionSide:0;
+            Need(side>=0&&side<=1&&(!split?meta.MeasuredEntryPartitionSide==-1&&Math.Abs(meta.MeasuredEntryMidpoint)<1e-12:
+                Math.Abs(meta.MeasuredEntryMidpoint-own.Length/2)<1e-12),"miter entry partition no longer uses the original profile midpoint");
+            var adjacent=side==0?own.Previous:own.Next;var choice=side==0?previous:next;
+            Need(meta.MeasuredEntryAdjacentStripIndex==adjacent.Index,"miter entry operation changed its actual adjacent Bend identity");
+            return choice;
+        }
+
+        static List<MeasuredCell> SelectedMeasuredCells(ISldWorks app,Strip[] own,Strip[] mates,bool cover,AfjBooleanResult peerCoverResult=null)
         {
             var families=MeasuredFamilies(own,mates,cover);var contacts=families.SelectMany(f=>f.Endpoints).ToList();
             // Follow only the same native arm away from its verified central
@@ -13534,6 +14649,7 @@ namespace ADDIN.Commands.AutoFrameJoint
             }
             foreach(var c in contacts)MeasuredAdjacentFootprint(c,cover);
             foreach(var c in contacts.ToArray())AddInwardTerminalCells(c,cover,contacts);
+            AddSecondaryMeasuredObstructions(app,own,mates,cover,families,contacts,peerCoverResult);
             var selected=new List<MeasuredCell>();
             foreach(var strip in own)
             {
@@ -13541,7 +14657,8 @@ namespace ADDIN.Commands.AutoFrameJoint
                 Need(central.Length<=1,"UNVERIFIED_MEASURED_MULTIPLE_INTERNAL_MITER_FAMILIES_ON_ONE_SHEET");
                 if(central.Length==1)
                 {
-                    var f=central[0];selected.Add(new MeasuredCell{Own=strip,Mate=f.Mate,FamilyOwn=strip,FamilyMate=f.Mate,Coplanar=true,Low=f.Low,High=f.High});
+                    var f=central[0];var centralCell=new MeasuredCell{Own=strip,Mate=f.Mate,FamilyOwn=strip,FamilyMate=f.Mate,Coplanar=true,Low=f.Low,High=f.High};
+                    selected.AddRange(PartitionMeasuredMiterCell(centralCell));
                     continue;
                 }
                 var allowed=contacts.Where(c=>c.Own==strip).ToList();
@@ -13558,7 +14675,7 @@ namespace ADDIN.Commands.AutoFrameJoint
                         {
                             path.Add(j);
                             if(families.Any(f=>f.Own==own[j]))break;
-                            var hits=contacts.Where(c=>c.Own==own[j]&&!c.FreeEnd).ToArray();
+                            var hits=contacts.Where(c=>c.Own==own[j]&&!c.FreeEnd&&!c.SecondaryObstruction).ToArray();
                             if(hits.Length>0)
                             {
                                 Func<MeasuredCell,double> distance=c=>direction<0?own[j].Length-c.High:c.Low;
@@ -13603,28 +14720,51 @@ namespace ADDIN.Commands.AutoFrameJoint
                     Func<MeasuredCell,double> cutoff=c=>CellCutoff(c,cover)+c.B*mid;
                     var ordered=cover?active.OrderByDescending(cutoff).ToArray():active.OrderBy(cutoff).ToArray();var chosen=ordered[0];
                     if(ordered.Length>1&&Math.Abs(cutoff(chosen)-cutoff(ordered[1]))<Eps)
-                        Need(chosen.Mate==ordered[1].Mate&&chosen.FamilyOwn==ordered[1].FamilyOwn&&chosen.FamilyMate==ordered[1].FamilyMate,
-                            "UNVERIFIED_MEASURED_EQUAL_ENVELOPE_WITH_DIFFERENT_NATIVE_AUTHORITIES");
+                    {
+                        TraceMeasuredEnvelopeTie(strip,cover,lo,hi,active);
+                        var tied=ordered.Where(c=>Math.Abs(cutoff(chosen)-cutoff(c))<Eps).ToArray();
+                        Need(tied.All(c=>SameMeasuredEnvelopeAuthority(chosen,c,cover,lo,hi)),
+                            "UNVERIFIED_MEASURED_EQUAL_ENVELOPE_WITH_DIFFERENT_PHYSICAL_AUTHORITIES");
+                        chosen.EquivalentFamilies=tied.SelectMany(MeasuredCellFamilies).GroupBy(pair=>pair[0]+":"+pair[1]).Select(g=>g.First()).OrderBy(pair=>pair[0]).ThenBy(pair=>pair[1]).ToArray();
+                        Trace.WriteLine("[AFJ-R72] EQUAL_ENVELOPE_CERTIFIED same_native_own_mate=True full_affine_interval=True compatible_datums_paths_extensions=True families="+MeasuredFamiliesKey(chosen.EquivalentFamilies));
+                    }
                     var prior=selected.LastOrDefault();
                     if(prior!=null&&!prior.Coplanar&&prior.Own==strip&&prior.Mate==chosen.Mate&&prior.FamilyOwn==chosen.FamilyOwn&&
-                        prior.FamilyMate==chosen.FamilyMate&&prior.Terminal==chosen.Terminal&&prior.FreeEnd==chosen.FreeEnd&&Math.Abs(prior.High-lo)<Eps)
-                    {prior.High=hi;prior.HighDatum=chosen.HighDatum;prior.HighOffset=chosen.HighOffset;continue;}
+                        prior.FamilyMate==chosen.FamilyMate&&MeasuredFamiliesKey(MeasuredCellFamilies(prior))==MeasuredFamiliesKey(MeasuredCellFamilies(chosen))&&prior.Terminal==chosen.Terminal&&prior.FreeEnd==chosen.FreeEnd&&
+                        SameSecondaryGapCertificate(prior,chosen)&&SameSecondaryBendCertificate(prior,chosen)&&prior.SecondaryObstruction==chosen.SecondaryObstruction&&
+                        SecondaryProofKey(prior.SecondaryAnchorProofs,prior.SecondaryPeerPaths)==SecondaryProofKey(chosen.SecondaryAnchorProofs,chosen.SecondaryPeerPaths)&&Math.Abs(prior.High-lo)<Eps)
+                    {prior.High=hi;if(Math.Abs(hi-chosen.High)<Eps)CopyMeasuredBoundaryDatum(prior,chosen,false,false);else ClearMeasuredBoundaryDatum(prior,false);continue;}
                     var cell=new MeasuredCell{Own=strip,Mate=chosen.Mate,FamilyOwn=chosen.FamilyOwn,FamilyMate=chosen.FamilyMate,
                         Low=lo,High=hi,A=chosen.A,B=chosen.B,Terminal=chosen.Terminal,TerminalAnchor=chosen.TerminalAnchor,InheritedPath=chosen.InheritedPath,FreeEnd=chosen.FreeEnd,FreePoint=chosen.FreePoint,FreeNormal=chosen.FreeNormal,
                         LowDatum=Math.Abs(lo-chosen.Low)<Eps?chosen.LowDatum:null,HighDatum=Math.Abs(hi-chosen.High)<Eps?chosen.HighDatum:null,
                         LowOffset=Math.Abs(lo-chosen.Low)<Eps?chosen.LowOffset:0,HighOffset=Math.Abs(hi-chosen.High)<Eps?chosen.HighOffset:0};
+                    if(cell.LowDatum!=null&&Math.Abs(lo-chosen.Low)<Eps)CopyMeasuredBoundaryDatum(cell,chosen,true,true);
+                    if(cell.HighDatum!=null&&Math.Abs(hi-chosen.High)<Eps)CopyMeasuredBoundaryDatum(cell,chosen,false,false);
                     if(cell.LowDatum==null&&lo>Eps)
-                    {var edge=allowed.FirstOrDefault(c=>Math.Abs(lo-c.Low)<Eps&&c.LowDatum!=null);if(edge!=null){cell.LowDatum=edge.LowDatum;cell.LowOffset=edge.LowOffset;}else {edge=allowed.FirstOrDefault(c=>Math.Abs(lo-c.High)<Eps&&c.HighDatum!=null);if(edge!=null){cell.LowDatum=edge.HighDatum;cell.LowOffset=edge.HighOffset;}}}
+                    {var edge=allowed.FirstOrDefault(c=>Math.Abs(lo-c.Low)<Eps&&c.LowDatum!=null);if(edge!=null){CopyMeasuredBoundaryDatum(cell,edge,true,true);}else {edge=allowed.FirstOrDefault(c=>Math.Abs(lo-c.High)<Eps&&c.HighDatum!=null);if(edge!=null){CopyMeasuredBoundaryDatum(cell,edge,true,false);}}}
                     if(cell.HighDatum==null&&hi<strip.Length-Eps)
-                    {var edge=allowed.FirstOrDefault(c=>Math.Abs(hi-c.Low)<Eps&&c.LowDatum!=null);if(edge!=null){cell.HighDatum=edge.LowDatum;cell.HighOffset=edge.LowOffset;}else {edge=allowed.FirstOrDefault(c=>Math.Abs(hi-c.High)<Eps&&c.HighDatum!=null);if(edge!=null){cell.HighDatum=edge.HighDatum;cell.HighOffset=edge.HighOffset;}}}
+                    {var edge=allowed.FirstOrDefault(c=>Math.Abs(hi-c.Low)<Eps&&c.LowDatum!=null);if(edge!=null){CopyMeasuredBoundaryDatum(cell,edge,false,true);}else {edge=allowed.FirstOrDefault(c=>Math.Abs(hi-c.High)<Eps&&c.HighDatum!=null);if(edge!=null){CopyMeasuredBoundaryDatum(cell,edge,false,false);}}}
+                    cell.SecondaryObstruction=chosen.SecondaryObstruction;
+                    cell.SecondaryAnchorProofs=chosen.SecondaryAnchorProofs;
+                    cell.SecondaryPeerPaths=chosen.SecondaryPeerPaths;
+                    cell.SecondaryWitnessVolume=chosen.SecondaryWitnessVolume;
+                    cell.SecondaryFlatLow=chosen.SecondaryFlatLow;cell.SecondaryFlatHigh=chosen.SecondaryFlatHigh;
+                    cell.SecondaryBendAdjacent=chosen.SecondaryBendAdjacent;
+                    cell.SecondaryBendWitnessVolumes=chosen.SecondaryBendWitnessVolumes;
+                    cell.SecondaryGapAdjacent=chosen.SecondaryGapAdjacent;
+                    cell.SecondaryGapDistances=chosen.SecondaryGapDistances;
+                    cell.SecondaryGapBounds=chosen.SecondaryGapBounds;
+                    cell.SecondaryFullAnnulusProofs=chosen.SecondaryFullAnnulusProofs;
+                    cell.EquivalentFamilies=MeasuredCellFamilies(chosen).Select(pair=>(int[])pair.Clone()).ToArray();
                     cell.Extensions.AddRange(chosen.Extensions);selected.Add(cell);
                 }
             }
+            selected=selected.SelectMany(PartitionSecondaryEntryCell).ToList();
             Need(selected.Count<=64,"measured qualified contact cell count exceeds bounded native plan");return selected;
         }
-        static AfjCutPlan PlanMeasured(ISldWorks app,Strip[] own,Strip[] mates,bool cover,string frame,AfjCutPlan guides,AfjSheetSlicePlanEvidence evidence)
+        static AfjCutPlan PlanMeasured(ISldWorks app,Strip[] own,Strip[] mates,bool cover,string frame,AfjCutPlan guides,AfjSheetSlicePlanEvidence evidence,AfjBooleanResult peerCoverResult=null)
         {
-            var result=new AfjCutPlan();var cells=SelectedMeasuredCells(own,mates,cover);int ordinal=0;
+            var result=new AfjCutPlan();var cells=SelectedMeasuredCells(app,own,mates,cover,peerCoverResult);int ordinal=0;
             foreach(var cell in cells)
                 AddMeasuredSlice(app,cell.Own,cell.Mate,cover,frame,result,guides,evidence,cell.Low,cell.High,cell.Coplanar,cell.A,cell.B,cell,ordinal++);
             foreach(var strip in own)
@@ -13924,9 +15064,34 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         static MeasuredTerminalEntryChoice MeasuredTerminalEntry(Strip own)
         {
+            if(own==null||own.Previous!=null&&own.Next!=null||own.Previous==null&&own.Next==null)return new MeasuredTerminalEntryChoice();
+            return MeasuredBendEntry(own,own.Previous??own.Next);
+        }
+        static MeasuredTerminalEntryChoice MeasuredOperationEntry(Strip own,AfjSheetSliceMetadata meta)
+        {
+            if(meta!=null&&meta.MeasuredEntryAdjacentStripIndex>=0)return MeasuredSheetOperationEntry(own,meta);
+            Need(meta==null||!meta.MeasuredEntryPartition,"miter partition is missing its actual Bend entry identity");
+            if(meta==null||!meta.MeasuredSecondaryObstruction)return MeasuredTerminalEntry(own);
+            Need(meta.MeasuredSecondaryBendAdjacent!=null&&meta.MeasuredSecondaryBendAdjacent.Length==2&&
+                meta.MeasuredSecondaryBendWitnessVolumes!=null&&meta.MeasuredSecondaryBendWitnessVolumes.Length==2,
+                "Secondary operation entry requires its independently certified native Bend sides");
+            var sides=Enumerable.Range(0,2).Where(i=>meta.MeasuredSecondaryBendAdjacent[i]>=0&&meta.MeasuredSecondaryBendWitnessVolumes[i]>1e-13).ToArray();
+            if(sides.Length==0)return MeasuredTerminalEntry(own);
+            Need(sides.Length==1,"UNVERIFIED_OPERATION_ENTRY: split cuts are required for two separately obstructed Bend sides");
+            var adjacent=sides[0]==0?own.Previous:own.Next;
+            Need(adjacent!=null&&adjacent.Index==meta.MeasuredSecondaryBendAdjacent[sides[0]],"Operation Bend entry lost its actual adjacent strip");
+            var choice=MeasuredBendEntry(own,adjacent);
+            var first=own.Index<adjacent.Index?own:adjacent;var second=first==own?adjacent:own;
+            var sector=SamePlaneBendMap(first,second,(own.Low+own.High)/2);var center=sector.ArcCenters[0];
+            double angle=Math.Acos(Math.Max(-1,Math.Min(1,Dot(Unit(Sub(sector.Polygon[0],center)),Unit(Sub(sector.Polygon[1],center))))));
+            Need(choice.Applicable&&angle<=Math.PI/2+1e-8,"Operation-specific Bend entry requires its actual admitted Ri/Ro sector");
+            Trace.WriteLine("[AFJ-R72] OPERATION_BEND_ENTRY strip="+own.Index+" adjacent="+adjacent.Index+" opposite="+choice.Opposite+
+                " authority=RECONSTRUCTED_SURVIVING_OBSTRUCTION_SECTOR_AND_ACTUAL_OUTER_TANGENCY_FACE");
+            return choice;
+        }
+        static MeasuredTerminalEntryChoice MeasuredBendEntry(Strip own,Strip adjacent)
+        {
             var result=new MeasuredTerminalEntryChoice();
-            if(own==null||own.Previous!=null&&own.Next!=null||own.Previous==null&&own.Next==null)return result;
-            var adjacent=own.Previous??own.Next;
             // Collinear source segments are not a formed corner. Any actual
             // noncollinear terminal Bend must have its real R/R+t cylinder pair.
             if(Math.Abs(Dot(own.U,adjacent.U))>=1-1e-7)return result;
@@ -13968,8 +15133,8 @@ namespace ADDIN.Commands.AutoFrameJoint
             var meta=tool==null?null:tool.SheetSlice;
             Need(meta!=null&&meta.MeasuredContactAuthority&&!meta.EntrySkinVerified&&!meta.OppositeEntrySkin,
                 "terminal entry skin cannot overwrite or reapply existing cut-entry metadata");
-            var choice=MeasuredTerminalEntry(own);ApplyTerminalEntryGeometry(own,tool,choice);
-            meta.EntryNormalEnvelopeDepth=MeasuredEntryEnvelopeDepth(own);
+            var choice=MeasuredOperationEntry(own,meta);ApplyTerminalEntryGeometry(own,tool,choice);
+            meta.EntryNormalEnvelopeDepth=own.Thickness+(choice.Applicable?Math.Min(own.Radius,AfjManufacturingConventions.SheetCutOverrun):0);
             if(!choice.Applicable)return;
             meta.EntrySkinVerified=true;meta.OppositeEntrySkin=choice.Opposite;
             meta.EntryAdjacentStripIndex=choice.AdjacentStripIndex;
@@ -13987,7 +15152,7 @@ namespace ADDIN.Commands.AutoFrameJoint
         static void VerifyAndApplyMeasuredTerminalEntry(Strip own,AfjSheetSliceMetadata actual,AfjToolDefinition expectedCanonical)
         {
             Need(actual!=null,"terminal entry validation requires the actual declared operation metadata");
-            var choice=MeasuredTerminalEntry(own);
+            var choice=MeasuredOperationEntry(own,actual);
             Need(actual.EntrySkinVerified==choice.Applicable&&actual.OppositeEntrySkin==(choice.Applicable&&choice.Opposite),
                 "declared terminal cut entry disagrees with independently measured outer tangency skin");
             if(choice.Applicable)
@@ -14061,10 +15226,487 @@ namespace ADDIN.Commands.AutoFrameJoint
         }
         static void VerifyMeasuredEntryEnvelopeMetadata(Strip own,AfjSheetSliceMetadata meta)
         {
-            var interval=MeasuredEntryNormalEnvelope(own);double expected=interval[1]-interval[0];
+            var choice=MeasuredOperationEntry(own,meta);
+            double expected=own.Thickness+(choice.Applicable?Math.Min(own.Radius,AfjManufacturingConventions.SheetCutOverrun):0);
             Need(meta!=null&&AfjTemporaryBoolean.Finite(meta.EntryNormalEnvelopeDepth)&&
                 Math.Abs(meta.EntryNormalEnvelopeDepth-expected)<1e-9,
                 "declared entry material envelope differs from actual terminal outer skin, measured Bend R and fixed Blind overrun");
+        }
+
+        // Narrow secondary authority: orthogonal FLAT/FLAT obstruction that
+        // survives an independently planned covering member. No member-body,
+        // centroid, projected-bound, or newly generated losing-cut witness can
+        // authorize this cell. Projection proposes a rectangle; full exact
+        // B-rep containment must certify every point of its complete 0/t slab.
+        static string SecondaryProofKey(int[][] proofs,int[][] paths)
+        {
+            if(proofs==null||paths==null)return proofs==null&&paths==null?"none":"invalid";
+            Need(proofs.Length==paths.Length&&proofs.Length>0&&proofs.Length<=64,"bounded secondary path proofs required");
+            return String.Join(";",proofs.Select((p,i)=>{
+                Need(p!=null&&p.Length==3&&paths[i]!=null&&paths[i].Length>=2,"secondary endpoint/path proof incomplete");
+                return String.Join(",",p)+"/"+String.Join(",",paths[i]);
+            }).OrderBy(x=>x,StringComparer.Ordinal));
+        }
+
+        static List<Body2> SecondaryIntersect(IEnumerable<Body2> first,IEnumerable<Body2> second,string purpose)
+        {
+            var result=new List<Body2>();int code;
+            foreach(var a in first)foreach(var b in second)
+                result.AddRange(AfjTemporaryBoolean.Boolean(a,b,(int)swBodyOperationType_e.SWBODYINTERSECT,out code,purpose));
+            Need(result.Count<=256,"secondary exact flat intersection exceeded bounded topology");
+            return result.Where(x=>AfjTemporaryBoolean.Volume(x)>1e-13).ToList();
+        }
+
+        static bool CertifySecondaryOrthogonalObstruction(ISldWorks app,Strip own,Strip peer,List<Body2> coveringKeepWorld,
+            out double low,out double high,out double a,out double b,out double witnessVolume)
+        {
+            low=high=a=b=witnessVolume=0;bool coplanar;
+            if(!Contact(own,peer,out low,out high,out coplanar,out a,out b,true)||coplanar)return false;
+            // A full analytic rectangular 0/t intersection is available only
+            // for this exact orthogonal basis. Skew pairs keep prior policy.
+            if(Math.Abs(Math.Abs(Dot(own.WorldAxis,peer.WorldNormal))-1)>1e-10||
+                Math.Abs(Math.Abs(Dot(own.WorldNormal,peer.WorldAxis))-1)>1e-10||
+                Math.Abs(Math.Abs(Dot(own.WorldU,peer.WorldU))-1)>1e-10||
+                Math.Abs(Dot(own.WorldNormal,peer.WorldNormal))>1e-10||Math.Abs(b)>1e-10)return false;
+            var ownFlat=AfjJointSolver.World(FiniteMaterialMasks(app,own,low,high,own.Low,own.High,"R72_SECONDARY_OWN_FLAT"),own.Transform);
+            var peerFlat=AfjJointSolver.World(FiniteMaterialMasks(app,peer,0,peer.Length,peer.Low,peer.High,"R72_SECONDARY_PEER_FLAT"),peer.Transform);
+            var paired=SecondaryIntersect(ownFlat,peerFlat,"R72_SECONDARY_ORIGINAL_FLAT_PAIR");
+            var surviving=SecondaryIntersect(paired,coveringKeepWorld,"R72_SECONDARY_SURVIVING_COVER_FLAT");
+            if(surviving.Count==0||AfjTemporaryBoolean.Total(surviving)<=1e-13)return false;
+            double origin=Dot(own.WorldBase,own.WorldU);
+            low=Math.Max(low,surviving.Min(x=>-AfjJointSolver.Projection(x,Mul(own.WorldU,-1)))-origin);
+            high=Math.Min(high,surviving.Max(x=>AfjJointSolver.Projection(x,own.WorldU))-origin);
+            if(high-low<=Eps)return false;
+            double den=Dot(peer.WorldNormal,own.WorldAxis),opposite=a+peer.Thickness/den;
+            double x0=Math.Max(own.Low,Math.Min(a,opposite)),x1=Math.Min(own.High,Math.Max(a,opposite));
+            if(x1-x0<=Eps)return false;
+            var analytic=AfjTemporaryBoolean.CreatePrism(app,new AfjToolDefinition{
+                Polygon=new[]{NativePoint(own,x0,low),NativePoint(own,x1,low),NativePoint(own,x1,high),NativePoint(own,x0,high)},
+                Direction=own.Normal,Length=own.Thickness});
+            var analyticWorld=AfjJointSolver.World(new[]{analytic},own.Transform);
+            witnessVolume=AfjTemporaryBoolean.Total(analyticWorld);
+            if(witnessVolume<=1e-13)return false;
+            // Both directions are required: no hole, interrupted interval,
+            // partial depth, tangency-trimmed footprint, or cover-cut wedge
+            // may be replaced by its projection's bounding rectangle.
+            if(OutsideMeasuredUnion(analyticWorld,surviving)>1e-13||
+                OutsideMeasuredUnion(surviving,analyticWorld)>1e-13)return false;
+            double cutoff=MeasuredCutoff(own,peer,false,a);
+            var removal=Clip(new List<double[]>{new[]{own.Low,low},new[]{own.High+.001,low},
+                new[]{own.High+.001,high},new[]{own.Low,high}},1,-b,cutoff,true);
+            // Includes assembly gap and actual own-entry 0/t+R envelope shift.
+            if(removal.Count<3||Area(removal)<=1e-12||removal.Min(p=>p[0])<=(own.Low+own.High)/2-Eps)return false;
+            return true;
+        }
+
+        static void AddSecondaryMeasuredObstructions(ISldWorks app,Strip[] own,Strip[] peers,bool cover,
+            List<MeasuredFamily> families,List<MeasuredCell> contacts,AfjBooleanResult peerCoverResult)
+        {
+            Need(!cover||peerCoverResult==null,"covering cells must be planned without losing-result authority");
+            if(cover||peerCoverResult==null)return;
+            Need(peerCoverResult.Kept.Count==1,"secondary authority requires one independently retained covering solid");
+            var keep=AfjJointSolver.World(peerCoverResult.Kept,peers[0].Transform);
+            foreach(var endpoints in families.SelectMany(f=>f.Endpoints).GroupBy(c=>c.Own.Index))
+            {
+                var strip=own[endpoints.Key];
+                // Central miter cells retain their separate paired-bend rule.
+                if(families.Any(f=>f.Own==strip))continue;
+                foreach(var peer in peers)
+                {
+                    if(contacts.Any(c=>c.Own==strip&&c.Mate==peer))continue;
+                    double low,high,a,b,volume;
+                    if(!CertifySecondaryOrthogonalObstruction(app,strip,peer,keep,out low,out high,out a,out b,out volume))continue;
+                    var proofs=new List<int[]>();var paths=new List<int[]>();
+                    foreach(var anchor in endpoints.OrderBy(c=>c.FamilyOwn.Index).ThenBy(c=>c.FamilyMate.Index).ThenBy(c=>c.Mate.Index))
+                    {
+                        if(anchor.Coplanar||anchor.FreeEnd||anchor.Terminal||anchor.Mate==peer)continue;
+                        int direction=Math.Sign(peer.Index-anchor.Mate.Index);var path=new List<int>{anchor.Mate.Index};
+                        var previous=anchor.Mate;
+                        for(int j=anchor.Mate.Index+direction;;j+=direction)
+                        {
+                            var next=peers[j];MeasuredNativeBend(previous,next);path.Add(j);previous=next;
+                            if(j==peer.Index)break;
+                        }
+                        var proof=new[]{anchor.FamilyOwn.Index,anchor.FamilyMate.Index,anchor.Mate.Index};
+                        string key=String.Join(",",proof);
+                        if(proofs.Any(p=>String.Join(",",p)==key))continue;
+                        proofs.Add(proof);paths.Add(path.ToArray());
+                    }
+                    if(proofs.Count==0)continue;
+                    var first=proofs[0];
+                    var cell=new MeasuredCell{Own=strip,Mate=peer,FamilyOwn=own[first[0]],FamilyMate=peers[first[1]],
+                        Low=low,High=high,A=a,B=b,SecondaryObstruction=true,SecondaryWitnessVolume=volume,
+                        SecondaryAnchorProofs=proofs.ToArray(),SecondaryPeerPaths=paths.ToArray(),
+                        EquivalentFamilies=proofs.Select(p=>new[]{p[0],p[1]}).GroupBy(p=>p[0]+":"+p[1]).Select(g=>g.First()).ToArray()};
+                    CertifySecondaryBendContinuation(app,cell,keep);
+                    CertifySecondaryTangentGap(app,cell,keep);
+                    contacts.Add(cell);
+                    Trace.WriteLine("[AFJ-R72] SECONDARY_SURVIVING_FLAT_OBSTRUCTION own="+strip.Index+" mate="+peer.Index+
+                        " v="+MeasuredTieNumber(low)+"/"+MeasuredTieNumber(high)+" exact_complete_slab_m3="+MeasuredTieNumber(volume)+
+                        " native_peer_path_proofs="+SecondaryProofKey(cell.SecondaryAnchorProofs,cell.SecondaryPeerPaths));
+                }
+            }
+        }
+
+        static void CertifySecondaryBendContinuation(ISldWorks app,MeasuredCell cell,List<Body2> coveringKeepWorld)
+        {
+            Need(cell.SecondaryObstruction&&!cell.Coplanar&&!cell.Terminal&&!cell.FreeEnd,
+                "native Bend continuation requires its completed secondary FLAT authority");
+            var own=cell.Own;var peer=cell.Mate;
+            cell.SecondaryFlatLow=cell.Low;cell.SecondaryFlatHigh=cell.High;
+            cell.SecondaryBendAdjacent=new[]{-1,-1};cell.SecondaryBendWitnessVolumes=new double[2];
+            var peerFlat=AfjJointSolver.World(FiniteMaterialMasks(app,peer,0,peer.Length,peer.Low,peer.High,
+                "R72_SECONDARY_BEND_NAMED_PEER_FLAT"),peer.Transform);
+            double cutoff=CellCutoff(cell,false);
+            for(int side=0;side<2;side++)
+            {
+                bool far=side==1;var adjacent=far?own.Next:own.Previous;if(adjacent==null)continue;
+                double original=far?cell.SecondaryFlatHigh:cell.SecondaryFlatLow,target=far?own.Length:0;
+                if(Math.Abs(original-target)<Eps)continue;
+                var tangent=LongEdge(own,own.WorldU,far);
+                double tangentStation=Dot(Sub(tangent.Middle,own.WorldBase),own.WorldU);
+                if(Math.Abs(original-tangentStation)>1e-9)continue;
+                // The contact must end at this actual finite skin's native
+                // longitudinal tangent, and the adjoining paired cylinders
+                // must contain a surviving obstruction by the SAME peer flat.
+                MeasuredNativeBend(own,adjacent);
+                var first=own.Index<adjacent.Index?own:adjacent;var second=first==own?adjacent:own;
+                var map=SamePlaneBendMap(first,second,cutoff);int code;
+                var nativeSector=AfjTemporaryBoolean.Boolean(own.Source,AfjTemporaryBoolean.CreatePrism(app,map),
+                    (int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R72_SECONDARY_BEND_ACTUAL_NATIVE_SECTOR");
+                var worldSector=AfjJointSolver.World(nativeSector,own.Transform);
+                var namedFlat=SecondaryIntersect(worldSector,peerFlat,"R72_SECONDARY_BEND_NAMED_FLAT_OBSTRUCTION");
+                var surviving=SecondaryIntersect(namedFlat,coveringKeepWorld,"R72_SECONDARY_BEND_SURVIVING_COVER_FLAT");
+                double volume=AfjTemporaryBoolean.Total(surviving);if(volume<=1e-13)continue;
+                cell.SecondaryBendAdjacent[side]=adjacent.Index;cell.SecondaryBendWitnessVolumes[side]=volume;
+                if(far)cell.High=target;else cell.Low=target;
+                Trace.WriteLine("[AFJ-R72] SECONDARY_NATIVE_BEND_CONTINUATION own="+own.Index+" mate="+peer.Index+
+                    " side="+(far?"HIGH":"LOW")+" adjacent="+adjacent.Index+" actual_tangent_v="+MeasuredTieNumber(tangentStation)+
+                    " original_flat_v="+MeasuredTieNumber(original)+" selected_profile_endpoint_v="+MeasuredTieNumber(target)+
+                    " surviving_named_flat_native_sector_m3="+MeasuredTieNumber(volume)+
+                    " authority=EXACT_PAIRED_NATIVE_CYLINDERS_AND_FINITE_TANGENCY_EDGE;NATIVE_NORMAL_MAP_REMAINING_REQUIRED");
+            }
+        }
+
+        static bool SameSecondaryBendCertificate(MeasuredCell a,MeasuredCell b)
+        {
+            if(!a.SecondaryObstruction&&!b.SecondaryObstruction)return true;
+            return a.SecondaryObstruction&&b.SecondaryObstruction&&
+                Math.Abs(a.SecondaryFlatLow-b.SecondaryFlatLow)<1e-10&&Math.Abs(a.SecondaryFlatHigh-b.SecondaryFlatHigh)<1e-10&&
+                a.SecondaryBendAdjacent!=null&&b.SecondaryBendAdjacent!=null&&a.SecondaryBendAdjacent.SequenceEqual(b.SecondaryBendAdjacent)&&
+                a.SecondaryBendWitnessVolumes!=null&&b.SecondaryBendWitnessVolumes!=null&&
+                a.SecondaryBendWitnessVolumes.Length==2&&b.SecondaryBendWitnessVolumes.Length==2&&
+                Enumerable.Range(0,2).All(i=>Math.Abs(a.SecondaryBendWitnessVolumes[i]-b.SecondaryBendWitnessVolumes[i])<=1e-13);
+        }
+
+        static void VerifySecondaryObstructionMetadata(MeasuredCell cell,AfjSheetSliceMetadata meta,bool cover)
+        {
+            Need(meta.MeasuredSecondaryObstruction==cell.SecondaryObstruction,"secondary physical authority flag changed");
+            Need(SecondaryProofKey(meta.MeasuredSecondaryAnchorProofs,meta.MeasuredSecondaryPeerPaths)==
+                SecondaryProofKey(cell.SecondaryAnchorProofs,cell.SecondaryPeerPaths),"secondary family endpoints/native bend paths changed");
+            if(!cell.SecondaryObstruction)return;
+            VerifySecondaryGapMetadata(cell,meta);
+            Need(!cover&&!cell.Coplanar&&!cell.FreeEnd&&!cell.Terminal&&cell.SecondaryWitnessVolume>1e-13&&
+                Math.Abs(meta.MeasuredSelectedCellLow-cell.Low)<Eps&&Math.Abs(meta.MeasuredSelectedCellHigh-cell.High)<Eps&&
+                Math.Abs(meta.MeasuredSecondaryFlatLow-cell.SecondaryFlatLow)<1e-10&&
+                Math.Abs(meta.MeasuredSecondaryFlatHigh-cell.SecondaryFlatHigh)<1e-10&&
+                meta.MeasuredSecondaryBendAdjacent!=null&&cell.SecondaryBendAdjacent!=null&&
+                meta.MeasuredSecondaryBendAdjacent.SequenceEqual(cell.SecondaryBendAdjacent)&&
+                meta.MeasuredSecondaryBendWitnessVolumes!=null&&cell.SecondaryBendWitnessVolumes!=null&&
+                meta.MeasuredSecondaryBendWitnessVolumes.Length==2&&cell.SecondaryBendWitnessVolumes.Length==2&&
+                Enumerable.Range(0,2).All(i=>Math.Abs(meta.MeasuredSecondaryBendWitnessVolumes[i]-cell.SecondaryBendWitnessVolumes[i])<=1e-13)&&
+                Math.Abs(meta.MeasuredSecondaryWitnessVolume-cell.SecondaryWitnessVolume)<=1e-13,
+                "secondary exact complete surviving-cover footprint certificate changed");
+        }
+
+        static void CopyMeasuredBoundaryDatum(MeasuredCell target,MeasuredCell source,bool targetLow,bool sourceLow)
+        {
+            var point=sourceLow?source.LowDatum:source.HighDatum;
+            double offset=sourceLow?source.LowOffset:source.HighOffset;
+            bool onOwn=sourceLow?source.LowDatumOnOwn:source.HighDatumOnOwn;
+            var normal=sourceLow?source.LowDatumNormal:source.HighDatumNormal;
+            int adjacent=sourceLow?source.LowDatumAdjacent:source.HighDatumAdjacent;
+            if(targetLow){target.LowDatum=point;target.LowOffset=offset;target.LowDatumOnOwn=onOwn;target.LowDatumNormal=normal;target.LowDatumAdjacent=adjacent;}
+            else{target.HighDatum=point;target.HighOffset=offset;target.HighDatumOnOwn=onOwn;target.HighDatumNormal=normal;target.HighDatumAdjacent=adjacent;}
+        }
+
+        static double SecondaryExactGap(ModelDoc2 context,List<Body2> first,List<Body2> second,out double[] ownClosest)
+        {
+            ownClosest=null;double gap=Double.MaxValue;
+            foreach(var a in first)foreach(var b in second)
+            {
+                object p,q;double value=context.ClosestDistance(a,b,out p,out q);
+                Need(AfjTemporaryBoolean.Finite(value)&&value>=0,"secondary exact finite native-sector gap unavailable");
+                if(value>=gap)continue;
+                var point=p as double[];Need(point!=null&&point.Length>=3,"secondary exact native-sector closest witness unavailable");
+                gap=value;ownClosest=point.Take(3).ToArray();
+            }
+            return gap;
+        }
+
+        static void CertifySecondaryTangentGap(ISldWorks app,MeasuredCell cell,List<Body2> coveringKeepWorld)
+        {
+            Need(cell.SecondaryObstruction&&cell.SecondaryBendAdjacent!=null&&cell.SecondaryBendWitnessVolumes!=null,
+                "secondary tangent gap requires independent complete FLAT and native Bend certificates");
+            cell.SecondaryGapAdjacent=new[]{-1,-1};cell.SecondaryGapDistances=new double[2];cell.SecondaryGapBounds=new double[2];
+            cell.SecondaryFullAnnulusProofs=new double[2][];
+            var own=cell.Own;var peer=cell.Mate;
+            // The paired basis was certified before this helper. Do not extend
+            // this orthogonal one-gap rule to skew slabs or inherited cells.
+            if(cell.Coplanar||cell.Terminal||cell.FreeEnd||Math.Abs(cell.B)>1e-10||
+                Math.Abs(Math.Abs(Dot(own.WorldAxis,peer.WorldNormal))-1)>1e-10||
+                Math.Abs(Math.Abs(Dot(own.WorldNormal,peer.WorldAxis))-1)>1e-10)return;
+            var retainedPeer=SecondaryIntersect(AfjJointSolver.World(FiniteMaterialMasks(app,peer,0,peer.Length,peer.Low,peer.High,
+                "R72_TANGENT_GAP_NAMED_PEER_FLAT"),peer.Transform),coveringKeepWorld,"R72_TANGENT_GAP_RETAINED_NAMED_FLAT");
+            if(retainedPeer.Count==0)return;
+            var obstructionSides=Enumerable.Range(0,2).Where(i=>cell.SecondaryBendAdjacent[i]>=0&&cell.SecondaryBendWitnessVolumes[i]>1e-13).ToArray();
+            // An existing positive Bend chooses this operation's entry skin.
+            // This gap-only side must not select another whole-Bend entry.
+            if(obstructionSides.Length!=1)return;
+            var entryAdjacent=obstructionSides[0]==0?own.Previous:own.Next;
+            Need(entryAdjacent!=null&&entryAdjacent.Index==cell.SecondaryBendAdjacent[obstructionSides[0]],"secondary gap lost established operation entry Bend");
+            var entry=MeasuredBendEntry(own,entryAdjacent);double entryOffset=entry.Applicable&&entry.Opposite?own.Thickness:0;
+            var model=app.ActiveDoc as ModelDoc2;Need(model!=null,"exact secondary tangent gap needs its active B-rep distance context");
+            double fit=AfjManufacturingConventions.AssemblyFitGap,cutoff=CellCutoff(cell,false);
+            for(int side=0;side<2;side++)
+            {
+                if(cell.SecondaryBendAdjacent[side]>=0)continue;
+                bool far=side==1;var adjacent=far?own.Next:own.Previous;if(adjacent==null)continue;
+                double original=far?cell.SecondaryFlatHigh:cell.SecondaryFlatLow;
+                double selected=far?cell.High:cell.Low;if(Math.Abs(selected-original)>1e-9)continue;
+                var tangent=LongEdge(own,own.WorldU,far);
+                double station=Dot(Sub(tangent.Middle,own.WorldBase),own.WorldU);
+                if(Math.Abs(station-original)>1e-9)continue;
+                MeasuredNativeBend(own,adjacent);
+                double den=Dot(adjacent.Normal,own.U);if(Math.Abs(Math.Abs(den)-1)>1e-10)continue;
+                var datum=Add(adjacent.Support,Mul(adjacent.Normal,adjacent.Thickness));
+                double support=Dot(adjacent.A,adjacent.Normal)+adjacent.Thickness;
+                if(!Plane(adjacent.Inner,adjacent.Normal,support)||!Contains(adjacent.Inner,datum))continue;
+                double bound=(support-Dot(Add(own.A,Mul(own.Normal,entryOffset)),adjacent.Normal))/den;
+                double extension=far?bound-original:original-bound;
+                // The actual existing opposite skin must independently supply
+                // exactly the physical fit gap, without promoting 0/Length.
+                if(Math.Abs(extension-fit)>1e-9||bound<=Eps||bound>=own.Length-Eps)continue;
+                var first=own.Index<adjacent.Index?own:adjacent;var second=first==own?adjacent:own;
+                var map=SamePlaneBendMap(first,second,cutoff);int code;
+                var native=AfjTemporaryBoolean.Boolean(own.Source,AfjTemporaryBoolean.CreatePrism(app,map),
+                    (int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R72_TANGENT_GAP_EXACT_NATIVE_SECTOR");
+                var world=AfjJointSolver.World(native,own.Transform);
+                if(world.Count==0||AfjTemporaryBoolean.Total(SecondaryIntersect(world,retainedPeer,"R72_TANGENT_GAP_NO_VOLUME_COLLISION"))>1e-13)continue;
+                double[] closest;double distance=SecondaryExactGap(model,world,retainedPeer,out closest);
+                if(distance>=fit-1e-9||closest==null)continue;
+                double closestV=Dot(Sub(closest,own.WorldBase),own.WorldU);
+                if(closestV<Math.Min(bound,original)-Eps||closestV>Math.Max(bound,original)+Eps)continue;
+                double ri=Norm(Sub(map.Polygon[3],map.ArcCenters[0]));
+                Need(Math.Abs(ri-fit)<1e-9,"UNVERIFIED_SECONDARY_RADIAL_GAP: partial Normal projection needs a separately solved angular clearance for Ri different from fit gap");
+                double[] fullAnnulusProof;
+                if(!CertifyFullAnnulusRetainedEdge(app,cell,adjacent,side,map,world,retainedPeer,fit,out fullAnnulusProof))continue;
+                cell.SecondaryFullAnnulusProofs[side]=fullAnnulusProof;
+                bound=far?own.Length:0;
+                cell.SecondaryGapAdjacent[side]=adjacent.Index;cell.SecondaryGapDistances[side]=distance;cell.SecondaryGapBounds[side]=bound;
+                if(far){cell.High=bound;ClearMeasuredBoundaryDatum(cell,false);}else{cell.Low=bound;ClearMeasuredBoundaryDatum(cell,true);}
+                Trace.WriteLine("[AFJ-R72] SECONDARY_FULL_ANNULUS_FIT_GAP own="+own.Index+" adjacent="+adjacent.Index+" ri_m="+MeasuredTieNumber(ri)+" fit_m="+MeasuredTieNumber(fit)+" original_endpoint_v="+MeasuredTieNumber(bound)+" partial_projection_rejected=True native_oracle_required=True");
+
+            }
+        }
+
+        static bool SameSecondaryGapCertificate(MeasuredCell a,MeasuredCell b)
+        {
+            if(!a.SecondaryObstruction&&!b.SecondaryObstruction)return true;
+            return a.SecondaryObstruction&&b.SecondaryObstruction&&
+                SameFullAnnulusProofs(a.SecondaryFullAnnulusProofs,b.SecondaryFullAnnulusProofs)&&
+                a.SecondaryGapAdjacent!=null&&b.SecondaryGapAdjacent!=null&&a.SecondaryGapAdjacent.SequenceEqual(b.SecondaryGapAdjacent)&&
+                a.SecondaryGapDistances!=null&&b.SecondaryGapDistances!=null&&a.SecondaryGapDistances.Length==2&&b.SecondaryGapDistances.Length==2&&
+                a.SecondaryGapBounds!=null&&b.SecondaryGapBounds!=null&&a.SecondaryGapBounds.Length==2&&b.SecondaryGapBounds.Length==2&&
+                Enumerable.Range(0,2).All(i=>Math.Abs(a.SecondaryGapDistances[i]-b.SecondaryGapDistances[i])<=1e-9&&Math.Abs(a.SecondaryGapBounds[i]-b.SecondaryGapBounds[i])<=1e-9);
+        }
+
+        static void VerifySecondaryGapMetadata(MeasuredCell cell,AfjSheetSliceMetadata meta)
+        {
+            if(!cell.SecondaryObstruction)return;
+            Need(SameFullAnnulusProofs(meta.MeasuredSecondaryFullAnnulusProofs,cell.SecondaryFullAnnulusProofs)&&
+                meta.MeasuredSecondaryGapAdjacent!=null&&cell.SecondaryGapAdjacent!=null&&
+                meta.MeasuredSecondaryGapAdjacent.SequenceEqual(cell.SecondaryGapAdjacent)&&
+                meta.MeasuredSecondaryGapDistances!=null&&cell.SecondaryGapDistances!=null&&
+                meta.MeasuredSecondaryGapDistances.Length==2&&cell.SecondaryGapDistances.Length==2&&
+                meta.MeasuredSecondaryGapBounds!=null&&cell.SecondaryGapBounds!=null&&
+                meta.MeasuredSecondaryGapBounds.Length==2&&cell.SecondaryGapBounds.Length==2&&
+                Enumerable.Range(0,2).All(i=>Math.Abs(meta.MeasuredSecondaryGapDistances[i]-cell.SecondaryGapDistances[i])<=1e-9&&
+                    Math.Abs(meta.MeasuredSecondaryGapBounds[i]-cell.SecondaryGapBounds[i])<=1e-9),
+                "secondary tangent physical-gap proof changed under independent B-rep re-read");
+            for(int side=0;side<2;side++)
+            {
+                if(cell.SecondaryGapAdjacent[side]<0)continue;
+                bool low=side==0;double bound=cell.SecondaryGapBounds[side];
+                // A partition can retain this proof while excluding its endpoint.
+                if(Math.Abs((low?cell.Low:cell.High)-bound)>Eps)continue;
+                if(Math.Abs(bound-(low?0:cell.Own.Length))<Eps) {
+                    Need(cell.SecondaryFullAnnulusProofs!=null&&cell.SecondaryFullAnnulusProofs.Length==2&&
+                        cell.SecondaryFullAnnulusProofs[side]!=null&&cell.SecondaryFullAnnulusProofs[side].Length==11,
+                        "Full annulus promotion lost complete retained finite edge and actual inner-radius projection proof");
+                    Need((low?meta.ContactLowDatumWorld:meta.ContactHighDatumWorld)==null&&
+                        !(low?meta.ContactLowDatumOnOwnComponent:meta.ContactHighDatumOnOwnComponent)&&
+                        (low?meta.ContactLowDatumAdjacentStripIndex:meta.ContactHighDatumAdjacentStripIndex)==-1,
+                        "Full annulus gap must use exact original profile endpoint authority");continue;
+                }
+                Need((low?meta.ContactLowDatumOnOwnComponent:meta.ContactHighDatumOnOwnComponent)&&
+                    (low?meta.ContactLowDatumAdjacentStripIndex:meta.ContactHighDatumAdjacentStripIndex)==cell.SecondaryGapAdjacent[side]&&
+                    SameMeasuredOptionalVector(low?meta.ContactLowDatumWorld:meta.ContactHighDatumWorld,low?cell.LowDatum:cell.HighDatum)&&
+                    SameMeasuredOptionalVector(low?meta.ContactLowDatumPlaneNormalWorld:meta.ContactHighDatumPlaneNormalWorld,low?cell.LowDatumNormal:cell.HighDatumNormal)&&
+                    Math.Abs(low?meta.ContactLowDatumOffset:meta.ContactHighDatumOffset)<1e-12,
+                    "secondary tangent gap lost its independently finite own opposite-skin datum");
+            }
+        }
+
+        static void AssignSecondaryPartialNormalBendMaps(ISldWorks app,Strip[] strips,AfjCutPlan plan,string frame)
+        {
+            foreach(var operation in plan.Operations)
+            {
+                if(operation.Tools.Count!=1)continue;var tool=operation.Tools[0];var meta=tool.SheetSlice;
+                if(meta==null||!meta.MeasuredSecondaryObstruction||meta.CoveringMember||!meta.ConstantAxialCutoff.HasValue||meta.TerminalOverhangTrim)continue;
+                Need(meta.StripIndex>=0&&meta.StripIndex<strips.Length,"secondary partial Normal map lost its original strip");
+                var own=strips[meta.StripIndex];double cutoff=meta.ConstantAxialCutoff.Value;
+                foreach(var adjacent in new[]{own.Previous,own.Next}.Where(x=>x!=null))
+                {
+                    var first=own.Index<adjacent.Index?own:adjacent;var second=first==own?adjacent:own;
+                    MeasuredNativeBend(own,adjacent);var map=SamePlaneBendMap(first,second,cutoff);
+                    if(meta.NormalBendPreserveMaps.Any(p=>SameSecondaryNativeBendSector(p,map,own.Axis)))continue;
+                    // Eligible windows come from BOTH measured Ri/Ro skins
+                    // against the actual operation-entry finite tool contour.
+                    if(NormalOuterArcWindows(map,tool).Count==0)continue;
+                    var radial=NormalOuterArcProjection(map,tool);var actual=new List<Body2>();int code;
+                    foreach(var r in radial)actual.AddRange(AfjTemporaryBoolean.Boolean(own.Source,AfjTemporaryBoolean.CreatePrism(app,r),
+                        (int)swBodyOperationType_e.SWBODYINTERSECT,out code,"R72_SECONDARY_PARTIAL_NATIVE_NORMAL_STOCK"));
+                    double volume=AfjTemporaryBoolean.Total(actual);if(volume<=1e-13)continue;
+                    meta.NormalBendPreserveMaps.Add(map);meta.NormalBendRemovalMaps.AddRange(radial);
+                    Trace.WriteLine("[AFJ-R72] SECONDARY_PARTIAL_NATIVE_NORMAL_BEND frame="+frame+" own="+own.Index+" adjacent="+adjacent.Index+
+                        " mate="+meta.MateStripIndex+" radial_windows="+radial.Count+" actual_native_mapped_stock_m3="+MeasuredTieNumber(volume)+
+                        " contact_low_v="+MeasuredTieNumber(meta.ContactLow)+" contact_high_v="+MeasuredTieNumber(meta.ContactHigh)+
+                        " authority=ACTUAL_PAIRED_RI_RO_ELIGIBLE_NORMAL_WINDOWS;EXISTING_MAPS_PRESERVED;NATIVE_NORMAL_ORACLE_REQUIRED");
+                }
+            }
+        }
+
+        static void ClearMeasuredBoundaryDatum(MeasuredCell target,bool low)
+        {
+            if(low){target.LowDatum=null;target.LowOffset=0;target.LowDatumOnOwn=false;target.LowDatumNormal=null;target.LowDatumAdjacent=-1;}
+            else{target.HighDatum=null;target.HighOffset=0;target.HighDatumOnOwn=false;target.HighDatumNormal=null;target.HighDatumAdjacent=-1;}
+        }
+
+        static bool SameSecondaryNativeBendSector(AfjToolDefinition first,AfjToolDefinition second,double[] axis)
+        {
+            if(first==null||second==null||first.ArcCenters==null||second.ArcCenters==null||
+                first.ArcCenters[0]==null||second.ArcCenters[0]==null||first.Polygon==null||second.Polygon==null||
+                first.Polygon.Length!=4||second.Polygon.Length!=4)return false;
+            var a=first.ArcCenters[0];var b=second.ArcCenters[0];var delta=Sub(a,b);
+            if(Norm(Sub(delta,Mul(axis,Dot(delta,axis))))>=Eps||
+                Math.Abs(Norm(Sub(first.Polygon[0],a))-Norm(Sub(second.Polygon[0],b)))>1e-9||
+                Math.Abs(Norm(Sub(first.Polygon[3],a))-Norm(Sub(second.Polygon[3],b)))>1e-9)return false;
+            var f0=Unit(Sub(first.Polygon[0],a));var f1=Unit(Sub(first.Polygon[1],a));
+            var s0=Unit(Sub(second.Polygon[0],b));var s1=Unit(Sub(second.Polygon[1],b));
+            return Same(f0,s0)&&Same(f1,s1)||Same(f0,s1)&&Same(f1,s0);
+        }
+
+        // Equality Ri==fit requires the full native radial sector only when
+        // the retained NAMED flat's finite transverse edge passes through the
+        // actual cylinder center. The peer's 0/t planes are axial here, so they
+        // cannot substitute for that finite transverse boundary certificate.
+        static bool CertifyFullAnnulusRetainedEdge(ISldWorks app,MeasuredCell cell,Strip adjacent,int side,
+            AfjToolDefinition map,List<Body2> nativeSectorWorld,List<Body2> retainedPeer,double fit,out double[] proof)
+        {
+            proof=null;var own=cell.Own;var peer=cell.Mate;bool far=side==1;
+            if(map==null||map.ArcCenters==null||map.ArcCenters.Length!=4||map.ArcCenters[0]==null||
+                map.Polygon==null||map.Polygon.Length!=4||retainedPeer.Count==0)return false;
+            var c=map.ArcCenters[0];double ri=Norm(Sub(map.Polygon[3],c)),ro=Norm(Sub(map.Polygon[0],c));
+            if(Math.Abs(ri-fit)>1e-9||ro<=ri||Math.Abs(ro-ri-own.Thickness)>1e-9)return false;
+            bool ownFirst=own.Index<adjacent.Index;
+            var ownRadial=Unit(Sub(map.Polygon[ownFirst?0:1],c));
+            var adjacentRadial=Unit(Sub(map.Polygon[ownFirst?1:0],c));
+            var ownWorldRadial=Vector(ownRadial,own.Transform);var adjacentWorldRadial=Vector(adjacentRadial,own.Transform);
+            var outward=Mul(own.WorldU,far?1:-1);
+            // This bounded certificate is for the exact quarter annulus whose
+            // adjacent tangent points away from the retained peer edge.
+            if(Dot(adjacentWorldRadial,outward)<1-1e-10||Math.Abs(Dot(ownWorldRadial,outward))>1e-10||
+                Math.Abs(Dot(ownWorldRadial,adjacentWorldRadial))>1e-10||
+                Math.Abs(Math.Abs(Dot(ownWorldRadial,own.WorldNormal))-1)>1e-10)return false;
+            var centerWorld=Point(c,own.Transform);double centerStation=Dot(centerWorld,own.WorldU);
+            double edgeStation=far?retainedPeer.Max(b=>AfjJointSolver.Projection(b,own.WorldU)):
+                retainedPeer.Min(b=>-AfjJointSolver.Projection(b,Mul(own.WorldU,-1)));
+            var originalPeerEdge=LongEdge(peer,own.WorldU,far);
+            if(Math.Abs(edgeStation-centerStation)>1e-9||Math.Abs(originalPeerEdge.Station-edgeStation)>1e-9)return false;
+            // Re-read an actual finite boundary FACE of the retained paired
+            // flat mask. Its complete material support is proved below, not
+            // inferred merely from an extreme-point/bounding support value.
+            double edgeFaceArea=0;
+            foreach(var face in retainedPeer.SelectMany(b=>ArrayOf(b.GetFaces()).OfType<Face2>()))
+            {
+                var surface=face.GetSurface() as Surface;if(surface==null||!surface.IsPlane())continue;
+                var p=surface.PlaneParams as double[];if(p==null||p.Length<6)continue;
+                if(Math.Abs(Dot(Unit(p.Take(3).ToArray()),own.WorldU))<1-1e-10||
+                    Math.Abs(Dot(p.Skip(3).Take(3).ToArray(),own.WorldU)-edgeStation)>1e-9)continue;
+                edgeFaceArea=Math.Max(edgeFaceArea,face.GetArea());
+            }
+            if(edgeFaceArea<=1e-13)return false;
+            double den=Dot(peer.WorldNormal,own.WorldAxis);if(Math.Abs(Math.Abs(den)-1)>1e-10)return false;
+            double opposite=cell.A+peer.Thickness/den;
+            double x0=Math.Max(own.Low,Math.Min(cell.A,opposite)),x1=Math.Min(own.High,Math.Max(cell.A,opposite));
+            if(x1-x0<=Eps)return false;
+            var innerAdjacent=Add(centerWorld,Mul(adjacentWorldRadial,ri));
+            var innerOwn=Add(centerWorld,Mul(ownWorldRadial,ri));
+            double w0=Math.Min(Dot(Sub(innerAdjacent,own.WorldPlanePoint),own.WorldNormal),Dot(Sub(innerOwn,own.WorldPlanePoint),own.WorldNormal));
+            double w1=Math.Max(Dot(Sub(innerAdjacent,own.WorldPlanePoint),own.WorldNormal),Dot(Sub(innerOwn,own.WorldPlanePoint),own.WorldNormal));
+            if(w1-w0<=Eps)return false;
+            double v=edgeStation-Dot(own.WorldBase,own.WorldU);
+            // Entire peer thickness and entire inner-arc projection must have
+            // retained finite paired material immediately inside this edge.
+            // This exact solid-containment proof rejects an end wedge or hole.
+            var edgeWindow=AfjTemporaryBoolean.CreatePrism(app,new AfjToolDefinition{
+                Polygon=new[]{Add(NativePoint(own,x0,v),Mul(own.Normal,w0)),Add(NativePoint(own,x1,v),Mul(own.Normal,w0)),
+                    Add(NativePoint(own,x1,v),Mul(own.Normal,w1)),Add(NativePoint(own,x0,v),Mul(own.Normal,w1))},
+                Direction=Mul(own.U,far?-1:1),Length=fit});
+            var edgeWindowWorld=AfjJointSolver.World(new[]{edgeWindow},own.Transform);
+            double windowVolume=AfjTemporaryBoolean.Total(edgeWindowWorld);
+            if(windowVolume<=1e-13||OutsideMeasuredUnion(edgeWindowWorld,retainedPeer)>1e-13)return false;
+            var first=ownFirst?own:adjacent;var second=ownFirst?adjacent:own;
+            var completeNative=SamePlaneBendMap(first,second,x0);completeNative.Length=x1-x0;
+            var completeBody=AfjTemporaryBoolean.CreatePrism(app,completeNative);
+            double annulusVolume=AfjTemporaryBoolean.Volume(completeBody);
+            if(annulusVolume<=1e-13||OutsideMeasuredUnion(new[]{completeBody},new List<Body2>{own.Source})>1e-13||
+                nativeSectorWorld.Count==0||AfjTemporaryBoolean.Total(nativeSectorWorld)<=1e-13)return false;
+            // For this measured geometry d(r,theta)=r*cos(theta). Since
+            // Ri==fit, every theta>0 violates fit at the native inner radius.
+            // Native radial NormalCut therefore requires the whole sector;
+            // its adjacent tangent at theta=0 remains exactly fit away.
+            proof=new[]{ri,ro,edgeStation,centerStation,w0,w1,x0,x1,windowVolume,annulusVolume,edgeFaceArea};
+            Trace.WriteLine("[AFJ-R72] FULL_ANNULUS_RETAINED_EDGE_CERTIFICATE own="+own.Index+" mate="+peer.Index+" adjacent="+adjacent.Index+
+                " side="+(far?"HIGH":"LOW")+" ri_m="+MeasuredTieNumber(ri)+" ro_m="+MeasuredTieNumber(ro)+
+                " actual_retained_transverse_edge_station="+MeasuredTieNumber(edgeStation)+" actual_cylinder_center_station="+MeasuredTieNumber(centerStation)+
+                " complete_retained_inner_projection_window_m3="+MeasuredTieNumber(windowVolume)+
+                " complete_original_native_annulus_witness_m3="+MeasuredTieNumber(annulusVolume)+
+                " clearance=MINIMUM_OVER_BOTH_ACTUAL_RADII;SOURCE_FLAT_AND_BEND_IDENTITY_REDERIVED=True");
+            return true;
+        }
+
+        static bool SameFullAnnulusProofs(double[][] first,double[][] second)
+        {
+            if(first==null||second==null)return first==null&&second==null;
+            if(first.Length!=2||second.Length!=2)return false;
+            for(int side=0;side<2;side++)
+            {
+                var a=first[side];var b=second[side];if(a==null||b==null){if(a!=null||b!=null)return false;continue;}
+                if(a.Length!=11||b.Length!=11)return false;
+                for(int i=0;i<11;i++)if(Math.Abs(a[i]-b[i])>(i<8?1e-9:i<10?1e-13:1e-12))return false;
+            }
+            return true;
+        }
+
+        static void FinishMeasuredPlan(ISldWorks app,Strip[] strips,AfjCutPlan plan,string frame)
+        {
+            AssignStandaloneConstantNormalBendMaps(app,strips,plan,frame);
+            AssignPiecewiseGuideNormalBendMaps(app,strips,plan,frame);
+            AssignSecondaryPartialNormalBendMaps(app,strips,plan,frame);
+            AssignMeasuredAdjacentFlatPreservation(app,strips,plan,frame);
+            AssignMeasuredAdjacentFlatCarryover(app,strips,plan,frame);
         }
 
         static void ApplyMeasured(ISldWorks app,AfjParametricPlan generated,AfjProfile pa,AfjProfile pb,Body2 ba,Body2 bb,MathTransform ta,MathTransform tb,bool coverA)
@@ -14072,11 +15714,21 @@ namespace ADDIN.Commands.AutoFrameJoint
             var a=Read(pa,ba,ta,coverA?generated.OutWinner:generated.OutLoser,coverA?generated.Winner:generated.Loser,true);
             var b=Read(pb,bb,tb,coverA?generated.OutLoser:generated.OutWinner,coverA?generated.Loser:generated.Winner,true);
             var evidence=new AfjSheetSlicePlanEvidence();var guides=new AfjJointPlan{RuleId=AfjMeasuredContactRules.RuleId+"_MEASURED_GUIDES"};
-            var aa=PlanMeasured(app,a,b,coverA,"A",guides.A,evidence);var bbPlan=PlanMeasured(app,b,a,!coverA,"B",guides.B,evidence);
-            AssignStandaloneConstantNormalBendMaps(app,a,aa,"A");AssignStandaloneConstantNormalBendMaps(app,b,bbPlan,"B");
-            AssignPiecewiseGuideNormalBendMaps(app,a,aa,"A");AssignPiecewiseGuideNormalBendMaps(app,b,bbPlan,"B");
-            AssignMeasuredAdjacentFlatPreservation(app,a,aa,"A");AssignMeasuredAdjacentFlatPreservation(app,b,bbPlan,"B");
-            AssignMeasuredAdjacentFlatCarryover(app,a,aa,"A");AssignMeasuredAdjacentFlatCarryover(app,b,bbPlan,"B");
+            AfjCutPlan aa,bbPlan;AfjBooleanResult fixedCover;
+            if(coverA)
+            {
+                aa=PlanMeasured(app,a,b,true,"A",guides.A,evidence);FinishMeasuredPlan(app,a,aa,"A");
+                fixedCover=AfjTemporaryBoolean.Execute(app,AfjTemporaryBoolean.Copy(ba),aa);
+                Need(fixedCover.Kept.Count==1,"independently planned covering A must retain one solid");
+                bbPlan=PlanMeasured(app,b,a,false,"B",guides.B,evidence,fixedCover);FinishMeasuredPlan(app,b,bbPlan,"B");
+            }
+            else
+            {
+                bbPlan=PlanMeasured(app,b,a,true,"B",guides.B,evidence);FinishMeasuredPlan(app,b,bbPlan,"B");
+                fixedCover=AfjTemporaryBoolean.Execute(app,AfjTemporaryBoolean.Copy(bb),bbPlan);
+                Need(fixedCover.Kept.Count==1,"independently planned covering B must retain one solid");
+                aa=PlanMeasured(app,a,b,false,"A",guides.A,evidence,fixedCover);FinishMeasuredPlan(app,a,aa,"A");
+            }
             Need(aa.Operations.Count+bbPlan.Operations.Count>0,"no positive measured local contact removal");
             generated.GuidePlan=guides;generated.SheetSlices=evidence;generated.Plan=new AfjJointPlan{RuleId=AfjMeasuredContactRules.RuleId,A=aa,B=bbPlan};
         }
