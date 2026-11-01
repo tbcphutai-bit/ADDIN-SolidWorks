@@ -1,0 +1,10 @@
+{
+  "native_tested_source_sha256": "2bc61527c5aea88efe145eeb6262fedb0a3445967238116cff35239024529d55",
+  "delivered_source_sha256": "cc7fc64ab6b5a6d51cbf5e5ef6b59bd1d15f509d29af262d2e173a52cb92b68c",
+  "native_tested_bytes": 452593,
+  "delivered_bytes": 452592,
+  "change": "Removed one redundant LF at EOF only; no C# token or logic change",
+  "compared_full_source_bytes_except_final_lf": true,
+  "native_tests_repeated": false,
+  "completed_utc": "2026-10-23T13:38:38.1411202Z"
+}

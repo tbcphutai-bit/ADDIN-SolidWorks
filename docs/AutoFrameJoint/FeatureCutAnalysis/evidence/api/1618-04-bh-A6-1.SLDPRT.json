@@ -1,0 +1,3382 @@
+{
+  "part": {
+    "file": "1618-04-bh-A6-1.SLDPRT",
+    "sha256_before": "93eb041958540e6d3d98054f252d2782b7e6333e5b5456447633b15d02c5e528",
+    "sha256_after": "93eb041958540e6d3d98054f252d2782b7e6333e5b5456447633b15d02c5e528",
+    "source_hash_unchanged": true,
+    "title": "1618-04-bh-A6-1",
+    "document_type": 1,
+    "path_matches_request": true,
+    "read_only": true,
+    "open_errors": 0,
+    "open_warnings": 0,
+    "configuration": "Default",
+    "all_configuration_names": [
+      "Default",
+      "DefaultSM-FLAT-PATTERN"
+    ],
+    "top_level_feature_count": 44,
+    "unique_tree_node_count": 52,
+    "explicit_cut_count": 0,
+    "sheet_metal": [
+      {
+        "BendRadius": 0.0001,
+        "Thickness": 0.003,
+        "BendAllowanceType": 1,
+        "BendTableFile": "REDACTED_LOCAL_PATH",
+        "KFactor": 0.5,
+        "BendAllowance": 0,
+        "UseAutoRelief": true,
+        "AutoReliefType": 2,
+        "ReliefRatio": 0,
+        "UseMaterialSheetMetalParameters": false
+      }
+    ],
+    "bodies": [
+      {
+        "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+        "box_m": [
+          0,
+          -9.999999999999746e-05,
+          -1.1475,
+          3.5925,
+          0.018000000000000065,
+          0
+        ],
+        "spans_mm": [
+          3592.5,
+          18.100000000000062,
+          1147.5
+        ],
+        "face_count": 134,
+        "volume_mm3": 12388528.37208117,
+        "surface_area_mm2": 8284612.631776651
+      }
+    ],
+    "save_flag_before_read": false,
+    "save_flag_after_read": false
+  },
+  "feature_tree": [
+    {
+      "index": 1,
+      "relation": "top_level",
+      "name": "Configuration Comments",
+      "type": "ConfigCommentsFolder",
+      "legacy_type": "ConfigCommentsFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 2,
+      "relation": "top_level",
+      "name": "Favorites",
+      "type": "FavoriteFolder",
+      "legacy_type": "FavoriteFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 3,
+      "relation": "top_level",
+      "name": "History",
+      "type": "HistoryFolder",
+      "legacy_type": "HistoryFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 4,
+      "relation": "top_level",
+      "name": "Selection Sets",
+      "type": "SelectionSetFolder",
+      "legacy_type": "SelectionSetFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 5,
+      "relation": "top_level",
+      "name": "Sensors",
+      "type": "SensorFolder",
+      "legacy_type": "SensorFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 6,
+      "relation": "top_level",
+      "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+      "type": "DocsFolder",
+      "legacy_type": "DocsFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 7,
+      "relation": "top_level",
+      "name": "Annotations",
+      "type": "DetailCabinet",
+      "legacy_type": "DetailCabinet",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "Notes",
+          "type": "NotesAreaFtrFolder",
+          "legacy_type": "NotesAreaFtrFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "Notes Area",
+          "type": "AnnotationViewFeat",
+          "legacy_type": "AnnotationViewFeat",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "Notes1___EndTag___",
+          "type": "FtrFolder",
+          "legacy_type": "FtrFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "relation": "top_level",
+      "name": "Markups",
+      "type": "InkMarkupFolder",
+      "legacy_type": "InkMarkupFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 9,
+      "relation": "top_level",
+      "name": "Lights and Cameras",
+      "type": "EnvFolder",
+      "legacy_type": "EnvFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "Ambient",
+          "type": "AmbientLight",
+          "legacy_type": "AmbientLight",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "Directional1",
+          "type": "DirectionLight",
+          "legacy_type": "DirectionLight",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "relation": "top_level",
+      "name": "Solid Bodies",
+      "type": "SolidBodyFolder",
+      "legacy_type": "SolidBodyFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "Sheet<1>",
+          "type": "CutListFolder",
+          "legacy_type": "CutListFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "Sheet<2>",
+          "type": "CutListFolder",
+          "legacy_type": "CutListFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "relation": "top_level",
+      "name": "Surface Bodies",
+      "type": "SurfaceBodyFolder",
+      "legacy_type": "SurfaceBodyFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 12,
+      "relation": "top_level",
+      "name": "Comments",
+      "type": "CommentsFolder",
+      "legacy_type": "CommentsFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 13,
+      "relation": "top_level",
+      "name": "Equations",
+      "type": "EqnFolder",
+      "legacy_type": "EqnFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 14,
+      "relation": "top_level",
+      "name": "A1100-",
+      "type": "MaterialFolder",
+      "legacy_type": "MaterialFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 15,
+      "relation": "top_level",
+      "name": "Front",
+      "type": "RefPlane",
+      "legacy_type": "RefPlane",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [
+        {
+          "feature_name": "Origin",
+          "type": "OriginProfileFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 16,
+      "relation": "top_level",
+      "name": "Top",
+      "type": "RefPlane",
+      "legacy_type": "RefPlane",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 17,
+      "relation": "top_level",
+      "name": "Right",
+      "type": "RefPlane",
+      "legacy_type": "RefPlane",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 18,
+      "relation": "top_level",
+      "name": "Origin",
+      "type": "OriginProfileFeature",
+      "legacy_type": "OriginProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "Front",
+          "type": "RefPlane"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 0,
+        "construction_segment_count": 0,
+        "contour_count_api": 0,
+        "region_count_api": 0,
+        "endpoint_graph_closed_inferred": false,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": null,
+        "model_bounds_mm": null,
+        "sketch_normal_model": [
+          0,
+          0,
+          1
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 19,
+      "relation": "top_level",
+      "name": "ｽｹｯﾁ1",
+      "type": "ProfileFeature",
+      "legacy_type": "ProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "Top",
+          "type": "RefPlane"
+        },
+        {
+          "feature_name": "Origin",
+          "type": "OriginProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 4,
+        "construction_segment_count": 0,
+        "contour_count_api": 1,
+        "region_count_api": 1,
+        "endpoint_graph_closed_inferred": true,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": [
+          0,
+          0,
+          0,
+          3592.5,
+          1147.5,
+          0
+        ],
+        "model_bounds_mm": [
+          0,
+          0,
+          -1147.5,
+          3592.5,
+          0,
+          0
+        ],
+        "sketch_normal_model": [
+          0,
+          1,
+          0
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 20,
+      "relation": "top_level",
+      "name": "板金19",
+      "type": "SheetMetal",
+      "legacy_type": "SheetMetal",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "板金",
+          "type": "TemplateSheetMetal"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+          "type": "FlatPattern"
+        }
+      ],
+      "definition": {
+        "ISheetMetalFeatureData": {
+          "BendRadius": 0.0001,
+          "Thickness": 0.003,
+          "BendAllowanceType": 1,
+          "BendTableFile": "REDACTED_LOCAL_PATH",
+          "KFactor": 0.5,
+          "BendAllowance": 0,
+          "UseAutoRelief": true,
+          "AutoReliefType": 2,
+          "ReliefRatio": 0,
+          "UseMaterialSheetMetalParameters": false
+        }
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 21,
+      "relation": "top_level",
+      "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+      "type": "SMBaseFlange",
+      "legacy_type": "SMBaseFlange",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "板金",
+          "type": "TemplateSheetMetal"
+        },
+        {
+          "feature_name": "板金19",
+          "type": "SheetMetal"
+        },
+        {
+          "feature_name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "Top",
+          "type": "RefPlane"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<3>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し22",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a3",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "a1",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し21",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a2",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "a",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "スタッド7.5<2>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "スタッド7.5<1>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+          "type": "FlatPattern"
+        },
+        {
+          "feature_name": "スタッド7.5<4>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し23",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し2",
+          "type": "ICE"
+        }
+      ],
+      "definition": {
+        "IBaseFlangeFeatureData": {
+          "OffsetDirections": 1,
+          "D1OffsetType": 1,
+          "D2OffsetType": 1,
+          "D1OffsetDistance": 0.03,
+          "D2OffsetDistance": 0.001,
+          "Thickness": 0.003,
+          "ReverseThickness": true,
+          "BendRadius": 0.0001,
+          "ReverseDirection": true,
+          "D1ReverseOffset": false,
+          "D2ReverseOffset": true,
+          "UseGaugeTable": false,
+          "GaugeTablePath": "",
+          "ThicknessTableName": null,
+          "TableThickness": 0,
+          "OverrideThickness": false,
+          "TableRadius": 0,
+          "OverrideRadius": false,
+          "KFactor": 0.5,
+          "OverrideKFactor": false,
+          "TableKFactor": 0,
+          "UseMaterialSheetMetalParameters": false,
+          "UseDefaultBendAllowance": false,
+          "OverrideDefaultSheetMetalParameters": false,
+          "UseDefaultBendRelief": true,
+          "ReliefType": 2,
+          "UseReliefRatio": true,
+          "ReliefRatio": 0,
+          "ReliefWidth": 0,
+          "ReliefDepth": 0,
+          "D1EndConditionType": 1,
+          "D1EndConditionDistance": 0.03,
+          "D2EndConditionType": 1,
+          "D2EndConditionDistance": 0.001,
+          "SymmetricThickness": false
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "Top",
+              "type": "RefPlane"
+            },
+            {
+              "feature_name": "Origin",
+              "type": "OriginProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 4,
+            "construction_segment_count": 0,
+            "contour_count_api": 1,
+            "region_count_api": 1,
+            "endpoint_graph_closed_inferred": true,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              0,
+              0,
+              0,
+              3592.5,
+              1147.5,
+              0
+            ],
+            "model_bounds_mm": [
+              0,
+              0,
+              -1147.5,
+              3592.5,
+              0,
+              0
+            ],
+            "sketch_normal_model": [
+              0,
+              1,
+              0
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 22,
+      "relation": "top_level",
+      "name": "Sheet<1>",
+      "type": "CutListFolder",
+      "legacy_type": "CutListFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 23,
+      "relation": "top_level",
+      "name": "a",
+      "type": "ProfileFeature",
+      "legacy_type": "ProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ2",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "スタッド7.5<1>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ1",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し2",
+          "type": "ICE"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 1,
+        "construction_segment_count": 2,
+        "contour_count_api": 1,
+        "region_count_api": 2,
+        "endpoint_graph_closed_inferred": true,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": [
+          4698.39139712234,
+          890.9203155765557,
+          0,
+          4705.891397122341,
+          898.4203155765562,
+          0
+        ],
+        "model_bounds_mm": [
+          3438.7499999999995,
+          3.000000000000067,
+          -1097.7500000000005,
+          3446.25,
+          3.0000000000000675,
+          -1090.25
+        ],
+        "sketch_normal_model": [
+          0,
+          1,
+          6.123233995736766e-17
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 24,
+      "relation": "top_level",
+      "name": "ﾎﾞｽ - 押し出し2",
+      "type": "ICE",
+      "legacy_type": "Boss",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "a",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ2",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "スタッド7.5<1>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ1",
+          "type": "CurvePattern"
+        }
+      ],
+      "definition": {
+        "IExtrudeFeatureData2": {
+          "ReverseDirection": true,
+          "BothDirections": true,
+          "FlipSideToCut": false,
+          "ThinWallType": -1,
+          "CapEnds": false,
+          "CapThickness": 0,
+          "Merge": true,
+          "FeatureScope": true,
+          "AutoSelect": false,
+          "FromType": 0,
+          "FromOffsetDistance": 0,
+          "FromOffsetReverse": false,
+          "LinkToThickness": false,
+          "AssemblyFeatureScope": true,
+          "AutoSelectComponents": true,
+          "PropagateFeatureToParts": false,
+          "NormalCut": false,
+          "OptimizeGeometry": false
+        },
+        "extrude": {
+          "end_condition_forward": 0,
+          "end_condition_reverse": 0,
+          "depth_forward_m": 0.0031,
+          "depth_reverse_m": 0.015,
+          "draft_forward_enabled": false,
+          "draft_reverse_enabled": false,
+          "draft_forward_rad": 0,
+          "draft_reverse_rad": 0,
+          "draft_outward_forward": false,
+          "draft_outward_reverse": false,
+          "reverse_offset_forward": false,
+          "reverse_offset_reverse": false,
+          "is_thin": false,
+          "scope_body_count": -1
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "a",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ2",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "スタッド7.5<1>",
+              "type": "LibraryFeature"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ1",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し2",
+              "type": "ICE"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 1,
+            "construction_segment_count": 2,
+            "contour_count_api": 1,
+            "region_count_api": 2,
+            "endpoint_graph_closed_inferred": true,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              4698.39139712234,
+              890.9203155765557,
+              0,
+              4705.891397122341,
+              898.4203155765562,
+              0
+            ],
+            "model_bounds_mm": [
+              3438.7499999999995,
+              3.000000000000067,
+              -1097.7500000000005,
+              3446.25,
+              3.0000000000000675,
+              -1090.25
+            ],
+            "sketch_normal_model": [
+              0,
+              1,
+              6.123233995736766e-17
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 25,
+      "relation": "top_level",
+      "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ1",
+      "type": "CurvePattern",
+      "legacy_type": "CurvePattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し2",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<1>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 26,
+      "relation": "top_level",
+      "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ2",
+      "type": "CurvePattern",
+      "legacy_type": "CurvePattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": true,
+      "suppressed_by_config": {
+        "Default": [
+          true
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          true
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し2",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<1>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 27,
+      "relation": "top_level",
+      "name": "スタッド7.5<1>",
+      "type": "LibraryFeature",
+      "legacy_type": "LibraryFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": true,
+      "suppressed_by_config": {
+        "Default": [
+          true
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          true
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "a",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し2",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ1",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ2",
+          "type": "CurvePattern"
+        }
+      ],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ﾎﾞｽ - 押し出し2",
+          "type": "ICE",
+          "legacy_type": "Boss",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "a",
+              "type": "ProfileFeature"
+            },
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ2",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "スタッド7.5<1>",
+              "type": "LibraryFeature"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ1",
+              "type": "CurvePattern"
+            }
+          ],
+          "definition": {
+            "IExtrudeFeatureData2": {
+              "ReverseDirection": true,
+              "BothDirections": true,
+              "FlipSideToCut": false,
+              "ThinWallType": -1,
+              "CapEnds": false,
+              "CapThickness": 0,
+              "Merge": true,
+              "FeatureScope": true,
+              "AutoSelect": false,
+              "FromType": 0,
+              "FromOffsetDistance": 0,
+              "FromOffsetReverse": false,
+              "LinkToThickness": false,
+              "AssemblyFeatureScope": true,
+              "AutoSelectComponents": true,
+              "PropagateFeatureToParts": false,
+              "NormalCut": false,
+              "OptimizeGeometry": false
+            },
+            "extrude": {
+              "end_condition_forward": 0,
+              "end_condition_reverse": 0,
+              "depth_forward_m": 0.0031,
+              "depth_reverse_m": 0.015,
+              "draft_forward_enabled": false,
+              "draft_reverse_enabled": false,
+              "draft_forward_rad": 0,
+              "draft_reverse_rad": 0,
+              "draft_outward_forward": false,
+              "draft_outward_reverse": false,
+              "reverse_offset_forward": false,
+              "reverse_offset_reverse": false,
+              "is_thin": false,
+              "scope_body_count": -1
+            }
+          },
+          "subfeatures": [
+            {
+              "index": 1,
+              "relation": "subfeature",
+              "name": "a",
+              "type": "ProfileFeature",
+              "legacy_type": "ProfileFeature",
+              "evidence": "API_VERIFIED",
+              "suppressed_active": false,
+              "suppressed_by_config": {
+                "Default": [
+                  false
+                ],
+                "DefaultSM-FLAT-PATTERN": [
+                  false
+                ]
+              },
+              "parents": [
+                {
+                  "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+                  "type": "SMBaseFlange"
+                }
+              ],
+              "children": [
+                {
+                  "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ2",
+                  "type": "CurvePattern"
+                },
+                {
+                  "feature_name": "スタッド7.5<1>",
+                  "type": "LibraryFeature"
+                },
+                {
+                  "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ1",
+                  "type": "CurvePattern"
+                },
+                {
+                  "feature_name": "ﾎﾞｽ - 押し出し2",
+                  "type": "ICE"
+                }
+              ],
+              "definition": {},
+              "sketch_summary": {
+                "nonconstruction_segment_count": 1,
+                "construction_segment_count": 2,
+                "contour_count_api": 1,
+                "region_count_api": 2,
+                "endpoint_graph_closed_inferred": true,
+                "curve_geometry_supported": true,
+                "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+                "sketch_bounds_mm": [
+                  4698.39139712234,
+                  890.9203155765557,
+                  0,
+                  4705.891397122341,
+                  898.4203155765562,
+                  0
+                ],
+                "model_bounds_mm": [
+                  3438.7499999999995,
+                  3.000000000000067,
+                  -1097.7500000000005,
+                  3446.25,
+                  3.0000000000000675,
+                  -1090.25
+                ],
+                "sketch_normal_model": [
+                  0,
+                  1,
+                  6.123233995736766e-17
+                ],
+                "plane_kind_inferred": "axis_aligned"
+              },
+              "subfeatures": []
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ1",
+          "type": "CurvePattern",
+          "legacy_type": "CurvePattern",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し2",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "a",
+              "type": "ProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<1>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ2",
+          "type": "CurvePattern",
+          "legacy_type": "CurvePattern",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": true,
+          "suppressed_by_config": {
+            "Default": [
+              true
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              true
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し2",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "a",
+              "type": "ProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<1>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 28,
+      "relation": "top_level",
+      "name": "a1",
+      "type": "ProfileFeature",
+      "legacy_type": "ProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し21",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "スタッド7.5<2>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ21",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ11",
+          "type": "CurvePattern"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 1,
+        "construction_segment_count": 2,
+        "contour_count_api": 1,
+        "region_count_api": 14,
+        "endpoint_graph_closed_inferred": true,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": [
+          4846.517822964662,
+          -611.2872033727327,
+          0,
+          4854.017822964662,
+          -603.7872033727322,
+          0
+        ],
+        "model_bounds_mm": [
+          3550.249999999999,
+          3.0000000000000075,
+          -123.75000000000026,
+          3557.7499999999995,
+          3.000000000000008,
+          -116.24999999999974
+        ],
+        "sketch_normal_model": [
+          0,
+          1,
+          6.123233995736766e-17
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 29,
+      "relation": "top_level",
+      "name": "ﾎﾞｽ - 押し出し21",
+      "type": "ICE",
+      "legacy_type": "Boss",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "a1",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<2>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ21",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ11",
+          "type": "CurvePattern"
+        }
+      ],
+      "definition": {
+        "IExtrudeFeatureData2": {
+          "ReverseDirection": true,
+          "BothDirections": true,
+          "FlipSideToCut": false,
+          "ThinWallType": -1,
+          "CapEnds": false,
+          "CapThickness": 0,
+          "Merge": true,
+          "FeatureScope": true,
+          "AutoSelect": false,
+          "FromType": 0,
+          "FromOffsetDistance": 0,
+          "FromOffsetReverse": false,
+          "LinkToThickness": false,
+          "AssemblyFeatureScope": true,
+          "AutoSelectComponents": true,
+          "PropagateFeatureToParts": false,
+          "NormalCut": false,
+          "OptimizeGeometry": false
+        },
+        "extrude": {
+          "end_condition_forward": 0,
+          "end_condition_reverse": 0,
+          "depth_forward_m": 0.0031,
+          "depth_reverse_m": 0.015,
+          "draft_forward_enabled": false,
+          "draft_reverse_enabled": false,
+          "draft_forward_rad": 0,
+          "draft_reverse_rad": 0,
+          "draft_outward_forward": false,
+          "draft_outward_reverse": false,
+          "reverse_offset_forward": false,
+          "reverse_offset_reverse": false,
+          "is_thin": false,
+          "scope_body_count": -1
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "a1",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し21",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "スタッド7.5<2>",
+              "type": "LibraryFeature"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ21",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ11",
+              "type": "CurvePattern"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 1,
+            "construction_segment_count": 2,
+            "contour_count_api": 1,
+            "region_count_api": 14,
+            "endpoint_graph_closed_inferred": true,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              4846.517822964662,
+              -611.2872033727327,
+              0,
+              4854.017822964662,
+              -603.7872033727322,
+              0
+            ],
+            "model_bounds_mm": [
+              3550.249999999999,
+              3.0000000000000075,
+              -123.75000000000026,
+              3557.7499999999995,
+              3.000000000000008,
+              -116.24999999999974
+            ],
+            "sketch_normal_model": [
+              0,
+              1,
+              6.123233995736766e-17
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 30,
+      "relation": "top_level",
+      "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ11",
+      "type": "CurvePattern",
+      "legacy_type": "CurvePattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し21",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a1",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<2>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 31,
+      "relation": "top_level",
+      "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ21",
+      "type": "CurvePattern",
+      "legacy_type": "CurvePattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": true,
+      "suppressed_by_config": {
+        "Default": [
+          true
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          true
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し21",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a1",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<2>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 32,
+      "relation": "top_level",
+      "name": "スタッド7.5<2>",
+      "type": "LibraryFeature",
+      "legacy_type": "LibraryFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": true,
+      "suppressed_by_config": {
+        "Default": [
+          true
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          true
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "a1",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し21",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ11",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ21",
+          "type": "CurvePattern"
+        }
+      ],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ﾎﾞｽ - 押し出し21",
+          "type": "ICE",
+          "legacy_type": "Boss",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "a1",
+              "type": "ProfileFeature"
+            },
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<2>",
+              "type": "LibraryFeature"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ21",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ11",
+              "type": "CurvePattern"
+            }
+          ],
+          "definition": {
+            "IExtrudeFeatureData2": {
+              "ReverseDirection": true,
+              "BothDirections": true,
+              "FlipSideToCut": false,
+              "ThinWallType": -1,
+              "CapEnds": false,
+              "CapThickness": 0,
+              "Merge": true,
+              "FeatureScope": true,
+              "AutoSelect": false,
+              "FromType": 0,
+              "FromOffsetDistance": 0,
+              "FromOffsetReverse": false,
+              "LinkToThickness": false,
+              "AssemblyFeatureScope": true,
+              "AutoSelectComponents": true,
+              "PropagateFeatureToParts": false,
+              "NormalCut": false,
+              "OptimizeGeometry": false
+            },
+            "extrude": {
+              "end_condition_forward": 0,
+              "end_condition_reverse": 0,
+              "depth_forward_m": 0.0031,
+              "depth_reverse_m": 0.015,
+              "draft_forward_enabled": false,
+              "draft_reverse_enabled": false,
+              "draft_forward_rad": 0,
+              "draft_reverse_rad": 0,
+              "draft_outward_forward": false,
+              "draft_outward_reverse": false,
+              "reverse_offset_forward": false,
+              "reverse_offset_reverse": false,
+              "is_thin": false,
+              "scope_body_count": -1
+            }
+          },
+          "subfeatures": [
+            {
+              "index": 1,
+              "relation": "subfeature",
+              "name": "a1",
+              "type": "ProfileFeature",
+              "legacy_type": "ProfileFeature",
+              "evidence": "API_VERIFIED",
+              "suppressed_active": false,
+              "suppressed_by_config": {
+                "Default": [
+                  false
+                ],
+                "DefaultSM-FLAT-PATTERN": [
+                  false
+                ]
+              },
+              "parents": [
+                {
+                  "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+                  "type": "SMBaseFlange"
+                }
+              ],
+              "children": [
+                {
+                  "feature_name": "ﾎﾞｽ - 押し出し21",
+                  "type": "ICE"
+                },
+                {
+                  "feature_name": "スタッド7.5<2>",
+                  "type": "LibraryFeature"
+                },
+                {
+                  "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ21",
+                  "type": "CurvePattern"
+                },
+                {
+                  "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ11",
+                  "type": "CurvePattern"
+                }
+              ],
+              "definition": {},
+              "sketch_summary": {
+                "nonconstruction_segment_count": 1,
+                "construction_segment_count": 2,
+                "contour_count_api": 1,
+                "region_count_api": 14,
+                "endpoint_graph_closed_inferred": true,
+                "curve_geometry_supported": true,
+                "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+                "sketch_bounds_mm": [
+                  4846.517822964662,
+                  -611.2872033727327,
+                  0,
+                  4854.017822964662,
+                  -603.7872033727322,
+                  0
+                ],
+                "model_bounds_mm": [
+                  3550.249999999999,
+                  3.0000000000000075,
+                  -123.75000000000026,
+                  3557.7499999999995,
+                  3.000000000000008,
+                  -116.24999999999974
+                ],
+                "sketch_normal_model": [
+                  0,
+                  1,
+                  6.123233995736766e-17
+                ],
+                "plane_kind_inferred": "axis_aligned"
+              },
+              "subfeatures": []
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ11",
+          "type": "CurvePattern",
+          "legacy_type": "CurvePattern",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し21",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "a1",
+              "type": "ProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<2>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ21",
+          "type": "CurvePattern",
+          "legacy_type": "CurvePattern",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": true,
+          "suppressed_by_config": {
+            "Default": [
+              true
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              true
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し21",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "a1",
+              "type": "ProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<2>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 33,
+      "relation": "top_level",
+      "name": "a2",
+      "type": "ProfileFeature",
+      "legacy_type": "ProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ12",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "スタッド7.5<3>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し22",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ22",
+          "type": "CurvePattern"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 1,
+        "construction_segment_count": 2,
+        "contour_count_api": 1,
+        "region_count_api": 18,
+        "endpoint_graph_closed_inferred": true,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": [
+          1285.8504600759893,
+          -259.8614640641122,
+          0,
+          1293.350460075989,
+          -252.36146406411225,
+          0
+        ],
+        "model_bounds_mm": [
+          146.25000000000023,
+          3.000000000000002,
+          -42.24999999999996,
+          153.75000000000006,
+          3.0000000000000027,
+          -34.75
+        ],
+        "sketch_normal_model": [
+          0,
+          1,
+          6.123233995736766e-17
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 34,
+      "relation": "top_level",
+      "name": "ﾎﾞｽ - 押し出し22",
+      "type": "ICE",
+      "legacy_type": "Boss",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "a2",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ12",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "スタッド7.5<3>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ22",
+          "type": "CurvePattern"
+        }
+      ],
+      "definition": {
+        "IExtrudeFeatureData2": {
+          "ReverseDirection": true,
+          "BothDirections": true,
+          "FlipSideToCut": false,
+          "ThinWallType": -1,
+          "CapEnds": false,
+          "CapThickness": 0,
+          "Merge": true,
+          "FeatureScope": true,
+          "AutoSelect": false,
+          "FromType": 0,
+          "FromOffsetDistance": 0,
+          "FromOffsetReverse": false,
+          "LinkToThickness": false,
+          "AssemblyFeatureScope": true,
+          "AutoSelectComponents": true,
+          "PropagateFeatureToParts": false,
+          "NormalCut": false,
+          "OptimizeGeometry": false
+        },
+        "extrude": {
+          "end_condition_forward": 0,
+          "end_condition_reverse": 0,
+          "depth_forward_m": 0.0031,
+          "depth_reverse_m": 0.015,
+          "draft_forward_enabled": false,
+          "draft_reverse_enabled": false,
+          "draft_forward_rad": 0,
+          "draft_reverse_rad": 0,
+          "draft_outward_forward": false,
+          "draft_outward_reverse": false,
+          "reverse_offset_forward": false,
+          "reverse_offset_reverse": false,
+          "is_thin": false,
+          "scope_body_count": -1
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "a2",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ12",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "スタッド7.5<3>",
+              "type": "LibraryFeature"
+            },
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し22",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ22",
+              "type": "CurvePattern"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 1,
+            "construction_segment_count": 2,
+            "contour_count_api": 1,
+            "region_count_api": 18,
+            "endpoint_graph_closed_inferred": true,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              1285.8504600759893,
+              -259.8614640641122,
+              0,
+              1293.350460075989,
+              -252.36146406411225,
+              0
+            ],
+            "model_bounds_mm": [
+              146.25000000000023,
+              3.000000000000002,
+              -42.24999999999996,
+              153.75000000000006,
+              3.0000000000000027,
+              -34.75
+            ],
+            "sketch_normal_model": [
+              0,
+              1,
+              6.123233995736766e-17
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 35,
+      "relation": "top_level",
+      "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ12",
+      "type": "CurvePattern",
+      "legacy_type": "CurvePattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し22",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a2",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<3>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 36,
+      "relation": "top_level",
+      "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ22",
+      "type": "CurvePattern",
+      "legacy_type": "CurvePattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": true,
+      "suppressed_by_config": {
+        "Default": [
+          true
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          true
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し22",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a2",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<3>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 37,
+      "relation": "top_level",
+      "name": "スタッド7.5<3>",
+      "type": "LibraryFeature",
+      "legacy_type": "LibraryFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": true,
+      "suppressed_by_config": {
+        "Default": [
+          true
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          true
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "a2",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し22",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ12",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ22",
+          "type": "CurvePattern"
+        }
+      ],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ﾎﾞｽ - 押し出し22",
+          "type": "ICE",
+          "legacy_type": "Boss",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "a2",
+              "type": "ProfileFeature"
+            },
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ12",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "スタッド7.5<3>",
+              "type": "LibraryFeature"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ22",
+              "type": "CurvePattern"
+            }
+          ],
+          "definition": {
+            "IExtrudeFeatureData2": {
+              "ReverseDirection": true,
+              "BothDirections": true,
+              "FlipSideToCut": false,
+              "ThinWallType": -1,
+              "CapEnds": false,
+              "CapThickness": 0,
+              "Merge": true,
+              "FeatureScope": true,
+              "AutoSelect": false,
+              "FromType": 0,
+              "FromOffsetDistance": 0,
+              "FromOffsetReverse": false,
+              "LinkToThickness": false,
+              "AssemblyFeatureScope": true,
+              "AutoSelectComponents": true,
+              "PropagateFeatureToParts": false,
+              "NormalCut": false,
+              "OptimizeGeometry": false
+            },
+            "extrude": {
+              "end_condition_forward": 0,
+              "end_condition_reverse": 0,
+              "depth_forward_m": 0.0031,
+              "depth_reverse_m": 0.015,
+              "draft_forward_enabled": false,
+              "draft_reverse_enabled": false,
+              "draft_forward_rad": 0,
+              "draft_reverse_rad": 0,
+              "draft_outward_forward": false,
+              "draft_outward_reverse": false,
+              "reverse_offset_forward": false,
+              "reverse_offset_reverse": false,
+              "is_thin": false,
+              "scope_body_count": -1
+            }
+          },
+          "subfeatures": [
+            {
+              "index": 1,
+              "relation": "subfeature",
+              "name": "a2",
+              "type": "ProfileFeature",
+              "legacy_type": "ProfileFeature",
+              "evidence": "API_VERIFIED",
+              "suppressed_active": false,
+              "suppressed_by_config": {
+                "Default": [
+                  false
+                ],
+                "DefaultSM-FLAT-PATTERN": [
+                  false
+                ]
+              },
+              "parents": [
+                {
+                  "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+                  "type": "SMBaseFlange"
+                }
+              ],
+              "children": [
+                {
+                  "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ12",
+                  "type": "CurvePattern"
+                },
+                {
+                  "feature_name": "スタッド7.5<3>",
+                  "type": "LibraryFeature"
+                },
+                {
+                  "feature_name": "ﾎﾞｽ - 押し出し22",
+                  "type": "ICE"
+                },
+                {
+                  "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ22",
+                  "type": "CurvePattern"
+                }
+              ],
+              "definition": {},
+              "sketch_summary": {
+                "nonconstruction_segment_count": 1,
+                "construction_segment_count": 2,
+                "contour_count_api": 1,
+                "region_count_api": 18,
+                "endpoint_graph_closed_inferred": true,
+                "curve_geometry_supported": true,
+                "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+                "sketch_bounds_mm": [
+                  1285.8504600759893,
+                  -259.8614640641122,
+                  0,
+                  1293.350460075989,
+                  -252.36146406411225,
+                  0
+                ],
+                "model_bounds_mm": [
+                  146.25000000000023,
+                  3.000000000000002,
+                  -42.24999999999996,
+                  153.75000000000006,
+                  3.0000000000000027,
+                  -34.75
+                ],
+                "sketch_normal_model": [
+                  0,
+                  1,
+                  6.123233995736766e-17
+                ],
+                "plane_kind_inferred": "axis_aligned"
+              },
+              "subfeatures": []
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ12",
+          "type": "CurvePattern",
+          "legacy_type": "CurvePattern",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し22",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "a2",
+              "type": "ProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<3>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ22",
+          "type": "CurvePattern",
+          "legacy_type": "CurvePattern",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": true,
+          "suppressed_by_config": {
+            "Default": [
+              true
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              true
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し22",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "a2",
+              "type": "ProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<3>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 38,
+      "relation": "top_level",
+      "name": "a3",
+      "type": "ProfileFeature",
+      "legacy_type": "ProfileFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ13",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "スタッド7.5<4>",
+          "type": "LibraryFeature"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し23",
+          "type": "ICE"
+        }
+      ],
+      "definition": {},
+      "sketch_summary": {
+        "nonconstruction_segment_count": 1,
+        "construction_segment_count": 2,
+        "contour_count_api": 1,
+        "region_count_api": 30,
+        "endpoint_graph_closed_inferred": true,
+        "curve_geometry_supported": true,
+        "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+        "sketch_bounds_mm": [
+          279.88329736884646,
+          704.7696500981785,
+          0,
+          287.3832973688465,
+          712.2696500981785,
+          0
+        ],
+        "model_bounds_mm": [
+          34.74999999999981,
+          3.0000000000000613,
+          -1001.2500000000002,
+          42.24999999999987,
+          3.0000000000000617,
+          -993.75
+        ],
+        "sketch_normal_model": [
+          0,
+          1,
+          6.123233995736766e-17
+        ],
+        "plane_kind_inferred": "axis_aligned"
+      },
+      "subfeatures": []
+    },
+    {
+      "index": 39,
+      "relation": "top_level",
+      "name": "ﾎﾞｽ - 押し出し23",
+      "type": "ICE",
+      "legacy_type": "Boss",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "a3",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ13",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "スタッド7.5<4>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {
+        "IExtrudeFeatureData2": {
+          "ReverseDirection": true,
+          "BothDirections": true,
+          "FlipSideToCut": false,
+          "ThinWallType": -1,
+          "CapEnds": false,
+          "CapThickness": 0,
+          "Merge": true,
+          "FeatureScope": true,
+          "AutoSelect": false,
+          "FromType": 0,
+          "FromOffsetDistance": 0,
+          "FromOffsetReverse": false,
+          "LinkToThickness": false,
+          "AssemblyFeatureScope": true,
+          "AutoSelectComponents": true,
+          "PropagateFeatureToParts": false,
+          "NormalCut": false,
+          "OptimizeGeometry": false
+        },
+        "extrude": {
+          "end_condition_forward": 0,
+          "end_condition_reverse": 0,
+          "depth_forward_m": 0.0031,
+          "depth_reverse_m": 0.015,
+          "draft_forward_enabled": false,
+          "draft_reverse_enabled": false,
+          "draft_forward_rad": 0,
+          "draft_reverse_rad": 0,
+          "draft_outward_forward": false,
+          "draft_outward_reverse": false,
+          "reverse_offset_forward": false,
+          "reverse_offset_reverse": false,
+          "is_thin": false,
+          "scope_body_count": -1
+        }
+      },
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "a3",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ13",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "スタッド7.5<4>",
+              "type": "LibraryFeature"
+            },
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し23",
+              "type": "ICE"
+            }
+          ],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 1,
+            "construction_segment_count": 2,
+            "contour_count_api": 1,
+            "region_count_api": 30,
+            "endpoint_graph_closed_inferred": true,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": [
+              279.88329736884646,
+              704.7696500981785,
+              0,
+              287.3832973688465,
+              712.2696500981785,
+              0
+            ],
+            "model_bounds_mm": [
+              34.74999999999981,
+              3.0000000000000613,
+              -1001.2500000000002,
+              42.24999999999987,
+              3.0000000000000617,
+              -993.75
+            ],
+            "sketch_normal_model": [
+              0,
+              1,
+              6.123233995736766e-17
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 40,
+      "relation": "top_level",
+      "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ13",
+      "type": "CurvePattern",
+      "legacy_type": "CurvePattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し23",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a3",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<4>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 41,
+      "relation": "top_level",
+      "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+      "type": "CurvePattern",
+      "legacy_type": "CurvePattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し23",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "a3",
+          "type": "ProfileFeature"
+        }
+      ],
+      "children": [
+        {
+          "feature_name": "スタッド7.5<4>",
+          "type": "LibraryFeature"
+        }
+      ],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 42,
+      "relation": "top_level",
+      "name": "スタッド7.5<4>",
+      "type": "LibraryFeature",
+      "legacy_type": "LibraryFeature",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "a3",
+          "type": "ProfileFeature"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        },
+        {
+          "feature_name": "ﾎﾞｽ - 押し出し23",
+          "type": "ICE"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ13",
+          "type": "CurvePattern"
+        },
+        {
+          "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+          "type": "CurvePattern"
+        }
+      ],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ﾎﾞｽ - 押し出し23",
+          "type": "ICE",
+          "legacy_type": "Boss",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "a3",
+              "type": "ProfileFeature"
+            },
+            {
+              "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+              "type": "SMBaseFlange"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ13",
+              "type": "CurvePattern"
+            },
+            {
+              "feature_name": "スタッド7.5<4>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {
+            "IExtrudeFeatureData2": {
+              "ReverseDirection": true,
+              "BothDirections": true,
+              "FlipSideToCut": false,
+              "ThinWallType": -1,
+              "CapEnds": false,
+              "CapThickness": 0,
+              "Merge": true,
+              "FeatureScope": true,
+              "AutoSelect": false,
+              "FromType": 0,
+              "FromOffsetDistance": 0,
+              "FromOffsetReverse": false,
+              "LinkToThickness": false,
+              "AssemblyFeatureScope": true,
+              "AutoSelectComponents": true,
+              "PropagateFeatureToParts": false,
+              "NormalCut": false,
+              "OptimizeGeometry": false
+            },
+            "extrude": {
+              "end_condition_forward": 0,
+              "end_condition_reverse": 0,
+              "depth_forward_m": 0.0031,
+              "depth_reverse_m": 0.015,
+              "draft_forward_enabled": false,
+              "draft_reverse_enabled": false,
+              "draft_forward_rad": 0,
+              "draft_reverse_rad": 0,
+              "draft_outward_forward": false,
+              "draft_outward_reverse": false,
+              "reverse_offset_forward": false,
+              "reverse_offset_reverse": false,
+              "is_thin": false,
+              "scope_body_count": -1
+            }
+          },
+          "subfeatures": [
+            {
+              "index": 1,
+              "relation": "subfeature",
+              "name": "a3",
+              "type": "ProfileFeature",
+              "legacy_type": "ProfileFeature",
+              "evidence": "API_VERIFIED",
+              "suppressed_active": false,
+              "suppressed_by_config": {
+                "Default": [
+                  false
+                ],
+                "DefaultSM-FLAT-PATTERN": [
+                  false
+                ]
+              },
+              "parents": [
+                {
+                  "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+                  "type": "SMBaseFlange"
+                }
+              ],
+              "children": [
+                {
+                  "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+                  "type": "CurvePattern"
+                },
+                {
+                  "feature_name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ13",
+                  "type": "CurvePattern"
+                },
+                {
+                  "feature_name": "スタッド7.5<4>",
+                  "type": "LibraryFeature"
+                },
+                {
+                  "feature_name": "ﾎﾞｽ - 押し出し23",
+                  "type": "ICE"
+                }
+              ],
+              "definition": {},
+              "sketch_summary": {
+                "nonconstruction_segment_count": 1,
+                "construction_segment_count": 2,
+                "contour_count_api": 1,
+                "region_count_api": 30,
+                "endpoint_graph_closed_inferred": true,
+                "curve_geometry_supported": true,
+                "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+                "sketch_bounds_mm": [
+                  279.88329736884646,
+                  704.7696500981785,
+                  0,
+                  287.3832973688465,
+                  712.2696500981785,
+                  0
+                ],
+                "model_bounds_mm": [
+                  34.74999999999981,
+                  3.0000000000000613,
+                  -1001.2500000000002,
+                  42.24999999999987,
+                  3.0000000000000617,
+                  -993.75
+                ],
+                "sketch_normal_model": [
+                  0,
+                  1,
+                  6.123233995736766e-17
+                ],
+                "plane_kind_inferred": "axis_aligned"
+              },
+              "subfeatures": []
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ13",
+          "type": "CurvePattern",
+          "legacy_type": "CurvePattern",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し23",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "a3",
+              "type": "ProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<4>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "ｶｰﾌﾞ ﾊﾟﾀｰﾝ23",
+          "type": "CurvePattern",
+          "legacy_type": "CurvePattern",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [
+            {
+              "feature_name": "ﾎﾞｽ - 押し出し23",
+              "type": "ICE"
+            },
+            {
+              "feature_name": "a3",
+              "type": "ProfileFeature"
+            }
+          ],
+          "children": [
+            {
+              "feature_name": "スタッド7.5<4>",
+              "type": "LibraryFeature"
+            }
+          ],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    },
+    {
+      "index": 43,
+      "relation": "top_level",
+      "name": "Sheet<2>",
+      "type": "CutListFolder",
+      "legacy_type": "CutListFolder",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": false,
+      "suppressed_by_config": {
+        "Default": [
+          false
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [],
+      "children": [],
+      "definition": {},
+      "subfeatures": []
+    },
+    {
+      "index": 44,
+      "relation": "top_level",
+      "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+      "type": "FlatPattern",
+      "legacy_type": "FlatPattern",
+      "evidence": "API_VERIFIED",
+      "suppressed_active": true,
+      "suppressed_by_config": {
+        "Default": [
+          true
+        ],
+        "DefaultSM-FLAT-PATTERN": [
+          false
+        ]
+      },
+      "parents": [
+        {
+          "feature_name": "板金",
+          "type": "TemplateSheetMetal"
+        },
+        {
+          "feature_name": "板金19",
+          "type": "SheetMetal"
+        },
+        {
+          "feature_name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange"
+        }
+      ],
+      "children": [],
+      "definition": {},
+      "subfeatures": [
+        {
+          "index": 1,
+          "relation": "subfeature",
+          "name": "ﾍﾞﾝﾄﾞ-ﾗｲﾝ2",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": false,
+          "suppressed_by_config": {
+            "Default": [
+              false
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 0,
+            "construction_segment_count": 0,
+            "contour_count_api": 0,
+            "region_count_api": 0,
+            "endpoint_graph_closed_inferred": false,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": null,
+            "model_bounds_mm": null,
+            "sketch_normal_model": [
+              0,
+              1,
+              0
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        },
+        {
+          "index": 2,
+          "relation": "subfeature",
+          "name": "境界ﾎﾞｯｸｽ2",
+          "type": "ProfileFeature",
+          "legacy_type": "ProfileFeature",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": true,
+          "suppressed_by_config": {
+            "Default": [
+              true
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "sketch_summary": {
+            "nonconstruction_segment_count": 0,
+            "construction_segment_count": 4,
+            "contour_count_api": 0,
+            "region_count_api": 0,
+            "endpoint_graph_closed_inferred": false,
+            "curve_geometry_supported": true,
+            "bounds_method": "exact for line-only sketches; conservative full-circle enclosure for arcs",
+            "sketch_bounds_mm": null,
+            "model_bounds_mm": null,
+            "sketch_normal_model": [
+              0,
+              -1,
+              0
+            ],
+            "plane_kind_inferred": "axis_aligned"
+          },
+          "subfeatures": []
+        },
+        {
+          "index": 3,
+          "relation": "subfeature",
+          "name": "ｽｹｯﾁ変換1",
+          "type": "FoldUpDownSketchFolder",
+          "legacy_type": "FoldUpDownSketchFolder",
+          "evidence": "API_VERIFIED",
+          "suppressed_active": true,
+          "suppressed_by_config": {
+            "Default": [
+              true
+            ],
+            "DefaultSM-FLAT-PATTERN": [
+              false
+            ]
+          },
+          "parents": [],
+          "children": [],
+          "definition": {},
+          "subfeatures": []
+        }
+      ]
+    }
+  ]
+}

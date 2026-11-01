@@ -1,0 +1,2 @@
+run_id,public_status,raw_progress_status_retained,started_utc,last_recorded_phase,last_recorded_phase_utc,geometry_result,rollback_result,final_cleanup_result,final_file_hash_result,interruption_cause,installed_addin_test
+native_u_parametric_rollback_01,INTERRUPTED_NO_FINAL_RESULT,RUNNING,2026-10-23T00:12:12.6154721Z,WRITER.U_RULE:NORMAL_BEND_CAP:CREATE_LINES_BEFORE_RELATIONS,2026-10-23T00:14:15.0394502Z,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,UNVERIFIED,False

@@ -1,0 +1,20 @@
+{
+  "part": "1618-04-bh-A6-fr3.SLDPRT",
+  "feature_name": "ﾎﾞｽ - 押し出し1",
+  "before_m3": 0.001168959606657295,
+  "after_m3": 0.0011705395927593515,
+  "added_m3": 1.5799861020571763e-06,
+  "before_check2": 0,
+  "after_check2": 0,
+  "added_count": 1,
+  "added_check2": [
+    0
+  ],
+  "delta_residual_m3": 1.4568966692773966e-19,
+  "prism_volume_m3": 1.579986102057194e-06,
+  "prism_check2": 0,
+  "prism_added_symmetric_difference_m3": 0,
+  "status": "VERIFIED_KEEP_REGION",
+  "length_m": 0.0141,
+  "restore_end": true
+}

@@ -1,0 +1,21 @@
+{
+  "status": "COPIED_EXACT_R74_NATIVE_VERIFIED_DIRECTION_TERMINAL_CONTACT_SOURCE_ONLY",
+  "main_source_copied": true,
+  "utc": "2026-11-01T15:48:32.0995805Z",
+  "source_relative": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "working_crlf_sha256": "7E66FD757B58F3C795AFEDA02790E27FEF6A875884A42BA30E96B9B0D9FC75FE",
+  "git_lf_sha256": "CA2574E8542F4C5513924BF90E1F5AB56D13D9C9C56A20ADEA59572464869020",
+  "baseline_working_sha256": "993DE2344FD675747F24292DF2FD4D368414DC42815B380FCA50A1112823162F",
+  "main_build": false,
+  "deployment": false,
+  "other_five_sources_project_dll_pdb_unchanged": true,
+  "installed_addin_test": false,
+  "user_manual_rebuild_required": true,
+  "publication_formatting": {
+    "tested_working_source_sha256": "7E66FD757B58F3C795AFEDA02790E27FEF6A875884A42BA30E96B9B0D9FC75FE",
+    "published_working_source_sha256": "E2D4FE74D677429C39A80A9AACFEF39F69C3BF218CF2C58250611BB973810D50",
+    "change": "REMOVE_WHITESPACE_FROM_ONE_OTHERWISE_EMPTY_LINE_ONLY",
+    "semantic_source_text_unchanged": true,
+    "main_copied_source_remains_exact_api_qualified_bytes": true
+  }
+}

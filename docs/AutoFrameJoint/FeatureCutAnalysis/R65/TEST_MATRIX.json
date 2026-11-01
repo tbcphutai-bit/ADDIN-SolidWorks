@@ -1,0 +1,81 @@
+{
+  "source_sha256": "9CC782AC11E8C17E641514B7B7538A28E5F1C77DEA0F3D09CC0387FAE7284B89",
+  "scope": "DIRECT_API_FINAL_SOURCE_NATIVE_AND_BREP",
+  "rows": [
+    {
+      "run": "r65_final_4332_direct_15",
+      "pair": "4332-04-TI-P-1-fr5-3 x 4332-04-TI-P-1-fr1a-2",
+      "status": "PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN",
+      "cuts": 18,
+      "sketches": 22,
+      "native_apply_ms": 41689,
+      "gap_mm": 0.09999999999833059,
+      "interference_m3": 0,
+      "max_native_preview_difference_m3": 0,
+      "fully_constrained_face_sketches": true,
+      "new_reference_planes": 0,
+      "source_and_copy_hashes_unchanged": true,
+      "installed_addin_test": false
+    },
+    {
+      "run": "r65_final_2354_four_corners_16",
+      "pair": "2354-04-lc-B11-fr01-1 x 2354-04-lc-B11-fr04-1",
+      "status": "PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN",
+      "cuts": 5,
+      "sketches": 9,
+      "native_apply_ms": 10137,
+      "gap_mm": 0.10000000000021103,
+      "interference_m3": 0,
+      "max_native_preview_difference_m3": 0,
+      "fully_constrained_face_sketches": true,
+      "new_reference_planes": 0,
+      "source_and_copy_hashes_unchanged": true,
+      "installed_addin_test": false
+    },
+    {
+      "run": "r65_final_2354_four_corners_16",
+      "pair": "2354-04-lc-B11-fr04-1 x 2354-04-lc-B11-fr03-1",
+      "status": "PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN",
+      "cuts": 7,
+      "sketches": 11,
+      "native_apply_ms": 16734,
+      "gap_mm": 0.10000000000021103,
+      "interference_m3": 0,
+      "max_native_preview_difference_m3": 0,
+      "fully_constrained_face_sketches": true,
+      "new_reference_planes": 0,
+      "source_and_copy_hashes_unchanged": true,
+      "installed_addin_test": false
+    },
+    {
+      "run": "r65_final_2354_four_corners_16",
+      "pair": "2354-04-lc-B11-fr03-1 x 2354-04-lc-B11-fr02-1",
+      "status": "PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN",
+      "cuts": 11,
+      "sketches": 15,
+      "native_apply_ms": 28492,
+      "gap_mm": 0.09999999999998899,
+      "interference_m3": 0,
+      "max_native_preview_difference_m3": 0,
+      "fully_constrained_face_sketches": true,
+      "new_reference_planes": 0,
+      "source_and_copy_hashes_unchanged": true,
+      "installed_addin_test": false
+    },
+    {
+      "run": "r65_final_2354_four_corners_16",
+      "pair": "2354-04-lc-B11-fr02-1 x 2354-04-lc-B11-fr01-1",
+      "status": "PASS_DIRECT_NATIVE_API_NOT_INSTALLED_ADDIN",
+      "cuts": 12,
+      "sketches": 16,
+      "native_apply_ms": 34246,
+      "gap_mm": 0.09999999999980143,
+      "interference_m3": 0,
+      "max_native_preview_difference_m3": 0,
+      "fully_constrained_face_sketches": true,
+      "new_reference_planes": 0,
+      "source_and_copy_hashes_unchanged": true,
+      "installed_addin_test": false
+    }
+  ]
+}

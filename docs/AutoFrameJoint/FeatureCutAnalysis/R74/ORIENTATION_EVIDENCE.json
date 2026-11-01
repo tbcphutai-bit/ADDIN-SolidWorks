@@ -1,0 +1,105 @@
+[
+  {
+    "case": "2222_corner_1",
+    "context_present": true,
+    "source_evidence": "API_VERIFIED_DIRECT_COINCIDENT_MATE_FACE2_REFERENCES",
+    "geometry_evidence": "GEOMETRY_VERIFIED_FINITE_CONTACT_PATCH_AND_ORIGINAL_KEEP_MATERIAL",
+    "scope": "ORTHOGONAL_MEMBER_AXES;QUALIFIED_FINITE_REMOTE_CONTACTS_ON_BOTH_MEMBERS",
+    "outgoing_A_world": [
+      -5.737582494898056e-17,
+      2.2204460492503126e-16,
+      1
+    ],
+    "outgoing_B_world": [
+      1,
+      0,
+      0
+    ],
+    "preview_remote_keep": {
+      "mask_count": 3,
+      "all_preserved": true,
+      "masks": [
+        {
+          "frame": "A",
+          "peer_component": "2222-04-TI-b4-z1-2",
+          "original_mask_volume_m3": 9.043902634325642e-07,
+          "missing_original_keep_m3": 0,
+          "status": "ORIGINAL_REMOTE_KEEP_PRESERVED"
+        },
+        {
+          "frame": "B",
+          "peer_component": "2222-04-TI-b4-lt2-1",
+          "original_mask_volume_m3": 9.043902634328756e-07,
+          "missing_original_keep_m3": 0,
+          "status": "ORIGINAL_REMOTE_KEEP_PRESERVED"
+        },
+        {
+          "frame": "B",
+          "peer_component": "2222-04-TI-b4-z1-1",
+          "original_mask_volume_m3": 9.043902634325285e-07,
+          "missing_original_keep_m3": 0,
+          "status": "ORIGINAL_REMOTE_KEEP_PRESERVED"
+        }
+      ]
+    },
+    "native_remote_keep": {
+      "mask_count": 3,
+      "all_preserved": true,
+      "masks": [
+        {
+          "frame": "A",
+          "peer_component": "2222-04-TI-b4-z1-2",
+          "original_mask_volume_m3": 9.043902634325641e-07,
+          "missing_original_keep_m3": 0,
+          "status": "ORIGINAL_REMOTE_KEEP_PRESERVED"
+        },
+        {
+          "frame": "B",
+          "peer_component": "2222-04-TI-b4-lt2-1",
+          "original_mask_volume_m3": 9.043902634328754e-07,
+          "missing_original_keep_m3": 0,
+          "status": "ORIGINAL_REMOTE_KEEP_PRESERVED"
+        },
+        {
+          "frame": "B",
+          "peer_component": "2222-04-TI-b4-z1-1",
+          "original_mask_volume_m3": 9.043902634325288e-07,
+          "missing_original_keep_m3": 0,
+          "status": "ORIGINAL_REMOTE_KEEP_PRESERVED"
+        }
+      ]
+    },
+    "native_flip_side_policy": "FINITE_CUT_POLYGON_ORIENTED_GEOMETRICALLY;NO_NATIVE_OUTSIDE_COMPLEMENT",
+    "unverified_scope": "NO_CLAIM_FOR_ALL_ASSEMBLIES_OR_AMBIGUOUS_MISSING_REMOTE_AUTHORITY"
+  },
+  {
+    "case": "2354_corner_1",
+    "context_present": false,
+    "status": "NO_NEW_R74_ORIENTATION_AUTHORITY;PREVIOUS_RULE_SCOPE_ONLY",
+    "design_scope": "NOT_A_UNIVERSAL_KEEP_DIRECTION_APPROVAL"
+  },
+  {
+    "case": "4458_corner_1",
+    "context_present": false,
+    "status": "NO_NEW_R74_ORIENTATION_AUTHORITY;PREVIOUS_RULE_SCOPE_ONLY",
+    "design_scope": "NOT_A_UNIVERSAL_KEEP_DIRECTION_APPROVAL"
+  },
+  {
+    "case": "4458_corner_2",
+    "context_present": false,
+    "status": "NO_NEW_R74_ORIENTATION_AUTHORITY;PREVIOUS_RULE_SCOPE_ONLY",
+    "design_scope": "NOT_A_UNIVERSAL_KEEP_DIRECTION_APPROVAL"
+  },
+  {
+    "case": "4458_corner_3",
+    "context_present": false,
+    "status": "NO_NEW_R74_ORIENTATION_AUTHORITY;PREVIOUS_RULE_SCOPE_ONLY",
+    "design_scope": "NOT_A_UNIVERSAL_KEEP_DIRECTION_APPROVAL"
+  },
+  {
+    "case": "4458_corner_4",
+    "context_present": false,
+    "status": "NO_NEW_R74_ORIENTATION_AUTHORITY;PREVIOUS_RULE_SCOPE_ONLY",
+    "design_scope": "NOT_A_UNIVERSAL_KEEP_DIRECTION_APPROVAL"
+  }
+]

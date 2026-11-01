@@ -1,0 +1,32 @@
+{
+  "native_parts_in_PR39": 15,
+  "api_verified_cuts_in_PR39": 43,
+  "parts_with_cut_before_after": 11,
+  "cut_before_after_verified": 42,
+  "native_cut_tool_replay_oracles": 28,
+  "curved_closed_profiles_excluded_from_corner_rules": 14,
+  "parametric_rule_families": 1,
+  "native_corner_oracle_matches": 8,
+  "native_final_runtime_passes": 0,
+  "before_cut_runtime_passes": 8,
+  "public_preview_API_passes": 8,
+  "independent_runtime_variant_passes": 12,
+  "independent_runtime_variants_run": 12,
+  "cover_policy": "USER_CONFIRMED_SHORTER_ACTUAL_FRAME_COVERS",
+  "assembly_gap_m": 0.0001,
+  "single_sheet_depth_overrun_m": 0.0001,
+  "main_addin_built": false,
+  "main_addin_deployed": false,
+  "installed_PMP_test": "UNVERIFIED",
+  "general_AFJ_completion": "INCOMPLETE: inclined/multi-step/inward-return and height-mismatch families remain UNVERIFIED_RULE",
+  "evidence_levels": [
+    "API_VERIFIED",
+    "GEOMETRY_VERIFIED",
+    "INFERRED"
+  ],
+  "strict_api_parameter_sets_complete": 0,
+  "native_cut_existence_unverified": 0,
+  "cuts_without_new_before_after": 1,
+  "solidworks_session_crash_observed": true,
+  "session_crash_cause": "UNVERIFIED"
+}

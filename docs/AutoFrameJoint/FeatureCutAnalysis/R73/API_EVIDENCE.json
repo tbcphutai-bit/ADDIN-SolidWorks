@@ -1,0 +1,176 @@
+[
+  {
+    "case": "2354_corner_1",
+    "selection_order_geometry": {
+      "status": "GEOMETRY_VERIFIED_PHYSICAL_TARGETS_INVARIANT",
+      "physical_original_A_difference_m3": 0,
+      "physical_original_B_difference_m3": 0,
+      "short_cover_physical_identity_preserved": true,
+      "elapsed_ms": 4498
+    },
+    "straight_end_fixture": {
+      "status": "POSITIVE_18MM_ORIGINAL_TAIL_REQUIRED_AND_PRESENT",
+      "completion_count": 1,
+      "terminal_positive_witness_count": 1,
+      "cells": [
+        {
+          "frame": "B",
+          "part_name": "2354-04-lc-B11-fr04.SLDPRT",
+          "strip": 2,
+          "mate_strip": 2,
+          "low_m": 0.042000000000000044,
+          "high_m": 0.06,
+          "anchor_low_m": 4.039964439677933e-17,
+          "anchor_high_m": 0.042000000000000044,
+          "shared_boundary_m": 0.042000000000000044,
+          "axial_cutoff_m": -0.29441548052754707,
+          "slope": 2.1924462484907925e-18
+        }
+      ]
+    },
+    "preview_original_material_checks": [
+      {
+        "frame": "B",
+        "strip_index": 2,
+        "terminal_cutoff_native_m": -0.29441548052754707,
+        "transverse_low_m": 0.042000000000000044,
+        "transverse_high_m": 0.06,
+        "outside_original_material_m3": 1.3248696623739582e-05,
+        "outside_residual_after_m3": 0,
+        "inside_original_material_m3": 7.675130337626019e-05,
+        "inside_removed_after_m3": 0,
+        "phase": "PREVIEW_TARGET",
+        "status": "GEOMETRY_VERIFIED_TERMINAL_OVERHANG_REMOVED"
+      }
+    ],
+    "native_original_material_checks": [
+      {
+        "frame": "B",
+        "strip_index": 2,
+        "terminal_cutoff_native_m": -0.29441548052754707,
+        "transverse_low_m": 0.042000000000000044,
+        "transverse_high_m": 0.06,
+        "outside_original_material_m3": 1.3248696623739582e-05,
+        "outside_residual_after_m3": 0,
+        "inside_original_material_m3": 7.675130337626019e-05,
+        "inside_removed_after_m3": 0,
+        "phase": "NATIVE_AFTER_CORNER",
+        "status": "GEOMETRY_VERIFIED_TERMINAL_OVERHANG_REMOVED"
+      }
+    ],
+    "generated_cut_count": 7,
+    "source_copy_bytes_unchanged": true,
+    "saved": false,
+    "design_direction_status": "NO_NEW_DIRECTION_APPROVAL_CLAIM"
+  },
+  {
+    "case": "4458_corner_1",
+    "selection_order_geometry": {
+      "status": "GEOMETRY_VERIFIED_PHYSICAL_TARGETS_INVARIANT",
+      "physical_original_A_difference_m3": 0,
+      "physical_original_B_difference_m3": 0,
+      "short_cover_physical_identity_preserved": true,
+      "elapsed_ms": 13933
+    },
+    "straight_end_fixture": {
+      "status": "NOT_A_NAMED_R73_FIXTURE",
+      "completion_count": 0,
+      "terminal_positive_witness_count": 0,
+      "cells": []
+    },
+    "preview_original_material_checks": [],
+    "native_original_material_checks": [],
+    "generated_cut_count": 10,
+    "source_copy_bytes_unchanged": true,
+    "saved": false,
+    "design_direction_status": "NO_NEW_DIRECTION_APPROVAL_CLAIM"
+  },
+  {
+    "case": "4458_corner_2",
+    "selection_order_geometry": {
+      "status": "GEOMETRY_VERIFIED_PHYSICAL_TARGETS_INVARIANT",
+      "physical_original_A_difference_m3": 0,
+      "physical_original_B_difference_m3": 0,
+      "short_cover_physical_identity_preserved": true,
+      "elapsed_ms": 20304
+    },
+    "straight_end_fixture": {
+      "status": "NOT_A_NAMED_R73_FIXTURE",
+      "completion_count": 0,
+      "terminal_positive_witness_count": 0,
+      "cells": []
+    },
+    "preview_original_material_checks": [],
+    "native_original_material_checks": [],
+    "generated_cut_count": 13,
+    "source_copy_bytes_unchanged": true,
+    "saved": false,
+    "design_direction_status": "NO_NEW_DIRECTION_APPROVAL_CLAIM"
+  },
+  {
+    "case": "4458_corner_3",
+    "selection_order_geometry": {
+      "status": "GEOMETRY_VERIFIED_PHYSICAL_TARGETS_INVARIANT",
+      "physical_original_A_difference_m3": 0,
+      "physical_original_B_difference_m3": 0,
+      "short_cover_physical_identity_preserved": true,
+      "elapsed_ms": 19369
+    },
+    "straight_end_fixture": {
+      "status": "NOT_A_NAMED_R73_FIXTURE",
+      "completion_count": 0,
+      "terminal_positive_witness_count": 0,
+      "cells": []
+    },
+    "preview_original_material_checks": [],
+    "native_original_material_checks": [],
+    "generated_cut_count": 9,
+    "source_copy_bytes_unchanged": true,
+    "saved": false,
+    "design_direction_status": "NO_NEW_DIRECTION_APPROVAL_CLAIM"
+  },
+  {
+    "case": "4458_corner_4",
+    "selection_order_geometry": {
+      "status": "GEOMETRY_VERIFIED_PHYSICAL_TARGETS_INVARIANT",
+      "physical_original_A_difference_m3": 0,
+      "physical_original_B_difference_m3": 0,
+      "short_cover_physical_identity_preserved": true,
+      "elapsed_ms": 19730
+    },
+    "straight_end_fixture": {
+      "status": "NOT_A_NAMED_R73_FIXTURE",
+      "completion_count": 0,
+      "terminal_positive_witness_count": 0,
+      "cells": []
+    },
+    "preview_original_material_checks": [],
+    "native_original_material_checks": [],
+    "generated_cut_count": 12,
+    "source_copy_bytes_unchanged": true,
+    "saved": false,
+    "design_direction_status": "NO_NEW_DIRECTION_APPROVAL_CLAIM"
+  },
+  {
+    "case": "2222_corner_1",
+    "selection_order_geometry": {
+      "status": "GEOMETRY_VERIFIED_PHYSICAL_TARGETS_INVARIANT",
+      "physical_original_A_difference_m3": 0,
+      "physical_original_B_difference_m3": 0,
+      "short_cover_physical_identity_preserved": true,
+      "elapsed_ms": 27699
+    },
+    "straight_end_fixture": {
+      "status": "ZERO_COMPLETIONS_EXPECTED_AND_PRESENT",
+      "completion_count": 0,
+      "terminal_positive_witness_count": 0,
+      "cells": []
+    },
+    "preview_original_material_checks": [],
+    "native_original_material_checks": [],
+    "generated_cut_count": 22,
+    "source_copy_bytes_unchanged": true,
+    "saved": false,
+    "design_direction_status": "UNVERIFIED_USER_REPORTS_COVER_STEP_REVERSED"
+  }
+]

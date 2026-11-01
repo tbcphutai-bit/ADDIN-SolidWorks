@@ -1,0 +1,2267 @@
+{
+  "scope": "Historical attempts are retained, not reclassified as PASS by a later successful run. Raw paths, stack traces and CAD payloads are excluded.",
+  "attempts": [
+    {
+      "attempt": "four_corners_01",
+      "audit_sha256": "025690cd4c5466a8fd008cb4d8f128764ec4ff073ff4c438e3610cc13c6eb087",
+      "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+      "harness_mvid": "c32cabd8-0eae-4f7a-bc3f-e7c4c34e2c83",
+      "failure_category": "RECORDED_FAILURE_OR_UNVERIFIED",
+      "captured_source_sha256": "NOT_AVAILABLE",
+      "pass_corners_in_this_attempt": [],
+      "nonpass_corners": [
+        {
+          "corner": 1,
+          "status": "FAIL_OR_UNVERIFIED",
+          "reported_native_cut_count": 0
+        }
+      ],
+      "resumed": false,
+      "inherited_pass_corner_count": 0,
+      "hresults": [
+        "0x80131509"
+      ],
+      "error_codes": [
+        "AFJ_U_TRANSACTION_UNVERIFIED",
+        "U_GATE2_UNVERIFIED"
+      ],
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_session_restored": true,
+      "rollback_statuses": [
+        true
+      ],
+      "copies_preserved_on_failure": "NOT_AVAILABLE",
+      "completed_prefix_corner_count": "NOT_AVAILABLE"
+    },
+    {
+      "attempt": "four_corners_02",
+      "audit_sha256": "38f71ca902f3df75a9ad54a658a9a8a6c31e30e7649e7e2a0cd4c39438fc26d6",
+      "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+      "harness_mvid": "5a011369-7ef7-4c00-b7a6-b59a419f2b7b",
+      "failure_category": "RECORDED_FAILURE_OR_UNVERIFIED",
+      "captured_source_sha256": "5440a54f725fd0d29262580921346dabadb4b90a41b885ead3403f116e223989",
+      "pass_corners_in_this_attempt": [
+        1
+      ],
+      "nonpass_corners": [
+        {
+          "corner": 2,
+          "status": "FAIL_OR_UNVERIFIED",
+          "reported_native_cut_count": 0
+        }
+      ],
+      "resumed": false,
+      "inherited_pass_corner_count": 0,
+      "hresults": [
+        "0x80131509"
+      ],
+      "error_codes": [
+        "U_OWNED_ROLLBACK_UNVERIFIED"
+      ],
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_session_restored": true,
+      "rollback_statuses": [
+        true
+      ],
+      "copies_preserved_on_failure": "NOT_AVAILABLE",
+      "completed_prefix_corner_count": "NOT_AVAILABLE"
+    },
+    {
+      "attempt": "four_corners_03",
+      "audit_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+      "status": "SETUP_FAILED_NO_FOUR_CORNER_QUALIFICATION",
+      "harness_mvid": "a8a3525f-69c9-4820-ac78-096947b59d2d",
+      "failure_category": "RECORDED_FAILURE_OR_UNVERIFIED",
+      "captured_source_sha256": "7760194eb4ded4b7b2c0508425565355f54fe8a9bb910a8f4d2846d89f59c378",
+      "pass_corners_in_this_attempt": [
+        1
+      ],
+      "nonpass_corners": [
+        {
+          "corner": 2,
+          "status": "FAIL_OR_UNVERIFIED",
+          "reported_native_cut_count": 2
+        }
+      ],
+      "resumed": false,
+      "inherited_pass_corner_count": 0,
+      "hresults": [
+        "0x80070020",
+        "0x80131509"
+      ],
+      "error_codes": [
+        "AFJ",
+        "U_OWNED_ROLLBACK_UNVERIFIED"
+      ],
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": "NOT_AVAILABLE",
+      "blank_session_restored": false,
+      "rollback_statuses": [
+        false
+      ],
+      "copies_preserved_on_failure": true,
+      "completed_prefix_corner_count": 1
+    },
+    {
+      "attempt": "four_corners_04",
+      "audit_sha256": "88b9cc1c29316682e1e97b5e3896412eff5537970e7d6514ea140f7e41f07589",
+      "status": "SETUP_FAILED_NO_FOUR_CORNER_QUALIFICATION",
+      "harness_mvid": "84aababc-0127-4c0b-8323-896102be8ac8",
+      "failure_category": "OWNED_PROCESS_IDENTITY_CHECK_REJECTED_BEFORE_CAD",
+      "captured_source_sha256": "NOT_AVAILABLE",
+      "pass_corners_in_this_attempt": [],
+      "nonpass_corners": [],
+      "resumed": false,
+      "inherited_pass_corner_count": 0,
+      "hresults": [
+        "0x80131509"
+      ],
+      "error_codes": [],
+      "source_hashes_unchanged": "NOT_AVAILABLE",
+      "copy_hashes_unchanged": "NOT_AVAILABLE",
+      "blank_session_restored": "NOT_AVAILABLE",
+      "rollback_statuses": [],
+      "copies_preserved_on_failure": "NOT_AVAILABLE",
+      "completed_prefix_corner_count": "NOT_AVAILABLE"
+    },
+    {
+      "attempt": "four_corners_05",
+      "audit_sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+      "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+      "harness_mvid": "84aababc-0127-4c0b-8323-896102be8ac8",
+      "failure_category": "RECORDED_FAILURE_OR_UNVERIFIED",
+      "captured_source_sha256": "ba35a674312e87a5daf030881580750ac8ee1081b857c12ab9df164cc930e582",
+      "pass_corners_in_this_attempt": [
+        1,
+        2
+      ],
+      "nonpass_corners": [
+        {
+          "corner": 3,
+          "status": "FAIL_OR_UNVERIFIED",
+          "reported_native_cut_count": 0
+        }
+      ],
+      "resumed": false,
+      "inherited_pass_corner_count": 0,
+      "hresults": [
+        "0x80131509"
+      ],
+      "error_codes": [
+        "AFJ",
+        "AFJ_U_TRANSACTION_UNVERIFIED",
+        "U_GATE2_UNVERIFIED"
+      ],
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_session_restored": false,
+      "rollback_statuses": [
+        false
+      ],
+      "copies_preserved_on_failure": true,
+      "completed_prefix_corner_count": 2
+    },
+    {
+      "attempt": "four_corners_06",
+      "audit_sha256": "f56175fb803296dfb4bef57a6d7e9c7f4d31ac9cee79158eb1dd49a3e1eebcbe",
+      "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+      "harness_mvid": "9af1c296-8821-4226-bfd0-7308b3d48e84",
+      "failure_category": "KNOWN_REPAIR_ORPHAN_CONTEXT_458_DISAPPEARED_GUARD_REFUSED_BEFORE_CUT",
+      "captured_source_sha256": "217fef97d577bb4792d30cb86e030013c1355afe4ee8faedc960d566bb11ecc6",
+      "pass_corners_in_this_attempt": [
+        1,
+        2
+      ],
+      "nonpass_corners": [
+        {
+          "corner": 3,
+          "status": "FAIL_OR_UNVERIFIED",
+          "reported_native_cut_count": 0
+        }
+      ],
+      "resumed": true,
+      "inherited_pass_corner_count": 2,
+      "hresults": [
+        "0x80131509"
+      ],
+      "error_codes": [
+        "AFJ",
+        "U_OWNED_ROLLBACK_UNVERIFIED"
+      ],
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_session_restored": false,
+      "rollback_statuses": [
+        false
+      ],
+      "copies_preserved_on_failure": true,
+      "completed_prefix_corner_count": 2
+    },
+    {
+      "attempt": "four_corners_07",
+      "audit_sha256": "cc02a9ffe71ad3b37ec91440e0a93c2ca6ef480cbb2ded61c031853f8d674fe1",
+      "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+      "harness_mvid": "9af1c296-8821-4226-bfd0-7308b3d48e84",
+      "failure_category": "LOSER_FIRST_AXIS_PERPENDICULAR_NOT_ADVERTISED_NO_REPORTED_NATIVE_CUT",
+      "captured_source_sha256": "217fef97d577bb4792d30cb86e030013c1355afe4ee8faedc960d566bb11ecc6",
+      "pass_corners_in_this_attempt": [
+        1,
+        2
+      ],
+      "nonpass_corners": [
+        {
+          "corner": 3,
+          "status": "FAIL_OR_UNVERIFIED",
+          "reported_native_cut_count": 0
+        }
+      ],
+      "resumed": false,
+      "inherited_pass_corner_count": 0,
+      "hresults": [
+        "0x80131509"
+      ],
+      "error_codes": [
+        "AFJ",
+        "AFJ_U_TRANSACTION_UNVERIFIED",
+        "U_GATE2_UNVERIFIED"
+      ],
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_session_restored": false,
+      "rollback_statuses": [
+        false
+      ],
+      "copies_preserved_on_failure": true,
+      "completed_prefix_corner_count": 2
+    }
+  ],
+  "authoritative_status": "PASS_FOUR_CORNERS_SAME_ASSEMBLY_NATIVE_API_HARNESS_ONLY_NOT_INSTALLED_ADDIN",
+  "resumed_authoritative_run": false,
+  "authoritative_harness_mvid": "f989a207-2194-43f7-847a-eaf16f7d48c8",
+  "repair_and_readonly_observations": [
+    {
+      "record": "repair03_audit_01/repair03_audit.private.json",
+      "sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+      "status": "READ_ONLY_AUDIT_COMPLETE_NO_REPAIR_NO_JOINT_PASS",
+      "mode": "AUDIT",
+      "harness_mvid": "95497df6-df5a-458b-aa50-19156e0ca5cb",
+      "joint_qualification": false,
+      "stop_category": "NO_RECORDED_EXCEPTION",
+      "repair_delete_api_called": false,
+      "exact_checkpoint_restored": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "copies_kept_open_unsaved": true,
+      "before_repair_documents": [
+        {
+          "frame": "backing-part",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 493,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 493,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr01",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            },
+            {
+              "feature_id": 743,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金37",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 743,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金37",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr02",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr03",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [
+            {
+              "id": 781,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_Loser",
+              "suppressed": false
+            },
+            {
+              "id": 783,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_LongFarRelief",
+              "suppressed": false
+            },
+            {
+              "id": 789,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_Loser_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 796,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_LongFarRelief_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 797,
+              "type": "SheetMetal",
+              "kind": "SheetMetal",
+              "name": "板金42",
+              "suppressed": false
+            }
+          ],
+          "symmetric_difference_vs_checkpoint_mm3": 68665.694004274,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr04",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            },
+            {
+              "feature_id": 827,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金35",
+              "public_enum_present": false,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 827,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金35",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [
+            {
+              "id": 828,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_Cover",
+              "suppressed": false
+            },
+            {
+              "id": 830,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_ShortRelief",
+              "suppressed": false
+            },
+            {
+              "id": 836,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_Cover_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 837,
+              "type": "SheetMetal",
+              "kind": "SheetMetal",
+              "name": "板金36",
+              "suppressed": false
+            }
+          ],
+          "symmetric_difference_vs_checkpoint_mm3": 71740.269355993,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "2354-02-lc-B11.SLDASM",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [],
+          "added_features": [
+            {
+              "id": 454,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ5",
+              "suppressed": false
+            },
+            {
+              "id": 455,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ6",
+              "suppressed": false
+            },
+            {
+              "id": 456,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ7",
+              "suppressed": false
+            },
+            {
+              "id": 457,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ8",
+              "suppressed": false
+            }
+          ]
+        }
+      ],
+      "after_repair_documents": [],
+      "owned_delete_candidates": [
+        {
+          "scope": "A",
+          "id": 836,
+          "name": "AFJ_299ebb52_Cover_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": false,
+          "ownership": "EXACT_RETURNED_CUT_IMMEDIATE_REGISTRATION_BEFORE_PROTECTED_CHECK_EXCEPTION"
+        },
+        {
+          "scope": "B",
+          "id": 796,
+          "name": "AFJ_299ebb52_LongFarRelief_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 789,
+          "name": "AFJ_299ebb52_Loser_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "A",
+          "id": 830,
+          "name": "AFJ_299ebb52_ShortRelief",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 783,
+          "name": "AFJ_299ebb52_LongFarRelief",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 781,
+          "name": "AFJ_299ebb52_Loser",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "A",
+          "id": 828,
+          "name": "AFJ_299ebb52_Cover",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        }
+      ],
+      "deletions": [],
+      "part_checkpoint_restoration_observed": false,
+      "resume_qualification": "NOT_ESTABLISHED_BY_REPAIR_PART_CHECKS",
+      "parent_failure_report": {
+        "record": "four_corners_03/four_corner_audit.private.json",
+        "sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "factory_trace": {
+        "record": "four_corners_03/four_corner_calls.private.log",
+        "sha256": "ec288c901c4979416d237ec3edface0365a7584139365b9967dbfb9f66158383",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "checkpoint": {
+        "record": "checkpoint_1/checkpoint.private.json",
+        "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+        "binding": "DECLARED_SHA256_VERIFIED",
+        "completed_prefix_corner_count": 1
+      }
+    },
+    {
+      "record": "repair03_execute_01/repair03_audit.private.json",
+      "sha256": "4da55adfb602ae6458579620b6a6cd827a7555e1f666deb8ec36aafcaa270f08",
+      "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+      "mode": "REPAIR",
+      "harness_mvid": "95497df6-df5a-458b-aa50-19156e0ca5cb",
+      "joint_qualification": false,
+      "stop_category": "HARNESS_ACTIVATION_LOG_COLLECTION_MISSING_BEFORE_DELETE",
+      "repair_delete_api_called": false,
+      "exact_checkpoint_restored": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "copies_kept_open_unsaved": true,
+      "before_repair_documents": [
+        {
+          "frame": "backing-part",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 493,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 493,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr01",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            },
+            {
+              "feature_id": 743,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金37",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 743,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金37",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr02",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr03",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [
+            {
+              "id": 781,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_Loser",
+              "suppressed": false
+            },
+            {
+              "id": 783,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_LongFarRelief",
+              "suppressed": false
+            },
+            {
+              "id": 789,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_Loser_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 796,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_LongFarRelief_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 797,
+              "type": "SheetMetal",
+              "kind": "SheetMetal",
+              "name": "板金42",
+              "suppressed": false
+            }
+          ],
+          "symmetric_difference_vs_checkpoint_mm3": 68665.694004274,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr04",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            },
+            {
+              "feature_id": 827,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金35",
+              "public_enum_present": false,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 827,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金35",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [
+            {
+              "id": 828,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_Cover",
+              "suppressed": false
+            },
+            {
+              "id": 830,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_ShortRelief",
+              "suppressed": false
+            },
+            {
+              "id": 836,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_Cover_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 837,
+              "type": "SheetMetal",
+              "kind": "SheetMetal",
+              "name": "板金36",
+              "suppressed": false
+            }
+          ],
+          "symmetric_difference_vs_checkpoint_mm3": 71740.269355993,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "2354-02-lc-B11.SLDASM",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [],
+          "added_features": [
+            {
+              "id": 454,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ5",
+              "suppressed": false
+            },
+            {
+              "id": 455,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ6",
+              "suppressed": false
+            },
+            {
+              "id": 456,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ7",
+              "suppressed": false
+            },
+            {
+              "id": 457,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ8",
+              "suppressed": false
+            }
+          ]
+        }
+      ],
+      "after_repair_documents": [],
+      "owned_delete_candidates": [
+        {
+          "scope": "A",
+          "id": 836,
+          "name": "AFJ_299ebb52_Cover_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": false,
+          "ownership": "EXACT_RETURNED_CUT_IMMEDIATE_REGISTRATION_BEFORE_PROTECTED_CHECK_EXCEPTION"
+        },
+        {
+          "scope": "B",
+          "id": 796,
+          "name": "AFJ_299ebb52_LongFarRelief_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 789,
+          "name": "AFJ_299ebb52_Loser_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "A",
+          "id": 830,
+          "name": "AFJ_299ebb52_ShortRelief",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 783,
+          "name": "AFJ_299ebb52_LongFarRelief",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 781,
+          "name": "AFJ_299ebb52_Loser",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "A",
+          "id": 828,
+          "name": "AFJ_299ebb52_Cover",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        }
+      ],
+      "deletions": [],
+      "part_checkpoint_restoration_observed": false,
+      "resume_qualification": "NOT_ESTABLISHED_BY_REPAIR_PART_CHECKS",
+      "parent_failure_report": {
+        "record": "four_corners_03/four_corner_audit.private.json",
+        "sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "prior_readonly_audit": {
+        "record": "repair03_audit_01/repair03_audit.private.json",
+        "sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "factory_trace": {
+        "record": "four_corners_03/four_corner_calls.private.log",
+        "sha256": "ec288c901c4979416d237ec3edface0365a7584139365b9967dbfb9f66158383",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "checkpoint": {
+        "record": "checkpoint_1/checkpoint.private.json",
+        "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+        "binding": "DECLARED_SHA256_VERIFIED",
+        "completed_prefix_corner_count": 1
+      }
+    },
+    {
+      "record": "repair03_execute_02/repair03_audit.private.json",
+      "sha256": "25e9852f7df20b359578522f04d60345e35b802554ccee360e83056ce807e4b9",
+      "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+      "mode": "REPAIR",
+      "harness_mvid": "0cd54d49-3dc3-4f5e-b12f-7210f09581b5",
+      "joint_qualification": false,
+      "stop_category": "EXACT_ASSEMBLY_CONTEXT_PRECONDITION_NOT_MET_BEFORE_DELETE",
+      "repair_delete_api_called": false,
+      "exact_checkpoint_restored": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "copies_kept_open_unsaved": true,
+      "before_repair_documents": [],
+      "after_repair_documents": [],
+      "owned_delete_candidates": [],
+      "deletions": [],
+      "part_checkpoint_restoration_observed": false,
+      "resume_qualification": "NOT_ESTABLISHED_BY_REPAIR_PART_CHECKS",
+      "parent_failure_report": {
+        "record": "four_corners_03/four_corner_audit.private.json",
+        "sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "factory_trace": {
+        "record": "four_corners_03/four_corner_calls.private.log",
+        "sha256": "ec288c901c4979416d237ec3edface0365a7584139365b9967dbfb9f66158383",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "checkpoint": {
+        "record": "checkpoint_1/checkpoint.private.json",
+        "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+        "binding": "DECLARED_SHA256_VERIFIED",
+        "completed_prefix_corner_count": 1
+      }
+    },
+    {
+      "record": "repair03_execute_03/repair03_audit.private.json",
+      "sha256": "a5106ec0a011faad24f9ada3622fa1920df3d63dd600285e0e4d7fbe6290b7a5",
+      "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+      "mode": "REPAIR",
+      "harness_mvid": "955cef58-a7f9-4df6-90de-b59bd7ca13d0",
+      "joint_qualification": false,
+      "stop_category": "ASSEMBLY_INVENTORY_NOT_EXACT_CHECKPOINT_RESUME_REFUSED",
+      "repair_delete_api_called": true,
+      "exact_checkpoint_restored": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "copies_kept_open_unsaved": true,
+      "before_repair_documents": [
+        {
+          "frame": "backing-part",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 493,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 493,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr01",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            },
+            {
+              "feature_id": 743,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金37",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 743,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金37",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr02",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr03",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [
+            {
+              "id": 781,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_Loser",
+              "suppressed": false
+            },
+            {
+              "id": 783,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_LongFarRelief",
+              "suppressed": false
+            },
+            {
+              "id": 789,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_Loser_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 796,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_LongFarRelief_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 797,
+              "type": "SheetMetal",
+              "kind": "SheetMetal",
+              "name": "板金42",
+              "suppressed": false
+            }
+          ],
+          "symmetric_difference_vs_checkpoint_mm3": 68665.694004274,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr04",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            },
+            {
+              "feature_id": 827,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金35",
+              "public_enum_present": false,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 827,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金35",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [
+            {
+              "id": 828,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_Cover",
+              "suppressed": false
+            },
+            {
+              "id": 830,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_299ebb52_ShortRelief",
+              "suppressed": false
+            },
+            {
+              "id": 836,
+              "type": "ICE",
+              "kind": "Cut",
+              "name": "AFJ_299ebb52_Cover_Cut",
+              "suppressed": false
+            },
+            {
+              "id": 837,
+              "type": "SheetMetal",
+              "kind": "SheetMetal",
+              "name": "板金36",
+              "suppressed": false
+            }
+          ],
+          "symmetric_difference_vs_checkpoint_mm3": 71740.269355993,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "2354-02-lc-B11.SLDASM",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [],
+          "added_features": [
+            {
+              "id": 454,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ5",
+              "suppressed": false
+            },
+            {
+              "id": 455,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ6",
+              "suppressed": false
+            },
+            {
+              "id": 456,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ7",
+              "suppressed": false
+            },
+            {
+              "id": 457,
+              "type": "InContextFeatHolder",
+              "kind": "InContextFeatHolder",
+              "name": "前後関係使用ﾌｨｰﾁｬｰ8",
+              "suppressed": false
+            }
+          ]
+        }
+      ],
+      "after_repair_documents": [
+        {
+          "frame": "backing-part",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 493,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 493,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr01",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            },
+            {
+              "feature_id": 743,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金37",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 743,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金37",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr02",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr03",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr04",
+          "protected_missing_or_changed_count": 0,
+          "known_identity_observations": [
+            {
+              "feature_id": 501,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金19",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 501,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金19",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            },
+            {
+              "feature_id": 827,
+              "expected_type": "SheetMetal",
+              "expected_name": "板金35",
+              "public_enum_present": true,
+              "native_resolve_state": 0,
+              "resolved_identity": {
+                "id": 827,
+                "type": "SheetMetal",
+                "kind": "SheetMetal",
+                "name": "板金35",
+                "suppressed": false
+              },
+              "exact_expected_identity_resolved": true
+            }
+          ],
+          "added_features": [],
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        }
+      ],
+      "owned_delete_candidates": [
+        {
+          "scope": "A",
+          "id": 836,
+          "name": "AFJ_299ebb52_Cover_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": false,
+          "ownership": "EXACT_RETURNED_CUT_IMMEDIATE_REGISTRATION_BEFORE_PROTECTED_CHECK_EXCEPTION"
+        },
+        {
+          "scope": "B",
+          "id": 796,
+          "name": "AFJ_299ebb52_LongFarRelief_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 789,
+          "name": "AFJ_299ebb52_Loser_Cut",
+          "kind": "Cut",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "A",
+          "id": 830,
+          "name": "AFJ_299ebb52_ShortRelief",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 783,
+          "name": "AFJ_299ebb52_LongFarRelief",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "B",
+          "id": 781,
+          "name": "AFJ_299ebb52_Loser",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        },
+        {
+          "scope": "A",
+          "id": 828,
+          "name": "AFJ_299ebb52_Cover",
+          "kind": "ProfileFeature",
+          "closed_confirmed_in_trace": true,
+          "ownership": "IMMEDIATE_FACTORY_REGISTRATION_AND_CLOSED_CONFIRMATION"
+        }
+      ],
+      "deletions": [
+        {
+          "scope": "A",
+          "id": 836,
+          "name": "AFJ_299ebb52_Cover_Cut",
+          "option": 0,
+          "deleted": true
+        },
+        {
+          "scope": "B",
+          "id": 796,
+          "name": "AFJ_299ebb52_LongFarRelief_Cut",
+          "option": 0,
+          "deleted": true
+        },
+        {
+          "scope": "B",
+          "id": 789,
+          "name": "AFJ_299ebb52_Loser_Cut",
+          "option": 0,
+          "deleted": true
+        },
+        {
+          "scope": "A",
+          "id": 830,
+          "name": "AFJ_299ebb52_ShortRelief",
+          "option": 0,
+          "deleted": true
+        },
+        {
+          "scope": "B",
+          "id": 783,
+          "name": "AFJ_299ebb52_LongFarRelief",
+          "option": 0,
+          "deleted": true
+        },
+        {
+          "scope": "B",
+          "id": 781,
+          "name": "AFJ_299ebb52_Loser",
+          "option": 0,
+          "deleted": true
+        },
+        {
+          "scope": "A",
+          "id": 828,
+          "name": "AFJ_299ebb52_Cover",
+          "option": 0,
+          "deleted": true
+        }
+      ],
+      "part_checkpoint_restoration_observed": true,
+      "resume_qualification": "NOT_ESTABLISHED_BY_REPAIR_PART_CHECKS",
+      "parent_failure_report": {
+        "record": "four_corners_03/four_corner_audit.private.json",
+        "sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "prior_readonly_audit": {
+        "record": "repair03_audit_01/repair03_audit.private.json",
+        "sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "factory_trace": {
+        "record": "four_corners_03/four_corner_calls.private.log",
+        "sha256": "ec288c901c4979416d237ec3edface0365a7584139365b9967dbfb9f66158383",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "checkpoint": {
+        "record": "checkpoint_1/checkpoint.private.json",
+        "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+        "binding": "DECLARED_SHA256_VERIFIED",
+        "completed_prefix_corner_count": 1
+      }
+    },
+    {
+      "record": "repair05_execute_01/repair05_audit.private.json",
+      "sha256": "36f8713f0bd10f459f9d83e26414efc0fff55c2c9f5c35b541cbd894f72ccd41",
+      "status": "REPAIR_VERIFIED_TWO_CORNER_GEOMETRY_WITH_EXACT_ORPHAN_CONTEXT_METADATA_NO_NEW_JOINT_PASS",
+      "mode": "REPAIR",
+      "harness_mvid": "dd34d18a-2abb-4662-9d71-12ef40a3112a",
+      "joint_qualification": false,
+      "stop_category": "NO_RECORDED_EXCEPTION",
+      "repair_delete_api_called": true,
+      "exact_checkpoint_restored": "NOT_AVAILABLE",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "copies_kept_open_unsaved": true,
+      "before_repair_documents": [
+        {
+          "frame": "backing-part",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": false,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr01",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": false,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr02",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [
+            {
+              "id": 741,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "AFJ_5e49cb39_Cover",
+              "suppressed": false
+            }
+          ],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": false,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr03",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [
+            {
+              "id": 798,
+              "type": "ProfileFeature",
+              "kind": "ProfileFeature",
+              "name": "ｽｹｯﾁ4",
+              "suppressed": false
+            }
+          ],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": false,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr04",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": false,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        }
+      ],
+      "after_repair_documents": [
+        {
+          "frame": "backing-part",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": true,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr01",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": true,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr02",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": true,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr03",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": true,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        },
+        {
+          "frame": "fr04",
+          "protected_missing_or_changed_count": "NOT_AVAILABLE",
+          "known_identity_observations": [],
+          "added_features": [],
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "exact_checkpoint_features": true,
+          "symmetric_difference_vs_checkpoint_mm3": 0,
+          "body_check2": 0,
+          "body_check3_fault_count": 0
+        }
+      ],
+      "owned_delete_candidates": [
+        {
+          "scope": "A",
+          "id": 798,
+          "name": "ｽｹｯﾁ4",
+          "type": "ProfileFeature",
+          "confirmed_closed_in_factory_trace": false,
+          "post_cleanup_closed_face_support_verified": true,
+          "ownership": "EXACT_FACTORY_REGISTER_PLUS_FAILURE_INVENTORY_PLUS_POST_CLEANUP_CLOSED_NATIVE_TOKEN"
+        },
+        {
+          "scope": "B",
+          "id": 741,
+          "name": "AFJ_5e49cb39_Cover",
+          "type": "ProfileFeature",
+          "confirmed_closed_in_factory_trace": true,
+          "post_cleanup_closed_face_support_verified": true,
+          "ownership": "EXACT_FACTORY_REGISTER_PLUS_FAILURE_INVENTORY_PLUS_POST_CLEANUP_CLOSED_NATIVE_TOKEN"
+        }
+      ],
+      "deletions": [
+        {
+          "scope": "A",
+          "id": 798,
+          "name": "ｽｹｯﾁ4",
+          "option": 0,
+          "deleted": true
+        },
+        {
+          "scope": "B",
+          "id": 741,
+          "name": "AFJ_5e49cb39_Cover",
+          "option": 0,
+          "deleted": true
+        }
+      ],
+      "part_checkpoint_restoration_observed": true,
+      "resume_qualification": "NOT_ESTABLISHED_BY_REPAIR_PART_CHECKS",
+      "exact_part_checkpoint_restored": true,
+      "original_assembly_snapshot_unchanged": true,
+      "completed_prefix_corner_count": 2,
+      "passive_context_was_explicitly_selected_or_deleted": false,
+      "retained_exact_passive_contexts": [
+        {
+          "id": 458,
+          "type": "InContextFeatHolder",
+          "suppressed": false,
+          "parent_feature_ids": [
+            10,
+            267
+          ],
+          "parent_feature_types": [
+            "MateGroup",
+            "Reference"
+          ],
+          "child_count": 0,
+          "admissibility": "EXACT_FAILURE_INVENTORY_458_WITH_SELECTED_REFERENCE_AND_MATEGROUP_NO_CHILDREN_NOT_MODELING_NOT_DELETED"
+        }
+      ],
+      "parent_failure_report": {
+        "record": "four_corners_05/four_corner_audit.private.json",
+        "sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "factory_trace": {
+        "record": "four_corners_05/four_corner_calls.private.log",
+        "sha256": "58686377e742a41446fe09a2f04f886c38471daa88d06035ad35509c3e6e6ea5",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      "checkpoint": {
+        "record": "repair05_execute_01/checkpoint_2_repaired_metadata.private.json",
+        "sha256": "2a6c7168ee742e6aec9e6a0910294b5a5fe2bed13949ae4c935c43bbe8ea916e",
+        "binding": "DECLARED_SHA256_VERIFIED",
+        "completed_prefix_corner_count": 2,
+        "current_assembly_only_metadata_amendment": true,
+        "original_assembly_snapshot_unchanged": true,
+        "part_snapshots_and_expected_bodies_unchanged": true,
+        "amendment_scope": "ONLY_CURRENT_ASSEMBLY_EXACT_FAILURE05_ORPHAN458_NO_NEW_JOINT_PASS",
+        "exact_known_orphan_contexts": [
+          {
+            "id": 458,
+            "type": "InContextFeatHolder",
+            "suppressed": false,
+            "parent_feature_ids": [
+              10,
+              267
+            ],
+            "parent_feature_types": [
+              "MateGroup",
+              "Reference"
+            ],
+            "child_count": 0,
+            "admissibility": "EXACT_FAILURE_INVENTORY_458_WITH_SELECTED_REFERENCE_AND_MATEGROUP_NO_CHILDREN_NOT_MODELING_NOT_DELETED"
+          }
+        ],
+        "prior_checkpoint": {
+          "record": "checkpoint_2/checkpoint.private.json",
+          "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2
+        }
+      },
+      "prior_checkpoint": {
+        "record": "checkpoint_2/checkpoint.private.json",
+        "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+        "binding": "DECLARED_SHA256_VERIFIED",
+        "completed_prefix_corner_count": 2
+      }
+    }
+  ],
+  "native_evidence_lineage": {
+    "scope": "Metadata parent hashes, exact checkpoint references and captured source versions. No opaque native entity bytes, CAD payload, document placement or machine path is exported.",
+    "authoritative_audit_sha256": "a7b99697300b7156678fcc400cd51d085d31106b3f36b66a923729ca9543f642",
+    "nodes": [
+      {
+        "record": "four_corners_08/four_corner_audit.private.json",
+        "sha256": "a7b99697300b7156678fcc400cd51d085d31106b3f36b66a923729ca9543f642",
+        "status": "PASS_FOUR_CORNERS_SAME_ASSEMBLY_NATIVE_API_HARNESS_ONLY_NOT_INSTALLED_ADDIN",
+        "harness_mvid": "f989a207-2194-43f7-847a-eaf16f7d48c8",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 4,
+        "completed_corner_count": 4,
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": true,
+        "nearby_source_manifest_sha256": "88739d3509781404aeb8cd12448a6906484b141a0bde409a4789e20571223ce6",
+        "ghost_source_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+        "source_manifest_binding": "EXACT_AUDIT_SHA256_BOUND",
+        "checkpoint": {
+          "record": "checkpoint_4/checkpoint.private.json",
+          "sha256": "63ae90890cf3e506c398d5e930f21bf0243bfc710753fe02774e7db62856d720",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 4
+        }
+      },
+      {
+        "record": "four_corners_01/four_corner_audit.private.json",
+        "sha256": "025690cd4c5466a8fd008cb4d8f128764ec4ff073ff4c438e3610cc13c6eb087",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "c32cabd8-0eae-4f7a-bc3f-e7c4c34e2c83",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": true
+      },
+      {
+        "record": "four_corners_02/four_corner_audit.private.json",
+        "sha256": "38f71ca902f3df75a9ad54a658a9a8a6c31e30e7649e7e2a0cd4c39438fc26d6",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "5a011369-7ef7-4c00-b7a6-b59a419f2b7b",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": true,
+        "nearby_source_manifest_sha256": "3add470a21aaac56dc561827efad44c9721e5e102a5f1d515c13b1aa6ed6fd98",
+        "ghost_source_sha256": "5440a54f725fd0d29262580921346dabadb4b90a41b885ead3403f116e223989",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND"
+      },
+      {
+        "record": "four_corners_03/four_corner_audit.private.json",
+        "sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "status": "SETUP_FAILED_NO_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "a8a3525f-69c9-4820-ac78-096947b59d2d",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": "NOT_AVAILABLE",
+        "blank_session_restored": false,
+        "nearby_source_manifest_sha256": "22c5f15ad88cedbb582bdd7007c0d2d1a4a45b77da8c4c425f8e10e6a0600680",
+        "ghost_source_sha256": "7760194eb4ded4b7b2c0508425565355f54fe8a9bb910a8f4d2846d89f59c378",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "four_corners_04/four_corner_audit.private.json",
+        "sha256": "88b9cc1c29316682e1e97b5e3896412eff5537970e7d6514ea140f7e41f07589",
+        "status": "SETUP_FAILED_NO_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "84aababc-0127-4c0b-8323-896102be8ac8",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": "NOT_AVAILABLE",
+        "copy_hashes_unchanged": "NOT_AVAILABLE",
+        "blank_session_restored": "NOT_AVAILABLE"
+      },
+      {
+        "record": "four_corners_05/four_corner_audit.private.json",
+        "sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "84aababc-0127-4c0b-8323-896102be8ac8",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": false,
+        "nearby_source_manifest_sha256": "55d799d72443f431e5acfd6ae523001b82bc35dfe8db37505a96f02ae70049ed",
+        "ghost_source_sha256": "ba35a674312e87a5daf030881580750ac8ee1081b857c12ab9df164cc930e582",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND",
+        "checkpoint": {
+          "record": "checkpoint_2/checkpoint.private.json",
+          "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2
+        }
+      },
+      {
+        "record": "four_corners_06/four_corner_audit.private.json",
+        "sha256": "f56175fb803296dfb4bef57a6d7e9c7f4d31ac9cee79158eb1dd49a3e1eebcbe",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "9af1c296-8821-4226-bfd0-7308b3d48e84",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 2,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": false,
+        "nearby_source_manifest_sha256": "ba5da4453ff5616a23d4aaa3c4819dc19c623ee75ad008a0ab90084160c5a585",
+        "ghost_source_sha256": "217fef97d577bb4792d30cb86e030013c1355afe4ee8faedc960d566bb11ecc6",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND",
+        "checkpoint": {
+          "record": "repair05_execute_01/checkpoint_2_repaired_metadata.private.json",
+          "sha256": "2a6c7168ee742e6aec9e6a0910294b5a5fe2bed13949ae4c935c43bbe8ea916e",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2,
+          "current_assembly_only_metadata_amendment": true,
+          "original_assembly_snapshot_unchanged": true,
+          "part_snapshots_and_expected_bodies_unchanged": true,
+          "amendment_scope": "ONLY_CURRENT_ASSEMBLY_EXACT_FAILURE05_ORPHAN458_NO_NEW_JOINT_PASS",
+          "exact_known_orphan_contexts": [
+            {
+              "id": 458,
+              "type": "InContextFeatHolder",
+              "suppressed": false,
+              "parent_feature_ids": [
+                10,
+                267
+              ],
+              "parent_feature_types": [
+                "MateGroup",
+                "Reference"
+              ],
+              "child_count": 0,
+              "admissibility": "EXACT_FAILURE_INVENTORY_458_WITH_SELECTED_REFERENCE_AND_MATEGROUP_NO_CHILDREN_NOT_MODELING_NOT_DELETED"
+            }
+          ],
+          "prior_checkpoint": {
+            "record": "checkpoint_2/checkpoint.private.json",
+            "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+            "binding": "DECLARED_SHA256_VERIFIED",
+            "completed_prefix_corner_count": 2
+          }
+        }
+      },
+      {
+        "record": "repair05_execute_01/resume_amendment.private.json",
+        "sha256": "7a115a91d86fb4252abe8bf1fac610b89427122fc9322d403432e72e8d262a1e",
+        "status": "REPAIR_VERIFIED_TWO_CORNER_GEOMETRY_WITH_EXACT_ORPHAN_CONTEXT_METADATA_NO_NEW_JOINT_PASS",
+        "harness_mvid": "dd34d18a-2abb-4662-9d71-12ef40a3112a",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": false,
+        "checkpoint": {
+          "record": "repair05_execute_01/checkpoint_2_repaired_metadata.private.json",
+          "sha256": "2a6c7168ee742e6aec9e6a0910294b5a5fe2bed13949ae4c935c43bbe8ea916e",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2,
+          "current_assembly_only_metadata_amendment": true,
+          "original_assembly_snapshot_unchanged": true,
+          "part_snapshots_and_expected_bodies_unchanged": true,
+          "amendment_scope": "ONLY_CURRENT_ASSEMBLY_EXACT_FAILURE05_ORPHAN458_NO_NEW_JOINT_PASS",
+          "exact_known_orphan_contexts": [
+            {
+              "id": 458,
+              "type": "InContextFeatHolder",
+              "suppressed": false,
+              "parent_feature_ids": [
+                10,
+                267
+              ],
+              "parent_feature_types": [
+                "MateGroup",
+                "Reference"
+              ],
+              "child_count": 0,
+              "admissibility": "EXACT_FAILURE_INVENTORY_458_WITH_SELECTED_REFERENCE_AND_MATEGROUP_NO_CHILDREN_NOT_MODELING_NOT_DELETED"
+            }
+          ],
+          "prior_checkpoint": {
+            "record": "checkpoint_2/checkpoint.private.json",
+            "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+            "binding": "DECLARED_SHA256_VERIFIED",
+            "completed_prefix_corner_count": 2
+          }
+        }
+      },
+      {
+        "record": "repair05_execute_01/repair05_audit.private.json",
+        "sha256": "36f8713f0bd10f459f9d83e26414efc0fff55c2c9f5c35b541cbd894f72ccd41",
+        "status": "REPAIR_VERIFIED_TWO_CORNER_GEOMETRY_WITH_EXACT_ORPHAN_CONTEXT_METADATA_NO_NEW_JOINT_PASS",
+        "harness_mvid": "dd34d18a-2abb-4662-9d71-12ef40a3112a",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "repair05_execute_01/checkpoint_2_repaired_metadata.private.json",
+          "sha256": "2a6c7168ee742e6aec9e6a0910294b5a5fe2bed13949ae4c935c43bbe8ea916e",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2,
+          "current_assembly_only_metadata_amendment": true,
+          "original_assembly_snapshot_unchanged": true,
+          "part_snapshots_and_expected_bodies_unchanged": true,
+          "amendment_scope": "ONLY_CURRENT_ASSEMBLY_EXACT_FAILURE05_ORPHAN458_NO_NEW_JOINT_PASS",
+          "exact_known_orphan_contexts": [
+            {
+              "id": 458,
+              "type": "InContextFeatHolder",
+              "suppressed": false,
+              "parent_feature_ids": [
+                10,
+                267
+              ],
+              "parent_feature_types": [
+                "MateGroup",
+                "Reference"
+              ],
+              "child_count": 0,
+              "admissibility": "EXACT_FAILURE_INVENTORY_458_WITH_SELECTED_REFERENCE_AND_MATEGROUP_NO_CHILDREN_NOT_MODELING_NOT_DELETED"
+            }
+          ],
+          "prior_checkpoint": {
+            "record": "checkpoint_2/checkpoint.private.json",
+            "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+            "binding": "DECLARED_SHA256_VERIFIED",
+            "completed_prefix_corner_count": 2
+          }
+        }
+      },
+      {
+        "record": "four_corners_07/four_corner_audit.private.json",
+        "sha256": "cc02a9ffe71ad3b37ec91440e0a93c2ca6ef480cbb2ded61c031853f8d674fe1",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "9af1c296-8821-4226-bfd0-7308b3d48e84",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": false,
+        "nearby_source_manifest_sha256": "af0312058c355172444925d6aea45646d0088330a0b352f6e8e6896fafcf9bc6",
+        "ghost_source_sha256": "217fef97d577bb4792d30cb86e030013c1355afe4ee8faedc960d566bb11ecc6",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND",
+        "checkpoint": {
+          "record": "checkpoint_2/checkpoint.private.json",
+          "sha256": "408929dba987fe225505ab072f4b3c31e61b39dcbd33d008e5fbae87c6c60cda",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2
+        }
+      },
+      {
+        "record": "repair03_audit_01/repair03_audit.private.json",
+        "sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "status": "READ_ONLY_AUDIT_COMPLETE_NO_REPAIR_NO_JOINT_PASS",
+        "harness_mvid": "95497df6-df5a-458b-aa50-19156e0ca5cb",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "repair03_execute_01/repair03_audit.private.json",
+        "sha256": "4da55adfb602ae6458579620b6a6cd827a7555e1f666deb8ec36aafcaa270f08",
+        "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+        "harness_mvid": "95497df6-df5a-458b-aa50-19156e0ca5cb",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "repair03_execute_02/repair03_audit.private.json",
+        "sha256": "25e9852f7df20b359578522f04d60345e35b802554ccee360e83056ce807e4b9",
+        "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+        "harness_mvid": "0cd54d49-3dc3-4f5e-b12f-7210f09581b5",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "repair03_execute_03/repair03_audit.private.json",
+        "sha256": "a5106ec0a011faad24f9ada3622fa1920df3d63dd600285e0e4d7fbe6290b7a5",
+        "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+        "harness_mvid": "955cef58-a7f9-4df6-90de-b59bd7ca13d0",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "edge_context_probe_04/edge_context_probe.private.json",
+        "sha256": "e3d64d13ca82ab52950f1b854a1158c3713f0b4abf32f1c07a1107264f48c72d",
+        "status": "PASS_QUERY_ONLY_BODY_SKETCH_CONTEXT_UNCHANGED_NOT_JOINT_QUALIFICATION",
+        "harness_mvid": "NOT_AVAILABLE",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE"
+      },
+      {
+        "record": "live_datum_probe_01/live_datum_probe.private.json",
+        "sha256": "6b0c89a75590794daf73299c88bd3a1398bd277acb773df1a8905e36eae8e299",
+        "status": "PASS_ONE_SCRATCH_LIVE_CONTEXT_QUERIES_ORIGINALS_RESTORED_NOT_JOINT_QUALIFICATION",
+        "harness_mvid": "NOT_AVAILABLE",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE"
+      }
+    ],
+    "parent_edges": [
+      {
+        "child_record": "repair05_execute_01/resume_amendment.private.json",
+        "child_sha256": "7a115a91d86fb4252abe8bf1fac610b89427122fc9322d403432e72e8d262a1e",
+        "relation": "original_failure_report",
+        "parent_record": "four_corners_05/four_corner_audit.private.json",
+        "parent_sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair05_execute_01/repair05_audit.private.json",
+        "child_sha256": "36f8713f0bd10f459f9d83e26414efc0fff55c2c9f5c35b541cbd894f72ccd41",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_05/four_corner_audit.private.json",
+        "parent_sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair05_execute_01/resume_amendment.private.json",
+        "child_sha256": "7a115a91d86fb4252abe8bf1fac610b89427122fc9322d403432e72e8d262a1e",
+        "relation": "repair_audit_report",
+        "parent_record": "repair05_execute_01/repair05_audit.private.json",
+        "parent_sha256": "36f8713f0bd10f459f9d83e26414efc0fff55c2c9f5c35b541cbd894f72ccd41",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "four_corners_06/four_corner_audit.private.json",
+        "child_sha256": "f56175fb803296dfb4bef57a6d7e9c7f4d31ac9cee79158eb1dd49a3e1eebcbe",
+        "relation": "resumed_from_report",
+        "parent_record": "repair05_execute_01/resume_amendment.private.json",
+        "parent_sha256": "7a115a91d86fb4252abe8bf1fac610b89427122fc9322d403432e72e8d262a1e",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_audit_01/repair03_audit.private.json",
+        "child_sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_03/four_corner_audit.private.json",
+        "parent_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_01/repair03_audit.private.json",
+        "child_sha256": "4da55adfb602ae6458579620b6a6cd827a7555e1f666deb8ec36aafcaa270f08",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_03/four_corner_audit.private.json",
+        "parent_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_01/repair03_audit.private.json",
+        "child_sha256": "4da55adfb602ae6458579620b6a6cd827a7555e1f666deb8ec36aafcaa270f08",
+        "relation": "prior_readonly_audit",
+        "parent_record": "repair03_audit_01/repair03_audit.private.json",
+        "parent_sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_02/repair03_audit.private.json",
+        "child_sha256": "25e9852f7df20b359578522f04d60345e35b802554ccee360e83056ce807e4b9",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_03/four_corner_audit.private.json",
+        "parent_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_03/repair03_audit.private.json",
+        "child_sha256": "a5106ec0a011faad24f9ada3622fa1920df3d63dd600285e0e4d7fbe6290b7a5",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_03/four_corner_audit.private.json",
+        "parent_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_03/repair03_audit.private.json",
+        "child_sha256": "a5106ec0a011faad24f9ada3622fa1920df3d63dd600285e0e4d7fbe6290b7a5",
+        "relation": "prior_readonly_audit",
+        "parent_record": "repair03_audit_01/repair03_audit.private.json",
+        "parent_sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      }
+    ]
+  }
+}

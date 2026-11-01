@@ -1,0 +1,27 @@
+{
+  "fresh_parts": 11,
+  "fresh_cuts": 42,
+  "baseline_before_after_verified": 42,
+  "forward_end_counts": {
+    "swEndCondBlind": 16,
+    "swEndCondThroughAllBoth": 22,
+    "swEndCondUpToVertex": 3,
+    "swEndCondThroughAll": 1
+  },
+  "normal_cut_true": 32,
+  "flip_side_true": 11,
+  "blind_depth_relation": {
+    "DEPTH_EQUALS_T": 14,
+    "OTHER_BLIND_DEPTH": 1,
+    "DEPTH_EQUALS_T_PLUS_0_10_MM": 1
+  },
+  "scalar_differences_from_prior": [],
+  "fresh_copy_hashes_unchanged": true,
+  "sheet_cut_overrun_mm": 0.1,
+  "assembly_fit_gap_mm": 0.1,
+  "meanings_independent": true,
+  "replay_counts": {
+    "NOT_APPLICABLE_CORNER_REPLAY": 14,
+    "PASS_GEOMETRY": 28
+  }
+}

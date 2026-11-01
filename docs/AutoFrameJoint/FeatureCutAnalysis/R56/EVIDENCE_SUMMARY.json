@@ -1,0 +1,228 @@
+{
+  "scope": "R56_RESEARCH_SUPPLEMENT_AND_BOUNDED_GENERATED_TESTS_NOT_UNIVERSAL_SOLVER_COMPLETION",
+  "exported_utc": "2026-10-25T05:34:31.841970+00:00",
+  "evidence_levels": {
+    "API_VERIFIED": "Read directly using SOLIDWORKS API; scalar and identity observations only.",
+    "GEOMETRY_VERIFIED": "Calculated and checked using captured native B-rep or finite paired geometry.",
+    "INFERRED": "Proposed generalization or interpretation without a completed direct native qualification."
+  },
+  "authored_finished_reference": {
+    "assembly": "4332-02-TI-P-1.SLDASM",
+    "part_documents_read": 28,
+    "deep_parts": [
+      "4332-04-TI-P-1-fr1.SLDPRT",
+      "4332-04-TI-P-1-fr3.SLDPRT",
+      "4332-04-TI-P-1-fr4.SLDPRT"
+    ],
+    "statistics": {
+      "authored_parts_deep_read": 3,
+      "authored_cut_records": 25,
+      "direction_activation_verified": 25,
+      "direction_activation_unverified": 0,
+      "both_directions_true": 17,
+      "both_directions_false": 8,
+      "active_through_all_both": 12,
+      "normal_cut_true": 25,
+      "flip_side_to_cut_true": 5,
+      "active_direction_1_blind": 10,
+      "active_direction_1_through_all": 15,
+      "active_direction_2_up_to_vertex": 2,
+      "active_blind_t_plus_0_1_features": 3
+    },
+    "source_hashes_unchanged": true,
+    "copy_hashes_unchanged": true,
+    "save_called": false,
+    "rebuild_called": false,
+    "before_after_cut_history_replayed": false,
+    "includes_non_joint_hole_and_slot_features": true
+  },
+  "local_contact_cells": [
+    {
+      "cell": 0,
+      "sheet_role": "UPPER_WALL",
+      "target_part": "4332-04-TI-P-1-fr3.SLDPRT",
+      "peer_part": "4332-04-TI-P-1-fr4.SLDPRT",
+      "target_sheet_owner_id": 669,
+      "peer_sheet_owner_id": 1585,
+      "peer_trim_owner_id": 1623,
+      "existing_target_trim_owner_id": 2051,
+      "current_normal_gap_mm": 0.1,
+      "required_normal_gap_mm": 0.1,
+      "additional_normal_removal_mm": 0,
+      "needs_removal": false,
+      "unique_finite_boundary": true,
+      "decision": "NO_OP",
+      "evidence": "GEOMETRY_VERIFIED",
+      "native_source_parameters": "API_VERIFIED"
+    },
+    {
+      "cell": 1,
+      "sheet_role": "LOWER_WALL",
+      "target_part": "4332-04-TI-P-1-fr3.SLDPRT",
+      "peer_part": "4332-04-TI-P-1-fr4.SLDPRT",
+      "target_sheet_owner_id": 669,
+      "peer_sheet_owner_id": 1529,
+      "peer_trim_owner_id": 1529,
+      "existing_target_trim_owner_id": 2051,
+      "current_normal_gap_mm": 0.070710678,
+      "required_normal_gap_mm": 0.1,
+      "additional_normal_removal_mm": 0.029289322,
+      "needs_removal": true,
+      "unique_finite_boundary": true,
+      "decision": "LOCAL_CUT_RULE_REQUIRED_NOT_PRODUCTION_QUALIFIED",
+      "evidence": "GEOMETRY_VERIFIED",
+      "native_source_parameters": "API_VERIFIED"
+    },
+    {
+      "cell": 2,
+      "sheet_role": "WEB",
+      "target_part": "4332-04-TI-P-1-fr3.SLDPRT",
+      "peer_part": "4332-04-TI-P-1-fr4.SLDPRT",
+      "target_sheet_owner_id": 669,
+      "peer_sheet_owner_id": 669,
+      "peer_trim_owner_id": 1391,
+      "existing_target_trim_owner_id": 1947,
+      "current_normal_gap_mm": 0.070710678,
+      "required_normal_gap_mm": 0.1,
+      "additional_normal_removal_mm": 0.029289322,
+      "needs_removal": true,
+      "unique_finite_boundary": true,
+      "decision": "LOCAL_CUT_RULE_REQUIRED_NOT_PRODUCTION_QUALIFIED",
+      "evidence": "GEOMETRY_VERIFIED",
+      "native_source_parameters": "API_VERIFIED"
+    }
+  ],
+  "strict_local_wall_probe": {
+    "series": "ORACLE02",
+    "status": "REJECTED_BEFORE_SKETCH",
+    "native_cut_called": false,
+    "reason": "One actual endpoint has a finite axial planar sheet boundary, rather than a cylinder tangent. No remote tangent was extended."
+  },
+  "read_only_corner_trace": {
+    "series": "TRACE03",
+    "status": "READ_ONLY_CORNER_ADJACENCY_TRACE_COMPLETED_NOT_A_RELAXED_DATUM_OR_CUT_RULE",
+    "native_cut_called": false,
+    "endpoint_0_kind": "AXIAL_SHEET_BOUNDARY",
+    "endpoint_0_planar_adjacent_owner_id": 2051,
+    "endpoint_1_kind": "AXIAL_BEND_TANGENT",
+    "endpoint_1_cylinder_owner_id": 681,
+    "evidence": "API_VERIFIED",
+    "rule_promotion": "UNVERIFIED"
+  },
+  "generated_tests": {
+    "raw_4332_first_pair_run_12": {
+      "pair": [
+        "fr3a-4",
+        "fr5-3"
+      ],
+      "status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_API_HARNESS_ONLY",
+      "native_cuts": 4,
+      "version_scope": "HISTORICAL_RUN_12_NOT_THE_FINAL_15_QUALIFICATION",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "installed_addin_test": false,
+      "manufacturing_equivalence_to_finished_added_end_stock": "UNVERIFIED"
+    },
+    "final_r56_15_raw_4332_first_pair": {
+      "pair": [
+        "fr3a-4",
+        "fr5-3"
+      ],
+      "status": "PASS_APPLY_1_PAIRS_SAME_ASSEMBLY_API_HARNESS_ONLY_NOT_INSTALLED_ADDIN",
+      "native_cuts": 4,
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "gap_mm": 0.1,
+      "overlap_m3": 0,
+      "installed_addin_test": false,
+      "manufacturing_equivalence_to_finished_added_end_stock": "UNVERIFIED"
+    },
+    "r56_15_2354_regression": {
+      "status": "PASS_FOUR_CORNERS_SAME_ASSEMBLY_NATIVE_API_HARNESS_ONLY_NOT_INSTALLED_ADDIN",
+      "completed_corners": 4,
+      "native_cuts": 16,
+      "fully_constrained_generated_cut_sketches": 16,
+      "new_planes": 0,
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "installed_addin_test": false,
+      "corners": [
+        {
+          "pair": "-fr01-1 x -fr04-1",
+          "status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_HARNESS_ONLY",
+          "gap_mm": 0.1,
+          "overlap_m3": 0
+        },
+        {
+          "pair": "-fr04-1 x -fr03-1",
+          "status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_HARNESS_ONLY",
+          "gap_mm": 0.1,
+          "overlap_m3": 0
+        },
+        {
+          "pair": "-fr03-1 x -fr02-1",
+          "status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_HARNESS_ONLY",
+          "gap_mm": 0.1,
+          "overlap_m3": 0
+        },
+        {
+          "pair": "-fr02-1 x -fr01-1",
+          "status": "PASS_PREVIEW_NATIVE_APPLY_AND_INDEPENDENT_BREP_CHECKS_HARNESS_ONLY",
+          "gap_mm": 0.1,
+          "overlap_m3": 0
+        }
+      ]
+    },
+    "final_r56_15_totals": {
+      "qualified_corner_pairs": 5,
+      "native_cuts": 20,
+      "fully_constrained_generated_sketches": 20,
+      "new_planes": 0,
+      "api_normal_cut_true": 0,
+      "api_normal_cut_false": 20,
+      "evidence": "API_VERIFIED",
+      "representation": "FORMED_PROFILE_ENVELOPE_AND_ANALYTIC_BEND_RELIEF",
+      "normal_bend_role_is_not_api_normalcut": true,
+      "universal_manufacturing_or_flattening_equivalence": "UNVERIFIED"
+    }
+  },
+  "raw_invalid_second_fixture": {
+    "pair": [
+      "fr1-1",
+      "fr3a-4"
+    ],
+    "status": "NOT_A_REQUIRED_MANUFACTURING_CORNER_PASS_CASE",
+    "approximate_axis_separation_mm": 1043.0,
+    "exact_minimum_distance_verified": false,
+    "current_fr1_faces": {
+      "plane": 23,
+      "cylinder": 8,
+      "other": 1
+    },
+    "base_sketch_segments": 7,
+    "base_axis_vs_actual_bend_axes": "BASE_Z_VERSUS_LATER_X_Y_BENDS",
+    "flat_or_corrupt_conclusion": "NOT_SUPPORTED",
+    "evidence": "INFERRED"
+  },
+  "manufacturing_conventions": {
+    "AssemblyFitGap_mm": 0.1,
+    "SheetCutOverrun_mm": 0.1,
+    "same_numeric_value_different_meaning": true
+  },
+  "historical_baseline": {
+    "api_cut_records": 43,
+    "before_after_cut_records": 42,
+    "status": "PRESERVED_SEPARATE_NOT_RECOUNTED_OR_OVERWRITTEN"
+  },
+  "production_local_wall_route": "UNVERIFIED",
+  "added_material_creation_authorized": false,
+  "private_evidence_digests": {
+    "finished_reference_02": "195f78344e9294749bc7c87fc4af9a0d7bb770f0368640c40e7252b3b5c52232",
+    "contact_cells_01": "ae9c585d0cdd2dabf7aefef94f61e349a6d03b376d1cf33708e3658a1e5a3298",
+    "historical_raw_run_12": "71024c8652356319e83029dae752ab8df48ba9ac6f958a98a54758dd571d136c",
+    "final_raw_run_15": "808bf0a0e0e5a677f0dc3c1bf893f5d66189cfb160cfbcbad70556429cb67bfc",
+    "trace_03": "60ddadb5942be886b6fe08eb77de0f627d9392f1cf49f948a1e1d3a21e6e910b",
+    "strict_local_oracle_02": "8c5d0e2ef10e268bb2da1cd6da51fc237a246230538c3190d7c8b068be45362f",
+    "r56_15_regression": "bb245d94fa67109ff5d7f3ec8ca8a11cc536b4a3910f6cace8b089331009e191"
+  }
+}

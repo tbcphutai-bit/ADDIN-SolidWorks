@@ -1,0 +1,57 @@
+{
+  "trials": [
+    {
+      "run": "r65_surface_4332_direct_10",
+      "status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "native_status": "ROLLBACK_UNVERIFIED",
+      "accepted_cuts": 11,
+      "reason": "System.InvalidOperationException: Actual native apply failed: Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_restored": true,
+      "installed_addin": false
+    },
+    {
+      "run": "r65_ruled_4332_direct_12",
+      "status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "native_status": null,
+      "accepted_cuts": 0,
+      "reason": "System.InvalidOperationException: Actual Ghost Preview failed: UNVERIFIED_RULE: PER_FOLD_NORMAL_BLIND localized Bend/tool partition failed exact volume conservation",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_restored": true,
+      "installed_addin": false
+    },
+    {
+      "run": "r65_ruled_4332_direct_13",
+      "status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "native_status": "ROLLBACK_UNVERIFIED",
+      "accepted_cuts": 13,
+      "reason": "System.InvalidOperationException: Actual native apply failed: Cut lỗi và chưa xác minh hoàn tác đầy đủ. Không lưu Part; xem log AFJ-APPLY và Undo thủ công.",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_restored": true,
+      "installed_addin": false
+    },
+    {
+      "run": "r65_sheetcap_4332_direct_14",
+      "status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+      "native_status": "APPLY_VERIFIED",
+      "accepted_cuts": 18,
+      "reason": "System.InvalidOperationException: R62 exact reported 4332 A strip 3 lacks positive outside-end material proof",
+      "source_hashes_unchanged": true,
+      "copy_hashes_unchanged": true,
+      "blank_restored": true,
+      "installed_addin": false
+    }
+  ],
+  "temporary_surface_oracle": {
+    "scope": "NO_CAD_DOCUMENTS_OR_FEATURES",
+    "bilinear_nonplanar_extrusion_valid": true,
+    "rational_euclidean_xyzw_equation_error_m": 8.673617379884035e-19,
+    "rational_extruded_mass_integral_error_m3": 5.404166373750383e-12,
+    "mass_integral_alone_is_not_exact_geometry_proof": true
+  },
+  "trial14_fixture_assertion": "NATIVE_PAIR_ALL_18_CUTS_PASS_BUT_OLD_HARNESS_REQUIRED_FR5_FR3A_SPECIFIC_OVERHANG_INDICES;FINAL15_CHECKS_ACTUAL_FR5_FR1A_POSITIVE_STOCK_WITNESSES",
+  "rollback_experiments_removed_from_final": true
+}

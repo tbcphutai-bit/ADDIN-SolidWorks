@@ -1,0 +1,57 @@
+{
+  "status": "FINAL_API_RUNS_VALIDATED_NOT_INSTALLED_ADDIN_QUALIFICATION",
+  "qualified_pairs": 6,
+  "qualified_generated_native_cuts": 72,
+  "created_sketches": 94,
+  "orientation_context_cases": 1,
+  "terminal_miter_cells": 2,
+  "failed_run_observations_excluded_from_totals": 3,
+  "source_sha256": "7E66FD757B58F3C795AFEDA02790E27FEF6A875884A42BA30E96B9B0D9FC75FE",
+  "runs": [
+    {
+      "run": "native2222_10",
+      "compile_label": "R74_NATIVE10",
+      "loaded_mvid": "cef24780-3dc2-44c5-9246-4534b5d823f4",
+      "diagnostic_binary_sha256": "6F5F2EC61D8C75066E92AEB3E9D26A0CD6493565B28DCDC7071B3CDB79A6EB51",
+      "source_sha256": "7E66FD757B58F3C795AFEDA02790E27FEF6A875884A42BA30E96B9B0D9FC75FE",
+      "harness_protocol_scope_tag": "R72_NONORTHOGONAL_AND_MULTI_RETURN_CURRENT_INPUT_API_HARNESS_NOT_INSTALLED_ADDIN",
+      "scope_tag_is_protocol_compatibility_not_solver_revision": true,
+      "completed_utc": "2026-11-01T15:41:27.9684704Z"
+    },
+    {
+      "run": "native2354_11",
+      "compile_label": "R74_2354_11",
+      "loaded_mvid": "5a163ccf-8ebb-4bbf-bbb3-d5c39f5416ce",
+      "diagnostic_binary_sha256": "D7614B36852CC2D7E29675269CD78905B52458AA5181F54443D91A6719658F65",
+      "source_sha256": "7E66FD757B58F3C795AFEDA02790E27FEF6A875884A42BA30E96B9B0D9FC75FE",
+      "harness_protocol_scope_tag": "R72_NONORTHOGONAL_AND_MULTI_RETURN_CURRENT_INPUT_API_HARNESS_NOT_INSTALLED_ADDIN",
+      "scope_tag_is_protocol_compatibility_not_solver_revision": true,
+      "completed_utc": "2026-11-01T15:44:19.0143896Z"
+    },
+    {
+      "run": "regression4458_12",
+      "compile_label": "R74_REG12",
+      "loaded_mvid": "9862d8aa-c8ea-4e87-bced-373893fca4eb",
+      "diagnostic_binary_sha256": "51CAD72D240D9591CF79362829BBF1DC8D4647BBEC09534D973DD2B01B59D934",
+      "source_sha256": "7E66FD757B58F3C795AFEDA02790E27FEF6A875884A42BA30E96B9B0D9FC75FE",
+      "harness_protocol_scope_tag": "R71_4458_ANGLED_PER_SHEET_SOLVER_API_HARNESS_NOT_INSTALLED_ADDIN",
+      "scope_tag_is_protocol_compatibility_not_solver_revision": true,
+      "completed_utc": "2026-11-01T15:34:55.6615185Z"
+    }
+  ],
+  "counts_are_new_generated_test_features_not_original_handoff_cut_counts": true,
+  "main_build": false,
+  "deployment": false,
+  "merge_performed": false,
+  "installed_addin_test": false,
+  "branch_six_source_compile": {
+    "status": "PASS_COMPILE_ONLY_NOT_API_QUALIFIED",
+    "diagnostic_binary_sha256": "61E5DD3804DF6FDB5718D26E17E019E59719D05CD28685D4A974159BB0A41141",
+    "utc": "2026-11-01T16:00:34.2612950Z",
+    "main_build": false,
+    "deployment": false,
+    "com_called": false,
+    "native_tested": false,
+    "does_not_replace_main_local_six_source_api_qualification": true
+  }
+}

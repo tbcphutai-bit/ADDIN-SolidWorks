@@ -1,0 +1,77 @@
+{
+  "scope": "Actual six installed main and branch source files compiled as separate verification libraries; main project was not built",
+  "variants": [
+    {
+      "output_sha256": "827c3d0cd02a04ba212baf00cac653a65a837d17e2fd5ffaa0dc419fa240f3ab",
+      "files": [
+        {
+          "name": "AutoFrameJointCommandEntry.cs",
+          "sha256": "4795f987af95740776f834cc454419bb50d557ab681f989452d6f2e35cdd3002"
+        },
+        {
+          "name": "AutoFrameJointGeometryMath.cs",
+          "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5"
+        },
+        {
+          "name": "AutoFrameJointGhostSessionManager.cs",
+          "sha256": "b505ce2611affaaa795d2246c8dd19560ee197dae8e7d79035bb89fc26d01fa1"
+        },
+        {
+          "name": "AutoFrameJointReadOnlyProbe.cs",
+          "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b"
+        },
+        {
+          "name": "AutoFrameJointGhostPreview.cs",
+          "sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27"
+        },
+        {
+          "name": "AutoFrameJointSelectionPage.cs",
+          "sha256": "dd1506216efc372d82220e05fc5b0dec97898ab8c712910a6fdb6e03b01cd1e7"
+        }
+      ],
+      "main_project_build": false,
+      "status": "PASS_DETACHED_ACTUAL_SIX_SOURCE_COMPILE_ONLY",
+      "label": "R55MainQualifiedActual",
+      "deployment": false
+    },
+    {
+      "label": "R55GitQualifiedActual",
+      "status": "PASS_DETACHED_ACTUAL_SIX_SOURCE_COMPILE_ONLY",
+      "files": [
+        {
+          "sha256": "35d5078fc2cc2c2db63237cddd5dec1e7a02496e1e1fa8099f6efcbcc2aa98c0",
+          "name": "AutoFrameJointCommandEntry.cs"
+        },
+        {
+          "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+          "name": "AutoFrameJointGeometryMath.cs"
+        },
+        {
+          "sha256": "85d6e38e8459a706bb1bec7d7e058e10e5eef0075173270ee204991a0b79b8f4",
+          "name": "AutoFrameJointGhostSessionManager.cs"
+        },
+        {
+          "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+          "name": "AutoFrameJointReadOnlyProbe.cs"
+        },
+        {
+          "sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+          "name": "AutoFrameJointGhostPreview.cs"
+        },
+        {
+          "sha256": "e614e97f6aaeec37f61385a58b5f12a44904ab40dffa2e0a250d24b22f76d737",
+          "name": "AutoFrameJointSelectionPage.cs"
+        }
+      ],
+      "output_sha256": "ac06f9d4f285b6136e40a53fc75036cdcec3628993a667c47f01fe4c27dddb90",
+      "deployment": false,
+      "main_project_build": false
+    }
+  ],
+  "deployed_addin_dll_after_source_install": {
+    "deployed_mvid": "5ec891d1-e8ff-4add-9cd0-60cadae6d10c",
+    "contains_new_role_scope_method": false,
+    "dll_sha256": "9c340dc7461adc565677279c52de8d4b5cad1cc8b0384fd5614ee7bb1deee8ec"
+  },
+  "installed_addin_ui_test": "NOT_RUN_REQUIRES_USER_MANUAL_REBUILD_AND_RELOAD"
+}

@@ -1,0 +1,5 @@
+# Research update — 2026-10-22
+
+This append-only research update supersedes earlier statements that no before/after or assembly mapping had been measured. Original Feature Tree/43-Cut API evidence is preserved. See SUMMARY.json and TEST_MATRIX.csv for current counts, refusals and limits.
+
+42 Cut before/after differences, 28 oracle tool replays and eight parameterized T1/T2 corner matches are now measured. Production policy is user-confirmed shorter Frame covers with fixed assembly gap 0.1 mm, separate from the t+0.1 mm single-sheet depth convention. Native cases retain their historical cover choices. One generalized U-family solver is implemented on the separate feat/afj-profile-aware-cut-solver-20261021 branch; this documentation branch contains no Add-in source. 1618 inclined/multi-step and Debug height-mismatch rules are still unverified. One SOLIDWORKS crash during harness transition is logged; its exact cause and production stability remain unverified. No full AFJ completion or installed Add-in UI test is claimed.

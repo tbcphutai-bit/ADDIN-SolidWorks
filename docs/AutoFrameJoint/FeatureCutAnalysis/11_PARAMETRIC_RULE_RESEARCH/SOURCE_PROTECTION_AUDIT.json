@@ -1,0 +1,135 @@
+{
+  "original_parts": [
+    {
+      "file": "1618-04-bh-A6-fr1.SLDPRT",
+      "before": "2bd2094b6e5a76b9da194516269d29b86a96a1ad57b7745e03327b40d5da2133",
+      "after": "2bd2094b6e5a76b9da194516269d29b86a96a1ad57b7745e03327b40d5da2133",
+      "unchanged": true
+    },
+    {
+      "file": "1618-04-bh-A6-1.SLDPRT",
+      "before": "93eb041958540e6d3d98054f252d2782b7e6333e5b5456447633b15d02c5e528",
+      "after": "93eb041958540e6d3d98054f252d2782b7e6333e5b5456447633b15d02c5e528",
+      "unchanged": true
+    },
+    {
+      "file": "1618-04-bh-A6-fr2.SLDPRT",
+      "before": "4103cb31b9dd7a32863020e7405fc676f788d9e71b14f786021ec07962e31e17",
+      "after": "4103cb31b9dd7a32863020e7405fc676f788d9e71b14f786021ec07962e31e17",
+      "unchanged": true
+    },
+    {
+      "file": "1618-04-bh-A6-fr3.SLDPRT",
+      "before": "462e585d0ae539305ce33d49718d24776e5b354f521ac04585377637eae66b8c",
+      "after": "462e585d0ae539305ce33d49718d24776e5b354f521ac04585377637eae66b8c",
+      "unchanged": true
+    },
+    {
+      "file": "1618-04-bh-A6-fr4.SLDPRT",
+      "before": "fe61216b8caa96f6f5169d34e72c2fcc4244750ed5fca21be8c98e6ef681b070",
+      "after": "fe61216b8caa96f6f5169d34e72c2fcc4244750ed5fca21be8c98e6ef681b070",
+      "unchanged": true
+    },
+    {
+      "file": "1618-04-bh-A6-中骨1.SLDPRT",
+      "before": "375ecfa994c9a6447ef4bf77f973021eeeab250570b3e9989d638e9c8d5d8dfe",
+      "after": "375ecfa994c9a6447ef4bf77f973021eeeab250570b3e9989d638e9c8d5d8dfe",
+      "unchanged": true
+    },
+    {
+      "file": "3615-04-bh-T1-1.SLDPRT",
+      "before": "917ff98ffa3b4f46cd96d4d83993bec35c95025ffd12c01603238646b44d6cac",
+      "after": "917ff98ffa3b4f46cd96d4d83993bec35c95025ffd12c01603238646b44d6cac",
+      "unchanged": true
+    },
+    {
+      "file": "3615-04-bh-T1-fr1.SLDPRT",
+      "before": "5cfbc53f38748af670094e8964d090daa4a5ea2f0bbb88ba5394ce63ada6926c",
+      "after": "5cfbc53f38748af670094e8964d090daa4a5ea2f0bbb88ba5394ce63ada6926c",
+      "unchanged": true
+    },
+    {
+      "file": "3615-04-bh-T1-fr2.SLDPRT",
+      "before": "faa80073631ca9b3ef1879e24fe4c4664156d82b45d5a600e60f33fbfe143208",
+      "after": "faa80073631ca9b3ef1879e24fe4c4664156d82b45d5a600e60f33fbfe143208",
+      "unchanged": true
+    },
+    {
+      "file": "3615-04-bh-T1-fr3.SLDPRT",
+      "before": "1799d1e2cb5c67eff3569863ab32b1a45a7daf49cf74d6956685fa66bddd5ec1",
+      "after": "1799d1e2cb5c67eff3569863ab32b1a45a7daf49cf74d6956685fa66bddd5ec1",
+      "unchanged": true
+    },
+    {
+      "file": "3615-04-bh-T1-fr4.SLDPRT",
+      "before": "f8be37cb822c1e2d2e120ec08b9341407c1c8d25cf9def69eadbe2e2529b21d8",
+      "after": "f8be37cb822c1e2d2e120ec08b9341407c1c8d25cf9def69eadbe2e2529b21d8",
+      "unchanged": true
+    },
+    {
+      "file": "3615-04-bh-T2-1.SLDPRT",
+      "before": "3acaa0b157c8f336ec4ba23ba7805b285a8cc4292987c30d07029b508882a047",
+      "after": "3acaa0b157c8f336ec4ba23ba7805b285a8cc4292987c30d07029b508882a047",
+      "unchanged": true
+    },
+    {
+      "file": "3615-04-bh-T2-fr1.SLDPRT",
+      "before": "79f91b1ed43b99a9b93ba7ae2327115e4eac927a39e9f3d12342a37d37310a82",
+      "after": "79f91b1ed43b99a9b93ba7ae2327115e4eac927a39e9f3d12342a37d37310a82",
+      "unchanged": true
+    },
+    {
+      "file": "3615-04-bh-T2-fr2.SLDPRT",
+      "before": "dc326ff6e051a79c70a27b295f1da957fa705c232045fc9c4fc66b146d943465",
+      "after": "dc326ff6e051a79c70a27b295f1da957fa705c232045fc9c4fc66b146d943465",
+      "unchanged": true
+    },
+    {
+      "file": "4114-04-HN-C07-12_New.SLDPRT",
+      "before": "126a7a288bab23a18389157ca4da405b1163ec5e10c8f7b12106d4bfef3006e2",
+      "after": "126a7a288bab23a18389157ca4da405b1163ec5e10c8f7b12106d4bfef3006e2",
+      "unchanged": true
+    }
+  ],
+  "user_working_copy_source": [
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "baseline_sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+      "current_sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+      "unchanged": true
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+      "baseline_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "current_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "unchanged": true
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "baseline_sha256": "f0fcda50d4852e715f353f9787d41d6c7d26de1ca4824e2b56752b6976c1584c",
+      "current_sha256": "f0fcda50d4852e715f353f9787d41d6c7d26de1ca4824e2b56752b6976c1584c",
+      "unchanged": true
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "baseline_sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+      "current_sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+      "unchanged": true
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+      "baseline_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "current_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "unchanged": true
+    },
+    {
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "baseline_sha256": "49cb55d564bdab3ef5a2472ef85475727c793d361e300a26af5fd26bde18dae8",
+      "current_sha256": "49cb55d564bdab3ef5a2472ef85475727c793d361e300a26af5fd26bde18dae8",
+      "unchanged": true
+    }
+  ],
+  "main_addin_built": false,
+  "main_addin_deployed": false,
+  "native_cad_uploaded": false
+}

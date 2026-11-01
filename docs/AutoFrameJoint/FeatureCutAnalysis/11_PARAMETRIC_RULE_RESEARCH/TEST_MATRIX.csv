@@ -1,0 +1,43 @@
+case,fixture,phase,status,short_cover,cut_a_mm3,cut_b_mm3,gap_mm,overlap_mm3,reason
+1618-02-bh-A6,AFJ-R01,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,UNVERIFIED_RULE: no unique Web between parallel outward Walls
+1618-02-bh-A6,AFJ-R02,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,UNVERIFIED_RULE: no unique Web between parallel outward Walls
+1618-02-bh-A6,AFJ-R03,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,UNVERIFIED_RULE: no unique Web between parallel outward Walls
+1618-02-bh-A6,AFJ-R04,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,UNVERIFIED_RULE: no unique Web between parallel outward Walls
+3615-02-bh-T1,AFJ-R05,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,"UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=27.708847204660252/0"
+3615-02-bh-T1,AFJ-R05,native_before_copies,PASS_GEOMETRY,A,52877.311671602656,242473.5318293358,0.09999999999991943,0.0,
+3615-02-bh-T1,AFJ-R05,private_rollback_public_preview,PASS_DISPLAY3_API,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 52877.312 mm³; B bỏ 242473.532 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+3615-02-bh-T1,AFJ-R06,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,"UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=28.493792724341706/258.41707902977316"
+3615-02-bh-T1,AFJ-R06,native_before_copies,PASS_GEOMETRY,A,52877.3116716028,218368.6087533718,0.1000000000000495,0.0,
+3615-02-bh-T1,AFJ-R06,private_rollback_public_preview,PASS_DISPLAY3_API,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 52877.312 mm³; B bỏ 218368.609 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+3615-02-bh-T1,AFJ-R07,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,"UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=363.89379272438691/256.85415805955813"
+3615-02-bh-T1,AFJ-R07,native_before_copies,PASS_GEOMETRY,B,242473.53182933608,52877.311671602896,0.0999999999995449,0.0,
+3615-02-bh-T1,AFJ-R07,private_rollback_public_preview,PASS_DISPLAY3_API,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 242473.532 mm³; B bỏ 52877.312 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+3615-02-bh-T1,AFJ-R08,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,"UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=28.493792724329992/258.41707902979158"
+3615-02-bh-T1,AFJ-R08,native_before_copies,PASS_GEOMETRY,B,218368.60875337172,52877.31167160257,0.09999999999995429,0.0,
+3615-02-bh-T1,AFJ-R08,private_rollback_public_preview,PASS_DISPLAY3_API,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 218368.609 mm³; B bỏ 52877.312 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+3615-02-bh-T2,AFJ-R09,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,"UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551942786/284.56300526426185"
+3615-02-bh-T2,AFJ-R09,native_before_copies,PASS_GEOMETRY,A,110629.53491385393,212077.6248597301,0.10000000000054324,0.0,
+3615-02-bh-T2,AFJ-R09,private_rollback_public_preview,PASS_DISPLAY3_API,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+3615-02-bh-T2,AFJ-R10,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,"UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551960293/284.56300526237317"
+3615-02-bh-T2,AFJ-R10,native_before_copies,PASS_GEOMETRY,A,110629.53491385379,212077.6248597302,0.0999999999999268,0.0,
+3615-02-bh-T2,AFJ-R10,private_rollback_public_preview,PASS_DISPLAY3_API,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+3615-02-bh-T2,AFJ-R11,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,"UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551966921/284.56300526237976"
+3615-02-bh-T2,AFJ-R11,native_before_copies,PASS_GEOMETRY,B,212077.62485973042,110629.53491385379,0.09999999999964898,0.0,
+3615-02-bh-T2,AFJ-R11,private_rollback_public_preview,PASS_DISPLAY3_API,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 212077.625 mm³; B bỏ 110629.535 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+3615-02-bh-T2,AFJ-R12,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,"UNVERIFIED_RULE: REQUIRED_KEEP_MISSING; insufficient stock, prior incompatible trim or hole in joint coverage band; missing loser/cover mm3=336.18494551969826/284.56300526423979"
+3615-02-bh-T2,AFJ-R12,native_before_copies,PASS_GEOMETRY,A,110629.53491385377,212077.62485973033,0.0999999999995449,0.0,
+3615-02-bh-T2,AFJ-R12,private_rollback_public_preview,PASS_DISPLAY3_API,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,ORTHOGONAL_U_COVER: Đã kiểm tra B-rep tạm. A bỏ 110629.535 mm³; B bỏ 212077.625 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.
+2354-02-lc-B11,DEBUG_PAIR_1,native_final,UNVERIFIED_RULE,NOT_AVAILABLE,0.0,0.0,NOT_AVAILABLE,NOT_AVAILABLE,UNVERIFIED_RULE: base skin/thickness side differs from verified formed family
+DEBUG_PAIR_2,unknown,identification,NOT_IDENTIFIED,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,NOT_AVAILABLE,No second distinct pair in the supplied Debug logs. No PASS claimed.
+U_VARIANT_1,independent analytic stock,runtime_boolean,PASS,B,23744.5852760527,23818.82460865963,0.09999999999998899,0.0,
+U_VARIANT_2,independent analytic stock,runtime_boolean,PASS,B,31339.178233274397,32235.21889189943,0.0999999999999319,0.0,
+U_VARIANT_3,independent analytic stock,runtime_boolean,PASS,B,63505.15018551764,47106.93829933245,0.09999999999998899,0.0,
+U_VARIANT_4,independent analytic stock,runtime_boolean,PASS,B,18784.497719658128,25563.524819710103,0.0999999999999319,0.0,
+U_VARIANT_5,independent analytic stock,runtime_boolean,PASS,B,103852.53278367135,80314.34823006863,0.09999999999993348,0.0,
+U_VARIANT_6,independent analytic stock,runtime_boolean,PASS,B,5679.614425126382,5608.496760633265,0.10000000000007582,0.0,
+U_VARIANT_7,independent analytic stock,runtime_boolean,PASS,B,24876.045387493545,26645.70751516065,0.09999999999993348,0.0,
+U_VARIANT_8,independent analytic stock,runtime_boolean,PASS,B,35077.64813766594,32107.98786921767,0.09999999999986507,0.0,
+U_VARIANT_9,independent analytic stock,runtime_boolean,PASS,B,54333.120517314,42595.93837347456,0.09999999999993348,0.0,
+U_VARIANT_10,independent analytic stock,runtime_boolean,PASS,B,16045.04777984103,16048.928951739601,0.09999999999989849,0.0,
+U_VARIANT_11,independent analytic stock,runtime_boolean,PASS,B,31394.927686537925,31856.227773468814,0.09999999999987796,0.0,
+U_VARIANT_12,independent analytic stock,runtime_boolean,PASS,B,16785.221356627437,16468.12580438697,0.09999999999962093,0.0,

@@ -1,0 +1,5 @@
+role,constrained_status,relations,dangling,overdefining,dimensions,new_planes,Cut_created
+MASTER,3,28,0,0,1,0,False
+LOSER,3,36,0,0,1,0,False
+U_RULE:NORMAL_BEND_CAP,3,6,0,0,0,0,False
+U_RULE:FAR_BEND_CLEARANCE,3,10,0,0,0,0,False
