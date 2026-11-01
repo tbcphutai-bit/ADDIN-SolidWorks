@@ -1,0 +1,26 @@
+[
+  {
+    "case": "2222_corner_1",
+    "frame": "A",
+    "strip": 7,
+    "mate_strip": 7,
+    "evidence_level": "GEOMETRY_VERIFIED",
+    "primary_remaining_flat_overlap_m3": 2.949119999999979e-06,
+    "own_primary_cutoff_m": 0.02150000000000607,
+    "mate_primary_cutoff_m": -0.9427962984286722,
+    "normal_cut_intent": true,
+    "scope": "ONE_FORMED_BEND_AND_ACTUAL_FREE_EDGE;POSITIVE_POST_PRIMARY_FLAT_OVERLAP"
+  },
+  {
+    "case": "2222_corner_1",
+    "frame": "B",
+    "strip": 7,
+    "mate_strip": 7,
+    "evidence_level": "GEOMETRY_VERIFIED",
+    "primary_remaining_flat_overlap_m3": 2.949119999999979e-06,
+    "own_primary_cutoff_m": -0.9427962984286722,
+    "mate_primary_cutoff_m": 0.02150000000000607,
+    "normal_cut_intent": true,
+    "scope": "ONE_FORMED_BEND_AND_ACTUAL_FREE_EDGE;POSITIVE_POST_PRIMARY_FLAT_OVERLAP"
+  }
+]

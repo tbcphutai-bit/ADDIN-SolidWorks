@@ -308,7 +308,17 @@ namespace ADDIN.Commands.AutoFrameJoint
                 if (!session.Ghost.TryClear(out cleanup))
                 { session.State=SessionState.PendingCleanup; message="APPLY: không dọn được Ghost; chưa cắt Part. " + cleanup; return false; }
                 AfjNativeApplyReport report;
-                bool applied = AfjNativeCutCommit.TryApply(session.App, session.Assembly, ticket, out report, out message);
+                // AFJ-APPLY-WRITER-PERF-20261022
+                var writerTimer = Stopwatch.StartNew();
+                bool applied;
+                try
+                {
+                    applied = AfjNativeCutCommit.TryApply(session.App, session.Assembly, ticket, out report, out message);
+                }
+                finally
+                {
+                    Trace.WriteLine("[AFJ-APPLY-PERF] phase=native_writer ms=" + writerTimer.ElapsedMilliseconds);
+                }
                 Trace.WriteLine("[AFJ-APPLY] END status=" + report.Status + " cuts=" + report.Cuts.Count + " rollback=" + report.RollbackVerified + " saveApiCalled=" + report.SaveApiCalled);
                 session.State = SessionState.Ready;
                 return applied;

@@ -1,0 +1,74 @@
+{
+  "qualification": "PRIVATE_COMPILE_ONLY_NOT_PRODUCTION_ENABLED",
+  "default_route_enabled": false,
+  "harness_opt_in_define": "AFJ_U_LINKED_WRITER_HARNESS",
+  "exact_reviewed_plan_retained": true,
+  "journal_input": "UOwnedFeatureJournal.V4SAFE.cs",
+  "transaction_input": "AfjNativeUTransaction.V2ManagedRefs.cs",
+  "writer_input": "UParametricSketchWriter.V2ManagedRefs.cs",
+  "inputs": [
+    {
+      "name": "AutoFrameJointGhostPreview.cs",
+      "sha256": "8ba673a608bf6dd2b9899429ae479dd5e23469b376cb1591668ca2b598cbdd06"
+    },
+    {
+      "name": "AfjNativeUTransaction.V2ManagedRefs.cs",
+      "sha256": "c23b67c2743cb497a51d3419e5bc7892927d59881d96d84775dcd523ef7d2c6d"
+    },
+    {
+      "name": "UParametricSketchWriter.V2ManagedRefs.cs",
+      "sha256": "daf036a5abcfa88ccfe15faf45484e7a4e26b54943b10e23d22e12192cdf97a4"
+    },
+    {
+      "name": "UOwnedFeatureJournal.V4SAFE.cs",
+      "sha256": "1f8e0203e59bf6e230eb43c58094d9eeef67ce084a9d3dcdbf0712e2f3d31617"
+    }
+  ],
+  "candidate_sha256": "aaf393877cb87dfa7a71898ab49348611e84d92e43a6c6a452a135199ceba11e",
+  "route_patch_sha256": "1651eec67150a07133682d46150d47391e75056f167479eaaa85cf583c99279e",
+  "status": "EXPERIMENTAL_SOURCE_DELIVERY_NOT_INSTALLED_REPAIR",
+  "main_addin_source_changed": false,
+  "main_project_changed": false,
+  "main_addin_built_or_deployed": false,
+  "complete_native_transaction_qualified": false,
+  "rollback_qualified": false,
+  "installed_addin_qualified": false,
+  "intent_retained_by_reference_not_immutable_snapshot": true,
+  "artifacts": [
+    {
+      "file": "AutoFrameJointGhostPreview.candidate.cs",
+      "private_input_sha256": "aaf393877cb87dfa7a71898ab49348611e84d92e43a6c6a452a135199ceba11e",
+      "published_utf8_lf_sha256": "a333d4d4174d76ceb2c9bc17a2d50ae18d209cb51c13a355104663862e99a3a4",
+      "changes_for_publication": "UTF8_LF_SINGLE_FINAL_NEWLINE_ONLY",
+      "bytes": 396135
+    },
+    {
+      "file": "AfjNativeUTransaction.V2ManagedRefs.cs.txt",
+      "private_input_sha256": "c23b67c2743cb497a51d3419e5bc7892927d59881d96d84775dcd523ef7d2c6d",
+      "published_utf8_lf_sha256": "c23b67c2743cb497a51d3419e5bc7892927d59881d96d84775dcd523ef7d2c6d",
+      "changes_for_publication": "UTF8_LF_SINGLE_FINAL_NEWLINE_ONLY",
+      "bytes": 28865
+    },
+    {
+      "file": "UParametricSketchWriter.V2ManagedRefs.cs.txt",
+      "private_input_sha256": "daf036a5abcfa88ccfe15faf45484e7a4e26b54943b10e23d22e12192cdf97a4",
+      "published_utf8_lf_sha256": "daf036a5abcfa88ccfe15faf45484e7a4e26b54943b10e23d22e12192cdf97a4",
+      "changes_for_publication": "UTF8_LF_SINGLE_FINAL_NEWLINE_ONLY",
+      "bytes": 104485
+    },
+    {
+      "file": "UOwnedFeatureJournal.V4SAFE.cs.txt",
+      "private_input_sha256": "1f8e0203e59bf6e230eb43c58094d9eeef67ce084a9d3dcdbf0712e2f3d31617",
+      "published_utf8_lf_sha256": "edf4c1e23a911aec295d51d87f460027dc2483bbe0c859db115c4c39f5c3b7c7",
+      "changes_for_publication": "UTF8_LF_SINGLE_FINAL_NEWLINE_ONLY",
+      "bytes": 47280
+    },
+    {
+      "file": "INTEGRATION_ROUTE.patch.txt",
+      "private_input_sha256": "1651eec67150a07133682d46150d47391e75056f167479eaaa85cf583c99279e",
+      "published_utf8_lf_sha256": "1651eec67150a07133682d46150d47391e75056f167479eaaa85cf583c99279e",
+      "changes_for_publication": "UTF8_LF_SINGLE_FINAL_NEWLINE_ONLY",
+      "bytes": 11210
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0",
+  "source_commit_sha": "90876693d34fbaf6b13f0570b548ba7f6b946547",
+  "raw_cad_or_binary_files": 0,
+  "hash_normalization": "UTF8_NO_BOM_LF",
+  "files": [
+    {
+      "path": "API_RESULTS.csv",
+      "canonical_utf8_lf_sha256": "89e1c3199df1e0ac1cfb59143460beedbe9d0d76d4c00e4b968a727972c4db04",
+      "canonical_bytes": 10690
+    },
+    {
+      "path": "API_RESULTS.json",
+      "canonical_utf8_lf_sha256": "e2ee3cc21d5677765ab9dc252a513e63444aaf5199a0818fe8515063973f1398",
+      "canonical_bytes": 132366
+    },
+    {
+      "path": "evidence/CROSS_END_ADAPTER_RESEARCH.cs.txt",
+      "canonical_utf8_lf_sha256": "3bbfcac54807a20c1816612d4ded57451a8657ddcecf5845aba1c90c374c4c57",
+      "canonical_bytes": 4609
+    },
+    {
+      "path": "evidence/CROSS_END_UNDO_FAILED_RESEARCH.cs.txt",
+      "canonical_utf8_lf_sha256": "009cd2d55b26ec2941ded4c8abe6b102b84d3ddfa14a82d24f2864febfcb4b49",
+      "canonical_bytes": 29335
+    },
+    {
+      "path": "evidence/DIRECT_COINCIDENT_FOLLOW_RESEARCH.cs.txt",
+      "canonical_utf8_lf_sha256": "0714df964330a3586db1bfeeb4608ea26f5e98cfa36750a16f63c08c1ef2ec60",
+      "canonical_bytes": 32234
+    },
+    {
+      "path": "evidence/MANAGED_89_CONTRACTS.cs.txt",
+      "canonical_utf8_lf_sha256": "927362be8cbb42138812b1bdcd21e2e1740492d92992e619a7fd92d2ba2e343e",
+      "canonical_bytes": 57421
+    },
+    {
+      "path": "evidence/NATIVE_COPY_CUT_HARNESS.cs.txt",
+      "canonical_utf8_lf_sha256": "56c8f196760c791842747bdcd700898d93207e7676baf3baac2cc0d8407797cb",
+      "canonical_bytes": 17294
+    },
+    {
+      "path": "evidence/NATIVE_GEOMETRY_HARNESS.cs.txt",
+      "canonical_utf8_lf_sha256": "05daeda8d1d2db1442555cd7fada0a62df06c61e5d42fe931785dc215997e7c2",
+      "canonical_bytes": 16284
+    },
+    {
+      "path": "evidence/PID_ROT_CONNECTION.cs.txt",
+      "canonical_utf8_lf_sha256": "abd1804d8d160282c666ebe8f98cf64a196f5721d773e2a524bf28108e7593fc",
+      "canonical_bytes": 2383
+    },
+    {
+      "path": "evidence/PUBLIC_PREVIEW_HARNESS.cs.txt",
+      "canonical_utf8_lf_sha256": "86301885eee490373ae9ec93e0380ec9720e2706df7561f9dd58cff797c3e2f8",
+      "canonical_bytes": 17735
+    },
+    {
+      "path": "EXPERIMENT_LOG_EXCERPTS.md",
+      "canonical_utf8_lf_sha256": "17c185800dbddc243fa37991f0a6506c390f4ed2fef16ea5655b6e907331a742",
+      "canonical_bytes": 5225
+    },
+    {
+      "path": "FLOW.md",
+      "canonical_utf8_lf_sha256": "9e1db8f6d0b142a74253dac83bd7b6dee8145303e15d93695c649aaae32abaef",
+      "canonical_bytes": 1862
+    },
+    {
+      "path": "KNOWN_LIMITATIONS.md",
+      "canonical_utf8_lf_sha256": "55aa037e504f24e4571325de471189473a27add08f7aa0a346c79bcd902c07ad",
+      "canonical_bytes": 8063
+    },
+    {
+      "path": "MANUAL_BUILD.md",
+      "canonical_utf8_lf_sha256": "dd186191120f1d1bded99fdfdc49ab81ba97308aaeafc8d4ff2b9aeb7829bdaf",
+      "canonical_bytes": 3317
+    },
+    {
+      "path": "PERFORMANCE.md",
+      "canonical_utf8_lf_sha256": "b557ff7b8c69f27754666d27d4bff0facbfbd45bb65990115c733280bc441467",
+      "canonical_bytes": 6343
+    },
+    {
+      "path": "README.md",
+      "canonical_utf8_lf_sha256": "2f8fe50aadd4302f5ef6414f4c56440319bd728ff46baabd242e113f6e3776d6",
+      "canonical_bytes": 7143
+    },
+    {
+      "path": "REPRODUCE.md",
+      "canonical_utf8_lf_sha256": "1cec1486552ccbfcbc40e730a620cea6a33fa682f047e55c4781c5699a9e4d9d",
+      "canonical_bytes": 2972
+    },
+    {
+      "path": "RULES.md",
+      "canonical_utf8_lf_sha256": "1adf52044e95c19428e94a65d54d19833c92aa5ae3effbdd4ab37cbe763dcb2d",
+      "canonical_bytes": 5605
+    },
+    {
+      "path": "SKETCH_CONSTRAINTS.md",
+      "canonical_utf8_lf_sha256": "291b38b0d0d383e3f7c92b70959162d45dcea4a77bbe944152fe76a40cdfd3b5",
+      "canonical_bytes": 7774
+    },
+    {
+      "path": "SOURCE_VERIFICATION.json",
+      "canonical_utf8_lf_sha256": "aeacf83382d9e74daf2a95069832c7164aa646e3f0c2ba24dba425745416854d",
+      "canonical_bytes": 5379
+    },
+    {
+      "path": "UNEQUAL_WIDTH.md",
+      "canonical_utf8_lf_sha256": "4f1ef5fe908c138af5fc78098d85a5ec96448c452136364cea639d503fda937e",
+      "canonical_bytes": 4064
+    }
+  ]
+}

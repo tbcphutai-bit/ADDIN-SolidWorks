@@ -1,0 +1,12 @@
+[
+  {
+    "scope": "local",
+    "before_sha256": "8f9c358eabfc2b67cd4a32e1b032493a5a4c6916876d43e0ee8a3acf167dccc2",
+    "after_sha256": "c6178e9492a4ee4200c7679dd530a0b923e58b2310e7837ddfada576114841c2"
+  },
+  {
+    "scope": "git",
+    "before_sha256": "3a5116f16031d98d221a5cdb7cdfbcf52788a06ef227bf3025689f0b94c74d78",
+    "after_sha256": "a04be5aedc84eb1cac23aa812adc427d055c58ab81db1ffeda3cb7b794cf85c6"
+  }
+]

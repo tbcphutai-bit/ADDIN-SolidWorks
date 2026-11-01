@@ -1,0 +1,8 @@
+from pathlib import Path
+r=Path(__file__).parent
+s=(r/'UCriticalPointsHarness.cs').read_text(encoding='utf-8-sig')
+s=s.replace('AfjUCriticalPointsProbe.Run','AfjUCoverMasterProbe.Run').replace('U_CRITICAL_POINTS_PROBE','U_COVER_MASTER_PROBE').replace('Run["critical_points"]','Run["cover_master"]')
+s=s.replace('"points",evidence.Points.Select','"profile_vertices",evidence.ProfileVertexCount,"axis_relations",evidence.AxisRelations,"critical_relations",evidence.CriticalDatumRelations,"closure_guides",evidence.ClosureGuides,"equal_margin_relations",evidence.EqualMarginRelations,"margin_m",evidence.ToolClosureMargin,"dimension_value_m",evidence.MarginDimensionValue,"dimension_name",evidence.MarginDimensionName,"axial_closure_datum",evidence.AxialClosureDatum,"seed_polygon_unchanged",evidence.SeedPolygonUnchanged,"points",evidence.Points.Select')
+s=s.replace('PASS_NATIVE_FOUR_CRITICAL','PASS_NATIVE_FULL_COVER_SKETCH')
+(r/'UCoverMasterHarness.cs').write_text(s,encoding='utf-8')
+(r/'AfjUCoverMasterProbe.cs').write_text((r/'AfjUCoverMasterProbe.cs.txt').read_text(encoding='utf-8-sig'),encoding='utf-8')

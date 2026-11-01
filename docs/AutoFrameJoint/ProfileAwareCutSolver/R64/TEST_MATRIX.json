@@ -1,0 +1,73 @@
+{
+  "scope": "PREVIEW_ONLY_NO_NATIVE_CUT_OR_MAIN_BUILD",
+  "rows": [
+    {
+      "run": "FRAME_4332",
+      "pair": "4332-04-TI-P-1-fr1a-2 x 4332-04-TI-P-1-fr2-1",
+      "status": "PASS_PREVIEW_API_AND_GEOMETRY_ONLY",
+      "normal_world": [
+        1,
+        -1.531977669721889e-16,
+        -3.6139439964916206e-15
+      ],
+      "world_delta_m": [
+        0.15509999999999996,
+        -2.3760973657386494e-17,
+        -5.605227138558502e-16
+      ],
+      "lift_mm": 155.09999999999997,
+      "display_clearance_mm": 14.099999999999996,
+      "actual_displayed_normal_gap_mm": 14.099999999999989,
+      "in_plane_slip_a_m": 3.1365349553214036e-22,
+      "in_plane_slip_b_m": 4.9369571417929264e-23,
+      "ab_swap_delta_identical": true,
+      "actual_camera_orientation_changed": true,
+      "world_position_after_orbit_unchanged": true,
+      "temporary_body_identities_unchanged": true,
+      "body_box_delta_after_orbit_m": 0,
+      "solver_calls_after_orbit": 0,
+      "hide_calls_after_orbit": 0,
+      "display_calls_after_orbit": 0,
+      "fit_calls_after_orbit": 0,
+      "cached_orbit_preview_ms": 1,
+      "camera_cleanup_preserves_user_view": true,
+      "source_and_copy_hashes_unchanged": true,
+      "native_cut_tested": false,
+      "installed_addin_tested": false
+    },
+    {
+      "run": "FRAME_2354",
+      "pair": "2354-04-lc-B11-fr04-1 x 2354-04-lc-B11-fr03-1",
+      "status": "PASS_PREVIEW_API_AND_GEOMETRY_ONLY",
+      "normal_world": [
+        0,
+        1.3877787807814457e-17,
+        1
+      ],
+      "world_delta_m": [
+        0,
+        9.159339953157542e-19,
+        0.066
+      ],
+      "lift_mm": 66.0,
+      "display_clearance_mm": 6.0,
+      "actual_displayed_normal_gap_mm": 6.000000000000005,
+      "in_plane_slip_a_m": 0,
+      "in_plane_slip_b_m": 0,
+      "ab_swap_delta_identical": true,
+      "actual_camera_orientation_changed": true,
+      "world_position_after_orbit_unchanged": true,
+      "temporary_body_identities_unchanged": true,
+      "body_box_delta_after_orbit_m": 0,
+      "solver_calls_after_orbit": 0,
+      "hide_calls_after_orbit": 0,
+      "display_calls_after_orbit": 0,
+      "fit_calls_after_orbit": 0,
+      "cached_orbit_preview_ms": 1,
+      "camera_cleanup_preserves_user_view": true,
+      "source_and_copy_hashes_unchanged": true,
+      "native_cut_tested": false,
+      "installed_addin_tested": false
+    }
+  ]
+}

@@ -1,0 +1,600 @@
+{
+  "schema_version": "R55-QUALIFIED-SOURCE-1",
+  "qualification_audit_sha256": "a7b99697300b7156678fcc400cd51d085d31106b3f36b66a923729ca9543f642",
+  "qualified_source_files": [
+    {
+      "file": "R55RoleScopedDatums.candidate.cs",
+      "sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+      "artifact_kind": "SOURCE_TEXT"
+    },
+    {
+      "file": "AutoFrameJointSelectionPage.cs",
+      "sha256": "dd1506216efc372d82220e05fc5b0dec97898ab8c712910a6fdb6e03b01cd1e7",
+      "artifact_kind": "SOURCE_TEXT"
+    },
+    {
+      "file": "R55FourCornerHarness.cs",
+      "sha256": "ee12bea89a35f18709758c4bbc866c7726a7186b6a2cf7e6398e0a1decafe3f1",
+      "artifact_kind": "SOURCE_TEXT"
+    },
+    {
+      "file": "HarnessConnection.R55Owned.cs",
+      "sha256": "9a32fd5d1fbff525ed9c83d1306898ee4bd3a35058de0019bfd7e79e38b2baa9",
+      "artifact_kind": "SOURCE_TEXT"
+    },
+    {
+      "file": "AutoFrameJointCommandEntry.cs",
+      "sha256": "4795f987af95740776f834cc454419bb50d557ab681f989452d6f2e35cdd3002",
+      "artifact_kind": "SOURCE_TEXT"
+    },
+    {
+      "file": "AutoFrameJointGeometryMath.cs",
+      "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "artifact_kind": "SOURCE_TEXT"
+    },
+    {
+      "file": "AutoFrameJointGhostSessionManager.cs",
+      "sha256": "b505ce2611affaaa795d2246c8dd19560ee197dae8e7d79035bb89fc26d01fa1",
+      "artifact_kind": "SOURCE_TEXT"
+    },
+    {
+      "file": "AutoFrameJointReadOnlyProbe.cs",
+      "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "artifact_kind": "SOURCE_TEXT"
+    },
+    {
+      "file": "R55Native08RoleScoped.exe",
+      "sha256": "6d1ff8258747a919613bea0e2830d4f7593b41a78ed6aac12b2f972ffffa4e66",
+      "artifact_kind": "HARNESS_BINARY_HASH_ONLY_NO_BINARY_EXPORTED"
+    }
+  ],
+  "ghost_source_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+  "lineage": [
+    {
+      "label": "FRESH_NATIVE08_ALL_FOUR_CORNERS_SAME_SOURCE",
+      "status": "PASS_FRESH_ALL_FOUR_SAME_SOURCE",
+      "source_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+      "harness_mvid": "f989a207-2194-43f7-847a-eaf16f7d48c8",
+      "source_equivalence": "Fresh copied documents and one executable for all four; no inherited PASS observations. Cut Plan geometry unchanged; active Sketch handles and per-Sketch datum cache scope changed.",
+      "source_file": "R55RoleScopedDatums.candidate.cs"
+    }
+  ],
+  "scope": "Exact source provenance supplied by the native qualification owner; no production DLL build performed by this export.",
+  "native_input_hashes": [
+    {
+      "basename": "2354-02-lc-B11.SLDASM",
+      "sha256": "c032aa7e50f2d5a0cd729e8ab0849c36048784798f7101755dbfbbad2f7f7a20"
+    },
+    {
+      "basename": "2354-04-lc-B11-1.SLDPRT",
+      "sha256": "8203425626794d5a08978e724010d24f0853104ef9627ec6b23e9d699505f94e"
+    },
+    {
+      "basename": "2354-04-lc-B11-fr01.SLDPRT",
+      "sha256": "aa47cd48819834eb49196739c6bfda20a47e8579363c1bb55d1852f3d55b1c02"
+    },
+    {
+      "basename": "2354-04-lc-B11-fr02.SLDPRT",
+      "sha256": "3974e8cdc06807f7e09e4cb4b8ac2492bf25833b6fa041f6f9a8ecf20352b4aa"
+    },
+    {
+      "basename": "2354-04-lc-B11-fr03.SLDPRT",
+      "sha256": "11c743b92e2bb2ecd9708f54a46af1f4c8d6d9fd36d1fd50e125a72996dacd4c"
+    },
+    {
+      "basename": "2354-04-lc-B11-fr04.SLDPRT",
+      "sha256": "307bfc4f3e255e2727f26ad70a573db1dbd4b5bdc187092ba56501a71046b68f"
+    }
+  ],
+  "native_profile_baseline": [
+    {
+      "frame": "fr01",
+      "base_flange_feature_id": 512,
+      "thickness_mm": 2.5,
+      "bend_radius_mm": 0.1,
+      "ordered_strip_lengths_mm": [
+        40.0,
+        100.0,
+        42.0,
+        23.0
+      ]
+    },
+    {
+      "frame": "fr02",
+      "base_flange_feature_id": 512,
+      "thickness_mm": 2.5,
+      "bend_radius_mm": 0.1,
+      "ordered_strip_lengths_mm": [
+        40.0,
+        55.0,
+        15.0,
+        15.0,
+        22.0,
+        12.0
+      ]
+    },
+    {
+      "frame": "fr03",
+      "base_flange_feature_id": 512,
+      "thickness_mm": 2.5,
+      "bend_radius_mm": 0.1,
+      "ordered_strip_lengths_mm": [
+        40.0,
+        70.0,
+        42.0
+      ]
+    },
+    {
+      "frame": "fr04",
+      "base_flange_feature_id": 512,
+      "thickness_mm": 2.5,
+      "bend_radius_mm": 0.1,
+      "ordered_strip_lengths_mm": [
+        40.0,
+        70.0,
+        60.0
+      ]
+    }
+  ],
+  "native_evidence_lineage": {
+    "scope": "Metadata parent hashes, exact checkpoint references and captured source versions. No opaque native entity bytes, CAD payload, document placement or machine path is exported.",
+    "authoritative_audit_sha256": "a7b99697300b7156678fcc400cd51d085d31106b3f36b66a923729ca9543f642",
+    "nodes": [
+      {
+        "record": "four_corners_08/four_corner_audit.private.json",
+        "sha256": "a7b99697300b7156678fcc400cd51d085d31106b3f36b66a923729ca9543f642",
+        "status": "PASS_FOUR_CORNERS_SAME_ASSEMBLY_NATIVE_API_HARNESS_ONLY_NOT_INSTALLED_ADDIN",
+        "harness_mvid": "f989a207-2194-43f7-847a-eaf16f7d48c8",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 4,
+        "completed_corner_count": 4,
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": true,
+        "nearby_source_manifest_sha256": "88739d3509781404aeb8cd12448a6906484b141a0bde409a4789e20571223ce6",
+        "ghost_source_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+        "source_manifest_binding": "EXACT_AUDIT_SHA256_BOUND",
+        "checkpoint": {
+          "record": "checkpoint_4/checkpoint.private.json",
+          "sha256": "63ae90890cf3e506c398d5e930f21bf0243bfc710753fe02774e7db62856d720",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 4
+        }
+      },
+      {
+        "record": "four_corners_01/four_corner_audit.private.json",
+        "sha256": "025690cd4c5466a8fd008cb4d8f128764ec4ff073ff4c438e3610cc13c6eb087",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "c32cabd8-0eae-4f7a-bc3f-e7c4c34e2c83",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": true
+      },
+      {
+        "record": "four_corners_02/four_corner_audit.private.json",
+        "sha256": "38f71ca902f3df75a9ad54a658a9a8a6c31e30e7649e7e2a0cd4c39438fc26d6",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "5a011369-7ef7-4c00-b7a6-b59a419f2b7b",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": true,
+        "nearby_source_manifest_sha256": "3add470a21aaac56dc561827efad44c9721e5e102a5f1d515c13b1aa6ed6fd98",
+        "ghost_source_sha256": "5440a54f725fd0d29262580921346dabadb4b90a41b885ead3403f116e223989",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND"
+      },
+      {
+        "record": "four_corners_03/four_corner_audit.private.json",
+        "sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "status": "SETUP_FAILED_NO_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "a8a3525f-69c9-4820-ac78-096947b59d2d",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": "NOT_AVAILABLE",
+        "blank_session_restored": false,
+        "nearby_source_manifest_sha256": "22c5f15ad88cedbb582bdd7007c0d2d1a4a45b77da8c4c425f8e10e6a0600680",
+        "ghost_source_sha256": "7760194eb4ded4b7b2c0508425565355f54fe8a9bb910a8f4d2846d89f59c378",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "four_corners_04/four_corner_audit.private.json",
+        "sha256": "88b9cc1c29316682e1e97b5e3896412eff5537970e7d6514ea140f7e41f07589",
+        "status": "SETUP_FAILED_NO_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "84aababc-0127-4c0b-8323-896102be8ac8",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": "NOT_AVAILABLE",
+        "copy_hashes_unchanged": "NOT_AVAILABLE",
+        "blank_session_restored": "NOT_AVAILABLE"
+      },
+      {
+        "record": "four_corners_05/four_corner_audit.private.json",
+        "sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "84aababc-0127-4c0b-8323-896102be8ac8",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": false,
+        "nearby_source_manifest_sha256": "55d799d72443f431e5acfd6ae523001b82bc35dfe8db37505a96f02ae70049ed",
+        "ghost_source_sha256": "ba35a674312e87a5daf030881580750ac8ee1081b857c12ab9df164cc930e582",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND",
+        "checkpoint": {
+          "record": "checkpoint_2/checkpoint.private.json",
+          "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2
+        }
+      },
+      {
+        "record": "four_corners_06/four_corner_audit.private.json",
+        "sha256": "f56175fb803296dfb4bef57a6d7e9c7f4d31ac9cee79158eb1dd49a3e1eebcbe",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "9af1c296-8821-4226-bfd0-7308b3d48e84",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 2,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": false,
+        "nearby_source_manifest_sha256": "ba5da4453ff5616a23d4aaa3c4819dc19c623ee75ad008a0ab90084160c5a585",
+        "ghost_source_sha256": "217fef97d577bb4792d30cb86e030013c1355afe4ee8faedc960d566bb11ecc6",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND",
+        "checkpoint": {
+          "record": "repair05_execute_01/checkpoint_2_repaired_metadata.private.json",
+          "sha256": "2a6c7168ee742e6aec9e6a0910294b5a5fe2bed13949ae4c935c43bbe8ea916e",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2,
+          "current_assembly_only_metadata_amendment": true,
+          "original_assembly_snapshot_unchanged": true,
+          "part_snapshots_and_expected_bodies_unchanged": true,
+          "amendment_scope": "ONLY_CURRENT_ASSEMBLY_EXACT_FAILURE05_ORPHAN458_NO_NEW_JOINT_PASS",
+          "exact_known_orphan_contexts": [
+            {
+              "id": 458,
+              "type": "InContextFeatHolder",
+              "suppressed": false,
+              "parent_feature_ids": [
+                10,
+                267
+              ],
+              "parent_feature_types": [
+                "MateGroup",
+                "Reference"
+              ],
+              "child_count": 0,
+              "admissibility": "EXACT_FAILURE_INVENTORY_458_WITH_SELECTED_REFERENCE_AND_MATEGROUP_NO_CHILDREN_NOT_MODELING_NOT_DELETED"
+            }
+          ],
+          "prior_checkpoint": {
+            "record": "checkpoint_2/checkpoint.private.json",
+            "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+            "binding": "DECLARED_SHA256_VERIFIED",
+            "completed_prefix_corner_count": 2
+          }
+        }
+      },
+      {
+        "record": "repair05_execute_01/resume_amendment.private.json",
+        "sha256": "7a115a91d86fb4252abe8bf1fac610b89427122fc9322d403432e72e8d262a1e",
+        "status": "REPAIR_VERIFIED_TWO_CORNER_GEOMETRY_WITH_EXACT_ORPHAN_CONTEXT_METADATA_NO_NEW_JOINT_PASS",
+        "harness_mvid": "dd34d18a-2abb-4662-9d71-12ef40a3112a",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": false,
+        "checkpoint": {
+          "record": "repair05_execute_01/checkpoint_2_repaired_metadata.private.json",
+          "sha256": "2a6c7168ee742e6aec9e6a0910294b5a5fe2bed13949ae4c935c43bbe8ea916e",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2,
+          "current_assembly_only_metadata_amendment": true,
+          "original_assembly_snapshot_unchanged": true,
+          "part_snapshots_and_expected_bodies_unchanged": true,
+          "amendment_scope": "ONLY_CURRENT_ASSEMBLY_EXACT_FAILURE05_ORPHAN458_NO_NEW_JOINT_PASS",
+          "exact_known_orphan_contexts": [
+            {
+              "id": 458,
+              "type": "InContextFeatHolder",
+              "suppressed": false,
+              "parent_feature_ids": [
+                10,
+                267
+              ],
+              "parent_feature_types": [
+                "MateGroup",
+                "Reference"
+              ],
+              "child_count": 0,
+              "admissibility": "EXACT_FAILURE_INVENTORY_458_WITH_SELECTED_REFERENCE_AND_MATEGROUP_NO_CHILDREN_NOT_MODELING_NOT_DELETED"
+            }
+          ],
+          "prior_checkpoint": {
+            "record": "checkpoint_2/checkpoint.private.json",
+            "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+            "binding": "DECLARED_SHA256_VERIFIED",
+            "completed_prefix_corner_count": 2
+          }
+        }
+      },
+      {
+        "record": "repair05_execute_01/repair05_audit.private.json",
+        "sha256": "36f8713f0bd10f459f9d83e26414efc0fff55c2c9f5c35b541cbd894f72ccd41",
+        "status": "REPAIR_VERIFIED_TWO_CORNER_GEOMETRY_WITH_EXACT_ORPHAN_CONTEXT_METADATA_NO_NEW_JOINT_PASS",
+        "harness_mvid": "dd34d18a-2abb-4662-9d71-12ef40a3112a",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "repair05_execute_01/checkpoint_2_repaired_metadata.private.json",
+          "sha256": "2a6c7168ee742e6aec9e6a0910294b5a5fe2bed13949ae4c935c43bbe8ea916e",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2,
+          "current_assembly_only_metadata_amendment": true,
+          "original_assembly_snapshot_unchanged": true,
+          "part_snapshots_and_expected_bodies_unchanged": true,
+          "amendment_scope": "ONLY_CURRENT_ASSEMBLY_EXACT_FAILURE05_ORPHAN458_NO_NEW_JOINT_PASS",
+          "exact_known_orphan_contexts": [
+            {
+              "id": 458,
+              "type": "InContextFeatHolder",
+              "suppressed": false,
+              "parent_feature_ids": [
+                10,
+                267
+              ],
+              "parent_feature_types": [
+                "MateGroup",
+                "Reference"
+              ],
+              "child_count": 0,
+              "admissibility": "EXACT_FAILURE_INVENTORY_458_WITH_SELECTED_REFERENCE_AND_MATEGROUP_NO_CHILDREN_NOT_MODELING_NOT_DELETED"
+            }
+          ],
+          "prior_checkpoint": {
+            "record": "checkpoint_2/checkpoint.private.json",
+            "sha256": "90e72a48f4faa70a43b0ae0598d0435b421e2dd1e1e78fb5d33ebb578e5b95f2",
+            "binding": "DECLARED_SHA256_VERIFIED",
+            "completed_prefix_corner_count": 2
+          }
+        }
+      },
+      {
+        "record": "four_corners_07/four_corner_audit.private.json",
+        "sha256": "cc02a9ffe71ad3b37ec91440e0a93c2ca6ef480cbb2ded61c031853f8d674fe1",
+        "status": "FAIL_OR_UNVERIFIED_FOUR_CORNER_QUALIFICATION",
+        "harness_mvid": "9af1c296-8821-4226-bfd0-7308b3d48e84",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 2,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": false,
+        "nearby_source_manifest_sha256": "af0312058c355172444925d6aea45646d0088330a0b352f6e8e6896fafcf9bc6",
+        "ghost_source_sha256": "217fef97d577bb4792d30cb86e030013c1355afe4ee8faedc960d566bb11ecc6",
+        "source_manifest_binding": "NEARBY_CAPTURED_SOURCE_SNAPSHOT_NOT_EXACT_AUDIT_HASH_BOUND",
+        "checkpoint": {
+          "record": "checkpoint_2/checkpoint.private.json",
+          "sha256": "408929dba987fe225505ab072f4b3c31e61b39dcbd33d008e5fbae87c6c60cda",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 2
+        }
+      },
+      {
+        "record": "repair03_audit_01/repair03_audit.private.json",
+        "sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "status": "READ_ONLY_AUDIT_COMPLETE_NO_REPAIR_NO_JOINT_PASS",
+        "harness_mvid": "95497df6-df5a-458b-aa50-19156e0ca5cb",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "repair03_execute_01/repair03_audit.private.json",
+        "sha256": "4da55adfb602ae6458579620b6a6cd827a7555e1f666deb8ec36aafcaa270f08",
+        "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+        "harness_mvid": "95497df6-df5a-458b-aa50-19156e0ca5cb",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "repair03_execute_02/repair03_audit.private.json",
+        "sha256": "25e9852f7df20b359578522f04d60345e35b802554ccee360e83056ce807e4b9",
+        "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+        "harness_mvid": "0cd54d49-3dc3-4f5e-b12f-7210f09581b5",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "repair03_execute_03/repair03_audit.private.json",
+        "sha256": "a5106ec0a011faad24f9ada3622fa1920df3d63dd600285e0e4d7fbe6290b7a5",
+        "status": "FAIL_OR_UNVERIFIED_REPAIR03_STOP_NO_JOINT_PASS",
+        "harness_mvid": "955cef58-a7f9-4df6-90de-b59bd7ca13d0",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": 1,
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE",
+        "checkpoint": {
+          "record": "checkpoint_1/checkpoint.private.json",
+          "sha256": "ecc68c395909f4b776a44820e0d263fe4e81c5258b1a48d8374f7a7b2593198a",
+          "binding": "DECLARED_SHA256_VERIFIED",
+          "completed_prefix_corner_count": 1
+        }
+      },
+      {
+        "record": "edge_context_probe_04/edge_context_probe.private.json",
+        "sha256": "e3d64d13ca82ab52950f1b854a1158c3713f0b4abf32f1c07a1107264f48c72d",
+        "status": "PASS_QUERY_ONLY_BODY_SKETCH_CONTEXT_UNCHANGED_NOT_JOINT_QUALIFICATION",
+        "harness_mvid": "NOT_AVAILABLE",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE"
+      },
+      {
+        "record": "live_datum_probe_01/live_datum_probe.private.json",
+        "sha256": "6b0c89a75590794daf73299c88bd3a1398bd277acb773df1a8905e36eae8e299",
+        "status": "PASS_ONE_SCRATCH_LIVE_CONTEXT_QUERIES_ORIGINALS_RESTORED_NOT_JOINT_QUALIFICATION",
+        "harness_mvid": "NOT_AVAILABLE",
+        "installed_addin_test": false,
+        "completed_prefix_corner_count": "NOT_AVAILABLE",
+        "completed_corner_count": "NOT_AVAILABLE",
+        "inherited_pass_corner_count": 0,
+        "source_hashes_unchanged": true,
+        "copy_hashes_unchanged": true,
+        "blank_session_restored": "NOT_AVAILABLE"
+      }
+    ],
+    "parent_edges": [
+      {
+        "child_record": "repair05_execute_01/resume_amendment.private.json",
+        "child_sha256": "7a115a91d86fb4252abe8bf1fac610b89427122fc9322d403432e72e8d262a1e",
+        "relation": "original_failure_report",
+        "parent_record": "four_corners_05/four_corner_audit.private.json",
+        "parent_sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair05_execute_01/repair05_audit.private.json",
+        "child_sha256": "36f8713f0bd10f459f9d83e26414efc0fff55c2c9f5c35b541cbd894f72ccd41",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_05/four_corner_audit.private.json",
+        "parent_sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair05_execute_01/resume_amendment.private.json",
+        "child_sha256": "7a115a91d86fb4252abe8bf1fac610b89427122fc9322d403432e72e8d262a1e",
+        "relation": "repair_audit_report",
+        "parent_record": "repair05_execute_01/repair05_audit.private.json",
+        "parent_sha256": "36f8713f0bd10f459f9d83e26414efc0fff55c2c9f5c35b541cbd894f72ccd41",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "four_corners_06/four_corner_audit.private.json",
+        "child_sha256": "f56175fb803296dfb4bef57a6d7e9c7f4d31ac9cee79158eb1dd49a3e1eebcbe",
+        "relation": "resumed_from_report",
+        "parent_record": "repair05_execute_01/resume_amendment.private.json",
+        "parent_sha256": "7a115a91d86fb4252abe8bf1fac610b89427122fc9322d403432e72e8d262a1e",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_audit_01/repair03_audit.private.json",
+        "child_sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_03/four_corner_audit.private.json",
+        "parent_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_01/repair03_audit.private.json",
+        "child_sha256": "4da55adfb602ae6458579620b6a6cd827a7555e1f666deb8ec36aafcaa270f08",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_03/four_corner_audit.private.json",
+        "parent_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_01/repair03_audit.private.json",
+        "child_sha256": "4da55adfb602ae6458579620b6a6cd827a7555e1f666deb8ec36aafcaa270f08",
+        "relation": "prior_readonly_audit",
+        "parent_record": "repair03_audit_01/repair03_audit.private.json",
+        "parent_sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_02/repair03_audit.private.json",
+        "child_sha256": "25e9852f7df20b359578522f04d60345e35b802554ccee360e83056ce807e4b9",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_03/four_corner_audit.private.json",
+        "parent_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_03/repair03_audit.private.json",
+        "child_sha256": "a5106ec0a011faad24f9ada3622fa1920df3d63dd600285e0e4d7fbe6290b7a5",
+        "relation": "parent_failure_report",
+        "parent_record": "four_corners_03/four_corner_audit.private.json",
+        "parent_sha256": "1d3c453180efa3a8bb339fdc4ee23a87fe9e927633cc9e4080670b5c4bf12c0f",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      },
+      {
+        "child_record": "repair03_execute_03/repair03_audit.private.json",
+        "child_sha256": "a5106ec0a011faad24f9ada3622fa1920df3d63dd600285e0e4d7fbe6290b7a5",
+        "relation": "prior_readonly_audit",
+        "parent_record": "repair03_audit_01/repair03_audit.private.json",
+        "parent_sha256": "a74a26a64cb358bae9e763ae92d7ee0e32c0837b5ecd4161f45a4f6f21dc61be",
+        "binding": "DECLARED_SHA256_VERIFIED"
+      }
+    ]
+  }
+}

@@ -1,0 +1,1112 @@
+{
+  "status": "PASS_ONE_SCRATCH_LIVE_CONTEXT_QUERIES_ORIGINALS_RESTORED_NOT_JOINT_QUALIFICATION",
+  "evidence_level": "API_VERIFIED",
+  "joint_qualification": false,
+  "audit_sha256": "6b0c89a75590794daf73299c88bd3a1398bd277acb773df1a8905e36eae8e299",
+  "parent_native07_audit_sha256": "cc02a9ffe71ad3b37ec91440e0a93c2ca6ef480cbb2ded61c031853f8d674fe1",
+  "scope": "One scratch Sketch/line was created on an existing Face, queried without adding relations or Cuts, and exactly deleted. All six pre-existing copied document histories and five Part Bodies were restored.",
+  "created_vs_active_sketch_same": true,
+  "created_vs_active_line_same": false,
+  "created_line_return_all_eight_edge_forms_rejected": true,
+  "active_inventory_mapped_cached_and_fresh_edges_advertise_perpendicular8": true,
+  "queries": [
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "ASSEMBLY_ACTIVE",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "FACTORY_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": true,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "CREATE_LINE_RETURN",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "ASSEMBLY_ACTIVE_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "FACTORY_SPECIFIC_INVENTORY",
+      "profile_same_active": true,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": [
+        27,
+        8,
+        7,
+        14
+      ]
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "CACHED_COMPONENT_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_PART_MAPPED",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_NATIVE",
+      "allowed_relations": []
+    },
+    {
+      "manager_source": "PART_TREE_GETSPECIFIC",
+      "manager_id": 799,
+      "manager_same_active": false,
+      "profile_source": "PART_TREE_SPECIFIC_INVENTORY",
+      "profile_same_active": false,
+      "edge_source": "FRESH_COMPONENT_MAPPED",
+      "allowed_relations": []
+    }
+  ],
+  "original_document_checks": [
+    {
+      "document_role": "backing-part",
+      "feature_history_and_dependencies_unchanged": true,
+      "configuration_and_reference_count_unchanged": true,
+      "body_symmetric_difference_mm3": 0
+    },
+    {
+      "document_role": "fr01",
+      "feature_history_and_dependencies_unchanged": true,
+      "configuration_and_reference_count_unchanged": true,
+      "body_symmetric_difference_mm3": 0
+    },
+    {
+      "document_role": "fr02",
+      "feature_history_and_dependencies_unchanged": true,
+      "configuration_and_reference_count_unchanged": true,
+      "body_symmetric_difference_mm3": 0
+    },
+    {
+      "document_role": "fr03",
+      "feature_history_and_dependencies_unchanged": true,
+      "configuration_and_reference_count_unchanged": true,
+      "body_symmetric_difference_mm3": 0
+    },
+    {
+      "document_role": "fr04",
+      "feature_history_and_dependencies_unchanged": true,
+      "configuration_and_reference_count_unchanged": true,
+      "body_symmetric_difference_mm3": 0
+    },
+    {
+      "document_role": "ASSEMBLY",
+      "feature_history_and_dependencies_unchanged": true,
+      "configuration_and_reference_count_unchanged": true,
+      "body_symmetric_difference_mm3": "NOT_APPLICABLE_ASSEMBLY_DOCUMENT"
+    }
+  ],
+  "assembly_context_restored": true,
+  "source_hashes_unchanged": true,
+  "copy_hashes_unchanged": true,
+  "datum_cache_lifetime_source_review": {
+    "method": "EXACT_VERSIONED_SOURCE_DIFF",
+    "source_observation_status": "VERIFIED",
+    "causal_evidence_level": "INFERRED",
+    "before_source_sha256": "217fef97d577bb4792d30cb86e030013c1355afe4ee8faedc960d566bb11ecc6",
+    "candidate_source_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+    "source_outside_parametric_writer_unchanged": true,
+    "observed_previous_lifetime": "Face/Edge/context cache shared across independent Cover, Loser and Cap Sketch roles; cleared only at writer completion.",
+    "candidate_lifetime": "Discard native datum handles before each independent Sketch role, after previous Sketch closure and before current datum reads.",
+    "cutter_math_change": false,
+    "native_causal_pass_from_this_probe": false
+  },
+  "limit": "The scratch experiment distinguishes CreateLine-return and active-inventory aliases. Cached and fresh mapped edges both worked with the active profile in this experiment; it does not independently prove a stale-cache cause or successful Cut execution. Role-cache lifetime is a verified source-scope observation; causality and the integrated solution require separate native corner tests."
+}

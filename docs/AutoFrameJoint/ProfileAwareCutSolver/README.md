@@ -1,4 +1,16 @@
+> **R70 — 2026-10-29:** Đã nghiên cứu 4458 qua API: 7 Frame, 93 Cut, hai biên dạng nghiêng 2,05° và hai cặp mặt tham chiếu offset 0,10 mm. Có phương pháp cắt từng lớp đề xuất; chưa sửa source hay qualified Cut mới. Xem [bằng chứng và giới hạn](R70/README.md).
+
+> **R68 — 2026-10-29:** Sửa màu Preview bị highlight A/B phủ xanh bằng ngữ cảnh hiển thị độc lập; pixel tím/vàng và vị trí B-rep đã xác minh bằng API. Chỉ class GhostPreview được chép vào source chính; người dùng tự rebuild. Giới hạn PMP/fallback ghi tại [R68](R68/README.md).
+
+> **R61 — 2026-10-28:** Đã xén phần dư của các nếp không giao: 2354 hiện tại đủ 4 góc/35 Cut, bộ lịch sử 4 góc/38 Cut, 4332 native PMP 12 Cut. Có phép đo riêng phần dư phẳng và Bend R phải hết, vật liệu phía thân phải giữ. Class chính đã chép; người dùng tự rebuild. Xem [kết quả và phạm vi](R61/README.md).
+
+> **R60 — 2026-10-28:** Sửa đường dẫn crash `ActivateDoc3`: Cut trong đúng Component edit, Apply sau native idle. Đã qua lại 4 góc 2354 và native PMP thật của cặp 4332 đảo A/B, có DLL/TaskPane hiện tại làm nền. Hai class đã chép vào source chính; người dùng tự rebuild. Xem [kết quả và phạm vi thực tế](R60/README.md).
+
+> **R59 — 2026-10-28:** Cut từng lớp tôn Normal/Blind=t+0,10 mm: 2354 đủ 4 góc, 33 Cut; 4332 thêm 8 Cut. Source chính đã chép để người dùng tự rebuild; kết quả là API harness, chưa xác nhận DLL/PMP sau rebuild. Xem [bằng chứng và giới hạn](R59/README.md).
+
 # Auto Frame Joint — parameterized U-section cut solver
+
+**Latest R58 installed API check (2026-10-26):** the actual deployed DLL completed all four corners on the same disposable Assembly through the existing selection/Preview and native PMP `Close(true)` path: **16 Cuts, 16 fully constrained face-supported 2D Sketches, zero new planes**, 0.10 mm final gaps and zero pair overlap. This passed with **CAD opened before the Add-in was loaded**. Main-first document opening still produced native failures; **the crash is not fixed**. Source/DLL/PDB were unchanged, and both final test hosts closed without saving and exited normally. [Evidence, limits and reproduction](R58/README.md).
 
 **Review status: partial implementation with real geometry tests. General AFJ is not complete.** The solver generates tools from measured section topology, sheet thickness/Bend R, assembly placement and the user's cover policy. Native Cut shapes are research oracles, not runtime templates.
 

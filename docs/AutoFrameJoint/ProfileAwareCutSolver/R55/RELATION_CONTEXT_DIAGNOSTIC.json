@@ -1,0 +1,476 @@
+{
+  "evidence_level": "API_VERIFIED",
+  "joint_qualification": false,
+  "audit_sha256": "e3d64d13ca82ab52950f1b854a1158c3713f0b4abf32f1c07a1107264f48c72d",
+  "failed_native_attempt_audit_sha256": "6ef11db30f5adf6ee7ea8c2df6bdcf5456e10789a0b2d85712293dd385705149",
+  "failed_native_attempt_source_sha256": "ba35a674312e87a5daf030881580750ac8ee1081b857c12ab9df164cc930e582",
+  "status": "PASS_QUERY_ONLY_BODY_SKETCH_CONTEXT_UNCHANGED_NOT_JOINT_QUALIFICATION",
+  "scope": "Query-only native allowed-relation comparison on one existing failed-corner Sketch; no relation or Cut was created by this diagnostic.",
+  "same_feature_id": 798,
+  "same_profile_segment_id": "0,1",
+  "active_vs_closed_part_sketch_is_same": false,
+  "active_vs_closed_part_profile_is_same": false,
+  "controlled_context_rejection_demonstrated": true,
+  "queries": [
+    {
+      "body_source": "PART_GETBODIES2",
+      "support_owner_feature_id": 512,
+      "support_owner_feature_type": "SMBaseFlange",
+      "native_edge_equals_component_corresponding_edge": false,
+      "manager_context_queries": [
+        {
+          "sketch_source": "PART_FEATURE_GETSPECIFIC_CLOSED_ALIAS",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": false,
+          "same_profile0_as_active": false,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_SKETCH_MANAGER_ACTIVE",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_MODELDOC_GETACTIVESKETCH2",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "body_source": "PART_GETBODIES2",
+      "support_owner_feature_id": 512,
+      "support_owner_feature_type": "SMBaseFlange",
+      "native_edge_equals_component_corresponding_edge": false,
+      "manager_context_queries": [
+        {
+          "sketch_source": "PART_FEATURE_GETSPECIFIC_CLOSED_ALIAS",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": false,
+          "same_profile0_as_active": false,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_SKETCH_MANAGER_ACTIVE",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_MODELDOC_GETACTIVESKETCH2",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "body_source": "PART_GETBODIES2",
+      "support_owner_feature_id": 512,
+      "support_owner_feature_type": "SMBaseFlange",
+      "native_edge_equals_component_corresponding_edge": false,
+      "manager_context_queries": [
+        {
+          "sketch_source": "PART_FEATURE_GETSPECIFIC_CLOSED_ALIAS",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": false,
+          "same_profile0_as_active": false,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_SKETCH_MANAGER_ACTIVE",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_MODELDOC_GETACTIVESKETCH2",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "body_source": "COMPONENT_GETBODIES3",
+      "support_owner_feature_id": 512,
+      "support_owner_feature_type": "SMBaseFlange",
+      "native_edge_equals_component_corresponding_edge": true,
+      "manager_context_queries": [
+        {
+          "sketch_source": "PART_FEATURE_GETSPECIFIC_CLOSED_ALIAS",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": false,
+          "same_profile0_as_active": false,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_SKETCH_MANAGER_ACTIVE",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_MODELDOC_GETACTIVESKETCH2",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "body_source": "COMPONENT_GETBODIES3",
+      "support_owner_feature_id": 512,
+      "support_owner_feature_type": "SMBaseFlange",
+      "native_edge_equals_component_corresponding_edge": true,
+      "manager_context_queries": [
+        {
+          "sketch_source": "PART_FEATURE_GETSPECIFIC_CLOSED_ALIAS",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": false,
+          "same_profile0_as_active": false,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_SKETCH_MANAGER_ACTIVE",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_MODELDOC_GETACTIVESKETCH2",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "body_source": "COMPONENT_GETBODIES3",
+      "support_owner_feature_id": 512,
+      "support_owner_feature_type": "SMBaseFlange",
+      "native_edge_equals_component_corresponding_edge": true,
+      "manager_context_queries": [
+        {
+          "sketch_source": "PART_FEATURE_GETSPECIFIC_CLOSED_ALIAS",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": false,
+          "same_profile0_as_active": false,
+          "native_allowed_own_profile0": [],
+          "corresponding_allowed_own_profile0": [],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_SKETCH_MANAGER_ACTIVE",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        },
+        {
+          "sketch_source": "ASSEMBLY_MODELDOC_GETACTIVESKETCH2",
+          "sketch_feature_id": 798,
+          "same_sketch_as_active": true,
+          "same_profile0_as_active": true,
+          "native_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_own_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "native_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ],
+          "corresponding_allowed_assembly_active_profile0": [
+            27,
+            8,
+            7,
+            14
+          ]
+        }
+      ]
+    }
+  ],
+  "assembly_context_restored": true,
+  "body_symmetric_difference_mm3": 0,
+  "sketch_endpoints_and_constraints_unchanged": true,
+  "source_hashes_unchanged": true,
+  "copy_hashes_unchanged": true,
+  "conclusion": "The same native Feature ID does not establish that closed Part Sketch/segment aliases are valid in the active Assembly edit context. On the same mapped supporting edge, the closed-Part profile advertised no allowed relation while the active Assembly profile advertised PERPENDICULAR (8). Merely changing the Body source is not established as a fix; the exact active Sketch/segment context must be preserved.",
+  "limit": "GetAllowedRelations evidence is not an AddRelation/Sketch-completion or native Cut PASS. Successful constraint creation and all four native corners require their independent qualification evidence."
+}

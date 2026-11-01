@@ -1,0 +1,46 @@
+{
+  "status": "PASS_REFERENCE_AFFINE_BOUNDARY_MATH_ONLY",
+  "source_api_json_sha256": "88161e99eb15463aba10c8301fe77e251cf52c7af95286a35afc95e2d4638a8d",
+  "tests": [
+    {
+      "part": "4458-04-TI-b2-fr1.SLDPRT",
+      "native_cut_feature_id": 710,
+      "evidence_level": "GEOMETRY_VERIFIED_MATHEMATICAL_REFERENCE_CHECK_ONLY",
+      "line_tilt_deg": 2.0499999999917193,
+      "actual_cut_line_span_mm": 146.0,
+      "actual_cut_line_axial_change_mm": 5.226000671325448,
+      "axial_change_across_144mm_mm": 5.1544116210333195,
+      "normal_gap_mm": 0.1,
+      "required_axial_gap_for_this_plane_mm": 0.10006404189470024,
+      "normal_gap_residual_mm": 0.0,
+      "cut_plane_dot_selected_host_face_normal": 4.4380498872650784e-16,
+      "meaning": "The measured sloped 2D line and final native cap plane agree; for this selected host face, extrusion along its normal preserves that plane. This is not a new per-sheet Cut/Boolean/native replay.",
+      "proposed_single_sheet_blind_depth_mm": 2.1,
+      "sheet_cut_overrun_mm": 0.1,
+      "new_native_cut_created": false,
+      "new_rule_native_qualified": false
+    },
+    {
+      "part": "4458-04-TI-b2-fr4.SLDPRT",
+      "native_cut_feature_id": 1024,
+      "evidence_level": "GEOMETRY_VERIFIED_MATHEMATICAL_REFERENCE_CHECK_ONLY",
+      "line_tilt_deg": 2.049999999991871,
+      "actual_cut_line_span_mm": 146.0,
+      "actual_cut_line_axial_change_mm": 5.226000671325837,
+      "axial_change_across_144mm_mm": 5.154411621033702,
+      "normal_gap_mm": 0.1,
+      "required_axial_gap_for_this_plane_mm": 0.10006404189470024,
+      "normal_gap_residual_mm": 0.0,
+      "cut_plane_dot_selected_host_face_normal": 2.138569413036414e-16,
+      "meaning": "The measured sloped 2D line and final native cap plane agree; for this selected host face, extrusion along its normal preserves that plane. This is not a new per-sheet Cut/Boolean/native replay.",
+      "proposed_single_sheet_blind_depth_mm": 2.1,
+      "sheet_cut_overrun_mm": 0.1,
+      "new_native_cut_created": false,
+      "new_rule_native_qualified": false
+    }
+  ],
+  "limits": [
+    "Mathematical checks of measured reference data only.",
+    "No new Cutter B-rep, Cut before/after, per-layer NormalCut replay, finite-contact or four-corner PASS."
+  ]
+}

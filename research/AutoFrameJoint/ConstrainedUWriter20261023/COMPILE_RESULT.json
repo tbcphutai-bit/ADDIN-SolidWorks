@@ -1,0 +1,23 @@
+{
+  "scope": "DETACHED_CSHARP_LIBRARY_ONLY_NOT_MAIN_ADDIN",
+  "candidate_private_compile_sha256": "aaf393877cb87dfa7a71898ab49348611e84d92e43a6c6a452a135199ceba11e",
+  "language_version": "7.3",
+  "platform": "x64",
+  "default_gate_off": {
+    "compiled": true,
+    "errors": 0,
+    "warnings": 8
+  },
+  "harness_define_on": {
+    "compiled": true,
+    "errors": 0,
+    "warnings": 8,
+    "define": "AFJ_U_LINKED_WRITER_HARNESS",
+    "installed_execution": false
+  },
+  "latest_native_driver": "UNormalizedFixtureRollbackHarness",
+  "latest_native_driver_is_full_candidate_entrypoint": false,
+  "native_full_try_apply_result": "NOT_RUN",
+  "native_rollback_result": "UNVERIFIED",
+  "no_new_native_tests_for_delivery": true
+}

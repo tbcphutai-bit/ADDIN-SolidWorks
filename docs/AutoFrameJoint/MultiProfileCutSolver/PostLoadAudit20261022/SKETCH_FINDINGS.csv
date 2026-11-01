@@ -1,0 +1,5 @@
+frame,feature_name,constrained_status,fully_constrained,relation_count,dangling_relations,overdefining_relations,display_dimensions,native_reference_entity_type,native_reference_is_refplane,parent_types,evidence_level
+A,AFJ_40d5ab53_A_01_Profile,2,False,0,0,0,0,4,True,['RefPlane'],API_VERIFIED
+A,AFJ_40d5ab53_A_02_Profile,2,False,0,0,0,0,4,True,['RefPlane'],API_VERIFIED
+B,AFJ_40d5ab53_B_01_Profile,2,False,0,0,0,0,4,True,['RefPlane'],API_VERIFIED
+B,AFJ_40d5ab53_B_02_Profile,2,False,0,0,0,0,4,True,['RefPlane'],API_VERIFIED

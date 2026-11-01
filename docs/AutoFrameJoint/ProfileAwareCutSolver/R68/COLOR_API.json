@@ -1,0 +1,131 @@
+{
+  "date": "2026-10-29",
+  "scope": "PREVIEW_COLOR_ONLY_EXISTING_GHOST_CLASS",
+  "status": "API_RENDERED_COLOR_AND_DISPLAY_GEOMETRY_VERIFIED;INSTALLED_COMMAND_AFTER_REBUILD_UNVERIFIED",
+  "source_sha256": "B56D83128310C0A3AF0549507B6E371FEC28C160888147A78EDB9CA73864A095",
+  "main_source_copy_verified": true,
+  "main_addin_build": false,
+  "deployment": false,
+  "cad_save_called": false,
+  "loaded_user_dll": {
+    "mvid": "b83932a1-dd5c-4e2d-920c-769c0a0740bd",
+    "sha256": "51EA97F15BFD260D4E34FF2ADDB332E1840180619B0E244D4ABDEED7A4F56F86",
+    "contains_r66": true,
+    "contains_r68": false,
+    "rebuild_by_user_required": true
+  },
+  "root_cause": {
+    "evidence_level": "API_VERIFIED",
+    "description": "Native selected display occurrence overrides temporary body and face appearances with selection blue. Independent non-selected occurrence preserves the Preview palette without altering A/B selection."
+  },
+  "baseline_pixel_stages": [
+    {
+      "stage": "CLEAR_SELECTION_R66",
+      "purple_pixels": 350,
+      "yellow_pixels": 1616
+    },
+    {
+      "stage": "A_B_SELECTED_R66",
+      "purple_pixels": 0,
+      "yellow_pixels": 0
+    },
+    {
+      "stage": "THIRD_UNSELECTED_CONTEXT",
+      "purple_pixels": 347,
+      "yellow_pixels": 1613
+    }
+  ],
+  "candidate_pixel_stages": [
+    {
+      "mode": 1,
+      "a_count": 1,
+      "b_count": 1,
+      "purple_pixels": 345,
+      "yellow_pixels": 1679,
+      "display_vs_approved_brep_symmetric_difference_m3": [
+        0,
+        0
+      ],
+      "evidence_level": "API_VERIFIED_AND_GEOMETRY_VERIFIED"
+    },
+    {
+      "mode": 1,
+      "a_count": 1,
+      "b_count": 1,
+      "purple_pixels": 345,
+      "yellow_pixels": 1679,
+      "display_vs_approved_brep_symmetric_difference_m3": [
+        0,
+        0
+      ],
+      "evidence_level": "API_VERIFIED_AND_GEOMETRY_VERIFIED"
+    },
+    {
+      "mode": 2,
+      "a_count": 1,
+      "b_count": 1,
+      "purple_pixels": 325,
+      "yellow_pixels": 1674,
+      "display_vs_approved_brep_symmetric_difference_m3": [
+        0,
+        0
+      ],
+      "evidence_level": "API_VERIFIED_AND_GEOMETRY_VERIFIED"
+    },
+    {
+      "mode": 1,
+      "a_count": 1,
+      "b_count": 1,
+      "purple_pixels": 347,
+      "yellow_pixels": 1680,
+      "display_vs_approved_brep_symmetric_difference_m3": [
+        0,
+        0
+      ],
+      "evidence_level": "API_VERIFIED_AND_GEOMETRY_VERIFIED"
+    }
+  ],
+  "completed_preview_only_run": {
+    "status": "PASS_PREVIEW_ONLY_1_PAIRS_SAME_ASSEMBLY_API_HARNESS_ONLY_NOT_INSTALLED_ADDIN",
+    "blank_session_restored": true,
+    "source_hashes_unchanged": true,
+    "copy_hashes_unchanged": true,
+    "provenance": "R68CandidateColor11: complete Preview-only run, no native PMP"
+  },
+  "auxiliary_native_pmp_probe": {
+    "status": "FAILED_OR_UNVERIFIED_NOT_PASS",
+    "reason": "Harness incorrectly expected no automatic Preview before explicit button107; native Cancel returned but genuine idle/onClosed completion was not observed. No installed-command or physical-click PASS is claimed.",
+    "actual_automatic_preview_callback_observed": true,
+    "fake_idle_called": false,
+    "provenance": "R68CandidatePmp12",
+    "overall_status": "FAIL_OR_UNVERIFIED_PAIR_QUALIFICATION",
+    "failed_harness_explicit_abort": true,
+    "blank_session_restored": true,
+    "source_hashes_unchanged": true,
+    "copy_hashes_unchanged": true,
+    "native_idle_pass_claimed": false
+  },
+  "limitations": [
+    "No rebuilt installed-DLL command smoke test.",
+    "A two-component assembly with both components selected may lack an independent render occurrence; geometry Preview remains available with COLOR_UNVERIFIED warning.",
+    "NormalCut, depth, sketch, Boolean and native apply logic were not changed or newly qualified by this color task."
+  ],
+  "public_images_or_cad_uploaded": false,
+  "candidate_pixel_provenance": "R68CandidatePmp12: color and B-rep assertions passed before auxiliary PMP failure",
+  "final_auxiliary_retry": {
+    "provenance": "R68CandidatePmp13",
+    "status": "HOST_CRASH_BEFORE_GHOST_PREVIEW",
+    "last_native_phase": "Second copied selected Part OpenDoc6 BEGIN",
+    "host_exit_code": -1073740940,
+    "windows_exception_code": "0xC0000374",
+    "fault_module": "ntdll.dll",
+    "preview_executed": false,
+    "native_pmp_executed": false,
+    "cause": "UNVERIFIED; warm separately-owned host with earlier diagnostic assemblies and installed background Add-in loaded",
+    "source_hashes_unchanged": true,
+    "copy_hashes_unchanged": true,
+    "disk_audit_complete": true,
+    "main_build": false,
+    "deployment": false
+  }
+}

@@ -1,0 +1,1682 @@
+{
+  "schema": "AFJ_R56_BEFORE_AFTER_SCALARS_1",
+  "source_sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+  "evidence_scope": "Native API and exact B-rep scalars; no CAD/topology/placement payload",
+  "initial_2354_bodies": {
+    "2354/support_plate": {
+      "check2": 0,
+      "check3_fault_count": 0,
+      "volume_m3": 0.007965000000000002,
+      "body_type": 0
+    },
+    "2354/fr01": {
+      "check2": 0,
+      "check3_fault_count": 0,
+      "volume_m3": 0.0016060938009881533,
+      "body_type": 0
+    },
+    "2354/fr02": {
+      "check2": 0,
+      "check3_fault_count": 0,
+      "volume_m3": 0.0005760107820219959,
+      "body_type": 0
+    },
+    "2354/fr03": {
+      "check2": 0,
+      "check3_fault_count": 0,
+      "volume_m3": 0.0011667292006587696,
+      "body_type": 0
+    },
+    "2354/fr04": {
+      "check2": 0,
+      "check3_fault_count": 0,
+      "volume_m3": 0.0006144043128087986,
+      "body_type": 0
+    }
+  },
+  "final_2354_parts": [
+    {
+      "part": "2354/support_plate",
+      "selected": false,
+      "target_symmetric_difference_m3": 0,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "body": {
+        "check2": 0,
+        "check3_fault_count": 0,
+        "volume_m3": 0.007965000000000002,
+        "body_type": 0
+      },
+      "new_reference_planes": 0,
+      "new_sketches": []
+    },
+    {
+      "part": "2354/fr01",
+      "selected": true,
+      "target_symmetric_difference_m3": 0,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "body": {
+        "check2": 0,
+        "check3_fault_count": 0,
+        "volume_m3": 0.001438582924165103,
+        "body_type": 0
+      },
+      "new_reference_planes": 0,
+      "new_sketches": [
+        {
+          "constraint_status": 3,
+          "relations": 44,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 1,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 10,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 0,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 44,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 1,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 10,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 0,
+          "support_type": 2,
+          "existing_face_support": true
+        }
+      ]
+    },
+    {
+      "part": "2354/fr02",
+      "selected": true,
+      "target_symmetric_difference_m3": 0,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "body": {
+        "check2": 0,
+        "check3_fault_count": 0,
+        "volume_m3": 0.00028786851761185945,
+        "body_type": 0
+      },
+      "new_reference_planes": 0,
+      "new_sketches": [
+        {
+          "constraint_status": 3,
+          "relations": 32,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 1,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 6,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 0,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 32,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 1,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 6,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 0,
+          "support_type": 2,
+          "existing_face_support": true
+        }
+      ]
+    },
+    {
+      "part": "2354/fr03",
+      "selected": true,
+      "target_symmetric_difference_m3": 0,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "body": {
+        "check2": 0,
+        "check3_fault_count": 0,
+        "volume_m3": 0.0010439156345244884,
+        "body_type": 0
+      },
+      "new_reference_planes": 0,
+      "new_sketches": [
+        {
+          "constraint_status": 3,
+          "relations": 36,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 1,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 10,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 0,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 38,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 1,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 10,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 0,
+          "support_type": 2,
+          "existing_face_support": true
+        }
+      ]
+    },
+    {
+      "part": "2354/fr04",
+      "selected": true,
+      "target_symmetric_difference_m3": 0,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "body": {
+        "check2": 0,
+        "check3_fault_count": 0,
+        "volume_m3": 0.0003041004242367304,
+        "body_type": 0
+      },
+      "new_reference_planes": 0,
+      "new_sketches": [
+        {
+          "constraint_status": 3,
+          "relations": 32,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 1,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 6,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 0,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 28,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 1,
+          "support_type": 2,
+          "existing_face_support": true
+        },
+        {
+          "constraint_status": 3,
+          "relations": 6,
+          "dangling": 0,
+          "overdefining": 0,
+          "driving_dimensions": 0,
+          "support_type": 2,
+          "existing_face_support": true
+        }
+      ]
+    }
+  ],
+  "final_2354_pair_rechecks": [
+    {
+      "pair": "2354/fr01 × 2354/fr04",
+      "gap_m": 0.0001000000000000445,
+      "overlap_m3": 0
+    },
+    {
+      "pair": "2354/fr04 × 2354/fr03",
+      "gap_m": 9.999999999976694e-05,
+      "overlap_m3": 0
+    },
+    {
+      "pair": "2354/fr03 × 2354/fr02",
+      "gap_m": 9.999999999975306e-05,
+      "overlap_m3": 0
+    },
+    {
+      "pair": "2354/fr02 × 2354/fr01",
+      "gap_m": 9.999999999991427e-05,
+      "overlap_m3": 0
+    }
+  ],
+  "protected_existing_2354_fr04_features": {
+    "count": 3,
+    "types": [
+      "RefPlane",
+      "ProfileFeature",
+      "ICE_Cut"
+    ],
+    "qualification": "PREEXISTING_BASELINE_UNCHANGED_NOT_CREATED_BY_R56"
+  },
+  "cases": [
+    {
+      "case_id": "R56-15-CORNER-1",
+      "source_sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+      "status": "PASS_NATIVE_API_HARNESS",
+      "native_cuts": [
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.04469999999999996,
+          "removed_m3": 6.966055058585585e-05,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 44,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:FAR_BEND_CLEARANCE",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0027999999999999995,
+          "removed_m3": 7.850918348751428e-10,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 10,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:COVER_WEB_WALL",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.060200000000000004,
+          "removed_m3": 0.0002385373625664265,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 32,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:NORMAL_BEND_CAP",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0026999999999999997,
+          "removed_m3": 1.3128324823541412e-08,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 6,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        }
+      ],
+      "parts": [
+        {
+          "part": "2354/support_plate",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.007965000000000002,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr01",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0015364324653104632,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 44,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 10,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        },
+        {
+          "part": "2354/fr02",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0005760107820219957,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr03",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0011667292006587696,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr04",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0003758538219175474,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 32,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 6,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        }
+      ],
+      "api_profile_scalars": null,
+      "gap_m": 9.999999999976694e-05,
+      "overlap_m3": 0
+    },
+    {
+      "case_id": "R56-15-CORNER-2",
+      "source_sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+      "status": "PASS_NATIVE_API_HARNESS",
+      "native_cuts": [
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.04220000000000001,
+          "removed_m3": 6.866490951705343e-05,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 36,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:FAR_BEND_CLEARANCE",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0027999999999999995,
+          "removed_m3": 7.844872207139674e-10,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 10,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:COVER_WEB_WALL",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.060200000000000004,
+          "removed_m3": 7.174026935599262e-05,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 28,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:NORMAL_BEND_CAP",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0026999999999999997,
+          "removed_m3": 1.3128324823542273e-08,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 6,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        }
+      ],
+      "parts": [
+        {
+          "part": "2354/support_plate",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.007965000000000002,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr01",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0015364324653104632,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr02",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0005760107820219957,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr03",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0010980635066544955,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 36,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 10,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        },
+        {
+          "part": "2354/fr04",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0003041004242367304,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 28,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 6,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        }
+      ],
+      "api_profile_scalars": null,
+      "gap_m": 9.999999999976694e-05,
+      "overlap_m3": 0
+    },
+    {
+      "case_id": "R56-15-CORNER-3",
+      "source_sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+      "status": "PASS_NATIVE_API_HARNESS",
+      "native_cuts": [
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.04220000000000001,
+          "removed_m3": 5.414708703817186e-05,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 38,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:FAR_BEND_CLEARANCE",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0027999999999999995,
+          "removed_m3": 7.850918348736764e-10,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 10,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:COVER_WEB_WALL",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.04020000000000001,
+          "removed_m3": 0.00021937741991913385,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 32,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:NORMAL_BEND_CAP",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0026999999999999997,
+          "removed_m3": 1.3128324823542645e-08,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 6,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        }
+      ],
+      "parts": [
+        {
+          "part": "2354/support_plate",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.007965000000000002,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr01",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0015364324653104628,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr02",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0003566202337780393,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 32,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 6,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        },
+        {
+          "part": "2354/fr03",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0010439156345244882,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 38,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 10,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        },
+        {
+          "part": "2354/fr04",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.00030410042423673035,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        }
+      ],
+      "api_profile_scalars": null,
+      "gap_m": 9.999999999975306e-05,
+      "overlap_m3": 0
+    },
+    {
+      "case_id": "R56-15-CORNER-4",
+      "source_sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+      "status": "PASS_NATIVE_API_HARNESS",
+      "native_cuts": [
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.04469999999999996,
+          "removed_m3": 9.784875605352574e-05,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 44,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:FAR_BEND_CLEARANCE",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0027999999999999995,
+          "removed_m3": 7.850918348727912e-10,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 10,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:COVER_WEB_WALL",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.04020000000000001,
+          "removed_m3": 6.873858784135633e-05,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 32,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:NORMAL_BEND_CAP",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0026999999999999997,
+          "removed_m3": 1.3128324823542554e-08,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 6,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        }
+      ],
+      "parts": [
+        {
+          "part": "2354/support_plate",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.007965000000000002,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr01",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0014385829241651026,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 44,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 10,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        },
+        {
+          "part": "2354/fr02",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0002878685176118594,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 32,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 6,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        },
+        {
+          "part": "2354/fr03",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0010439156345244886,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        },
+        {
+          "part": "2354/fr04",
+          "selected": false,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0003041004242367304,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": []
+        }
+      ],
+      "api_profile_scalars": null,
+      "gap_m": 9.999999999991427e-05,
+      "overlap_m3": 0
+    },
+    {
+      "case_id": "R56-12-RAW-4332-PAIR-1",
+      "source_sha256": "6bd0957dc0ca8b49be8c42a0648740c5ce3977bbd469fe85b2d8645785427add",
+      "status": "PAIR_PASS_WITHIN_RUN_FAILED_ON_SEPARATE_UNQUALIFIED_FIXTURE",
+      "native_cuts": [
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.03120000000000013,
+          "removed_m3": 0.0007669048458379415,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 48,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:FAR_BEND_CLEARANCE",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0022999999999999995,
+          "removed_m3": 4.985851513918229e-10,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 11,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:COVER_WEB_WALL",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.12669999999999998,
+          "removed_m3": 0.0006349875835523524,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 32,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:NORMAL_BEND_CAP",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0021999999999999997,
+          "removed_m3": 6.83273911462663e-09,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 6,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        }
+      ],
+      "parts": [
+        {
+          "part": "4332/fr3a",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0013932326813804736,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 48,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 11,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        },
+        {
+          "part": "4332/fr5",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0011658981073640713,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 32,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 6,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        }
+      ],
+      "api_profile_scalars": [
+        {
+          "part": "4332/fr3a",
+          "thickness_m": 0.002,
+          "bend_radius_m": 0.0001,
+          "physical_strip_count": 5,
+          "bend_face_count": 8
+        },
+        {
+          "part": "4332/fr5",
+          "thickness_m": 0.002,
+          "bend_radius_m": 0.0001,
+          "physical_strip_count": 5,
+          "bend_face_count": 8
+        }
+      ],
+      "gap_m": 9.999999999976694e-05,
+      "overlap_m3": 0
+    },
+    {
+      "case_id": "R56-12-UNQUALIFIED-FIXTURE-PAIR-2",
+      "source_sha256": "6bd0957dc0ca8b49be8c42a0648740c5ce3977bbd469fe85b2d8645785427add",
+      "status": "REJECTED_UNVERIFIED_NATIVE_CONSTRUCTION_NOT_A_PASS",
+      "native_cuts": [],
+      "parts": [],
+      "api_profile_scalars": [
+        {
+          "part": "4332/fr1",
+          "thickness_m": "NOT_AVAILABLE",
+          "bend_radius_m": "NOT_AVAILABLE",
+          "physical_strip_count": "NOT_AVAILABLE",
+          "bend_face_count": "NOT_AVAILABLE"
+        },
+        {
+          "part": "4332/fr3a",
+          "thickness_m": 0.002,
+          "bend_radius_m": 0.0001,
+          "physical_strip_count": 5,
+          "bend_face_count": 8
+        }
+      ],
+      "gap_m": null,
+      "overlap_m3": null
+    },
+    {
+      "case_id": "R56-15-RAW-4332-PAIR-1",
+      "source_sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+      "status": "PASS_NATIVE_API_HARNESS",
+      "native_cuts": [
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:LOSER_STEPPED_WEB_WALL_RETURN",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.03120000000000013,
+          "removed_m3": 0.0007669048458379417,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 48,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "A",
+          "operation_role": "U_RULE:FAR_BEND_CLEARANCE",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0022999999999999995,
+          "removed_m3": 4.985851513918229e-10,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 11,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:COVER_WEB_WALL",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "FORMED_PROFILE_ENVELOPE",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.12669999999999998,
+          "removed_m3": 0.000634987583552354,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 32,
+          "sketch_driving_dimensions": 1,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        },
+        {
+          "frame": "B",
+          "operation_role": "U_RULE:NORMAL_BEND_CAP",
+          "feature_type": "ICE",
+          "underlying_type": "Cut",
+          "depth_policy": "BEND_NORMAL_RELIEF",
+          "end_condition_1": 0,
+          "normal_cut": false,
+          "flip_side_to_cut": false,
+          "reverse_direction": false,
+          "depth_m": 0.0021999999999999997,
+          "removed_m3": 6.832739114626629e-09,
+          "native_target_symmetric_difference_m3": 0,
+          "sketch_support": "ORIGINAL_OUTER_WEB_FACE",
+          "sketch_reference_type": 2,
+          "sketch_constraint_status": 3,
+          "sketch_relations": 6,
+          "sketch_driving_dimensions": 0,
+          "new_reference_planes": 0,
+          "sketch_reference_qualification": "API_FACE_REFERENCE_TYPE_2_ORIGINAL_OWNER;DIRECT_GEOMETRIC_RELATIONS;NO_CONVERT_OR_FIX",
+          "sketch_observed_reference_is_face": true,
+          "sketch_plane_verified": true,
+          "api_evidence": "API_VERIFIED",
+          "geometry_evidence": "GEOMETRY_VERIFIED",
+          "both_directions": "NOT_RECORDED_IN_THIS_PRODUCTION_APPLY_REPORT",
+          "single_direction_factory_intent": "SOURCE_VERIFIED_INTENT_NOT_A_SEPARATE_API_READBACK",
+          "end_condition_1_name": "Blind"
+        }
+      ],
+      "parts": [
+        {
+          "part": "4332/fr3a",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0013932326813804739,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 48,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 11,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        },
+        {
+          "part": "4332/fr5",
+          "selected": true,
+          "target_symmetric_difference_m3": 0,
+          "protected_history_unchanged": true,
+          "protected_top_order_unchanged": true,
+          "body": {
+            "check2": 0,
+            "check3_fault_count": 0,
+            "volume_m3": 0.0011658981073640704,
+            "body_type": 0
+          },
+          "new_reference_planes": 0,
+          "new_sketches": [
+            {
+              "constraint_status": 3,
+              "relations": 32,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 1,
+              "support_type": 2,
+              "existing_face_support": true
+            },
+            {
+              "constraint_status": 3,
+              "relations": 6,
+              "dangling": 0,
+              "overdefining": 0,
+              "driving_dimensions": 0,
+              "support_type": 2,
+              "existing_face_support": true
+            }
+          ]
+        }
+      ],
+      "api_profile_scalars": [
+        {
+          "part": "4332/fr3a",
+          "thickness_m": 0.002,
+          "bend_radius_m": 0.0001,
+          "physical_strip_count": 5,
+          "bend_face_count": 8
+        },
+        {
+          "part": "4332/fr5",
+          "thickness_m": 0.002,
+          "bend_radius_m": 0.0001,
+          "physical_strip_count": 5,
+          "bend_face_count": 8
+        }
+      ],
+      "gap_m": 9.999999999976694e-05,
+      "overlap_m3": 0
+    }
+  ]
+}
