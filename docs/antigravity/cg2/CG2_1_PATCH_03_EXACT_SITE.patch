@@ -1,0 +1,99 @@
+diff --git a/docs/antigravity/cg2/CG2_1_SITE_ASSERT.cs b/docs/antigravity/cg2/CG2_1_SITE_ASSERT.cs
+--- a/docs/antigravity/cg2/CG2_1_SITE_ASSERT.cs
++++ b/docs/antigravity/cg2/CG2_1_SITE_ASSERT.cs
+@@ -22,7 +22,7 @@
+             try
+             {
+                 File.WriteAllText(Path.Combine(testRoot, Cg21SiteManifestName),
++                    "Fixture_Pos.SLDASM\tPartA-1\tPartB-1\tHole#1\tBREP_SOLID_ON_AXIS\t2.9\t3.1\t2\t1\t0.25\t0.35\r\n");
+-                    "Fixture_Pos.SLDASM\tPartA-1\tPartB-1\tHole#1\tBREP_SOLID_ON_AXIS\t2.9\t3.1\t2\t1\r\n");
+                 var m = new Metrics
+                 {
+                     HasCg2 = true, Cg2Candidates = 1, Cg2SubassemblyContainers = 1
+@@ -32,10 +32,17 @@
+                     Id = 1, SourceOccurrence = "PartA-1",
+                     TargetOccurrence = "PartB-1", SourceHoleLabel = "Hole#1",
+                     Classification = "CHECK_ONLY", MaterialEvidence = "BREP_SOLID_ON_AXIS",
++                    MaterialSpanMm = 3.0, MaterialHitCount = 2,
++                    TargetHoleAxisCount = 1, NearestTargetAxisRadialMm = 0.30,
++                    NearestTargetAxisAngleDeg = 0.0
+-                    MaterialSpanMm = 3.0, MaterialHitCount = 2
+                 };
+                 m.Cg2ExpectedCandidates.Add(c);
+                 AssertCg21Sites(testRoot, "Fixture_Pos.SLDASM", m);
++                c.NearestTargetAxisRadialMm = 0.05;
++                bool rejectedWrongOffset = false;
++                try { AssertCg21Sites(testRoot, "Fixture_Pos.SLDASM", m); }
++                catch (InvalidOperationException) { rejectedWrongOffset = true; }
++                c.NearestTargetAxisRadialMm = 0.30;
+                 c.MaterialSpanMm = 1.0;
+                 bool failedAsExpected = false;
+                 try { AssertCg21Sites(testRoot, "Fixture_Pos.SLDASM", m); }
+@@ -43,7 +50,10 @@
+                 Console.WriteLine(failedAsExpected ?
+                     "PASS: CG2.1 manifest rejects wrong material span" :
+                     "FAIL: CG2.1 manifest accepted incorrect material span");
++                Console.WriteLine(rejectedWrongOffset ?
++                    "PASS: CG2.1 manifest rejects wrong radial axis offset" :
++                    "FAIL: CG2.1 manifest accepted wrong radial axis offset");
++                return failedAsExpected && rejectedWrongOffset;
+-                return failedAsExpected;
+             }
+             catch (Exception ex)
+             {
+@@ -75,8 +85,9 @@
+                 if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
+                     continue;
+                 string[] fields = line.Split('\t');
++                if (fields.Length != 9 && fields.Length != 11)
++                    throw new InvalidDataException(
++                        "CG2.1 site manifest expects 9 or 11 tab-separated columns at line " + lineNumber);
+-                if (fields.Length != 9)
+-                    throw new InvalidDataException("CG2.1 site manifest expects 9 tab-separated columns at line " + lineNumber);
+                 if (!string.Equals(fields[0], fixtureName, StringComparison.OrdinalIgnoreCase))
+                     continue;
+ 
+@@ -109,6 +120,9 @@
+ 
+                 if (expectedEvidence == "SUPPRESSED")
+                 {
++                    if (fields.Length == 11)
++                        throw new InvalidDataException(
++                            "Cannot assert radial offset of a suppressed candidate at line " + lineNumber);
+                     // Candidate absence is NOT proof of counterpart-hole correctness.
+                     if (matches.Count != 0)
+                         throw new InvalidOperationException("CG2.1 expected candidate absence at line " + lineNumber);
+@@ -127,9 +141,32 @@
+                     c.MaterialHitCount < minHits)
+                     throw new InvalidOperationException("CG2.1 material span/hit count mismatch at line " + lineNumber);
+ 
++                // Optional columns 10+11 must be independently measured
++                // hole-axis radial offset limits, NOT AxisToBoxMm values.
++                if (fields.Length == 11)
++                {
++                    double minRadial, maxRadial;
++                    if (!double.TryParse(fields[9], NumberStyles.Float,
++                        CultureInfo.InvariantCulture, out minRadial) ||
++                        !double.TryParse(fields[10], NumberStyles.Float,
++                        CultureInfo.InvariantCulture, out maxRadial) ||
++                        double.IsNaN(minRadial) || double.IsNaN(maxRadial) ||
++                        double.IsInfinity(minRadial) || double.IsInfinity(maxRadial) ||
++                        minRadial < 0 || maxRadial < minRadial)
++                        throw new InvalidDataException(
++                            "Invalid radial limits at line " + lineNumber);
++                    if (c.TargetHoleAxisCount < 1 ||
++                        c.NearestTargetAxisRadialMm < minRadial ||
++                        c.NearestTargetAxisRadialMm > maxRadial)
++                        throw new InvalidOperationException(
++                            "CG2_1_TARGET_AXIS_RADIAL_MISMATCH line=" + lineNumber);
++                }
++
+                 Console.WriteLine("  CG2_1_EXACT_SITE_ASSERT=PASS line=" + lineNumber +
+                     " candidateId=" + c.Id + " material=" + c.MaterialEvidence +
++                    " spanMm=" + c.MaterialSpanMm.ToString("F3", CultureInfo.InvariantCulture) +
++                    " radialMm=" + c.NearestTargetAxisRadialMm.ToString("F3", CultureInfo.InvariantCulture) +
++                    " targetAxes=" + c.TargetHoleAxisCount);
+-                    " spanMm=" + c.MaterialSpanMm.ToString("F3", CultureInfo.InvariantCulture));
+             }
+ 
+             if (matchedExpectations == 0)
