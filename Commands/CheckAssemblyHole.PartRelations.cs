@@ -30,6 +30,10 @@ namespace ADDIN.Commands
         public string SourceHoleLabel { get; set; }
         public double BoxSeparationMm { get; set; }
         public double AxisToBoxMm { get; set; }
+        // Read-only diagnosis: nearest detected target hole axis, NOT AABB distance.
+        public int TargetHoleAxisCount { get; set; }
+        public double NearestTargetAxisRadialMm { get; set; } // -1 when unavailable
+        public double NearestTargetAxisAngleDeg { get; set; } // -1 when unavailable
         public string Classification { get; set; }
         public string Reason { get; set; }
         // Actual BREP solid-body ray intersection evidence. Not an NG verdict.
@@ -273,6 +277,26 @@ namespace ADDIN.Commands
                     report.CandidateCount++;
                     if (report.ExpectedHoleCandidates.Count < Cg2MaxStoredCandidates)
                     {
+                        // Read-only axis-to-axis measurement. No NG decision change.
+                        int validTargetAxes = 0;
+                        double nearestRadialMm = -1.0;
+                        double nearestAngleDeg = -1.0;
+                        if (targetHoles != null)
+                        {
+                            foreach (HoleAxis targetHole in targetHoles)
+                            {
+                                double radialMm, angleDeg;
+                                if (!Cg2TryMeasureAxisSeparation(hole, targetHole,
+                                    out radialMm, out angleDeg))
+                                    continue;
+                                validTargetAxes++;
+                                if (nearestRadialMm < 0 || radialMm < nearestRadialMm)
+                                {
+                                    nearestRadialMm = radialMm;
+                                    nearestAngleDeg = angleDeg;
+                                }
+                            }
+                        }
                         report.ExpectedHoleCandidates.Add(new CheckHoleCg2ExpectedHoleRow
                         {
                             Id = report.ExpectedHoleCandidates.Count + 1,
@@ -281,6 +305,9 @@ namespace ADDIN.Commands
                             SourceHoleLabel = "Hole#" + sourceHoleId.ToString(CultureInfo.InvariantCulture),
                             BoxSeparationMm = n.Item2 * 1000.0,
                             AxisToBoxMm = distanceOnAxis * 1000.0,
+                            TargetHoleAxisCount = validTargetAxes,
+                            NearestTargetAxisRadialMm = nearestRadialMm,
+                            NearestTargetAxisAngleDeg = nearestAngleDeg,
                             Classification = "CHECK_ONLY",
                             Reason = "Axis crosses approximate component bounding box; " +
                                 "actual material/contact/fastening intent NOT verified."
@@ -402,6 +429,41 @@ namespace ADDIN.Commands
             minAbsAxialDistance = tmin <= 0 && tmax >= 0
                 ? 0 : Math.Min(Math.Abs(tmin), Math.Abs(tmax));
             return minAbsAxialDistance <= Cg2MaxAxisReachM;
+        }
+
+        // Radial offset between two detected HOLE AXES in assembly coordinates.
+        // AABB AxisToBoxMm is axial distance and must not be used as hole offset.
+        private static bool Cg2TryMeasureAxisSeparation(
+            HoleAxis source, HoleAxis target, out double radialMm, out double angleDeg)
+        {
+            radialMm = -1.0;
+            angleDeg = -1.0;
+            if (source == null || target == null ||
+                !Cg2ValidVector(source.Center) || !Cg2ValidVector(source.Direction) ||
+                !Cg2ValidVector(target.Center) || !Cg2ValidVector(target.Direction))
+                return false;
+
+            double aSq = 0, bSq = 0, dot = 0;
+            double projection = 0, distanceSq = 0;
+            for (int k = 0; k < 3; k++)
+            {
+                double a = source.Direction[k], b = target.Direction[k];
+                double delta = target.Center[k] - source.Center[k];
+                aSq += a * a;
+                bSq += b * b;
+                dot += a * b;
+                projection += delta * a;
+                distanceSq += delta * delta;
+            }
+            if (aSq < 1e-16 || bSq < 1e-16) return false;
+            double radialSq = Math.Max(0.0,
+                distanceSq - projection * projection / aSq);
+            double cosine = Math.Max(0.0, Math.Min(1.0,
+                Math.Abs(dot) / Math.Sqrt(aSq * bSq)));
+            radialMm = Math.Sqrt(radialSq) * 1000.0;
+            angleDeg = Math.Acos(cosine) * 180.0 / Math.PI;
+            return !(double.IsNaN(radialMm) || double.IsInfinity(radialMm) ||
+                double.IsNaN(angleDeg) || double.IsInfinity(angleDeg));
         }
 
         private static bool Cg2LikelyKnownCounterpart(HoleAxis a, HoleAxis b)
