@@ -51,6 +51,9 @@ namespace ADDIN.Commands
 
         // Cụm góc dưới bên phải (Bảng 合番)
         public string Goban { get; set; } = "";
+        // A property re-evaluated from the sheet's referenced model is not
+        // independently verified Drawing displayed text.
+        public string GobanSource { get; set; } = "DRAWING_DISPLAY";
 
         // Cụm góc dưới bên trái (Tên file & DXF)
         public string PartFileName { get; set; } = "";
@@ -753,7 +756,21 @@ namespace ADDIN.Commands
             itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
                 CompareThicknessField(drawingData.Thickness, bomThickness),
                 GetPropertyLinkAudit(propertyLinkAudits, "板厚")));
-            itemResult.Fields.Add(CompareGobanField(drawingData.Goban, bomGoban));
+            DrawingBomFieldResult gobanComparison =
+                CompareGobanField(drawingData.Goban, bomGoban);
+            if (string.Equals(drawingData.GobanSource,
+                "PRPSHEET_VIEW_MODEL_UNVERIFIED", StringComparison.Ordinal))
+            {
+                // NEVER call this result OK: the value was re-evaluated from the
+                // model referenced by the Drawing sheet, not independently
+                // displayed by the hidden Drawing. Keep a visible audit warning.
+                gobanComparison.Source = "PRPSHEET_VIEW_MODEL_UNVERIFIED";
+                gobanComparison.Status = DrawingBomCheckStatus.Warning;
+                gobanComparison.Message =
+                    "Đã giải công thức $PRPSHEET từ model/configuration mà Sheet tham chiếu. " +
+                    "Drawing mở ẩn chưa xác nhận giá trị chữ thực tế; không kết luận OK/NG.";
+            }
+            itemResult.Fields.Add(gobanComparison);
             itemResult.Fields.Add(CompareFileNameField(drawingData.PartFileName, componentName));
             itemResult.Fields.Add(CompareDxfField(drawingData.DxfFileName, expectedDxf));
             itemResult.Fields.Add(CompareOptionalStringField("品名", drawingData.ProductName, bomProductName));
@@ -1216,6 +1233,8 @@ namespace ADDIN.Commands
             // 数量 của COMPONENT phải lấy đúng ô 数量 trong title block ở CỤM 1,
             // sau đó so với 数量 của đúng dòng Component trong SolidWorks BOM.
             ApplyPartGobanQuantityTableData(data, tables);
+            if (strictHiddenBatch && string.IsNullOrWhiteSpace(data.Goban))
+                ResolveHiddenPrpSheetGoban(data, tables, drawingDoc);
 
             // =========================================================================
             // CỤM 3: GÓC DƯỚI BÊN TRÁI (Bottom-Left Block: DXFファイル名 & Part-ファイル名)
@@ -1594,6 +1613,132 @@ namespace ADDIN.Commands
                     $"parsedQtyTotal=\"{FormatQuantityNumber(quantityTotal)}\" " +
                     $"drawingTitleQty=\"{data.Quantity}\" entries={entries.Count}");
             }
+        }
+
+        // Resolves only the exact $PRPSHEET:"合番" expression actually present
+        // in the Drawing table cell next to a 合番 header. The sheet's chosen
+        // custom property view determines the model/configuration. The result
+        // is unverified model-side evaluation, NOT verified Drawing display.
+        private void ResolveHiddenPrpSheetGoban(
+            DrawingDisplayedData data, List<TableDiagnosticInfo> tables,
+            ModelDoc2 drawingModel)
+        {
+            if (data == null || drawingModel == null || tables == null)
+                return;
+            DrawingDoc drawing = drawingModel as DrawingDoc;
+            if (drawing == null) return;
+
+            Sheet sheet = null;
+            try { sheet = drawing.GetCurrentSheet() as Sheet; }
+            catch (Exception ex) {
+                LogDebug("[GOBAN PRPSHEET] sheet API failed: " + ex.Message);
+                return;
+            }
+            if (sheet == null) {
+                LogDebug("[GOBAN PRPSHEET] current sheet unavailable");
+                return;
+            }
+            string sheetName = "";
+            string propertyViewName = "";
+            try {
+                sheetName = sheet.GetName() ?? "";
+                propertyViewName = (sheet.CustomPropertyView ?? "").Trim();
+            } catch (Exception ex) {
+                LogDebug("[GOBAN PRPSHEET] sheet property view unavailable: " + ex.Message);
+                return;
+            }
+
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.Cells == null) continue;
+                foreach (TableCellDiagnosticInfo header in table.Cells)
+                {
+                    if (header == null ||
+                        !string.Equals(NormalizeText(CleanTableCellText(header.DisplayedText)),
+                            "合番", StringComparison.Ordinal))
+                        continue;
+                    TableCellDiagnosticInfo valueCell =
+                        FindTableCell(table, header.Row, header.Column + 1);
+                    if (valueCell == null ||
+                        !string.IsNullOrWhiteSpace(valueCell.DisplayedText))
+                        continue;
+                    string raw = (valueCell.RawText ?? "").Trim();
+                    if (!Regex.IsMatch(raw,
+                        @"^\$PRPSHEET\s*:\s*[""“”]?合番[""“”]?\s*$",
+                        RegexOptions.IgnoreCase))
+                        continue;
+
+                    LogDebug("[GOBAN PRPSHEET] expression confirmed table=" +
+                        table.Index + " r=" + valueCell.Row + " c=" + valueCell.Column +
+                        " sheet=" + sheetName + " propertyView=" + propertyViewName);
+
+                    var modelViews = new List<SolidWorks.Interop.sldworks.View>();
+                    SolidWorks.Interop.sldworks.View current = null;
+                    try { current = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View; }
+                    catch { }
+                    while (current != null)
+                    {
+                        SolidWorks.Interop.sldworks.View next = null;
+                        try { next = current.GetNextView() as SolidWorks.Interop.sldworks.View; }
+                        catch { }
+                        try {
+                            if (current.Type != (int)swDrawingViewTypes_e.swDrawingSheet &&
+                                IsViewOnSheet(current, sheetName))
+                                modelViews.Add(current);
+                        } catch { }
+                        current = next;
+                    }
+
+                    SolidWorks.Interop.sldworks.View chosen = null;
+                    if (!string.IsNullOrWhiteSpace(propertyViewName))
+                        chosen = modelViews.Find(v =>
+                            string.Equals((v.Name ?? "").Trim(), propertyViewName,
+                                StringComparison.OrdinalIgnoreCase));
+                    else if (modelViews.Count == 1)
+                        chosen = modelViews[0];
+
+                    if (chosen == null)
+                    {
+                        LogDebug("[GOBAN PRPSHEET] UNSOLVED: property view ambiguous or " +
+                            "not found. chosen=" + propertyViewName +
+                            " availableViews=" + modelViews.Count);
+                        return;
+                    }
+
+                    ModelDoc2 linkedModel = null;
+                    string conf = "";
+                    try {
+                        linkedModel = chosen.ReferencedDocument as ModelDoc2;
+                        conf = chosen.ReferencedConfiguration ?? "";
+                    } catch (Exception ex) {
+                        LogDebug("[GOBAN PRPSHEET] referenced document error: " + ex.Message);
+                        return;
+                    }
+                    if (linkedModel == null)
+                    {
+                        // No extra model OpenDoc6 calls in this diagnostic.
+                        LogDebug("[GOBAN PRPSHEET] UNSOLVED: referenced model not loaded");
+                        return;
+                    }
+                    string linkedValue = GetModelCustomProperty(linkedModel, conf, "合番");
+                    if (string.IsNullOrWhiteSpace(linkedValue))
+                    {
+                        LogDebug("[GOBAN PRPSHEET] UNSOLVED: referenced model property " +
+                            "missing/blank. view=" + chosen.Name + " config=" + conf);
+                        return;
+                    }
+
+                    data.Goban = CleanTableCellText(linkedValue);
+                    data.GobanSource = "PRPSHEET_VIEW_MODEL_UNVERIFIED";
+                    SaveDrawingTableValueLocation(data, "合番", table, valueCell);
+                    LogDebug("[GOBAN PRPSHEET RESOLVED] view=" + chosen.Name +
+                        " configuration=" + conf + " model=" +
+                        (linkedModel.GetPathName() ?? "") + " value=\"" + data.Goban +
+                        "\" source=MODEL_PROPERTY_NOT_DRAWING_DISPLAY");
+                    return;
+                }
+            }
+            LogDebug("[GOBAN PRPSHEET] no exact $PRPSHEET:合番 expression found");
         }
 
         private static List<PartGobanQuantityEntry> ReadPartGobanQuantityEntries(
