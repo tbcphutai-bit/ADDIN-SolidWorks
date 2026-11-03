@@ -497,7 +497,13 @@ namespace ADDIN.Commands
                     else ExcelDrawingCheckExporter.Export(result);
                 }
 
-                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " + result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning."; if (!silent) ShowBatchSummaryDialog(result);
+                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " +
+                    result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning.";
+                if (strictHiddenBatch)
+                    result.Message += " | TEST STRICT HIDDEN: linked text/chức năng 表/ウラ chưa được " +
+                        "xác minh; Drawing mở bởi batch được giữ trong bộ nhớ. Khởi động lại SOLIDWORKS " +
+                        "sau lần thử này.";
+                if (!silent) ShowBatchSummaryDialog(result);
             }
             catch (Exception ex)
             {
