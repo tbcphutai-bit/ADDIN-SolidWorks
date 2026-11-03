@@ -1480,7 +1480,29 @@ namespace ADDIN.Commands
                 ReadPartGobanQuantityEntries(tables);
 
             if (entries.Count == 0)
+            {
+                // Log the actual source-side evidence, never substitute BOM's
+                // expected value for a Drawing value.
+                foreach (TableDiagnosticInfo tab in tables)
+                {
+                    if (tab == null) continue;
+                    foreach (TableCellDiagnosticInfo cell in tab.Cells)
+                    {
+                        if (cell == null) continue;
+                        string displayed = CleanTableCellText(cell.DisplayedText);
+                        string raw = CleanTableCellText(cell.RawText);
+                        if (displayed.Contains("合番") || displayed.Contains("単品搬入") ||
+                            raw.Contains("合番") || raw.Contains("単品搬入"))
+                            LogDebug("[GOBAN SOURCE DIAG] table=" + tab.Index +
+                                " r=" + cell.Row + " c=" + cell.Column +
+                                " source=" + cell.ValueSource +
+                                " shown=\"" + displayed + "\" raw=\"" + raw + "\"");
+                    }
+                }
+                LogDebug("[GOBAN SOURCE MISSING] all candidate tables scanned; " +
+                    "no verified 合番 value from Drawing. Keep Warning.");
                 return;
+            }
 
             // Hợp nhất 合番 theo đúng thứ tự xuất hiện, KHÔNG làm mất 数量 đi kèm.
             // Ví dụ:
@@ -5959,6 +5981,78 @@ namespace ADDIN.Commands
             return Regex.IsMatch(text ?? "", @"\$PRP(?:SHEET|MODEL|VIEW)?\s*:", RegexOptions.IgnoreCase);
         }
 
+        // Only used when a table's anchor is outside the sheet. Compare the
+        // actual table rectangle with sheet bounds rather than dropping it from
+        // an anchor-point test. Dimensions returned by the API are in meters.
+        // On unknown anchors / invalid dimensions, fail closed to avoid using
+        // content outside the sheet as Drawing evidence.
+        private static bool TableFootprintOverlapsSheet(
+            ITableAnnotation table, double x, double y, int rows, int columns,
+            SheetFrameBounds sheet, out string diagnostic)
+        {
+            diagnostic = "geometry=UNAVAILABLE";
+            if (table == null || sheet == null || !sheet.IsValid ||
+                rows < 1 || columns < 1 || rows > 500 || columns > 500)
+                return false;
+
+            try
+            {
+                double width = 0.0, height = 0.0;
+                for (int c = 0; c < columns; c++)
+                    width += table.GetColumnWidth(c);
+                for (int r = 0; r < rows; r++)
+                    height += table.GetRowHeight(r);
+                if (!(width > 0.0 && height > 0.0) ||
+                    double.IsNaN(width) || double.IsNaN(height) ||
+                    double.IsInfinity(width) || double.IsInfinity(height))
+                    return false;
+
+                double minX, maxX, minY, maxY;
+                int anchorType = table.AnchorType;
+                switch ((swBOMConfigurationAnchorType_e)anchorType)
+                {
+                    case swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_TopLeft:
+                        minX = x; maxX = x + width;
+                        minY = y - height; maxY = y;
+                        break;
+                    case swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_TopRight:
+                        minX = x - width; maxX = x;
+                        minY = y - height; maxY = y;
+                        break;
+                    case swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_BottomLeft:
+                        minX = x; maxX = x + width;
+                        minY = y; maxY = y + height;
+                        break;
+                    case swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_BottomRight:
+                        minX = x - width; maxX = x;
+                        minY = y; maxY = y + height;
+                        break;
+                    default:
+                        diagnostic = "anchorType=" + anchorType + " unsupported";
+                        return false;
+                }
+
+                // Rectangle intersection is not evidence that every cell is
+                // visible. Subsequent parsing still requires the exact 合番
+                // header and the Drawing's own displayed cell value.
+                bool overlaps = maxX >= sheet.MinX - DrawingFrameEpsilon &&
+                    minX <= sheet.MaxX + DrawingFrameEpsilon &&
+                    maxY >= sheet.MinY - DrawingFrameEpsilon &&
+                    minY <= sheet.MaxY + DrawingFrameEpsilon;
+                diagnostic = "anchorType=" + anchorType +
+                    " X=[" + minX.ToString("F6", CultureInfo.InvariantCulture) +
+                    "," + maxX.ToString("F6", CultureInfo.InvariantCulture) +
+                    "] Y=[" + minY.ToString("F6", CultureInfo.InvariantCulture) +
+                    "," + maxY.ToString("F6", CultureInfo.InvariantCulture) + "]";
+                return overlaps;
+            }
+            catch (Exception e)
+            {
+                diagnostic = "geometry=ERROR " + e.GetType().Name;
+                return false;
+            }
+        }
+
         private TableDiagnosticInfo ExtractTableInfo(
             ITableAnnotation table,
             string viewName,
@@ -6018,10 +6112,27 @@ namespace ADDIN.Commands
 
                         if (!tableAnchorInside)
                         {
+                            // GetPosition() refers to AnchorType, not necessarily the
+                            // top-left corner. A BottomLeft/BottomRight anchor may be
+                            // a few mm below Y=0 while table cells remain on the sheet.
+                            // Use real row/column dimensions and anchor orientation.
+                            string footprintDetails;
+                            bool footprintOverlaps = TableFootprintOverlapsSheet(
+                                table, tableX, tableY, rowCount, colCount,
+                                frameBounds, out footprintDetails);
                             LogDebug(
-                                $"[TABLE FRAME FILTER] table={index} " +
-                                "SKIP_TABLE reason=ANCHOR_OUTSIDE_SHEET");
-                            return null;
+                                $"[TABLE FRAME FOOTPRINT] table={index} " +
+                                $"intersects={footprintOverlaps} {footprintDetails}");
+                            if (!footprintOverlaps)
+                            {
+                                LogDebug(
+                                    $"[TABLE FRAME FILTER] table={index} " +
+                                    "SKIP_TABLE reason=FOOTPRINT_OUTSIDE_SHEET");
+                                return null;
+                            }
+                            LogDebug(
+                                $"[TABLE FRAME RECOVER] table={index} " +
+                                "anchor outside but table footprint intersects sheet");
                         }
                     }
                     else
