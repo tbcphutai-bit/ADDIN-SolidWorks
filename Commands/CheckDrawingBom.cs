@@ -51,9 +51,9 @@ namespace ADDIN.Commands
 
         // Cụm góc dưới bên phải (Bảng 合番)
         public string Goban { get; set; } = "";
-        // A property re-evaluated from the sheet's referenced model is not
-        // independently verified Drawing displayed text.
-        public string GobanSource { get; set; } = "DRAWING_DISPLAY";
+        // True only if Drawing itself contains an unresolved display link in
+        // the 合番 value cell. This is not a real empty user-entered string.
+        public bool GobanDisplayUnavailable { get; set; }
 
         // Cụm góc dưới bên trái (Tên file & DXF)
         public string PartFileName { get; set; } = "";
@@ -758,17 +758,18 @@ namespace ADDIN.Commands
                 GetPropertyLinkAudit(propertyLinkAudits, "板厚")));
             DrawingBomFieldResult gobanComparison =
                 CompareGobanField(drawingData.Goban, bomGoban);
-            if (string.Equals(drawingData.GobanSource,
-                "PRPSHEET_VIEW_MODEL_UNVERIFIED", StringComparison.Ordinal))
+            if (drawingData.GobanDisplayUnavailable)
             {
-                // NEVER call this result OK: the value was re-evaluated from the
-                // model referenced by the Drawing sheet, not independently
-                // displayed by the hidden Drawing. Keep a visible audit warning.
-                gobanComparison.Source = "PRPSHEET_VIEW_MODEL_UNVERIFIED";
+                // Never replace a Drawing value with $PRPSHEET, the model
+                // property, or a value from BOM. All verified values must
+                // have come from the Drawing displayed-text accessors.
+                gobanComparison.DrawingValue = "(Chưa đọc được chữ hiển thị)";
+                gobanComparison.Source = "DRAWING_TABLE_DISPLAY_UNAVAILABLE";
                 gobanComparison.Status = DrawingBomCheckStatus.Warning;
                 gobanComparison.Message =
-                    "Đã giải công thức $PRPSHEET từ model/configuration mà Sheet tham chiếu. " +
-                    "Drawing mở ẩn chưa xác nhận giá trị chữ thực tế; không kết luận OK/NG.";
+                    "Drawing có ô 合番 liên kết, nhưng các API DisplayedText2/DisplayedText " +
+                    "đều không trả về chữ thực tế khi bản vẽ đang ẩn. " +
+                    "Không sử dụng $PRPSHEET hoặc Custom Property làm giá trị Drawing.";
             }
             itemResult.Fields.Add(gobanComparison);
             itemResult.Fields.Add(CompareFileNameField(drawingData.PartFileName, componentName));
@@ -1233,8 +1234,8 @@ namespace ADDIN.Commands
             // 数量 của COMPONENT phải lấy đúng ô 数量 trong title block ở CỤM 1,
             // sau đó so với 数量 của đúng dòng Component trong SolidWorks BOM.
             ApplyPartGobanQuantityTableData(data, tables);
-            if (strictHiddenBatch && string.IsNullOrWhiteSpace(data.Goban))
-                ResolveHiddenPrpSheetGoban(data, tables, drawingDoc);
+            if (string.IsNullOrWhiteSpace(data.Goban))
+                MarkUnavailableGobanDisplay(data, tables);
 
             // =========================================================================
             // CỤM 3: GÓC DƯỚI BÊN TRÁI (Bottom-Left Block: DXFファイル名 & Part-ファイル名)
@@ -1615,130 +1616,51 @@ namespace ADDIN.Commands
             }
         }
 
-        // Resolves only the exact $PRPSHEET:"合番" expression actually present
-        // in the Drawing table cell next to a 合番 header. The sheet's chosen
-        // custom property view determines the model/configuration. The result
-        // is unverified model-side evaluation, NOT verified Drawing display.
-        private void ResolveHiddenPrpSheetGoban(
-            DrawingDisplayedData data, List<TableDiagnosticInfo> tables,
-            ModelDoc2 drawingModel)
+        // Display-only contract:
+        // The Drawing column must be sourced from displayed text returned by
+        // the Drawing table API. A raw $PRPSHEET expression is NOT displayed
+        // text and must NEVER be expanded from a model or BOM as a substitute.
+        private static void MarkUnavailableGobanDisplay(
+            DrawingDisplayedData data, List<TableDiagnosticInfo> tables)
         {
-            if (data == null || drawingModel == null || tables == null)
-                return;
-            DrawingDoc drawing = drawingModel as DrawingDoc;
-            if (drawing == null) return;
-
-            Sheet sheet = null;
-            try { sheet = drawing.GetCurrentSheet() as Sheet; }
-            catch (Exception ex) {
-                LogDebug("[GOBAN PRPSHEET] sheet API failed: " + ex.Message);
-                return;
-            }
-            if (sheet == null) {
-                LogDebug("[GOBAN PRPSHEET] current sheet unavailable");
-                return;
-            }
-            string sheetName = "";
-            string propertyViewName = "";
-            try {
-                sheetName = sheet.GetName() ?? "";
-                propertyViewName = (sheet.CustomPropertyView ?? "").Trim();
-            } catch (Exception ex) {
-                LogDebug("[GOBAN PRPSHEET] sheet property view unavailable: " + ex.Message);
-                return;
-            }
-
+            if (data == null || tables == null) return;
             foreach (TableDiagnosticInfo table in tables)
             {
                 if (table == null || table.Cells == null) continue;
-                foreach (TableCellDiagnosticInfo header in table.Cells)
+                foreach (TableCellDiagnosticInfo label in table.Cells)
                 {
-                    if (header == null ||
-                        !string.Equals(NormalizeText(CleanTableCellText(header.DisplayedText)),
+                    if (label == null ||
+                        !string.Equals(CleanTableCellText(label.DisplayedText),
                             "合番", StringComparison.Ordinal))
                         continue;
-                    TableCellDiagnosticInfo valueCell =
-                        FindTableCell(table, header.Row, header.Column + 1);
-                    if (valueCell == null ||
-                        !string.IsNullOrWhiteSpace(valueCell.DisplayedText))
+
+                    TableCellDiagnosticInfo cell =
+                        FindTableCell(table, label.Row, label.Column + 1);
+                    if (cell == null) continue;
+
+                    // DisplayedText was already computed from DisplayedText2,
+                    // DisplayedText2(includeHidden), and legacy DisplayedText.
+                    // Never read RawText as an actual displayed value.
+                    if (!string.IsNullOrWhiteSpace(cell.DisplayedText) &&
+                        !ContainsTablePropertyExpression(cell.DisplayedText))
                         continue;
-                    string raw = (valueCell.RawText ?? "").Trim();
+
+                    string raw = cell.RawText ?? "";
                     if (!Regex.IsMatch(raw,
-                        @"^\$PRPSHEET\s*:\s*[""“”]?合番[""“”]?\s*$",
+                        @"^\s*\$PRPSHEET\s*:\s*[""“”]?合番[""“”]?\s*$",
                         RegexOptions.IgnoreCase))
                         continue;
-
-                    LogDebug("[GOBAN PRPSHEET] expression confirmed table=" +
-                        table.Index + " r=" + valueCell.Row + " c=" + valueCell.Column +
-                        " sheet=" + sheetName + " propertyView=" + propertyViewName);
-
-                    var modelViews = new List<SolidWorks.Interop.sldworks.View>();
-                    SolidWorks.Interop.sldworks.View current = null;
-                    try { current = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View; }
-                    catch { }
-                    while (current != null)
-                    {
-                        SolidWorks.Interop.sldworks.View next = null;
-                        try { next = current.GetNextView() as SolidWorks.Interop.sldworks.View; }
-                        catch { }
-                        try {
-                            if (current.Type != (int)swDrawingViewTypes_e.swDrawingSheet &&
-                                IsViewOnSheet(current, sheetName))
-                                modelViews.Add(current);
-                        } catch { }
-                        current = next;
-                    }
-
-                    SolidWorks.Interop.sldworks.View chosen = null;
-                    if (!string.IsNullOrWhiteSpace(propertyViewName))
-                        chosen = modelViews.Find(v =>
-                            string.Equals((v.Name ?? "").Trim(), propertyViewName,
-                                StringComparison.OrdinalIgnoreCase));
-                    else if (modelViews.Count == 1)
-                        chosen = modelViews[0];
-
-                    if (chosen == null)
-                    {
-                        LogDebug("[GOBAN PRPSHEET] UNSOLVED: property view ambiguous or " +
-                            "not found. chosen=" + propertyViewName +
-                            " availableViews=" + modelViews.Count);
-                        return;
-                    }
-
-                    ModelDoc2 linkedModel = null;
-                    string conf = "";
-                    try {
-                        linkedModel = chosen.ReferencedDocument as ModelDoc2;
-                        conf = chosen.ReferencedConfiguration ?? "";
-                    } catch (Exception ex) {
-                        LogDebug("[GOBAN PRPSHEET] referenced document error: " + ex.Message);
-                        return;
-                    }
-                    if (linkedModel == null)
-                    {
-                        // No extra model OpenDoc6 calls in this diagnostic.
-                        LogDebug("[GOBAN PRPSHEET] UNSOLVED: referenced model not loaded");
-                        return;
-                    }
-                    string linkedValue = GetModelCustomProperty(linkedModel, conf, "合番");
-                    if (string.IsNullOrWhiteSpace(linkedValue))
-                    {
-                        LogDebug("[GOBAN PRPSHEET] UNSOLVED: referenced model property " +
-                            "missing/blank. view=" + chosen.Name + " config=" + conf);
-                        return;
-                    }
-
-                    data.Goban = CleanTableCellText(linkedValue);
-                    data.GobanSource = "PRPSHEET_VIEW_MODEL_UNVERIFIED";
-                    SaveDrawingTableValueLocation(data, "合番", table, valueCell);
-                    LogDebug("[GOBAN PRPSHEET RESOLVED] view=" + chosen.Name +
-                        " configuration=" + conf + " model=" +
-                        (linkedModel.GetPathName() ?? "") + " value=\"" + data.Goban +
-                        "\" source=MODEL_PROPERTY_NOT_DRAWING_DISPLAY");
+                    data.GobanDisplayUnavailable = true;
+                    LogDebug("[GOBAN DISPLAY UNAVAILABLE] table=" + table.Index +
+                        " row=" + cell.Row + " col=" + cell.Column +
+                        " source=" + cell.ValueSource +
+                        " displayedText2=\"" + (cell.ApiDisplayedText ?? "") +
+                        "\" displayedText2Hidden=\"" +
+                        (cell.ApiDisplayedTextWithHidden ?? "") +
+                        "\" rawExpressionPresent=True modelFallback=DISABLED");
                     return;
                 }
             }
-            LogDebug("[GOBAN PRPSHEET] no exact $PRPSHEET:合番 expression found");
         }
 
         private static List<PartGobanQuantityEntry> ReadPartGobanQuantityEntries(
