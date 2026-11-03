@@ -6,8 +6,9 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    // Suppress document painting in the supplied session. Never create, hide or
-    // exit an application. Visible document windows still evaluate linked text.
+    // Managed-only diagnostic scope; DOES NOT suppress document painting.
+    // Never creates, hides or exits the SOLIDWORKS application.
+    // Drawing windows can be visible during a batch; this isolates native hook crashes.
     internal sealed class DrawingCommandDisplayScope : IDisposable
     {
         // Diagnostic A/B implementation: no Win32 P/Invoke, subclassing or redraw interception.
