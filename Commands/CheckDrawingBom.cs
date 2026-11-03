@@ -367,14 +367,11 @@ namespace ADDIN.Commands
                         itemResult = CheckOneDrawing(drawingDoc, row, drawingPath, resolvedPartPath);
                         if (strictHiddenBatch)
                         {
-                            itemResult.Fields.Add(new DrawingBomFieldResult
-                            {
-                                FieldName = "STRICT HIDDEN LINK VALIDATION",
-                                Source = "HIDDEN_DRAWING_UNVERIFIED",
-                                Status = DrawingBomCheckStatus.Warning,
-                                Message = "NOT CHECKED: các giá trị Drawing liên kết đọc trong trạng thái ẩn có thể " +
-                                    "là dữ liệu cached; cần kiểm chứng trước khi kết luận OK hoặc NG."
-                            });
+                            // Diagnostic metadata is not a real BOM/Drawing field.
+                            // Keep the overall result unverified, but do not add a
+                            // fake table row to the user's comparison details.
+                            LogDebug("[STRICT HIDDEN LINK VALIDATION] row=" + (i + 1) +
+                                " linked title-block values are not independently verified");
                             itemResult.Status = DrawingBomCheckStatus.Warning;
                             itemResult.Note = (itemResult.Note ?? "") +
                                 " | HIDDEN_PROBE: linked text not independently verified.";
