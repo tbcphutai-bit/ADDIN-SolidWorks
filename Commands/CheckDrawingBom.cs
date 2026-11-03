@@ -164,6 +164,10 @@ namespace ADDIN.Commands
         // Diagnostic-only switch: strictly hidden Drawing API, not the native UI hook.
         private bool strictHiddenBatch;
         private const int MaxHiddenDiagnosticDrawings = 12;
+        // One bounded experiment per SOLIDWORKS process. Re-running without
+        // restarting could accumulate hidden native models indefinitely.
+        private static readonly HashSet<string> RetainedHiddenDrawingPaths =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private const double NumericTolerance = 0.01; // 0.01 mm tolerance cho W, L, 板厚
         private const double HeaderYBandTolerance = 0.010; // 10mm band độ chênh Y giữa các Header
@@ -259,6 +263,14 @@ namespace ADDIN.Commands
                 }
 
                 LogDebug($"Total selected BOM rows = {checkedRows.Count}");
+                if (silent && RetainedHiddenDrawingPaths.Count > 0)
+                {
+                    result.Message = "Đã giữ " + RetainedHiddenDrawingPaths.Count +
+                        " Drawing ẩn trong phiên SOLIDWORKS. Hãy khởi động lại SOLIDWORKS " +
+                        "trước khi thử tiếp để tránh tích lũy tài liệu native.";
+                    LogDebug("[STRICT HIDDEN SESSION LIMIT] " + result.Message);
+                    return result;
+                }
                 if (silent && checkedRows.Count > MaxHiddenDiagnosticDrawings)
                 {
                     result.Message = "STRICT HIDDEN diagnostic chỉ hỗ trợ tối đa " +
@@ -281,7 +293,8 @@ namespace ADDIN.Commands
                     result.Message = "Đã hủy CHECK DRAWING.";
                     return result;
                 }
-                if (silent) displayScope = new DrawingCommandDisplayScope(swApp);
+                if (silent)
+                    LogDebug("[STRICT HIDDEN SCOPE] DrawingCommandDisplayScope=SKIPPED; native GUI untouched");
 
                 for (int i = 0; i < checkedRows.Count; i++)
                 {
@@ -390,6 +403,9 @@ namespace ADDIN.Commands
                             // A/B isolation: both CloseDoc and QuitDoc crashed natively.
                             // Intentionally keep only command-opened hidden Drawings in memory.
                             // SOLIDWORKS must be restarted after this <=12 Drawing experiment.
+                            if (openedByCommand && drawingDoc != null &&
+                                !string.IsNullOrWhiteSpace(itemResult.DrawingPath))
+                                RetainedHiddenDrawingPaths.Add(itemResult.DrawingPath);
                             LogDebug("[STRICT HIDDEN HOLD] row=" + (i + 1) +
                                 " openedByCommand=" + openedByCommand +
                                 " path=" + (itemResult.DrawingPath ?? "") + " close=SKIPPED");
