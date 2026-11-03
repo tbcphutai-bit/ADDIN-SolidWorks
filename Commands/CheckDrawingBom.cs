@@ -360,12 +360,26 @@ namespace ADDIN.Commands
                     }
                     finally
                     {
+                        // Checkpoint logging: native crashes may occur inside CloseDoc
+                        // before any managed catch block or batch summary can run.
+                        LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDrawing BEGIN openedByCommand=" + openedByCommand);
                         if (openedByCommand && drawingDoc != null)
                         {
-                            try { swApp.CloseDoc(drawingDoc.GetTitle()); }
-                            catch { }
+                            try
+                            {
+                                string closeTitle = drawingDoc.GetTitle();
+                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDoc CALL title=" + closeTitle);
+                                swApp.CloseDoc(closeTitle);
+                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDoc RETURN");
+                            }
+                            catch (Exception closeError)
+                            {
+                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDoc ERROR " + closeError);
+                            }
                         }
+                        LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive CALL");
                         RestoreBatchActiveDocument(originalTitle);
+                        LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive RETURN");
                     }
                 }
 
