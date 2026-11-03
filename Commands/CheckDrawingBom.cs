@@ -367,14 +367,41 @@ namespace ADDIN.Commands
                         {
                             try
                             {
+                                // The failed run crashed *inside* CloseDoc on an owned, read-only Drawing.
+                                // Change exactly this close path for an A/B test. Never close a document
+                                // that was already open before the batch, is no longer read-only, or has
+                                // a different path than the one resolved for the current BOM row.
                                 string closeTitle = drawingDoc.GetTitle();
-                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDoc CALL title=" + closeTitle);
-                                swApp.CloseDoc(closeTitle);
-                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDoc RETURN");
+                                string actualPath = drawingDoc.GetPathName();
+                                string intendedPath = itemResult.DrawingPath ?? "";
+                                bool samePath =
+                                    !string.IsNullOrWhiteSpace(actualPath) &&
+                                    !string.IsNullOrWhiteSpace(intendedPath) &&
+                                    string.Equals(Path.GetFullPath(actualPath), Path.GetFullPath(intendedPath),
+                                        StringComparison.OrdinalIgnoreCase);
+                                bool readOnly = drawingDoc.IsOpenedReadOnly();
+                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) +
+                                    " OwnedDrawingVerify samePath=" + samePath +
+                                    " readOnly=" + readOnly + " title=" + closeTitle);
+                                if (!samePath || !readOnly)
+                                {
+                                    // Fail closed: do not risk closing a user-owned/modified document.
+                                    // The document is left open and this diagnostic must be reviewed.
+                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc SKIPPED unsafe target");
+                                }
+                                else
+                                {
+                                    // QuitDoc closes without saving. This is safe ONLY for our own
+                                    // OpenDoc6(Silent|ReadOnly) Drawing verified above.
+                                    // This does NOT prove native crashes are fixed; it is one A/B variable.
+                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc CALL title=" + closeTitle);
+                                    swApp.QuitDoc(closeTitle);
+                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc RETURN");
+                                }
                             }
                             catch (Exception closeError)
                             {
-                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDoc ERROR " + closeError);
+                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc ERROR " + closeError);
                             }
                         }
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive CALL");
