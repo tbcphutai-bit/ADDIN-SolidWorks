@@ -161,6 +161,13 @@ namespace ADDIN.Commands
         //   Không dùng Custom Property 数量/Qty của 3D Part/Assembly làm Expected.
         private readonly ISldWorks swApp;
         private readonly DataGridView bomGrid;
+        // Diagnostic-only switch: strictly hidden Drawing API, not the native UI hook.
+        private bool strictHiddenBatch;
+        private const int MaxHiddenDiagnosticDrawings = 12;
+        // One bounded experiment per SOLIDWORKS process. Re-running without
+        // restarting could accumulate hidden native models indefinitely.
+        private static readonly HashSet<string> RetainedHiddenDrawingPaths =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private const double NumericTolerance = 0.01; // 0.01 mm tolerance cho W, L, 板厚
         private const double HeaderYBandTolerance = 0.010; // 10mm band độ chênh Y giữa các Header
@@ -256,6 +263,22 @@ namespace ADDIN.Commands
                 }
 
                 LogDebug($"Total selected BOM rows = {checkedRows.Count}");
+                if (silent && RetainedHiddenDrawingPaths.Count > 0)
+                {
+                    result.Message = "Đã giữ " + RetainedHiddenDrawingPaths.Count +
+                        " Drawing ẩn trong phiên SOLIDWORKS. Hãy khởi động lại SOLIDWORKS " +
+                        "trước khi thử tiếp để tránh tích lũy tài liệu native.";
+                    LogDebug("[STRICT HIDDEN SESSION LIMIT] " + result.Message);
+                    return result;
+                }
+                if (silent && checkedRows.Count > MaxHiddenDiagnosticDrawings)
+                {
+                    result.Message = "STRICT HIDDEN diagnostic chỉ hỗ trợ tối đa " +
+                        MaxHiddenDiagnosticDrawings + " Drawing; không thực thi để tránh giữ quá nhiều tài liệu.";
+                    LogDebug("[STRICT HIDDEN LIMIT] " + result.Message);
+                    return result;
+                }
+                strictHiddenBatch = silent;
 
                 ModelDoc2 originalDocument = swApp.ActiveDoc as ModelDoc2;
                 originalTitle = originalDocument != null ? originalDocument.GetTitle() : "";
@@ -270,7 +293,8 @@ namespace ADDIN.Commands
                     result.Message = "Đã hủy CHECK DRAWING.";
                     return result;
                 }
-                if (silent) displayScope = new DrawingCommandDisplayScope(swApp);
+                if (silent)
+                    LogDebug("[STRICT HIDDEN SCOPE] DrawingCommandDisplayScope=SKIPPED; native GUI untouched");
 
                 for (int i = 0; i < checkedRows.Count; i++)
                 {
@@ -341,6 +365,20 @@ namespace ADDIN.Commands
                         }
 
                         itemResult = CheckOneDrawing(drawingDoc, row, drawingPath, resolvedPartPath);
+                        if (strictHiddenBatch)
+                        {
+                            itemResult.Fields.Add(new DrawingBomFieldResult
+                            {
+                                FieldName = "STRICT HIDDEN LINK VALIDATION",
+                                Source = "HIDDEN_DRAWING_UNVERIFIED",
+                                Status = DrawingBomCheckStatus.Warning,
+                                Message = "NOT CHECKED: các giá trị Drawing liên kết đọc trong trạng thái ẩn có thể " +
+                                    "là dữ liệu cached; cần kiểm chứng trước khi kết luận OK hoặc NG."
+                            });
+                            itemResult.Status = DrawingBomCheckStatus.Warning;
+                            itemResult.Note = (itemResult.Note ?? "") +
+                                " | HIDDEN_PROBE: linked text not independently verified.";
+                        }
 
                         LogDebug(
                             $"[DRAWING RESULT] component={itemResult.Component} " +
@@ -360,6 +398,20 @@ namespace ADDIN.Commands
                     }
                     finally
                     {
+                        if (strictHiddenBatch)
+                        {
+                            // A/B isolation: both CloseDoc and QuitDoc crashed natively.
+                            // Intentionally keep only command-opened hidden Drawings in memory.
+                            // SOLIDWORKS must be restarted after this <=12 Drawing experiment.
+                            if (openedByCommand && drawingDoc != null &&
+                                !string.IsNullOrWhiteSpace(itemResult.DrawingPath))
+                                RetainedHiddenDrawingPaths.Add(itemResult.DrawingPath);
+                            LogDebug("[STRICT HIDDEN HOLD] row=" + (i + 1) +
+                                " openedByCommand=" + openedByCommand +
+                                " path=" + (itemResult.DrawingPath ?? "") + " close=SKIPPED");
+                        }
+                        else
+                        {
                         // Checkpoint logging: native crashes may occur inside CloseDoc
                         // before any managed catch block or batch summary can run.
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDrawing BEGIN openedByCommand=" + openedByCommand);
@@ -407,10 +459,11 @@ namespace ADDIN.Commands
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive CALL");
                         RestoreBatchActiveDocument(originalTitle);
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive RETURN");
+                        }
                     }
                 }
 
-                if (originalDocument != null && !string.IsNullOrEmpty(originalTitle))
+                if (!strictHiddenBatch && originalDocument != null && !string.IsNullOrEmpty(originalTitle))
                 {
                     try
                     {
@@ -444,7 +497,13 @@ namespace ADDIN.Commands
                     else ExcelDrawingCheckExporter.Export(result);
                 }
 
-                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " + result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning."; if (!silent) ShowBatchSummaryDialog(result);
+                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " +
+                    result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning.";
+                if (strictHiddenBatch)
+                    result.Message += " | TEST STRICT HIDDEN: linked text/chức năng 表/ウラ chưa được " +
+                        "xác minh; Drawing mở bởi batch được giữ trong bộ nhớ. Khởi động lại SOLIDWORKS " +
+                        "sau lần thử này.";
+                if (!silent) ShowBatchSummaryDialog(result);
             }
             catch (Exception ex)
             {
@@ -461,6 +520,9 @@ namespace ADDIN.Commands
             {
                 RestoreBatchActiveDocument(originalTitle);
                 displayScope?.Dispose();
+                if (strictHiddenBatch)
+                    LogDebug("[STRICT HIDDEN END] diagnostic retained command-opened Drawings in memory; restart SOLIDWORKS.");
+                strictHiddenBatch = false;
                 if (progressStarted && !progressFinished)
                 {
                     progressFinished = true;
@@ -533,9 +595,11 @@ namespace ADDIN.Commands
                 return itemResult;
             }
 
-            // Linked drawing tables need an active document window. Opening them
-            // with DocumentVisible(false) leaves $PRPSHEET display evaluation empty.
-            ActivateDrawingForDisplayRead(drawingModel, drawing);
+            // Hide without activating. Linked text will be explicitly marked unverified.
+            if (!strictHiddenBatch)
+                ActivateDrawingForDisplayRead(drawingModel, drawing);
+            else
+                LogDebug("[STRICT HIDDEN READ] ActivateDoc3=SKIPPED");
             Sheet activeSheet = drawing.GetCurrentSheet() as Sheet;
             string sheetName = ResolveCurrentSheetName(drawing, activeSheet);
 
@@ -546,10 +610,10 @@ namespace ADDIN.Commands
             // Read the current displayed Drawing after activation. Forcing a
             // full rebuild here also rebuilds referenced models and can fail on
             // in-context parts with missing assembly references.
-            RefreshDrawingBeforeCheck(
-                drawingModel,
-                drawing,
-                sheetName);
+            if (!strictHiddenBatch)
+                RefreshDrawingBeforeCheck(drawingModel, drawing, sheetName);
+            else
+                LogDebug("[STRICT HIDDEN READ] GraphicsRedraw2=SKIPPED");
 
             // 2. Chỉ quét Notes/Tables nằm TRONG phạm vi khung Sheet hiện tại.
             // Nếu SolidWorks trả tên sheet rỗng/space khi Drawing mở silent,
@@ -597,7 +661,16 @@ namespace ADDIN.Commands
 
             // 表/ウラ applies only to Part drawings. UNIT/Assembly drawings
             // return above without inspecting or reporting the flat view side.
-            AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
+            if (strictHiddenBatch)
+                itemResult.Fields.Add(new DrawingBomFieldResult
+                {
+                    FieldName = "表/ウラ ↔ 展開",
+                    Source = "STRICT_HIDDEN_DIAGNOSTIC",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = "NOT CHECKED: tạm bỏ Working Copy để cô lập lỗi đóng tài liệu native."
+                });
+            else
+                AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
 
             BomNumberValues bomNumbers = GetBomNumberValues(bomRow);
             itemResult.Fields.Add(CompareBomNumbers(bomNumbers));
@@ -5366,36 +5439,40 @@ namespace ADDIN.Commands
 
             int errors = 0;
             int warnings = 0;
-            bool restoreVisibility = false;
-
+            int docType = (int)swDocumentTypes_e.swDocDRAWING;
+            bool visibilityChanged = false;
+            bool restoreTo = true;
             try
             {
-                // A visible document window is required for drawing-side linked
-                // text evaluation. Silent still suppresses opening prompts.
-                swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocDRAWING);
-                restoreVisibility = true;
+                if (strictHiddenBatch)
+                {
+                    restoreTo = swApp.GetDocumentVisible(docType);
+                    swApp.DocumentVisible(false, docType);
+                    visibilityChanged = true;
+                    LogDebug("[STRICT HIDDEN OPEN] visible=false path=" + drawingPath);
+                }
+                else
+                {
+                    swApp.DocumentVisible(true, docType);
+                    visibilityChanged = true;
+                }
 
-                int openOptions = (int)(swOpenDocOptions_e.swOpenDocOptions_Silent | swOpenDocOptions_e.swOpenDocOptions_ReadOnly);
-                ModelDoc2 openedDoc = swApp.OpenDoc6(
-                    drawingPath,
-                    (int)swDocumentTypes_e.swDocDRAWING,
-                    openOptions,
-                    "",
-                    ref errors,
-                    ref warnings) as ModelDoc2;
-
-                openedByCommand = (openedDoc != null);
+                int openOptions = (int)(swOpenDocOptions_e.swOpenDocOptions_Silent |
+                    swOpenDocOptions_e.swOpenDocOptions_ReadOnly);
+                ModelDoc2 openedDoc = swApp.OpenDoc6(drawingPath, docType,
+                    openOptions, "", ref errors, ref warnings) as ModelDoc2;
+                openedByCommand = openedDoc != null;
+                LogDebug("[DRAWING OPEN] hidden=" + strictHiddenBatch +
+                    " success=" + openedByCommand + " errors=" + errors +
+                    " warnings=" + warnings);
                 return openedDoc;
             }
             finally
             {
-                if (restoreVisibility)
+                if (visibilityChanged)
                 {
-                    try
-                    {
-                        swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocDRAWING);
-                    }
-                    catch { }
+                    try { swApp.DocumentVisible(restoreTo, docType); }
+                    catch (Exception ex) { LogDebug("[DRAWING VISIBILITY RESTORE ERROR] " + ex); }
                 }
             }
         }
