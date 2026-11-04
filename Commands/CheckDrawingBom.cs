@@ -6365,8 +6365,8 @@ namespace ADDIN.Commands
                 LogDebug("[GOBAN TABLE EXPORT PROBE] success=True table=" +
                     info.Index + " bytes=" + fi.Length +
                     " formulaPresent=" +
-                    exportedText.IndexOf("$PRPSHEET",
-                        StringComparison.OrdinalIgnoreCase) >= 0 +
+                    (exportedText.IndexOf("$PRPSHEET",
+                        StringComparison.OrdinalIgnoreCase) >= 0) +
                     " preview=\"" + normalized + "\"");
                 LogDebug("[GOBAN TABLE EXPORT PROBE] status=DIAGNOSTIC_ONLY " +
                     "neverPromoteExportToDrawing=True");
