@@ -166,6 +166,9 @@ namespace ADDIN.Commands
         private readonly DataGridView bomGrid;
         // Diagnostic-only switch: strictly hidden Drawing API, not the native UI hook.
         private bool strictHiddenBatch;
+        // Probe at most one linked-Goban Drawing table export per batch.
+        // Result is diagnostic evidence only, never a BOM comparison source.
+        private bool gobanTableExportProbeDone;
         private const int MaxHiddenDiagnosticDrawings = 12;
         // One bounded experiment per SOLIDWORKS process. Re-running without
         // restarting could accumulate hidden native models indefinitely.
@@ -282,6 +285,7 @@ namespace ADDIN.Commands
                     return result;
                 }
                 strictHiddenBatch = silent;
+                gobanTableExportProbeDone = false;
 
                 ModelDoc2 originalDocument = swApp.ActiveDoc as ModelDoc2;
                 originalTitle = originalDocument != null ? originalDocument.GetTitle() : "";
@@ -6283,11 +6287,103 @@ namespace ADDIN.Commands
                         $"anchorX={tableX:F6} anchorY={tableY:F6}");
                 }
 
+                if (strictHiddenBatch)
+                    ProbeExportedGobanTableText(table, tableInfo);
+
                 return tableInfo;
             }
             catch
             {
                 return null;
+            }
+        }
+
+        // A/B diagnostic ONLY. Save the Drawing's *own* table to a temporary
+        // text file to check whether SOLIDWORKS exposes its rendered cell text
+        // through a second API while the Drawing is invisible. This does not
+        // read custom properties and NEVER sets a value or status.
+        private void ProbeExportedGobanTableText(
+            ITableAnnotation table, TableDiagnosticInfo info)
+        {
+            if (gobanTableExportProbeDone || table == null || info == null)
+                return;
+
+            bool hasUnresolvedGobanCell = false;
+            foreach (TableCellDiagnosticInfo label in info.Cells)
+            {
+                if (label == null ||
+                    !string.Equals(CleanTableCellText(label.DisplayedText),
+                        "合番", StringComparison.Ordinal))
+                    continue;
+                TableCellDiagnosticInfo value =
+                    FindTableCell(info, label.Row, label.Column + 1);
+                if (value == null || !string.IsNullOrWhiteSpace(value.DisplayedText))
+                    continue;
+                string raw = value.RawText ?? "";
+                if (Regex.IsMatch(raw,
+                    @"^\s*\$PRPSHEET\s*:\s*[""“”]?合番[""“”]?\s*$",
+                    RegexOptions.IgnoreCase))
+                {
+                    hasUnresolvedGobanCell = true;
+                    break;
+                }
+            }
+            if (!hasUnresolvedGobanCell)
+                return;
+
+            // Exactly one table probe, even if the COM export fails. The probe
+            // is intentionally not invoked for every Drawing in a 12-row batch.
+            gobanTableExportProbeDone = true;
+            string tempFile = Path.Combine(Path.GetTempPath(),
+                "TAI_GOBAN_TABLE_PROBE_" + Guid.NewGuid().ToString("N") + ".txt");
+            try
+            {
+                bool exported = table.SaveAsText2(tempFile, "\t", false);
+                if (!exported || !File.Exists(tempFile))
+                {
+                    LogDebug("[GOBAN TABLE EXPORT PROBE] success=False fileCreated=" +
+                        File.Exists(tempFile));
+                    return;
+                }
+
+                // Limit log content and read effort; Japanese Windows commonly
+                // writes Shift-JIS. Detect BOM when present.
+                FileInfo fi = new FileInfo(tempFile);
+                if (fi.Length > 1024 * 1024)
+                {
+                    LogDebug("[GOBAN TABLE EXPORT PROBE] skipped=TOO_LARGE");
+                    return;
+                }
+                string exportedText;
+                using (var reader = new StreamReader(tempFile,
+                    Encoding.GetEncoding(932), true))
+                    exportedText = reader.ReadToEnd();
+                string normalized = exportedText.Replace("\r", "\\r")
+                    .Replace("\n", "\\n").Replace("\t", " | ");
+                if (normalized.Length > 400)
+                    normalized = normalized.Substring(0, 400) + "...";
+                LogDebug("[GOBAN TABLE EXPORT PROBE] success=True table=" +
+                    info.Index + " bytes=" + fi.Length +
+                    " formulaPresent=" +
+                    (exportedText.IndexOf("$PRPSHEET",
+                        StringComparison.OrdinalIgnoreCase) >= 0) +
+                    " preview=\"" + normalized + "\"");
+                LogDebug("[GOBAN TABLE EXPORT PROBE] status=DIAGNOSTIC_ONLY " +
+                    "neverPromoteExportToDrawing=True");
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[GOBAN TABLE EXPORT PROBE] ERROR " +
+                    ex.GetType().Name + " " + ex.Message);
+            }
+            finally
+            {
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); }
+                catch (Exception ex)
+                {
+                    LogDebug("[GOBAN TABLE EXPORT PROBE] TEMP_DELETE_FAILED " +
+                        ex.GetType().Name);
+                }
             }
         }
 
