@@ -248,6 +248,9 @@ namespace ADDIN.Commands
                 LogDebug("==================================================");
                 LogDebug("START CHECK DRAWING BOM — PRECISE MULTI-BLOCK BATCH");
                 LogDebug("==================================================");
+#if DEBUG
+                RunGobanLinkSelfTests();
+#endif
 
                 if (swApp == null)
                 {
@@ -384,6 +387,20 @@ namespace ADDIN.Commands
                             result.ProcessedCount++;
                             continue;
                         }
+
+                        // A/B source: existing document reuse versus newly hidden
+                        // OpenDoc6. Never claim an existing document is visible
+                        // solely because it was already open.
+                        string actualOpenPath = "";
+                        try { actualOpenPath = drawingDoc.GetPathName() ?? ""; } catch { }
+                        LogDebug("[GOBAN AB OPEN] row=" + (i + 1) +
+                            " source=" + (openedByCommand
+                                ? (strictHiddenBatch ? "NEW_HIDDEN" : "NEW_COMMAND_OPEN")
+                                : "REUSED_EXISTING") +
+                            " process=" + Process.GetCurrentProcess().Id +
+                            " target=\"" + drawingPath + "\"" +
+                            " actual=\"" + actualOpenPath + "\"" +
+                            " exactPath=" + PathsEqualSafe(drawingPath, actualOpenPath));
 
                         itemResult = CheckOneDrawing(drawingDoc, row, drawingPath, resolvedPartPath);
                         if (strictHiddenBatch)
@@ -648,6 +665,10 @@ namespace ADDIN.Commands
 
             List<TableDiagnosticInfo> tables =
                 ScanCurrentSheetTables(drawing, sheetName, drawingModel, frameBounds);
+
+            // Read-only A/B evidence from the SAME Drawing table that the
+            // comparer uses. No property-model fallback, activation or rebuild.
+            LogGobanAbDisplayProbe(drawingModel, tables);
 
             // 3. Trích xuất toàn bộ giá trị Displayed Text từ khung tên
             DrawingDisplayedData drawingData = ExtractAllTitleBlockValues(notes, tables, drawingModel);
@@ -1736,13 +1757,8 @@ namespace ADDIN.Commands
 
             data.GobanLinkRawExpression = value.RawText ?? "";
             const string expected = "$PRPSHEET:\"合番\"";
-            bool valid = Regex.IsMatch(
-                data.GobanLinkRawExpression,
-                @"^\s*\$PRPSHEET\s*:\s*[""“”]合番[""“”]\s*$",
-                RegexOptions.IgnoreCase);
-            data.GobanLinkAuditState = valid
-                ? DrawingGobanLinkAuditState.Valid
-                : DrawingGobanLinkAuditState.Invalid;
+            data.GobanLinkAuditState = EvaluateGobanLink(
+                data.GobanLinkRawExpression, value.RawTextReadSucceeded);
 
             LogDebug("[GOBAN LINK AUDIT] status=" +
                 data.GobanLinkAuditState + " table=" + target.Index +
@@ -1751,7 +1767,8 @@ namespace ADDIN.Commands
         }
 
         private static void ApplyGobanTemplateLinkAudit(
-            DrawingBomFieldResult result, DrawingDisplayedData data)
+            DrawingBomFieldResult result, DrawingDisplayedData data,
+            bool emitDiagnosticLog = true)
         {
             if (result == null || data == null) return;
             if (data.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid)
@@ -1763,8 +1780,9 @@ namespace ADDIN.Commands
                     "Ô 合番 mất/sai liên kết bắt buộc $PRPSHEET:\"合番\". Raw=\"" +
                     data.GobanLinkRawExpression + "\". " +
                     "Giá trị hiển thị trùng BOM cũng không được coi là OK.";
-                LogDebug("[GOBAN LINK NG] table=" + data.GobanLinkTableIndex +
-                    " raw=\"" + data.GobanLinkRawExpression + "\"");
+                if (emitDiagnosticLog)
+                    LogDebug("[GOBAN LINK NG] table=" + data.GobanLinkTableIndex +
+                        " raw=\"" + data.GobanLinkRawExpression + "\"");
             }
             else if (data.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable ||
                      data.GobanLinkAuditState == DrawingGobanLinkAuditState.Ambiguous)
@@ -1777,6 +1795,113 @@ namespace ADDIN.Commands
                     data.GobanLinkAuditState + ").";
                 if (result.Status != DrawingBomCheckStatus.NG)
                     result.Source = "DRAWING_GOBAN_LINK_UNVERIFIED";
+            }
+        }
+
+        // Pure link validation: the fixed Drawing value and the linked Drawing
+        // value may look identical, but only the expression retains template
+        // integrity. An API failure must not be reported as a broken link.
+        private static DrawingGobanLinkAuditState EvaluateGobanLink(
+            string raw, bool rawApiSucceeded)
+        {
+            if (!rawApiSucceeded) return DrawingGobanLinkAuditState.Unavailable;
+            return Regex.IsMatch(raw ?? "",
+                    @"^\s*\$PRPSHEET\s*:\s*[""“”]合番[""“”]\s*$",
+                    RegexOptions.IgnoreCase)
+                ? DrawingGobanLinkAuditState.Valid
+                : DrawingGobanLinkAuditState.Invalid;
+        }
+
+#if DEBUG
+        // No SOLIDWORKS document, user file, BOM grid, or COM object is touched.
+        // This is a regression guard for the exact scenario requested by user.
+        private static void RunGobanLinkSelfTests()
+        {
+            CheckGobanSyntheticCase("LINKED_VALUE_MATCHES_BOM",
+                "$PRPSHEET:\"合番\"", true, "※単品搬入", "※単品搬入",
+                DrawingGobanLinkAuditState.Valid, DrawingBomCheckStatus.OK);
+            CheckGobanSyntheticCase("HARDCODE_VALUE_MATCHES_BOM",
+                "※単品搬入", true, "※単品搬入", "※単品搬入",
+                DrawingGobanLinkAuditState.Invalid, DrawingBomCheckStatus.NG);
+            CheckGobanSyntheticCase("WRONG_PROPERTY_LINK",
+                "$PRPSHEET:\"材質\"", true, "※単品搬入", "※単品搬入",
+                DrawingGobanLinkAuditState.Invalid, DrawingBomCheckStatus.NG);
+            CheckGobanSyntheticCase("MISSING_DISPLAY",
+                "$PRPSHEET:\"合番\"", true, "", "※単品搬入",
+                DrawingGobanLinkAuditState.Valid, DrawingBomCheckStatus.Warning);
+            CheckGobanSyntheticCase("RAW_API_ERROR",
+                "", false, "※単品搬入", "※単品搬入",
+                DrawingGobanLinkAuditState.Unavailable, DrawingBomCheckStatus.Warning);
+            LogDebug("[GOBAN LINK SELFTEST] ALL_PASS count=5 source=SYNTHETIC_ONLY");
+        }
+
+        private static void CheckGobanSyntheticCase(
+            string name, string raw, bool rawReadSucceeded,
+            string drawingValue, string bomValue,
+            DrawingGobanLinkAuditState expectedLink,
+            DrawingBomCheckStatus expectedStatus)
+        {
+            var data = new DrawingDisplayedData
+            {
+                GobanLinkAuditState = EvaluateGobanLink(raw, rawReadSucceeded),
+                GobanLinkRawExpression = raw
+            };
+            DrawingBomFieldResult field = CompareGobanField(drawingValue, bomValue);
+            ApplyGobanTemplateLinkAudit(field, data, false);
+            if (data.GobanLinkAuditState != expectedLink ||
+                field.Status != expectedStatus)
+            {
+                throw new InvalidOperationException(
+                    "[GOBAN LINK SELFTEST] FAIL case=" + name +
+                    " link=" + data.GobanLinkAuditState +
+                    " status=" + field.Status);
+            }
+            LogDebug("[GOBAN LINK SELFTEST] PASS case=" + name +
+                " link=" + data.GobanLinkAuditState +
+                " status=" + field.Status);
+        }
+#endif
+
+        private static bool PathsEqualSafe(string first, string second)
+        {
+            try
+            {
+                return !string.IsNullOrWhiteSpace(first) &&
+                    !string.IsNullOrWhiteSpace(second) &&
+                    string.Equals(Path.GetFullPath(first), Path.GetFullPath(second),
+                        StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private void LogGobanAbDisplayProbe(
+            ModelDoc2 drawingModel, List<TableDiagnosticInfo> tables)
+        {
+            if (tables == null) return;
+            string currentDrawingPath = "";
+            try { currentDrawingPath = drawingModel.GetPathName() ?? ""; }
+            catch { }
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.RowCount != 1 || table.ColumnCount != 2)
+                    continue;
+                TableCellDiagnosticInfo label = FindTableCell(table, 0, 0);
+                TableCellDiagnosticInfo value = FindTableCell(table, 0, 1);
+                if (label == null || value == null ||
+                    !string.Equals(CleanTableCellText(label.DisplayedText),
+                        "合番", StringComparison.Ordinal))
+                    continue;
+                LogDebug("[GOBAN AB DISPLAY] mode=" +
+                    (strictHiddenBatch ? "STRICT_HIDDEN_BATCH" : "NORMAL_BATCH") +
+                    " process=" + Process.GetCurrentProcess().Id +
+                    " drawing=\"" + currentDrawingPath + "\"" +
+                    " table=" + table.Index +
+                    " rawRead=" + value.RawTextReadSucceeded +
+                    " raw=\"" + (value.RawText ?? "") + "\"" +
+                    " display2=\"" + (value.ApiDisplayedText ?? "") + "\"" +
+                    " display2Hidden=\"" + (value.ApiDisplayedTextWithHidden ?? "") + "\"" +
+                    " selected=\"" + (value.DisplayedText ?? "") + "\"" +
+                    " source=" + (value.ValueSource ?? ""));
             }
         }
 
