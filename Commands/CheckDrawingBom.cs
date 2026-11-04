@@ -5516,6 +5516,100 @@ namespace ADDIN.Commands
             }
         }
 
+        // Diagnostic: enumerate open documents in the same SOLIDWORKS
+        // process. Never reuse a same-named Drawing from a different folder.
+        // Never activate or close a user-owned document.
+        private ModelDoc2 FindOpenDrawingByExactPath(string expectedDrawingPath)
+        {
+            if (swApp == null || string.IsNullOrWhiteSpace(expectedDrawingPath))
+                return null;
+
+            string expected;
+            try { expected = Path.GetFullPath(expectedDrawingPath); }
+            catch (Exception ex)
+            {
+                LogDebug("[DRAWING OPEN DOC SCAN] invalid expected path " +
+                    ex.GetType().Name);
+                return null;
+            }
+
+            try
+            {
+                ModelDoc2 direct = swApp.GetOpenDocumentByName(expected) as ModelDoc2;
+                if (direct != null)
+                {
+                    string directPath = direct.GetPathName() ?? "";
+                    string fullDirect = "";
+                    try { fullDirect = Path.GetFullPath(directPath); } catch { }
+                    if (string.Equals(expected, fullDirect,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        LogDebug("[DRAWING OPEN DOC SCAN] direct=EXACT_MATCH " +
+                            "path=" + fullDirect);
+                        return direct;
+                    }
+                    LogDebug("[DRAWING OPEN DOC SCAN] direct=PATH_MISMATCH " +
+                        "path=" + directPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[DRAWING OPEN DOC SCAN] direct=ERROR " +
+                    ex.GetType().Name + " " + ex.Message);
+            }
+
+            int scanned = 0, sameNameDifferentPath = 0;
+            ModelDoc2 exact = null;
+            try
+            {
+                object openDocs = swApp.GetDocuments();
+                Array docs = openDocs as Array;
+                if (docs != null)
+                {
+                    foreach (object entry in docs)
+                    {
+                        ModelDoc2 doc = entry as ModelDoc2;
+                        if (doc == null) continue;
+                        string candidatePath = "";
+                        try { candidatePath = doc.GetPathName() ?? ""; }
+                        catch { continue; }
+                        scanned++;
+                        if (string.IsNullOrWhiteSpace(candidatePath)) continue;
+                        string fullPath;
+                        try { fullPath = Path.GetFullPath(candidatePath); }
+                        catch { continue; }
+
+                        if (string.Equals(fullPath, expected,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            exact = doc;
+                            break;
+                        }
+                        if (string.Equals(Path.GetFileName(fullPath),
+                                Path.GetFileName(expected),
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            sameNameDifferentPath++;
+                            LogDebug("[DRAWING OPEN DOC SCAN] SAME_NAME_DIFFERENT_PATH " +
+                                "target=" + expected + " open=" + fullPath);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[DRAWING OPEN DOC SCAN] enumeration=ERROR " +
+                    ex.GetType().Name + " " + ex.Message);
+            }
+
+            LogDebug("[DRAWING OPEN DOC SCAN] process=" +
+                Process.GetCurrentProcess().Id + " scanned=" + scanned +
+                " exactMatch=" + (exact != null) +
+                " sameNameOtherPath=" + sameNameDifferentPath +
+                " target=" + expected);
+            return exact;
+        }
+
         private ModelDoc2 OpenDrawingDocumentSilent(string drawingPath, out bool openedByCommand)
         {
             openedByCommand = false;
@@ -5523,9 +5617,18 @@ namespace ADDIN.Commands
             if (string.IsNullOrWhiteSpace(drawingPath) || !File.Exists(drawingPath))
                 return null;
 
-            ModelDoc2 openDoc = swApp.GetOpenDocumentByName(drawingPath) as ModelDoc2;
+            // GetOpenDocumentByName can return null for a document that the
+            // user believes is already open (different folder, session, etc.).
+            // Verify full path and enumerate THIS ISldWorks session before
+            // concluding the Drawing must be opened invisibly.
+            ModelDoc2 openDoc = FindOpenDrawingByExactPath(drawingPath);
             if (openDoc != null)
+            {
+                LogDebug("[DRAWING REUSE] path=" + drawingPath +
+                    " openedByCommand=False (user-owned document preserved)");
                 return openDoc;
+            }
+            LogDebug("[DRAWING REUSE] exact match unavailable; hidden OpenDoc6 required");
 
             int errors = 0;
             int warnings = 0;
