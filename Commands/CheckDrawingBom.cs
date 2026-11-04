@@ -19,6 +19,16 @@ namespace ADDIN.Commands
         Warning
     }
 
+    // Link integrity must be checked independently of displayed values.
+    internal enum DrawingGobanLinkAuditState
+    {
+        NotApplicable,
+        Valid,
+        Invalid,
+        Unavailable,
+        Ambiguous
+    }
+
     internal sealed class DrawingValueLocation
     {
         public double X { get; set; }
@@ -54,6 +64,10 @@ namespace ADDIN.Commands
         // True only if Drawing itself contains an unresolved display link in
         // the 合番 value cell. This is not a real empty user-entered string.
         public bool GobanDisplayUnavailable { get; set; }
+        public DrawingGobanLinkAuditState GobanLinkAuditState { get; set; } =
+            DrawingGobanLinkAuditState.NotApplicable;
+        public string GobanLinkRawExpression { get; set; } = "";
+        public int GobanLinkTableIndex { get; set; } = -1;
 
         // Cụm góc dưới bên trái (Tên file & DXF)
         public string PartFileName { get; set; } = "";
@@ -379,7 +393,11 @@ namespace ADDIN.Commands
                             // fake table row to the user's comparison details.
                             LogDebug("[STRICT HIDDEN LINK VALIDATION] row=" + (i + 1) +
                                 " linked title-block values are not independently verified");
-                            itemResult.Status = DrawingBomCheckStatus.Warning;
+                            // Never overwrite a proven NG with diagnostic Warning.
+                            if (itemResult.Status == DrawingBomCheckStatus.OK)
+                                itemResult.Status = DrawingBomCheckStatus.Warning;
+                            LogDebug("[STRICT HIDDEN STATUS] row=" + (i + 1) +
+                                " result=" + itemResult.Status + " NG_PRESERVED=True");
                             itemResult.Note = (itemResult.Note ?? "") +
                                 " | HIDDEN_PROBE: linked text not independently verified.";
                         }
@@ -663,6 +681,9 @@ namespace ADDIN.Commands
                     bomQuantity);
             }
 
+            // Part Drawing template audit uses RAW table text only, not BOM/Part.
+            AuditCompactGobanTemplateLink(drawingData, tables);
+
             // 表/ウラ applies only to Part drawings. UNIT/Assembly drawings
             // return above without inspecting or reporting the flat view side.
             if (strictHiddenBatch)
@@ -775,6 +796,8 @@ namespace ADDIN.Commands
                     "đều không trả về chữ thực tế khi bản vẽ đang ẩn. " +
                     "Không sử dụng $PRPSHEET hoặc Custom Property làm giá trị Drawing.";
             }
+            // A hard-coded Drawing cell may equal BOM but must still be NG.
+            ApplyGobanTemplateLinkAudit(gobanComparison, drawingData);
             itemResult.Fields.Add(gobanComparison);
             itemResult.Fields.Add(CompareFileNameField(drawingData.PartFileName, componentName));
             itemResult.Fields.Add(CompareDxfField(drawingData.DxfFileName, expectedDxf));
@@ -1664,6 +1687,96 @@ namespace ADDIN.Commands
                         "\" rawExpressionPresent=True modelFallback=DISABLED");
                     return;
                 }
+            }
+        }
+
+        // Protect the compact, linked title-block template: exactly
+        // one row and two cells [合番 | $PRPSHEET:"合番"].
+        // Do NOT impose this rule on multi-row 合番/数量 layouts.
+        private static void AuditCompactGobanTemplateLink(
+            DrawingDisplayedData data, List<TableDiagnosticInfo> tables)
+        {
+            if (data == null || tables == null) return;
+            List<TableDiagnosticInfo> matches = new List<TableDiagnosticInfo>();
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.RowCount != 1 || table.ColumnCount != 2)
+                    continue;
+                TableCellDiagnosticInfo label = FindTableCell(table, 0, 0);
+                if (label != null &&
+                    string.Equals(CleanTableCellText(label.DisplayedText),
+                        "合番", StringComparison.Ordinal))
+                    matches.Add(table);
+            }
+
+            if (matches.Count == 0)
+            {
+                LogDebug("[GOBAN LINK AUDIT] status=NOT_APPLICABLE " +
+                    "reason=NO_COMPACT_1X2_GOBAN_TEMPLATE");
+                return;
+            }
+            if (matches.Count != 1)
+            {
+                data.GobanLinkAuditState = DrawingGobanLinkAuditState.Ambiguous;
+                LogDebug("[GOBAN LINK AUDIT] status=AMBIGUOUS " +
+                    "reason=MULTIPLE_COMPACT_GOBAN_TABLES count=" + matches.Count);
+                return;
+            }
+
+            TableDiagnosticInfo target = matches[0];
+            data.GobanLinkTableIndex = target.Index;
+            TableCellDiagnosticInfo value = FindTableCell(target, 0, 1);
+            if (value == null || !value.RawTextReadSucceeded)
+            {
+                data.GobanLinkAuditState = DrawingGobanLinkAuditState.Unavailable;
+                LogDebug("[GOBAN LINK AUDIT] status=UNAVAILABLE table=" +
+                    target.Index + " reason=RAW_CELL_API_UNAVAILABLE");
+                return;
+            }
+
+            data.GobanLinkRawExpression = value.RawText ?? "";
+            const string expected = "$PRPSHEET:\"合番\"";
+            bool valid = Regex.IsMatch(
+                data.GobanLinkRawExpression,
+                @"^\s*\$PRPSHEET\s*:\s*[""“”]合番[""“”]\s*$",
+                RegexOptions.IgnoreCase);
+            data.GobanLinkAuditState = valid
+                ? DrawingGobanLinkAuditState.Valid
+                : DrawingGobanLinkAuditState.Invalid;
+
+            LogDebug("[GOBAN LINK AUDIT] status=" +
+                data.GobanLinkAuditState + " table=" + target.Index +
+                " raw=\"" + data.GobanLinkRawExpression + "\" expected=\"" +
+                expected + "\" displayed=\"" + (value.DisplayedText ?? "") + "\"");
+        }
+
+        private static void ApplyGobanTemplateLinkAudit(
+            DrawingBomFieldResult result, DrawingDisplayedData data)
+        {
+            if (result == null || data == null) return;
+            if (data.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid)
+            {
+                // A lost/wrong formula is NG even if the displayed text equals BOM.
+                result.Status = DrawingBomCheckStatus.NG;
+                result.Source = "DRAWING_GOBAN_LINK_INVALID";
+                result.Message =
+                    "Ô 合番 mất/sai liên kết bắt buộc $PRPSHEET:\"合番\". Raw=\"" +
+                    data.GobanLinkRawExpression + "\". " +
+                    "Giá trị hiển thị trùng BOM cũng không được coi là OK.";
+                LogDebug("[GOBAN LINK NG] table=" + data.GobanLinkTableIndex +
+                    " raw=\"" + data.GobanLinkRawExpression + "\"");
+            }
+            else if (data.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable ||
+                     data.GobanLinkAuditState == DrawingGobanLinkAuditState.Ambiguous)
+            {
+                // Missing COM evidence cannot be equated with a broken link.
+                if (result.Status == DrawingBomCheckStatus.OK)
+                    result.Status = DrawingBomCheckStatus.Warning;
+                result.Message = (result.Message ?? "") +
+                    " | Chưa xác minh được link ô 合番 (" +
+                    data.GobanLinkAuditState + ").";
+                if (result.Status != DrawingBomCheckStatus.NG)
+                    result.Source = "DRAWING_GOBAN_LINK_UNVERIFIED";
             }
         }
 
@@ -6340,9 +6453,10 @@ namespace ADDIN.Commands
                         string apiDisplayedText = "";
                         string apiDisplayedTextWithHidden = "";
                         string rawText = "";
+                        bool rawReadSucceeded = false;
                         try { apiDisplayedText = table.get_DisplayedText2(r, c, false) ?? ""; } catch { }
                         try { apiDisplayedTextWithHidden = table.get_DisplayedText2(r, c, true) ?? ""; } catch { }
-                        try { rawText = table.get_Text(r, c) ?? ""; } catch { }
+                        try { rawText = table.get_Text(r, c) ?? ""; rawReadSucceeded = true; } catch { }
 
                         string valueSource;
                         string displayText = SelectDrawingTableText(
@@ -6375,6 +6489,7 @@ namespace ADDIN.Commands
                             ApiDisplayedText = apiDisplayedText,
                             ApiDisplayedTextWithHidden = apiDisplayedTextWithHidden,
                             RawText = rawText,
+                            RawTextReadSucceeded = rawReadSucceeded,
                             ValueSource = valueSource,
                             X = cellX,
                             Y = cellY
@@ -8069,6 +8184,7 @@ namespace ADDIN.Commands
             public string ApiDisplayedText { get; set; }
             public string ApiDisplayedTextWithHidden { get; set; }
             public string RawText { get; set; }
+            public bool RawTextReadSucceeded { get; set; }
             public string ValueSource { get; set; }
 
             public double X { get; set; }
