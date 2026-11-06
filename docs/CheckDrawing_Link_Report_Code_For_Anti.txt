@@ -1,0 +1,384 @@
+CHECK DRAWING — PROPERTY LINK REPORT IMPLEMENTATION
+Target baseline: PR #56 (commit 014fae5161fa), which already includes PR #55.
+Only apply to the CURRENT LOCAL FILES by inserting snippets; NEVER overwrite files with full GitHub copies.
+
+A) Commands/CheckDrawingBom.cs — INSERT AFTER internal sealed class DrawingBomFieldResult (at namespace level)
+--------------------------------------------------------------------------------
+internal sealed class DrawingPropertyLinkReportRow
+{
+    public string FieldName { get; set; } = "";
+    public string DrawingRaw { get; set; } = "";
+    public string PropertyValue { get; set; } = "";
+    public string BomValue { get; set; } = "";
+    public DrawingBomCheckStatus LinkStatus { get; set; } = DrawingBomCheckStatus.Warning;
+    public DrawingBomCheckStatus PropertyStatus { get; set; } = DrawingBomCheckStatus.Warning;
+    public DrawingBomCheckStatus DisplayStatus { get; set; } = DrawingBomCheckStatus.Warning;
+    public string Note { get; set; } = "";
+}
+
+B) Commands/CheckDrawingBom.cs — ADD PROPERTY INSIDE DrawingCheckItemResult
+--------------------------------------------------------------------------------
+public List<DrawingPropertyLinkReportRow> PropertyLinkRows { get; } =
+    new List<DrawingPropertyLinkReportRow>();
+
+C) Commands/CheckDrawingBom.cs — IN CheckOneDrawing, IMMEDIATELY AFTER:
+    ApplyGobanTemplateLinkAudit(gobanComparison, drawingData);
+    itemResult.Fields.Add(gobanComparison);
+  INSERT:
+--------------------------------------------------------------------------------
+// Reporting-only: never replace Drawing displayed text with Model/BOM data.
+AddGobanPropertyLinkReportRow(
+    itemResult, drawingData, gobanComparison, bomRow, referencedModel,
+    referencedConfiguration, sheetName, drawing, activeSheet);
+
+D) Commands/CheckDrawingBom.cs — INSERT METHODS INSIDE class CheckDrawingBom
+   (for example before EvaluateGobanLink).
+--------------------------------------------------------------------------------
+private static void AddGobanPropertyLinkReportRow(
+    DrawingCheckItemResult item,
+    DrawingDisplayedData drawingData,
+    DrawingBomFieldResult comparison,
+    DataGridViewRow bomRow,
+    ModelDoc2 referencedModel,
+    string referencedConfiguration,
+    string sheetName,
+    DrawingDoc drawing,
+    Sheet sheet)
+{
+    if (item == null || drawingData == null ||
+        drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.NotApplicable)
+        return;
+
+    var row = new DrawingPropertyLinkReportRow
+    {
+        FieldName = "合番",
+        DrawingRaw = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable
+            ? "(Không đọc được Raw Text)" : (drawingData.GobanLinkRawExpression ?? ""),
+        LinkStatus = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Valid
+            ? DrawingBomCheckStatus.OK
+            : drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid
+                ? DrawingBomCheckStatus.NG
+                : DrawingBomCheckStatus.Warning
+    };
+    var reasons = new List<string>();
+    if (row.LinkStatus == DrawingBomCheckStatus.NG)
+        reasons.Add("Mất hoặc sai công thức bắt buộc $PRPSHEET:\"合番\".");
+    else if (row.LinkStatus == DrawingBomCheckStatus.Warning)
+        reasons.Add("Không xác minh được raw link hoặc có nhiều bảng phù hợp.");
+
+    string bomDirect;
+    bool hasBomValue = TryReadBomGobanColumn(bomRow, out bomDirect);
+    row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番)";
+
+    string propValue;
+    string propSource;
+    bool gotProperty = TryGetVerifiedSheetGobanProperty(
+        drawing, sheet, sheetName, referencedModel, referencedConfiguration,
+        item.PartPath, out propValue, out propSource);
+    row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh Property)";
+
+    // Property↔BOM can be OK only if BOTH independent sources were read.
+    // ReadBomAndComponentProperties() falls back to Model property, so NEVER
+    // use its bomGoban variable as independent BOM evidence here.
+    if (gotProperty && hasBomValue && !string.IsNullOrWhiteSpace(bomDirect))
+    {
+        row.PropertyStatus = string.Equals(
+            NormalizeText(propValue), NormalizeText(bomDirect),
+            StringComparison.OrdinalIgnoreCase)
+            ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+        if (row.PropertyStatus == DrawingBomCheckStatus.NG)
+            reasons.Add("Giá trị Property khác BOM.");
+    }
+    else
+    {
+        row.PropertyStatus = DrawingBomCheckStatus.Warning;
+        reasons.Add(!gotProperty
+            ? "Chưa xác nhận được Property từ đúng model/config của Sheet: " + propSource
+            : "Thiếu dữ liệu 合番 độc lập trong BOM.");
+    }
+
+    string actualDisplayed = drawingData.Goban ?? "";
+    if (drawingData.GobanDisplayUnavailable ||
+        string.IsNullOrWhiteSpace(actualDisplayed) || !gotProperty)
+    {
+        row.DisplayStatus = DrawingBomCheckStatus.Warning;
+        reasons.Add("Chưa đối chiếu được chữ hiển thị thực tế trên Drawing.");
+    }
+    else
+    {
+        row.DisplayStatus = string.Equals(
+            NormalizeText(actualDisplayed), NormalizeText(propValue),
+            StringComparison.OrdinalIgnoreCase)
+            ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+        if (row.DisplayStatus == DrawingBomCheckStatus.NG)
+            reasons.Add("Chữ hiển thị Drawing khác Property.");
+    }
+
+    // A verified mismatch must also affect the existing field result, not
+    // merely the new presentation tab. Existing NG is never downgraded.
+    if (comparison != null &&
+        (row.PropertyStatus == DrawingBomCheckStatus.NG ||
+         row.DisplayStatus == DrawingBomCheckStatus.NG))
+    {
+        comparison.Status = DrawingBomCheckStatus.NG;
+        comparison.Message = (comparison.Message ?? "") +
+            " | Property/BOM/DisplayedValue mismatch confirmed.";
+    }
+    row.Note = string.Join(" | ", reasons);
+    item.PropertyLinkRows.Add(row);
+    LogDebug("[GOBAN REPORT ROW] link=" + row.LinkStatus +
+        " property=" + row.PropertyStatus + " display=" + row.DisplayStatus +
+        " source=" + propSource + " raw=\"" + row.DrawingRaw + "\"");
+}
+
+private static bool TryReadBomGobanColumn(DataGridViewRow row, out string value)
+{
+    value = "";
+    if (row == null || row.DataGridView == null) return false;
+    for (int c = 0; c < row.DataGridView.Columns.Count; c++)
+    {
+        if (!string.Equals(NormalizeText(row.DataGridView.Columns[c].HeaderText),
+            "合番", StringComparison.Ordinal)) continue;
+        value = Convert.ToString(row.Cells[c].Value ?? "").Trim();
+        return true;
+    }
+    return false;
+}
+
+private static bool TryGetVerifiedSheetGobanProperty(
+    DrawingDoc drawing,
+    Sheet sheet,
+    string sheetName,
+    ModelDoc2 fallbackModel,
+    string fallbackConfiguration,
+    string expectedPartPath,
+    out string value,
+    out string source)
+{
+    value = "";
+    source = "SHEET_SOURCE_UNVERIFIED";
+    if (drawing == null || sheet == null) return false;
+
+    // Sheet.CustomPropertyView must point to the actual property-source view.
+    // Do not guess the source by taking the first Drawing View or BOM model.
+    string propertyView = "";
+    try { propertyView = sheet.CustomPropertyView ?? ""; }
+    catch { source = "CUSTOM_PROPERTY_VIEW_API_ERROR"; return false; }
+
+    if (string.IsNullOrWhiteSpace(propertyView))
+    {
+        source = "CUSTOM_PROPERTY_VIEW_UNSPECIFIED";
+        return false; // conservative: no false Property OK
+    }
+
+    SolidWorks.Interop.sldworks.View targetView = null;
+    try
+    {
+        SolidWorks.Interop.sldworks.View view = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+        while (view != null)
+        {
+            string name = "";
+            try { name = view.GetName2() ?? ""; } catch { }
+            if (string.Equals(name, propertyView, StringComparison.OrdinalIgnoreCase))
+            {
+                targetView = view;
+                break;
+            }
+            view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
+        }
+    }
+    catch { source = "PROPERTY_VIEW_LOOKUP_ERROR"; return false; }
+    if (targetView == null)
+    {
+        source = "PROPERTY_VIEW_NOT_FOUND";
+        return false;
+    }
+
+    ModelDoc2 model = null;
+    try { model = targetView.ReferencedDocument as ModelDoc2; }
+    catch { source = "REFERENCED_MODEL_API_ERROR"; return false; }
+    if (model == null)
+    {
+        source = "REFERENCED_MODEL_NOT_LOADED";
+        return false;
+    }
+    string modelPath = "";
+    try { modelPath = model.GetPathName() ?? ""; }
+    catch { source = "MODEL_PATH_API_ERROR"; return false; }
+    if (!string.IsNullOrWhiteSpace(expectedPartPath) &&
+        !PathsEqualSafe(modelPath, expectedPartPath))
+    {
+        source = "PROPERTY_SOURCE_MODEL_MISMATCH";
+        return false;
+    }
+
+    string configuration = "";
+    try { configuration = targetView.ReferencedConfiguration ?? ""; }
+    catch { source = "VIEW_CONFIGURATION_API_ERROR"; return false; }
+    if (string.IsNullOrWhiteSpace(configuration))
+    {
+        source = "VIEW_CONFIGURATION_UNKNOWN";
+        return false;
+    }
+
+    string[] scopes = new[] { configuration, "" };
+    foreach (string scope in scopes)
+    {
+        try
+        {
+            CustomPropertyManager mgr = model.Extension.get_CustomPropertyManager(scope);
+            if (mgr == null) continue;
+            string raw, resolved;
+            bool wasResolved, linkedToParent;
+            mgr.Get6("合番", true, out raw, out resolved,
+                out wasResolved, out linkedToParent); // cached, no activation
+            if (!wasResolved || string.IsNullOrWhiteSpace(resolved))
+                continue;
+            value = resolved;
+            source = "SHEET_VIEW:" + propertyView + "|CONFIG:" +
+                (string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope);
+            return true;
+        }
+        catch { source = "PROPERTY_GET6_API_ERROR"; }
+    }
+    if (source == "SHEET_SOURCE_UNVERIFIED")
+        source = "PROPERTY_NOT_RESOLVED";
+    return false;
+}
+
+CAUTION: The actual Sheet view source API can vary by SOLIDWORKS version.
+Anti must verify GetFirstView, GetName2, ReferencedDocument, ReferencedConfiguration,
+CustomPropertyView against the referenced COM API and current project references.
+If a reference cannot be verified, return Warning, NEVER guess a property value.
+Do not add activated/rebuild/close operations.
+
+E) Commands/ExcelDrawingCheckExporter.cs — MINIMAL EXPORT LIFECYCLE CHANGES
+--------------------------------------------------------------------------------
+1) In ExportReport, next to summarySheet and detailSheet:
+   dynamic propertyLinkSheet = null;
+2) Change PrepareSheetCount(excel, workbook, 2); to count 3.
+3) After creating detailSheet and naming it, insert:
+   propertyLinkSheet = workbook.Sheets[3];
+   propertyLinkSheet.Name = "KIỂM TRA LIÊN KẾT";
+4) After WriteGroupedDetailSheet + FreezeTopRow(detailSheet):
+   WritePropertyLinkSheet(propertyLinkSheet, result.Items);
+   FreezeTopRow(propertyLinkSheet);
+5) In silent finally, add ReleaseExcelObject((object)propertyLinkSheet)
+   next to existing sheet releases. Do NOT change normal/hidden export paths.
+
+F) Commands/ExcelDrawingCheckExporter.cs — ADD METHOD INSIDE exporter class
+--------------------------------------------------------------------------------
+private static void WritePropertyLinkSheet(
+    dynamic sheet, List<DrawingCheckItemResult> items)
+{
+    const int columns = 9;
+    var rows = new List<object[]>();
+    var statusRanges = new Dictionary<string, List<string>>();
+    rows.Add(new object[] { "KIỂM TRA LIÊN KẾT PROPERTY", null, null, null,
+        null, null, null, null, null });
+    rows.Add(new object[] { "No.", "Hạng mục", "Raw Drawing",
+        "Property (Part/Asm)", "BOM", "Link", "Property", "Display", "Ghi chú" });
+
+    int group = 0;
+    if (items != null)
+        foreach (DrawingCheckItemResult item in items)
+        {
+            if (item == null || item.PropertyLinkRows == null ||
+                item.PropertyLinkRows.Count == 0) continue;
+            group++;
+            string file = string.IsNullOrWhiteSpace(item.DrawingPath)
+                ? "(Không có Drawing)" : Path.GetFileName(item.DrawingPath);
+            rows.Add(new object[] { "COMPONENT INo " + item.BomItemNumber +
+                " | " + (item.Component ?? "") + " | " + file +
+                " | Kết quả tổng: " + item.Status,
+                null, null, null, null, null, null, null, null });
+            int index = 0;
+            foreach (DrawingPropertyLinkReportRow field in item.PropertyLinkRows)
+            {
+                index++;
+                int rowNumber = rows.Count + 1;
+                rows.Add(new object[] { index, field.FieldName, field.DrawingRaw,
+                    field.PropertyValue, field.BomValue,
+                    field.LinkStatus.ToString(), field.PropertyStatus.ToString(),
+                    field.DisplayStatus.ToString(), field.Note });
+                AddStatusRange(statusRanges, field.LinkStatus.ToString(), "F" + rowNumber);
+                AddStatusRange(statusRanges, field.PropertyStatus.ToString(), "G" + rowNumber);
+                AddStatusRange(statusRanges, field.DisplayStatus.ToString(), "H" + rowNumber);
+            }
+            rows.Add(new object[columns]);
+        }
+    if (group == 0)
+        rows.Add(new object[] { "Không có bảng 合番 1×2 được kiểm tra link", null,
+            null, null, null, null, null, null, null });
+
+    object[,] data = new object[rows.Count, columns];
+    for (int r = 0; r < rows.Count; r++)
+        for (int c = 0; c < columns; c++)
+            data[r, c] = rows[r][c];
+
+    // Treat property values and raw expressions as text; avoid Excel formula
+    // interpretation of user-edited Drawing cells that begin with '='.
+    sheet.Range["C:E"].NumberFormat = "@";
+    sheet.Range[sheet.Cells[1, 1],
+        sheet.Cells[rows.Count, columns]].Value2 = data;
+
+    dynamic title = sheet.Range["A1:I1"];
+    title.Merge();
+    title.Font.Bold = true;
+    title.Font.Size = 14;
+    title.Font.Color = Rgb(255, 255, 255);
+    title.Interior.Color = Rgb(31, 78, 120);
+    sheet.Rows[1].RowHeight = 28.0;
+
+    dynamic header = sheet.Range["A2:I2"];
+    header.Font.Bold = true;
+    header.Font.Color = Rgb(255, 255, 255);
+    header.Interior.Color = Rgb(54, 95, 145);
+    sheet.Rows[2].RowHeight = 26.0;
+
+    sheet.Columns[1].ColumnWidth = 7;
+    sheet.Columns[2].ColumnWidth = 16;
+    sheet.Columns[3].ColumnWidth = 36;
+    sheet.Columns[4].ColumnWidth = 25;
+    sheet.Columns[5].ColumnWidth = 25;
+    sheet.Columns[6].ColumnWidth = 12;
+    sheet.Columns[7].ColumnWidth = 12;
+    sheet.Columns[8].ColumnWidth = 12;
+    sheet.Columns[9].ColumnWidth = 72;
+    sheet.Range["A1:I" + rows.Count].VerticalAlignment = XlTop;
+    sheet.Range["I1:I" + rows.Count].WrapText = true;
+    sheet.Range["F1:H" + rows.Count].HorizontalAlignment = XlCenter;
+
+    for (int r = 3; r <= rows.Count; r++)
+    {
+        string titleText = Convert.ToString(rows[r - 1][0] ?? "");
+        if (titleText.StartsWith("COMPONENT INo ", StringComparison.Ordinal))
+        {
+            dynamic groupTitle = sheet.Range["A" + r + ":I" + r];
+            groupTitle.Merge();
+            groupTitle.Font.Bold = true;
+            groupTitle.Interior.Color = Rgb(221, 235, 247);
+            sheet.Rows[r].RowHeight = 24.0;
+        }
+    }
+    ApplyBatchedStatusColors((object)sheet, statusRanges);
+}
+
+G) ACCEPTANCE TESTS (must pass before any merge)
+--------------------------------------------------------------------------------
+1. Raw=$PRPSHEET:"合番" ; property available; BOM direct match ; displayed missing
+   => Link OK, Property OK, Display Warning, overall item Warning.
+2. Raw text is same fixed literal as BOM => Link NG regardless of values.
+3. Wrong formula $PRPSHEET:"材質" => Link NG.
+4. API fails to read Raw Text => Link Warning (not invented NG).
+5. Invalid source view/config/part path => Property Warning (not invented OK).
+6. No explicit 合番 column in BOM => Property Warning (not compared to Part fallback).
+7. Non-1x2 layouts => NO new link rule, legacy report intact.
+8. Verify that early-return cases (missing header or 部品番号) never hide a
+   separate proven NG for a broken 合番 formula; adjust minimally if needed.
+9. Both old sheets must retain their existing headers and grouped layout.
+10. NG already found must not be overwritten by Strict Hidden Warning.
+11. Keep UI/ADDIN.csproj/CheckUraOmote/CheckPartWorkingCopy unchanged.
+12. A verified Property-BOM mismatch in the new tab must also be NG on the
+    existing 合番 field, so the top-level overall and the detail tab agree.
+13. Only user tests on Windows + SOLIDWORKS can confirm real COM behavior.
