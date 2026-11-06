@@ -101,6 +101,18 @@ namespace ADDIN.Commands
         public string DrawingViewName { get; set; } = "";
     }
 
+    internal sealed class DrawingPropertyLinkReportRow
+    {
+        public string FieldName { get; set; } = "";
+        public string DrawingRaw { get; set; } = "";
+        public string PropertyValue { get; set; } = "";
+        public string BomValue { get; set; } = "";
+        public DrawingBomCheckStatus LinkStatus { get; set; } = DrawingBomCheckStatus.Warning;
+        public DrawingBomCheckStatus PropertyStatus { get; set; } = DrawingBomCheckStatus.Warning;
+        public DrawingBomCheckStatus DisplayStatus { get; set; } = DrawingBomCheckStatus.Warning;
+        public string Note { get; set; } = "";
+    }
+
     internal sealed class ModelPropertyLinkAudit
     {
         public string PropertyName { get; set; } = "";
@@ -122,6 +134,8 @@ namespace ADDIN.Commands
         public DrawingBomCheckStatus Status { get; set; } = DrawingBomCheckStatus.OK;
         public List<DrawingBomFieldResult> Fields { get; } = new List<DrawingBomFieldResult>();
         public string Note { get; set; } = "";
+        public List<DrawingPropertyLinkReportRow> PropertyLinkRows { get; } =
+            new List<DrawingPropertyLinkReportRow>();
     }
 
     internal sealed class DrawingBatchCheckResult
@@ -575,6 +589,21 @@ namespace ADDIN.Commands
 
         internal sealed class DrawingReferenceSnapshot : BomDrawingReference { }
 
+        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptions]
+        [System.Security.SecurityCritical]
+        private void SafeCloseDocument(string title)
+        {
+            if (string.IsNullOrWhiteSpace(title) || swApp == null) return;
+            try
+            {
+                swApp.CloseDoc(title);
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[SAFE CLOSE DOC] " + title + ": " + ex.Message);
+            }
+        }
+
         private void RestoreBatchActiveDocument(string title)
         {
             if (string.IsNullOrWhiteSpace(title)) return;
@@ -820,6 +849,12 @@ namespace ADDIN.Commands
             // A hard-coded Drawing cell may equal BOM but must still be NG.
             ApplyGobanTemplateLinkAudit(gobanComparison, drawingData);
             itemResult.Fields.Add(gobanComparison);
+
+            // Reporting-only: never replace Drawing displayed text with Model/BOM data.
+            AddGobanPropertyLinkReportRow(
+                itemResult, drawingData, gobanComparison, bomRow, referencedModel,
+                referencedConfiguration, sheetName, drawing, activeSheet);
+
             itemResult.Fields.Add(CompareFileNameField(drawingData.PartFileName, componentName));
             itemResult.Fields.Add(CompareDxfField(drawingData.DxfFileName, expectedDxf));
             itemResult.Fields.Add(CompareOptionalStringField("品名", drawingData.ProductName, bomProductName));
@@ -1796,6 +1831,218 @@ namespace ADDIN.Commands
                 if (result.Status != DrawingBomCheckStatus.NG)
                     result.Source = "DRAWING_GOBAN_LINK_UNVERIFIED";
             }
+        }
+
+        private static void AddGobanPropertyLinkReportRow(
+            DrawingCheckItemResult item,
+            DrawingDisplayedData drawingData,
+            DrawingBomFieldResult comparison,
+            DataGridViewRow bomRow,
+            ModelDoc2 referencedModel,
+            string referencedConfiguration,
+            string sheetName,
+            DrawingDoc drawing,
+            Sheet sheet)
+        {
+            if (item == null || drawingData == null ||
+                drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.NotApplicable)
+                return;
+
+            var row = new DrawingPropertyLinkReportRow
+            {
+                FieldName = "合番",
+                DrawingRaw = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable
+                    ? "(Không đọc được Raw Text)" : (drawingData.GobanLinkRawExpression ?? ""),
+                LinkStatus = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Valid
+                    ? DrawingBomCheckStatus.OK
+                    : drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid
+                        ? DrawingBomCheckStatus.NG
+                        : DrawingBomCheckStatus.Warning
+            };
+            var reasons = new List<string>();
+            if (row.LinkStatus == DrawingBomCheckStatus.NG)
+                reasons.Add("Mất hoặc sai công thức bắt buộc $PRPSHEET:\"合番\".");
+            else if (row.LinkStatus == DrawingBomCheckStatus.Warning)
+                reasons.Add("Không xác minh được raw link hoặc có nhiều bảng phù hợp.");
+
+            string bomDirect;
+            bool hasBomValue = TryReadBomGobanColumn(bomRow, out bomDirect);
+            row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番)";
+
+            string propValue;
+            string propSource;
+            bool gotProperty = TryGetVerifiedSheetGobanProperty(
+                drawing, sheet, sheetName, referencedModel, referencedConfiguration,
+                item.PartPath, out propValue, out propSource);
+            row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh Property)";
+
+            // Property↔BOM can be OK only if BOTH independent sources were read.
+            // ReadBomAndComponentProperties() falls back to Model property, so NEVER
+            // use its bomGoban variable as independent BOM evidence here.
+            if (gotProperty && hasBomValue && !string.IsNullOrWhiteSpace(bomDirect))
+            {
+                row.PropertyStatus = string.Equals(
+                    NormalizeText(propValue), NormalizeText(bomDirect),
+                    StringComparison.OrdinalIgnoreCase)
+                    ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+                if (row.PropertyStatus == DrawingBomCheckStatus.NG)
+                    reasons.Add("Giá trị Property khác BOM.");
+            }
+            else
+            {
+                row.PropertyStatus = DrawingBomCheckStatus.Warning;
+                reasons.Add(!gotProperty
+                    ? "Chưa xác nhận được Property từ đúng model/config của Sheet: " + propSource
+                    : "Thiếu dữ liệu 合番 độc lập trong BOM.");
+            }
+
+            string actualDisplayed = drawingData.Goban ?? "";
+            if (drawingData.GobanDisplayUnavailable ||
+                string.IsNullOrWhiteSpace(actualDisplayed) || !gotProperty)
+            {
+                row.DisplayStatus = DrawingBomCheckStatus.Warning;
+                reasons.Add("Chưa đối chiếu được chữ hiển thị thực tế trên Drawing.");
+            }
+            else
+            {
+                row.DisplayStatus = string.Equals(
+                    NormalizeText(actualDisplayed), NormalizeText(propValue),
+                    StringComparison.OrdinalIgnoreCase)
+                    ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+                if (row.DisplayStatus == DrawingBomCheckStatus.NG)
+                    reasons.Add("Chữ hiển thị Drawing khác Property.");
+            }
+
+            // A verified mismatch must also affect the existing field result, not
+            // merely the new presentation tab. Existing NG is never downgraded.
+            if (comparison != null &&
+                (row.PropertyStatus == DrawingBomCheckStatus.NG ||
+                 row.DisplayStatus == DrawingBomCheckStatus.NG))
+            {
+                comparison.Status = DrawingBomCheckStatus.NG;
+                comparison.Message = (comparison.Message ?? "") +
+                    " | Property/BOM/DisplayedValue mismatch confirmed.";
+            }
+            row.Note = string.Join(" | ", reasons);
+            item.PropertyLinkRows.Add(row);
+            LogDebug("[GOBAN REPORT ROW] link=" + row.LinkStatus +
+                " property=" + row.PropertyStatus + " display=" + row.DisplayStatus +
+                " source=" + propSource + " raw=\"" + row.DrawingRaw + "\"");
+        }
+
+        private static bool TryReadBomGobanColumn(DataGridViewRow row, out string value)
+        {
+            value = "";
+            if (row == null || row.DataGridView == null) return false;
+            for (int c = 0; c < row.DataGridView.Columns.Count; c++)
+            {
+                if (!string.Equals(NormalizeText(row.DataGridView.Columns[c].HeaderText),
+                    "合番", StringComparison.Ordinal)) continue;
+                value = Convert.ToString(row.Cells[c].Value ?? "").Trim();
+                return true;
+            }
+            return false;
+        }
+
+        private static bool TryGetVerifiedSheetGobanProperty(
+            DrawingDoc drawing,
+            Sheet sheet,
+            string sheetName,
+            ModelDoc2 fallbackModel,
+            string fallbackConfiguration,
+            string expectedPartPath,
+            out string value,
+            out string source)
+        {
+            value = "";
+            source = "SHEET_SOURCE_UNVERIFIED";
+            if (drawing == null || sheet == null) return false;
+
+            // Sheet.CustomPropertyView must point to the actual property-source view.
+            // Do not guess the source by taking the first Drawing View or BOM model.
+            string propertyView = "";
+            try { propertyView = sheet.CustomPropertyView ?? ""; }
+            catch { source = "CUSTOM_PROPERTY_VIEW_API_ERROR"; return false; }
+
+            if (string.IsNullOrWhiteSpace(propertyView))
+            {
+                source = "CUSTOM_PROPERTY_VIEW_UNSPECIFIED";
+                return false; // conservative: no false Property OK
+            }
+
+            SolidWorks.Interop.sldworks.View targetView = null;
+            try
+            {
+                SolidWorks.Interop.sldworks.View view = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                while (view != null)
+                {
+                    string name = "";
+                    try { name = view.GetName2() ?? ""; } catch { }
+                    if (string.Equals(name, propertyView, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetView = view;
+                        break;
+                    }
+                    view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
+                }
+            }
+            catch { source = "PROPERTY_VIEW_LOOKUP_ERROR"; return false; }
+            if (targetView == null)
+            {
+                source = "PROPERTY_VIEW_NOT_FOUND";
+                return false;
+            }
+
+            ModelDoc2 model = null;
+            try { model = targetView.ReferencedDocument as ModelDoc2; }
+            catch { source = "REFERENCED_MODEL_API_ERROR"; return false; }
+            if (model == null)
+            {
+                source = "REFERENCED_MODEL_NOT_LOADED";
+                return false;
+            }
+            string modelPath = "";
+            try { modelPath = model.GetPathName() ?? ""; }
+            catch { source = "MODEL_PATH_API_ERROR"; return false; }
+            if (!string.IsNullOrWhiteSpace(expectedPartPath) &&
+                !PathsEqualSafe(modelPath, expectedPartPath))
+            {
+                source = "PROPERTY_SOURCE_MODEL_MISMATCH";
+                return false;
+            }
+
+            string configuration = "";
+            try { configuration = targetView.ReferencedConfiguration ?? ""; }
+            catch { source = "VIEW_CONFIGURATION_API_ERROR"; return false; }
+            if (string.IsNullOrWhiteSpace(configuration))
+            {
+                source = "VIEW_CONFIGURATION_UNKNOWN";
+                return false;
+            }
+
+            string[] scopes = new[] { configuration, "" };
+            foreach (string scope in scopes)
+            {
+                try
+                {
+                    CustomPropertyManager mgr = model.Extension.get_CustomPropertyManager(scope);
+                    if (mgr == null) continue;
+                    string raw, resolved;
+                    bool wasResolved, linkedToParent;
+                    mgr.Get6("合番", true, out raw, out resolved,
+                        out wasResolved, out linkedToParent); // cached, no activation
+                    if (!wasResolved || string.IsNullOrWhiteSpace(resolved))
+                        continue;
+                    value = resolved;
+                    source = "SHEET_VIEW:" + propertyView + "|CONFIG:" +
+                        (string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope);
+                    return true;
+                }
+                catch { source = "PROPERTY_GET6_API_ERROR"; }
+            }
+            if (source == "SHEET_SOURCE_UNVERIFIED")
+                source = "PROPERTY_NOT_RESOLVED";
+            return false;
         }
 
         // Pure link validation: the fixed Drawing value and the linked Drawing
@@ -3210,8 +3457,10 @@ namespace ADDIN.Commands
             {
                 if (openedAssemblyByCommand && assemblyModel != null && swApp != null)
                 {
-                    try { swApp.CloseDoc(assemblyModel.GetTitle()); }
-                    catch { }
+                    string closeTitle = "";
+                    try { closeTitle = assemblyModel.GetTitle(); } catch { }
+                    SafeCloseDocument(closeTitle);
+                    assemblyModel = null;
                 }
             }
         }
@@ -5725,7 +5974,12 @@ namespace ADDIN.Commands
                 {
                     try
                     {
-                        drawing.ActivateSheet(sheetName);
+                        Sheet curSheet = drawing.GetCurrentSheet() as Sheet;
+                        string curName = curSheet != null ? (curSheet.GetName() ?? "").Trim() : "";
+                        if (!string.Equals(curName, sheetName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            drawing.ActivateSheet(sheetName);
+                        }
                     }
                     catch
                     {

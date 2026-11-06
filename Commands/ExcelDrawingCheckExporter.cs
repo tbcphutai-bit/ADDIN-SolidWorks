@@ -60,6 +60,7 @@ namespace ADDIN.Commands
             dynamic workbook = null;
             dynamic summarySheet = null;
             dynamic detailSheet = null;
+            dynamic propertyLinkSheet = null;
             bool eventsEnabled = true;
             var totalTimer = Stopwatch.StartNew();
             var phaseTimer = Stopwatch.StartNew();
@@ -97,7 +98,7 @@ namespace ADDIN.Commands
                 PrepareSheetCount(
                     excel,
                     workbook,
-                    2);
+                    3);
 
                 Debug.WriteLine("[CHECK DRAWING EXCEL] workbook created ms=" + phaseTimer.ElapsedMilliseconds);
 
@@ -112,6 +113,12 @@ namespace ADDIN.Commands
 
                 detailSheet.Name =
                     "CHI TIẾT KIỂM TRA";
+
+                propertyLinkSheet =
+                    workbook.Sheets[3];
+
+                propertyLinkSheet.Name =
+                    "KIỂM TRA LIÊN KẾT";
 
                 // TỔNG HỢP chỉ dành cho COMPONENT / Part Drawing.
                 // UNIT / Assembly Drawing chỉ xuất ở sheet CHI TIẾT KIỂM TRA.
@@ -153,6 +160,13 @@ namespace ADDIN.Commands
 
                 FreezeTopRow(
                     detailSheet);
+
+                WritePropertyLinkSheet(
+                    propertyLinkSheet,
+                    result.Items);
+
+                FreezeTopRow(
+                    propertyLinkSheet);
 
                 summarySheet.Activate();
                 summarySheet.Range["A1"].Select();
@@ -216,6 +230,7 @@ namespace ADDIN.Commands
                     {
                         try { excel.Quit(); } catch { }
                     }
+                    ReleaseExcelObject((object)propertyLinkSheet);
                     ReleaseExcelObject((object)detailSheet);
                     ReleaseExcelObject((object)summarySheet);
                     ReleaseExcelObject((object)workbook);
@@ -906,6 +921,102 @@ namespace ADDIN.Commands
             sheet.Range["A3:A" + rows.Count].HorizontalAlignment = XlCenter;
             sheet.Range["D3:D" + rows.Count].HorizontalAlignment = XlCenter;
             // Grouped blocks intentionally have no AutoFilter.
+        }
+
+        private static void WritePropertyLinkSheet(
+            dynamic sheet, List<DrawingCheckItemResult> items)
+        {
+            const int columns = 9;
+            var rows = new List<object[]>();
+            var statusRanges = new Dictionary<string, List<string>>();
+            rows.Add(new object[] { "KIỂM TRA LIÊN KẾT PROPERTY", null, null, null,
+                null, null, null, null, null });
+            rows.Add(new object[] { "No.", "Hạng mục", "Raw Drawing",
+                "Property (Part/Asm)", "BOM", "Link", "Property", "Display", "Ghi chú" });
+
+            int group = 0;
+            if (items != null)
+                foreach (DrawingCheckItemResult item in items)
+                {
+                    if (item == null || item.PropertyLinkRows == null ||
+                        item.PropertyLinkRows.Count == 0) continue;
+                    group++;
+                    string file = string.IsNullOrWhiteSpace(item.DrawingPath)
+                        ? "(Không có Drawing)" : Path.GetFileName(item.DrawingPath);
+                    rows.Add(new object[] { "COMPONENT INo " + item.BomItemNumber +
+                        " | " + (item.Component ?? "") + " | " + file +
+                        " | Kết quả tổng: " + item.Status,
+                        null, null, null, null, null, null, null, null });
+                    int index = 0;
+                    foreach (DrawingPropertyLinkReportRow field in item.PropertyLinkRows)
+                    {
+                        index++;
+                        int rowNumber = rows.Count + 1;
+                        rows.Add(new object[] { index, field.FieldName, field.DrawingRaw,
+                            field.PropertyValue, field.BomValue,
+                            field.LinkStatus.ToString(), field.PropertyStatus.ToString(),
+                            field.DisplayStatus.ToString(), field.Note });
+                        AddStatusRange(statusRanges, field.LinkStatus.ToString(), "F" + rowNumber);
+                        AddStatusRange(statusRanges, field.PropertyStatus.ToString(), "G" + rowNumber);
+                        AddStatusRange(statusRanges, field.DisplayStatus.ToString(), "H" + rowNumber);
+                    }
+                    rows.Add(new object[columns]);
+                }
+            if (group == 0)
+                rows.Add(new object[] { "Không có bảng 合番 1×2 được kiểm tra link", null,
+                    null, null, null, null, null, null, null });
+
+            object[,] data = new object[rows.Count, columns];
+            for (int r = 0; r < rows.Count; r++)
+                for (int c = 0; c < columns; c++)
+                    data[r, c] = rows[r][c];
+
+            // Treat property values and raw expressions as text; avoid Excel formula
+            // interpretation of user-edited Drawing cells that begin with '='.
+            sheet.Range["C:E"].NumberFormat = "@";
+            sheet.Range[sheet.Cells[1, 1],
+                sheet.Cells[rows.Count, columns]].Value2 = data;
+
+            dynamic title = sheet.Range["A1:I1"];
+            title.Merge();
+            title.Font.Bold = true;
+            title.Font.Size = 14;
+            title.Font.Color = Rgb(255, 255, 255);
+            title.Interior.Color = Rgb(31, 78, 120);
+            sheet.Rows[1].RowHeight = 28.0;
+
+            dynamic header = sheet.Range["A2:I2"];
+            header.Font.Bold = true;
+            header.Font.Color = Rgb(255, 255, 255);
+            header.Interior.Color = Rgb(54, 95, 145);
+            sheet.Rows[2].RowHeight = 26.0;
+
+            sheet.Columns[1].ColumnWidth = 7;
+            sheet.Columns[2].ColumnWidth = 16;
+            sheet.Columns[3].ColumnWidth = 36;
+            sheet.Columns[4].ColumnWidth = 25;
+            sheet.Columns[5].ColumnWidth = 25;
+            sheet.Columns[6].ColumnWidth = 12;
+            sheet.Columns[7].ColumnWidth = 12;
+            sheet.Columns[8].ColumnWidth = 12;
+            sheet.Columns[9].ColumnWidth = 72;
+            sheet.Range["A1:I" + rows.Count].VerticalAlignment = XlTop;
+            sheet.Range["I1:I" + rows.Count].WrapText = true;
+            sheet.Range["F1:H" + rows.Count].HorizontalAlignment = XlCenter;
+
+            for (int r = 3; r <= rows.Count; r++)
+            {
+                string titleText = Convert.ToString(rows[r - 1][0] ?? "");
+                if (titleText.StartsWith("COMPONENT INo ", StringComparison.Ordinal))
+                {
+                    dynamic groupTitle = sheet.Range["A" + r + ":I" + r];
+                    groupTitle.Merge();
+                    groupTitle.Font.Bold = true;
+                    groupTitle.Interior.Color = Rgb(221, 235, 247);
+                    sheet.Rows[r].RowHeight = 24.0;
+                }
+            }
+            ApplyBatchedStatusColors((object)sheet, statusRanges);
         }
 
         private static string ColumnName(int column)
