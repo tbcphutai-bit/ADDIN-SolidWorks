@@ -366,6 +366,39 @@ private static void WritePropertyLinkSheet(
 }
 ~~~
 
+## D2 — Tên nguồn và câu chữ chính xác (2 chỉnh sửa nhỏ)
+
+Trong TryGetVerifiedSheetGobanProperty, sau khi đã chọn targetView và trước khi đọc Property, lấy tên View thật:
+
+~~~csharp
+string verifiedSourceViewName = (targetView.GetName2() ?? "").Trim();
+~~~
+
+Sau đó chỉ đổi dòng gán source khi Get6 thành công từ
+
+~~~csharp
+source = "SHEET_VIEW:" + propertyView + "|CONFIG:" +
+    (string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope);
+~~~
+
+sang:
+
+~~~csharp
+source = "SHEET_VIEW:" + verifiedSourceViewName + "|CONFIG:" +
+    (string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope);
+~~~
+
+Như vậy ghi tên View thực, không báo nhầm "SHEET_VIEW:Default" như thể Default là tên View.
+
+Trong AddGobanPropertyLinkReportRow thay các nhãn chưa rõ nghĩa (không sửa điều kiện logic):
+
+~~~csharp
+row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番 riêng)";
+row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh được Property)";
+~~~
+
+**Kiểm tra bản thân Sheet.Properties trước khi tin nguồn Default.** Chỉ ghi Property (tham chiếu) khi View/Model/Config đã được xác minh và raw link hợp lệ. Chưa xác minh thì giữ "(Chưa đọc được)".
+
 ## E — expected sample outputs (not runtime evidence)
 
 1. Raw linked correctly; Property = ※単品搬入; Drawing display API empty; BOM has no 合番:
