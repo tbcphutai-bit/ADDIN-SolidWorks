@@ -1,0 +1,277 @@
+{
+  "evidence_level": "API_VERIFIED",
+  "top_order_scope": "BOUNDED_TOP_PREFIX_UNTIL_IDENTICAL_REPEAT_FULL_IDENTITY_PROTECTION_USES_FINITE_FLAT_UNION",
+  "observations": [],
+  "observation_count": 0,
+  "meaning": "An identical repeated native top-level identity terminates only that bounded walk. Finite flat feature union and original identity/order protection remain required. No Feature is removed or normalized to obtain a pass.",
+  "cumulative_parts": [
+    {
+      "frame": "backing-part",
+      "selected": false,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "symmetric_difference_mm3": 0,
+      "new_feature_count": 0,
+      "new_reference_planes": 0,
+      "new_sketch_count": 0,
+      "body_check2": 0,
+      "body_check3_fault_count": 0,
+      "body_volume_mm3": 7965000.000000002,
+      "new_feature_identities": []
+    },
+    {
+      "frame": "fr01",
+      "selected": true,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "symmetric_difference_mm3": 0,
+      "new_feature_count": 9,
+      "new_reference_planes": 0,
+      "new_sketch_count": 4,
+      "body_check2": 0,
+      "body_check3_fault_count": 0,
+      "body_volume_mm3": 1438582.924165103,
+      "new_feature_identities": [
+        {
+          "id": 727,
+          "name": "AFJ_e15ee0e8_Loser",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 729,
+          "name": "AFJ_e15ee0e8_LongFarRelief",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 735,
+          "name": "AFJ_e15ee0e8_Loser_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 742,
+          "name": "AFJ_e15ee0e8_LongFarRelief_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 744,
+          "name": "AFJ_d1b517bb_Loser",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 746,
+          "name": "AFJ_d1b517bb_LongFarRelief",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 752,
+          "name": "AFJ_d1b517bb_Loser_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 759,
+          "name": "AFJ_d1b517bb_LongFarRelief_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 760,
+          "name": "板金39",
+          "type": "SheetMetal"
+        }
+      ]
+    },
+    {
+      "frame": "fr02",
+      "selected": true,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "symmetric_difference_mm3": 0,
+      "new_feature_count": 9,
+      "new_reference_planes": 0,
+      "new_sketch_count": 4,
+      "body_check2": 0,
+      "body_check3_fault_count": 0,
+      "body_volume_mm3": 287868.517611859,
+      "new_feature_identities": [
+        {
+          "id": 741,
+          "name": "AFJ_fb843f44_Cover",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 743,
+          "name": "AFJ_fb843f44_ShortRelief",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 749,
+          "name": "AFJ_fb843f44_Cover_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 756,
+          "name": "AFJ_fb843f44_ShortRelief_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 758,
+          "name": "AFJ_d1b517bb_Cover",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 760,
+          "name": "AFJ_d1b517bb_ShortRelief",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 766,
+          "name": "AFJ_d1b517bb_Cover_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 773,
+          "name": "AFJ_d1b517bb_ShortRelief_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 774,
+          "name": "板金32",
+          "type": "SheetMetal"
+        }
+      ]
+    },
+    {
+      "frame": "fr03",
+      "selected": true,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "symmetric_difference_mm3": 0,
+      "new_feature_count": 9,
+      "new_reference_planes": 0,
+      "new_sketch_count": 4,
+      "body_check2": 0,
+      "body_check3_fault_count": 0,
+      "body_volume_mm3": 1043915.634524489,
+      "new_feature_identities": [
+        {
+          "id": 781,
+          "name": "AFJ_6ebf46e0_Loser",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 783,
+          "name": "AFJ_6ebf46e0_LongFarRelief",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 789,
+          "name": "AFJ_6ebf46e0_Loser_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 796,
+          "name": "AFJ_6ebf46e0_LongFarRelief_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 798,
+          "name": "AFJ_fb843f44_Loser",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 800,
+          "name": "AFJ_fb843f44_LongFarRelief",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 806,
+          "name": "AFJ_fb843f44_Loser_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 813,
+          "name": "AFJ_fb843f44_LongFarRelief_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 814,
+          "name": "板金44",
+          "type": "SheetMetal"
+        }
+      ]
+    },
+    {
+      "frame": "fr04",
+      "selected": true,
+      "protected_history_unchanged": true,
+      "protected_top_order_unchanged": true,
+      "symmetric_difference_mm3": 0,
+      "new_feature_count": 9,
+      "new_reference_planes": 0,
+      "new_sketch_count": 4,
+      "body_check2": 0,
+      "body_check3_fault_count": 0,
+      "body_volume_mm3": 304100.42423673,
+      "new_feature_identities": [
+        {
+          "id": 811,
+          "name": "AFJ_e15ee0e8_Cover",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 813,
+          "name": "AFJ_e15ee0e8_ShortRelief",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 819,
+          "name": "AFJ_e15ee0e8_Cover_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 826,
+          "name": "AFJ_e15ee0e8_ShortRelief_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 828,
+          "name": "AFJ_6ebf46e0_Cover",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 830,
+          "name": "AFJ_6ebf46e0_ShortRelief",
+          "type": "ProfileFeature"
+        },
+        {
+          "id": 836,
+          "name": "AFJ_6ebf46e0_Cover_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 843,
+          "name": "AFJ_6ebf46e0_ShortRelief_Cut",
+          "type": "ICE"
+        },
+        {
+          "id": 844,
+          "name": "板金37",
+          "type": "SheetMetal"
+        }
+      ]
+    }
+  ],
+  "preexisting_feature_preservation": {
+    "frame": "fr04",
+    "feature_ids": [
+      802,
+      803,
+      809
+    ],
+    "kinds": [
+      "RefPlane",
+      "ProfileFeature",
+      "ICE"
+    ],
+    "source": "Native read-only baseline audit; these pre-existing features are protected rather than counted as new R55 planes."
+  }
+}

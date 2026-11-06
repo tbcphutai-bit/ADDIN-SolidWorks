@@ -1,0 +1,32 @@
+{
+  "status": "NATIVE_VERIFIED_FIX_FOR_OBSERVED_THIRD_CORNER_TEST",
+  "parameter_evidence": "API_VERIFIED",
+  "result_evidence": "GEOMETRY_VERIFIED",
+  "scope": "Same fr03 × fr02 third-corner input/pose/seed/datum comparison between the preserved failed217 run and the complete fresh D517 suite; no universal COM-cause claim.",
+  "before_audit_sha256": "cc02a9ffe71ad3b37ec91440e0a93c2ca6ef480cbb2ded61c031853f8d674fe1",
+  "after_audit_sha256": "a7b99697300b7156678fcc400cd51d085d31106b3f36b66a923729ca9543f642",
+  "after_call_log_sha256": "c0b1515035c9a1d8c060c14fe6ca311e66776b73622423f749a138da3ff23c73",
+  "before_source_sha256": "217fef97d577bb4792d30cb86e030013c1355afe4ee8faedc960d566bb11ecc6",
+  "after_source_sha256": "d5176bd2403c63ffaf3529795177e32c11abce5ed1ce425ce15024a31d773a27",
+  "source_inputs_byte_identical": true,
+  "component_poses_and_configurations_identical": true,
+  "private_seed_geometry_and_axis_metadata_exactly_equal": true,
+  "datum_owner_feature_id": 512,
+  "requested_relation_code": 8,
+  "before_allowed_relations": [],
+  "after_allowed_relations": [
+    27,
+    8,
+    7,
+    14
+  ],
+  "before_reported_native_cut_count": 0,
+  "after_verified_native_cut_count": 4,
+  "after_all_cut_sketches_fully_constrained": true,
+  "after_native_target_symmetric_difference_mm3": 0,
+  "source_edit_scope": "ROLE_SCOPED_DATUM_CACHE_REFRESH_AND_DIAGNOSTIC_INVARIANTS_ONLY",
+  "cutter_and_rule_mathematics_changed": false,
+  "authoritative_fresh_corner_count": 4,
+  "same_source_for_all_four_corners": true,
+  "limit": "The paired native result verifies the applied fix for this observed input and source change. The separate scratch experiment remains query-only and does not alone prove stale-edge causality. Other profiles, APIs and context lifetimes require their own native qualification. Private coordinates and opaque entity values are omitted."
+}

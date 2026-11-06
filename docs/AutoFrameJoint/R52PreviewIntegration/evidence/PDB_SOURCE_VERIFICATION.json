@@ -1,0 +1,70 @@
+{
+  "dll_codeview": [
+    {
+      "guid": "c0f93be0-cf0e-4082-ae81-72431d3a8218",
+      "age": 1,
+      "pdb_filename": "ADDIN.pdb"
+    }
+  ],
+  "pdb_id": {
+    "guid": "c0f93be0-cf0e-4082-ae81-72431d3a8218",
+    "age": 1
+  },
+  "pdb_matches_dll": true,
+  "afj_source_checksums": [
+    {
+      "source": "AutoFrameJointTaskPaneLauncher.cs",
+      "algorithm": "NOT_AVAILABLE",
+      "pdb_checksum": "NOT_AVAILABLE",
+      "current_source_checksum": "NOT_AVAILABLE",
+      "matches_current_source_bytes": "NOT_AVAILABLE"
+    },
+    {
+      "source": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "algorithm": "NOT_AVAILABLE",
+      "pdb_checksum": "NOT_AVAILABLE",
+      "current_source_checksum": "NOT_AVAILABLE",
+      "matches_current_source_bytes": "NOT_AVAILABLE"
+    },
+    {
+      "source": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+      "algorithm": "NOT_AVAILABLE",
+      "pdb_checksum": "NOT_AVAILABLE",
+      "current_source_checksum": "NOT_AVAILABLE",
+      "matches_current_source_bytes": "NOT_AVAILABLE"
+    },
+    {
+      "source": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+      "algorithm": "NOT_AVAILABLE",
+      "pdb_checksum": "NOT_AVAILABLE",
+      "current_source_checksum": "NOT_AVAILABLE",
+      "matches_current_source_bytes": "NOT_AVAILABLE"
+    },
+    {
+      "source": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "algorithm": "NOT_AVAILABLE",
+      "pdb_checksum": "NOT_AVAILABLE",
+      "current_source_checksum": "NOT_AVAILABLE",
+      "matches_current_source_bytes": "NOT_AVAILABLE"
+    },
+    {
+      "source": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "algorithm": "NOT_AVAILABLE",
+      "pdb_checksum": "NOT_AVAILABLE",
+      "current_source_checksum": "NOT_AVAILABLE",
+      "matches_current_source_bytes": "NOT_AVAILABLE"
+    },
+    {
+      "source": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "algorithm": "NOT_AVAILABLE",
+      "pdb_checksum": "NOT_AVAILABLE",
+      "current_source_checksum": "NOT_AVAILABLE",
+      "matches_current_source_bytes": "NOT_AVAILABLE"
+    }
+  ],
+  "source_proof_available": false,
+  "checksum_limit": "Managed native PDB file checksum entries expose no hash via this C13 parser; use IL evidence separately, do not report an empty checksum as mismatch.",
+  "module_count": 2661,
+  "dll_sha256": "16020db76d451ded49aa8e58d3a8a2959a83f76a045f9ee75e73da56e0ad6872",
+  "pdb_sha256": "8700870373db4a262a35bcef6fe0a60f6001b913d84fe8229b755a18d6b65ecb"
+}

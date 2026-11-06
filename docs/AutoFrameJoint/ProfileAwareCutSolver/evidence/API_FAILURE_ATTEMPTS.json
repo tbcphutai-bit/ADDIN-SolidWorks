@@ -1,0 +1,230 @@
+[
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr1.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr1.SLDPRT",
+    "ordinal": 3,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr1.SLDPRT",
+    "ordinal": 4,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 3,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 4,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 3,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 4,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 5,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 6,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 3,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 4,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 5,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "1618-04-bh-A6-中骨1.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T1-fr2.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T1-fr2.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T1-fr4.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T1-fr4.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T2-fr1.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T2-fr1.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T2-fr2.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "prism_replay_attempt1.json",
+    "part": "3615-04-bh-T2-fr2.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x80010105): サーバーによって例外が返されました。 (HRESULT からの例外:0x80010105 (RPC_E_SERVERFAULT))\r\n   場所 SolidWorks.Interop.sldworks.ISurface.CreateTrimmedSheet4(Object Curves, Boolean PreserveAnalyticCurves)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjPrism spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 PrismProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 3,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 3,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "3615-04-bh-T1-fr2.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "3615-04-bh-T2-fr2.SLDPRT",
+    "ordinal": 1,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  },
+  {
+    "attempt": "correction_attempt_box3.json",
+    "part": "3615-04-bh-T2-fr2.SLDPRT",
+    "ordinal": 2,
+    "error": "System.Runtime.InteropServices.COMException (0x8002000D): メモリがロックされています。 (HRESULT からの例外:0x8002000D (DISP_E_ARRAYISLOCKED))\r\n   場所 SolidWorks.Interop.sldworks.IModeler.CreateBodyFromBox3(Object BoxDimArray)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreateConvexCell(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.CreatePrism(ISldWorks app, AfjToolDefinition spec)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 CorrectionProbe.Main(String[] args)"
+  }
+]

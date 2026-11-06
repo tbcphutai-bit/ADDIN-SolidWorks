@@ -41,6 +41,7 @@ namespace ADDIN.Commands
         public int MissingHoles;
         public double EngineSeconds;
         public CheckHoleConnectionCoverage ConnectionCoverage;
+        public CheckHoleCg2Report PartRelations;
         public string MarkerStatus = "Chưa vẽ sketch NG.";
         public readonly List<CheckHoleReportRow> Rows = new List<CheckHoleReportRow>();
 
@@ -74,6 +75,22 @@ namespace ADDIN.Commands
                       .Append(" | NG chưa rõ Master: ").Append(ConnectionCoverage.NgGroupsWithoutMaster)
                       .Append(" | Lỗ chưa ghép: ").Append(ConnectionCoverage.UnmatchedHoleCount)
                       .Append(" | ").Append(ConnectionCoverage.CoverageStatus);
+                if (PartRelations != null)
+                    sb.AppendLine().Append("CG2 / Quan hệ Part (AABB chẩn đoán): ")
+                      .Append(PartRelations.RecordedNearbyPairs)
+                      .Append(" cặp gần | Ứng viên cần xem: ")
+                      .Append(PartRelations.CandidateCount)
+                      .Append(" | Part không phát hiện lỗ: ")
+                      .Append(PartRelations.ComponentsWithoutDetectedHoles)
+                      .Append(" | BREP có vật liệu: ")
+                      .Append(PartRelations.BrepSolidEvidenceCount)
+                      .Append(" | BREP không giao trục: ")
+                      .Append(PartRelations.BrepNoAxisHitCount)
+                      .Append(" | Chưa xác minh: ")
+                      .Append(PartRelations.BrepUnknownCount + PartRelations.BrepNotTestedCount)
+                      .Append(" | ").Append(PartRelations.CoverageStatus)
+                      .Append(" | Container Subassembly: ").Append(PartRelations.SubassemblyContainerCount)
+                      .Append(" | Part chưa resolve: ").Append(PartRelations.UnresolvedLeafOccurrenceCount);
                 if (!string.IsNullOrEmpty(MarkerStatus))
                     sb.AppendLine().Append(MarkerStatus);
                 return sb.ToString();
@@ -122,6 +139,9 @@ namespace ADDIN.Commands
         private readonly Button allMarkers = new Button();
         private readonly Button export = new Button();
         private readonly Button connectionGroups = new Button();
+        private readonly Button partRelations = new Button();
+        // CG2.5 FIX1: retained modeless candidate window.
+        private Form cg25RelationsDialog;
         private readonly TableLayoutPanel detailLayout;
         private readonly TableLayoutPanel compactLayout = new TableLayoutPanel();
         private readonly Label compactSummary = new Label();
@@ -142,6 +162,9 @@ namespace ADDIN.Commands
         public bool DiagnosticEnabled { get { return diagnostic.Checked; } }
         public bool AutoMarkersEnabled { get { return autoMarkers.Checked; } }
         public Action<string> PublishNotice { get; set; }
+        // CG2.5 temporary viewport preview. Wired by CheckAssemblyHole.Run.
+        internal Func<int, string> Cg25PreviewAction { get; set; }
+        internal Action Cg25ClearPreviewAction { get; set; }
 
         public void SetOptions(bool diagnosticEnabled, bool autoMarkersEnabled)
         {
@@ -206,6 +229,7 @@ namespace ADDIN.Commands
             AddButton(toolbar, allMarkers, "Vẽ toàn bộ NG", () => markAction(null));
             AddButton(toolbar, export, "Xuất CSV", ExportReport);
             AddButton(toolbar, connectionGroups, "Nhóm liên kết", ShowConnectionGroups);
+            AddButton(toolbar, partRelations, "Quan hệ Part (CG2)", ShowPartRelations);
             AddButton(toolbar, cancel, "Hủy", () => cancelAction());
 
             autoMarkers.Text = "Tự vẽ NG";
@@ -544,6 +568,7 @@ namespace ADDIN.Commands
             allMarkers.Enabled = !busy && report != null && report.Rows.Any(x => x.CanMark);
             export.Enabled = !busy && report != null;
             connectionGroups.Enabled = !busy && report != null && report.ConnectionCoverage != null;
+            partRelations.Enabled = !busy && report != null && report.PartRelations != null;
             rerun.Enabled = !busy;
             cancel.Enabled = busy;
             filter.Enabled = !busy;
@@ -602,6 +627,165 @@ namespace ADDIN.Commands
                 dialog.Controls.Add(table);
                 dialog.Controls.Add(description);
                 dialog.ShowDialog();
+            }
+        }
+
+
+        // CG2: diagnostic-only. AABB screening is NOT physical contact or
+        // confirmation that a counterpart hole is required. No model edits.
+        private void ShowPartRelations()
+        {
+            if (busy || report == null || report.PartRelations == null) return;
+            if (cg25RelationsDialog != null && !cg25RelationsDialog.IsDisposed)
+            {
+                if (cg25RelationsDialog.WindowState == FormWindowState.Minimized)
+                    cg25RelationsDialog.WindowState = FormWindowState.Normal;
+                cg25RelationsDialog.Activate();
+                return;
+            }
+            CheckHoleCg2Report c = report.PartRelations;
+            var dialog = new Form();
+            cg25RelationsDialog = dialog;
+            {
+                dialog.Text = "CHECK HOLE - Quan hệ Part / CG2 (chẩn đoán)";
+                dialog.Size = new Size(1150, 630);
+                dialog.MinimumSize = new Size(850, 460);
+                dialog.StartPosition = FormStartPosition.CenterScreen;
+                dialog.Font = new Font("Segoe UI", 9F);
+
+                var header = new Label
+                {
+                    Dock = DockStyle.Top,
+                    Height = 94,
+                    Padding = new Padding(8),
+                    Text = "Component có bounding box: " + c.ComponentsWithBounds
+                        + " | Part chưa nhận diện lỗ: " + c.ComponentsWithoutDetectedHoles
+                        + " | Cặp AABB gần: " + c.RecordedNearbyPairs
+                        + " | Ứng viên AABB: " + c.CandidateCount
+                        + " | BREP có vật liệu: " + c.BrepSolidEvidenceCount
+                        + " | BREP không giao trục: " + c.BrepNoAxisHitCount
+                        + " | Chưa xác minh: " + (c.BrepUnknownCount + c.BrepNotTestedCount)
+                        + Environment.NewLine
+                        + "Độ phủ: " + c.CoverageStatus
+                        + " | Đã thử cặp Part: " + c.ComparedComponentPairs
+                        + " | Đã thử trục lỗ: " + c.TestedHoleRelations
+                        + " | Subassembly container: " + c.SubassemblyContainerCount
+                        + " | Part chưa resolve: " + c.UnresolvedLeafOccurrenceCount
+                        + Environment.NewLine
+                        + "BREP_SOLID_ON_AXIS: chỉ chứng minh có solid trên trục; "
+                        + "KHÔNG khẳng định cần lỗ xuyên, không xác định Master, không tạo NG."
+                };
+                var tabs = new TabControl { Dock = DockStyle.Fill };
+
+                var candidatePage = new TabPage("Ứng viên cần kiểm tra");
+                var cg25CandidateGrid = new DataGridView
+                {
+                    Dock = DockStyle.Fill,
+                    ReadOnly = true,
+                    AutoGenerateColumns = true,
+                    AllowUserToAddRows = false,
+                    AllowUserToDeleteRows = false,
+                    RowHeadersVisible = false,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    // Prioritize physical BREP evidence; retain ALL AABB candidates.
+                    // BREP_NO_AXIS_HIT comes last, not deleted (avoid false negatives).
+                    DataSource = c.ExpectedHoleCandidates
+                        .OrderBy(row => row.MaterialEvidence == "BREP_SOLID_ON_AXIS" ? 0
+                            : row.MaterialEvidence == "BREP_NO_AXIS_HIT" ? 2 : 1)
+                        .ThenBy(row => row.Id).ToList()
+                };
+                candidatePage.Controls.Add(cg25CandidateGrid);
+                var cg25Tools = new FlowLayoutPanel
+                {
+                    Dock = DockStyle.Bottom,
+                    Height = 42,
+                    WrapContents = false,
+                    Padding = new Padding(4)
+                };
+                var cg25Show = new Button { Text = "Xem Entry/Exit 3D (tạm)", AutoSize = true };
+                var cg25Hide = new Button { Text = "Ẩn dấu tạm", AutoSize = true };
+                var cg25Notice = new Label
+                {
+                    Text = "Xanh: Entry | Cam: Exit | Chỉ chẩn đoán",
+                    AutoSize = true,
+                    Margin = new Padding(12, 9, 2, 0)
+                };
+                cg25Show.Click += (s, e) =>
+                {
+                    CheckHoleCg2ExpectedHoleRow selected = cg25CandidateGrid.SelectedRows
+                        .Cast<DataGridViewRow>()
+                        .Select(x => x.DataBoundItem as CheckHoleCg2ExpectedHoleRow)
+                        .FirstOrDefault(x => x != null);
+                    if (selected == null)
+                    {
+                        cg25Notice.Text = "Hãy chọn một Candidate.";
+                        return;
+                    }
+                    cg25Notice.Text = Cg25PreviewAction == null
+                        ? "Preview chưa được kết nối với CHECK HOLE."
+                        : Cg25PreviewAction(selected.Id);
+                    System.Diagnostics.Debug.WriteLine(
+                        "[CG25][UI] Candidate=" + selected.Id +
+                        " Result=" + cg25Notice.Text);
+                    cg25Notice.AutoEllipsis = true;
+                    cg25Notice.AutoSize = false;
+                    cg25Notice.Width = 410;
+                };
+                cg25Hide.Click += (s, e) =>
+                {
+                    if (Cg25ClearPreviewAction != null) Cg25ClearPreviewAction();
+                    cg25Notice.Text = "Đã ẩn dấu tạm.";
+                };
+                cg25Tools.Controls.Add(cg25Show);
+                cg25Tools.Controls.Add(cg25Hide);
+                cg25Tools.Controls.Add(cg25Notice);
+                candidatePage.Controls.Add(cg25Tools);
+                // FIX2: detach OpenGL callback before SOLIDWORKS tears down a view.
+                dialog.FormClosing += (s, e) =>
+                {
+                    if (Cg25ClearPreviewAction != null) Cg25ClearPreviewAction();
+                };
+                dialog.FormClosed += (s, e) =>
+                {
+                    if (ReferenceEquals(cg25RelationsDialog, dialog))
+                        cg25RelationsDialog = null;
+                };
+                tabs.TabPages.Add(candidatePage);
+
+                var relationPage = new TabPage("Cặp Component gần nhau");
+                relationPage.Controls.Add(new DataGridView
+                {
+                    Dock = DockStyle.Fill,
+                    ReadOnly = true,
+                    AutoGenerateColumns = true,
+                    AllowUserToAddRows = false,
+                    AllowUserToDeleteRows = false,
+                    RowHeadersVisible = false,
+                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    DataSource = c.NearbyPairs
+                });
+                tabs.TabPages.Add(relationPage);
+
+                if (c.Warnings.Count > 0)
+                {
+                    var warningPage = new TabPage("Giới hạn dữ liệu");
+                    warningPage.Controls.Add(new TextBox
+                    {
+                        Multiline = true,
+                        ReadOnly = true,
+                        Dock = DockStyle.Fill,
+                        ScrollBars = ScrollBars.Vertical,
+                        Text = string.Join(Environment.NewLine, c.Warnings)
+                    });
+                    tabs.TabPages.Add(warningPage);
+                }
+                dialog.Controls.Add(tabs);
+                dialog.Controls.Add(header);
+                // FIX1: ShowDialog locks the SOLIDWORKS graphics window.
+                // Show keeps the CG2 table open while users rotate/zoom 3D.
+                dialog.Show(this);
             }
         }
 

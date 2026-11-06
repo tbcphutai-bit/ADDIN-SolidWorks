@@ -122,6 +122,15 @@
     <Compile Include="Commands\NativeToolBridges.cs" />
     <Compile Include="Commands\RepairDanglingDimensions.Native.cs" />
     <Compile Include="UI\MirrorAssemblyPropertyManagerPage.cs" />
+    <Compile Include="UI\AutoFrameJointTaskPaneLauncher.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\AutoFrameJoint\AutoFrameJointSelectionPage.cs" />
+    <Compile Include="Commands\AutoFrameJoint\AutoFrameJointCommandEntry.cs" />
+    <Compile Include="Commands\AutoFrameJoint\AutoFrameJointReadOnlyProbe.cs" />
+    <Compile Include="Commands\AutoFrameJoint\AutoFrameJointGeometryMath.cs" />
+    <Compile Include="Commands\AutoFrameJoint\AutoFrameJointGhostPreview.cs" />
+    <Compile Include="Commands\AutoFrameJoint\AutoFrameJointGhostSessionManager.cs" />
     <Compile Include="UI\VCutBendAssignmentControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -208,6 +217,7 @@
     <Compile Include="Commands\AutoVCutSectionCommand.Assembly.cs" />
     <Compile Include="Commands\AutoVCutSectionCommand.PartLayout.cs" />
     <Compile Include="Commands\AutoVCutSectionCommand.PartMarks.cs" />
+    <Compile Include="Commands\AutoVCutSectionCommand.OmoteMark.cs" />
     <Compile Include="Commands\PartSectionLayoutPlanner.cs" />
     <Compile Include="Commands\VCutPropertySetupCommand.cs" />
     <Compile Include="Commands\BendPanelGeometry.cs" />
@@ -318,6 +328,19 @@
     </Compile>
     <Compile Include="Commands\CheckAssemblyHole.cs" />
     <Compile Include="Commands\CheckAssemblyHole.ConnectionGroups.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.PartRelations.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.MaterialEvidence.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg22Evidence.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg22Fix1Diagnostics.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg23CounterpartEvidence.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg24TopologyEvidence.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg25CadValidation.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg31EvidenceFusion.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg32KnownNgCorrelation.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg33HoleIntentEvidence.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg34GroundTruthAudit.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg35ContrastAudit.cs" />
+    <Compile Include="Commands\CheckAssemblyHole.Cg36ManualLabels.cs" />
     <Compile Include="Commands\CheckAssemblyHole.Results.cs" />
     <Compile Include="Commands\CheckAssemblyHole.MissingPattern.cs" />
     <Compile Include="Commands\CheckAssemblyHole.SkippedPattern.cs" />

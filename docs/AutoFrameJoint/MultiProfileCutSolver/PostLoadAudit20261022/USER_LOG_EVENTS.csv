@@ -1,0 +1,43 @@
+source_log_line,evidence_kind,event
+249,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=COMMAND_OPEN MVID=420dfcfc-a6ee-4861-ae82-f54d916e32e4
+392,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=SELECTION_READ seq=46 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=1 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr03-1
+393,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=SELECTION_READ seq=47 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False mark=2 count=1 resolved=True route=GET_SELECTED_COMPONENT component=2354-04-lc-B11-fr04-1
+525,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=SOLVER_BEGIN
+552,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52-PERF] phase=solve ms=271 completed=True
+553,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=SOLVER_END keptA=1 keptB=1 removedA_m3=6.8665694004274168E-05 removedB_m3=7.17533976808162E-05
+560,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=DISPLAY3_END group=A_KEEP status=0 tracked=1 actual_visibility=UNVERIFIED
+562,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=DISPLAY3_END group=B_KEEP status=0 tracked=2 actual_visibility=UNVERIFIED
+566,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-SOLVER] ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 68665.694 mm³; B bỏ 71753.398 mm³. Frame ngắn B che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Đang xem KEEP.
+567,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52-PERF] phase=preview_total ms=302 reused=False closing=False
+589,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=CLOSE seq=103 epoch=1 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=False activated=True faulted=False reason=1
+590,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] CLOSING reason=1 epoch=2; defer apply until AfterClose
+591,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=AFTER_CLOSE seq=104 epoch=2 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=True closing=True activated=False faulted=False cleanup callback=True
+592,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=APPLY_CALLBACK_BEGIN seq=105 epoch=3 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=False closing=True activated=False faulted=False closed page; no native controls retained
+595,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=HIDE_END tracked_index=1
+597,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=HIDE_END tracked_index=0
+599,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=REDRAW_END actual_visibility=UNVERIFIED
+600,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] PREFLIGHT active=2354-02-lc-B11 bound=2354-02-lc-B11 assembly_equality=1 part_equality=0
+601,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] ACTIVATE status=0 identity=True
+608,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] NATIVE_FEATURE type=ICE underlying=Cut error=0
+613,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] CUT_VERIFIED frame=A id=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN feature=AFJ_40425af2_A_01_Cut delta_m3=0
+616,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] NATIVE_FEATURE type=ICE underlying=Cut error=0
+621,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] CUT_VERIFIED frame=A id=U_RULE:FAR_BEND_CLEARANCE feature=AFJ_40425af2_A_02_Cut delta_m3=0
+622,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+627,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] ACTIVATE status=0 identity=True
+634,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] NATIVE_FEATURE type=ICE underlying=Cut error=0
+639,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] CUT_VERIFIED frame=B id=U_RULE:COVER_WEB_WALL feature=AFJ_40425af2_B_01_Cut delta_m3=0
+642,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] NATIVE_FEATURE type=ICE underlying=Cut error=0
+647,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] CUT_VERIFIED frame=B id=U_RULE:NORMAL_BEND_CAP feature=AFJ_40425af2_B_02_Cut delta_m3=0
+652,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] ACTIVATE status=2 identity=True
+662,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY-PERF] phase=native_writer ms=5627
+663,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY] END status=APPLY_VERIFIED cuts=4 rollback=False saveApiCalled=False
+664,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY-PERF] phase=session_apply ms=5640
+665,USER_LOG_RECORDED_NATIVE_EXECUTION,"[AFJ-APPLY] ENTRY success=True Đã tạo 4 Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi."
+666,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-APPLY-PERF] phase=result_notification ms=2 shown=True modal=False channel=status_bar
+667,USER_LOG_RECORDED_NATIVE_EXECUTION,"[AFJ-R52] stage=APPLY_CALLBACK_END seq=106 epoch=3 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=False closing=True activated=False faulted=False Đã tạo 4 Cut-Extrude trên hai Frame, khớp Preview. Hãy kiểm tra và lưu Part khi muốn giữ thay đổi."
+668,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-GHOST] AfterClose CLEAN Không có Temporary Body còn chờ dọn.
+669,USER_LOG_RECORDED_NATIVE_EXECUTION,[AFJ-R52] stage=AFTER_CLOSE_END seq=107 epoch=3 thread=1 owner=1 cbDepth=0 focusCache=0 callbackCounts=1/1 shown=False closing=True activated=False faulted=False apply/cleanup/onClosed returned ms=5646
+670,USER_LOG_RECORDED_NATIVE_EXECUTION,[MAKE HOLE SAFE] Cleanup skipped: active document is not a Make Hole context.
+681,USER_LOG_RECORDED_NATIVE_EXECUTION,"[CHECK CHAN] {""Utc"":""2026-10-22T15:01:51.3011169+00:00"",""Pid"":21160,""Thread"":1,""Apartment"":""STA"",""Mvid"":""420dfcfc-a6ee-4861-ae82-f54d916e32e4"",""Stage"":""Controller.connected"",""Cancelled"":false,""Data"":{""Controller"":38228382,""Form"":8511124,""StaThread"":1},""Exception"":null}"
+682,USER_LOG_RECORDED_NATIVE_EXECUTION,"[CHECK CHAN] {""Utc"":""2026-10-22T15:02:12.8848901+00:00"",""Pid"":21160,""Thread"":1,""Apartment"":""STA"",""Mvid"":""420dfcfc-a6ee-4861-ae82-f54d916e32e4"",""Stage"":""Controller.connected"",""Cancelled"":false,""Data"":{""Controller"":12143461,""Form"":42182293,""StaThread"":1},""Exception"":null}"
+683,USER_LOG_RECORDED_NATIVE_EXECUTION,The program '[21160] SLDWORKS.exe' has exited with code 4294967295 (0xffffffff).

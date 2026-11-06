@@ -1,0 +1,538 @@
+{
+  "schema_version": "1.0",
+  "evidence_levels": {
+    "API_VERIFIED": "Native feature, Sketch, reference, model-call or file-hash observation.",
+    "GEOMETRY_VERIFIED": "Native exact B-rep comparison at the recorded checkpoint.",
+    "INFERRED": "Proposed implementation, interpretation or untested diagnosis."
+  },
+  "basic_part_activation_and_rebuild": {
+    "case": "2354_fr03_A_x_fr04_B",
+    "status": "AUDIT_COMPLETED_REQUIREMENTS_FAIL",
+    "scope": "STANDALONE_API_HARNESS_COMPILED_WITH_EXACT_LOCAL_AFJ_SOURCE",
+    "native_execution_by_root_runner": true,
+    "native_evidence_sha256": "a922c3375f891560e6c96163a43d7bc539c686fc0ec85ef70601929194fbf221",
+    "installed_addin_test": false,
+    "rule": "ORTHOGONAL_U_TALLER_COVER",
+    "cut_count": 4,
+    "all_cuts_native_representation": [
+      "FIXED_PLANE_PRISM"
+    ],
+    "post_apply_part_activations_completed": true,
+    "copy_rebuild_A_returned": true,
+    "copy_rebuild_B_returned": true,
+    "geometry_matches_reviewed_at_all_checkpoints": true,
+    "new_native_feature_errors": 0,
+    "new_refplanes": 4,
+    "new_sketches": 4,
+    "underconstrained_new_sketches": 4,
+    "hang_reproduced_in_harness": false,
+    "installed_addin_hang_cause": "UNVERIFIED",
+    "save_api_called": false,
+    "original_file_hashes_unchanged": true,
+    "copy_file_hashes_unchanged": true,
+    "blank_owned_session_restored": true,
+    "snapshots": [
+      {
+        "phase": "A.BEFORE_APPLY",
+        "feature_count": 37,
+        "new_refplane_count": 0,
+        "new_sketch_count": 0,
+        "new_underconstrained_sketch_count": 0,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": null
+      },
+      {
+        "phase": "B.BEFORE_APPLY",
+        "feature_count": 40,
+        "new_refplane_count": 0,
+        "new_sketch_count": 0,
+        "new_underconstrained_sketch_count": 0,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": null
+      },
+      {
+        "phase": "A.AFTER_APPLY_BEFORE_ACTIVATION",
+        "feature_count": 43,
+        "new_refplane_count": 2,
+        "new_sketch_count": 2,
+        "new_underconstrained_sketch_count": 2,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": 0
+      },
+      {
+        "phase": "B.AFTER_APPLY_BEFORE_ACTIVATION",
+        "feature_count": 46,
+        "new_refplane_count": 2,
+        "new_sketch_count": 2,
+        "new_underconstrained_sketch_count": 2,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": 0
+      },
+      {
+        "phase": "A.AFTER_PART_ACTIVATION_NO_REBUILD",
+        "feature_count": 43,
+        "new_refplane_count": 2,
+        "new_sketch_count": 2,
+        "new_underconstrained_sketch_count": 2,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": 0
+      },
+      {
+        "phase": "A.AFTER_EXPLICIT_REBUILD_COPY_ONLY",
+        "feature_count": 43,
+        "new_refplane_count": 2,
+        "new_sketch_count": 2,
+        "new_underconstrained_sketch_count": 2,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": 0
+      },
+      {
+        "phase": "B.AFTER_PART_ACTIVATION_NO_REBUILD",
+        "feature_count": 46,
+        "new_refplane_count": 2,
+        "new_sketch_count": 2,
+        "new_underconstrained_sketch_count": 2,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": 0
+      },
+      {
+        "phase": "B.AFTER_EXPLICIT_REBUILD_COPY_ONLY",
+        "feature_count": 46,
+        "new_refplane_count": 2,
+        "new_sketch_count": 2,
+        "new_underconstrained_sketch_count": 2,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": 0
+      },
+      {
+        "phase": "A.FINAL_AFTER_BOTH_SWITCHES",
+        "feature_count": 43,
+        "new_refplane_count": 2,
+        "new_sketch_count": 2,
+        "new_underconstrained_sketch_count": 2,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": 0
+      },
+      {
+        "phase": "B.FINAL_AFTER_BOTH_SWITCHES",
+        "feature_count": 46,
+        "new_refplane_count": 2,
+        "new_sketch_count": 2,
+        "new_underconstrained_sketch_count": 2,
+        "new_feature_error_count": 0,
+        "feature_detail_error_count": 0,
+        "symmetric_difference_from_reviewed_m3": 0
+      }
+    ],
+    "new_sketch_details": [
+      {
+        "frame": "A",
+        "feature_name": "AFJ_40d5ab53_A_01_Profile",
+        "constrained_status": 2,
+        "fully_constrained": false,
+        "relation_count": 0,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "display_dimensions": 0,
+        "native_reference_entity_type": 4,
+        "native_reference_is_refplane": true,
+        "parent_types": [
+          "RefPlane"
+        ],
+        "evidence_level": "API_VERIFIED"
+      },
+      {
+        "frame": "A",
+        "feature_name": "AFJ_40d5ab53_A_02_Profile",
+        "constrained_status": 2,
+        "fully_constrained": false,
+        "relation_count": 0,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "display_dimensions": 0,
+        "native_reference_entity_type": 4,
+        "native_reference_is_refplane": true,
+        "parent_types": [
+          "RefPlane"
+        ],
+        "evidence_level": "API_VERIFIED"
+      },
+      {
+        "frame": "B",
+        "feature_name": "AFJ_40d5ab53_B_01_Profile",
+        "constrained_status": 2,
+        "fully_constrained": false,
+        "relation_count": 0,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "display_dimensions": 0,
+        "native_reference_entity_type": 4,
+        "native_reference_is_refplane": true,
+        "parent_types": [
+          "RefPlane"
+        ],
+        "evidence_level": "API_VERIFIED"
+      },
+      {
+        "frame": "B",
+        "feature_name": "AFJ_40d5ab53_B_02_Profile",
+        "constrained_status": 2,
+        "fully_constrained": false,
+        "relation_count": 0,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "display_dimensions": 0,
+        "native_reference_entity_type": 4,
+        "native_reference_is_refplane": true,
+        "parent_types": [
+          "RefPlane"
+        ],
+        "evidence_level": "API_VERIFIED"
+      }
+    ]
+  },
+  "copy_save_reopen_round_trip": {
+    "run_id": "native_u_save_reopen_copy_01",
+    "status": "RUNNING_RESULT_NOT_YET_QUALIFIED",
+    "scope": "EXPLICIT_COPY_ONLY_SAVE_AND_READ_ONLY_REOPEN",
+    "save_allowed_only_for_new_disposable_copies": true,
+    "original_cad_save_allowed": false,
+    "status_must_not_be_inferred_from_partial_progress_files": true
+  },
+  "installed_addin": {
+    "user_log_apply": "APPLY_VERIFIED_FOUR_LEGACY_U_CUTS",
+    "user_log_afj_cleanup": "CLEAN_COMPLETED",
+    "process_exit_code": "0xffffffff",
+    "part_open_event_or_native_fault_stack": "NOT_AVAILABLE_IN_SUPPLIED_LOG",
+    "hang_cause": "UNVERIFIED",
+    "matching_windows_fault_event": "NO_MATCHING_EVENT_FOUND_IN_PARENT_AUDIT",
+    "native_harness_did_not_reproduce_reported_hang": true
+  },
+  "legacy_constructor_observations": {
+    "NativeRepresentation": "FIXED_PLANE_PRISM",
+    "EndFaceSketchEvidenceAvailable": false,
+    "unmeasured_sketch_counters_initialized_to": -1,
+    "interpretation": "-1 means unavailable in original writer DTO, not measured zero; separate native audit measured the four actual Sketches."
+  },
+  "project_protection": {
+    "no_main_addin_build_or_deploy_by_audit": true,
+    "no_original_cad_modified": true,
+    "no_cad_brep_dll_pdb_or_persistence_payload_published": true
+  },
+  "save_copy_readonly_reopen": {
+    "case": "2354_fr03_A_x_fr04_B_SAVE_COPY_REOPEN_READONLY",
+    "status": "AUDIT_COMPLETED_REQUIREMENTS_FAIL",
+    "scope": "EXACT_CURRENT_LOCAL_SOURCE_STANDALONE_API_HARNESS",
+    "native_execution_by_root_runner": true,
+    "installed_addin_test": false,
+    "native_evidence_sha256": "3045259037877cd9aca740b9287a5cd57f2e491553bc93acc294249b2a2581d4",
+    "rule": "ORTHOGONAL_U_TALLER_COVER",
+    "native_cut_count": 4,
+    "roundtrip_completed": true,
+    "roundtrip_all_valid_bodies": true,
+    "save_api_called": true,
+    "save_scope": "TWO_DISPOSABLE_COPIED_PARTS_ONLY",
+    "read_only_reopen": true,
+    "original_hashes_unchanged": true,
+    "copy_hashes_unchanged": false,
+    "copy_hash_changes_expected": true,
+    "blank_session_restored": true,
+    "full_brep_equivalence_before_save": "GEOMETRY_VERIFIED_SYMMETRIC_DIFFERENCE_ZERO_AGAINST_REVIEWED_PLAN",
+    "full_brep_equivalence_after_reopen": "NOT_RUN_VOLUME_AREA_CHECK2_ONLY",
+    "material_density": "NOT_READ_MASS_PROPERTY_USES_DENSITY_ARGUMENT_1_KG_PER_M3",
+    "hang_reproduced_in_standalone_harness": false,
+    "installed_addin_hang_cause": "UNVERIFIED",
+    "parts": [
+      {
+        "frame": "A",
+        "open_error": 0,
+        "open_warning": 0,
+        "read_only_requested": true,
+        "body_check2": 0,
+        "body_type": 0,
+        "solid_body": true,
+        "faces": 23,
+        "edges": 51,
+        "before_save_volume_m3": 0.0010980635066544949,
+        "reopened_volume_m3": 0.001098063506654495,
+        "volume_delta_m3": 2.168404344971009e-19,
+        "area_delta_m2": 0,
+        "mass_property_density1_delta_kg": 2.168404344971009e-19,
+        "new_refplanes": 2,
+        "new_sketches": 2,
+        "new_underconstrained_sketches": 2,
+        "native_sketch_relation_count_total": 0,
+        "new_native_feature_errors": 0,
+        "full_brep_equivalence_after_reopen": "NOT_RUN_VOLUME_AREA_CHECK2_ONLY",
+        "status": "PASS_COPY_READONLY_REOPEN_BODY",
+        "evidence_level": "API_VERIFIED"
+      },
+      {
+        "frame": "B",
+        "open_error": 0,
+        "open_warning": 0,
+        "read_only_requested": true,
+        "body_check2": 0,
+        "body_type": 0,
+        "solid_body": true,
+        "faces": 22,
+        "edges": 46,
+        "before_save_volume_m3": 0.000542650915127981,
+        "reopened_volume_m3": 0.000542650915127981,
+        "volume_delta_m3": 0,
+        "area_delta_m2": 0,
+        "mass_property_density1_delta_kg": 0.0,
+        "new_refplanes": 2,
+        "new_sketches": 2,
+        "new_underconstrained_sketches": 2,
+        "native_sketch_relation_count_total": 0,
+        "new_native_feature_errors": 0,
+        "full_brep_equivalence_after_reopen": "NOT_RUN_VOLUME_AREA_CHECK2_ONLY",
+        "status": "PASS_COPY_READONLY_REOPEN_BODY",
+        "evidence_level": "API_VERIFIED"
+      }
+    ],
+    "sketches": [
+      {
+        "frame": "A",
+        "sketch_name": "AFJ_2986aff3_A_01_Profile",
+        "constrained_status": 2,
+        "fully_constrained": false,
+        "relations": 0,
+        "external_relations": 0,
+        "incontext_relations": 0,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "dimension_count": 0,
+        "native_support_type": 4,
+        "native_support_is_refplane": true,
+        "native_support_is_face2": false,
+        "parent_types": "RefPlane",
+        "parent_names": "AFJ_2986aff3_A_01_Plane",
+        "new_refplane_parents": 1,
+        "evidence_level": "API_VERIFIED"
+      },
+      {
+        "frame": "A",
+        "sketch_name": "AFJ_2986aff3_A_02_Profile",
+        "constrained_status": 2,
+        "fully_constrained": false,
+        "relations": 0,
+        "external_relations": 0,
+        "incontext_relations": 0,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "dimension_count": 0,
+        "native_support_type": 4,
+        "native_support_is_refplane": true,
+        "native_support_is_face2": false,
+        "parent_types": "RefPlane",
+        "parent_names": "AFJ_2986aff3_A_02_Plane",
+        "new_refplane_parents": 1,
+        "evidence_level": "API_VERIFIED"
+      },
+      {
+        "frame": "B",
+        "sketch_name": "AFJ_2986aff3_B_01_Profile",
+        "constrained_status": 2,
+        "fully_constrained": false,
+        "relations": 0,
+        "external_relations": 0,
+        "incontext_relations": 0,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "dimension_count": 0,
+        "native_support_type": 4,
+        "native_support_is_refplane": true,
+        "native_support_is_face2": false,
+        "parent_types": "RefPlane",
+        "parent_names": "AFJ_2986aff3_B_01_Plane",
+        "new_refplane_parents": 1,
+        "evidence_level": "API_VERIFIED"
+      },
+      {
+        "frame": "B",
+        "sketch_name": "AFJ_2986aff3_B_02_Profile",
+        "constrained_status": 2,
+        "fully_constrained": false,
+        "relations": 0,
+        "external_relations": 0,
+        "incontext_relations": 0,
+        "dangling_relations": 0,
+        "overdefining_relations": 0,
+        "dimension_count": 0,
+        "native_support_type": 4,
+        "native_support_is_refplane": true,
+        "native_support_is_face2": false,
+        "parent_types": "RefPlane",
+        "parent_names": "AFJ_2986aff3_B_02_Plane",
+        "new_refplane_parents": 1,
+        "evidence_level": "API_VERIFIED"
+      }
+    ],
+    "timings": {
+      "wall_clock_seconds": 159.370747,
+      "observed_native_call_count": 5988,
+      "sum_observed_call_ms": 143287,
+      "last_call": {
+        "sequence": 5988,
+        "phase": "CLEANUP.GetDocumentCount",
+        "state": "END",
+        "utc": "2026-10-22T15:24:24.2162087Z",
+        "previous_completed_phase": "CLEANUP.enumerate.GetFirstDocument",
+        "elapsed_ms": 18
+      },
+      "selected_calls": [
+        {
+          "sequence": 7,
+          "begin_utc": "2026-10-22T15:21:44.9558848Z",
+          "phase": "OPEN_COPIED_ASSEMBLY.OpenDoc6",
+          "elapsed_ms": 1096
+        },
+        {
+          "sequence": 9,
+          "begin_utc": "2026-10-22T15:21:46.0797015Z",
+          "phase": "ACTIVATE_COPIED_ASSEMBLY.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 9
+        },
+        {
+          "sequence": 846,
+          "begin_utc": "2026-10-22T15:21:56.9184919Z",
+          "phase": "SOLVE_REVIEWED_PAIR.AfjJointSolver.Solve",
+          "elapsed_ms": 32328
+        },
+        {
+          "sequence": 850,
+          "begin_utc": "2026-10-22T15:22:29.2905864Z",
+          "phase": "APPLY_NATIVE_CUTS_ON_COPIES.TryApply",
+          "elapsed_ms": 32974
+        },
+        {
+          "sequence": 1856,
+          "begin_utc": "2026-10-22T15:23:21.8011431Z",
+          "phase": "A.OPEN_EXISTING_COPY_PART_NO_REBUILD.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 138
+        },
+        {
+          "sequence": 2336,
+          "begin_utc": "2026-10-22T15:23:29.2166159Z",
+          "phase": "A.EXPLICIT_REBUILD_COPY_ONLY.EditRebuild3",
+          "elapsed_ms": 329
+        },
+        {
+          "sequence": 2814,
+          "begin_utc": "2026-10-22T15:23:35.9581033Z",
+          "phase": "A.RETURN_TO_COPIED_ASSEMBLY_NO_REBUILD.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 95
+        },
+        {
+          "sequence": 2819,
+          "begin_utc": "2026-10-22T15:23:36.2237962Z",
+          "phase": "B.OPEN_EXISTING_COPY_PART_NO_REBUILD.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 128
+        },
+        {
+          "sequence": 3351,
+          "begin_utc": "2026-10-22T15:23:44.1614893Z",
+          "phase": "B.EXPLICIT_REBUILD_COPY_ONLY.EditRebuild3",
+          "elapsed_ms": 80
+        },
+        {
+          "sequence": 3881,
+          "begin_utc": "2026-10-22T15:23:50.8123789Z",
+          "phase": "B.RETURN_TO_COPIED_ASSEMBLY_NO_REBUILD.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 82
+        },
+        {
+          "sequence": 4904,
+          "begin_utc": "2026-10-22T15:24:07.7338566Z",
+          "phase": "A.ROUNDTRIP.SAVE_COPY.ActivateNoRebuild.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 141
+        },
+        {
+          "sequence": 4914,
+          "begin_utc": "2026-10-22T15:24:08.2121115Z",
+          "phase": "A.ROUNDTRIP.SAVE_COPY.Save3.CopyOnly.SilentAvoidRebuild",
+          "elapsed_ms": 154
+        },
+        {
+          "sequence": 4917,
+          "begin_utc": "2026-10-22T15:24:08.6078310Z",
+          "phase": "B.ROUNDTRIP.SAVE_COPY.ActivateNoRebuild.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 142
+        },
+        {
+          "sequence": 4927,
+          "begin_utc": "2026-10-22T15:24:08.9628660Z",
+          "phase": "B.ROUNDTRIP.SAVE_COPY.Save3.CopyOnly.SilentAvoidRebuild",
+          "elapsed_ms": 146
+        },
+        {
+          "sequence": 4942,
+          "begin_utc": "2026-10-22T15:24:09.2377403Z",
+          "phase": "ROUNDTRIP.CloseDoc.NO_ADDITIONAL_SAVE.AFJ_PAIR_2354-02-lc-B11.SLDASM",
+          "elapsed_ms": 151
+        },
+        {
+          "sequence": 4947,
+          "begin_utc": "2026-10-22T15:24:09.4481267Z",
+          "phase": "ROUNDTRIP.CloseDoc.NO_ADDITIONAL_SAVE.AFJ_PAIR_2354-04-lc-B11-fr03.SLDPRT",
+          "elapsed_ms": 106
+        },
+        {
+          "sequence": 4949,
+          "begin_utc": "2026-10-22T15:24:09.5626574Z",
+          "phase": "ROUNDTRIP.CloseDoc.NO_ADDITIONAL_SAVE.AFJ_PAIR_2354-04-lc-B11-fr04.SLDPRT",
+          "elapsed_ms": 106
+        },
+        {
+          "sequence": 4951,
+          "begin_utc": "2026-10-22T15:24:09.6852472Z",
+          "phase": "A.ROUNDTRIP.REOPEN_READONLY.OpenDoc6.ReadOnlySilent",
+          "elapsed_ms": 865
+        },
+        {
+          "sequence": 4957,
+          "begin_utc": "2026-10-22T15:24:10.5925248Z",
+          "phase": "A.ROUNDTRIP.REOPEN_READONLY.ActivateNoRebuild.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 11
+        },
+        {
+          "sequence": 5442,
+          "begin_utc": "2026-10-22T15:24:16.6464195Z",
+          "phase": "A.ROUNDTRIP.REOPEN_READONLY.CloseDoc.NO_SAVE",
+          "elapsed_ms": 76
+        },
+        {
+          "sequence": 5443,
+          "begin_utc": "2026-10-22T15:24:16.7393869Z",
+          "phase": "B.ROUNDTRIP.REOPEN_READONLY.OpenDoc6.ReadOnlySilent",
+          "elapsed_ms": 866
+        },
+        {
+          "sequence": 5449,
+          "begin_utc": "2026-10-22T15:24:17.6619830Z",
+          "phase": "B.ROUNDTRIP.REOPEN_READONLY.ActivateNoRebuild.ActivateDoc3.swDontRebuildActiveDoc",
+          "elapsed_ms": 9
+        },
+        {
+          "sequence": 5986,
+          "begin_utc": "2026-10-22T15:24:24.0992879Z",
+          "phase": "B.ROUNDTRIP.REOPEN_READONLY.CloseDoc.NO_SAVE",
+          "elapsed_ms": 82
+        }
+      ],
+      "interpretation": "Wrapper elapsed time including COM/native work; standalone audit instrumentation overhead included in wall clock. No UI responsiveness conclusion."
+    }
+  },
+  "installed_addin_hang_cause": "UNVERIFIED_USER_CANNOT_PROVIDE_MAIN_THREAD_CALLSTACK"
+}

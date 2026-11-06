@@ -834,7 +834,7 @@ namespace ADDIN
             // 
             // tabComponentDrawing
             // 
-            this.tabComponentDrawing.AutoScroll = true;
+            this.tabComponentDrawing.AutoScroll = false;
             this.tabComponentDrawing.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(241)))), ((int)(((byte)(245)))), ((int)(((byte)(249)))));
             this.tabComponentDrawing.Controls.Add(this.groupBox3);
             this.tabComponentDrawing.Controls.Add(this.grpComponentBom);

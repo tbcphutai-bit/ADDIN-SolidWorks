@@ -1,0 +1,44 @@
+[
+  {
+    "variant": "local",
+    "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "before_sha256": "d29dc9a1eb1b8f806edc2bb0aa084e929e1b260371b3cd9e507d02cbb8229970",
+    "after_sha256": "904956aff586726c3e931b78996fd47b208403bfc4e05b8fc85c8f8a47efd200",
+    "r51_core_unchanged": null
+  },
+  {
+    "variant": "local",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+    "before_sha256": "cafe0a13242f1b18f5d1a9d37cb9b733caf851b782a642d9dc0b7bb7061671df",
+    "after_sha256": "af3f3d043d38dce89a08ff16c233b53e22f64f684d2f165398a1d9a107dcbaf5",
+    "r51_core_unchanged": true
+  },
+  {
+    "variant": "local",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+    "before_sha256": "ec1e7daea7989e2a8a405311f85cebd761f15ad2b87825a41a2fea95262a9af2",
+    "after_sha256": "d72694979b651589332b437224be6fc4672e4a99a0c930717608ee1b1b4ad983",
+    "r51_core_unchanged": null
+  },
+  {
+    "variant": "branch",
+    "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "before_sha256": "c3b1919db3b1a05b3b07867cd9c22fd754331e8d4871dbfad34427529bc31272",
+    "after_sha256": "b2cfdf7bf34157e56587466dea7efd7b02270e519f71006eeb3ee3034aa2b0a5",
+    "r51_core_unchanged": null
+  },
+  {
+    "variant": "branch",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+    "before_sha256": "4e0fd2bbc1aa1fcf03c0e4c2e6af11a282d31ff3b32d58f520270ae0a7b06c0a",
+    "after_sha256": "97d2c286ed12d4f95d0e1280f70e77844ef0a72f358ca638f8f297edd7673981",
+    "r51_core_unchanged": true
+  },
+  {
+    "variant": "branch",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+    "before_sha256": "eccedf4edb649bf81d2d51ec4fe528e9d18d2197b5441f6055f29f340cb0b7fd",
+    "after_sha256": "863e4f5972173551e98e3125b5435d53fcbde3464de8eab7b00afd42878936c1",
+    "r51_core_unchanged": null
+  }
+]

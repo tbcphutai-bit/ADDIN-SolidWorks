@@ -1,0 +1,82 @@
+{
+  "records": [
+    {
+      "file": "ADDIN.csproj",
+      "initial_sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+      "before_apply_sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+      "after_apply_sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+      "changed_by_apply": false,
+      "already_different_from_initial": false
+    },
+    {
+      "file": "ADDIN.dll",
+      "initial_sha256": "eb7f7e82f816c416fd333b80e995ccaef34eba9c525cfc8b8391ddf6f307a0d0",
+      "before_apply_sha256": "4ab84b2918c14018aa0dff0bc14c84bc8050edc86f102d645cb1aa6bef0c490e",
+      "after_apply_sha256": "4ab84b2918c14018aa0dff0bc14c84bc8050edc86f102d645cb1aa6bef0c490e",
+      "changed_by_apply": false,
+      "already_different_from_initial": true
+    },
+    {
+      "file": "ADDIN.pdb",
+      "initial_sha256": "6c2f712e20a445e9758bae716a82c7c05ff7b8ec4076ef0014c19966627786c3",
+      "before_apply_sha256": "8d33b822085364efd4cfd30d3c4ce57499500d2658aa74a4ed5249c4e0e40c6f",
+      "after_apply_sha256": "8d33b822085364efd4cfd30d3c4ce57499500d2658aa74a4ed5249c4e0e40c6f",
+      "changed_by_apply": false,
+      "already_different_from_initial": true
+    },
+    {
+      "file": "AutoFrameJointCommandEntry.cs",
+      "initial_sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+      "before_apply_sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+      "after_apply_sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+      "changed_by_apply": false,
+      "already_different_from_initial": false
+    },
+    {
+      "file": "AutoFrameJointGeometryMath.cs",
+      "initial_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "before_apply_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "after_apply_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "changed_by_apply": false,
+      "already_different_from_initial": false
+    },
+    {
+      "file": "AutoFrameJointGhostPreview.cs",
+      "initial_sha256": "f0fcda50d4852e715f353f9787d41d6c7d26de1ca4824e2b56752b6976c1584c",
+      "before_apply_sha256": "f0fcda50d4852e715f353f9787d41d6c7d26de1ca4824e2b56752b6976c1584c",
+      "after_apply_sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b",
+      "changed_by_apply": true,
+      "already_different_from_initial": false
+    },
+    {
+      "file": "AutoFrameJointGhostSessionManager.cs",
+      "initial_sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+      "before_apply_sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+      "after_apply_sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+      "changed_by_apply": false,
+      "already_different_from_initial": false
+    },
+    {
+      "file": "AutoFrameJointReadOnlyProbe.cs",
+      "initial_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "before_apply_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "after_apply_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "changed_by_apply": false,
+      "already_different_from_initial": false
+    },
+    {
+      "file": "AutoFrameJointSelectionPage.cs",
+      "initial_sha256": "17a7cc2e448e2d71c5fc88af19fc99f1a710773e541a1b84de0e66ca47d919fe",
+      "before_apply_sha256": "17a7cc2e448e2d71c5fc88af19fc99f1a710773e541a1b84de0e66ca47d919fe",
+      "after_apply_sha256": "17a7cc2e448e2d71c5fc88af19fc99f1a710773e541a1b84de0e66ca47d919fe",
+      "changed_by_apply": false,
+      "already_different_from_initial": false
+    }
+  ],
+  "branch": "integrate/check-chan-pr37-vs-20261021",
+  "head": "66d12511f24c35b560d699228109857058ad66cb",
+  "only_backend_written": true,
+  "main_addin_build_invoked": false,
+  "external_output_change_note": "DLL/PDB hashes already differed before source application. This task does not write them; actor/cause is not established by hashing.",
+  "applied_utc": "2026-10-22T04:09:53.3447441Z"
+}

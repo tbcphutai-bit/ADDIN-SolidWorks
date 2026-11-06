@@ -1782,7 +1782,15 @@ namespace ADDIN.Commands
         private bool TryGetUraViewNormal(ModelDoc2 part, SolidWorks.Interop.sldworks.View view,
             string referencedConfig, out double[] viewNormal)
         {
+            Face2 face;
+            return TryGetUraViewNormal(part, view, referencedConfig, out viewNormal, out face);
+        }
+
+        private bool TryGetUraViewNormal(ModelDoc2 part, SolidWorks.Interop.sldworks.View view,
+            string referencedConfig, out double[] viewNormal, out Face2 uraFace)
+        {
             viewNormal = null;
+            uraFace = null;
             try
             {
                 ConfigurationManager manager = part.ConfigurationManager;
@@ -1846,6 +1854,7 @@ namespace ADDIN.Commands
                 double[] tip = TransformModelPoint(math, transform, normal[0], normal[1], normal[2]);
                 if (origin == null || tip == null) return false;
                 viewNormal = new[] { tip[0] - origin[0], tip[1] - origin[1], tip[2] - origin[2] };
+                uraFace = best;
                 Log("URA SIDE pinkFaces=" + pinkFaces + " dominantAreaMm2=" + F(bestArea * 1000000) +
                     " modelNormal=(" + F(normal[0]) + "," + F(normal[1]) + "," + F(normal[2]) + ")" +
                     " viewNormal=(" + F(viewNormal[0]) + "," + F(viewNormal[1]) +

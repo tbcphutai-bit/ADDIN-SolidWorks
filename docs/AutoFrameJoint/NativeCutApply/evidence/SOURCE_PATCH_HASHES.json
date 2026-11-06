@@ -1,0 +1,50 @@
+[
+  {
+    "variant": "local",
+    "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "before_sha256": "904956aff586726c3e931b78996fd47b208403bfc4e05b8fc85c8f8a47efd200",
+    "after_sha256": "8f9c358eabfc2b67cd4a32e1b032493a5a4c6916876d43e0ee8a3acf167dccc2"
+  },
+  {
+    "variant": "local",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+    "before_sha256": "af3f3d043d38dce89a08ff16c233b53e22f64f684d2f165398a1d9a107dcbaf5",
+    "after_sha256": "45ac41caa1d97bb0f5868956c4bc2cb78e08ebfd51e61467d3f9ba395e06b52f"
+  },
+  {
+    "variant": "local",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+    "before_sha256": "d72694979b651589332b437224be6fc4672e4a99a0c930717608ee1b1b4ad983",
+    "after_sha256": "a5b825c59258b5e54ea809201350e12a067730b48e63001c39632bc18d9dc0c7"
+  },
+  {
+    "variant": "local",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+    "before_sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09",
+    "after_sha256": "fe853fe4e53c38143c8713b3e96c26d3f63d9a713f841a6251b9f549aeb374e3"
+  },
+  {
+    "variant": "branch",
+    "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "before_sha256": "b2cfdf7bf34157e56587466dea7efd7b02270e519f71006eeb3ee3034aa2b0a5",
+    "after_sha256": "3a5116f16031d98d221a5cdb7cdfbcf52788a06ef227bf3025689f0b94c74d78"
+  },
+  {
+    "variant": "branch",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+    "before_sha256": "97d2c286ed12d4f95d0e1280f70e77844ef0a72f358ca638f8f297edd7673981",
+    "after_sha256": "9dd634f2d865dea38a0e4ba17f7957ee7847660f9eb734d7f6fdb3ebe2cc239d"
+  },
+  {
+    "variant": "branch",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+    "before_sha256": "863e4f5972173551e98e3125b5435d53fcbde3464de8eab7b00afd42878936c1",
+    "after_sha256": "b8a4c55260c02ecff8f66302dc1869b611fa740813bdfc1b102a41e6a069df12"
+  },
+  {
+    "variant": "branch",
+    "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+    "before_sha256": "8e6c35e17e100d2604a2a9c8dc9ff3fe28f60c5f5c9594554d0726696fb4d061",
+    "after_sha256": "029f280f0dc44506442dac7bf447eb004830f69fda18110cbb45a93c0db95a99"
+  }
+]

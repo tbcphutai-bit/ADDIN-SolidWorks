@@ -1,0 +1,204 @@
+// PRIVATE GATE 2. Compile only with a detached AFJ harness candidate.
+// No Cut, new plane, dimension, Convert or FIX is created by this helper.
+// Caller supplies fresh COPIED assembly/Parts and the current U generated plan.
+// Caller closes copies without Save and owns all source/copy hash checks.
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    internal static class AfjUCriticalPointsProbe
+    {
+        internal sealed class Datum
+        {
+            internal Component2 Component;
+            internal object Native,Context;
+            internal string Kind,Role;
+            internal int OwnerFeatureId;
+            internal double[] PlaneWorld,SeedWorld;
+            internal bool SeedOnFiniteTrim;
+            internal double ClosestDistance;
+        }
+        internal sealed class PointEvidence
+        {
+            internal string Role,PointId;
+            internal double[] ExpectedWorld,ExpectedSketch,ObservedSketch;
+            internal Datum First,Second;
+            internal int[] AllowedFirst,AllowedSecond;
+            internal int FirstRelationType,SecondRelationType;
+            internal string Qualification;
+        }
+        internal sealed class Result
+        {
+            internal string Status="UNVERIFIED",Error,CoordinateContext="ASSEMBLY_WORLD_TO_TARGET_PART_TO_SKETCH",Scope="FOUR_U_CRITICAL_POINTS_ONLY_NO_CUT";
+            internal bool NativeApi,InstalledAddin=false,CutCreated=false,SaveApiCalled=false,OwnSupportVerified,SketchOwnerVerified,ContextRestored;
+            internal bool CriticalSeamNearMatchesPlan,AllPointsFullyConstrained,NoDimensions,NoNewPlanes;
+            internal int SketchFeatureId=-1,SupportReferenceType=-1,ConstraintStatus=-1,Relations=-1,Dangling=-1,Overdefining=-1;
+            internal int NewPlanes=-1,Dimensions=-1,ExternalReferences=-1;
+            internal string SketchName;
+            internal readonly List<PointEvidence> Points=new List<PointEvidence>();
+        }
+        static void Need(bool b,string reason){if(!b)throw new InvalidOperationException("U_GATE2_UNVERIFIED: "+reason);}
+        static double Dot(double[] a,double[] b){return AfjParametricRules.Dot(a,b);}
+        static double[] Add(double[] a,double[] b){return AfjParametricRules.Add(a,b);}
+        static double[] Sub(double[] a,double[] b){return AfjParametricRules.Sub(a,b);}
+        static double[] Mul(double[] a,double b){return AfjParametricRules.Scale(a,b);}
+        static double Norm(double[] a){return Math.Sqrt(Dot(a,a));}
+        static double[] Unit(double[] a){return AfjParametricRules.Unit(a);}
+        static double[] Point(ISldWorks app,double[] p,MathTransform t){var math=app.GetMathUtility() as MathUtility;Need(math!=null,"MathUtility unavailable");var q=math.CreatePoint(p) as MathPoint;return ((MathPoint)q.MultiplyTransform(t)).ArrayData as double[];}
+        static double[] World(ISldWorks app,double[] p,Component2 c){return Point(app,p,c.GetTotalTransform(false));}
+        static double[] WorldVector(ISldWorks app,double[] p,Component2 c){var t=c.GetTotalTransform(false);return Unit(Sub(Point(app,p,t),Point(app,new double[3],t)));}
+        static bool Same(ISldWorks app,object a,object b){return a!=null&&b!=null&&app.IsSame(a,b)==(int)swObjectEquality.swObjectSame;}
+        static Body2 NativeBody(Component2 c){object info;var raw=c.GetBodies3((int)swBodyType_e.swSolidBody,out info) as Array;Need(raw!=null&&raw.Length==1,"one native body required");return raw.GetValue(0) as Body2;}
+        static int Planes(ModelDoc2 part){int n=0,seen=0;for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(++seen<2000,"plane traversal bound");if(f.GetTypeName2()=="RefPlane")n++;}return n;}
+        static HashSet<int> Ids(ModelDoc2 part){var ids=new HashSet<int>();for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(ids.Count<2000,"feature traversal bound");ids.Add(f.GetID());}return ids;}
+        static Feature FindFeature(ModelDoc2 part,int id){int n=0;for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(++n<2000,"owned feature traversal bound");if(f.GetID()==id)return f;}return null;}
+        static double[] Common(AfjParametricPlan plan,double s,double q){return Add(plan.JointOrigin,Add(Mul(plan.OutLoser,s),Mul(plan.OutWinner,q)));}
+        static Datum FaceDatum(ISldWorks app,Component2 c,double[] expectedNormal,double[] seed,string role)
+        {
+            var options=new List<Tuple<Datum,double>>();double support=Dot(seed,expectedNormal);
+            foreach(Face2 face in (Array)NativeBody(c).GetFaces())
+            {
+                var surface=face.GetSurface() as Surface;if(surface==null||!surface.IsPlane())continue;
+                var p=surface.PlaneParams as double[];if(p==null||p.Length!=6)continue;
+                double[] n=WorldVector(app,p.Take(3).ToArray(),c),a=World(app,p.Skip(3).Take(3).ToArray(),c);
+                if(Math.Abs(Math.Abs(Dot(n,expectedNormal))-1)>1e-7||Math.Abs(Dot(a,expectedNormal)-support)>1e-8)continue;
+                Feature owner=face.GetFeature() as Feature;if(owner==null)continue;
+                object context=c.GetCorrespondingEntity(face);if(!(context is Face2))continue;
+                double[] local=Point(app,seed,c.GetTotalTransform(false).Inverse() as MathTransform),closest=face.GetClosestPointOn(local[0],local[1],local[2]) as double[];
+                if(closest==null||closest.Length<3)continue;double distance=Norm(Sub(World(app,closest.Take(3).ToArray(),c),seed));
+                var datum=new Datum{Component=c,Native=face,Context=context,Kind="ACTUAL_NATIVE_FACE_UNDERLYING_PLANE",Role=role,OwnerFeatureId=owner.GetID(),
+                    PlaneWorld=n.Concat(a).ToArray(),SeedWorld=seed,SeedOnFiniteTrim=distance<1e-8,ClosestDistance=distance};
+                options.Add(Tuple.Create(datum,face.GetArea()));
+            }
+            Need(options.Count>0,"native Face plane datum unavailable: "+role);return options.OrderByDescending(x=>x.Item2).First().Item1;
+        }
+        static Datum EdgeDatum(ISldWorks app,Component2 c,Face2 support,double[] worldDirection,double[] seed,string role)
+        {
+            var options=new List<Datum>();var raw=support.GetEdges() as Array;Need(raw!=null,"support edge inventory unavailable");
+            foreach(Edge edge in raw.Cast<object>().OfType<Edge>())
+            {
+                var curve=edge.GetCurve() as Curve;if(curve==null||!curve.IsLine())continue;
+                var av=edge.GetStartVertex() as Vertex;var bv=edge.GetEndVertex() as Vertex;if(av==null||bv==null)continue;
+                double[] a=World(app,(double[])av.GetPoint(),c),b=World(app,(double[])bv.GetPoint(),c);double length=Norm(Sub(b,a));
+                if(length<1e-7||Math.Abs(Math.Abs(Dot(Unit(Sub(b,a)),worldDirection))-1)>1e-7)continue;
+                double along=Dot(Sub(seed,a),Unit(Sub(b,a)));double[] projection=Add(a,Mul(Unit(Sub(b,a)),along));
+                if(Norm(Sub(projection,seed))>1e-8||along< -1e-8||along>length+1e-8)continue;
+                object context=c.GetCorrespondingEntity(edge);if(!(context is Edge))continue;
+                var owner=support.GetFeature() as Feature;Need(owner!=null,"edge support owner unavailable");
+                options.Add(new Datum{Component=c,Native=edge,Context=context,Kind="ACTUAL_NATIVE_FINITE_EDGE",Role=role,OwnerFeatureId=owner.GetID(),
+                    SeedWorld=seed,SeedOnFiniteTrim=true,ClosestDistance=Norm(Sub(projection,seed))});
+            }
+            Need(options.Count>0,"actual finite Web tangent edge unavailable: "+role);return options[0];
+        }
+        static Datum AtSeed(ISldWorks app,Datum source,double[] seed)
+        {
+            double[] local=Point(app,seed,source.Component.GetTotalTransform(false).Inverse() as MathTransform),closest=null;
+            var face=source.Native as Face2;var edge=source.Native as Edge;
+            if(face!=null)closest=face.GetClosestPointOn(local[0],local[1],local[2]) as double[];
+            else if(edge!=null)closest=edge.GetClosestPointOn(local[0],local[1],local[2]) as double[];
+            Need(closest!=null&&closest.Length>=3,"datum trimmed witness unavailable at individual critical point");
+            double distance=Norm(Sub(World(app,closest.Take(3).ToArray(),source.Component),seed));
+            if(edge!=null)Need(distance<1e-8,"critical point outside actual finite tangent edge "+source.Role);
+            return new Datum{Component=source.Component,Native=source.Native,Context=source.Context,Kind=source.Kind,Role=source.Role,
+                OwnerFeatureId=source.OwnerFeatureId,PlaneWorld=source.PlaneWorld,SeedWorld=seed,SeedOnFiniteTrim=distance<1e-8,ClosestDistance=distance};
+        }
+        static int[] Allowed(Sketch sketch,params object[] entities){var values=sketch.RelationManager.GetAllowedRelations(entities.Select(e=>new DispatchWrapper(e)).ToArray()) as Array;return values==null?new int[0]:values.Cast<object>().Select(Convert.ToInt32).ToArray();}
+        static int Relate(Sketch sketch,SketchPoint point,object target){var relation=sketch.RelationManager.AddRelation(new[]{new DispatchWrapper(point),new DispatchWrapper(target)},(int)swConstraintType_e.swConstraintType_COINCIDENT) as SketchRelation;Need(relation!=null,"Coincident native relation returned null");return relation.GetRelationType();}
+        static string PointId(SketchPoint point){var raw=point.GetID() as Array;return raw==null?Convert.ToString(point.GetID()):String.Join(",",raw.Cast<object>().Select(Convert.ToString));}
+        internal static Result Run(ISldWorks app,ModelDoc2 model,Component2 longFrame,Component2 shortFrame,AfjParametricPlan plan)
+        {
+            var result=new Result();var assembly=model as AssemblyDoc;ModelDoc2 part=null;Sketch sketch=null;bool editing=false,opened=false;
+            try
+            {
+                Need(app!=null&&assembly!=null,"bound application/assembly required");result.NativeApi=true;
+                Need(Same(app,app.ActiveDoc,model),"bound active assembly required");
+                Need(plan!=null&&plan.Folded==null&&(plan.Plan.RuleId=="ORTHOGONAL_U_COVER"||plan.Plan.RuleId=="ORTHOGONAL_U_TALLER_COVER"),"current qualified U plan required");
+                Need(plan.Winner!=null&&plan.Loser!=null&&Math.Abs(plan.SeamNear[1]-plan.Loser.Thickness)<1e-8,"this bounded four-point recipe only covers current clamped qn=t mode");
+                result.CriticalSeamNearMatchesPlan=true;
+                Need(Same(app,assembly.GetEditTarget(),model),"exit prior edit context");
+                part=shortFrame.GetModelDoc2() as ModelDoc2;Need(part!=null&&!Same(app,part,longFrame.GetModelDoc2()),"two resolved independent Parts required");
+                var cfg=part.ConfigurationManager.ActiveConfiguration;Need(cfg!=null&&cfg.Name==shortFrame.ReferencedConfiguration,"short target configuration mismatch");
+                int beforePlanes=Planes(part);HashSet<int> beforeIds=Ids(part);
+                var longPart=longFrame.GetModelDoc2() as ModelDoc2;Need(longPart!=null,"long Part unresolved");HashSet<int> longBeforeIds=Ids(longPart);
+                // Fresh pre-AFJ copies only. Referencing later Cut boundaries
+                // could hide a cycle; this probe does not qualify that case.
+                foreach(var source in new[]{part,longPart})
+                {
+                    int seen=0;for(Feature f=source.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature)
+                    {Need(++seen<2000,"source owner traversal bound");Need(!f.Name.StartsWith("AFJ_",StringComparison.Ordinal),"fresh pre-AFJ source feature history required");}
+                }
+                double sn=plan.SeamNear[0],sf=plan.SeamFar[0],qf=plan.SeamFar[1],innerFar=plan.Winner.Width-plan.Winner.Thickness;
+                double[][] seeds={Common(plan,sn,plan.Loser.Thickness),Common(plan,sf,qf),Common(plan,innerFar,qf),Common(plan,innerFar,plan.Loser.Width)};
+                var ownWeb=FaceDatum(app,shortFrame,Unit(plan.Depth),seeds[0],"SHORT_OUTER_WEB_SUPPORT");
+                var longWeb=FaceDatum(app,longFrame,Unit(plan.Depth),seeds[1],"LONG_OUTER_WEB_DATUM");
+                var nearOwn=EdgeDatum(app,shortFrame,(Face2)ownWeb.Native,Unit(plan.OutWinner),seeds[0],"SHORT_NEAR_WEB_BEND_TANGENT");
+                var farOwn=EdgeDatum(app,shortFrame,(Face2)ownWeb.Native,Unit(plan.OutWinner),seeds[1],"SHORT_FAR_WEB_BEND_TANGENT");
+                var nearOther=FaceDatum(app,longFrame,Unit(plan.OutWinner),seeds[0],"LONG_INNER_NEAR_WALL_PLANE");
+                var farOther=EdgeDatum(app,longFrame,(Face2)longWeb.Native,Unit(plan.OutLoser),seeds[1],"LONG_FAR_WEB_BEND_TANGENT");
+                var innerOwn=FaceDatum(app,shortFrame,Unit(plan.OutLoser),seeds[2],"SHORT_INNER_FAR_WALL_PLANE");
+                var outerOther=FaceDatum(app,longFrame,Unit(plan.OutWinner),seeds[3],"LONG_OUTER_FAR_WALL_PLANE");
+                Datum[][] pairs={new[]{nearOwn,nearOther},new[]{farOwn,farOther},new[]{innerOwn,farOther},new[]{innerOwn,outerOther}};
+                string[] roles={"P1_CLAMPED_MASTER_NEAR","P2_MASTER_FAR","P3_INNER_FAR_WALL_TANGENT","P4_OUTER_WALL_INTERSECTION"};
+                for(int i=0;i<pairs.Length;i++)for(int j=0;j<2;j++)
+                {
+                    Datum source=pairs[i][j];Need((Same(app,source.Component,shortFrame)?beforeIds:longBeforeIds).Contains(source.OwnerFeatureId),"datum owner was not in source feature history");
+                    pairs[i][j]=AtSeed(app,source,seeds[i]);
+                }
+                model.ClearSelection2(true);Need(shortFrame.Select4(false,null,false),"select target component");int information=0;
+                assembly.EditPart2(true,false,ref information);editing=true;
+                Need(Same(app,assembly.GetEditTarget(),part)&&Same(app,assembly.GetEditTargetComponent(),shortFrame),"exact native edit target not established");
+                model.ClearSelection2(true);Need(((IEntity)ownWeb.Context).Select4(false,null),"select corresponding Web face");
+                model.SketchManager.InsertSketch(true);opened=true;
+                sketch=model.SketchManager.ActiveSketch??part.SketchManager.ActiveSketch;Need(sketch!=null&&!sketch.Is3D(),"active assembly manager did not open a 2D Sketch");
+                var feature=sketch as Feature;Need(feature!=null,"Sketch→Feature QueryInterface unavailable");result.SketchFeatureId=feature.GetID();
+                int type=0;object reference=sketch.GetReferenceEntity(ref type);result.SupportReferenceType=type;
+                result.OwnSupportVerified=reference is Face2&&(Same(app,reference,ownWeb.Context)||Same(app,reference,ownWeb.Native));Need(result.OwnSupportVerified,"Sketch support is not selected actual Web");
+                MathTransform inverseTarget=shortFrame.GetTotalTransform(false).Inverse() as MathTransform;
+                Need(inverseTarget!=null,"target component inverse transform unavailable");
+                for(int i=0;i<seeds.Length;i++)
+                {
+                    // Active Assembly manager owns sketch editing, while this
+                    // native Sketch transform takes target-Part coordinates.
+                    // Compose Assembly-world -> target-Part -> native Sketch.
+                    double[] nativeSeed=Point(app,seeds[i],inverseTarget);
+                    double[] expected=Point(app,nativeSeed,sketch.ModelToSketchTransform);Need(Math.Abs(expected[2])<1e-8,"target-Part seed is off actual Sketch plane");
+                    bool previous=model.SketchManager.AddToDB;SketchPoint point;
+                    try{model.SketchManager.AddToDB=true;point=model.SketchManager.CreatePoint(expected[0],expected[1],0);}finally{model.SketchManager.AddToDB=previous;}
+                    Need(point!=null,"native SketchPoint returned null");var row=new PointEvidence{Role=roles[i],ExpectedWorld=seeds[i],ExpectedSketch=expected,First=pairs[i][0],Second=pairs[i][1],PointId=PointId(point)};
+                    result.Points.Add(row);row.AllowedFirst=Allowed(sketch,point,row.First.Context);row.AllowedSecond=Allowed(sketch,point,row.Second.Context);
+                    Need(row.AllowedFirst.Contains((int)swConstraintType_e.swConstraintType_COINCIDENT)&&row.AllowedSecond.Contains((int)swConstraintType_e.swConstraintType_COINCIDENT),"API did not advertise both Coincident relations for "+row.Role);
+                    row.FirstRelationType=Relate(sketch,point,row.First.Context);row.SecondRelationType=Relate(sketch,point,row.Second.Context);
+                    row.ObservedSketch=new[]{point.X,point.Y,point.Z};Need(Norm(Sub(row.ObservedSketch,expected))<1e-8,"native relation moved the reviewed critical point "+row.Role);
+                    row.Qualification="NATIVE_DIRECT_COINCIDENT_PAIR_SEED_MATCH";
+                }
+                result.ConstraintStatus=sketch.GetConstrainedStatus();result.Relations=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+                result.Dangling=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling);result.Overdefining=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining);
+                result.AllPointsFullyConstrained=result.ConstraintStatus==(int)swConstrainedStatus_e.swFullyConstrained&&result.Dangling==0&&result.Overdefining==0;
+                Need(result.AllPointsFullyConstrained,"four isolated points did not become valid fully constrained geometry");
+                model.SketchManager.InsertSketch(true);opened=false;assembly.EditAssembly();editing=false;
+                Feature owned=FindFeature(part,result.SketchFeatureId);result.SketchOwnerVerified=owned!=null&&!beforeIds.Contains(owned.GetID());Need(result.SketchOwnerVerified,"new Sketch feature not owned by target Part");
+                owned.Name="AFJ_U_CRITICAL_POINTS_PROBE";result.SketchName=owned.Name;Sketch final=owned.GetSpecificFeature2() as Sketch;Need(final!=null,"closed owned Sketch unavailable");
+                result.NewPlanes=Planes(part)-beforePlanes;result.NoNewPlanes=result.NewPlanes==0;result.Dimensions=0;
+                for(DisplayDimension dim=owned.GetFirstDisplayDimension() as DisplayDimension;dim!=null;dim=owned.GetNextDisplayDimension(dim) as DisplayDimension)Need(++result.Dimensions<64,"dimension traversal bound");
+                result.NoDimensions=result.Dimensions==0;result.ExternalReferences=part.Extension.ListExternalFileReferencesCount();
+                Need(result.NoDimensions&&result.NoNewPlanes&&result.ExternalReferences>0,"dimensions/planes/external association not qualified");
+                Need(final.GetConstrainedStatus()==(int)swConstrainedStatus_e.swFullyConstrained&&final.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&final.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0,"critical point constraints changed on close");
+                result.ContextRestored=Same(app,assembly.GetEditTarget(),model);Need(result.ContextRestored,"assembly context not restored");
+                result.NativeApi=true;result.Status="PASS_NATIVE_FOUR_CRITICAL_POINTS_ONLY_NO_CUT_NO_FOLLOW_TEST";
+            }
+            catch(Exception ex){result.Status="FAIL_OR_UNVERIFIED";result.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;}
+            finally
+            {
+                try{if(opened&&model!=null)model.SketchManager.InsertSketch(true);}catch(Exception ex){result.Error+=" SKETCH_CLOSE "+ex;result.Status="FAIL_OR_UNVERIFIED";}
+                try{if(editing&&assembly!=null)assembly.EditAssembly();}catch(Exception ex){result.Error+=" EDIT_ASSEMBLY "+ex;result.Status="FAIL_OR_UNVERIFIED";}
+                try{if(assembly!=null&&app!=null)result.ContextRestored=Same(app,assembly.GetEditTarget(),model);}
+                catch(Exception ex){result.Error+=" CONTEXT_RECHECK "+ex;result.Status="FAIL_OR_UNVERIFIED";}
+            }
+            return result;
+        }
+    }
+}

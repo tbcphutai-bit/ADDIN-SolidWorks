@@ -1,0 +1,18 @@
+[
+  {
+    "variant": "local",
+    "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "before_sha256": "1a4c3856cace4c7de954356900e1ced9c144594abfabde3390a6773fbabd6749",
+    "after_sha256": "d29dc9a1eb1b8f806edc2bb0aa084e929e1b260371b3cd9e507d02cbb8229970",
+    "selection_and_action_methods_unchanged": true,
+    "runtime_label_and_enabled_setter_count": 0
+  },
+  {
+    "variant": "branch",
+    "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "before_sha256": "67da39aca6e4c43440558c5628b66c5628cee4516434843c6136796c427ec411",
+    "after_sha256": "c3b1919db3b1a05b3b07867cd9c22fd754331e8d4871dbfad34427529bc31272",
+    "selection_and_action_methods_unchanged": true,
+    "runtime_label_and_enabled_setter_count": 0
+  }
+]

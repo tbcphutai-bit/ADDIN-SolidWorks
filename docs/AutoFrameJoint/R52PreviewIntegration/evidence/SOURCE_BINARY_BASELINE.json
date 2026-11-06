@@ -1,0 +1,63 @@
+[
+  {
+    "file": "ADDIN.csproj",
+    "sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+    "bytes": 38652,
+    "modified_utc_epoch": 1792576956.2902253,
+    "matches_branch_bytes": false
+  },
+  {
+    "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "sha256": "17a7cc2e448e2d71c5fc88af19fc99f1a710773e541a1b84de0e66ca47d919fe",
+    "bytes": 54126,
+    "modified_utc_epoch": 1792631579.09064,
+    "matches_branch_bytes": false
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+    "sha256": "e20b58755114336cfdae795cf5b8e22b7ab95cf6d69fd356e6eab149ef029076",
+    "bytes": 9387,
+    "modified_utc_epoch": 1792579722.1388538,
+    "matches_branch_bytes": false
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+    "sha256": "4ed70eaf8b70137dc3b3b8feac55e3d41b43f7d6567c055fb91f637528005274",
+    "bytes": 16835,
+    "modified_utc_epoch": 1792579722.1398568,
+    "matches_branch_bytes": false
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+    "sha256": "2670c383134d76e77db103ad52ee70aa49d03f95287ff1c9c14305eda896070b",
+    "bytes": 83538,
+    "modified_utc_epoch": 1792642193.2819977,
+    "matches_branch_bytes": false
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+    "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+    "bytes": 8751,
+    "modified_utc_epoch": 1792575636.5130773,
+    "matches_branch_bytes": true
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+    "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+    "bytes": 24394,
+    "modified_utc_epoch": 1792573301.5368702,
+    "matches_branch_bytes": true
+  },
+  {
+    "file": "../ADDIN.dll",
+    "sha256": "16020db76d451ded49aa8e58d3a8a2959a83f76a045f9ee75e73da56e0ad6872",
+    "bytes": 8318976,
+    "modified_utc_epoch": 1792642903.478351
+  },
+  {
+    "file": "../ADDIN.pdb",
+    "sha256": "8700870373db4a262a35bcef6fe0a60f6001b913d84fe8229b755a18d6b65ecb",
+    "bytes": 12690944,
+    "modified_utc_epoch": 1792642903.478351
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "schema": "AFJ_R61_SOURCE_VERIFICATION_V1",
+  "date": "2026-10-28",
+  "main_copy_status": "TESTED_R61_GHOST_COPIED_TO_MAIN",
+  "main_copy_utc": "2026-10-28T08:56:38.2556714Z",
+  "changed_file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "source_before_sha256": "EF7197D1C7188ECD308076A026B3A9DA17463B732DEA380E44FCB3BDDEF00F46",
+  "source_after_sha256": "8C4218B6205309407565109C96B89E328449FABFE39D2567CA8B26D3228BE195",
+  "backup_created": true,
+  "main_six_source_compile": "PASS_STANDALONE_COMPILATION_ONLY",
+  "main_six_source_compile_output_sha256": "E7C3BE48962786BF14EB8274278A5F1560F35FE66E0042902F8D4CF8ECCC9BA6",
+  "main_build": false,
+  "deployment": false,
+  "project_edited": false,
+  "main_selection_page_preserved": true,
+  "main_ui_sha256": "27BE94F7A1D12FB25EB1C90733068259E9326BF6BEAC1340F41C1D0A5F13914E",
+  "installed_dll_contains_r61": false,
+  "installed_dll_mvid": "8c96c27a-617f-4ece-ad7a-71a9d6c49a1d",
+  "protected_files": [
+    {
+      "file": "ADDIN.dll",
+      "sha256": "35D8B1BB7E63CD1CA46244DE47F6E22C15B71313124CEA332EDC1F9B261E6B3A",
+      "preserved": true
+    },
+    {
+      "file": "ADDIN.pdb",
+      "sha256": "4993854DF1E3037134958E04D1CB9839D39BEC5B571F6FAAF13AA43BFF7522DD",
+      "preserved": true
+    },
+    {
+      "file": "ADDIN.csproj",
+      "sha256": "771EFCFADD0729DAFD5EBA9B0F589B07164A6C3CA81A0736A45DD005244D7004",
+      "preserved": true
+    },
+    {
+      "file": "AutoFrameJointSelectionPage.cs",
+      "sha256": "27BE94F7A1D12FB25EB1C90733068259E9326BF6BEAC1340F41C1D0A5F13914E",
+      "preserved": true
+    },
+    {
+      "file": "AutoFrameJointCommandEntry.cs",
+      "sha256": "4795F987AF95740776F834CC454419BB50D557AB681F989452D6F2E35CDD3002",
+      "preserved": true
+    },
+    {
+      "file": "AutoFrameJointGhostSessionManager.cs",
+      "sha256": "B505CE2611AFFAAA795D2246C8DD19560EE197DAE8E7D79035BB89FC26D01FA1",
+      "preserved": true
+    }
+  ],
+  "qualified_fixtures": [
+    {
+      "cuts": 35,
+      "pairs": 4,
+      "sketches": 51,
+      "name": "2354_CURRENT_USER_PROVIDED"
+    },
+    {
+      "cuts": 38,
+      "pairs": 4,
+      "sketches": 54,
+      "name": "2354_HISTORICAL_RECOVERED"
+    },
+    {
+      "cuts": 12,
+      "pairs": 1,
+      "sketches": 16,
+      "name": "4332_CANDIDATE_NATIVE_PMP"
+    }
+  ],
+  "native_pmp_candidate_api": true,
+  "native_pmp_installed_afj_command": false,
+  "actual_visibility": "UNVERIFIED",
+  "failure_rollback": "UNVERIFIED",
+  "branch_six_source_compile": "PASS_STANDALONE_COMPILER_R61Publication19_NOT_MAIN_BUILD"
+}

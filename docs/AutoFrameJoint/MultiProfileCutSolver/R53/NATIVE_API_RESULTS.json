@@ -1,0 +1,303 @@
+[
+  {
+    "evidence_id": "R53-EQUAL-14",
+    "case": "2354 fr03 long A x fr04 short B; Web70/70",
+    "status": "PASS_NATIVE_REAL_TRY_APPLY_FOUR_LINKED_U_CUTS_HARNESS_ONLY_NOT_INSTALLED",
+    "source_sha256": "2bc61527c5aea88efe145eeb6262fedb0a3445967238116cff35239024529d55",
+    "solve_count": 1,
+    "native_cuts": 4,
+    "fully_constrained_sketches": 4,
+    "relations": 80,
+    "dimensions": 2,
+    "new_planes": 0,
+    "body_difference_A_mm3": 0.0,
+    "body_difference_B_mm3": 0.0,
+    "gap_mm": 0.09999999999976694,
+    "interference_mm3": 0.0,
+    "protected_original_feature_state_unchanged": true,
+    "assembly_edit_context_restored": true,
+    "source_copy_disk_hashes_unchanged": true,
+    "installed_addin_test": false,
+    "display_visibility_verified": false,
+    "save_called": false,
+    "global_rollback_tested": false,
+    "execution_evidence_level": "API_VERIFIED",
+    "body_vs_plan_evidence_level": "GEOMETRY_VERIFIED",
+    "body_vs_plan_scope": "Native-vs-reviewed-plan only; not every CAD design",
+    "generalization_beyond_tested_cases": "INFERRED",
+    "started_utc": "2026-10-23T10:16:49.0055812Z",
+    "completed_utc": "2026-10-23T10:17:17.4529511Z",
+    "solidworks_revision": "32.5.0",
+    "entrypoint": "AfjNativeCutCommit.TryApply",
+    "ticket_consumed": true,
+    "independent_part_results": [
+      {
+        "symmetric_difference_m3": 0,
+        "protected_features_unchanged": true,
+        "protected_top_order_unchanged": true,
+        "new_feature_count": 5,
+        "new_planes": 0,
+        "new_sketches": [
+          {
+            "feature_id": 745,
+            "name": "AFJ_6828292f_Loser",
+            "status": 3,
+            "relations": 36,
+            "dangling": 0,
+            "overdefining": 0,
+            "dimensions": 1,
+            "original_face_reference": true
+          },
+          {
+            "feature_id": 747,
+            "name": "AFJ_6828292f_LongFarRelief",
+            "status": 3,
+            "relations": 10,
+            "dangling": 0,
+            "overdefining": 0,
+            "dimensions": 0,
+            "original_face_reference": true
+          }
+        ],
+        "new_sketch_count": 2,
+        "new_sketch_dimensions": 1,
+        "new_sketch_relations": 46
+      },
+      {
+        "symmetric_difference_m3": 0,
+        "protected_features_unchanged": true,
+        "protected_top_order_unchanged": true,
+        "new_feature_count": 5,
+        "new_planes": 0,
+        "new_sketches": [
+          {
+            "feature_id": 756,
+            "name": "AFJ_6828292f_Cover",
+            "status": 3,
+            "relations": 28,
+            "dangling": 0,
+            "overdefining": 0,
+            "dimensions": 1,
+            "original_face_reference": true
+          },
+          {
+            "feature_id": 758,
+            "name": "AFJ_6828292f_ShortRelief",
+            "status": 3,
+            "relations": 6,
+            "dangling": 0,
+            "overdefining": 0,
+            "dimensions": 0,
+            "original_face_reference": true
+          }
+        ],
+        "new_sketch_count": 2,
+        "new_sketch_dimensions": 1,
+        "new_sketch_relations": 34
+      }
+    ],
+    "fixture_preparation": {
+      "scope": "DISPOSABLE_IN_MEMORY_FIXTURE_ONLY_NOT_PRODUCTION_APPLY",
+      "operation": "KNOWN_EMPTY_SKETCH_LIFECYCLE_NO_CUT_NO_SAVE",
+      "original_out_of_context_holder_ids": [
+        424,
+        425,
+        435,
+        437,
+        438,
+        439,
+        440,
+        441,
+        443,
+        446,
+        447,
+        448,
+        449
+      ],
+      "remaining_holder_count": 0,
+      "part_histories_unchanged": true,
+      "part_brep_difference_m3": [
+        0,
+        0
+      ],
+      "assembly_nonholder_history_unchanged": true,
+      "production_normalization_enabled": false
+    },
+    "feature_inventory_scope": "top-level plus flat native API, TemplateSheetMetal parent closure, exact-token known-owned passive metadata inside transaction; full recursive UI order not qualified",
+    "delivered_source_sha256": "cc7fc64ab6b5a6d51cbf5e5ef6b59bd1d15f509d29af262d2e173a52cb92b68c",
+    "native_tested_source_sha256": "2bc61527c5aea88efe145eeb6262fedb0a3445967238116cff35239024529d55",
+    "delivery_difference": "Removed one redundant LF at EOF only; no C# token or logic change"
+  },
+  {
+    "evidence_id": "R53-WIDER-COVER-03",
+    "case": "2354 disposable variation; long A70 x short B100",
+    "status": "PASS_NATIVE_SHORT_B_100_LONG_A_70_REAL_TRY_APPLY_9_8_SKETCHES_HARNESS_ONLY_NOT_INSTALLED",
+    "source_sha256": "2bc61527c5aea88efe145eeb6262fedb0a3445967238116cff35239024529d55",
+    "solve_count": 1,
+    "native_cuts": 4,
+    "fully_constrained_sketches": 4,
+    "relations": 84,
+    "dimensions": 2,
+    "new_planes": 0,
+    "body_difference_A_mm3": 0.0,
+    "body_difference_B_mm3": 0.0,
+    "gap_mm": 0.10000000000021103,
+    "interference_mm3": 0.0,
+    "protected_original_feature_state_unchanged": true,
+    "assembly_edit_context_restored": true,
+    "source_copy_disk_hashes_unchanged": true,
+    "installed_addin_test": false,
+    "display_visibility_verified": false,
+    "save_called": false,
+    "global_rollback_tested": false,
+    "execution_evidence_level": "API_VERIFIED",
+    "body_vs_plan_evidence_level": "GEOMETRY_VERIFIED",
+    "body_vs_plan_scope": "Native-vs-reviewed-plan only; not every CAD design",
+    "generalization_beyond_tested_cases": "INFERRED",
+    "started_utc": "2026-10-23T10:15:29.4411596Z",
+    "completed_utc": "2026-10-23T10:16:01.0450288Z",
+    "solidworks_revision": "32.5.0",
+    "entrypoint": "AfjNativeCutCommit.TryApply",
+    "ticket_consumed": true,
+    "independent_part_results": [
+      {
+        "symmetric_difference_m3": 0,
+        "protected_features_unchanged": true,
+        "protected_top_order_unchanged": true,
+        "new_feature_count": 5,
+        "new_planes": 0,
+        "new_sketches": [
+          {
+            "feature_id": 745,
+            "name": "AFJ_bdf178bb_Loser",
+            "status": 3,
+            "relations": 36,
+            "dangling": 0,
+            "overdefining": 0,
+            "dimensions": 1,
+            "profile_segment_count": 8,
+            "construction_segment_count": 6,
+            "original_face_reference": true
+          },
+          {
+            "feature_id": 747,
+            "name": "AFJ_bdf178bb_LongFarRelief",
+            "status": 3,
+            "relations": 10,
+            "dangling": 0,
+            "overdefining": 0,
+            "dimensions": 0,
+            "profile_segment_count": 4,
+            "construction_segment_count": 1,
+            "original_face_reference": true
+          }
+        ],
+        "new_sketch_count": 2,
+        "new_sketch_dimensions": 1,
+        "new_sketch_relations": 46
+      },
+      {
+        "symmetric_difference_m3": 0,
+        "protected_features_unchanged": true,
+        "protected_top_order_unchanged": true,
+        "new_feature_count": 5,
+        "new_planes": 0,
+        "new_sketches": [
+          {
+            "feature_id": 756,
+            "name": "AFJ_bdf178bb_Cover",
+            "status": 3,
+            "relations": 32,
+            "dangling": 0,
+            "overdefining": 0,
+            "dimensions": 1,
+            "profile_segment_count": 9,
+            "construction_segment_count": 5,
+            "original_face_reference": true
+          },
+          {
+            "feature_id": 758,
+            "name": "AFJ_bdf178bb_ShortRelief",
+            "status": 3,
+            "relations": 6,
+            "dangling": 0,
+            "overdefining": 0,
+            "dimensions": 0,
+            "profile_segment_count": 4,
+            "construction_segment_count": 0,
+            "original_face_reference": true
+          }
+        ],
+        "new_sketch_count": 2,
+        "new_sketch_dimensions": 1,
+        "new_sketch_relations": 38
+      }
+    ],
+    "fixture_preparation": {
+      "scope": "DISPOSABLE_IN_MEMORY_FIXTURE_ONLY_NOT_PRODUCTION_APPLY",
+      "operation": "KNOWN_EMPTY_SKETCH_LIFECYCLE_NO_CUT_NO_SAVE",
+      "original_out_of_context_holder_ids": [
+        424,
+        425,
+        435,
+        437,
+        438,
+        439,
+        440,
+        441,
+        443,
+        446,
+        447,
+        448,
+        449
+      ],
+      "remaining_holder_count": 0,
+      "part_histories_unchanged": true,
+      "part_brep_difference_m3": [
+        0,
+        0
+      ],
+      "assembly_nonholder_history_unchanged": true,
+      "production_normalization_enabled": false
+    },
+    "feature_inventory_scope": "top-level plus flat native API, TemplateSheetMetal parent closure, exact-token known-owned passive metadata inside transaction; full recursive UI order not qualified",
+    "copy_only_width_setup": {
+      "target": "SHORT_FRAME_B",
+      "before_web_width_m": 0.07,
+      "after_web_width_m": 0.1,
+      "before_brep_span_m": 0.07,
+      "after_brep_span_m": 0.1,
+      "set_status": 0,
+      "body_check": 0,
+      "save_called": false,
+      "source_file_edit": false
+    },
+    "unequal_rule": {
+      "loser_width_m": 0.07,
+      "cover_width_m": 0.1,
+      "seam_slope": 1,
+      "master_vertices": 9,
+      "loser_vertices": 8
+    },
+    "native_constraint_counts": {
+      "expected_sorted": [
+        6,
+        10,
+        32,
+        36
+      ],
+      "actual_sorted": [
+        6,
+        10,
+        32,
+        36
+      ],
+      "expected_total": 84,
+      "actual_total": 84,
+      "expected_count_basis": "EIGHT_VERTEX_NATIVE_BASE_PLUS_ONE_PROFILE_AXIS_AND_THREE_EQUAL_TRIANGLE_RELATIONS"
+    },
+    "delivered_source_sha256": "cc7fc64ab6b5a6d51cbf5e5ef6b59bd1d15f509d29af262d2e173a52cb92b68c",
+    "native_tested_source_sha256": "2bc61527c5aea88efe145eeb6262fedb0a3445967238116cff35239024529d55",
+    "delivery_difference": "Removed one redundant LF at EOF only; no C# token or logic change"
+  }
+]

@@ -1,0 +1,204 @@
+{
+  "candidate_ghost_sha256": "BA65262E381E7409A9D667235ABB28A591FC8D42CE7769BF9ADE83FD3A8F598D",
+  "main_source_copied_exactly": true,
+  "actual_main_six_sources_independent_compile_passed": true,
+  "main_build_or_deploy": false,
+  "new_native_cut_events": 83,
+  "new_authored_sketch_events": 119,
+  "runs": [
+    {
+      "run": "R62_4332_HISTORY",
+      "layout": [
+        {
+          "pair_index": 1,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            908,
+            3,
+            23,
+            4
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": 0,
+          "camera_cache_elapsed_ms": 7
+        }
+      ],
+      "logical_fixed_face_certificates": [
+        {
+          "status": "API_VERIFIED_OLD_REFERENCE_ALIASES_EXACT_CURRENT_FACE",
+          "pending_native_factory_cut_id": 2013,
+          "all_other_flat_definition_fields_exact": true,
+          "plane_only_fallback": false,
+          "old_face_token_state": 0,
+          "old_face_token_resolved_face2": true,
+          "current_fixed_face2_available": true,
+          "old_face_resolution_bytes_equal_current": true,
+          "current_face_token_roundtrip_state": 0,
+          "oriented_plane_preserved": true,
+          "unique_current_native_sheet_solid_face_membership": true,
+          "encoding_changed_from_original": true,
+          "document": "B",
+          "flat_id": 668
+        },
+        {
+          "status": "API_VERIFIED_OLD_REFERENCE_ALIASES_EXACT_CURRENT_FACE",
+          "pending_native_factory_cut_id": 2021,
+          "all_other_flat_definition_fields_exact": true,
+          "plane_only_fallback": false,
+          "old_face_token_state": 0,
+          "old_face_token_resolved_face2": true,
+          "current_fixed_face2_available": true,
+          "old_face_resolution_bytes_equal_current": true,
+          "current_face_token_roundtrip_state": 0,
+          "oriented_plane_preserved": true,
+          "unique_current_native_sheet_solid_face_membership": true,
+          "encoding_changed_from_original": true,
+          "document": "B",
+          "flat_id": 668
+        }
+      ],
+      "positive_flat_witnesses": 2,
+      "positive_bend_witnesses": 1,
+      "final_authored_sketch_count": 14,
+      "final_body_and_gap_checks_verified": true,
+      "source_and_copy_disk_hashes_unchanged": true,
+      "api_scope": "CANDIDATE_PMP_CLOSE_IDLE_APPLY",
+      "installed_rebuilt_addin_tested": false
+    },
+    {
+      "run": "R62_2354_HISTORICAL",
+      "layout": [
+        {
+          "pair_index": 1,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            430,
+            4,
+            15,
+            3
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": 0,
+          "camera_cache_elapsed_ms": 7
+        },
+        {
+          "pair_index": 2,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            208,
+            4,
+            32,
+            3
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": "NOT_APPLICABLE",
+          "camera_cache_elapsed_ms": "NOT_APPLICABLE"
+        },
+        {
+          "pair_index": 3,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            607,
+            3,
+            22,
+            18
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": "NOT_APPLICABLE",
+          "camera_cache_elapsed_ms": "NOT_APPLICABLE"
+        },
+        {
+          "pair_index": 4,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            1013,
+            3,
+            28,
+            16
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": "NOT_APPLICABLE",
+          "camera_cache_elapsed_ms": "NOT_APPLICABLE"
+        }
+      ],
+      "logical_fixed_face_certificates": [],
+      "positive_flat_witnesses": 5,
+      "positive_bend_witnesses": 1,
+      "final_authored_sketch_count": 54,
+      "final_body_and_gap_checks_verified": true,
+      "source_and_copy_disk_hashes_unchanged": true,
+      "api_scope": "CANDIDATE_DIRECT_API_APPLY",
+      "installed_rebuilt_addin_tested": false
+    },
+    {
+      "run": "R62_2354_CURRENT",
+      "layout": [
+        {
+          "pair_index": 1,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            420,
+            7,
+            11,
+            4
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": 0,
+          "camera_cache_elapsed_ms": 6
+        },
+        {
+          "pair_index": 2,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            193,
+            7,
+            11,
+            5
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": "NOT_APPLICABLE",
+          "camera_cache_elapsed_ms": "NOT_APPLICABLE"
+        },
+        {
+          "pair_index": 3,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            612,
+            5,
+            22,
+            4
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": "NOT_APPLICABLE",
+          "camera_cache_elapsed_ms": "NOT_APPLICABLE"
+        },
+        {
+          "pair_index": 4,
+          "camera_restoration_verified": true,
+          "preview_elapsed_ms": [
+            945,
+            4,
+            38,
+            4
+          ],
+          "projection_fit_and_nonoverlap_asserted": true,
+          "camera_cache_no_resolve": "NOT_APPLICABLE",
+          "camera_cache_elapsed_ms": "NOT_APPLICABLE"
+        }
+      ],
+      "logical_fixed_face_certificates": [],
+      "positive_flat_witnesses": 5,
+      "positive_bend_witnesses": 1,
+      "final_authored_sketch_count": 51,
+      "final_body_and_gap_checks_verified": true,
+      "source_and_copy_disk_hashes_unchanged": true,
+      "api_scope": "CANDIDATE_DIRECT_API_APPLY",
+      "installed_rebuilt_addin_tested": false
+    }
+  ],
+  "actual_api_bitmap_inspected": {
+    "4332_side_by_side": true,
+    "cad_images_published": false
+  },
+  "host_reuse_crash": "UNVERIFIED_NOT_FIXED_SEE_CRASH_REUSE_LIMITATION_MD"
+}

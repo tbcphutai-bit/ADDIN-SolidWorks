@@ -1,0 +1,17 @@
+{
+  "class_file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+  "main_before_sha256": "8f9c358eabfc2b67cd4a32e1b032493a5a4c6916876d43e0ee8a3acf167dccc2",
+  "main_after_sha256": "c6178e9492a4ee4200c7679dd530a0b923e58b2310e7837ddfada576114841c2",
+  "branch_before_sha256": "3a5116f16031d98d221a5cdb7cdfbcf52788a06ef227bf3025689f0b94c74d78",
+  "branch_after_sha256": "a04be5aedc84eb1cac23aa812adc427d055c58ab81db1ffeda3cb7b794cf85c6",
+  "distinct_existing_baselines_preserved": true,
+  "protected_other_sources_csproj_unchanged": true,
+  "main_branch_head_unchanged": true,
+  "dll_sha256": "3b72c5c3b95b5a1db69d31914bed3594df84320f6d1f8303d8cc8b751c015d8e",
+  "pdb_sha256": "d90c4812d8d7094fd2596fd47fa1de1c7b6cc68c5e98aaa40b73beb73f20a983",
+  "dll_pdb_unchanged": true,
+  "addin_build_deploy_performed": false,
+  "cad_modified": false,
+  "solidworks_runtime_retest": false,
+  "completed_utc": "2026-10-23T14:02:24.5896924Z"
+}

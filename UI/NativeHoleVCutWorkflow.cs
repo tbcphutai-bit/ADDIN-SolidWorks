@@ -200,14 +200,16 @@ namespace ADDIN
             catch (COMException) { return false; }
             catch (InvalidComObjectException) { return false; }
         }
-        private void ShowNativeVCutSectionPage()
+        private void RunSelectedSection()
         {
             try
             {
-                OpenNativeModelCommand(closed => new VCutSectionPropertyManagerPage(swApp,
-                    () => { if (!solidWorksClosing && swApp != null) new AutoVCutSectionCommand(swApp).Run(); }, closed));
+                EnsureNativeModelCommandAvailable();
+                // The engine reads the selected cutting line and its owning View
+                // directly. No parameter page or extra confirmation is needed.
+                new AutoVCutSectionCommand(swApp).Run();
             }
-            catch (Exception ex) { NativeModelCommandError("V CUT — SECTION VIEW", ex); }
+            catch (Exception ex) { NativeModelCommandError("SECTION / 断面", ex); }
         }
     }
 }

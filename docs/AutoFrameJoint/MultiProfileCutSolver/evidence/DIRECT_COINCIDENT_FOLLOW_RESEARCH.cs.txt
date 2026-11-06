@@ -1,0 +1,279 @@
+// Standalone copy-only in-context direct geometric-relation qualification.
+// Compile with HarnessConnection.cs and SW interops; never part of ADDIN.csproj.
+// args: freshOutputDirectory inputPairDirectory targetSuffix otherSuffix expectedPID
+// Does NOT call Convert Entities, create dimensions/FIX, or create a Cut.
+// Its PASS is narrowly a native Face-attached 2D sketch + direct other-Frame relations.
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+
+class GeometryReferenceProbeV3Free
+{
+ static readonly JavaScriptSerializer Json=new JavaScriptSerializer{MaxJsonLength=Int32.MaxValue};
+ static Dictionary<string,object> D(params object[] a){var d=new Dictionary<string,object>();for(int i=0;i<a.Length;i+=2)d[(string)a[i]]=a[i+1];return d;}
+ static void Require(bool b,string reason){if(!b)throw new InvalidOperationException(reason);}
+ static string Hash(string p){using(var sha=SHA256.Create())using(var f=new FileStream(p,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))return BitConverter.ToString(sha.ComputeHash(f)).Replace("-","").ToLowerInvariant();}
+ static double Dot(double[] a,double[] b){return a.Zip(b,(x,y)=>x*y).Sum();}
+ static double[] Sub(double[] a,double[] b){return a.Zip(b,(x,y)=>x-y).ToArray();}
+ static double[] Unit(double[] a){double n=Math.Sqrt(Dot(a,a));Require(n>1e-10,"Zero vector");return a.Select(x=>x/n).ToArray();}
+ static double[] Cross(double[] a,double[] b){return new[]{a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};}
+ static double[] Point(ISldWorks sw,double[] p,MathTransform t){var math=(MathUtility)sw.GetMathUtility();return ((MathPoint)((MathPoint)math.CreatePoint(p)).MultiplyTransform(t)).ArrayData as double[];}
+ static double[] Vector(ISldWorks sw,double[] p,MathTransform t){return Sub(Point(sw,p,t),Point(sw,new double[3],t));}
+ static Body2 Body(Component2 c){object info;Array all=c.GetBodies3((int)swBodyType_e.swSolidBody,out info) as Array;Require(all!=null&&all.Length==1,"Expected exactly one resolved solid");return (Body2)all.GetValue(0);}
+ static double[] Axis(ModelDoc2 part)
+ {
+  var bases=new List<Feature>();for(Feature f=(Feature)part.FirstFeature();f!=null;f=(Feature)f.GetNextFeature())if(f.GetTypeName2()=="SMBaseFlange")bases.Add(f);
+  Require(bases.Count==1,"Expected one native base flange");
+  foreach(object o in (Array)bases[0].GetParents()){var f=o as Feature;var s=f==null?null:f.GetSpecificFeature2() as Sketch;if(s==null)continue;
+   double[] m=(double[])((MathTransform)s.ModelToSketchTransform.Inverse()).ArrayData;return Unit(new[]{m[6],m[7],m[8]});}
+  throw new InvalidOperationException("Base profile axis unavailable");
+ }
+ class Pair {internal Face2 Own,Other;internal Edge Edge;internal Vertex A,B;internal double Area;internal double[] WorldA,WorldB;}
+ static Pair References(ISldWorks sw,Component2 own,Component2 other)
+ {
+  var ot=own.GetTotalTransform(false);var rt=other.GetTotalTransform(false);
+  var op=(ModelDoc2)own.GetModelDoc2();var rp=(ModelDoc2)other.GetModelDoc2();
+  double[] oa=Unit(Vector(sw,Axis(op),ot)),ra=Unit(Vector(sw,Axis(rp),rt));
+  Require(Math.Abs(Dot(oa,ra))<1e-7,"Probe requires perpendicular extrusion axes");double[] depth=Unit(Cross(oa,ra));
+  var pairs=new List<Pair>();
+  foreach(Face2 of in (Array)Body(own).GetFaces()){
+   var os=(Surface)of.GetSurface();if(!os.IsPlane())continue;double[] po=(double[])os.PlaneParams;
+   var no=Unit(Vector(sw,po.Take(3).ToArray(),ot));if(Math.Abs(Dot(no,depth))<.999999)continue;
+   var wo=Point(sw,po.Skip(3).Take(3).ToArray(),ot);
+   foreach(Face2 rf in (Array)Body(other).GetFaces()){
+    var rs=(Surface)rf.GetSurface();if(!rs.IsPlane())continue;double[] pr=(double[])rs.PlaneParams;
+    var nr=Unit(Vector(sw,pr.Take(3).ToArray(),rt));if(Math.Abs(Dot(nr,depth))<.999999)continue;
+    var wr=Point(sw,pr.Skip(3).Take(3).ToArray(),rt);if(Math.Abs(Dot(Sub(wr,wo),depth))>1e-8)continue;
+    foreach(Edge edge in (Array)rf.GetEdges()){
+     Curve cv=(Curve)edge.GetCurve();if(cv==null||!cv.IsLine())continue;
+     var va=edge.GetStartVertex() as Vertex;var vb=edge.GetEndVertex() as Vertex;if(va==null||vb==null)continue;
+     var wa=Point(sw,(double[])va.GetPoint(),rt);var wb=Point(sw,(double[])vb.GetPoint(),rt);var delta=Sub(wb,wa);if(Math.Sqrt(Dot(delta,delta))<.01)continue;
+     if(Math.Abs(Dot(Unit(delta),ra))<.999999)continue;
+     pairs.Add(new Pair{Own=of,Other=rf,Edge=edge,A=va,B=vb,WorldA=wa,WorldB=wb,Area=of.GetArea()+rf.GetArea()});
+    }
+   }
+  }
+  Require(pairs.Count>0,"No coplanar native sheet faces with a longitudinal other-Frame edge");return pairs.OrderByDescending(x=>x.Area).ThenByDescending(x=>Dot(Sub(x.WorldB,x.WorldA),Sub(x.WorldB,x.WorldA))).First();
+ }
+ static List<object> Tree(ModelDoc2 model)
+ {
+  var rows=new List<object>();int count=0;
+  for(Feature f=model.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Require(++count<500,"Feature enumeration bound exceeded");rows.Add(D("id",f.GetID(),"name",f.Name,"type",f.GetTypeName2()));}
+  return rows;
+ }
+ static HashSet<int> Ids(ModelDoc2 model){return new HashSet<int>(Tree(model).Cast<Dictionary<string,object>>().Select(x=>(int)x["id"]));}
+ static void Mark(Dictionary<string,object> row,string output,string stage){row["stage"]=stage;File.WriteAllText(Path.Combine(output,"progress.private.json"),Json.Serialize(row));Console.WriteLine("[DIRECT-REF] "+stage);}
+ static int[] Allowed(Sketch s,params object[] entities)
+ {
+  Array values=s.RelationManager.GetAllowedRelations(entities.Select(x=>new DispatchWrapper(x)).ToArray()) as Array;
+  return values==null?new int[0]:values.Cast<object>().Select(Convert.ToInt32).ToArray();
+ }
+ class PointGuide {internal double[] World;internal object OwnEdge,OtherFace,OtherVertex;internal double[] OtherPlane;}
+ static PointGuide PointReferences(ISldWorks sw,Component2 own,Component2 other,Face2 ownFace,Sketch sketch,bool projection,bool sketchInputWorld)
+ {
+  MathTransform ot=own.GetTotalTransform(false),rt=other.GetTotalTransform(false),inv=(MathTransform)ot.Inverse();
+  double[] axis=Unit(Vector(sw,Axis((ModelDoc2)own.GetModelDoc2()),ot));
+  if(projection){
+   foreach(Face2 f in (Array)Body(other).GetFaces())foreach(Edge e in (Array)f.GetEdges())foreach(Vertex vertex in new[]{e.GetStartVertex() as Vertex,e.GetEndVertex() as Vertex}){
+    if(vertex==null)continue;double[] w=Point(sw,(double[])vertex.GetPoint(),rt),local=Point(sw,sketchInputWorld?w:Point(sw,w,inv),sketch.ModelToSketchTransform);
+    if(Math.Abs(local[2])>.001)return new PointGuide{World=w,OtherVertex=other.GetCorrespondingEntity(vertex)};
+   }
+   throw new InvalidOperationException("No noncoplanar actual other-Frame Vertex found");
+  }
+  foreach(Face2 f in (Array)Body(other).GetFaces()){
+   var surface=(Surface)f.GetSurface();if(!surface.IsPlane())continue;double[] p=(double[])surface.PlaneParams;
+   double[] n=Unit(Vector(sw,p.Take(3).ToArray(),rt)),plane=Point(sw,p.Skip(3).Take(3).ToArray(),rt);if(Math.Abs(Dot(n,axis))<.999999)continue;
+   foreach(Edge e in (Array)ownFace.GetEdges()){
+    var cv=e.GetCurve() as Curve;if(cv==null||!cv.IsLine())continue;var va=e.GetStartVertex() as Vertex;var vb=e.GetEndVertex() as Vertex;if(va==null||vb==null)continue;
+    double[] a=Point(sw,(double[])va.GetPoint(),ot),b=Point(sw,(double[])vb.GetPoint(),ot),d=Sub(b,a);if(Math.Sqrt(Dot(d,d))<.02||Math.Abs(Dot(Unit(d),axis))<.999999)continue;
+    double denominator=Dot(d,n);if(Math.Abs(denominator)<1e-9)continue;double t=Dot(Sub(plane,a),n)/denominator;if(t<0||t>1)continue;
+    return new PointGuide{World=a.Zip(d,(x,y)=>x+t*y).ToArray(),OwnEdge=own.GetCorrespondingEntity(e),OtherFace=other.GetCorrespondingEntity(f),OtherPlane=n.Concat(plane).ToArray()};
+   }
+  }
+  throw new InvalidOperationException("No target Web edge intersects other Frame planar Wall within native edge span");
+ }
+ static string PointId(SketchPoint point)
+ {
+  object id=point.GetID();var array=id as Array;return array==null?Convert.ToString(id):String.Join(",",array.Cast<object>().Select(Convert.ToString));
+ }
+ static SketchPoint ReacquirePoint(ModelDoc2 part,int featureId,string pointId)
+ {
+  Feature feature=part.FirstFeature() as Feature;int count=0;while(feature!=null&&feature.GetID()!=featureId){Require(++count<500,"Feature lookup bound exceeded");feature=feature.GetNextFeature() as Feature;}
+  Require(feature!=null,"Referenced Sketch feature missing after parameter update");var sketch=feature.GetSpecificFeature2() as Sketch;Require(sketch!=null,"Referenced Sketch specific interface unavailable");
+  var all=sketch.GetSketchPoints2() as Array;Require(all!=null,"Sketch points missing after parameter update");
+  var points=all.Cast<SketchPoint>().Where(x=>PointId(x)==pointId).ToArray();Require(points.Length==1,"Cannot unambiguously reacquire the exact native SketchPoint ID after rebuild");
+  Require(sketch.GetConstrainedStatus()==(int)swConstrainedStatus_e.swFullyConstrained&&sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0,"Sketch constraint graph became invalid after parameter update");
+  bool warning;Require(feature.GetErrorCode2(out warning)==0,"Sketch acquired a native Feature error after parameter update");return points[0];
+ }
+ sealed class MateSnapshot {internal int Id;internal string Name,Type;internal bool Suppressed;}
+ static List<Feature> NativeMates(ModelDoc2 model)
+ {
+  var result=new List<Feature>();var seen=new HashSet<int>();int total=0;
+  Action<Feature,int> visit=null;visit=(first,depth)=>{
+   Require(depth<12,"Mate traversal depth exceeded");var siblings=new HashSet<int>();
+   for(Feature f=first;f!=null;f=f.GetNextSubFeature() as Feature){Require(++total<1000,"Mate traversal bound exceeded");int id=f.GetID();Require(siblings.Add(id),"Repeated sibling in mate traversal");
+    if(!seen.Add(id))continue;string type=f.GetTypeName2();if(type!="MateGroup"&&(type.StartsWith("Mate",StringComparison.Ordinal)||(f.GetSpecificFeature2() is Mate2)))result.Add(f);
+    var sub=f.GetFirstSubFeature() as Feature;if(sub!=null)visit(sub,depth+1);
+   }
+  };
+  for(Feature f=model.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature)if(f.GetTypeName2()=="MateGroup")visit(f.GetFirstSubFeature() as Feature,0);
+  return result;
+ }
+ static Feature MateById(ModelDoc2 model,int id){var result=NativeMates(model).Where(x=>x.GetID()==id).ToArray();Require(result.Length==1,"Cannot reacquire exact copied mate Feature ID");return result[0];}
+ static bool SameMatrix(double[] a,double[] b){return a!=null&&b!=null&&a.Length==b.Length&&a.Zip(b,(x,y)=>Math.Abs(x-y)).Max()<1e-8;}
+ static void Follow(ISldWorks sw,ModelDoc2 model,ModelDoc2 part,Component2 own,Component2 other,int featureId,string pointId,double[] initial,double[] expectedDelta,Dictionary<string,object> row,string output)
+ {
+  var assembly=(AssemblyDoc)model;var original=other.Transform2;double[] originalMatrix=(double[])original.ArrayData;
+  double[] originalOwn=(double[])own.GetTotalTransform(false).ArrayData;bool originallyFixed=other.IsFixed();var snapshots=new List<MateSnapshot>();
+  var mateSetup=new List<object>();row["copy_mate_setup"]=mateSetup;row["other_component_was_fixed"]=originallyFixed;row["mate_setup_scope"]="ALL_ASSEMBLY_MATES_ON_CONTAINED_DISPOSABLE_COPY_ONLY";
+  row["parameter_follow_move_m"]=.001;row["parameter_follow_expected_sketch_delta"]=expectedDelta;bool movedPass=false,restorePass=false;
+  try{
+   Mark(row,output,"SNAPSHOT_COPY_ASSEMBLY_MATES");foreach(var mate in NativeMates(model))snapshots.Add(new MateSnapshot{Id=mate.GetID(),Name=mate.Name,Type=mate.GetTypeName2(),Suppressed=mate.IsSuppressed()});
+   row["copy_mates_before"]=snapshots.Select(x=>D("id",x.Id,"name",x.Name,"type",x.Type,"suppressed",x.Suppressed)).ToArray();
+   foreach(var snapshot in snapshots.Where(x=>!x.Suppressed)){
+    Feature mate=MateById(model,snapshot.Id);bool suppressed=mate.SetSuppression2((int)swFeatureSuppressionAction_e.swSuppressFeature,(int)swInConfigurationOpts_e.swThisConfiguration,null);
+    bool readback=MateById(model,snapshot.Id).IsSuppressed();mateSetup.Add(D("id",snapshot.Id,"name",snapshot.Name,"returned",suppressed,"suppressed",readback));Require(suppressed&&readback,"Cannot suppress a copied Assembly mate for translation qualification");
+   }
+   if(originallyFixed){model.ClearSelection2(true);Require(other.Select4(false,null,false),"Cannot select copied component to release fixed state");assembly.UnfixComponent();Require(!other.IsFixed(),"Copied component remained fixed");}
+   row["copy_other_released_from_fixed"]=originallyFixed&&!other.IsFixed();row["copy_mate_setup_rebuild_returned"]=model.EditRebuild3();
+   Require((bool)row["copy_mate_setup_rebuild_returned"],"Copy mate-release setup rebuild failed");
+   Require(SameMatrix((double[])other.Transform2.ArrayData,originalMatrix)&&SameMatrix((double[])own.GetTotalTransform(false).ArrayData,originalOwn),"Copy transforms changed during mate-release setup");
+   SketchPoint setupPoint=ReacquirePoint(part,featureId,pointId);Require(new[]{setupPoint.X,setupPoint.Y,setupPoint.Z}.Zip(initial,(x,y)=>Math.Abs(x-y)).Max()<1e-7,"Direct reference point moved during mate-release setup");
+   var math=(MathUtility)sw.GetMathUtility();double[] matrix=(double[])originalMatrix.Clone(),axis=Unit(Vector(sw,Axis(part),own.GetTotalTransform(false)));for(int i=0;i<3;i++)matrix[9+i]+=.001*axis[i];
+   Mark(row,output,"MOVE_OTHER_UNMATED_FRAME_COPY_ONLY");other.Transform2=(MathTransform)math.CreateTransform(matrix);bool rebuilt=model.EditRebuild3();row["moved_rebuild_returned"]=rebuilt;
+   double[] actual=(double[])other.Transform2.ArrayData;row["moved_other_transform"]=actual;Require(rebuilt&&SameMatrix(actual,matrix),"Requested copied-component translation was not retained after all copied mates were suppressed");
+   Require(SameMatrix((double[])own.GetTotalTransform(false).ArrayData,originalOwn),"Target component moved during other-Frame translation");
+   SketchPoint observed=ReacquirePoint(part,featureId,pointId);double[] point={observed.X,observed.Y,observed.Z};row["moved_sketch_point"]=point;
+   Require(point.Zip(initial.Zip(expectedDelta,(x,y)=>x+y),(x,y)=>Math.Abs(x-y)).Max()<1e-7,"Directly referenced native point did not follow the other Frame's 1 mm translation");movedPass=true;
+  }finally{
+   Mark(row,output,"RESTORE_OTHER_UNMATED_FRAME_COPY_ONLY");other.Transform2=original;bool freeRebuilt=model.EditRebuild3();row["restore_free_rebuild_returned"]=freeRebuilt;
+   double[] actual=(double[])other.Transform2.ArrayData;row["restored_other_transform_before_mates"]=actual;
+   SketchPoint restored=ReacquirePoint(part,featureId,pointId);double[] point={restored.X,restored.Y,restored.Z};row["restored_sketch_point_before_mates"]=point;
+   bool freeRestored=freeRebuilt&&SameMatrix(actual,originalMatrix)&&point.Zip(initial,(x,y)=>Math.Abs(x-y)).Max()<1e-7;row["free_transform_and_point_restored"]=freeRestored;
+   Mark(row,output,"RESTORE_COPY_FIXED_STATE_AND_MATES");
+   if(originallyFixed&&!other.IsFixed()){model.ClearSelection2(true);Require(other.Select4(false,null,false),"Cannot select copied component to restore fixed state");assembly.FixComponent();}
+   foreach(var snapshot in snapshots){Feature mate=MateById(model,snapshot.Id);if(mate.IsSuppressed()==snapshot.Suppressed)continue;
+    bool changed=mate.SetSuppression2(snapshot.Suppressed?(int)swFeatureSuppressionAction_e.swSuppressFeature:(int)swFeatureSuppressionAction_e.swUnSuppressFeature,(int)swInConfigurationOpts_e.swThisConfiguration,null);Require(changed,"Cannot restore a copied mate suppression state");}
+   bool finalRebuild=model.EditRebuild3();row["restore_mates_rebuild_returned"]=finalRebuild;
+   bool matesRestored=snapshots.All(x=>MateById(model,x.Id).IsSuppressed()==x.Suppressed);row["copy_mate_states_restored"]=matesRestored;row["copy_fixed_state_restored"]=other.IsFixed()==originallyFixed;
+   restored=ReacquirePoint(part,featureId,pointId);point=new[]{restored.X,restored.Y,restored.Z};row["restored_sketch_point"]=point;row["restored_other_transform"]=other.Transform2.ArrayData;
+   restorePass=freeRestored&&finalRebuild&&matesRestored&&other.IsFixed()==originallyFixed&&SameMatrix((double[])other.Transform2.ArrayData,originalMatrix)&&SameMatrix((double[])own.GetTotalTransform(false).ArrayData,originalOwn)&&point.Zip(initial,(x,y)=>Math.Abs(x-y)).Max()<1e-7;
+   row["parameter_transform_and_point_restored"]=restorePass;Require(restorePass,"Cannot verify all copied mates/fixed state/transforms/reference point restored");
+  }
+  Require(movedPass&&restorePass,"Copy-only direct geometry follow qualification incomplete");row["parameter_follow_test"]="PASS_NATIVE_COPY_UNMATED_TRANSLATION_AND_ALL_STATE_RESTORED";
+ }
+ static SketchRelation Relation(Sketch s,int type,params object[] entities)
+ {
+  var wrapped=entities.Select(x=>new DispatchWrapper(x)).ToArray();var r=s.RelationManager.AddRelation(wrapped,type) as SketchRelation;
+  Require(r!=null,"Native direct relation was not created, type="+type);return r;
+ }
+ static Feature SketchFeature(ModelDoc2 p,ISldWorks sw,Sketch s){for(Feature f=(Feature)p.FirstFeature();f!=null;f=(Feature)f.GetNextFeature())if(sw.IsSame(f.GetSpecificFeature2(),s)==1)return f;throw new InvalidOperationException("Owned sketch missing from FeatureManager");}
+ [STAThread]static int Main(string[] args)
+ {
+  string output=Path.GetFullPath(args[0]),input=Path.GetFullPath(args[1]);Require(!Directory.Exists(output),"Output must be a fresh folder");Directory.CreateDirectory(output);
+  var row=D("native_api",true,"scope","DIRECT_OTHER_FRAME_RELATIONS_ONLY","cut_created",false,"convert_entities_called",false,"dimensions_created",0,"fixed_relations_created",0,"save_api_called",false,"parameter_follow_test","NOT_RUN");
+  var source=Directory.GetFiles(input).Where(x=>new[]{".sldprt",".sldasm"}.Contains(Path.GetExtension(x).ToLowerInvariant())).ToArray();var hashes=source.ToDictionary(x=>x,Hash);
+  ISldWorks sw=null;ModelDoc2 model=null,part=null;AssemblyDoc assembly=null;Sketch sketch=null;bool editing=false;string[] copiedPaths=new string[0];HashSet<int> partBeforeIds=null;Feature sketchFeature=null;int sketchFeatureId=-1;
+  try{
+   Require(args.Length>=5&&args.Length<=6,"Expected five/six arguments");System.Environment.SetEnvironmentVariable("AFJ_R51_SW_PID",args[4]);sw=HarnessConnection.AttachVisible();Require(sw.GetProcessID()==Int32.Parse(args[4]),"Session PID mismatch");Require(sw.GetDocumentCount()==0,"This probe only runs in an isolated blank SOLIDWORKS process");
+   int command;string title;bool active;sw.GetRunningCommandInfo(out command,out title,out active);Require(!active&&!sw.CommandInProgress,"A command is active");
+   foreach(string p in source)File.Copy(p,Path.Combine(output,Path.GetFileName(p)),false);copiedPaths=source.Select(x=>Path.Combine(output,Path.GetFileName(x))).ToArray();
+   int error=0,warning=0;model=sw.OpenDoc6(copiedPaths.Single(x=>Path.GetExtension(x).Equals(".SLDASM",StringComparison.OrdinalIgnoreCase)),(int)swDocumentTypes_e.swDocASSEMBLY,(int)swOpenDocOptions_e.swOpenDocOptions_Silent,"",ref error,ref warning) as ModelDoc2;
+   row["open_error"]=error;row["open_warning"]=warning;Require(model!=null,"Copy OpenDoc6 returned null");assembly=(AssemblyDoc)model;
+   var components=((Array)assembly.GetComponents(false)).Cast<Component2>().ToArray();foreach(var c in components){var p=c.GetModelDoc2() as ModelDoc2;Require(p!=null&&Path.GetFullPath(p.GetPathName()).StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase),"Reference escaped fresh copy directory");}
+   var own=components.Single(c=>c.Name2.EndsWith(args[2],StringComparison.OrdinalIgnoreCase));var other=components.Single(c=>c.Name2.EndsWith(args[3],StringComparison.OrdinalIgnoreCase));Require(own.GetParent()==null&&other.GetParent()==null,"Top-level only");part=(ModelDoc2)own.GetModelDoc2();
+   Mark(row,output,"REFERENCE_SELECTION");partBeforeIds=Ids(part);row["part_tree_before"]=Tree(part);row["assembly_tree_before"]=Tree(model);Pair refs=References(sw,own,other);var support=own.GetCorrespondingEntity(refs.Own) as IEntity;var va=other.GetCorrespondingEntity(refs.A);var vb=other.GetCorrespondingEntity(refs.B);var externalEdge=other.GetCorrespondingEntity(refs.Edge);
+   Require(support!=null&&va!=null&&vb!=null&&externalEdge!=null,"Assembly-context native entities unavailable");
+   Mark(row,output,"EDIT_PART");model.ClearSelection2(true);Require(own.Select4(false,null,false),"Cannot select edit target");int information=0;int edit=assembly.EditPart2(true,false,ref information);row["edit_result"]=edit;row["edit_information"]=information;
+   Require(sw.IsSame(assembly.GetEditTargetComponent(),own)==1&&sw.IsSame(assembly.GetEditTarget(),part)==1,"Exact edit target was not established");editing=true;
+   Mark(row,output,"CREATE_PART_SKETCH");model.ClearSelection2(true);Require(support.Select4(false,null),"Cannot select own native support face");model.SketchManager.InsertSketch(true);
+   var partSketch=part.SketchManager.ActiveSketch;var assemblySketch=model.SketchManager.ActiveSketch;
+   row["part_active_sketch_nonnull"]=partSketch!=null;row["assembly_active_sketch_nonnull"]=assemblySketch!=null;
+   row["active_sketch_context_equality"]=partSketch==null||assemblySketch==null?-1:sw.IsSame(partSketch,assemblySketch);
+   sketch=partSketch??assemblySketch;Require(sketch!=null&&!sketch.Is3D(),"Expected face-attached 2D sketch");
+   // ISketch has no GetFeature API. Official GetSpecificFeature2 documents
+   // QueryInterface from the specific interface back to IFeature.
+   sketchFeature=sketch as Feature;row["sketch_feature_query_interface_nonnull"]=sketchFeature!=null;
+   if(sketchFeature!=null){sketchFeatureId=sketchFeature.GetID();row["sketch_qi_feature_id"]=sketchFeatureId;row["sketch_qi_feature_name"]=sketchFeature.Name;}
+   row["part_tree_during_sketch_edit"]=Tree(part);row["assembly_tree_during_sketch_edit"]=Tree(model);
+   Mark(row,output,"READ_REFERENCE");
+   int refType=0;object refEntity=sketch.GetReferenceEntity(ref refType);row["support_reference_type"]=refType;row["reference_same_assembly_support"]=sw.IsSame(refEntity,support);row["reference_same_native_support"]=sw.IsSame(refEntity,refs.Own);Require(refEntity is Face2,"Sketch reference is not a native Face");
+   // ISketch.ModelToSketchTransform is target-Part -> Sketch. Component transform
+   // maps target-Part -> Assembly; compose by transforming world through inverse.
+   var inverseOwn=(MathTransform)own.GetTotalTransform(false).Inverse();
+   double[] worldA=Point(sw,refs.WorldA,sketch.ModelToSketchTransform),worldB=Point(sw,refs.WorldB,sketch.ModelToSketchTransform);
+   double[] partA=Point(sw,Point(sw,refs.WorldA,inverseOwn),sketch.ModelToSketchTransform),partB=Point(sw,Point(sw,refs.WorldB,inverseOwn),sketch.ModelToSketchTransform);
+   bool worldPlanar=Math.Abs(worldA[2])<1e-8&&Math.Abs(worldB[2])<1e-8,partPlanar=Math.Abs(partA[2])<1e-8&&Math.Abs(partB[2])<1e-8;
+   row["model_to_sketch"]=sketch.ModelToSketchTransform.ArrayData;row["world_input_planar"]=worldPlanar;row["part_input_planar"]=partPlanar;
+   row["world_input_sketch_points"]=new[]{worldA,worldB};row["part_input_sketch_points"]=new[]{partA,partB};
+   Require(worldPlanar||partPlanar,"Neither active Assembly nor native Part coordinates are coplanar with support Sketch");
+   bool sketchInputWorld=worldPlanar;row["chosen_sketch_input_context"]=sketchInputWorld?"ACTIVE_ASSEMBLY_WORLD":"NATIVE_PART";
+   string requestedMode=args.Length==6?args[5]:"face_point";bool follow=requestedMode.EndsWith("_follow",StringComparison.Ordinal);string mode=follow?requestedMode.Substring(0,requestedMode.Length-7):requestedMode;row["experiment"]=requestedMode;
+   Require(new[]{"face_point","face_intersection","projected_vertex_hv","query_only"}.Contains(mode),"Unknown direct relation experiment");
+   Mark(row,output,"CREATE_POINT");PointGuide guide=PointReferences(sw,own,other,refs.Own,sketch,mode=="projected_vertex_hv",sketchInputWorld);
+   double[] point3=Point(sw,sketchInputWorld?guide.World:Point(sw,guide.World,inverseOwn),sketch.ModelToSketchTransform);double[] expectedPoint=new[]{point3[0],point3[1],0d};
+   bool oldAdd=model.SketchManager.AddToDB;SketchPoint point;try{model.SketchManager.AddToDB=true;point=model.SketchManager.CreatePoint(expectedPoint[0],expectedPoint[1],0);}finally{model.SketchManager.AddToDB=oldAdd;}
+   Require(point!=null,"Native sketch point creation returned null");row["projected_vertex_depth_m"]=point3[2];string nativePointId=PointId(point);row["native_sketch_point_id"]=nativePointId;
+   var results=new List<object>();
+   if(mode=="projected_vertex_hv"){
+    Mark(row,output,"QUERY_PROJECTED_VERTEX_RELATIONS");int[] allowed=Allowed(sketch,point,guide.OtherVertex);row["allowed_point_noncoplanar_vertex"]=allowed;
+    foreach(int relation in new[]{(int)swConstraintType_e.swConstraintType_HORIZPOINTS,(int)swConstraintType_e.swConstraintType_VERTPOINTS}){
+     Require(allowed.Contains(relation),"Native API does not advertise projected H/V relation for point+noncoplanar Vertex");
+     var created=Relation(sketch,relation,point,guide.OtherVertex);results.Add(D("type",created.GetRelationType(),"entity_types",created.GetEntitiesType()));}
+   }else{
+    row["other_plane_world_parameters"]=guide.OtherPlane;
+    Mark(row,output,"QUERY_POINT_FACE_EDGE_RELATIONS");int[] face=Allowed(sketch,point,guide.OtherFace),edge=Allowed(sketch,point,guide.OwnEdge),intersection=Allowed(sketch,point,guide.OwnEdge,guide.OtherFace);
+    row["allowed_point_face"]=face;row["allowed_point_native_edge"]=edge;row["allowed_point_edge_face"]=intersection;
+    if(mode=="face_point"){
+     Require(face.Contains((int)swConstraintType_e.swConstraintType_COINCIDENT)&&edge.Contains((int)swConstraintType_e.swConstraintType_COINCIDENT),"Native API does not advertise direct point/Face and point/Edge Coincident");
+     Mark(row,output,"ADD_POINT_TO_OTHER_FACE_COINCIDENT");var fr=Relation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,point,guide.OtherFace);results.Add(D("type",fr.GetRelationType(),"entity_types",fr.GetEntitiesType()));
+     Mark(row,output,"ADD_POINT_TO_OWN_EDGE_COINCIDENT");var er=Relation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,point,guide.OwnEdge);results.Add(D("type",er.GetRelationType(),"entity_types",er.GetEntitiesType()));
+    }else if(mode=="face_intersection"){
+     int type=intersection.Contains((int)swConstraintType_e.swConstraintType_ATINTERSECT)?(int)swConstraintType_e.swConstraintType_ATINTERSECT:intersection.Contains((int)swConstraintType_e.swConstraintType_INTERSECTION)?(int)swConstraintType_e.swConstraintType_INTERSECTION:0;
+     Require(type!=0,"Native API does not advertise point/Edge/Face intersection relation");var ir=Relation(sketch,type,point,guide.OwnEdge,guide.OtherFace);results.Add(D("type",ir.GetRelationType(),"entity_types",ir.GetEntitiesType()));
+    }
+   }
+   row["created_relations"]=results;
+   Mark(row,output,"VERIFY_CONSTRAINTS");int status=sketch.GetConstrainedStatus(),dangling=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling),over=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining);
+   row["constraint_status"]=status;row["dangling_relations"]=dangling;row["overdefining_relations"]=over;row["relation_count"]=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+   if(mode!="query_only")Require(status==(int)swConstrainedStatus_e.swFullyConstrained&&dangling==0&&over==0,"Direct geometric point relations did not produce a valid fully constrained point");
+   Require(Math.Abs(point.X-expectedPoint[0])<1e-8&&Math.Abs(point.Y-expectedPoint[1])<1e-8,"Constraint solve moved expected intersection/projection");
+   Mark(row,output,"CLOSE_SKETCH");model.SketchManager.InsertSketch(true);sketch=null;
+   row["part_tree_after_sketch_close"]=Tree(part);row["assembly_tree_after_sketch_close"]=Tree(model);
+   assembly.EditAssembly();editing=sw.IsSame(assembly.GetEditTarget(),model)!=1;
+   row["part_tree_after_edit_assembly"]=Tree(part);row["assembly_tree_after_edit_assembly"]=Tree(model);
+   var newPart=Ids(part);newPart.ExceptWith(partBeforeIds);row["new_part_feature_ids"]=newPart.ToArray();
+   Require(newPart.Contains(sketchFeatureId),"The newly created Sketch feature was not proven to belong to the target Part");
+   Feature actual=part.FirstFeature() as Feature;while(actual!=null&&actual.GetID()!=sketchFeatureId)actual=actual.GetNextFeature() as Feature;
+   Require(actual!=null,"Target Part sketch feature missing after context restoration");actual.Name="AFJ_DIRECT_RELATION_PROBE";
+   row["sketch_owner_verified"]=true;
+   row["edit_target_equals_assembly"]=sw.IsSame(assembly.GetEditTarget(),model)==1;
+   var finalEditComponent=assembly.GetEditTargetComponent();row["edit_component_is_null"]=finalEditComponent==null;row["edit_component_is_original_target"]=finalEditComponent!=null&&sw.IsSame(finalEditComponent,own)==1;row["edit_component_name"]=finalEditComponent==null?null:finalEditComponent.Name2;
+   row["edit_context_restored"]=(bool)row["edit_target_equals_assembly"]&&!(bool)row["edit_component_is_original_target"];row["external_file_reference_count"]=part.Extension.ListExternalFileReferencesCount();
+   Require((bool)row["edit_context_restored"],"Assembly edit context not restored");if(mode!="query_only")Require((int)row["external_file_reference_count"]>0,"External association was not observable in native file-reference graph");
+   if(follow){Require(mode!="query_only","Query-only mode cannot qualify parameter following");
+    double[] deltaWorld=Unit(Vector(sw,Axis(part),own.GetTotalTransform(false))).Select(x=>x*.001).ToArray();
+    double[] deltaInput=sketchInputWorld?deltaWorld:Vector(sw,deltaWorld,inverseOwn);
+    // Preserve the initial active-Sketch transform; reacquired native Part Sketch
+    // may expose a different model context after leaving Assembly edit mode.
+    double[] initialTransform=(double[])row["model_to_sketch"];
+    var math=(MathUtility)sw.GetMathUtility();var transform=(MathTransform)math.CreateTransform(initialTransform);double[] expectedDelta=Vector(sw,deltaInput,transform);expectedDelta[2]=0;
+    Follow(sw,model,part,own,other,sketchFeatureId,nativePointId,expectedPoint,expectedDelta,row,output);
+   }
+   row["status"]=mode=="query_only"?"PASS_NATIVE_RELATION_QUERY_ONLY":follow?"PASS_NATIVE_DIRECT_GEOMETRY_FOLLOW":"PASS_NATIVE_DIRECT_GEOMETRIC_RELATIONS";
+  }catch(Exception ex){row["status"]="FAIL_OR_UNVERIFIED";row["error"]=ex.ToString();row["hresult"]="0x"+ex.HResult.ToString("X8");}
+  finally{
+   if(sw!=null){try{if(sketch!=null&&part!=null)model.SketchManager.InsertSketch(true);}catch(Exception ex){row["sketch_close_error"]=ex.Message;}try{if(editing&&assembly!=null)assembly.EditAssembly();}catch(Exception ex){row["edit_context_cleanup_error"]=ex.Message;}
+    try{var owned=new List<string>();for(ModelDoc2 d=sw.GetFirstDocument() as ModelDoc2;d!=null;d=d.GetNext() as ModelDoc2){string p=d.GetPathName();if(!String.IsNullOrEmpty(p)&&Path.GetFullPath(p).StartsWith(output+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))owned.Add(p);}foreach(string p in owned.OrderBy(x=>Path.GetExtension(x).Equals(".SLDASM",StringComparison.OrdinalIgnoreCase)?0:1))sw.CloseDoc(p);row["session_blank_after_cleanup"]=sw.GetDocumentCount()==0;}catch(Exception ex){row["document_cleanup_error"]=ex.ToString();}
+   }
+   row["input_hashes_unchanged"]=hashes.All(x=>Hash(x.Key)==x.Value);row["copy_hashes_unchanged"]=copiedPaths.Length==source.Length&&source.All(x=>Hash(Path.Combine(output,Path.GetFileName(x)))==hashes[x]);File.WriteAllText(Path.Combine(output,"direct_geometry_relations.private.json"),Json.Serialize(row));Console.WriteLine(Json.Serialize(row));
+  }
+  return ((string)row["status"]).StartsWith("PASS_NATIVE",StringComparison.Ordinal)?0:1;
+ }
+}

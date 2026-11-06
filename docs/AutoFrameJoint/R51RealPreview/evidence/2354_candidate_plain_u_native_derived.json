@@ -1,0 +1,81 @@
+{
+  "research_only": true,
+  "manufacturing_rule_approval": "UNVERIFIED",
+  "loser_section": {
+    "origin": [
+      -0.7849999999999999,
+      -0.10000000000000007,
+      -0.0030000000000000027
+    ],
+    "axis": [
+      0,
+      1,
+      -1.3877787807814457e-17
+    ],
+    "width_direction": [
+      -1,
+      0,
+      0
+    ],
+    "depth_direction": [
+      0,
+      -1.3877787807814457e-17,
+      -0.9999999999999999
+    ],
+    "width_m": 0.07,
+    "t_m": 0.0025,
+    "r_m": 0.0001,
+    "near_height_m": 0.04,
+    "far_height_m": 0.042
+  },
+  "winner_section": {
+    "origin": [
+      -1,
+      2.877000000000001,
+      -0.0030000000000000443
+    ],
+    "axis": [
+      1,
+      0,
+      0
+    ],
+    "width_direction": [
+      0,
+      1,
+      0
+    ],
+    "depth_direction": [
+      0,
+      4.440892098500626e-16,
+      -1
+    ],
+    "width_m": 0.07,
+    "t_m": 0.0025,
+    "r_m": 0.0001,
+    "near_height_m": 0.04,
+    "far_height_m": 0.06
+  },
+  "joint_origin": [
+    -0.7849999999999999,
+    2.877000000000001,
+    -0.003000000000000044
+  ],
+  "out_loser": [
+    0,
+    1,
+    -1.3877787807814457e-17
+  ],
+  "out_winner": [
+    -1,
+    0,
+    0
+  ],
+  "plan": {},
+  "error": {
+    "type": "System.InvalidOperationException",
+    "hresult": "0x80131509",
+    "message": "AFJ: Boolean error=547",
+    "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Boolean(Body2 a, Body2 b, Int32 operation, Int32& code)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean.Execute(ISldWorks app, Body2 source, AfjCutPlan plan)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 Candidate2354.Main(String[] args)"
+  },
+  "geometry_status": "FAIL"
+}

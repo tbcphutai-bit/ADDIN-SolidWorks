@@ -1,0 +1,1089 @@
+{
+  "status": "PASS",
+  "checks": 269,
+  "original_parts_unchanged": 15,
+  "user_afj_source_files_unchanged": 6,
+  "native_before_geometry_passes": 8,
+  "public_ghost_preview_api_passes": 8,
+  "independent_runtime_variant_passes": 12,
+  "native_cut_before_after": 42,
+  "scope": "Report/source integrity and recorded-run validation. This is not an installed Add-in test; session-transition crash remains UNVERIFIED cause.",
+  "details": [
+    {
+      "check": "allowed text report extension: 01_IMPLEMENTATION_AND_SCOPE.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 01_IMPLEMENTATION_AND_SCOPE.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 02_BEFORE_AFTER_METHOD.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 02_BEFORE_AFTER_METHOD.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 03_KEEP_CUT_RULES.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 03_KEEP_CUT_RULES.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 04_NORMALCUT_AND_BEND.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 04_NORMALCUT_AND_BEND.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 05_TEST_RESULTS_AND_LIMITATIONS.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 05_TEST_RESULTS_AND_LIMITATIONS.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 06_API_DIAGNOSTICS.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 06_API_DIAGNOSTICS.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 07_PROVENANCE_AND_PROTECTION.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 07_PROVENANCE_AND_PROTECTION.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 08_MANUAL_COPY_AND_BUILD.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 08_MANUAL_COPY_AND_BUILD.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 09_SHEET_THICKNESS_OVERRUN.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 09_SHEET_THICKNESS_OVERRUN.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: BLIND_DEPTH_CONVENTION.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: BLIND_DEPTH_CONVENTION.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: BOSS_KEEP_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: BOSS_KEEP_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: FEATURE_CUT_BEFORE_AFTER.csv",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: FEATURE_CUT_BEFORE_AFTER.csv",
+      "pass": true
+    },
+    {
+      "check": "rectangular CSV: FEATURE_CUT_BEFORE_AFTER.csv",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: FEATURE_CUT_BEFORE_AFTER.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: FEATURE_CUT_BEFORE_AFTER.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: JOINT_RULES.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: JOINT_RULES.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: NATIVE_RULE_ORACLE.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: NATIVE_RULE_ORACLE.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: PROFILE_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: PROFILE_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: README.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: README.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: REPORT_MANIFEST.csv",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: REPORT_MANIFEST.csv",
+      "pass": true
+    },
+    {
+      "check": "rectangular CSV: REPORT_MANIFEST.csv",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: SUMMARY.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: SUMMARY.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: TEST_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: TEST_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "rectangular CSV: TEST_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: TEST_RESULTS.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: TEST_RESULTS.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/API_FAILURE_ATTEMPTS.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/API_FAILURE_ATTEMPTS.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/API_SESSION_TRANSITION.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/API_SESSION_TRANSITION.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/com_after_variants.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/com_after_variants.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/com_final_status.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/com_final_status.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/correction_probe2.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/correction_probe2.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/FOLDED_COPY_PREPARATION.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/FOLDED_COPY_PREPARATION.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/GeneralRuleProbe.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/GeneralRuleProbe.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/general_rule_final.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/general_rule_final.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/pair_research4.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/pair_research4.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/ParametricRuntimeHarness.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/ParametricRuntimeHarness.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/ParametricRuntimeVariants.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/ParametricRuntimeVariants.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/parametric_full_compile.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/parametric_full_compile.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/parametric_runtime.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/parametric_runtime.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/parametric_runtime_variants.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/parametric_runtime_variants.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/source_build_evidence.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/source_build_evidence.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/SOURCE_PROTECTION_AUDIT.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/SOURCE_PROTECTION_AUDIT.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/StageStudy.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/StageStudy.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/study.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/study.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/variant_connection.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/variant_connection.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: history/BOSS_ATTEMPT_UNTRIMMED_ARC.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: history/BOSS_ATTEMPT_UNTRIMMED_ARC.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: history/general_rule_closest_gap_failure.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: history/general_rule_closest_gap_failure.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: history/general_rule_gap_caps_attempt1.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: history/general_rule_gap_caps_attempt1.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: history/parametric_variant_attempt1.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: history/parametric_variant_attempt1.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: history/README.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: history/README.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: history/variant_startup_failure.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: history/variant_startup_failure.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 02_BEFORE_AFTER_METHOD.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 02_BEFORE_AFTER_METHOD.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 03_KEEP_CUT_RULES.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 03_KEEP_CUT_RULES.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 04_NORMALCUT_AND_BEND.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 04_NORMALCUT_AND_BEND.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 05_TEST_RESULTS_AND_LIMITATIONS.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 05_TEST_RESULTS_AND_LIMITATIONS.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 06_API_DIAGNOSTICS.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 06_API_DIAGNOSTICS.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: 09_SHEET_THICKNESS_OVERRUN.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: 09_SHEET_THICKNESS_OVERRUN.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: BLIND_DEPTH_CONVENTION.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: BLIND_DEPTH_CONVENTION.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: BOSS_KEEP_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: BOSS_KEEP_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: FEATURE_CUT_BEFORE_AFTER.csv",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: FEATURE_CUT_BEFORE_AFTER.csv",
+      "pass": true
+    },
+    {
+      "check": "rectangular CSV: FEATURE_CUT_BEFORE_AFTER.csv",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: FEATURE_CUT_BEFORE_AFTER.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: FEATURE_CUT_BEFORE_AFTER.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: JOINT_RULES.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: JOINT_RULES.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: NATIVE_RULE_ORACLE.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: NATIVE_RULE_ORACLE.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: PROFILE_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: PROFILE_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: README.md",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: README.md",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: SOURCE_PROTECTION_AUDIT.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: SOURCE_PROTECTION_AUDIT.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: SUMMARY.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: SUMMARY.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: TEST_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: TEST_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "rectangular CSV: TEST_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: TEST_RESULTS.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: TEST_RESULTS.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/API_SESSION_TRANSITION.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/API_SESSION_TRANSITION.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/com_final_status.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/com_final_status.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/parametric_runtime.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/parametric_runtime.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/parametric_runtime_variants.log",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/parametric_runtime_variants.log",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/source_build_evidence.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/source_build_evidence.json",
+      "pass": true
+    },
+    {
+      "check": "allowed text report extension: evidence/variant_connection.json",
+      "pass": true
+    },
+    {
+      "check": "no personal machine path/token: evidence/variant_connection.json",
+      "pass": true
+    },
+    {
+      "check": "8 native-before geometry passes",
+      "pass": true
+    },
+    {
+      "check": "native before both members have positive removed volume",
+      "pass": true
+    },
+    {
+      "check": "native before valid connected bodies and conservation",
+      "pass": true
+    },
+    {
+      "check": "8 public Ghost API/cleanup/end-restoration passes",
+      "pass": true
+    },
+    {
+      "check": "native before no interference and 0.1mm gap",
+      "pass": true
+    },
+    {
+      "check": "12 independent runtime dimension variants",
+      "pass": true
+    },
+    {
+      "check": "variant gap/body/coverage checks",
+      "pass": true
+    },
+    {
+      "check": "A/B swap and equal/nonorthogonal refusals executed",
+      "pass": true
+    },
+    {
+      "check": "8 native historical oracles symmetric difference zero",
+      "pass": true
+    },
+    {
+      "check": "42 native Cut before/after records",
+      "pass": true
+    },
+    {
+      "check": "Debug2 explicitly not identified",
+      "pass": true
+    },
+    {
+      "check": "all 15 source Parts and 6 user source files unchanged",
+      "pass": true
+    },
+    {
+      "check": "no fixture rule lookup in runtime source",
+      "pass": true
+    },
+    {
+      "check": "no CAD feature/save/rollback calls in runtime solver",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/01_IMPLEMENTATION_AND_SCOPE.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/02_BEFORE_AFTER_METHOD.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/03_KEEP_CUT_RULES.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/04_NORMALCUT_AND_BEND.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/05_TEST_RESULTS_AND_LIMITATIONS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/06_API_DIAGNOSTICS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/07_PROVENANCE_AND_PROTECTION.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/08_MANUAL_COPY_AND_BUILD.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/09_SHEET_THICKNESS_OVERRUN.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/BLIND_DEPTH_CONVENTION.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/BOSS_KEEP_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/API_FAILURE_ATTEMPTS.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/API_SESSION_TRANSITION.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/com_after_variants.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/com_final_status.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/correction_probe2.log",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/FOLDED_COPY_PREPARATION.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/general_rule_final.log",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/GeneralRuleProbe.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/pair_research4.log",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/parametric_full_compile.log",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/parametric_runtime.log",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/parametric_runtime_variants.log",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/ParametricRuntimeHarness.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/ParametricRuntimeVariants.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/source_build_evidence.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/SOURCE_PROTECTION_AUDIT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/StageStudy.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/study.log",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/evidence/variant_connection.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/FEATURE_CUT_BEFORE_AFTER.csv",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/FEATURE_CUT_BEFORE_AFTER.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/history/BOSS_ATTEMPT_UNTRIMMED_ARC.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/history/general_rule_closest_gap_failure.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/history/general_rule_gap_caps_attempt1.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/history/parametric_variant_attempt1.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/history/README.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/history/variant_startup_failure.log",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/JOINT_RULES.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/NATIVE_RULE_ORACLE.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/PROFILE_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/README.md",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/SUMMARY.json",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/TEST_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "manifest ProfileAwareCutSolver/TEST_RESULTS.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/01_INPUT_INVENTORY.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/02_FEATURE_TREE_REPORT.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/03_CUT_FEATURE_DETAILS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/04_FRAME_GEOMETRY_ANALYSIS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/05_JOINT_RULE_COMPARISON.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/06_STEP_VS_SLDPRT.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/07_UNVERIFIED_FINDINGS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/08_SOLVER_RECOMMENDATIONS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/09_API_ACCESS_DIAGNOSTICS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/10_API_METHOD_AND_PROVENANCE.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/02_BEFORE_AFTER_METHOD.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/03_KEEP_CUT_RULES.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/04_NORMALCUT_AND_BEND.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/05_TEST_RESULTS_AND_LIMITATIONS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/06_API_DIAGNOSTICS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/09_SHEET_THICKNESS_OVERRUN.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/BLIND_DEPTH_CONVENTION.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/BOSS_KEEP_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/evidence/API_SESSION_TRANSITION.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/evidence/com_final_status.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/evidence/parametric_runtime.log",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/evidence/parametric_runtime_variants.log",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/evidence/source_build_evidence.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/evidence/variant_connection.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/FEATURE_CUT_BEFORE_AFTER.csv",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/FEATURE_CUT_BEFORE_AFTER.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/JOINT_RULES.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/NATIVE_RULE_ORACLE.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/PROFILE_EVIDENCE.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/README.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/SOURCE_PROTECTION_AUDIT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/SUMMARY.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/TEST_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/11_PARAMETRIC_RULE_RESEARCH/TEST_RESULTS.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/AFJ_CASE_MATRIX.csv",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/AFJ_CUT_RULE_ANALYSIS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/AFJ_FEATURE_DETAILS.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/AFJ_FEATURE_INVENTORY.csv",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/AFJ_REVIEW_FOR_CHATGPT.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/AFJ_UNKNOWN_GAPS.md",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/API_ACCESS_DIAGNOSTICS.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/API_EXTRACTION_SUMMARY.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/1618-04-bh-A6-1.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/1618-04-bh-A6-fr1.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/1618-04-bh-A6-fr2.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/1618-04-bh-A6-fr3.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/1618-04-bh-A6-fr4.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/1618-04-bh-A6-中骨1.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/3615-04-bh-T1-1.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/3615-04-bh-T1-fr1.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/3615-04-bh-T1-fr2.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/3615-04-bh-T1-fr3.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/3615-04-bh-T1-fr4.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/3615-04-bh-T2-1.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/3615-04-bh-T2-fr1.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/3615-04-bh-T2-fr2.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/api/4114-04-HN-C07-12_New.SLDPRT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/API_SESSION_LOG.txt",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/SOURCE_HASH_AUDIT.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/evidence/STA_READER_SOURCE.cs.txt",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/FEATURE_CUT_INVENTORY.csv",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/FEATURE_CUT_INVENTORY.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/history/PRE_API_FEATURE_CUT_INVENTORY.csv",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/history/PRE_API_FEATURE_CUT_INVENTORY.json",
+      "pass": true
+    },
+    {
+      "check": "manifest FeatureCutAnalysis/README.md",
+      "pass": true
+    }
+  ]
+}

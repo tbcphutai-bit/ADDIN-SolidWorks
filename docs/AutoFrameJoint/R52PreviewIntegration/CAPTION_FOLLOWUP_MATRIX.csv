@@ -1,0 +1,36 @@
+﻿case,scope,status,detail
+A_B_COMMIT,USER_NATIVE_LOG,OBSERVED_IN_USER_ADDIN_LOG,Submit accepted; marks 1/2 count=1
+BUTTONS,USER_NATIVE_LOG,OBSERVED_IN_USER_ADDIN_LOG,"107 once, 108 twice"
+SOLVER,USER_NATIVE_LOG,OBSERVED_IN_USER_ADDIN_LOG,"Three solves; each keptA/B=1, positive removed volume"
+DISPLAY3_API,USER_NATIVE_LOG,OBSERVED_IN_USER_ADDIN_LOG,14 calls status=0
+HIDE_BETWEEN_PREVIEWS,USER_NATIVE_LOG,OBSERVED_IN_USER_ADDIN_LOG,8 Hide END events before replacing Preview
+CRASH_SITE,USER_NATIVE_LOG_AND_SCREENSHOT,FAIL_NATIVE_ACCESS_VIOLATION,"Caption BEGIN 104 after repeated P2, no END; screenshot at label.Caption"
+ROOT_CAUSE,USER_NATIVE_LOG,UNVERIFIED,Earlier Caption writes succeeded; unique native memory corruption cause not established
+SIX_CLASS_DETACHED_COMPILE,local,PASS_COMPILE_ONLY,Explicit source; no main Add-in build
+A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+BUTTON_107_DEFERRED_PREVIEW_DELEGATE,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+BUTTON_108_DEFERRED_PREVIEW_DELEGATE,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+FOREIGN_THREAD_SUBMIT_REFUSED,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH,local,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+SIX_CLASS_DETACHED_COMPILE,branch,PASS_COMPILE_ONLY,Explicit source; no main Add-in build
+A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+BUTTON_107_DEFERRED_PREVIEW_DELEGATE,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+BUTTON_108_DEFERRED_PREVIEW_DELEGATE,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+FOREIGN_THREAD_SUBMIT_REFUSED,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH,branch,PASS_MANAGED_CONTRACT,"Proxy-only; 0 label calls, no native fix execution"
+NEW_CAPTION_FIX_NATIVE,NEW_SOURCE,NOT_RUN,DLL remains the user-built R52 baseline; pending owner manual build/test
+ACTUAL_PREVIEW_VISIBLE,USER_NATIVE_LOG,UNVERIFIED,Viewport estimates/status=0 do not prove visible pixels or complete fit

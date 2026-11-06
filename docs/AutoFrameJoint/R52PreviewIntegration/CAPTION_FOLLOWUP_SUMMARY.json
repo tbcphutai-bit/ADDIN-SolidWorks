@@ -1,0 +1,164 @@
+{
+  "source": "USER_NATIVE_RUNTIME_LOG",
+  "user_log_sha256": "5e9965b1f6d4a4039617ce3dcd18111470e3c361c7ed95d3666899eef62a9497",
+  "expected_current_mvid": "ae27a276-be1d-4959-8391-1b3d60f3b997",
+  "observed_dll_mvid": "ae27a276-be1d-4959-8391-1b3d60f3b997",
+  "dll_matches_native_log": true,
+  "afj_normalized_il_matches": 265,
+  "afj_method_count": 265,
+  "native_button_events": [
+    {
+      "line": 410,
+      "id": 107
+    },
+    {
+      "line": 488,
+      "id": 108
+    },
+    {
+      "line": 590,
+      "id": 108
+    }
+  ],
+  "native_solver_results": [
+    {
+      "line": 456,
+      "kept_a": 1,
+      "kept_b": 1,
+      "removed_a_m3": 7.175339768081619e-05,
+      "removed_b_m3": 6.866569400427415e-05
+    },
+    {
+      "line": 540,
+      "kept_a": 1,
+      "kept_b": 1,
+      "removed_a_m3": 7.175339768081622e-05,
+      "removed_b_m3": 6.866569400427417e-05
+    },
+    {
+      "line": 650,
+      "kept_a": 1,
+      "kept_b": 1,
+      "removed_a_m3": 7.175339768081623e-05,
+      "removed_b_m3": 6.866569400427417e-05
+    }
+  ],
+  "native_display3_results": [
+    {
+      "line": 461,
+      "group": "A_KEEP",
+      "status": 0
+    },
+    {
+      "line": 465,
+      "group": "B_KEEP",
+      "status": 0
+    },
+    {
+      "line": 545,
+      "group": "A_KEEP",
+      "status": 0
+    },
+    {
+      "line": 549,
+      "group": "B_KEEP",
+      "status": 0
+    },
+    {
+      "line": 553,
+      "group": "A_CUT",
+      "status": 0
+    },
+    {
+      "line": 557,
+      "group": "A_CUT",
+      "status": 0
+    },
+    {
+      "line": 561,
+      "group": "B_CUT",
+      "status": 0
+    },
+    {
+      "line": 565,
+      "group": "B_CUT",
+      "status": 0
+    },
+    {
+      "line": 655,
+      "group": "A_KEEP",
+      "status": 0
+    },
+    {
+      "line": 659,
+      "group": "B_KEEP",
+      "status": 0
+    },
+    {
+      "line": 663,
+      "group": "A_CUT",
+      "status": 0
+    },
+    {
+      "line": 667,
+      "group": "A_CUT",
+      "status": 0
+    },
+    {
+      "line": 671,
+      "group": "B_CUT",
+      "status": 0
+    },
+    {
+      "line": 675,
+      "group": "B_CUT",
+      "status": 0
+    }
+  ],
+  "native_hide_end_events": [
+    {
+      "line": 505,
+      "index": 1
+    },
+    {
+      "line": 507,
+      "index": 0
+    },
+    {
+      "line": 607,
+      "index": 5
+    },
+    {
+      "line": 609,
+      "index": 4
+    },
+    {
+      "line": 611,
+      "index": 3
+    },
+    {
+      "line": 613,
+      "index": 2
+    },
+    {
+      "line": 615,
+      "index": 1
+    },
+    {
+      "line": 617,
+      "index": 0
+    }
+  ],
+  "crash_after_caption_begin_line": 694,
+  "exception": "System.AccessViolationException",
+  "exit_code": "0xffffffff",
+  "physical_memory_corruption_root_cause": "UNVERIFIED",
+  "actual_preview_visibility": "UNVERIFIED",
+  "caption_fix_native_execution": "NOT_RUN",
+  "caption_fix_local_managed_tests": 12,
+  "caption_fix_branch_managed_tests": 12,
+  "compiled_caption_setter_calls": 0,
+  "compiled_enabled_setter_calls": 0,
+  "compiled_set_message3_calls": 1,
+  "main_addin_built_deployed": false
+}

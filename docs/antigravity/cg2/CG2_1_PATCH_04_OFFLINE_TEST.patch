@@ -1,0 +1,39 @@
+diff --git a/docs/antigravity/cg2/CG2_TEST_HARNESS.cs b/docs/antigravity/cg2/CG2_TEST_HARNESS.cs
+--- a/docs/antigravity/cg2/CG2_TEST_HARNESS.cs
++++ b/docs/antigravity/cg2/CG2_TEST_HARNESS.cs
+@@ -267,6 +267,35 @@
+                 else Console.WriteLine("PASS: 2mm / 2deg misalignment remains a CG2 diagnostic candidate");
+             }
+ 
++            // CG2.1: 0.30mm axis-to-axis RADIAL offset, not the AABB axial distance.
++            MethodInfo axisSeparation = checkerType.GetMethod(
++                "Cg2TryMeasureAxisSeparation", BindingFlags.NonPublic | BindingFlags.Static);
++            if (axisSeparation == null || holeAxisType == null)
++            {
++                Console.WriteLine("FAIL: CG2.1 axis-to-axis diagnostic helper missing");
++                errors++;
++            }
++            else
++            {
++                object sourceAxis = Activator.CreateInstance(holeAxisType);
++                holeAxisType.GetField("Center").SetValue(sourceAxis, new double[] { 0, 0, 0 });
++                holeAxisType.GetField("Direction").SetValue(sourceAxis, new double[] { 0, 0, 1 });
++                object targetAxis = Activator.CreateInstance(holeAxisType);
++                holeAxisType.GetField("Center").SetValue(targetAxis, new double[] { 0.00030, 0, 0.015 });
++                holeAxisType.GetField("Direction").SetValue(targetAxis, new double[] { 0, 0, 1 });
++                object[] parameters = { sourceAxis, targetAxis, 0.0, 0.0 };
++                bool success = (bool)axisSeparation.Invoke(null, parameters);
++                double radialMm = (double)parameters[2];
++                double angleDeg = (double)parameters[3];
++                if (success && Math.Abs(radialMm - 0.30) < 1e-6 &&
++                    angleDeg < 1e-6)
++                    Console.WriteLine("PASS: CG2.1 measures 0.30mm true radial offset");
++                else
++                {
++                    Console.WriteLine("FAIL: CG2.1 true radial offset calculation");
++                    errors++;
++                }
++            }
+             return errors;
+         }
+ 

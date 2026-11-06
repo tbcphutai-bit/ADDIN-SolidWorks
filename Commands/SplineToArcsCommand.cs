@@ -242,7 +242,7 @@ namespace ADDIN.Commands
                 foreach (ArcDefinition definition in arcDefinitions)
                     worstDeviationMm = Math.Max(worstDeviationMm, definition.MaximumDeviationMm);
 
-                ShowMessage(
+                if (nativeShowCompletion) ShowMessage(
                     "Đã tạo " + createdArcs.Count + " cung R theo hướng đã chọn.\n"
                      + "Dim R: " + radiusDimensionCount
                      + " | Dim bước: " + stepDimensionCount

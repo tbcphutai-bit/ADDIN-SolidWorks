@@ -1,0 +1,252 @@
+{
+  "mvid": "2f4e359e-bffe-4f74-9441-891bb4c77b12",
+  "matches_user_log": true,
+  "comparison": "Normalized opcode/member/operand signatures, NOP ignored; not a PDB source checksum",
+  "types": [
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointCommandEntry",
+      "methods": 2,
+      "r51_il_matches": 2
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointCommandEntry/<>c",
+      "methods": 3,
+      "r51_il_matches": 3
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointCommandEntry/<>c__DisplayClass3_0",
+      "methods": 4,
+      "r51_il_matches": 4
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointCommandEntry/<>c__DisplayClass3_1",
+      "methods": 2,
+      "r51_il_matches": 2
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointReadOnlyProbe",
+      "methods": 12,
+      "r51_il_matches": 12
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointReadOnlyProbe/FrameScan",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointReadOnlyProbe/Segment",
+      "methods": 0,
+      "r51_il_matches": 0
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointReadOnlyProbe/Vec3",
+      "methods": 7,
+      "r51_il_matches": 7
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGeometryMath",
+      "methods": 5,
+      "r51_il_matches": 5
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGeometryMath/V",
+      "methods": 11,
+      "r51_il_matches": 11
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGeometryMath/Axis",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGeometryMath/Result",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGhostPreview",
+      "methods": 12,
+      "r51_il_matches": 12
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGhostPreview/ShownBody",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjOperationKind",
+      "methods": 0,
+      "r51_il_matches": 0
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjToolDefinition",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjCutOperation",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjCutPlan",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjJointPlan",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjBooleanResult",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean",
+      "methods": 10,
+      "r51_il_matches": 10
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjTemporaryBoolean/<>c__DisplayClass8_0",
+      "methods": 3,
+      "r51_il_matches": 3
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjProfile",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer",
+      "methods": 5,
+      "r51_il_matches": 5
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer/<>c",
+      "methods": 3,
+      "r51_il_matches": 3
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjJointSolution",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjJointRuleLibrary",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjJointSolver",
+      "methods": 10,
+      "r51_il_matches": 10
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjJointSolver/<>c",
+      "methods": 3,
+      "r51_il_matches": 3
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjUSection",
+      "methods": 3,
+      "r51_il_matches": 3
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricPlan",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricRules",
+      "methods": 23,
+      "r51_il_matches": 23
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricRules/<>c",
+      "methods": 4,
+      "r51_il_matches": 4
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricRules/<>c__DisplayClass12_0",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricRules/<>c__DisplayClass12_1",
+      "methods": 3,
+      "r51_il_matches": 3
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricRules/<>c__DisplayClass13_0",
+      "methods": 2,
+      "r51_il_matches": 2
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricRules/<>c__DisplayClass18_0",
+      "methods": 2,
+      "r51_il_matches": 2
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricRules/<>c__DisplayClass21_0",
+      "methods": 4,
+      "r51_il_matches": 4
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjParametricRules/<>c__DisplayClass24_0",
+      "methods": 2,
+      "r51_il_matches": 2
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjBooleanException",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjManufacturingConventions",
+      "methods": 0,
+      "r51_il_matches": 0
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjSheetCutTools",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AfjSheetCutTools/<>c__DisplayClass0_0",
+      "methods": 2,
+      "r51_il_matches": 2
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGhostSessionManager",
+      "methods": 18,
+      "r51_il_matches": 18
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGhostSessionManager/SessionState",
+      "methods": 0,
+      "r51_il_matches": 0
+    },
+    {
+      "type": "ADDIN.Commands.AutoFrameJoint.AutoFrameJointGhostSessionManager/Session",
+      "methods": 1,
+      "r51_il_matches": 1
+    },
+    {
+      "type": "ADDIN.UI.AutoFrameJoint.AutoFrameJointSelectionPage",
+      "methods": 75,
+      "r51_il_matches": 75
+    },
+    {
+      "type": "ADDIN.UI.AutoFrameJoint.AutoFrameJointSelectionPage/<>c__DisplayClass129_0",
+      "methods": 2,
+      "r51_il_matches": 2
+    },
+    {
+      "type": "ADDIN.UI.AutoFrameJoint.AutoFrameJointSelectionPage/<>c__DisplayClass135_0",
+      "methods": 2,
+      "r51_il_matches": 2
+    }
+  ]
+}

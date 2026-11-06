@@ -1,0 +1,17 @@
+frame,sketch_feature_id,sketch_name,evidence_level,constrained_status,relation_count,dangling_relations,overdefining_relations,driving_dimensions,dimension_roles,support_type,support_owner_feature_id,existing_face_support
+fr01,727,AFJ_e15ee0e8_Loser,API_VERIFIED,3,44,0,0,1,AFJ_AssemblyFitGap,2,512,True
+fr01,729,AFJ_e15ee0e8_LongFarRelief,API_VERIFIED,3,10,0,0,0,,2,512,True
+fr01,744,AFJ_d1b517bb_Loser,API_VERIFIED,3,44,0,0,1,AFJ_AssemblyFitGap,2,512,True
+fr01,746,AFJ_d1b517bb_LongFarRelief,API_VERIFIED,3,10,0,0,0,,2,512,True
+fr02,741,AFJ_fb843f44_Cover,API_VERIFIED,3,32,0,0,1,AFJ_ToolClosureMargin,2,512,True
+fr02,743,AFJ_fb843f44_ShortRelief,API_VERIFIED,3,6,0,0,0,,2,512,True
+fr02,758,AFJ_d1b517bb_Cover,API_VERIFIED,3,32,0,0,1,AFJ_ToolClosureMargin,2,512,True
+fr02,760,AFJ_d1b517bb_ShortRelief,API_VERIFIED,3,6,0,0,0,,2,512,True
+fr03,781,AFJ_6ebf46e0_Loser,API_VERIFIED,3,36,0,0,1,AFJ_AssemblyFitGap,2,512,True
+fr03,783,AFJ_6ebf46e0_LongFarRelief,API_VERIFIED,3,10,0,0,0,,2,512,True
+fr03,798,AFJ_fb843f44_Loser,API_VERIFIED,3,38,0,0,1,AFJ_AssemblyFitGap,2,512,True
+fr03,800,AFJ_fb843f44_LongFarRelief,API_VERIFIED,3,10,0,0,0,,2,512,True
+fr04,811,AFJ_e15ee0e8_Cover,API_VERIFIED,3,32,0,0,1,AFJ_ToolClosureMargin,2,512,True
+fr04,813,AFJ_e15ee0e8_ShortRelief,API_VERIFIED,3,6,0,0,0,,2,512,True
+fr04,828,AFJ_6ebf46e0_Cover,API_VERIFIED,3,28,0,0,1,AFJ_ToolClosureMargin,2,512,True
+fr04,830,AFJ_6ebf46e0_ShortRelief,API_VERIFIED,3,6,0,0,0,,2,512,True

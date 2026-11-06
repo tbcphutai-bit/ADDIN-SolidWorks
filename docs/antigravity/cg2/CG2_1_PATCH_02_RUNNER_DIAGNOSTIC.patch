@@ -1,0 +1,165 @@
+diff --git a/docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs b/docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs
+--- a/docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs
++++ b/docs/antigravity/cg2/CG2_LIVE_CAD_RUNNER.cs
+@@ -32,6 +32,9 @@
+             public string SourceHoleLabel;
+             public double BoxSeparationMm;
+             public double AxisToBoxMm;
++            public int TargetHoleAxisCount;
++            public double NearestTargetAxisRadialMm;
++            public double NearestTargetAxisAngleDeg;
+             public string Classification;
+             public string Reason;
+             public string MaterialEvidence;
+@@ -58,6 +61,7 @@
+             // CG2 metrics
+             public bool HasCg2;
+             public int Cg2Bounds, Cg2NoHole, Cg2Pairs, Cg2Candidates;
++            public int Cg2TotalOccurrences, Cg2EligibleComponents, Cg2SkippedOrUnreadable;
+             public int Cg2ComparedPairs, Cg2TestedHoles;
+             public int Cg2SubassemblyContainers, Cg2UnresolvedLeafParts;
+             public int Cg2BrepRayTested, Cg2BrepSolid, Cg2BrepNoAxisHit;
+@@ -246,10 +250,14 @@
+             foreach (CandidateDetail c in ordered)
+                 Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                     "  Candidate #{0}: Source=[{1}] ({2}) -> Target=[{3}] | " +
++                    "Gap={4:F3}mm AABB_AxialDist={5:F3}mm | {6} | " +
++                    "BREP={7} Hits={8} Span={9:F3}mm | " +
++                    "NearestTargetRadial={10:F3}mm Angle={11:F3}deg TargetAxes={12}",
+-                    "Gap={4:F3}mm AxisDist={5:F3}mm | {6} | BREP={7} Hits={8} Span={9:F3}mm",
+                     c.Id, c.SourceOccurrence, c.SourceHoleLabel, c.TargetOccurrence,
+                     c.BoxSeparationMm, c.AxisToBoxMm, c.Classification,
++                    c.MaterialEvidence ?? "NOT_RECORDED", c.MaterialHitCount, c.MaterialSpanMm,
++                    c.NearestTargetAxisRadialMm, c.NearestTargetAxisAngleDeg,
++                    c.TargetHoleAxisCount));
+-                    c.MaterialEvidence ?? "NOT_RECORDED", c.MaterialHitCount, c.MaterialSpanMm));
+             Console.WriteLine("  BREP_HIT_PROVES_MISSING_HOLE=NO");
+             Console.WriteLine("  CONTACT_OR_FASTENING_INTENT=NOT_VERIFIED");
+             Console.WriteLine("  EXACT_NESTED_SITE=REQUIRES_FIXTURE_MANIFEST_ASSERTION");
+@@ -424,6 +432,7 @@
+                 Metrics candidate = RunOneIsolated(app, candidateType, root, model, isCandidate: true);
+                 response.Baseline = baseline;
+                 response.Candidate = candidate;
++                AuditCg21Coverage(candidate, Path.GetFileName(model));
+ 
+                 // 1. Rigorous Row-by-Row Metrics & Signature Comparison (Review #1 BLOCKER B)
+                 CompareMetrics(baseline, candidate, model);
+@@ -482,9 +491,43 @@
+ 
+             if (!a.SequenceEqual(b))
+             {
++                int first = 0, limit = Math.Min(a.Length, b.Length);
++                while (first < limit && a[first] == b[first]) first++;
++                Console.WriteLine("  CSV_STRICT_PARITY=FAIL model=" + modelName +
++                    " FirstDiffByte=" + first + " BaselineBytes=" + a.Length +
++                    " CandidateBytes=" + b.Length);
++                Console.WriteLine("  CSV_BASELINE_SHA256=" + Sha256(baseCsv));
++                Console.WriteLine("  CSV_CANDIDATE_SHA256=" + Sha256(candCsv));
++                // Diagnostics only: raw byte mismatch MUST remain FAIL.
++                try
++                {
++                    string[] recordsA = SplitCsvRecords(
++                        new UTF8Encoding(false, true).GetString(a)).ToArray();
++                    string[] recordsB = SplitCsvRecords(
++                        new UTF8Encoding(false, true).GetString(b)).ToArray();
++                    bool orderOnly = recordsA
++                        .OrderBy(value => value, StringComparer.Ordinal)
++                        .SequenceEqual(recordsB.OrderBy(value => value, StringComparer.Ordinal));
++                    bool rawOrderedRowsEqual = string.Equals(
++                        OrderedRowSignatureExact(baselineReport),
++                        OrderedRowSignatureExact(candidateReport),
++                        StringComparison.Ordinal);
++                    Console.WriteLine("  CSV_RECORD_COUNTS=" +
++                        recordsA.Length + "/" + recordsB.Length);
++                    Console.WriteLine("  CSV_EXACT_RECORDS_IGNORE_ORDER=" + orderOnly);
++                    Console.WriteLine("  PRODUCTION_RAW_ROWS_ORDERED_EXACT_EQUAL=" +
++                        rawOrderedRowsEqual);
++                    Console.WriteLine("  CSV_MISMATCH_TYPE=" +
++                        (orderOnly ? "ORDER_ONLY_OBSERVED" : "RECORD_CONTENT_OR_COUNT_DIFF"));
++                    var details = new StringBuilder();
++                    WriteFirstDifferentCsvRecords(a, b, details);
++                    Console.WriteLine(details.ToString()); // LOCAL private logs only
++                }
++                catch (Exception ex)
++                {
++                    Console.WriteLine("  CSV_DETAIL_DIAGNOSTIC_UNAVAILABLE=" +
++                        ex.GetType().Name);
++                }
+-                int first = 0;
+-                int n = Math.Min(a.Length, b.Length);
+-                while (first < n && a[first] == b[first]) first++;
+                 throw new InvalidOperationException(string.Format(
+                     CultureInfo.InvariantCulture,
+                     "CSV_BYTE_PARITY_FAIL model={0}, baselineBytes={1}, candidateBytes={2}, firstDiffByte={3}",
+@@ -670,6 +713,9 @@
+                 object partRel = pr.GetValue(report);
+                 Type pt = partRel.GetType();
+                 m.HasCg2 = true;
++                m.Cg2TotalOccurrences = IntField(pt, partRel, "TotalOccurrenceCount");
++                m.Cg2EligibleComponents = IntField(pt, partRel, "EligibleComponentCount");
++                m.Cg2SkippedOrUnreadable = IntField(pt, partRel, "SkippedOrUnreadableCount");
+                 m.Cg2Bounds = IntField(pt, partRel, "ComponentsWithBounds");
+                 m.Cg2NoHole = IntField(pt, partRel, "ComponentsWithoutDetectedHoles");
+                 m.Cg2Pairs = IntField(pt, partRel, "RecordedNearbyPairs");
+@@ -685,6 +731,10 @@
+                 m.Cg2BrepNotTested = IntField(pt, partRel, "BrepNotTestedCount");
+                 m.Cg2IsPartial = (bool)pt.GetField("IsPartial").GetValue(partRel);
+                 m.Cg2CoverageStatus = (string)pt.GetField("CoverageStatus").GetValue(partRel);
++                IEnumerable warnings = pt.GetField("Warnings").GetValue(partRel) as IEnumerable;
++                if (warnings != null)
++                    foreach (object item in warnings)
++                        m.Cg2Warnings.Add(Convert.ToString(item, CultureInfo.InvariantCulture));
+ 
+                 IEnumerable candList = pt.GetField("ExpectedHoleCandidates").GetValue(partRel) as IEnumerable;
+                 if (candList != null)
+@@ -700,6 +750,9 @@
+                             SourceHoleLabel = (string)crt.GetProperty("SourceHoleLabel").GetValue(cRow, null),
+                             BoxSeparationMm = (double)crt.GetProperty("BoxSeparationMm").GetValue(cRow, null),
+                             AxisToBoxMm = (double)crt.GetProperty("AxisToBoxMm").GetValue(cRow, null),
++                            TargetHoleAxisCount = (int)crt.GetProperty("TargetHoleAxisCount").GetValue(cRow, null),
++                            NearestTargetAxisRadialMm = (double)crt.GetProperty("NearestTargetAxisRadialMm").GetValue(cRow, null),
++                            NearestTargetAxisAngleDeg = (double)crt.GetProperty("NearestTargetAxisAngleDeg").GetValue(cRow, null),
+                             Classification = (string)crt.GetProperty("Classification").GetValue(cRow, null),
+                             Reason = (string)crt.GetProperty("Reason").GetValue(cRow, null),
+                             MaterialEvidence = (string)crt.GetProperty("MaterialEvidence").GetValue(cRow, null),
+@@ -713,6 +766,40 @@
+             return m;
+         }
+ 
++        private static void AuditCg21Coverage(Metrics m, string modelName)
++        {
++            if (m == null || !m.HasCg2)
++                throw new InvalidOperationException("CG2 report missing: " + modelName);
++
++            Console.WriteLine("  CG2_COUNTS model=" + modelName +
++                " Total=" + m.Cg2TotalOccurrences +
++                " EligibleParts=" + m.Cg2EligibleComponents +
++                " Bounds=" + m.Cg2Bounds +
++                " SubassemblyContainers=" + m.Cg2SubassemblyContainers +
++                " UnresolvedParts=" + m.Cg2UnresolvedLeafParts +
++                " Skipped=" + m.Cg2SkippedOrUnreadable);
++            bool consistent = m.Cg2TotalOccurrences >= 0 &&
++                m.Cg2EligibleComponents >= 0 && m.Cg2Bounds >= 0 &&
++                m.Cg2SubassemblyContainers >= 0 &&
++                m.Cg2UnresolvedLeafParts >= 0 && m.Cg2SkippedOrUnreadable >= 0 &&
++                m.Cg2Bounds <= m.Cg2EligibleComponents &&
++                m.Cg2UnresolvedLeafParts <= m.Cg2SkippedOrUnreadable &&
++                (long)m.Cg2EligibleComponents + m.Cg2SubassemblyContainers
++                    <= m.Cg2TotalOccurrences;
++            if (!consistent)
++                throw new InvalidOperationException("CG2_COUNT_INCONSISTENT: " + modelName);
++            Console.WriteLine("  CG2_COUNT_AUDIT=PASS");
++            if (string.Equals(m.Cg2CoverageStatus, "PARTIAL_UNVERIFIED",
++                StringComparison.Ordinal))
++            {
++                Console.WriteLine("  CG2_PARTIAL_REASON Skipped=" +
++                    m.Cg2SkippedOrUnreadable + " IsPartial=" + m.Cg2IsPartial +
++                    " Bounds=" + m.Cg2Bounds);
++                foreach (string warning in m.Cg2Warnings.Take(5))
++                    Console.WriteLine("  CG2_WARNING=" + warning);
++            }
++        }
++
+         private static int IntField(Type type, object obj, string name)
+         {
+             FieldInfo field = type.GetField(name);

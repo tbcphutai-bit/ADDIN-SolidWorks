@@ -206,7 +206,11 @@ namespace ADDIN.Commands
             bool hasOldCommandInProgress = false;
             try
             {
+                // CG2.5 transient viewport markers are never persisted.
+                Cg25ClearCandidatePreview();
                 EnsureResultsForm();
+                resultsForm.Cg25PreviewAction = Cg25ShowCandidatePreview;
+                resultsForm.Cg25ClearPreviewAction = Cg25ClearCandidatePreview;
                 EnableDiagnostics = resultsForm.DiagnosticEnabled;
                 AutoCreateMarkers = resultsForm.AutoMarkersEnabled;
                 resultsForm.BeginRun();
@@ -331,6 +335,92 @@ namespace ADDIN.Commands
                 Stopwatch reportWatch = Stopwatch.StartNew();
                 lastReport = BuildReport(model.GetTitle(), SafeConfigurationName(model), holes, results, patternIssues, 0);
                 lastReport.ConnectionCoverage = BuildConnectionCoverage(holes, results);
+                // CG2: broad-phase component screening only. Never changes production NG.
+                // AABB overlap is not proof of solid contact or a missing hole.
+                try
+                {
+                    lastReport.PartRelations = BuildCg2PartRelations(assembly, holes);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception cg2Error)
+                {
+                    Debug.WriteLine("[CHECK HOLE CG2] diagnostics unavailable: " + cg2Error);
+                    lastReport.PartRelations = new CheckHoleCg2Report
+                    {
+                        IsPartial = true,
+                        CoverageStatus = "ERROR_UNVERIFIED"
+                    };
+                    lastReport.PartRelations.Warnings.Add(cg2Error.GetType().Name);
+                }
+                // CG2 BREP diagnostic: actual solid hit evidence, never promotes CHECK_ONLY to NG.
+                // Any COM/body/transform failure leaves the candidate UNVERIFIED.
+                try
+                {
+                    if (lastReport.PartRelations != null)
+                    {
+                        EnrichCg2BrepMaterialEvidence(assembly, holes, lastReport.PartRelations);
+                        // CG2.3 read-only counterpart evidence; NOT a production NG.
+                        Cg23AnalyzeCounterparts(holes, lastReport.PartRelations);
+                        // CG2.4: geometry/topology boundary screening; read-only.
+                        Cg24AnalyzeTopology(assembly, holes, lastReport.PartRelations);
+                        // CG2.5 real-CAD positive controls (debug evidence only).
+                        // CG3.1: read-only fusion of CG2 evidence, no production verdict.
+                        Cg31AnalyzeReviewCandidates(lastReport.PartRelations);
+                        // CG3.2: cross-reference P1 against CURRENT production NG results.
+                        // Diagnostic only; neither removes nor creates any NG.
+                        Cg32CorrelateExistingNg(results, patternIssues, lastReport.PartRelations);
+                        // CG3.3: observed counterpart-hole pairs and regular candidate pitch.
+                        // Diagnostic evidence only; intent is NOT established and no NG changes.
+                        Cg33AssessIntentEvidence(results, lastReport.PartRelations);
+                        // CG3.4: DEBUG-only audit against 6 user-confirmed missing-hole
+                        // positions in one known assembly. NEVER changes production NG.
+                        Cg34GroundTruthAudit(model, lastReport.PartRelations);
+                        // CG3.5: optional DEBUG-only contrast audit, never production NG.
+                        Cg35ContrastAudit(model, results, lastReport.PartRelations);
+                        // CG3.6: DEBUG-only optional, human labels; never production NG.
+                        Cg36ManualIntentAudit(model, lastReport.PartRelations);
+                        Cg25RunRealCadControls(assembly, holes, lastReport.PartRelations);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception cg2BrepError)
+                {
+                    Debug.WriteLine("[CHECK HOLE CG2 BREP] material evidence unavailable: " + cg2BrepError);
+                    if (lastReport.PartRelations != null)
+                    {
+                        lastReport.PartRelations.IsPartial = true;
+                        lastReport.PartRelations.CoverageStatus = "PARTIAL_UNVERIFIED";
+                        lastReport.PartRelations.Warnings.Add(
+                            "BREP material screening failed: " + cg2BrepError.GetType().Name);
+                    }
+                }
+#if DEBUG
+                try
+                {
+                    if (EnableDiagnostics)
+                    {
+                        Cg22WriteDiagnosticDebug(
+                            lastReport == null
+                                ? null
+                                : lastReport.PartRelations);
+                    }
+                }
+                catch (Exception cg22DebugError)
+                {
+                    Debug.WriteLine(
+                        "[CG22][DEBUG_ERROR] " +
+                        cg22DebugError.ToString());
+                }
+#endif
+                ThrowIfCanceled();
+                if (!string.Equals(inputState, CaptureModelState(model), StringComparison.Ordinal))
+                    throw new InvalidOperationException("Model đã thay đổi trong khi CG2 quét; hãy chạy lại.");
                 reportWatch.Stop();
                 profile.ReportBuildMs = reportWatch.ElapsedMilliseconds;
                 // Keep previous markers until a complete replacement sketch is confirmed.

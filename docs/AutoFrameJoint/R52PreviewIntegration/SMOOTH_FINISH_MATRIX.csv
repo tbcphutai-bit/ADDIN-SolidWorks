@@ -1,0 +1,70 @@
+﻿case,variant,status,evidence,native_api
+A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+BUTTON_107_DEFERRED_PREVIEW_DELEGATE,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+BUTTON_108_DEFERRED_PREVIEW_DELEGATE,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+FOREIGN_THREAD_SUBMIT_REFUSED,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+FINISH_CANCELS_QUEUED_PREVIEW_AND_CLOSES_ONCE,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+FINISH_DURING_RUNNING_BACKEND_IS_RETAINED,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+FINISH_PRIORITY_BLOCKS_NEW_BACKEND_AND_SELECTION_REFRESH,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+STANDARD_NATIVE_CLOSE_INVALIDATES_PENDING_FINISH,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+NORMAL_CLOSE_EXCEPTION_ALLOWS_EXPLICIT_FINISH_RETRY,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_REPEATED_P1_HAS_NO_BODY_COPY_DISPLAY_HIDE_OR_REDRAW,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_P1_TO_P2_DISPLAYS_ONLY_REMOVED_AND_REDRAWS_ONCE,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_P2_TO_P1_HIDES_ONLY_REMOVED_AND_REDRAWS_ONCE,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_INVALIDATED_BY_DOCUMENT_AND_BODY_STAMPS,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_INVALIDATED_BY_CONFIGURATION_AND_FULL_TRANSFORM,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_INVALIDATED_BY_SOURCE_BODY_IDENTITY_AND_AB_ORDER,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_REQUIRES_CONCLUSIVE_COMPONENT_AND_PART_IDENTITY,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_STAMP_FAILURE_AND_NONFINITE_TRANSFORM_DISABLE_REUSE,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CLEAR_DROPS_CACHE_AFTER_HIDING_ALL_DISPLAYED_BODIES,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+HIDE_FAILURE_RETAINS_OWNERSHIP_FOR_EXPLICIT_RETRY,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+NONZERO_DISPLAY3_STATUS_IS_FAILURE_AND_DROPS_CACHE,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CLOSE_WHILE_COMPUTING_WITH_NO_BODY_RETAINS_SESSION,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+REENTRANT_NATIVE_CLOSE_STOPS_FURTHER_DISPLAY_AND_DRAINS_SESSION,local,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+BUTTON_107_DEFERRED_PREVIEW_DELEGATE,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+BUTTON_108_DEFERRED_PREVIEW_DELEGATE,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+FOREIGN_THREAD_SUBMIT_REFUSED,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+FINISH_CANCELS_QUEUED_PREVIEW_AND_CLOSES_ONCE,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+FINISH_DURING_RUNNING_BACKEND_IS_RETAINED,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+FINISH_PRIORITY_BLOCKS_NEW_BACKEND_AND_SELECTION_REFRESH,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+STANDARD_NATIVE_CLOSE_INVALIDATES_PENDING_FINISH,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+NORMAL_CLOSE_EXCEPTION_ALLOWS_EXPLICIT_FINISH_RETRY,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_REPEATED_P1_HAS_NO_BODY_COPY_DISPLAY_HIDE_OR_REDRAW,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_P1_TO_P2_DISPLAYS_ONLY_REMOVED_AND_REDRAWS_ONCE,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_P2_TO_P1_HIDES_ONLY_REMOVED_AND_REDRAWS_ONCE,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_INVALIDATED_BY_DOCUMENT_AND_BODY_STAMPS,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_INVALIDATED_BY_CONFIGURATION_AND_FULL_TRANSFORM,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_INVALIDATED_BY_SOURCE_BODY_IDENTITY_AND_AB_ORDER,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_REQUIRES_CONCLUSIVE_COMPONENT_AND_PART_IDENTITY,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CACHE_STAMP_FAILURE_AND_NONFINITE_TRANSFORM_DISABLE_REUSE,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CLEAR_DROPS_CACHE_AFTER_HIDING_ALL_DISPLAYED_BODIES,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+HIDE_FAILURE_RETAINS_OWNERSHIP_FOR_EXPLICIT_RETRY,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+NONZERO_DISPLAY3_STATUS_IS_FAILURE_AND_DROPS_CACHE,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+CLOSE_WHILE_COMPUTING_WITH_NO_BODY_RETAINS_SESSION,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+REENTRANT_NATIVE_CLOSE_STOPS_FURTHER_DISPLAY_AND_DRAINS_SESSION,branch,PASS_MANAGED_CONTRACT,"Managed proxies; no native PMP, kernel geometry or installed Add-in",False
+Earlier Caption fix executed in installed DLL,user_native_log,BINARY_VERIFIED_AND_USER_NATIVE_LOG,MVID matches; 267/267 AFJ normalized IL methods match Caption baseline,True
+Preview visible,user_report,USER_CONFIRMED_VISIBLE,User: có preview nhưng không được mượt và chưa kết thúc được lệnh,False
+Four repeated P1 solves and eight Display3 status0,user_native_log,OBSERVED,4 SOLVER_END; 8 DISPLAY3_END status0,True
+Command close and cleanup boundaries,user_native_log,OBSERVED_LIMITED,3 CLOSE and AFTER_CLOSE; all 8 Hide end. No button106 in supplied run. Does not establish interactive finish success,True
+Cause of final 0xffffffff exit,user_native_log,UNVERIFIED,No crash stack or matching Windows Application event returned,False
+New follow-up: timed real first solve and repeated P1/P2,installed_addin,NOT_RUN,No main Build/Deploy; only hidden SOLIDWORKS process observed,False
+New follow-up: button106/OK/Esc close and reopen stability,installed_addin,NOT_RUN,Managed contracts only; needs owner manual Build/test,False
+New geometry replay 2354/1618/3615,native_geometry,NOT_RUN,"No R51 cut plan, rules, cutter or validators changed; prior evidence is separate",False
+Apply permanent Cut on OK,production_cut,NOT_IMPLEMENTED,Existing command remains temporary Preview; Finish closes without modifying Part,False

@@ -1,0 +1,14 @@
+{
+  "installed_file": "ADDIN.dll",
+  "installed_mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+  "user_log_mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+  "mvid_matches_user_log": true,
+  "comparison_baseline": "Caption follow-up local detached harness, before smooth/finish changes",
+  "afj_method_count": 267,
+  "normalized_il_matches": 267,
+  "pdb_matches_dll_guid_age": true,
+  "pdb_document_source_checksums": "NOT_AVAILABLE",
+  "installed_dll_sha256": "21524f3d5a7fa5d92c6a3ee5d95e32147e26e5b8a29bc5939ed6dc7f479e8435",
+  "installed_pdb_sha256": "90ba656f3275e55608073190c5b4903a340f98424a941eacc30530d3f36d534d",
+  "conclusion": "Installed module contains the earlier Caption fix. Smooth/finish follow-up exists in source only; no main Build/Deploy."
+}

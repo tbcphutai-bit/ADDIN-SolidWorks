@@ -1,0 +1,165 @@
+{
+  "report_generated_at_utc": "2026-10-22T08:47:29.670731+00:00",
+  "application": {
+    "user_branch": "integrate/check-chan-pr37-vs-20261021",
+    "user_head": "66d12511f24c35b560d699228109857058ad66cb",
+    "only_four_existing_classes_written": true,
+    "project_and_installed_dll_pdb_unchanged": true,
+    "main_addin_build_deploy": false,
+    "files": [
+      {
+        "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+        "before_sha256": "904956aff586726c3e931b78996fd47b208403bfc4e05b8fc85c8f8a47efd200",
+        "after_sha256": "8f9c358eabfc2b67cd4a32e1b032493a5a4c6916876d43e0ee8a3acf167dccc2"
+      },
+      {
+        "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+        "before_sha256": "af3f3d043d38dce89a08ff16c233b53e22f64f684d2f165398a1d9a107dcbaf5",
+        "after_sha256": "45ac41caa1d97bb0f5868956c4bc2cb78e08ebfd51e61467d3f9ba395e06b52f"
+      },
+      {
+        "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+        "before_sha256": "d72694979b651589332b437224be6fc4672e4a99a0c930717608ee1b1b4ad983",
+        "after_sha256": "a5b825c59258b5e54ea809201350e12a067730b48e63001c39632bc18d9dc0c7"
+      },
+      {
+        "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+        "before_sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09",
+        "after_sha256": "fe853fe4e53c38143c8713b3e96c26d3f63d9a713f841a6251b9f549aeb374e3"
+      }
+    ]
+  },
+  "source_patch_hashes": [
+    {
+      "variant": "local",
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "before_sha256": "904956aff586726c3e931b78996fd47b208403bfc4e05b8fc85c8f8a47efd200",
+      "after_sha256": "8f9c358eabfc2b67cd4a32e1b032493a5a4c6916876d43e0ee8a3acf167dccc2"
+    },
+    {
+      "variant": "local",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "before_sha256": "af3f3d043d38dce89a08ff16c233b53e22f64f684d2f165398a1d9a107dcbaf5",
+      "after_sha256": "45ac41caa1d97bb0f5868956c4bc2cb78e08ebfd51e61467d3f9ba395e06b52f"
+    },
+    {
+      "variant": "local",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "before_sha256": "d72694979b651589332b437224be6fc4672e4a99a0c930717608ee1b1b4ad983",
+      "after_sha256": "a5b825c59258b5e54ea809201350e12a067730b48e63001c39632bc18d9dc0c7"
+    },
+    {
+      "variant": "local",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "before_sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09",
+      "after_sha256": "fe853fe4e53c38143c8713b3e96c26d3f63d9a713f841a6251b9f549aeb374e3"
+    },
+    {
+      "variant": "branch",
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "before_sha256": "b2cfdf7bf34157e56587466dea7efd7b02270e519f71006eeb3ee3034aa2b0a5",
+      "after_sha256": "3a5116f16031d98d221a5cdb7cdfbcf52788a06ef227bf3025689f0b94c74d78"
+    },
+    {
+      "variant": "branch",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "before_sha256": "97d2c286ed12d4f95d0e1280f70e77844ef0a72f358ca638f8f297edd7673981",
+      "after_sha256": "9dd634f2d865dea38a0e4ba17f7957ee7847660f9eb734d7f6fdb3ebe2cc239d"
+    },
+    {
+      "variant": "branch",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "before_sha256": "863e4f5972173551e98e3125b5435d53fcbde3464de8eab7b00afd42878936c1",
+      "after_sha256": "b8a4c55260c02ecff8f66302dc1869b611fa740813bdfc1b102a41e6a069df12"
+    },
+    {
+      "variant": "branch",
+      "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "before_sha256": "8e6c35e17e100d2604a2a9c8dc9ff3fe28f60c5f5c9594554d0726696fb4d061",
+      "after_sha256": "029f280f0dc44506442dac7bf447eb004830f69fda18110cbb45a93c0db95a99"
+    }
+  ],
+  "r51_core": [
+    {
+      "variant": "local",
+      "r51_core_unchanged": true,
+      "core_sha256": "f2f8095d1e591894d54a02929932ca9ff7a5645fcf603d027f2764cc7c0d5f7c"
+    },
+    {
+      "variant": "branch",
+      "r51_core_unchanged": true,
+      "core_sha256": "f2f8095d1e591894d54a02929932ca9ff7a5645fcf603d027f2764cc7c0d5f7c"
+    }
+  ],
+  "actual_local_reproduction": "47/47 managed controls; detached six-class compilation from the applied local files",
+  "assembly_metadata": [
+    {
+      "file": "ADDIN.dll",
+      "mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+      "native_apply_type_present": false,
+      "assembly_executed_by_metadata_inspection": false
+    },
+    {
+      "file": "NativeApply_branch.exe",
+      "mvid": "b7d2f9ac-4f9a-42df-b5ff-d0ff9e7a1271",
+      "native_apply_type_present": true,
+      "assembly_executed_by_metadata_inspection": false
+    },
+    {
+      "file": "NativeApply_local.exe",
+      "mvid": "f888ba27-7d23-42c6-90de-d708a2102d12",
+      "native_apply_type_present": true,
+      "assembly_executed_by_metadata_inspection": false
+    },
+    {
+      "file": "ManagedContracts.exe",
+      "mvid": "cbb2b6d4-0fe9-400b-a99c-af9a58a9989c",
+      "native_apply_type_present": true,
+      "assembly_executed_by_metadata_inspection": false
+    }
+  ],
+  "installed_dll": {
+    "mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+    "sha256": "21524f3d5a7fa5d92c6a3ee5d95e32147e26e5b8a29bc5939ed6dc7f479e8435",
+    "new_native_cut_writer_in_installed_dll": false,
+    "main_build_deploy": false
+  },
+  "protected_before": [
+    {
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "sha256": "904956aff586726c3e931b78996fd47b208403bfc4e05b8fc85c8f8a47efd200"
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "sha256": "af3f3d043d38dce89a08ff16c233b53e22f64f684d2f165398a1d9a107dcbaf5"
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "sha256": "d72694979b651589332b437224be6fc4672e4a99a0c930717608ee1b1b4ad983"
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09"
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+      "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5"
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+      "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b"
+    },
+    {
+      "file": "ADDIN.csproj",
+      "sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a"
+    },
+    {
+      "file": "../ADDIN.dll",
+      "sha256": "21524f3d5a7fa5d92c6a3ee5d95e32147e26e5b8a29bc5939ed6dc7f479e8435"
+    },
+    {
+      "file": "../ADDIN.pdb",
+      "sha256": "90ba656f3275e55608073190c5b4903a340f98424a941eacc30530d3f36d534d"
+    }
+  ]
+}

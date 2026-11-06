@@ -1,0 +1,46 @@
+[
+  {
+    "self_pid": 37568,
+    "session": 1,
+    "token": {
+      "elevated": false
+    }
+  },
+  {
+    "sw_pid": 8508,
+    "session": 1,
+    "token": {
+      "elevated": false
+    },
+    "responding": true,
+    "has_main_window": false
+  },
+  {
+    "sw_pid": 45240,
+    "session": 1,
+    "token": {
+      "elevated": false
+    },
+    "responding": true,
+    "has_main_window": true
+  },
+  {
+    "progid": "SldWorks.Application",
+    "sw_pid": 45240,
+    "revision": "32.5.0"
+  },
+  {
+    "progid": "SldWorks.Application.32",
+    "sw_pid": 45240,
+    "revision": "32.5.0"
+  },
+  {
+    "sw_moniker": "SolidWorks_PID_45240",
+    "cast_ok": true,
+    "sw_pid": 45240
+  },
+  {
+    "rot_moniker_count": 18,
+    "activation_performed": false
+  }
+]

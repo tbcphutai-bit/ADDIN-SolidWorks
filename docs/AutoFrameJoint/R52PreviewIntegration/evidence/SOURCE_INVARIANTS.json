@@ -1,0 +1,36 @@
+[
+  {
+    "variant": "local",
+    "check": "R50 control creation/marks/filters, captions, owner/epoch gates, readiness validators preserved",
+    "status": "PASS_STATIC_INVARIANT"
+  },
+  {
+    "variant": "local",
+    "check": "Selection callbacks have no selection/control/property getter calls; supplied-dispatch interface casts only",
+    "status": "PASS_STATIC_INVARIANT"
+  },
+  {
+    "variant": "local",
+    "check": "R51 classifier/rules/cutters/Boolean/validation helpers and +120 mm placement unchanged",
+    "status": "PASS_STATIC_INVARIANT"
+  },
+  {
+    "variant": "branch",
+    "check": "R50 control creation/marks/filters, captions, owner/epoch gates, readiness validators preserved",
+    "status": "PASS_STATIC_INVARIANT"
+  },
+  {
+    "variant": "branch",
+    "check": "Selection callbacks have no selection/control/property getter calls; supplied-dispatch interface casts only",
+    "status": "PASS_STATIC_INVARIANT"
+  },
+  {
+    "variant": "branch",
+    "check": "R51 classifier/rules/cutters/Boolean/validation helpers and +120 mm placement unchanged",
+    "status": "PASS_STATIC_INVARIANT"
+  },
+  {
+    "check": "Current local source/DLL/project/PDB match post-apply protection snapshot; exactly four intended CS writes",
+    "status": "PASS_STATIC_INVARIANT"
+  }
+]

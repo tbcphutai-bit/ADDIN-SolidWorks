@@ -1,0 +1,38 @@
+[
+  {
+    "file": "ADDIN.csproj",
+    "sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a"
+  },
+  {
+    "file": "UI\\AutoFrameJoint\\AutoFrameJointSelectionPage.cs",
+    "sha256": "1a4c3856cace4c7de954356900e1ced9c144594abfabde3390a6773fbabd6749"
+  },
+  {
+    "file": "Commands\\AutoFrameJoint\\AutoFrameJointCommandEntry.cs",
+    "sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09"
+  },
+  {
+    "file": "Commands\\AutoFrameJoint\\AutoFrameJointGhostSessionManager.cs",
+    "sha256": "ec1e7daea7989e2a8a405311f85cebd761f15ad2b87825a41a2fea95262a9af2"
+  },
+  {
+    "file": "Commands\\AutoFrameJoint\\AutoFrameJointGhostPreview.cs",
+    "sha256": "cafe0a13242f1b18f5d1a9d37cb9b733caf851b782a642d9dc0b7bb7061671df"
+  },
+  {
+    "file": "Commands\\AutoFrameJoint\\AutoFrameJointGeometryMath.cs",
+    "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5"
+  },
+  {
+    "file": "Commands\\AutoFrameJoint\\AutoFrameJointReadOnlyProbe.cs",
+    "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b"
+  },
+  {
+    "file": "..\\ADDIN.dll",
+    "sha256": "de621d0895b8b4d4c381ebd3a5a4cdb8f08db23454e1c7657c9fd70ca1ffa433"
+  },
+  {
+    "file": "..\\ADDIN.pdb",
+    "sha256": "a5ebb378ebdacd521d31ae6c024879319df19bee9852448e8448a281e43954aa"
+  }
+]

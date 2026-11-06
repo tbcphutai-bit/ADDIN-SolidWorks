@@ -1,0 +1,18 @@
+Original user debug log: selected 1-based lines only.
+Excluded: full DLL/CAD paths, sample names, coordinates and unrelated warnings.
+SHA-256 of private full input: 63ba320851c1d0b1a584e62bc6da0c1a437b2ac213e0bdeaddc0b9b9d17393c3
+
+211: [AFJ-SEL] READY=False A-count=0 B-count=0 reason=Bước 1: Chọn Frame A trong Assembly.
+213: [AFJ-SEL] List box=101 count=1
+214: [AFJ-SEL] READY=False A-count=1 B-count=0 reason=Đã chọn Frame A — tiếp tục chọn Frame B.
+215: [AFJ-SEL] A->B AUTO FOCUS
+216: [AFJ-SEL] List box=102 count=1
+217: [AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+218: [AFJ-SEL] AUTO ANALYZE START
+219: [AFJ-READONLY] AUTO FRAME JOINT - READ ONLY
+262: Cut geometry: NOT GENERATED. No SolidWorks document was changed.
+264: [AFJ-SEL] READY=True A-count=1 B-count=1 reason=Đã chọn 2 Component — nhấn Phân tích.
+265: Exception thrown: 'System.AccessViolationException' in ADDIN.dll
+266: An unhandled exception of type 'System.AccessViolationException' occurred in ADDIN.dll
+267: 保護されているメモリに読み取りまたは書き込み操作を行おうとしました。他のメモリが壊れていることが考えられます。
+269: The program '[36128] SLDWORKS.exe' has exited with code 1 (0x1).

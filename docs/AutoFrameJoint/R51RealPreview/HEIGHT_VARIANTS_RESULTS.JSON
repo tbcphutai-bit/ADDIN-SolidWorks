@@ -1,0 +1,146 @@
+[
+  {
+    "case": "HEIGHT_VARIANT_1",
+    "dimensions_mm": [
+      70,
+      70,
+      40,
+      42,
+      40,
+      60,
+      2.5,
+      0.1
+    ],
+    "expected": "PASS_GEOMETRY",
+    "evidence": "GEOMETRY_VERIFIED_SYNTHETIC_CONTROL",
+    "one_sided_stock_profile_at_end": true,
+    "rule": "ORTHOGONAL_U_TALLER_COVER",
+    "cover": "B",
+    "gap_m": 9.999999999975136e-05,
+    "interference_m3": 0,
+    "removed_a_m3": 7.850997163483288e-05,
+    "removed_b_m3": 8.608949831302163e-05,
+    "check2_a": [
+      0
+    ],
+    "check2_b": [
+      0
+    ],
+    "check3_a": [
+      0
+    ],
+    "check3_b": [
+      0
+    ],
+    "swap_status": "PASS",
+    "status": "PASS_GEOMETRY"
+  },
+  {
+    "case": "HEIGHT_VARIANT_2",
+    "dimensions_mm": [
+      60,
+      55,
+      30,
+      34,
+      35,
+      50,
+      2,
+      0.3
+    ],
+    "expected": "PASS_GEOMETRY",
+    "evidence": "GEOMETRY_VERIFIED_SYNTHETIC_CONTROL",
+    "rule": "ORTHOGONAL_U_TALLER_COVER",
+    "cover": "B",
+    "gap_m": 9.999999999986508e-05,
+    "interference_m3": 0,
+    "removed_a_m3": 5.310176910375683e-05,
+    "removed_b_m3": 5.806741621898834e-05,
+    "check2_a": [
+      0
+    ],
+    "check2_b": [
+      0
+    ],
+    "check3_a": [
+      0
+    ],
+    "check3_b": [
+      0
+    ],
+    "swap_status": "PASS",
+    "status": "PASS_GEOMETRY"
+  },
+  {
+    "case": "HEIGHT_VARIANT_3",
+    "dimensions_mm": [
+      90,
+      65,
+      45,
+      50,
+      55,
+      65,
+      3,
+      0.8
+    ],
+    "expected": "PASS_GEOMETRY",
+    "evidence": "GEOMETRY_VERIFIED_SYNTHETIC_CONTROL",
+    "rule": "ORTHOGONAL_U_TALLER_COVER",
+    "cover": "B",
+    "gap_m": 9.99999999999094e-05,
+    "interference_m3": 0,
+    "removed_a_m3": 0.00011774402269384844,
+    "removed_b_m3": 0.00010491615360422646,
+    "check2_a": [
+      0
+    ],
+    "check2_b": [
+      0
+    ],
+    "check3_a": [
+      0
+    ],
+    "check3_b": [
+      0
+    ],
+    "swap_status": "PASS",
+    "status": "PASS_GEOMETRY"
+  },
+  {
+    "case": "HEIGHT_VARIANT_4",
+    "dimensions_mm": [
+      60,
+      55,
+      30,
+      34,
+      29,
+      50,
+      2,
+      0.3
+    ],
+    "expected": "UNVERIFIED_RULE",
+    "evidence": "GEOMETRY_VERIFIED_SYNTHETIC_CONTROL",
+    "status": "UNVERIFIED_RULE",
+    "message": "UNVERIFIED_RULE: actual covering Wall is too low or unequal Return levels lack evidence",
+    "hresult": "0x80131509",
+    "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.Generate(AfjProfile profileA, AfjProfile profileB, Body2 bodyA, Body2 bodyB, MathTransform ta, MathTransform tb, Boolean aCovers, Double webGap)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointRuleLibrary.Create(AfjProfile a, AfjProfile b, Body2 ba, Body2 bb, MathTransform ta, MathTransform tb, Boolean aCovers)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 R51HeightVariants.Main(String[] args)"
+  },
+  {
+    "case": "HEIGHT_VARIANT_5",
+    "dimensions_mm": [
+      60,
+      55,
+      30,
+      34,
+      35,
+      33,
+      2,
+      0.3
+    ],
+    "expected": "UNVERIFIED_RULE",
+    "evidence": "GEOMETRY_VERIFIED_SYNTHETIC_CONTROL",
+    "status": "UNVERIFIED_RULE",
+    "message": "UNVERIFIED_RULE: actual covering Wall is too low or unequal Return levels lack evidence",
+    "hresult": "0x80131509",
+    "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjParametricRules.Generate(AfjProfile profileA, AfjProfile profileB, Body2 bodyA, Body2 bodyB, MathTransform ta, MathTransform tb, Boolean aCovers, Double webGap)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointRuleLibrary.Create(AfjProfile a, AfjProfile b, Body2 ba, Body2 bb, MathTransform ta, MathTransform tb, Boolean aCovers)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.SolveBodies(ISldWorks sw, ModelDoc2 assembly, Body2 a, Body2 b, AfjProfile pfa, AfjProfile pfb, ModelDoc2 pa, ModelDoc2 pb, MathTransform ta, MathTransform tb)\r\n   場所 R51HeightVariants.Main(String[] args)"
+  }
+]

@@ -1,0 +1,171 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.Commands.AutoFrameJoint;
+
+// Standalone COPY-ONLY diagnostic. The parent bounds native execution externally.
+// No Save, Add-in build/deployment, auto-activation or original-CAD edits.
+internal static class PostLoadAuditHarness
+{
+ static readonly JavaScriptSerializer Json=new JavaScriptSerializer{MaxJsonLength=Int32.MaxValue,RecursionLimit=160};
+ static readonly Dictionary<string,object> Run=D("status","RUNNING","evidence_level","NATIVE_API_HARNESS_ONLY","installed_addin_test",false,"save_api_called",false);
+ static string Output,LastCompleted;static long Sequence;
+ static Dictionary<string,object> D(params object[] v){var d=new Dictionary<string,object>();for(int i=0;i<v.Length;i+=2)d[(string)v[i]]=v[i+1];return d;}
+ static void Require(bool v,string m){if(!v)throw new InvalidOperationException(m);}
+ static string Hash(string f){using(var a=SHA256.Create())using(var s=new FileStream(f,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))return BitConverter.ToString(a.ComputeHash(s)).Replace("-","").ToLowerInvariant();}
+ static void Save(){File.WriteAllText(Path.Combine(Output,"post_load_audit.private.json"),Json.Serialize(Run));}
+ static T N<T>(string phase,Func<T> op){
+  long n=++Sequence;Require(n<=30000,"Native observation bound exceeded");
+  var row=D("sequence",n,"phase",phase,"state","BEGIN","utc",DateTime.UtcNow.ToString("o"),"previous_completed_phase",LastCompleted);
+  File.WriteAllText(Path.Combine(Output,"last_native_call.private.json"),Json.Serialize(row));Trace.WriteLine("[AFJ-POSTLOAD] BEGIN #"+n+" utc="+row["utc"]+" phase="+phase);
+  var clock=Stopwatch.StartNew();
+  try{T value=op();row["state"]="END";row["elapsed_ms"]=clock.ElapsedMilliseconds;LastCompleted=phase;File.WriteAllText(Path.Combine(Output,"last_native_call.private.json"),Json.Serialize(row));Trace.WriteLine("[AFJ-POSTLOAD] END #"+n+" ms="+clock.ElapsedMilliseconds+" phase="+phase);return value;}
+  catch(Exception ex){row["state"]="THREW";row["elapsed_ms"]=clock.ElapsedMilliseconds;row["hresult"]="0x"+ex.HResult.ToString("X8");row["exception"]=ex.ToString();File.WriteAllText(Path.Combine(Output,"last_native_call.private.json"),Json.Serialize(row));Trace.WriteLine("[AFJ-POSTLOAD] THREW #"+n+" "+ex);throw;}
+ }
+ static void V(string p,Action op){N(p,()=>{op();return true;});}
+ static void Major(string p){Run["major_phase"]=p;Run["phase_utc"]=DateTime.UtcNow.ToString("o");Save();Console.WriteLine("[AFJ-POSTLOAD] PHASE utc="+Run["phase_utc"]+" "+p);}
+ static bool Inside(string p,string dir){return !String.IsNullOrEmpty(p)&&Path.GetFullPath(p).StartsWith(Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase);}
+ static List<object> Parents(Feature f,string p){
+  Array raw=N(p+".GetParents",()=>f.GetParents() as Array);var rows=new List<object>();if(raw==null)return rows;Require(raw.Length<256,"Parent bound exceeded");int i=0;
+  foreach(object value in raw){var parent=value as Feature;if(parent==null){rows.Add(D("index",i++,"feature_cast",false));continue;}string s=p+".parent["+(i++)+"]";rows.Add(D("id",N(s+".GetID",()=>parent.GetID()),"type",N(s+".GetTypeName2",()=>parent.GetTypeName2()),"name",N(s+".Name",()=>parent.Name)));}
+  return rows;
+ }
+ static Dictionary<string,object> SketchInfo(Sketch s,Feature owner,string p){
+  var r=D("status","READING","is_3d",N(p+".Is3D",()=>s.Is3D()),"constrained_status",N(p+".GetConstrainedStatus",()=>s.GetConstrainedStatus()));
+  r["fully_constrained"]=(int)r["constrained_status"]==(int)swConstrainedStatus_e.swFullyConstrained;
+  var m=N(p+".RelationManager",()=>s.RelationManager);
+  foreach(var filter in new[]{swSketchRelationFilterType_e.swAll,swSketchRelationFilterType_e.swDangling,swSketchRelationFilterType_e.swOverDefining,swSketchRelationFilterType_e.swExternal,swSketchRelationFilterType_e.swDefinedInContext,swSketchRelationFilterType_e.swLocked,swSketchRelationFilterType_e.swBroken}){
+   var current=filter;r[current.ToString()]=N(p+".GetRelationsCount."+current,()=>m.GetRelationsCount((int)current));
+  }
+  int kind=-1;object reference=N(p+".GetReferenceEntity",()=>s.GetReferenceEntity(ref kind));
+  r["reference_entity_type"]=kind;r["reference_present"]=reference!=null;r["reference_is_face2"]=reference is Face2;r["reference_is_refplane"]=reference is RefPlane;
+  // A historical face support can marshal as RefPlane; count real new native
+  // RefPlane Features separately rather than infer ownership from runtime type.
+  if(reference is Face2){
+   Feature support=N(p+".supportFace.GetFeature",()=>((Face2)reference).GetFeature() as Feature);
+   if(support!=null)r["face_feature"]=D("id",N(p+".supportFeature.GetID",()=>support.GetID()),"name",N(p+".supportFeature.Name",()=>support.Name),"type",N(p+".supportFeature.GetTypeName2",()=>support.GetTypeName2()));
+  }
+  var dims=new List<object>();var names=new HashSet<string>();object value=N(p+".GetFirstDisplayDimension",()=>owner.GetFirstDisplayDimension());
+  for(int i=0;value!=null;i++){
+   Require(i<256,"Sketch dimension bound exceeded");var display=value as DisplayDimension;Require(display!=null,"No DisplayDimension");
+   var dim=N(p+".dimension["+i+"].GetDimension2",()=>display.GetDimension2(0) as Dimension);Require(dim!=null,"No Dimension");
+   string name=N(p+".dimension["+i+"].FullName",()=>dim.FullName);Require(names.Add(name),"Repeated Sketch dimension");
+   dims.Add(D("name",name,"system_value",N(p+".dimension["+i+"].SystemValue",()=>dim.SystemValue),"driven_state",N(p+".dimension["+i+"].DrivenState",()=>dim.DrivenState)));
+   object old=value;value=N(p+".GetNextDisplayDimension["+i+"]",()=>owner.GetNextDisplayDimension(old));
+  }
+  r["display_dimensions"]=dims;r["display_dimension_count"]=dims.Count;r["status"]="API_READ";return r;
+ }
+ static Dictionary<string,object> Snapshot(ModelDoc2 part,string phase,ISet<int> baseline,Body2 reviewed){
+  Major(phase);var rows=new List<object>();var snap=D("phase",phase,"utc",DateTime.UtcNow.ToString("o"),"features",rows);
+  snap["document_title"]=N(phase+".GetTitle",()=>part.GetTitle());snap["document_path"]=N(phase+".GetPathName",()=>part.GetPathName());snap["update_stamp"]=N(phase+".GetUpdateStamp",()=>part.GetUpdateStamp());snap["needs_save_in_memory"]=N(phase+".GetSaveFlag",()=>part.GetSaveFlag());
+  var seen=new HashSet<int>();int count=0;Action<Feature,bool,string,int> visit=null;
+  visit=(first,top,parent,depth)=>{
+   Require(depth<=12,"Feature depth bound exceeded");var siblings=new HashSet<int>();int i=0;
+   for(Feature f=first;f!=null;){
+    Require(++count<=1600,"Feature count bound exceeded");string p=phase+".feature["+depth+","+(i++)+"]";int id=N(p+".GetID",()=>f.GetID());Require(siblings.Add(id),"Repeated sibling Feature ID");
+    if(seen.Add(id)){
+     string type=N(p+".GetTypeName2",()=>f.GetTypeName2()),underlying=type=="ICE"?N(p+".GetTypeName",()=>f.GetTypeName()):type;
+     var row=D("id",id,"type",type,"underlying_type",underlying,"name",N(p+".Name",()=>f.Name),"parent_path",parent,"depth",depth,"new_since_baseline",baseline!=null&&!baseline.Contains(id));rows.Add(row);
+     row["suppressed"]=N(p+".IsSuppressed",()=>f.IsSuppressed());bool warning=false;row["error_code"]=N(p+".GetErrorCode2",()=>f.GetErrorCode2(out warning));row["is_warning"]=warning;
+     try{
+      if(type=="RefPlane"||type=="ProfileFeature"||type=="3DProfileFeature")row["parents"]=Parents(f,p);
+      if(type=="ProfileFeature"||type=="3DProfileFeature"){var s=N(p+".GetSpecificFeature2",()=>f.GetSpecificFeature2() as Sketch);Require(s!=null,"Sketch unavailable");row["sketch"]=SketchInfo(s,f,p+".sketch");}
+      if(underlying=="Cut"){
+       var data=N(p+".GetDefinition",()=>f.GetDefinition() as ExtrudeFeatureData2);
+       if(data!=null)row["cut"]=D("end_condition_1",N(p+".cut.GetEndCondition1",()=>data.GetEndCondition(true)),"end_condition_2",N(p+".cut.GetEndCondition2",()=>data.GetEndCondition(false)),"depth_1_m",N(p+".cut.GetDepth1",()=>data.GetDepth(true)),"depth_2_m",N(p+".cut.GetDepth2",()=>data.GetDepth(false)),"normal_cut",N(p+".cut.NormalCut",()=>data.NormalCut),"flip_side_to_cut",N(p+".cut.FlipSideToCut",()=>data.FlipSideToCut),"reverse_direction",N(p+".cut.ReverseDirection",()=>data.ReverseDirection));
+      }
+     }catch(Exception ex){row["detail_error"]=ex.ToString();row["detail_hresult"]="0x"+ex.HResult.ToString("X8");}
+     Feature sub=N(p+".GetFirstSubFeature",()=>f.GetFirstSubFeature() as Feature);if(sub!=null)visit(sub,false,parent+"/"+id,depth+1);
+    }
+    f=N(p+(top?".GetNextFeature":".GetNextSubFeature"),()=>(top?f.GetNextFeature():f.GetNextSubFeature()) as Feature);
+   }
+  };
+  visit(N(phase+".FirstFeature",()=>part.FirstFeature() as Feature),true,"",0);
+  var all=rows.Cast<Dictionary<string,object>>().ToArray();var added=all.Where(r=>(bool)r["new_since_baseline"]).ToArray();var sketches=added.Where(r=>r.ContainsKey("sketch")).ToArray();
+  snap["feature_count"]=all.Length;snap["refplane_count"]=all.Count(r=>(string)r["type"]=="RefPlane");snap["new_refplane_count"]=added.Count(r=>(string)r["type"]=="RefPlane");snap["new_sketch_count"]=sketches.Length;
+  snap["new_underconstrained_sketch_count"]=sketches.Count(r=>!(bool)((Dictionary<string,object>)r["sketch"])["fully_constrained"]);snap["new_feature_error_count"]=added.Count(r=>(int)r["error_code"]!=0&&!(bool)r["is_warning"]);snap["new_feature_warning_count"]=added.Count(r=>(int)r["error_code"]!=0&&(bool)r["is_warning"]);snap["feature_detail_error_count"]=all.Count(r=>r.ContainsKey("detail_error"));
+  if(reviewed!=null){snap["symmetric_difference_from_reviewed_m3"]=N(phase+".CurrentBodyCopy.SymmetricDifference",()=>AfjNativeCutCommit.SymmetricDifference(AfjTemporaryBoolean.Copy(AfjNativeCutCommit.CurrentBody(part)),reviewed));snap["reviewed_geometry_matches"]=(double)snap["symmetric_difference_from_reviewed_m3"]<=1e-12;}
+  return snap;
+ }
+ static void Activate(ISldWorks app,ModelDoc2 target,string phase){
+  Major(phase);string title=N(phase+".GetTitle",()=>target.GetTitle());int error=0;
+  var returned=N(phase+".ActivateDoc3.swDontRebuildActiveDoc",()=>app.ActivateDoc3(title,false,(int)swRebuildOnActivation_e.swDontRebuildActiveDoc,ref error) as ModelDoc2);
+  bool same=N(phase+".IsSame.returned",()=>app.IsSame(returned,target))==1;var active=N(phase+".ActiveDoc",()=>app.ActiveDoc as ModelDoc2);bool activeSame=N(phase+".IsSame.active",()=>app.IsSame(active,target))==1;
+  ((List<object>)Run["activations"]).Add(D("phase",phase,"error",error,"returned_exact_document",same,"active_exact_document",activeSame));Save();
+  Require(same&&activeSame&&(error&~(int)swActivateDocError_e.swDocNeedsRebuildWarning)==0,"Exact disposable document activation failed");
+ }
+ static List<ModelDoc2> OpenDocs(ISldWorks app,string phase){
+  var docs=new List<ModelDoc2>();for(ModelDoc2 d=N(phase+".GetFirstDocument",()=>app.GetFirstDocument() as ModelDoc2);d!=null;){Require(docs.Count<100,"Document bound exceeded");docs.Add(d);var old=d;d=N(phase+".GetNext["+docs.Count+"]",()=>old.GetNext() as ModelDoc2);}return docs;
+ }
+ static int Execute(ISldWorks app,string input,string suffixA,string suffixB){
+  string folder=Path.Combine(Output,"fresh_cad_copy");Require(!Directory.Exists(folder),"Do not reuse an earlier CAD test folder");Directory.CreateDirectory(folder);
+  string[] files=Directory.GetFiles(input).Where(p=>new[]{".sldprt",".sldasm"}.Contains(Path.GetExtension(p).ToLowerInvariant())).ToArray();Require(files.Length>2,"Incomplete source Assembly/Part dataset");
+  var hashes=files.ToDictionary(p=>p,Hash);foreach(string file in files)File.Copy(file,Path.Combine(folder,Path.GetFileName(file)),false);
+  Run["copied_file_count"]=files.Length;Run["copy_folder"]=folder;Run["part_suffix_a"]=suffixA;Run["part_suffix_b"]=suffixB;
+  var snapshots=new List<object>();Run["snapshots"]=snapshots;Run["activations"]=new List<object>();ModelDoc2 assembly=null;
+  try{
+   string path=Directory.GetFiles(folder,"*.SLDASM").Single();int openError=0,openWarning=0;Major("OPEN_COPIED_ASSEMBLY");
+   assembly=N("OPEN_COPIED_ASSEMBLY.OpenDoc6",()=>app.OpenDoc6(path,(int)swDocumentTypes_e.swDocASSEMBLY,(int)swOpenDocOptions_e.swOpenDocOptions_Silent,"",ref openError,ref openWarning) as ModelDoc2);
+   Run["assembly_open_error"]=openError;Run["assembly_open_warning"]=openWarning;Require(assembly!=null,"OpenDoc6 null is not proof of source CAD damage");Activate(app,assembly,"ACTIVATE_COPIED_ASSEMBLY");
+   Array raw=N("CONTAINMENT.GetComponents",()=>((AssemblyDoc)assembly).GetComponents(false) as Array);Require(raw!=null&&raw.Length>0&&raw.Length<500,"Components unavailable/bound exceeded");var named=new List<Tuple<Component2,string>>();
+   foreach(var component in raw.Cast<Component2>()){
+    string name=N("CONTAINMENT.component.Name2",()=>component.Name2);var doc=N("CONTAINMENT."+name+".GetModelDoc2",()=>component.GetModelDoc2() as ModelDoc2);Require(doc!=null,"Unresolved component");
+    Require(Inside(N("CONTAINMENT."+name+".GetPathName",()=>doc.GetPathName()),folder),"Component reference escaped fresh copy folder");named.Add(Tuple.Create(component,name));
+   }
+   foreach(var doc in OpenDocs(app,"CONTAINMENT.open_documents"))Require(Inside(N("CONTAINMENT.open_document.GetPathName",()=>doc.GetPathName()),folder),"OpenDoc6 loaded a document outside fresh copy folder; no writer allowed");
+   var a=named.Single(r=>r.Item2.EndsWith(suffixA,StringComparison.OrdinalIgnoreCase)).Item1;var b=named.Single(r=>r.Item2.EndsWith(suffixB,StringComparison.OrdinalIgnoreCase)).Item1;
+   ModelDoc2 pa=null,pb=null;MathTransform ta=null,tb=null;
+   Body2 beforeA=N("A.NativeBody",()=>AfjJointSolver.NativeBody(a,out pa,out ta)),beforeB=N("B.NativeBody",()=>AfjJointSolver.NativeBody(b,out pb,out tb));var parts=new[]{pa,pb};
+   var baselines=parts.Select((p,i)=>Snapshot(p,(i==0?"A":"B")+".BEFORE_APPLY",null,null)).ToArray();snapshots.AddRange(baselines);Save();
+   var ids=baselines.Select(r=>new HashSet<int>(((List<object>)r["features"]).Cast<Dictionary<string,object>>().Select(f=>(int)f["id"]))).ToArray();
+   Major("SOLVE_REVIEWED_PAIR");var solution=N("SOLVE_REVIEWED_PAIR.AfjJointSolver.Solve",()=>AfjJointSolver.Solve(app,assembly,a,b));
+   Run["rule_id"]=solution.Plan.RuleId;Run["coverage_warning"]=solution.CoverageWarning;Run["solver_after_gap_m"]=solution.AfterGap;Run["solver_after_overlap_m3"]=solution.AfterOverlap;
+   int sa=N("A.ticket.GetUpdateStamp",()=>pa.GetUpdateStamp()),sb=N("B.ticket.GetUpdateStamp",()=>pb.GetUpdateStamp()),sas=N("assembly.ticket.GetUpdateStamp",()=>assembly.GetUpdateStamp());
+   var ticket=new AfjApplyTicket{FrameA=a,FrameB=b,Preview=solution,BeforeA=beforeA,BeforeB=beforeB,IsSourceCurrent=()=>pa.GetUpdateStamp()==sa&&pb.GetUpdateStamp()==sb&&assembly.GetUpdateStamp()==sas};
+   AfjNativeCutCommit.AllowWebFaceOffsetProbe=true; AfjNativeCutCommit.WebFaceOffsetNormalSign=Int32.Parse(System.Environment.GetEnvironmentVariable("AFJ_WEB_OFFSET_SIGN")??"0");
+   AfjNativeApplyReport report=null;string message=null;Major("APPLY_NATIVE_CUTS_ON_COPIES");
+   bool applied=N("APPLY_NATIVE_CUTS_ON_COPIES.TryApply",()=>AfjNativeCutCommit.TryApply(app,assembly,ticket,out report,out message));
+   Run["apply_returned_success"]=applied;Run["native_apply_report"]=report;Run["apply_message"]=message;Save();Require(applied&&report!=null&&report.Cuts.Count>0,"Positive native Cut apply failed");
+   var reviewed=new[]{solution.A.Kept.Single(),solution.B.Kept.Single()};
+   for(int i=0;i<2;i++){snapshots.Add(Snapshot(parts[i],(i==0?"A":"B")+".AFTER_APPLY_BEFORE_ACTIVATION",ids[i],reviewed[i]));Save();}
+   for(int i=0;i<2;i++){
+    string frame=i==0?"A":"B";ModelDoc2 part=parts[i];Activate(app,part,frame+".OPEN_EXISTING_COPY_PART_NO_REBUILD");snapshots.Add(Snapshot(part,frame+".AFTER_PART_ACTIVATION_NO_REBUILD",ids[i],reviewed[i]));Save();
+    Major(frame+".EXPLICIT_REBUILD_COPY_ONLY");Run[frame+"_explicit_rebuild_returned"]=N(frame+".EXPLICIT_REBUILD_COPY_ONLY.EditRebuild3",()=>part.EditRebuild3());Save();
+    snapshots.Add(Snapshot(part,frame+".AFTER_EXPLICIT_REBUILD_COPY_ONLY",ids[i],reviewed[i]));Save();Activate(app,assembly,frame+".RETURN_TO_COPIED_ASSEMBLY_NO_REBUILD");
+   }
+   var final=parts.Select((p,i)=>Snapshot(p,(i==0?"A":"B")+".FINAL_AFTER_BOTH_SWITCHES",ids[i],reviewed[i])).ToArray();snapshots.AddRange(final);Save();
+   bool geometry=snapshots.Cast<Dictionary<string,object>>().Where(s=>s.ContainsKey("reviewed_geometry_matches")).All(s=>(bool)s["reviewed_geometry_matches"]);
+   bool good=final.All(s=>(int)s["new_feature_error_count"]==0&&(int)s["feature_detail_error_count"]==0),constraints=final.All(s=>(int)s["new_underconstrained_sketch_count"]==0),planes=final.All(s=>(int)s["new_refplane_count"]==0);
+   Run["post_apply_document_switches_completed"]=true;Run["reviewed_geometry_preserved_all_checkpoints"]=geometry;Run["new_feature_error_checks_passed"]=good;Run["new_sketches_fully_constrained"]=constraints;Run["zero_new_planes"]=planes;
+   Run["hang_reproduced_in_harness"]=false;Run["installed_addin_hang_status"]="UNVERIFIED_NOT_EXECUTED_INSIDE_ADDIN";Run["status"]=geometry&&good&&constraints&&planes?"PASS_NATIVE_COPY_POSTLOAD_AUDIT":"AUDIT_COMPLETED_REQUIREMENTS_FAIL";
+   if(!(bool)Run["A_explicit_rebuild_returned"]||!(bool)Run["B_explicit_rebuild_returned"])Run["status"]="AUDIT_COMPLETED_REBUILD_RETURNED_FALSE";
+  }catch(Exception ex){Run["status"]="FAIL_NATIVE_COPY_POSTLOAD_AUDIT";Run["error"]=ex.ToString();Run["hresult"]="0x"+ex.HResult.ToString("X8");Save();}
+  finally{
+   Major("CLOSE_OWNED_COPIES_WITHOUT_SAVE");
+   try{
+    var owned=new List<string>();foreach(var doc in OpenDocs(app,"CLEANUP.enumerate")){string p=N("CLEANUP.GetPathName",()=>doc.GetPathName());if(Inside(p,folder))owned.Add(p);}
+    foreach(string p in owned.OrderBy(p=>Path.GetExtension(p).Equals(".SLDASM",StringComparison.OrdinalIgnoreCase)?0:1))if(N("CLEANUP.GetOpenDocumentByName."+Path.GetFileName(p),()=>app.GetOpenDocumentByName(p))!=null)V("CLEANUP.CloseDoc.NO_SAVE."+Path.GetFileName(p),()=>app.CloseDoc(p));
+    Run["final_document_count"]=N("CLEANUP.GetDocumentCount",()=>app.GetDocumentCount());Run["blank_session_restored"]=(int)Run["final_document_count"]==0;
+   }catch(Exception ex){Run["cleanup_error"]=ex.ToString();Run["blank_session_restored"]=false;}
+   Run["source_file_hashes_unchanged"]=hashes.All(p=>Hash(p.Key)==p.Value);Run["copy_file_hashes_unchanged"]=files.All(p=>Hash(Path.Combine(folder,Path.GetFileName(p)))==hashes[p]);
+   Run["copy_file_inventory"]=files.Select(p=>D("name",Path.GetFileName(p),"original_sha256",hashes[p],"after_sha256",Hash(Path.Combine(folder,Path.GetFileName(p))))).ToArray();Run["completed_utc"]=DateTime.UtcNow.ToString("o");Save();
+  }
+  return (string)Run["status"]=="PASS_NATIVE_COPY_POSTLOAD_AUDIT"&&(bool)Run["source_file_hashes_unchanged"]&&(bool)Run["copy_file_hashes_unchanged"]&&(bool)Run["blank_session_restored"]?0:1;
+ }
+ [STAThread]static int Main(string[] args){
+  Require(args.Length>=2,"Arguments: NEW_OUTPUT_FOLDER INPUT_DATASET_FOLDER [suffixA=-fr03-1] [suffixB=-fr04-1]");Output=Path.GetFullPath(args[0]);Directory.CreateDirectory(Output);Require(!File.Exists(Path.Combine(Output,"post_load_audit.private.json")),"Refusing to overwrite prior audit");
+  Trace.Listeners.Add(new TextWriterTraceListener(Path.Combine(Output,"post_load_calls.private.log")));Trace.AutoFlush=true;Run["started_utc"]=DateTime.UtcNow.ToString("o");Run["standalone_harness_mvid"]=typeof(PostLoadAuditHarness).Module.ModuleVersionId.ToString();Run["test_mode"]="EXACT_CURRENT_SOURCE_STANDALONE_HARNESS";
+  try{
+   Major("ATTACH_EXISTING_PARENT_SELECTED_SESSION");Require(!String.IsNullOrWhiteSpace(System.Environment.GetEnvironmentVariable("AFJ_R51_SW_PID")),"Explicit parent-selected PID required; no activation/fallback");
+   var app=N("SETUP.HarnessConnection.AttachVisible",()=>HarnessConnection.AttachVisible());int pid=N("SETUP.GetProcessID",()=>app.GetProcessID());Require(pid.ToString()==System.Environment.GetEnvironmentVariable("AFJ_R51_SW_PID"),"Parent-selected PID mismatch");Run["solidworks_pid"]=pid;Run["solidworks_revision"]=N("SETUP.RevisionNumber",()=>app.RevisionNumber());
+   Require(N("SETUP.GetDocumentCount",()=>app.GetDocumentCount())==0,"Audit requires empty separately owned test session");int command=-1;string title=null;bool commandUi=true;V("SETUP.GetRunningCommandInfo",()=>app.GetRunningCommandInfo(out command,out title,out commandUi));Require(!commandUi&&!N("SETUP.CommandInProgress",()=>app.CommandInProgress),"Active command prevents copy testing");
+   int code=Execute(app,Path.GetFullPath(args[1]),args.Length>2?args[2]:"-fr03-1",args.Length>3?args[3]:"-fr04-1");Console.WriteLine("POSTLOAD_RESULT="+Run["status"]);GC.KeepAlive(app);return code;
+  }catch(Exception ex){Run["status"]="SETUP_FAILED_NO_QUALIFIED_POSTLOAD_RESULT";Run["error"]=ex.ToString();Run["hresult"]="0x"+ex.HResult.ToString("X8");Save();Console.WriteLine("POSTLOAD_RESULT="+Run["status"]);return 2;}
+ }
+}

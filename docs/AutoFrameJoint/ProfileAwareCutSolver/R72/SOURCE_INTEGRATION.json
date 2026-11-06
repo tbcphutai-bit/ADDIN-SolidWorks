@@ -1,0 +1,45 @@
+{
+  "status": "COPIED_EXACT_SIX_PAIR_API_VERIFIED_SOURCE_ONLY",
+  "utc": "2026-10-31T00:12:10.5938595Z",
+  "before_sha256": "B29462871487F1F8D802DAA1F08EA81A4B375489ED542EB6D9D989C5C8730766",
+  "after_sha256": "93B73678BB508BD7CFB68BAF8984AFB5316CE3759959574A4640678E5C273543",
+  "qualified_runs": [
+    {
+      "binary_sha256": "D38D361FB59B966520FF389BF8DEABA962710188952316DAA2C58C495DE4B25C",
+      "run": "native2222_26",
+      "native_cuts": 22,
+      "mvid": "d61b98ff-df0a-450c-a91b-cbb7d343c502",
+      "sketches": 33,
+      "label": "R72_NATIVE26"
+    },
+    {
+      "binary_sha256": "4C4DE95957F2893600490DC4A0389CB19A37E74078E4BF48F905ED8F1EF6D059",
+      "run": "native2354_final27",
+      "native_cuts": 6,
+      "mvid": "8dbf6561-7def-4e91-8ac6-9981fafb5a13",
+      "sketches": 8,
+      "label": "R72_NON9027"
+    },
+    {
+      "binary_sha256": "F0BF1E01FC070A14EDE1732E4CE5AA7452DAFAF77C6477AD40C69671B58979B9",
+      "run": "regression4458_final29",
+      "native_cuts": 44,
+      "mvid": "3ec651be-1290-4203-a576-eba506e4b2c6",
+      "sketches": 52,
+      "label": "R72_REG29"
+    }
+  ],
+  "main_build": false,
+  "deployment": false,
+  "other_five_sources_project_dll_pdb_unchanged": true,
+  "installed_addin_test": false,
+  "user_manual_rebuild_required": true,
+  "main_source_relative": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "qualified_local_source_sha256": "93B73678BB508BD7CFB68BAF8984AFB5316CE3759959574A4640678E5C273543",
+  "git_normalized_lf_source_sha256": "B383DAF8B6D4763F30406AAA571426B8DE130857886F04261AE3AC5CF2AA209B",
+  "unchanged_existing_main_dll_mvid": "da813a56-ec88-45be-b43c-8895306d3c23",
+  "unchanged_existing_main_dll_sha256": "C95AF100EC1CB64BA59BAE87659D728C2C12E8485A1AE6506FF002FF1A86D42F",
+  "independent_branch_six_source_compile": "PASS_COMPILE_ONLY_NOT_API_OR_INSTALLED_ADDIN_QUALIFICATION",
+  "independent_branch_diagnostic_sha256": "55F7A52A33073C1F901D20A72F1C2951E6A79159FFEF8B648D25A138F4DF7321",
+  "branch_baseline_note": "The main-local entry and UI sources were preserved. Repository baseline differences in three other files are comments, captions/tooltips, an analysis-message reset and method position; only GhostPreview changed in R72. Direct API qualification uses the frozen main-local six-source baseline; the repository six-source combination separately compiled."
+}

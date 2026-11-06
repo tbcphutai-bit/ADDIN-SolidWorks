@@ -1,0 +1,1160 @@
+[
+  {
+    "part": "1618-04-bh-A6-fr1.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し110",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "1618-04-bh-A6-fr1.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0008524370448048723,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0008524370448051702,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0008524370448048725,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1.0560097387677411e-11,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr1.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し2",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0008418769474169108,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0008418769474171928,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.000841876947416911,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1.0560097387977085e-11,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr1.SLDPRT",
+    "ordinal": 4,
+    "feature_name": "ｶｯﾄ - 押し出し112",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0008418018884354804,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0008418018884354804,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0008418018884354804,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し14",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し3",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00027610843241952603,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.0002761015996804115,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00027610159968041167,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00027610159968041156,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.832739114625692e-09,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 8.301308946466554e-11,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00018991924599060973,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.00018984924752513265,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0001898492475251327,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00018984924752513265,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.99984654770747e-08,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 8.625235215527899e-11,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr2.SLDPRT",
+    "ordinal": 4,
+    "feature_name": "ｶｯﾄ - 押し出し15",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0001894681108616933,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00018946811086169397,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00018946811086169334,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し110",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0011799532727931616,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0011799532727931616,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0011799532727931603,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 6.445306155761438e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し116",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.001175164686637398,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0011751646866373997,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0011751646866373982,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 4.788586155761442e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 4,
+    "feature_name": "ｶｯﾄ - 押し出し114",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0011745919166373999,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.0011725103866373997,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0011725103866374,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0011725103866373993,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 2.0815299999999914e-06,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 2.6543000000002566e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 5,
+    "feature_name": "ｶｯﾄ - 押し出し115",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.001170138952359229,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0011701389523592293,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0011701389523592293,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 2.3714342781706432e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 6,
+    "feature_name": "ｶｯﾄ - 押し出し117",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0011689596066572947,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.001168959606657295,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0011689596066572945,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1.179345701934984e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr3.SLDPRT",
+    "ordinal": 7,
+    "feature_name": "ｶｯﾄ - 押し出し119",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し14",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し3",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0003218063250377207,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.0003217363265722435,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00032173632657224357,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00032173632657224357,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.999846547707463e-08,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 9.94898664107312e-11,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00022546149983932335,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.00022545466710020856,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00022545466710020753,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00022545466710020872,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.832739114625827e-09,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 9.62816594720362e-11,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 4,
+    "feature_name": "ｶｯﾄ - 押し出し15",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00022460545564192234,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00022460545564192229,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00022460545564192223,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-fr4.SLDPRT",
+    "ordinal": 5,
+    "feature_name": "ｶｯﾄ - 押し出し16",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00022405761502835146,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00022405761502835146,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00022405761502835146,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1e-12,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "1618-04-bh-A6-中骨1.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し13",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0009032501578090961,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.0008840974879853302,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0008840974879853313,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00088409748798533,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 1.915266982376564e-05,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 3.8305339647530566e-11,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00043354489570581866,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0004335448957058169,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0004335448957058188,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 5.278961580787591e-11,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し2",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00038067441677332837,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.0003806675840342152,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00038066758403421455,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00038066758403421526,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.832739114626076e-09,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 5.287731167160226e-11,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し11",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "3615-04-bh-T1-fr1.SLDPRT",
+    "ordinal": 4,
+    "feature_name": "ｶｯﾄ - 押し出し13",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "3615-04-bh-T1-fr2.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0004869608288477098,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.00048695399610859544,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0004869539961085966,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00048695399610859533,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.83273911462575e-09,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 2.425477711619423e-10,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr2.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し2",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0002444939208103797,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00024449392081037834,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00024449392081037975,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 2.4246007529821834e-10,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr2.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し11",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0004334640325812054,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.00043345719984209035,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00043345719984209236,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00043345719984209024,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.832739114626103e-09,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 5.287731167160026e-11,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し2",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0003805867209096046,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.0003805798881704903,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00038057988817048874,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0003805798881704902,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.832739114627295e-09,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 5.287731167160394e-11,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し11",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "3615-04-bh-T1-fr3.SLDPRT",
+    "ordinal": 4,
+    "feature_name": "ｶｯﾄ - 押し出し13",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "3615-04-bh-T1-fr4.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00043597935929144167,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00043597935929143744,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.00043597935929144183,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 2.183551522222554e-10,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr4.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し2",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0002176242070691881,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00021762420706918588,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0002176242070691881,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 2.1835515222225175e-10,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T1-fr4.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し11",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "3615-04-bh-T2-fr1.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.000375792672463568,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0003757926724635639,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0003757926724635679,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1.1054183905012899e-10,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T2-fr1.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し2",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00026525083341343833,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0002652508334134381,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0002652508334134383,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 0,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 1.1054183905012546e-10,
+    "normal_correction_tool_count": 0,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 0,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T2-fr1.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し11",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "3615-04-bh-T2-fr1.SLDPRT",
+    "ordinal": 4,
+    "feature_name": "ｶｯﾄ - 押し出し13",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "part": "3615-04-bh-T2-fr2.SLDPRT",
+    "ordinal": 1,
+    "feature_name": "ｶｯﾄ - 押し出し1",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.0005173567358173166,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.000517349903078202,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.0005173499030782021,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.000517349903078202,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.83273911462589e-09,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 2.1215186419233676e-10,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T2-fr2.SLDPRT",
+    "ordinal": 2,
+    "feature_name": "ｶｯﾄ - 押し出し2",
+    "stages": [
+      {
+        "tool": 0,
+        "result": {
+          "volume_m3": 0.00030520487162497933,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      },
+      {
+        "tool": 1,
+        "result": {
+          "volume_m3": 0.0003051980388858647,
+          "check2": 0,
+          "check3_faults": 0
+        }
+      }
+    ],
+    "native_after": {
+      "volume_m3": 0.00030519803888586394,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "replay_after": {
+      "volume_m3": 0.0003051980388858648,
+      "check2": 0,
+      "check3_faults": 0
+    },
+    "plain_prism_difference_m3": 6.8327391146244435e-09,
+    "symmetric_difference_m3": 0,
+    "match_tolerance_m3": 2.1215186419233795e-10,
+    "normal_correction_tool_count": 1,
+    "status": "PASS_GEOMETRY",
+    "bend_residue_vs_native_after": "NO_UNEXPECTED_RESIDUE_RELATIVE_TO_NATIVE_AFTER",
+    "extra_tool_count": 1,
+    "tool_role_annotation": "Normal relief count from verified template; other extra prisms are ordinary compound-cut tools"
+  },
+  {
+    "part": "3615-04-bh-T2-fr2.SLDPRT",
+    "ordinal": 3,
+    "feature_name": "ｶｯﾄ - 押し出し11",
+    "status": "NOT_APPLICABLE_CORNER_REPLAY",
+    "reason": "Curved hole/slot profile; included in 42-Feature metadata audit, not a corner mask"
+  },
+  {
+    "fixture": "SINGLE_PLANAR_SHEET",
+    "api_reference_thickness_m": 0.002,
+    "nominal_depth_m": 0.0021,
+    "tool_length_with_entry_m": 0.00211,
+    "sheet_overrun_m": 0.0001,
+    "assembly_fit_gap_m": 0.0001,
+    "removed_m3": 3.200000000000003e-06,
+    "expected_removed_m3": 3.2000000000000003e-06,
+    "kept": [
+      {
+        "volume_m3": 1.6800000000000002e-05,
+        "check2": 0,
+        "check3_faults": 0
+      }
+    ],
+    "bend_guard": true,
+    "reverse_skin_guard": true,
+    "status": "PASS_GEOMETRY"
+  },
+  {
+    "fixture": "SINGLE_PLANAR_SHEET",
+    "api_reference_thickness_m": 0.0025,
+    "nominal_depth_m": 0.0026,
+    "tool_length_with_entry_m": 0.00261,
+    "sheet_overrun_m": 0.0001,
+    "assembly_fit_gap_m": 0.0001,
+    "removed_m3": 4.000000000000004e-06,
+    "expected_removed_m3": 4.000000000000001e-06,
+    "kept": [
+      {
+        "volume_m3": 2.1000000000000006e-05,
+        "check2": 0,
+        "check3_faults": 0
+      }
+    ],
+    "bend_guard": true,
+    "reverse_skin_guard": true,
+    "status": "PASS_GEOMETRY"
+  }
+]

@@ -1,0 +1,98 @@
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.002 R=0.0001
+[AFJ-PROFILE] API/BREP skins verified: Web 0/t, Wall 0/t/W-t/W, four base Bend radius/center matches; t=0.002 R=0.0001
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-APPLY] PREFLIGHT active=AFJ_PAIR_3615-02-bh-T1 bound=AFJ_PAIR_3615-02-bh-T1 assembly_equality=1 part_equality=0
+[AFJ-APPLY] ACTIVATE status=0 identity=True
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:COVER_WEB_WALL:cut code=0 name=swBodyOperationNoError
+[AFJ-APPLY] NATIVE_FEATURE type=ICE underlying=Cut error=0
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-APPLY] CUT_VERIFIED frame=A id=U_RULE:COVER_WEB_WALL feature=AFJ_c4c6e59d_A_01_Cut delta_m3=0
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:NORMAL_BEND_CAP:cut code=0 name=swBodyOperationNoError
+[AFJ-APPLY] NATIVE_FEATURE type=ICE underlying=Cut error=0
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-APPLY] CUT_VERIFIED frame=A id=U_RULE:NORMAL_BEND_CAP feature=AFJ_c4c6e59d_A_02_Cut delta_m3=0
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-APPLY] ACTIVATE status=0 identity=True
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN:cut code=0 name=swBodyOperationNoError
+[AFJ-APPLY] NATIVE_FEATURE type=ICE underlying=Cut error=0
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-APPLY] CUT_VERIFIED frame=B id=U_RULE:LOSER_STEPPED_WEB_WALL_RETURN feature=AFJ_c4c6e59d_B_01_Cut delta_m3=0
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=U_RULE:FAR_BEND_CLEARANCE:cut code=0 name=swBodyOperationNoError
+[AFJ-APPLY] NATIVE_FEATURE type=ICE underlying=Cut error=0
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-APPLY] CUT_VERIFIED frame=B id=U_RULE:FAR_BEND_CLEARANCE feature=AFJ_c4c6e59d_B_02_Cut delta_m3=0
+[AFJ-BOOLEAN] operation=U_RULE:NEAR_BEND_CLEARANCE:measure code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-APPLY] ACTIVATE status=2 identity=True
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYINTERSECT code=0 name=swBodyOperationNoError
+[AFJ-BOOLEAN] operation=SWBODYCUT code=0 name=swBodyOperationNoError
+[AFJ-APPLY] HRESULT=0x80131509 System.InvalidOperationException: PREVIEW_STALE: hãy tạo lại Preview đúng hai Frame trước khi OK
+   場所 ADDIN.Commands.AutoFrameJoint.AfjNativeCutCommit.TryApply(ISldWorks app, ModelDoc2 assembly, AfjApplyTicket ticket, AfjNativeApplyReport& report, String& message)

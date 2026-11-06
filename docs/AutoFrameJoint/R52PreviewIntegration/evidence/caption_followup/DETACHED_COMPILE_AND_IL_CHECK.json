@@ -1,0 +1,16 @@
+{
+  "compiler": "Visual Studio 18 Roslyn csc.exe",
+  "target": "standalone x64 C# 7.3 TRACE",
+  "explicit_six_afj_classes": true,
+  "no_main_project_or_deploy": true,
+  "compile_exit_codes": {
+    "local": 0,
+    "branch": 0
+  },
+  "local_exe_sha256": "1cf5df3216715697e767e03a526144941dbe83fc6ec3a7152a2736b8ae95c3c5",
+  "branch_exe_sha256": "48c93a90d93fb7b88304772970cbc5b2b656dd4323e958494df5adcbfa9d13da",
+  "caption_setter_calls": 0,
+  "enabled_setter_calls": 0,
+  "set_message3_calls": 1,
+  "evidence_scope": "COM proxies; not native Caption-fix validation"
+}

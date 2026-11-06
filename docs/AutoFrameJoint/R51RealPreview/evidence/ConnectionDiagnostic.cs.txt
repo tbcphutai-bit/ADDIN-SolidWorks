@@ -1,0 +1,22 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+class ConnectionDiagnostic {
+ [DllImport("ole32.dll")] static extern int GetRunningObjectTable(int reserved, out IRunningObjectTable rot);
+ [DllImport("ole32.dll")] static extern int CreateBindCtx(int reserved, out IBindCtx context);
+ [DllImport("advapi32.dll",SetLastError=true)] static extern bool OpenProcessToken(IntPtr process,uint access,out IntPtr token);
+ [DllImport("advapi32.dll",SetLastError=true)] static extern bool GetTokenInformation(IntPtr token,int kind,out int value,int length,out int needed);
+ [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+ static Dictionary<string,object> D(params object[] x){var r=new Dictionary<string,object>();for(int i=0;i<x.Length;i+=2)r[(string)x[i]]=x[i+1];return r;}
+ static object Token(Process p){IntPtr t=IntPtr.Zero;try{if(!OpenProcessToken(p.Handle,8,out t))return D("win32_error",Marshal.GetLastWin32Error());int elevated,n;if(!GetTokenInformation(t,20,out elevated,4,out n))return D("win32_error",Marshal.GetLastWin32Error());return D("elevated",elevated!=0);}catch(Exception e){return D("error",e.Message,"hresult","0x"+e.HResult.ToString("X8"));}finally{if(t!=IntPtr.Zero)CloseHandle(t);}}
+ [STAThread] static int Main(string[] args){var rows=new List<object>();rows.Add(D("self_pid",Process.GetCurrentProcess().Id,"session",Process.GetCurrentProcess().SessionId,"token",Token(Process.GetCurrentProcess())));foreach(var p in Process.GetProcessesByName("SLDWORKS"))rows.Add(D("sw_pid",p.Id,"session",p.SessionId,"token",Token(p),"responding",p.Responding,"has_main_window",p.MainWindowHandle!=IntPtr.Zero));
+ foreach(string prog in new[]{"SldWorks.Application","SldWorks.Application.32"})try{var sw=Marshal.GetActiveObject(prog) as ISldWorks;rows.Add(D("progid",prog,"sw_pid",sw==null?-1:sw.GetProcessID(),"revision",sw==null?null:sw.RevisionNumber()));}catch(Exception e){rows.Add(D("progid",prog,"hresult","0x"+e.HResult.ToString("X8"),"exception",e.GetType().FullName,"message",e.Message));}
+ IRunningObjectTable rot;IBindCtx bc;Marshal.ThrowExceptionForHR(GetRunningObjectTable(0,out rot));Marshal.ThrowExceptionForHR(CreateBindCtx(0,out bc));IEnumMoniker en;rot.EnumRunning(out en);var monikers=new IMoniker[1];int count=0;while(en.Next(1,monikers,IntPtr.Zero)==0){count++;string name=null;try{monikers[0].GetDisplayName(bc,null,out name);if(name.IndexOf("SolidWorks",StringComparison.OrdinalIgnoreCase)<0&&name.IndexOf("SldWorks",StringComparison.OrdinalIgnoreCase)<0)continue;object obj;rot.GetObject(monikers[0],out obj);var sw=obj as ISldWorks;rows.Add(D("sw_moniker",name,"cast_ok",sw!=null,"sw_pid",sw==null?-1:sw.GetProcessID()));}catch(Exception e){rows.Add(D("sw_rot_exception",e.Message,"hresult","0x"+e.HResult.ToString("X8")));}}
+ rows.Add(D("rot_moniker_count",count,"activation_performed",false));var j=new JavaScriptSerializer();string output=j.Serialize(rows);File.WriteAllText(args[0],output);Console.WriteLine(output);return 0;}
+}

@@ -1,0 +1,8 @@
+﻿run,role,pair_index,pair,native_apply_success,reported_cut_count,native_elapsed_ms,preview_first_ms,cut_parameter_report_verified,independent_native_flags_verified,native_preview_brep_match_and_valid,authored_history_and_top_order_verified,gap_0_10mm_and_no_interference_verified,cut_consumed,scope,installed_rebuilt_addin_tested,status
+NEW_PAIR_PMP,FINAL,1,4332-04-TI-P-1-fr1a-2 x 4332-04-TI-P-1-fr2-1,True,12,24897,1284,True,True,True,True,True,True,CANDIDATE_NATIVE_PMP_CLOSE_IDLE_APPLY,False,PASS_API_AND_GEOMETRY_GATES
+SEQUENTIAL_DIRECT,FINAL,1,4332-04-TI-P-1-fr1a-2 x 4332-04-TI-P-1-fr2-1,True,12,19879,1290,True,True,True,True,True,True,CANDIDATE_DIRECT_API_APPLY,False,PASS_API_AND_GEOMETRY_GATES
+SEQUENTIAL_DIRECT,FINAL,2,4332-04-TI-P-1-fr2-1 x 4332-04-TI-P-1-fr3a-4,True,10,20553,972,True,True,True,True,True,True,CANDIDATE_DIRECT_API_APPLY,False,PASS_API_AND_GEOMETRY_GATES
+FOUR_CORNERS_2354,FINAL,1,2354-04-lc-B11-fr01-1 x 2354-04-lc-B11-fr04-1,True,5,9504,415,True,True,True,True,True,True,CANDIDATE_DIRECT_API_APPLY,False,PASS_API_AND_GEOMETRY_GATES
+FOUR_CORNERS_2354,FINAL,2,2354-04-lc-B11-fr04-1 x 2354-04-lc-B11-fr03-1,True,7,11291,194,True,True,True,True,True,True,CANDIDATE_DIRECT_API_APPLY,False,PASS_API_AND_GEOMETRY_GATES
+FOUR_CORNERS_2354,FINAL,3,2354-04-lc-B11-fr03-1 x 2354-04-lc-B11-fr02-1,True,11,19821,585,True,True,True,True,True,True,CANDIDATE_DIRECT_API_APPLY,False,PASS_API_AND_GEOMETRY_GATES
+FOUR_CORNERS_2354,FINAL,4,2354-04-lc-B11-fr02-1 x 2354-04-lc-B11-fr01-1,True,12,25265,902,True,True,True,True,True,True,CANDIDATE_DIRECT_API_APPLY,False,PASS_API_AND_GEOMETRY_GATES
