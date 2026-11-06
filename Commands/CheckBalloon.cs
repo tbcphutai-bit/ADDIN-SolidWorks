@@ -15,13 +15,23 @@ namespace ADDIN.Commands
     public sealed class BalloonCheckErrorRow
     {
         public string UnitDrawing { get; set; }
-        public string KetQua { get; set; }
-        public string Sheet { get; set; }
-        public string DrawingView { get; set; }
         public string BoPhanSo { get; set; }
         public int SoLuongBom { get; set; }
-        public int InstanceCoBalloon { get; set; }
         public int TongBalloon { get; set; }
+        public int ChenhLech { get { return TongBalloon - SoLuongBom; } }
+        public string KetQua { get; set; }
+        public string DrawingView { get; set; }
+        public string ChiTiet { get; set; }
+        public string Sheet { get; set; }
+        public int InstanceCoBalloon { get; set; }
+    }
+
+    public sealed class BalloonDanglingRow
+    {
+        public string UnitDrawing { get; set; }
+        public string Sheet { get; set; }
+        public string DrawingView { get; set; }
+        public string BalloonText { get; set; }
         public string ChiTiet { get; set; }
     }
 
@@ -33,6 +43,7 @@ namespace ADDIN.Commands
         public int ExpectedCount { get; internal set; }
         public int ValidCount { get; internal set; }
         public int MissingCount { get; internal set; }
+        public int MissingItemCount { get; internal set; }
         public int ExcessCount { get; internal set; }
         public int DuplicateCount { get; internal set; }
         public int DanglingCount { get; internal set; }
@@ -44,18 +55,24 @@ namespace ADDIN.Commands
 
         private readonly List<string> details = new List<string>();
         private readonly List<BalloonCheckErrorRow> rows = new List<BalloonCheckErrorRow>();
+        private readonly List<BalloonDanglingRow> danglingRows = new List<BalloonDanglingRow>();
 
         public List<string> Details { get { return details; } }
         public List<BalloonCheckErrorRow> ErrorRows { get { return rows; } }
+        public List<BalloonDanglingRow> DanglingRows { get { return danglingRows; } }
 
         public bool IsOk
         {
             get
             {
-                return MissingCount == 0 && ExcessCount == 0 && DuplicateCount == 0
-                    && DanglingCount == 0 && UnknownCount == 0 && WrongTextCount == 0
-                    && BomDataErrorCount == 0;
+                return MissingCount == 0 && BomDataErrorCount == 0;
             }
+        }
+
+        public void AddRow(string status, string sheet, string view, string partNumber,
+            int bomQuantity, int totalBalloon, string detail)
+        {
+            AddRow(status, sheet, view, partNumber, bomQuantity, totalBalloon, totalBalloon, detail);
         }
 
         public void AddRow(string status, string sheet, string view, string partNumber,
@@ -77,6 +94,18 @@ namespace ADDIN.Commands
                 details.Add((status ?? "LỖI") + ": " + (detail ?? ""));
         }
 
+        public void AddDanglingRow(string unitName, string sheet, string view, string balloonText, string detail)
+        {
+            danglingRows.Add(new BalloonDanglingRow
+            {
+                UnitDrawing = string.IsNullOrWhiteSpace(unitName) ? (UnitName ?? "") : unitName,
+                Sheet = sheet ?? "",
+                DrawingView = view ?? "",
+                BalloonText = balloonText ?? "",
+                ChiTiet = detail ?? ""
+            });
+        }
+
         public void Merge(BalloonCheckResult child)
         {
             if (child == null)
@@ -87,6 +116,7 @@ namespace ADDIN.Commands
             ExpectedCount += child.ExpectedCount;
             ValidCount += child.ValidCount;
             MissingCount += child.MissingCount;
+            MissingItemCount += child.MissingItemCount;
             ExcessCount += child.ExcessCount;
             DuplicateCount += child.DuplicateCount;
             DanglingCount += child.DanglingCount;
@@ -96,18 +126,28 @@ namespace ADDIN.Commands
             TotalBalloonFoundCount += child.TotalBalloonFoundCount;
             rows.AddRange(child.ErrorRows);
             details.AddRange(child.Details);
+            danglingRows.AddRange(child.DanglingRows);
         }
 
         public string BuildMessage()
         {
-            return (IsOk ? "CHECK BALLOON: OK" : "CHECK BALLOON: CÓ LỖI")
-                + "\r\nSheet: " + SheetCount + " | View: " + ViewCount
-                + " | Dòng BOM: " + BomRowCount
-                + "\r\nComponent: " + ExpectedCount + " | Balloon tìm thấy: " + TotalBalloonFoundCount
-                + " | Balloon khớp: " + ValidCount
-                + " | Thiếu: " + MissingCount + " | Dư: " + ExcessCount
-                + "\r\nTrùng view: " + DuplicateCount + " | Sai số: " + WrongTextCount
-                + " | Dangling: " + DanglingCount + " | Ngoài BOM: " + UnknownCount;
+            if (IsOk)
+            {
+                return "CHECK BALLOON: OK (ĐẠT)"
+                    + "\r\nBản vẽ: " + (UnitName ?? "DRAWING")
+                    + " | Tổng số chi tiết: " + BomRowCount
+                    + " | Tất cả đều đủ Balloon"
+                    + (DanglingCount > 0 ? (" | Cảnh báo: " + DanglingCount + " Balloon mất gốc (Dangling)") : "");
+            }
+            else
+            {
+                return "CHECK BALLOON: NG (CÓ CHI TIẾT THIẾU BALLOON)"
+                    + "\r\nBản vẽ: " + (UnitName ?? "DRAWING")
+                    + " | Tổng chi tiết: " + BomRowCount
+                    + " | Đạt (OK): " + (BomRowCount - MissingItemCount)
+                    + " | Thiếu Balloon (NG): " + MissingItemCount + " chi tiết (Tổng thiếu " + MissingCount + " balloon)"
+                    + (DanglingCount > 0 ? (" | Balloon Dangling: " + DanglingCount) : "");
+            }
         }
 
         public void ShowSummary(IWin32Window owner)
@@ -119,16 +159,18 @@ namespace ADDIN.Commands
             using (Button export = new Button())
             using (Button close = new Button())
             {
-                form.Text = IsOk ? "CHECK BALLOON - OK" : "CHECK BALLOON - KẾT QUẢ";
+                form.Text = IsOk ? "CHECK BALLOON - OK" : "CHECK BALLOON - KẾT QUẢ NG";
                 form.StartPosition = FormStartPosition.CenterParent;
                 form.Size = new Size(1160, 650);
                 form.MinimumSize = new Size(900, 460);
                 form.Font = new Font("Segoe UI", 9F);
 
                 summary.Dock = DockStyle.Top;
-                summary.Height = 70;
+                summary.Height = 75;
                 summary.Padding = new Padding(12, 8, 12, 5);
                 summary.Text = BuildMessage();
+                summary.BackColor = IsOk ? Color.Honeydew : Color.MistyRose;
+                summary.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
 
                 grid.Dock = DockStyle.Fill;
                 grid.ReadOnly = true;
@@ -147,11 +189,15 @@ namespace ADDIN.Commands
                     foreach (DataGridViewRow row in grid.Rows)
                     {
                         string status = Convert.ToString(row.Cells["KetQua"].Value);
-                        if (status == "OK") row.DefaultCellStyle.BackColor = Color.Honeydew;
-                        else if (status.Contains("THIẾU")) row.DefaultCellStyle.BackColor = Color.MistyRose;
-                        else if (status.Contains("DƯ") || status.Contains("TRÙNG")) row.DefaultCellStyle.BackColor = Color.LightYellow;
-                        else if (status.Contains("SAI")) row.DefaultCellStyle.BackColor = Color.PeachPuff;
-                        else row.DefaultCellStyle.BackColor = Color.Gainsboro;
+                        if (string.Equals(status, "OK", StringComparison.OrdinalIgnoreCase))
+                        {
+                            row.DefaultCellStyle.BackColor = Color.Honeydew;
+                        }
+                        else
+                        {
+                            row.DefaultCellStyle.BackColor = Color.MistyRose;
+                            row.DefaultCellStyle.ForeColor = Color.DarkRed;
+                        }
                     }
                 };
 
@@ -181,7 +227,7 @@ namespace ADDIN.Commands
 
         public void ExportToExcel()
         {
-            if (ErrorRows.Count == 0)
+            if (ErrorRows.Count == 0 && DanglingRows.Count == 0)
             {
                 MessageBox.Show("Không có dữ liệu để xuất.", "CHECK BALLOON",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -202,89 +248,165 @@ namespace ADDIN.Commands
                 excel = Activator.CreateInstance(excelType);
                 dynamic workbook = excel.Workbooks.Add();
                 dynamic summarySheet = workbook.Sheets[1];
-                summarySheet.Name = "TONG HOP";
-                Dictionary<string, int> unitColorIndexes =
-                    new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                summarySheet.Name = "CHECK BALLOON";
 
-                List<BalloonCheckErrorRow> summaryRows = new List<BalloonCheckErrorRow>();
-                List<BalloonCheckErrorRow> detailRows = new List<BalloonCheckErrorRow>();
+                string lastCol = "I";
+
+                // Title Row 1
+                summarySheet.Range["A1:" + lastCol + "1"].Merge();
+                summarySheet.Cells[1, 1].Value = "BÁO CÁO KIỂM TRA BALLOON (CHECK BALLOON)";
+                summarySheet.Range["A1:" + lastCol + "1"].Font.Bold = true;
+                summarySheet.Range["A1:" + lastCol + "1"].Font.Size = 14;
+                summarySheet.Range["A1:" + lastCol + "1"].HorizontalAlignment = -4108;
+                summarySheet.Range["A1:" + lastCol + "1"].VerticalAlignment = -4108;
+                summarySheet.Range["A1:" + lastCol + "1"].Interior.Color = ExcelRgb(31, 78, 121);
+                summarySheet.Range["A1:" + lastCol + "1"].Font.Color = ExcelRgb(255, 255, 255);
+                summarySheet.Rows[1].RowHeight = 28;
+
+                // Subtitle Row 2
+                summarySheet.Range["A2:" + lastCol + "2"].Merge();
+                string subtitle = "Bản vẽ: " + (UnitName ?? "TẤT CẢ UNIT")
+                    + "   |   Tổng loại chi tiết: " + BomRowCount
+                    + "   |   Chi tiết ĐỦ Balloon (OK): " + (BomRowCount - MissingItemCount)
+                    + "   |   Chi tiết THIẾU Balloon (NG): " + MissingItemCount
+                    + "   |   Đánh giá: " + (IsOk ? "OK (ĐẠT)" : "NG (CẦN BỔ SUNG BALLOON)");
+                summarySheet.Cells[2, 1].Value = subtitle;
+                summarySheet.Range["A2:" + lastCol + "2"].Font.Size = 10;
+                summarySheet.Range["A2:" + lastCol + "2"].Font.Bold = true;
+                summarySheet.Range["A2:" + lastCol + "2"].HorizontalAlignment = -4108;
+                summarySheet.Range["A2:" + lastCol + "2"].VerticalAlignment = -4108;
+                if (IsOk)
+                {
+                    summarySheet.Range["A2:" + lastCol + "2"].Interior.Color = ExcelRgb(226, 239, 218);
+                    summarySheet.Range["A2:" + lastCol + "2"].Font.Color = ExcelRgb(55, 86, 35);
+                }
+                else
+                {
+                    summarySheet.Range["A2:" + lastCol + "2"].Interior.Color = ExcelRgb(255, 230, 230);
+                    summarySheet.Range["A2:" + lastCol + "2"].Font.Color = ExcelRgb(156, 0, 6);
+                }
+                summarySheet.Rows[2].RowHeight = 24;
+
+                // Header Row 4
+                string[] headers =
+                {
+                    "STT", "UNIT Drawing", "部品番号 (Mã chi tiết)", "SL Yêu Cầu",
+                    "SL Balloon", "Chênh Lệch", "Đánh Giá", "Drawing View Có Balloon", "Ghi Chú"
+                };
+                for (int col = 0; col < headers.Length; col++)
+                    summarySheet.Cells[4, col + 1].Value = headers[col];
+
+                summarySheet.Range["A4:" + lastCol + "4"].Font.Bold = true;
+                summarySheet.Range["A4:" + lastCol + "4"].Interior.Color = ExcelRgb(91, 155, 213);
+                summarySheet.Range["A4:" + lastCol + "4"].Font.Color = ExcelRgb(255, 255, 255);
+                summarySheet.Range["A4:" + lastCol + "4"].HorizontalAlignment = -4108;
+                summarySheet.Range["A4:" + lastCol + "4"].VerticalAlignment = -4108;
+                summarySheet.Rows[4].RowHeight = 26;
+
+                // Data Rows
+                int excelRow = 5;
+                int stt = 1;
                 foreach (BalloonCheckErrorRow row in ErrorRows)
                 {
-                    if (string.Equals(row.DrawingView, "TẤT CẢ VIEW", StringComparison.OrdinalIgnoreCase)
-                        || (string.IsNullOrWhiteSpace(row.DrawingView)
-                            && string.IsNullOrWhiteSpace(row.BoPhanSo)))
-                        summaryRows.Add(row);
+                    summarySheet.Cells[excelRow, 1].Value = stt++;
+                    summarySheet.Cells[excelRow, 2].Value = row.UnitDrawing;
+                    summarySheet.Cells[excelRow, 3].Value = row.BoPhanSo;
+                    summarySheet.Cells[excelRow, 4].Value = row.SoLuongBom;
+                    summarySheet.Cells[excelRow, 5].Value = row.TongBalloon;
+
+                    int diff = row.TongBalloon - row.SoLuongBom;
+                    summarySheet.Cells[excelRow, 6].Value = (diff > 0 ? "+" : "") + diff;
+                    summarySheet.Cells[excelRow, 7].Value = row.KetQua;
+                    summarySheet.Cells[excelRow, 8].Value = string.IsNullOrWhiteSpace(row.DrawingView) ? "(Chưa có)" : row.DrawingView;
+                    summarySheet.Cells[excelRow, 9].Value = row.ChiTiet;
+
+                    summarySheet.Range["A" + excelRow].HorizontalAlignment = -4108;
+                    summarySheet.Range["B" + excelRow].HorizontalAlignment = -4108;
+                    summarySheet.Range["D" + excelRow + ":G" + excelRow].HorizontalAlignment = -4108;
+
+                    bool isNg = string.Equals(row.KetQua, "NG", StringComparison.OrdinalIgnoreCase);
+                    if (isNg)
+                    {
+                        summarySheet.Range["A" + excelRow + ":" + lastCol + excelRow].Interior.Color = ExcelRgb(255, 245, 245);
+                        summarySheet.Cells[excelRow, 7].Interior.Color = ExcelRgb(255, 199, 206);
+                        summarySheet.Cells[excelRow, 7].Font.Color = ExcelRgb(156, 0, 6);
+                        summarySheet.Cells[excelRow, 7].Font.Bold = true;
+
+                        summarySheet.Cells[excelRow, 6].Font.Color = ExcelRgb(192, 0, 0);
+                        summarySheet.Cells[excelRow, 6].Font.Bold = true;
+                    }
                     else
-                        detailRows.Add(row);
-                }
+                    {
+                        summarySheet.Cells[excelRow, 7].Interior.Color = ExcelRgb(226, 239, 218);
+                        summarySheet.Cells[excelRow, 7].Font.Color = ExcelRgb(55, 86, 35);
+                        summarySheet.Cells[excelRow, 7].Font.Bold = true;
 
-                WriteExcelTitle(summarySheet, "CHECK BALLOON - " + (UnitName ?? "DRAWING"),
-                    BuildMessage().Replace("\r\n", "   |   "), 8);
-                string[] summaryHeaders =
-                {
-                    "UNIT Drawing", "部品番号", "SL từ Assembly", "SL Balloon",
-                    "Chênh lệch", "Kết quả", "Cảnh báo thiếu Balloon", "Ghi chú"
-                };
-                WriteExcelHeaders(summarySheet, summaryHeaders);
+                        if (diff > 0)
+                        {
+                            summarySheet.Cells[excelRow, 6].Font.Color = ExcelRgb(0, 112, 192);
+                        }
+                    }
 
-                int excelRow = 5;
-                foreach (BalloonCheckErrorRow row in summaryRows)
-                {
-                    summarySheet.Cells[excelRow, 1].Value = row.UnitDrawing;
-                    summarySheet.Cells[excelRow, 2].Value = row.BoPhanSo;
-                    summarySheet.Cells[excelRow, 3].Value = row.SoLuongBom;
-                    summarySheet.Cells[excelRow, 4].Value = row.TongBalloon;
-                    summarySheet.Cells[excelRow, 5].Value = row.TongBalloon - row.SoLuongBom;
-                    summarySheet.Cells[excelRow, 6].Value = row.KetQua;
-                    summarySheet.Cells[excelRow, 8].Value = row.ChiTiet;
-                    ColorExcelUnitRow(summarySheet.Range["A" + excelRow + ":H" + excelRow],
-                        row.UnitDrawing, unitColorIndexes);
-                    WriteMissingBalloonNotice(
-                        summarySheet.Cells[excelRow, 7],
-                        summarySheet.Cells[excelRow, 2],
-                        row);
                     excelRow++;
                 }
-                FormatExcelTable(summarySheet, 8, Math.Max(5, excelRow - 1));
-                summarySheet.Columns[7].ColumnWidth = 24;
-                summarySheet.Columns[8].ColumnWidth = 48;
-                summarySheet.Columns[8].WrapText = true;
 
-                if (detailRows.Count > 0)
+                int lastDataRow = Math.Max(5, excelRow - 1);
+                dynamic dataRange = summarySheet.Range["A4:" + lastCol + lastDataRow];
+                dataRange.Borders.LineStyle = 1;
+                dataRange.AutoFilter();
+
+                summarySheet.Columns.AutoFit();
+                summarySheet.Columns[1].ColumnWidth = 7;
+                summarySheet.Columns[4].ColumnWidth = 14;
+                summarySheet.Columns[5].ColumnWidth = 14;
+                summarySheet.Columns[6].ColumnWidth = 13;
+                summarySheet.Columns[7].ColumnWidth = 13;
+                summarySheet.Columns[8].ColumnWidth = 32;
+                summarySheet.Columns[9].ColumnWidth = 42;
+
+                if (DanglingRows.Count > 0)
                 {
-                    dynamic detailSheet = workbook.Sheets.Add(After: summarySheet);
-                    detailSheet.Name = "CHI TIET LOI";
-                    WriteExcelTitle(detailSheet, "CHI TIẾT BALLOON CẦN KIỂM TRA",
-                        "Chỉ mở sheet này khi cần tìm vị trí lỗi theo Sheet và Drawing View.", 9);
-                    string[] detailHeaders =
+                    dynamic danglingSheet = workbook.Sheets.Add(After: summarySheet);
+                    danglingSheet.Name = "BALLOON DANGLING";
+                    danglingSheet.Range["A1:F1"].Merge();
+                    danglingSheet.Cells[1, 1].Value = "DANH SÁCH BALLOON MẤT GỐC (DANGLING) CẦN XỬ LÝ";
+                    danglingSheet.Range["A1:F1"].Font.Bold = true;
+                    danglingSheet.Range["A1:F1"].Font.Size = 13;
+                    danglingSheet.Range["A1:F1"].HorizontalAlignment = -4108;
+                    danglingSheet.Range["A1:F1"].Interior.Color = ExcelRgb(192, 0, 0);
+                    danglingSheet.Range["A1:F1"].Font.Color = ExcelRgb(255, 255, 255);
+                    danglingSheet.Rows[1].RowHeight = 26;
+
+                    danglingSheet.Range["A2:F2"].Merge();
+                    danglingSheet.Cells[2, 1].Value = "Các Balloon này có mũi tên không trỏ vào linh kiện nào. Hãy dùng nút 'Xóa Balloon màu vàng' trên TaskPane hoặc gắn lại.";
+                    danglingSheet.Range["A2:F2"].Interior.Color = ExcelRgb(255, 235, 156);
+                    danglingSheet.Range["A2:F2"].Font.Size = 10;
+                    danglingSheet.Rows[2].RowHeight = 22;
+
+                    string[] dHeaders = { "STT", "UNIT Drawing", "Sheet", "Drawing View", "Balloon Text", "Ghi Chú" };
+                    for (int col = 0; col < dHeaders.Length; col++)
+                        danglingSheet.Cells[4, col + 1].Value = dHeaders[col];
+                    danglingSheet.Range["A4:F4"].Font.Bold = true;
+                    danglingSheet.Range["A4:F4"].Interior.Color = ExcelRgb(237, 125, 49);
+                    danglingSheet.Range["A4:F4"].Font.Color = ExcelRgb(255, 255, 255);
+                    danglingSheet.Range["A4:F4"].HorizontalAlignment = -4108;
+
+                    int dRow = 5;
+                    int dIndex = 1;
+                    foreach (BalloonDanglingRow row in DanglingRows)
                     {
-                        "UNIT Drawing", "Kết quả", "Sheet", "Drawing View", "部品番号",
-                        "SL từ Assembly", "SL Balloon", "Cảnh báo thiếu Balloon", "Chi tiết"
-                    };
-                    WriteExcelHeaders(detailSheet, detailHeaders);
-                    int detailRow = 5;
-                    foreach (BalloonCheckErrorRow row in detailRows)
-                    {
-                        detailSheet.Cells[detailRow, 1].Value = row.UnitDrawing;
-                        detailSheet.Cells[detailRow, 2].Value = row.KetQua;
-                        detailSheet.Cells[detailRow, 3].Value = row.Sheet;
-                        detailSheet.Cells[detailRow, 4].Value = row.DrawingView;
-                        detailSheet.Cells[detailRow, 5].Value = row.BoPhanSo;
-                        detailSheet.Cells[detailRow, 6].Value = row.SoLuongBom;
-                        detailSheet.Cells[detailRow, 7].Value = row.TongBalloon;
-                        detailSheet.Cells[detailRow, 9].Value = row.ChiTiet;
-                        ColorExcelUnitRow(detailSheet.Range["A" + detailRow + ":I" + detailRow],
-                            row.UnitDrawing, unitColorIndexes);
-                        WriteMissingBalloonNotice(
-                            detailSheet.Cells[detailRow, 8],
-                            detailSheet.Cells[detailRow, 5],
-                            row);
-                        detailRow++;
+                        danglingSheet.Cells[dRow, 1].Value = dIndex++;
+                        danglingSheet.Cells[dRow, 2].Value = row.UnitDrawing;
+                        danglingSheet.Cells[dRow, 3].Value = row.Sheet;
+                        danglingSheet.Cells[dRow, 4].Value = row.DrawingView;
+                        danglingSheet.Cells[dRow, 5].Value = row.BalloonText;
+                        danglingSheet.Cells[dRow, 6].Value = row.ChiTiet;
+                        dRow++;
                     }
-                    FormatExcelTable(detailSheet, 9, Math.Max(5, detailRow - 1));
-                    detailSheet.Columns[8].ColumnWidth = 24;
-                    detailSheet.Columns[9].ColumnWidth = 60;
-                    detailSheet.Columns[9].WrapText = true;
+                    int lastDRow = Math.Max(5, dRow - 1);
+                    dynamic dRange = danglingSheet.Range["A4:F" + lastDRow];
+                    dRange.Borders.LineStyle = 1;
+                    danglingSheet.Columns.AutoFit();
                 }
 
                 summarySheet.Activate();
@@ -301,115 +423,12 @@ namespace ADDIN.Commands
             }
         }
 
-        private void WriteExcelTitle(dynamic sheet, string title, string subtitle, int columnCount)
-        {
-            string lastColumn = GetExcelColumnName(columnCount);
-            sheet.Range["A1:" + lastColumn + "1"].Merge();
-            sheet.Cells[1, 1].Value = title;
-            sheet.Range["A1:" + lastColumn + "1"].Font.Bold = true;
-            sheet.Range["A1:" + lastColumn + "1"].Font.Size = 15;
-            sheet.Range["A1:" + lastColumn + "1"].HorizontalAlignment = -4108;
-            sheet.Range["A1:" + lastColumn + "1"].Interior.Color = ExcelRgb(31, 78, 121);
-            sheet.Range["A1:" + lastColumn + "1"].Font.Color = ExcelRgb(255, 255, 255);
-            sheet.Range["A2:" + lastColumn + "2"].Merge();
-            sheet.Cells[2, 1].Value = subtitle;
-            sheet.Range["A2:" + lastColumn + "2"].WrapText = true;
-            sheet.Range["A2:" + lastColumn + "2"].Interior.Color = ExcelRgb(255, 235, 156);
-        }
-
-        private void WriteExcelHeaders(dynamic sheet, string[] headers)
-        {
-            for (int column = 0; column < headers.Length; column++)
-                sheet.Cells[4, column + 1].Value = headers[column];
-            string lastColumn = GetExcelColumnName(headers.Length);
-            sheet.Range["A4:" + lastColumn + "4"].Font.Bold = true;
-            sheet.Range["A4:" + lastColumn + "4"].Interior.Color = ExcelRgb(91, 155, 213);
-            sheet.Range["A4:" + lastColumn + "4"].Font.Color = ExcelRgb(255, 255, 255);
-            sheet.Range["A4:" + lastColumn + "4"].HorizontalAlignment = -4108;
-        }
-
-        private void FormatExcelTable(dynamic sheet, int columnCount, int lastRow)
-        {
-            string lastColumn = GetExcelColumnName(columnCount);
-            dynamic range = sheet.Range["A4:" + lastColumn + lastRow];
-            range.Borders.LineStyle = 1;
-            range.AutoFilter();
-            sheet.Columns.AutoFit();
-            sheet.Rows[1].RowHeight = 24;
-            sheet.Rows[2].RowHeight = 34;
-        }
-
-        private void ColorExcelStatusRow(dynamic range, string status)
-        {
-            string value = status ?? "";
-            if (value == "OK") range.Interior.Color = ExcelRgb(226, 239, 218);
-            else if (value.IndexOf("THIẾU", StringComparison.OrdinalIgnoreCase) >= 0)
-                range.Interior.Color = ExcelRgb(255, 199, 206);
-            else if (value.IndexOf("DƯ", StringComparison.OrdinalIgnoreCase) >= 0
-                || value.IndexOf("TRÙNG", StringComparison.OrdinalIgnoreCase) >= 0)
-                range.Interior.Color = ExcelRgb(255, 235, 156);
-            else if (value.IndexOf("SAI", StringComparison.OrdinalIgnoreCase) >= 0)
-                range.Interior.Color = ExcelRgb(255, 217, 102);
-            else range.Interior.Color = ExcelRgb(217, 217, 217);
-        }
-
-        private void WriteMissingBalloonNotice(
-            dynamic noticeCell,
-            dynamic partNumberCell,
-            BalloonCheckErrorRow row)
-        {
-            if (row == null || row.SoLuongBom <= row.InstanceCoBalloon)
-                return;
-
-            int missing = row.SoLuongBom - row.InstanceCoBalloon;
-            noticeCell.Value = "THIẾU " + missing + " BALLOON";
-            noticeCell.Interior.Color = ExcelRgb(192, 0, 0);
-            noticeCell.Font.Color = ExcelRgb(255, 255, 255);
-            noticeCell.Font.Bold = true;
-            noticeCell.HorizontalAlignment = -4108;
-            partNumberCell.Interior.Color = ExcelRgb(192, 0, 0);
-            partNumberCell.Font.Color = ExcelRgb(255, 255, 255);
-            partNumberCell.Font.Bold = true;
-        }
-
-        private void ColorExcelUnitRow(dynamic range, string unitName,
-            Dictionary<string, int> unitColorIndexes)
-        {
-            string key = string.IsNullOrWhiteSpace(unitName) ? "(KHÔNG CÓ UNIT)" : unitName.Trim();
-            int colorIndex;
-            if (!unitColorIndexes.TryGetValue(key, out colorIndex))
-            {
-                colorIndex = unitColorIndexes.Count % 6;
-                unitColorIndexes[key] = colorIndex;
-            }
-
-            switch (colorIndex)
-            {
-                case 0: range.Interior.Color = ExcelRgb(221, 235, 247); break;
-                case 1: range.Interior.Color = ExcelRgb(226, 239, 218); break;
-                case 2: range.Interior.Color = ExcelRgb(252, 228, 214); break;
-                case 3: range.Interior.Color = ExcelRgb(228, 223, 236); break;
-                case 4: range.Interior.Color = ExcelRgb(255, 242, 204); break;
-                default: range.Interior.Color = ExcelRgb(208, 224, 227); break;
-            }
-        }
-
-        private string GetExcelColumnName(int column)
-        {
-            return Convert.ToChar('A' + column - 1).ToString();
-        }
-
         private static int ExcelRgb(int red, int green, int blue)
         {
             return red + (green << 8) + (blue << 16);
         }
     }
 
-    /// <summary>
-    /// Scans all sheets and all model views (including section/detail views).
-    /// Each physical Component2 occurrence is counted once, even if ballooned
-    /// in more than one view. The unique count is compared with BOM 数量.
-    /// </summary>
     public sealed class CheckBalloon
     {
         private readonly ISldWorks swApp;
@@ -492,7 +511,6 @@ namespace ADDIN.Commands
             }
 
             BuildBomSummary(bomItems, result);
-            MarkMissingComponents(model, viewGroups, bomItems, result);
             model.GraphicsRedraw2();
             Debug.WriteLine("[CHECK BALLOON] done sheets=" + result.SheetCount
                 + ", views=" + result.ViewCount + ", bomRows=" + result.BomRowCount
@@ -1096,16 +1114,11 @@ namespace ADDIN.Commands
                     }
 
                     string partNumber = GetComponentPartNumber(component).Trim();
+                    if (string.IsNullOrWhiteSpace(partNumber))
+                        partNumber = GetComponentDisplayName(component);
                     Debug.WriteLine("[CHECK BALLOON] expected include component="
                         + GetComponentDisplayName(component) + ", partNumber=" + partNumber
                         + ", model=" + GetComponentModelKey(component));
-                    if (string.IsNullOrWhiteSpace(partNumber))
-                    {
-                        result.BomDataErrorCount++;
-                        result.AddRow("THIẾU 部品番号", sourceSheet, sourceView, "", 0, 0, 0,
-                            "Component không có custom property 部品番号: " + GetComponentDisplayName(component));
-                        continue;
-                    }
 
                     string normalizedPart = Normalize(partNumber);
                     BomItem item;
@@ -1356,8 +1369,8 @@ namespace ADDIN.Commands
                     if (component == null)
                     {
                         result.DanglingCount++;
-                        result.AddRow("DANGLING", sheet, viewName, balloonText, 0, 0, 1,
-                            "Leader không còn trỏ vào component; Balloon này không được tính.");
+                        result.AddDanglingRow(result.UnitName, sheet, viewName, balloonText,
+                            "Leader không còn trỏ vào component (Dangling).");
                         note = next;
                         continue;
                     }
@@ -1382,36 +1395,14 @@ namespace ADDIN.Commands
                     if (item == null)
                     {
                         result.UnknownCount++;
-                        result.AddRow("KHÔNG THUỘC BOM", sheet, viewName, balloonText, 0, 0, 1,
-                            "Balloon trỏ vào " + GetComponentDisplayName(component) + " nhưng không tìm thấy trong BOM.");
+                        result.AddDanglingRow(result.UnitName, sheet, viewName, balloonText,
+                            "Balloon trỏ vào " + GetComponentDisplayName(component) + " nhưng không thuộc danh mục Assembly/BOM.");
                         note = next;
                         continue;
                     }
 
                     item.TotalBalloonCount++;
-                    string componentKey = GetComponentKey(matchedComponent ?? component);
-                    if (!string.IsNullOrWhiteSpace(componentKey))
-                    {
-                        if (!item.BalloonComponentKeys.Add(componentKey))
-                        {
-                            item.DuplicateBalloonCount++;
-                            result.DuplicateCount++;
-                            result.AddRow("TRÙNG INSTANCE", sheet, viewName, item.PartNumber,
-                                item.Quantity, item.BalloonComponentKeys.Count, item.TotalBalloonCount,
-                                "Component " + GetComponentDisplayName(matchedComponent ?? component)
-                                    + " đã có Balloon ở view khác hoặc Balloon khác trong cùng view.");
-                        }
-                    }
-
-                    if (!IsPropertyLinkText(balloonText)
-                        && !string.Equals(Normalize(balloonText), Normalize(item.PartNumber), StringComparison.OrdinalIgnoreCase))
-                    {
-                        item.WrongTextCount++;
-                        result.WrongTextCount++;
-                        result.AddRow("SAI SỐ", sheet, viewName, item.PartNumber,
-                            item.Quantity, item.BalloonComponentKeys.Count, item.TotalBalloonCount,
-                            "Balloon hiển thị '" + balloonText + "' nhưng component thuộc 部品番号 '" + item.PartNumber + "'.");
-                    }
+                    item.FoundViews.Add(viewName);
                 }
                 note = next;
             }
@@ -1427,42 +1418,59 @@ namespace ADDIN.Commands
                 return ComparePartNumbers(left == null ? "" : left.PartNumber,
                     right == null ? "" : right.PartNumber);
             });
+
             foreach (BomItem item in sortedItems)
             {
-                int unique = item.BalloonComponentKeys.Count;
+                int required = item.Quantity;
                 int actual = item.TotalBalloonCount;
-                int coveredInstances = 0;
-                foreach (string componentKey in item.BomComponentKeys)
-                {
-                    if (item.BalloonComponentKeys.Contains(componentKey))
-                        coveredInstances++;
-                }
-                int missing = Math.Max(0, item.Quantity - coveredInstances);
-                int excess = Math.Max(0, actual - item.Quantity);
-                result.ExpectedCount += item.Quantity;
-                result.ValidCount += coveredInstances;
-                result.MissingCount += missing;
-                result.ExcessCount += excess;
+                int diff = actual - required;
 
-                List<string> messages = new List<string>();
-                if (missing > 0) messages.Add("thiếu " + missing);
-                if (excess > 0) messages.Add("dư " + excess);
-                if (item.DuplicateBalloonCount > 0)
-                    messages.Add("trùng instance " + item.DuplicateBalloonCount);
-                if (item.WrongTextCount > 0) messages.Add("sai số " + item.WrongTextCount);
-                string status = messages.Count == 0 ? "OK" : string.Join(", ", messages).ToUpperInvariant();
-                result.AddRow(status, item.SheetName, "TẤT CẢ VIEW", item.PartNumber,
-                    item.Quantity, unique, item.TotalBalloonCount,
-                    messages.Count == 0
-                        ? "Số Balloon khớp với số component từ assembly."
-                        : "Kết quả tổng hợp: " + string.Join(", ", messages) + ".");
+                result.ExpectedCount += required;
+                result.ValidCount += Math.Min(actual, required);
+
+                string viewsString = item.FoundViews.Count > 0
+                    ? string.Join(", ", item.FoundViews)
+                    : "(Chưa có)";
+
+                string status;
+                string detail;
+
+                if (actual < required)
+                {
+                    status = "NG";
+                    int missing = required - actual;
+                    result.MissingCount += missing;
+                    result.MissingItemCount++;
+
+                    detail = actual == 0
+                        ? "CHƯA ĐÁNH BALLOON (0/" + required + ")"
+                        : "THIẾU " + missing + " BALLOON (" + actual + "/" + required + ")";
+                }
+                else
+                {
+                    status = "OK";
+                    if (actual == required)
+                    {
+                        detail = "Đủ balloon (" + actual + "/" + required + ")";
+                    }
+                    else
+                    {
+                        int excess = actual - required;
+                        result.ExcessCount += excess;
+                        // Balloon đánh dư không sao, kết quả vẫn OK
+                        detail = "Đủ balloon (" + actual + "/" + required + " - Dư " + excess + " bóng)";
+                    }
+                }
+
+                result.AddRow(status, item.SheetName, viewsString, item.PartNumber,
+                    required, actual, detail);
             }
 
             if (bomItems.Count == 0)
             {
                 result.BomDataErrorCount++;
-                result.AddRow("KHÔNG CÓ DỮ LIỆU", "", "", "", 0, 0, 0,
-                    "Không lấy được component cấp trên cùng từ assembly của Drawing View.");
+                result.AddRow("LỖI DỮ LIỆU", "", "", "", 0, 0,
+                    "Không lấy được danh mục chi tiết từ assembly của Drawing View.");
             }
         }
 
@@ -1471,101 +1479,7 @@ namespace ADDIN.Commands
             Dictionary<string, BomItem> bomItems,
             BalloonCheckResult result)
         {
-            if (drawingModel == null || viewGroups == null || bomItems == null)
-                return;
-
-            Dictionary<string, string> missingPartByComponentKey =
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (BomItem item in bomItems.Values)
-            {
-                foreach (string componentKey in item.BomComponentKeys)
-                {
-                    if (!item.BalloonComponentKeys.Contains(componentKey))
-                        missingPartByComponentKey[componentKey] = item.PartNumber;
-                }
-            }
-            if (missingPartByComponentKey.Count == 0)
-                return;
-
-            try { drawingModel.ClearSelection2(true); }
-            catch { }
-
-            HashSet<string> markedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (DrawingViewGroup group in viewGroups)
-            {
-                foreach (SolidWorks.Interop.sldworks.View view in group.Views)
-                {
-                    DrawingComponent root = null;
-                    try { root = view.RootDrawingComponent as DrawingComponent; }
-                    catch { }
-                    if (root == null)
-                        continue;
-
-                    MarkMissingInDrawingComponentTree(root, group.SheetName, GetViewName(view),
-                        missingPartByComponentKey, markedKeys, result);
-                    if (markedKeys.Count == missingPartByComponentKey.Count)
-                        break;
-                }
-                if (markedKeys.Count == missingPartByComponentKey.Count)
-                    break;
-            }
-
-            foreach (KeyValuePair<string, string> missing in missingPartByComponentKey)
-            {
-                if (markedKeys.Contains(missing.Key))
-                    continue;
-                result.AddRow("THIẾU BALLOON", "", "", missing.Value, 1, 0, 0,
-                    "Không tìm thấy DrawingComponent để đánh dấu instance thiếu Balloon.");
-            }
-            Debug.WriteLine("[CHECK BALLOON] marked missing components=" + markedKeys.Count
-                + "/" + missingPartByComponentKey.Count);
-        }
-
-        private void MarkMissingInDrawingComponentTree(DrawingComponent parent,
-            string sheet, string viewName,
-            Dictionary<string, string> missingPartByComponentKey,
-            HashSet<string> markedKeys, BalloonCheckResult result)
-        {
-            if (parent == null)
-                return;
-
-            Array children = null;
-            try { children = parent.GetChildren() as Array; }
-            catch { }
-            if (children == null)
-                return;
-
-            foreach (object value in children)
-            {
-                DrawingComponent drawingComponent = value as DrawingComponent;
-                if (drawingComponent == null)
-                    continue;
-
-                Component2 component = null;
-                try { component = drawingComponent.Component as Component2; }
-                catch { }
-                string componentKey = GetComponentKey(component);
-                string partNumber;
-                if (!string.IsNullOrWhiteSpace(componentKey)
-                    && missingPartByComponentKey.TryGetValue(componentKey, out partNumber)
-                    && !markedKeys.Contains(componentKey))
-                {
-                    bool selected = false;
-                    try { selected = drawingComponent.Select(true, null); }
-                    catch { }
-                    if (selected)
-                    {
-                        markedKeys.Add(componentKey);
-                        result.AddRow("THIẾU BALLOON - ĐÃ ĐÁNH DẤU", sheet, viewName,
-                            partNumber, 1, 0, 0,
-                            "Đã chọn component thiếu Balloon: " + GetComponentDisplayName(component) + ".");
-                    }
-                }
-
-                if (markedKeys.Count < missingPartByComponentKey.Count)
-                    MarkMissingInDrawingComponentTree(drawingComponent, sheet, viewName,
-                        missingPartByComponentKey, markedKeys, result);
-            }
+            // Da luoc bo de khong boi xanh man hinh va khong chen dong loi gia
         }
 
         private BomItem ResolveExpectedItem(Component2 component,
@@ -1735,7 +1649,14 @@ namespace ADDIN.Commands
                 string value = ReadCustomProperty(model, configuration, "部品番号");
                 if (string.IsNullOrWhiteSpace(value))
                     value = ReadCustomProperty(model, "", "部品番号");
-                return value;
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    if (!string.IsNullOrWhiteSpace(path))
+                        value = Path.GetFileNameWithoutExtension(path);
+                    else
+                        value = GetComponentDisplayName(component);
+                }
+                return value ?? "";
             }
             catch { return ""; }
             finally
@@ -1960,11 +1881,13 @@ namespace ADDIN.Commands
             public int TotalBalloonCount { get; set; }
             public int DuplicateBalloonCount { get; set; }
             public int WrongTextCount { get; set; }
+            public HashSet<string> FoundViews { get; private set; }
             public HashSet<string> BomComponentKeys { get; private set; }
             public HashSet<string> BalloonComponentKeys { get; private set; }
 
             public BomItem()
             {
+                FoundViews = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 BomComponentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 BalloonComponentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             }

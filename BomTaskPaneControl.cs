@@ -2893,14 +2893,10 @@ namespace ADDIN
 
 
                 lblStatus.Text = result.IsOk
+                    ? ("CHECK BALLOON: OK (" + result.BomRowCount + " chi tiết đủ balloon)")
+                    : ("CHECK BALLOON: NG (Thiếu balloon ở " + result.MissingItemCount + "/" + result.BomRowCount + " chi tiết)");
 
-                    ? "CHECK BALLOON: OK - " + result.ValidCount + "/" + result.ExpectedCount
-
-                    : "CHECK BALLOON: thieu " + result.MissingCount + ", trung " + result.DuplicateCount
-
-                        + ", sai so " + result.WrongTextCount + ", dangling " + result.DanglingCount;
-
-                result.ExportToExcel();
+                result.ShowSummary(this);
 
             });
 
