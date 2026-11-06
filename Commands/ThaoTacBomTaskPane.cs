@@ -533,12 +533,12 @@ namespace ADDIN.Commands
             ShowRoundResult(result);
         }
 
-        public void CheckSamePart(SamePartToleranceOptions toleranceOptions)
+        public SamePartCheckResult CheckSamePart(SamePartToleranceOptions toleranceOptions)
         {
             if (swApp == null)
             {
                 lblStatus.Text = "Chưa kết nối SOLIDWORKS.";
-                return;
+                return null;
             }
 
             if (toleranceOptions == null)
@@ -563,11 +563,12 @@ namespace ADDIN.Commands
             }
 
             if (result == null)
-                return;
+                return null;
 
             HighlightRows(result.HighlightRowIndexes);
             AutoFitBomGrid();
             ShowSamePartResult(result, excelOutputDirectory);
+            return result;
         }
 
         public void CheckAll(CombinedCheckOptions options)
@@ -1054,12 +1055,9 @@ namespace ADDIN.Commands
             if (!string.IsNullOrWhiteSpace(result.DebugLogPath))
                 message += " Debug: " + result.DebugLogPath;
 
+            result.ReportPath = exportedPath;
+            result.Message = message;
             lblStatus.Text = message;
-            MessageBox.Show(
-                message,
-                "CHECK SAME PART",
-                MessageBoxButtons.OK,
-                result.Errors.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
         }
 
         private void WriteCheckDebugResult(KetQuaSoSanhDfTk result)

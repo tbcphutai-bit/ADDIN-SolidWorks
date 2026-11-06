@@ -2817,7 +2817,12 @@ namespace ADDIN
 
 
 
-            RunDrawingBomCommand(() => actions?.CheckSamePart(options));
+            SamePartCheckResult samePartResult = null;
+            RunDrawingBomCommand(() =>
+            {
+                samePartResult = actions?.CheckSamePart(options);
+            });
+            ShowSamePartCheckReview(samePartResult);
 
         }
 

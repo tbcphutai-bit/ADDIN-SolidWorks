@@ -455,6 +455,12 @@
     <Compile Include="UI\DrawingBomCheckReviewIntegration.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="UI\SamePartCheckReviewForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\SamePartCheckReviewIntegration.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="UI\DxfBomDrawingReviewForm.cs">
       <SubType>Form</SubType>
     </Compile>

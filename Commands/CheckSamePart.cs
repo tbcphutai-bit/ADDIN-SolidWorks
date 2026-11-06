@@ -26,6 +26,8 @@ namespace ADDIN.Commands
         public List<SamePartGroupResult> Groups { get; } = new List<SamePartGroupResult>();
         public List<SamePartItemResult> Errors { get; } = new List<SamePartItemResult>();
         public HashSet<int> HighlightRowIndexes { get; } = new HashSet<int>();
+        public string ReportPath { get; set; }
+        public string Message { get; set; }
     }
 
     public sealed class SamePartGroupResult
@@ -2589,7 +2591,7 @@ namespace ADDIN.Commands
                 System.Environment.SpecialFolder.DesktopDirectory);
         }
 
-        private static string FormatNoteForExcel(SamePartGroupResult group)
+        internal static string FormatNoteForExcel(SamePartGroupResult group)
         {
             string status = group == null ? "" : (group.Status ?? "");
             switch (status)
@@ -2609,7 +2611,7 @@ namespace ADDIN.Commands
             }
         }
 
-        private static string FormatDifferenceValues(SamePartGroupResult group)
+        internal static string FormatDifferenceValues(SamePartGroupResult group)
         {
             if (group == null || group.Items == null || group.Items.Count < 2)
                 return "";
