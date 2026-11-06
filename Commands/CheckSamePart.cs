@@ -35,6 +35,7 @@ namespace ADDIN.Commands
         public int GroupNumber { get; set; }
         public string Status { get; set; }
         public string Note { get; set; }
+        public double GeometryToleranceMm { get; set; }
         public List<SamePartItemResult> Items { get; } = new List<SamePartItemResult>();
     }
 
@@ -71,6 +72,8 @@ namespace ADDIN.Commands
         public string FeatureMirrorSignature { get; set; }
         public string FeatureOperationSignature { get; set; }
         public string FeatureTrace { get; set; }
+        internal SamePartGeometrySnapshot FoldedGeometry { get; set; }
+        internal SamePartGeometrySnapshot FlatGeometry { get; set; }
         public string Error { get; set; }
     }
 
@@ -335,6 +338,7 @@ namespace ADDIN.Commands
                     out BroadGeometryMetrics foldedBroadMetrics);
                 item.FoldedBroadSummary = foldedBroadSummary;
                 item.FoldedBroadMetrics = foldedBroadMetrics;
+                item.FoldedGeometry = SamePartGeometryVerifier.Capture(part);
                 item.FoldedOrientationSignature = GeometrySignatureBuilder.CreateOrientation(part, isCancellationRequested);
                 item.FoldedChiralitySignature = GeometrySignatureBuilder.CreateChirality(part, isCancellationRequested);
                 GeometrySignatureBuilder.CreateFeatureDiagnostics(
@@ -365,6 +369,7 @@ namespace ADDIN.Commands
                     out BroadGeometryMetrics flatBroadMetrics);
                 item.FlatBroadSummary = flatBroadSummary;
                 item.FlatBroadMetrics = flatBroadMetrics;
+                item.FlatGeometry = SamePartGeometryVerifier.Capture(part);
                 item.FlatProfileMetrics = GeometrySignatureBuilder.CreateFlatProfileMetrics(
                     part,
                     isCancellationRequested,
@@ -377,6 +382,13 @@ namespace ADDIN.Commands
 
                 if (item.FoldedSignature.Length == 0 || item.FlatSignature.Length == 0)
                     item.Error = "Khong tao duoc chu ky hinh hoc cua chi tiet.";
+                else if (item.FoldedGeometry == null || item.FlatGeometry == null ||
+                    item.FoldedGeometry.InvalidReason.Length > 0 ||
+                    item.FlatGeometry.InvalidReason.Length > 0)
+                    item.Error = "KHONG DU DU LIEU HINH HOC: Folded="
+                        + (item.FoldedGeometry == null ? "null" : item.FoldedGeometry.InvalidReason)
+                        + "; Flat="
+                        + (item.FlatGeometry == null ? "null" : item.FlatGeometry.InvalidReason);
                 LogItem(item);
                 return item;
             }
@@ -430,9 +442,10 @@ namespace ADDIN.Commands
                     {
                         if (ReferenceEquals(seed, candidate) || used.Contains(candidate))
                             continue;
-                        if (profileGroup.All(existing => AreFlatProfilesWithinTolerance(
-                            existing.FlatProfileMetrics,
-                            candidate.FlatProfileMetrics)))
+                        if (profileGroup.All(existing =>
+                            AreFlatProfilesWithinTolerance(existing.FlatProfileMetrics,
+                                candidate.FlatProfileMetrics)
+                            && ConfirmSameGeometry(existing, candidate, true, 0.02)))
                             profileGroup.Add(candidate);
                     }
                     if (profileGroup.Count < 2)
@@ -484,10 +497,12 @@ namespace ADDIN.Commands
                     .Select(item => item.FeatureOperationSignature ?? "")
                     .Distinct(StringComparer.Ordinal)
                     .Count();
-                bool sameFolded = foldedCandidateCount == 1;
+                bool sameFolded = foldedCandidateCount == 1
+                    && groupItems.Skip(1).All(item => ConfirmSameGeometry(
+                        groupItems[0], item, false, 0.02));
                 bool sameMaterial = groupItems.Select(item => item.MaterialKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
                 bool sameThickness = groupItems.Select(item => item.ThicknessKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
-                bool mirrorByDirection = foldedInvariantCount == 1 && foldedDirectionCount > 1;
+                bool mirrorByDirection = false; // rotation of coordinate system is not mirror proof
                 bool mirrorByChirality = foldedChiralityCount > 1;
                 bool mirrorByFeature = mirrorFeatureCount > 1;
                 bool mirrorByOperation = flatExactCount == 1
@@ -593,7 +608,9 @@ namespace ADDIN.Commands
                 {
                     GroupNumber = groupNumber++,
                     Status = "SAME TOLERANCE",
-                    Note = "Giong nhau trong dung sai nguoi dung da nhap."
+                    Note = "Da xac minh bien dang B-Rep trong dung sai." ,
+                    GeometryToleranceMm = Math.Max(0.001, Math.Min(0.20,
+                        Math.Min(toleranceOptions.EdgeLengthMm, toleranceOptions.HoleLinearMm)))
                 };
                 group.Items.AddRange(groupItems);
                 result.Groups.Add(group);
@@ -630,9 +647,33 @@ namespace ADDIN.Commands
             if (!AreChiralitiesCompatible(first.FoldedChiralitySignature,
                 second.FoldedChiralitySignature))
                 return false;
-            return AreMetricsWithinTolerance(first.FlatBroadMetrics, second.FlatBroadMetrics)
-                && AreMetricsWithinTolerance(first.FoldedBroadMetrics, second.FoldedBroadMetrics)
-                && AreFlatProfilesWithinTolerance(first.FlatProfileMetrics, second.FlatProfileMetrics);
+            if (!AreMetricsWithinTolerance(first.FlatBroadMetrics, second.FlatBroadMetrics)
+                || !AreMetricsWithinTolerance(first.FoldedBroadMetrics, second.FoldedBroadMetrics)
+                || !AreFlatProfilesWithinTolerance(first.FlatProfileMetrics, second.FlatProfileMetrics))
+                return false;
+            double geometryTolerance = Math.Max(0.001, Math.Min(0.20,
+                Math.Min(toleranceOptions.EdgeLengthMm, toleranceOptions.HoleLinearMm)));
+            return ConfirmSameGeometry(first, second, true, geometryTolerance)
+                && ConfirmSameGeometry(first, second, false, geometryTolerance);
+        }
+
+        // Fast signatures are candidate filters ONLY; matching edge positions
+        // is mandatory for any affirmative SAME result.
+        private bool ConfirmSameGeometry(SamePartItemResult a, SamePartItemResult b,
+            bool flat, double toleranceMm)
+        {
+            double maximumMm;
+            string reason;
+            bool same = SamePartGeometryVerifier.TryMatch(
+                flat ? a.FlatGeometry : a.FoldedGeometry,
+                flat ? b.FlatGeometry : b.FoldedGeometry,
+                toleranceMm, out maximumMm, out reason);
+            Log("[GEOMETRY VERIFY] " + (flat ? "FLAT" : "FOLDED")
+                + " | parts=" + a.BuhinNo + " <> " + b.BuhinNo
+                + " | result=" + (same ? "PASS" : "REJECT/REVIEW")
+                + " | maximumDeviationMm=" + maximumMm.ToString("F4", CultureInfo.InvariantCulture)
+                + " | " + reason);
+            return same;
         }
 
         private static bool AreChiralitiesCompatible(string first, string second)
@@ -2204,6 +2245,464 @@ namespace ADDIN.Commands
         }
     }
 
+    // PATCH SAFE-GEOMETRY-20261106
+    // B-Rep edge verification: this is an additional fail-closed gate after fast signatures.
+    // It does NOT replace SolidWorks' B-Rep kernel, and cannot prove surface identity
+    // for arbitrary freeform patches with coincident boundary edges.
+    internal sealed class SamePartGeometrySnapshot
+    {
+        internal readonly List<SamePartGeometryEdge> Edges = new List<SamePartGeometryEdge>();
+        internal readonly List<SamePartGeometryFace> Faces = new List<SamePartGeometryFace>();
+        internal readonly List<double[]> Anchors = new List<double[]>();
+        internal int BodyCount;
+        internal string InvalidReason = "";
+    }
+
+    internal sealed class SamePartGeometryFace
+    {
+        internal string Type;
+        internal double AreaMm2;
+    }
+
+    internal sealed class SamePartGeometryEdge
+    {
+        internal string Kind;
+        internal double LengthMm;
+        internal bool FullCircle;
+        internal double RadiusMm;
+        internal double[] Center;
+        internal double[] Axis;
+        internal readonly List<double[]> Samples = new List<double[]>();
+    }
+
+    internal static class SamePartGeometryVerifier
+    {
+        private const double MmPerMeter = 1000.0;
+        private const int MaxEdges = 5000;
+        private const int MaxAnchors = 350;
+        private const int MaxRegistrations = 3000;
+        private const double Tiny = 1e-9;
+
+        internal static SamePartGeometrySnapshot Capture(ModelDoc2 model)
+        {
+            SamePartGeometrySnapshot snapshot = new SamePartGeometrySnapshot();
+            PartDoc part = model as PartDoc;
+            if (part == null)
+            {
+                snapshot.InvalidReason = "Not a part document";
+                return snapshot;
+            }
+
+            object[] bodies = AsArray(part.GetBodies2((int)swBodyType_e.swSolidBody, true));
+            snapshot.BodyCount = bodies.Length;
+            if (bodies.Length == 0)
+            {
+                snapshot.InvalidReason = "No solid body in active configuration";
+                return snapshot;
+            }
+
+            try
+            {
+                foreach (object bodyValue in bodies)
+                {
+                    Body2 body = bodyValue as Body2;
+                    if (body == null)
+                        throw new InvalidOperationException("Non-Body2 solid");
+
+                    foreach (object value in AsArray(body.GetFaces()))
+                    {
+                        Face2 face = value as Face2;
+                        if (face == null)
+                            throw new InvalidOperationException("Cannot read B-Rep face");
+                        Surface surface = face.GetSurface() as Surface;
+                        if (surface == null)
+                            throw new InvalidOperationException("Cannot read B-Rep surface");
+                        string type = surface.IsPlane() ? "P" :
+                            surface.IsCylinder() ? "C" :
+                            surface.IsCone() ? "N" :
+                            surface.IsSphere() ? "S" :
+                            surface.IsTorus() ? "T" : "U";
+                        if (type == "U")
+                            throw new InvalidOperationException("Unsupported curved B-Rep face; manual review");
+                        snapshot.Faces.Add(new SamePartGeometryFace
+                        {
+                            Type = type,
+                            AreaMm2 = face.GetArea() * 1000000.0
+                        });
+                    }
+
+                    foreach (object value in AsArray(body.GetEdges()))
+                    {
+                        Edge edge = value as Edge;
+                        if (edge == null)
+                            throw new InvalidOperationException("Cannot read B-Rep edge");
+                        Curve curve = edge.GetCurve() as Curve;
+                        CurveParamData range = edge.GetCurveParams3();
+                        if (curve == null || range == null)
+                            throw new InvalidOperationException("Missing edge curve/parameter range");
+
+                        double lengthMm = curve.GetLength3(range.UMinValue, range.UMaxValue) * MmPerMeter;
+                        if (double.IsNaN(lengthMm) || double.IsInfinity(lengthMm) || lengthMm < 0)
+                            throw new InvalidOperationException("Invalid edge length");
+                        if (!curve.IsLine() && !curve.IsCircle())
+                            throw new InvalidOperationException("Unsupported spline/elliptic B-Rep edge; manual review");
+                        SamePartGeometryEdge e = new SamePartGeometryEdge
+                        {
+                            Kind = curve.IsLine() ? "LINE" : (curve.IsCircle() ? "CIRCLE" : "OTHER"),
+                            LengthMm = lengthMm
+                        };
+                        if (e.Kind == "CIRCLE")
+                        {
+                            double[] circle = curve.CircleParams as double[];
+                            if (circle == null || circle.Length < 7)
+                                throw new InvalidOperationException("Missing circular-edge parameters");
+                            e.Center = ToMm(new[] { circle[0], circle[1], circle[2] });
+                            e.Axis = Unit(new[] { circle[3], circle[4], circle[5] });
+                            e.RadiusMm = Math.Abs(circle[6]) * MmPerMeter;
+                            if (e.RadiusMm <= Tiny || e.Axis == null)
+                                throw new InvalidOperationException("Invalid circle radius/axis");
+                            e.FullCircle = Math.Abs(lengthMm - 2.0 * Math.PI * e.RadiusMm) <= 0.02;
+                            AddUnique(snapshot.Anchors, e.Center);
+                        }
+
+                        int sampleCount = e.Kind == "LINE" ? 2 :
+                            Math.Min(65, Math.Max(9, (int)Math.Ceiling(lengthMm / 2.0) + 1));
+                        // A full circle has an arbitrary seam: its geometric verification
+                        // uses center, radius and normal rather than comparing seam samples.
+                        if (e.FullCircle)
+                            sampleCount = 4;
+                        for (int i = 0; i < sampleCount; i++)
+                        {
+                            double t = (double)i / (sampleCount - 1);
+                            double parameter = range.UMinValue + (range.UMaxValue - range.UMinValue) * t;
+                            double[] evaluated = curve.Evaluate2(parameter, 0) as double[];
+                            if (evaluated == null || evaluated.Length < 3)
+                                throw new InvalidOperationException("Cannot evaluate B-Rep edge");
+                            double[] point = ToMm(evaluated);
+                            e.Samples.Add(point);
+                        }
+                        if (!e.FullCircle)
+                        {
+                            AddUnique(snapshot.Anchors, e.Samples[0]);
+                            AddUnique(snapshot.Anchors, e.Samples[e.Samples.Count - 1]);
+                            if (e.Kind != "LINE")
+                                AddUnique(snapshot.Anchors, e.Samples[e.Samples.Count / 2]);
+                        }
+                        snapshot.Edges.Add(e);
+                        if (snapshot.Edges.Count > MaxEdges)
+                            throw new InvalidOperationException("B-Rep too complex: edges > " + MaxEdges);
+                    }
+                }
+
+                if (snapshot.Edges.Count == 0 || snapshot.Faces.Count == 0)
+                    throw new InvalidOperationException("Empty B-Rep");
+                if (snapshot.Anchors.Count < 3)
+                {
+                    // Single circular solids may have few distinct seam-independent anchors.
+                    // Conservatively do not classify them as SAME without extra proof.
+                    throw new InvalidOperationException("Insufficient rotation-independent anchors");
+                }
+                if (snapshot.Anchors.Count > MaxAnchors)
+                    throw new InvalidOperationException("B-Rep too complex: anchors > " + MaxAnchors);
+            }
+            catch (Exception ex)
+            {
+                snapshot.InvalidReason = ex.GetType().Name + ": " + ex.Message;
+            }
+            return snapshot;
+        }
+
+        // Only proper 3-D rotations and translations are permitted, NOT reflections.
+        // Each B-Rep edge must match a unique target edge after alignment.
+        // Fail closed if geometry, topology or API extraction cannot be verified.
+        internal static bool TryMatch(
+            SamePartGeometrySnapshot a, SamePartGeometrySnapshot b,
+            double distanceToleranceMm, out double maxDeviationMm, out string reason)
+        {
+            maxDeviationMm = 0;
+            reason = "";
+            if (a == null || b == null || a.InvalidReason.Length != 0 || b.InvalidReason.Length != 0)
+            {
+                reason = "Geometry extraction failed: " + (a == null ? "null A" : a.InvalidReason)
+                    + " / " + (b == null ? "null B" : b.InvalidReason);
+                return false;
+            }
+            if (a.BodyCount != b.BodyCount || a.Edges.Count != b.Edges.Count ||
+                a.Faces.Count != b.Faces.Count || a.Anchors.Count != b.Anchors.Count)
+            {
+                reason = "B-Rep body/face/edge/anchor counts differ";
+                return false;
+            }
+            double tol = Math.Max(0.001, Math.Min(0.20, distanceToleranceMm));
+            if (!SameFaceSpectrum(a.Faces, b.Faces, tol))
+            {
+                reason = "B-Rep face type/area spectrum differs";
+                return false;
+            }
+            if (!SameEdgeSpectrum(a.Edges, b.Edges, tol))
+            {
+                reason = "B-Rep edge type/length spectrum differs";
+                return false;
+            }
+
+            List<double[]> pa = a.Anchors;
+            List<double[]> pb = b.Anchors;
+            double[] centroidA = Centroid(pa);
+            double[] centroidB = Centroid(pb);
+            int i0 = FarthestFrom(pa, centroidA);
+            int i1 = FarthestFrom(pa, pa[i0]);
+            int i2 = FarthestFromLine(pa, pa[i0], pa[i1]);
+            if (i0 == i1 || i2 == i0 || i2 == i1 ||
+                Length(Cross(Sub(pa[i1], pa[i0]), Sub(pa[i2], pa[i0]))) < 1e-5)
+            {
+                reason = "Degenerate geometry registration anchors";
+                return false;
+            }
+            double d01 = Distance(pa[i0], pa[i1]);
+            double d02 = Distance(pa[i0], pa[i2]);
+            double d12 = Distance(pa[i1], pa[i2]);
+            double r0 = Distance(pa[i0], centroidA);
+            double loose = Math.Max(0.02, tol * 3.0);
+            int registrations = 0;
+
+            for (int j0 = 0; j0 < pb.Count; j0++)
+            {
+                if (Math.Abs(Distance(pb[j0], centroidB) - r0) > loose)
+                    continue;
+                for (int j1 = 0; j1 < pb.Count; j1++)
+                {
+                    if (j0 == j1 || Math.Abs(Distance(pb[j0], pb[j1]) - d01) > loose)
+                        continue;
+                    for (int j2 = 0; j2 < pb.Count; j2++)
+                    {
+                        if (j2 == j0 || j2 == j1 ||
+                            Math.Abs(Distance(pb[j0], pb[j2]) - d02) > loose ||
+                            Math.Abs(Distance(pb[j1], pb[j2]) - d12) > loose)
+                            continue;
+                        registrations++;
+                        if (registrations > MaxRegistrations)
+                        {
+                            reason = "Too many ambiguous rigid registrations; manual review";
+                            return false;
+                        }
+                        RigidFrame af = new RigidFrame(pa[i0], pa[i1], pa[i2]);
+                        RigidFrame bf = new RigidFrame(pb[j0], pb[j1], pb[j2]);
+                        if (!af.Valid || !bf.Valid)
+                            continue;
+                        double anchorError;
+                        if (!MatchAnchors(pa, pb, af, bf, tol, out anchorError))
+                            continue;
+                        double edgeError;
+                        if (!MatchEdges(a.Edges, b.Edges, af, bf, tol, out edgeError))
+                            continue;
+                        maxDeviationMm = Math.Max(anchorError, edgeError);
+                        reason = "Verified rigid B-Rep edge registration";
+                        return true;
+                    }
+                }
+            }
+            reason = "No rigid transform makes every B-Rep edge/face match within "
+                + tol.ToString("F3", CultureInfo.InvariantCulture) + " mm";
+            return false;
+        }
+
+        private static bool SameFaceSpectrum(List<SamePartGeometryFace> x,
+            List<SamePartGeometryFace> y, double tol)
+        {
+            var a = x.OrderBy(v => v.Type, StringComparer.Ordinal).ThenBy(v => v.AreaMm2).ToList();
+            var b = y.OrderBy(v => v.Type, StringComparer.Ordinal).ThenBy(v => v.AreaMm2).ToList();
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i].Type != b[i].Type ||
+                    Math.Abs(a[i].AreaMm2 - b[i].AreaMm2) > Math.Max(0.05, tol * 10))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool SameEdgeSpectrum(List<SamePartGeometryEdge> x,
+            List<SamePartGeometryEdge> y, double tol)
+        {
+            var a = x.OrderBy(v => v.Kind, StringComparer.Ordinal).ThenBy(v => v.LengthMm).ToList();
+            var b = y.OrderBy(v => v.Kind, StringComparer.Ordinal).ThenBy(v => v.LengthMm).ToList();
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i].Kind != b[i].Kind || a[i].FullCircle != b[i].FullCircle ||
+                    Math.Abs(a[i].LengthMm - b[i].LengthMm) > tol)
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool MatchAnchors(List<double[]> a, List<double[]> b,
+            RigidFrame from, RigidFrame to, double tol, out double error)
+        {
+            error = 0;
+            foreach (double[] p in a)
+            {
+                double d = b.Min(q => Distance(to.MapFrom(from, p), q));
+                if (d > tol) return false;
+                error = Math.Max(error, d);
+            }
+            foreach (double[] q in b)
+            {
+                double d = a.Min(p => Distance(to.MapFrom(from, p), q));
+                if (d > tol) return false;
+                error = Math.Max(error, d);
+            }
+            return true;
+        }
+
+        private static bool MatchEdges(List<SamePartGeometryEdge> a,
+            List<SamePartGeometryEdge> b, RigidFrame from, RigidFrame to,
+            double tol, out double error)
+        {
+            error = 0;
+            bool[] used = new bool[b.Count];
+            foreach (SamePartGeometryEdge source in a)
+            {
+                int best = -1;
+                double bestError = double.PositiveInfinity;
+                for (int i = 0; i < b.Count; i++)
+                {
+                    if (used[i]) continue;
+                    double candidateError;
+                    if (MatchEdge(source, b[i], from, to, tol, out candidateError)
+                        && candidateError < bestError)
+                    {
+                        best = i;
+                        bestError = candidateError;
+                    }
+                }
+                if (best < 0) return false;
+                used[best] = true;
+                error = Math.Max(error, bestError);
+            }
+            return true;
+        }
+
+        private static bool MatchEdge(SamePartGeometryEdge a,
+            SamePartGeometryEdge b, RigidFrame from, RigidFrame to,
+            double tol, out double error)
+        {
+            error = 0;
+            if (a.Kind != b.Kind || a.FullCircle != b.FullCircle ||
+                Math.Abs(a.LengthMm - b.LengthMm) > tol)
+                return false;
+            if (a.Kind == "CIRCLE")
+            {
+                if (Math.Abs(a.RadiusMm - b.RadiusMm) > tol)
+                    return false;
+                double centerError = Distance(to.MapFrom(from, a.Center), b.Center);
+                if (centerError > tol) return false;
+                // The normal can be reversed depending on B-Rep face traversal.
+                double[] mappedNormal = to.MapVectorFrom(from, a.Axis);
+                double normalAlignment = Math.Abs(Dot(mappedNormal, b.Axis));
+                if (normalAlignment < 0.999999) return false;
+                error = centerError;
+                if (a.FullCircle) return true;
+            }
+            if (a.Samples.Count != b.Samples.Count)
+                return false;
+            double forwardError = 0, backwardError = 0;
+            int count = a.Samples.Count;
+            for (int i = 0; i < count; i++)
+            {
+                double[] p = to.MapFrom(from, a.Samples[i]);
+                forwardError = Math.Max(forwardError, Distance(p, b.Samples[i]));
+                backwardError = Math.Max(backwardError, Distance(p, b.Samples[count - 1 - i]));
+                if (forwardError > tol && backwardError > tol)
+                    return false;
+            }
+            double curveError = Math.Min(forwardError, backwardError);
+            if (curveError > tol) return false;
+            error = Math.Max(error, curveError);
+            return true;
+        }
+
+        private sealed class RigidFrame
+        {
+            private readonly double[] origin, u, v, w;
+            internal readonly bool Valid;
+            internal RigidFrame(double[] p0, double[] p1, double[] p2)
+            {
+                origin = p0;
+                u = Unit(Sub(p1, p0));
+                if (u == null) return;
+                double[] normal = Cross(u, Sub(p2, p0));
+                w = Unit(normal);
+                if (w == null) return;
+                v = Unit(Cross(w, u));
+                Valid = v != null;
+            }
+            private double[] Local(double[] p)
+            {
+                double[] d = Sub(p, origin);
+                return new[] { Dot(d, u), Dot(d, v), Dot(d, w) };
+            }
+            internal double[] MapFrom(RigidFrame source, double[] p)
+            {
+                double[] s = source.Local(p);
+                return new[] {
+                    origin[0] + s[0]*u[0] + s[1]*v[0] + s[2]*w[0],
+                    origin[1] + s[0]*u[1] + s[1]*v[1] + s[2]*w[1],
+                    origin[2] + s[0]*u[2] + s[1]*v[2] + s[2]*w[2]};
+            }
+            internal double[] MapVectorFrom(RigidFrame source, double[] vector)
+            {
+                double x = Dot(vector, source.u), y = Dot(vector, source.v), z = Dot(vector, source.w);
+                return new[] { x*u[0]+y*v[0]+z*w[0], x*u[1]+y*v[1]+z*w[1],
+                    x*u[2]+y*v[2]+z*w[2] };
+            }
+        }
+
+        private static object[] AsArray(object o)
+        {
+            if (o == null) return new object[0];
+            object[] values = o as object[];
+            if (values != null) return values;
+            Array a = o as Array;
+            if (a == null) return new[] { o };
+            return a.Cast<object>().ToArray();
+        }
+        private static double[] ToMm(double[] p) => new[] { p[0]*MmPerMeter, p[1]*MmPerMeter, p[2]*MmPerMeter };
+        private static void AddUnique(List<double[]> points, double[] p)
+        {
+            if (!points.Any(q => Distance(p, q) < 0.00001)) points.Add(p);
+        }
+        private static double[] Sub(double[] a, double[] b) => new[] { a[0]-b[0], a[1]-b[1], a[2]-b[2] };
+        private static double Dot(double[] a, double[] b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+        private static double[] Cross(double[] a, double[] b) => new[] {
+            a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]};
+        private static double Length(double[] a) => Math.Sqrt(Dot(a,a));
+        private static double[] Unit(double[] a)
+        {
+            double len=Length(a);
+            return len < Tiny ? null : new[] {a[0]/len,a[1]/len,a[2]/len};
+        }
+        private static double Distance(double[] a,double[] b) => Length(Sub(a,b));
+        private static double[] Centroid(List<double[]> ps) => new[] {
+            ps.Average(p=>p[0]),ps.Average(p=>p[1]),ps.Average(p=>p[2])};
+        private static int FarthestFrom(List<double[]> ps, double[] p)
+        {
+            int best=0; double value=-1;
+            for(int i=0;i<ps.Count;i++) {double d=Distance(ps[i],p);if(d>value){best=i;value=d;}}
+            return best;
+        }
+        private static int FarthestFromLine(List<double[]> ps,double[] p,double[] q)
+        {
+            double[] axis=Unit(Sub(q,p));
+            if(axis==null) return 0;
+            int best=0;double value=-1;
+            for(int i=0;i<ps.Count;i++)
+            {
+                double d=Length(Cross(Sub(ps[i],p),axis));
+                if(d>value){value=d;best=i;}
+            }
+            return best;
+        }
+    }
+
     internal sealed class SamePartToleranceDialog : Form
     {
         private static SamePartToleranceOptions lastOptions = new SamePartToleranceOptions();
@@ -2617,8 +3116,30 @@ namespace ADDIN.Commands
                 return "";
 
             string status = group.Status ?? "";
-            if (status == "SAME FULL" || status == "SAME TOLERANCE")
+            if (status == "SAME FULL")
                 return "";
+            if (status == "SAME TOLERANCE")
+            {
+                SamePartItemResult origin = group.Items[0];
+                List<string> verified = new List<string>();
+                foreach (SamePartItemResult target in group.Items.Skip(1))
+                {
+                    double flatError, foldedError;
+                    string flatReason, foldedReason;
+                    bool f = SamePartGeometryVerifier.TryMatch(origin.FlatGeometry,
+                        target.FlatGeometry, group.GeometryToleranceMm,
+                        out flatError, out flatReason);
+                    bool b = SamePartGeometryVerifier.TryMatch(origin.FoldedGeometry,
+                        target.FoldedGeometry, group.GeometryToleranceMm,
+                        out foldedError, out foldedReason);
+                    verified.Add(origin.BuhinNo + " <> " + target.BuhinNo
+                        + ": Flat max=" + flatError.ToString("F4", CultureInfo.InvariantCulture)
+                        + " mm; Folded max=" + foldedError.ToString("F4", CultureInfo.InvariantCulture)
+                        + " mm; limit=" + group.GeometryToleranceMm.ToString("F3", CultureInfo.InvariantCulture)
+                        + " mm; verified=" + (f && b ? "YES" : "NO"));
+                }
+                return string.Join(System.Environment.NewLine, verified);
+            }
 
             SamePartItemResult reference = group.Items[0];
             List<string> comparisons = new List<string>();
