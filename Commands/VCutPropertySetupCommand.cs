@@ -96,17 +96,24 @@ namespace ADDIN.Commands
             catch { return false; }
         }
 
-        private bool IsLoadedPart(ModelDoc2 active)
+        internal bool IsLoadedPart(ModelDoc2 active)
         {
-            return loadedPart != null && active != null &&
-                (ReferenceEquals(loadedPart, active) || app.IsSame(loadedPart, active) == (int)swObjectEquality.swObjectSame) &&
-                active.GetType() == (int)swDocumentTypes_e.swDocPART &&
-                string.Equals(active.GetTitle(), loadedPartTitle,
-                    StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(active.GetPathName(), loadedPartPath,
-                    StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(active.ConfigurationManager.ActiveConfiguration.Name,
-                    loadedConfiguration, StringComparison.OrdinalIgnoreCase);
+            try
+            {
+                return loadedPart != null && active != null &&
+                    (ReferenceEquals(loadedPart, active) || app.IsSame(loadedPart, active) == (int)swObjectEquality.swObjectSame) &&
+                    active.GetType() == (int)swDocumentTypes_e.swDocPART &&
+                    string.Equals(active.GetTitle(), loadedPartTitle,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(active.GetPathName(), loadedPartPath,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(active.ConfigurationManager.ActiveConfiguration.Name,
+                        loadedConfiguration, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         // Read-only validation for the native page; Save repeats it before mutation.

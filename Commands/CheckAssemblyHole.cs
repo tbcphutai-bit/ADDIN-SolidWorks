@@ -206,7 +206,11 @@ namespace ADDIN.Commands
             bool hasOldCommandInProgress = false;
             try
             {
+                // CG2.5 transient viewport markers are never persisted.
+                Cg25ClearCandidatePreview();
                 EnsureResultsForm();
+                resultsForm.Cg25PreviewAction = Cg25ShowCandidatePreview;
+                resultsForm.Cg25ClearPreviewAction = Cg25ClearCandidatePreview;
                 EnableDiagnostics = resultsForm.DiagnosticEnabled;
                 AutoCreateMarkers = resultsForm.AutoMarkersEnabled;
                 resultsForm.BeginRun();
@@ -356,7 +360,30 @@ namespace ADDIN.Commands
                 try
                 {
                     if (lastReport.PartRelations != null)
+                    {
                         EnrichCg2BrepMaterialEvidence(assembly, holes, lastReport.PartRelations);
+                        // CG2.3 read-only counterpart evidence; NOT a production NG.
+                        Cg23AnalyzeCounterparts(holes, lastReport.PartRelations);
+                        // CG2.4: geometry/topology boundary screening; read-only.
+                        Cg24AnalyzeTopology(assembly, holes, lastReport.PartRelations);
+                        // CG2.5 real-CAD positive controls (debug evidence only).
+                        // CG3.1: read-only fusion of CG2 evidence, no production verdict.
+                        Cg31AnalyzeReviewCandidates(lastReport.PartRelations);
+                        // CG3.2: cross-reference P1 against CURRENT production NG results.
+                        // Diagnostic only; neither removes nor creates any NG.
+                        Cg32CorrelateExistingNg(results, patternIssues, lastReport.PartRelations);
+                        // CG3.3: observed counterpart-hole pairs and regular candidate pitch.
+                        // Diagnostic evidence only; intent is NOT established and no NG changes.
+                        Cg33AssessIntentEvidence(results, lastReport.PartRelations);
+                        // CG3.4: DEBUG-only audit against 6 user-confirmed missing-hole
+                        // positions in one known assembly. NEVER changes production NG.
+                        Cg34GroundTruthAudit(model, lastReport.PartRelations);
+                        // CG3.5: optional DEBUG-only contrast audit, never production NG.
+                        Cg35ContrastAudit(model, results, lastReport.PartRelations);
+                        // CG3.6: DEBUG-only optional, human labels; never production NG.
+                        Cg36ManualIntentAudit(model, lastReport.PartRelations);
+                        Cg25RunRealCadControls(assembly, holes, lastReport.PartRelations);
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -373,6 +400,24 @@ namespace ADDIN.Commands
                             "BREP material screening failed: " + cg2BrepError.GetType().Name);
                     }
                 }
+#if DEBUG
+                try
+                {
+                    if (EnableDiagnostics)
+                    {
+                        Cg22WriteDiagnosticDebug(
+                            lastReport == null
+                                ? null
+                                : lastReport.PartRelations);
+                    }
+                }
+                catch (Exception cg22DebugError)
+                {
+                    Debug.WriteLine(
+                        "[CG22][DEBUG_ERROR] " +
+                        cg22DebugError.ToString());
+                }
+#endif
                 ThrowIfCanceled();
                 if (!string.Equals(inputState, CaptureModelState(model), StringComparison.Ordinal))
                     throw new InvalidOperationException("Model đã thay đổi trong khi CG2 quét; hãy chạy lại.");

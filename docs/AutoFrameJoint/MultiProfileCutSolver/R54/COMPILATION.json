@@ -1,0 +1,12 @@
+{
+  "detached_six_afj_source_compile": "PASS",
+  "local_callback_cases": 11,
+  "branch_callback_cases": 11,
+  "old_exception_reproduction": "PASS_EXPECTED_HRESULT_1_THROW",
+  "real_com_calls": 0,
+  "source_baselines_preserved": true,
+  "main_addin_build": false,
+  "deploy": false,
+  "cad_open_or_modified": false,
+  "installed_addin_runtime_test": "NOT_RUN"
+}

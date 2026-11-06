@@ -1,0 +1,63 @@
+{
+  "branch": "integrate/check-chan-pr37-vs-20261021",
+  "head": "66d12511f24c35b560d699228109857058ad66cb",
+  "records": [
+    {
+      "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "before_sha256": "d29dc9a1eb1b8f806edc2bb0aa084e929e1b260371b3cd9e507d02cbb8229970",
+      "after_sha256": "904956aff586726c3e931b78996fd47b208403bfc4e05b8fc85c8f8a47efd200",
+      "changed": true
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "before_sha256": "cafe0a13242f1b18f5d1a9d37cb9b733caf851b782a642d9dc0b7bb7061671df",
+      "after_sha256": "af3f3d043d38dce89a08ff16c233b53e22f64f684d2f165398a1d9a107dcbaf5",
+      "changed": true
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "before_sha256": "ec1e7daea7989e2a8a405311f85cebd761f15ad2b87825a41a2fea95262a9af2",
+      "after_sha256": "d72694979b651589332b437224be6fc4672e4a99a0c930717608ee1b1b4ad983",
+      "changed": true
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "before_sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09",
+      "after_sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09",
+      "changed": false
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+      "before_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "after_sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5",
+      "changed": false
+    },
+    {
+      "file": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+      "before_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "after_sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b",
+      "changed": false
+    },
+    {
+      "file": "ADDIN.csproj",
+      "before_sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+      "after_sha256": "044326d9eeb5efd3d380cf68ebcfec7adf1384f5b81d815330a06de012e7097a",
+      "changed": false
+    },
+    {
+      "file": "ADDIN.dll (existing output)",
+      "before_sha256": "21524f3d5a7fa5d92c6a3ee5d95e32147e26e5b8a29bc5939ed6dc7f479e8435",
+      "after_sha256": "21524f3d5a7fa5d92c6a3ee5d95e32147e26e5b8a29bc5939ed6dc7f479e8435",
+      "changed": false
+    },
+    {
+      "file": "ADDIN.pdb (existing output)",
+      "before_sha256": "90ba656f3275e55608073190c5b4903a340f98424a941eacc30530d3f36d534d",
+      "after_sha256": "90ba656f3275e55608073190c5b4903a340f98424a941eacc30530d3f36d534d",
+      "changed": false
+    }
+  ],
+  "main_addin_built": false,
+  "deployment_changed": false,
+  "applied_utc": "2026-10-22T05:43:29.9745335Z"
+}

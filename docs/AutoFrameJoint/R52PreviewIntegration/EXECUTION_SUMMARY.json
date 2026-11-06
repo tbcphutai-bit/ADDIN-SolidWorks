@@ -1,0 +1,34 @@
+{
+  "overall": "NATIVE_PREVIEW_INTEGRATION_NOT_VERIFIED",
+  "r51_in_installed_dll": true,
+  "dll_mvid": "2f4e359e-bffe-4f74-9441-891bb4c77b12",
+  "r52_in_installed_dll": false,
+  "new_frame_b_native_received": "NOT_RUN",
+  "supplied_log_frame_b_count": 0,
+  "new_native_preview_button": "NOT_RUN",
+  "new_native_solver": "NOT_RUN",
+  "new_native_body2": "NOT_RUN",
+  "new_native_display3_hide": "NOT_RUN",
+  "actual_preview_visibility": "UNVERIFIED",
+  "managed_contract_local": {
+    "tests_passed": 9,
+    "tests_total": 9,
+    "preview_delegate_calls": 2,
+    "interface_invocations_inside_selection_callbacks": 0
+  },
+  "managed_contract_branch": {
+    "tests_passed": 9,
+    "tests_total": 9,
+    "preview_delegate_calls": 2,
+    "interface_invocations_inside_selection_callbacks": 0
+  },
+  "main_addin_build_deploy": false,
+  "cad_modified_uploaded": false,
+  "production_cs_files_changed": 4,
+  "r51_core_geometry_unchanged": true,
+  "current_dll_source_relationship": "Installed DLL contains pre-R52 R51 logic; R52 source instrumentation pending owner build",
+  "cause_b_missing": "UNVERIFIED_NOT_REPRODUCED_NATIVELY",
+  "exit_cause": "UNVERIFIED_NO_UNIQUE_CALLBACK_MAPPING",
+  "snapshot_scope": "INITIAL_R52_AUDIT_BEFORE_USER_NATIVE_TEST",
+  "newer_evidence": "CAPTION_FOLLOWUP_SUMMARY.json"
+}

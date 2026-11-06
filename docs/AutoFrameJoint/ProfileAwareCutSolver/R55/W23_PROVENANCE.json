@@ -1,0 +1,102 @@
+{
+  "checked_utc": "2026-10-23T14:52:56.0822055Z",
+  "evidence_level": "API_VERIFIED_FOR_PRIOR_METADATA_FILESYSTEM_HASH_VERIFIED_FOR_CURRENT_IDENTITY",
+  "prior_part_status": "PASS_READONLY_COPIED_PART_METADATA_NO_BEFORE_AFTER",
+  "prior_assembly_status": "PASS_READONLY_COPIED_ASSEMBLY_POSES",
+  "exact_source_file_count": 9,
+  "all_match": true,
+  "files": [
+    {
+      "basename": "2216-02-lc-W23.SLDASM",
+      "matches_prior_native_input": true,
+      "current_sha256": "3de6380a0555f51b88c7245a1c0daaf719527dbd61a86c52cb6559d34c362433",
+      "prior_native_sha256": "3de6380a0555f51b88c7245a1c0daaf719527dbd61a86c52cb6559d34c362433"
+    },
+    {
+      "basename": "2216-04-lc-W23-fr2.SLDPRT",
+      "matches_prior_native_input": true,
+      "current_sha256": "2bdddb7c4413a249ad1827aac391c8a0ca44feed963a0265b3e13157196eb051",
+      "prior_native_sha256": "2bdddb7c4413a249ad1827aac391c8a0ca44feed963a0265b3e13157196eb051"
+    },
+    {
+      "basename": "2216-04-lc-W23-fr3.SLDPRT",
+      "matches_prior_native_input": true,
+      "current_sha256": "97b08fee415ff6122978cb9ed83acc6dc54b9035807d18753fd6da72e0c8487b",
+      "prior_native_sha256": "97b08fee415ff6122978cb9ed83acc6dc54b9035807d18753fd6da72e0c8487b"
+    },
+    {
+      "basename": "2216-04-lc-W23-fr4.SLDPRT",
+      "matches_prior_native_input": true,
+      "current_sha256": "f1eb00d22a4b0ceacebc6d73c0491d295fe4966ef83758cdbb0be792147c87dc",
+      "prior_native_sha256": "f1eb00d22a4b0ceacebc6d73c0491d295fe4966ef83758cdbb0be792147c87dc"
+    },
+    {
+      "basename": "2216-04-lc-W23-ft1.SLDPRT",
+      "matches_prior_native_input": true,
+      "current_sha256": "61b3fc5a2ce050d2a759ead540abd34bc53d7e005d5fc0dae52e928b67eefb24",
+      "prior_native_sha256": "61b3fc5a2ce050d2a759ead540abd34bc53d7e005d5fc0dae52e928b67eefb24"
+    },
+    {
+      "basename": "2216-04-lc-W22-fr1.SLDPRT",
+      "matches_prior_native_input": true,
+      "current_sha256": "4bbaf71f968cda562b2eb9f51db778883a19d2ee49a0c8d7a63372f606431093",
+      "prior_native_sha256": "4bbaf71f968cda562b2eb9f51db778883a19d2ee49a0c8d7a63372f606431093"
+    },
+    {
+      "basename": "2216-04-lc-W22-中骨1.SLDPRT",
+      "matches_prior_native_input": true,
+      "current_sha256": "cddb6ea8bbd77a72601d016072451d65f73b5b7d7cc5a0bbfdd1a150519477ff",
+      "prior_native_sha256": "cddb6ea8bbd77a72601d016072451d65f73b5b7d7cc5a0bbfdd1a150519477ff"
+    },
+    {
+      "basename": "2216-04-lc-W22-1.SLDPRT",
+      "matches_prior_native_input": true,
+      "current_sha256": "6f62054f4588b5ac15043450890c82c4f68bf3e544764734cd3d36522ff0b797",
+      "prior_native_sha256": "6f62054f4588b5ac15043450890c82c4f68bf3e544764734cd3d36522ff0b797"
+    },
+    {
+      "basename": "2216-04-lc-W22-2.SLDPRT",
+      "matches_prior_native_input": true,
+      "current_sha256": "fd9471973e844b350a605a43660e2353e68c568e0358bbdd75bfa630832afb1e",
+      "prior_native_sha256": "fd9471973e844b350a605a43660e2353e68c568e0358bbdd75bfa630832afb1e"
+    }
+  ],
+  "prior_native_inventory_summary": {
+    "parts_with_feature_tree": 3,
+    "cut_features_with_listed_api_parameters": 23,
+    "active_cut_features": 20,
+    "suppressed_cut_features": 3,
+    "all_direction_1_end_conditions": {
+      "Blind": 11,
+      "Through All": 6,
+      "Up To Vertex": 2,
+      "Through All Both": 4
+    },
+    "active_direction_1_end_conditions": {
+      "Blind": 8,
+      "Through All": 6,
+      "Up To Vertex": 2,
+      "Through All Both": 4
+    },
+    "normal_cut_true_all": 17,
+    "normal_cut_true_active": 14,
+    "flip_side_to_cut_true_all": 4,
+    "reverse_direction_true_all": 3,
+    "fully_constrained_consumed_sketches": 22,
+    "underconstrained_consumed_sketches": 1,
+    "face2_supported_consumed_sketches": 23,
+    "before_after_brep_verified_cuts": 0,
+    "w23_native_apply_tests": 0,
+    "w23_installed_addin_tests": 0,
+    "active_blind_depth_parameter_mm_counts": {
+      "2.0": 8
+    }
+  },
+  "new_geometry_tests_still_required": [
+    "W23 before-after material and Bend R verification",
+    "Multi-fold solver and native Apply geometry qualification",
+    "Face ownership for third component ft1 referenced trim"
+  ],
+  "scope": "Current requested W23 inputs are byte-identical to nine inputs of the earlier native metadata/pose study. This identity check does not create before/after B-rep or successful native Apply evidence for W23.",
+  "generalization_limit": "The reported 59.130328-degree projected corner trace also involves third component ft1; it is not a general two-frame miter rule."
+}

@@ -38,8 +38,63 @@ namespace ADDIN.Commands
         public string Reason { get; set; }
         // Actual BREP solid-body ray intersection evidence. Not an NG verdict.
         public string MaterialEvidence { get; set; }
+        // CG2.3 — read-only assembly-space slab snapshots, metres.
+        // Internal data is not part of production CSV or NG.
+        public double[] Cg23EntryWorldM { get; set; }
+        public double[] Cg23ExitWorldM { get; set; }
+        public string Cg23State { get; set; }
+        public string Cg23Reason { get; set; }
+        public int Cg23LocalTargetAxisCount { get; set; }
+        public double Cg23NearestLocalRadialMm { get; set; }
+        public double Cg23NearestLocalAxialGapMm { get; set; }
+        public double Cg23NearestLocalAngleDeg { get; set; }
+        // CG2.4 read-only topology evidence. NOT production missing-hole results.
+        public string Cg24State { get; set; }
+        public string Cg24Reason { get; set; }
+        public int Cg24TargetDetectedAxesTotal { get; set; }
+        public int Cg24NearbyCircularInnerLoops { get; set; }
+        public int Cg24NearbyComplexInnerLoops { get; set; }
+        public int Cg24NearbyOuterLoops { get; set; }
+        public double Cg24NearestBoundaryRadialMm { get; set; }
+        public double Cg24NearestBoundaryAxialGapMm { get; set; }
+        public int Cg24FacesVisited { get; set; }
+        public int Cg24EdgeSamples { get; set; }
+        // CG3.1: diagnostic review priority ONLY. Never a production NG verdict.
+        public int Cg31ReviewPriority { get; set; }
+        public string Cg31State { get; set; }
+        public string Cg31Reason { get; set; }
+        public string Cg31Verdict { get; set; }
+        // CG3.2 read-only link to existing NG. Never a new Missing Hole NG.
+        public string Cg32State { get; set; }
+        public string Cg32LinkedNg { get; set; }
+        public string Cg32LinkedNgLabel { get; set; }
+        public double Cg32NearestNgRadialMm { get; set; }
+        public string Cg32Reason { get; set; }
+        public string Cg32Verdict { get; set; }
+        // CG3.3: observed OK paired holes and repeated candidate pitch. REVIEW ONLY.
+        public int Cg33ObservedPairCount { get; set; }
+        public int Cg33RowCount { get; set; }
+        public double Cg33RowPitchMm { get; set; }
+        public double Cg33NearestPairedHoleMm { get; set; }
+        public string Cg33State { get; set; }
+        public string Cg33Reason { get; set; }
+        public string Cg33Verdict { get; set; }
         public double MaterialSpanMm { get; set; }
         public int MaterialHitCount { get; set; }
+        // CG2.2 diagnostic-only geometry; never used to assign production NG.
+        public string Cg22SourceCenterWorldMm { get; set; }
+        public string Cg22SourceAxisWorld { get; set; }
+        public string Cg22HitEntryWorldMm { get; set; }
+        public string Cg22HitExitWorldMm { get; set; }
+        public string Cg22EntryNormalWorld { get; set; }
+        public double? Cg22AbsoluteNormalDotAxis { get; set; }
+        public double? Cg22IncidenceDeg { get; set; }
+        public string Cg22GeometryStatus { get; set; }
+        public double Cg22ProbeRadiusMm { get; set; }
+        public int Cg22ProbeSolidCount { get; set; }
+        public int Cg22ProbeVoidCount { get; set; }
+        public int Cg22ProbeUnknownCount { get; set; }
+        public string Cg22ProbeStatus { get; set; }
     }
 
     internal sealed class CheckHoleCg2Report

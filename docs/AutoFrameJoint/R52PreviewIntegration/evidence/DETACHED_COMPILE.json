@@ -1,0 +1,104 @@
+[
+  {
+    "variant": "local",
+    "compiler": "Visual Studio 18 Roslyn csc.exe",
+    "target": "standalone x64 exe, C# 7.3, TRACE",
+    "exit_code": 0,
+    "sources": [
+      {
+        "source": "ManagedUiFlowHarness.cs",
+        "sha256": "6e23897d98b88e52853ad60b151b548d2a5ece723061946d21ba1df91be2f142"
+      },
+      {
+        "source": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+        "sha256": "1a4c3856cace4c7de954356900e1ced9c144594abfabde3390a6773fbabd6749"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+        "sha256": "9be941cf7dfb38385b22074c12673bf70c79f28cd873565bbd85705f47eb7c09"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+        "sha256": "ec1e7daea7989e2a8a405311f85cebd761f15ad2b87825a41a2fea95262a9af2"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+        "sha256": "cafe0a13242f1b18f5d1a9d37cb9b733caf851b782a642d9dc0b7bb7061671df"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+        "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+        "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b"
+      }
+    ],
+    "output_filename": "R52Managed_local.exe",
+    "output_sha256": "fe311505c998b9c2a5e7f46e8e1122b2cc9044875869582d2c0ecb11e9527e64",
+    "main_project_invoked": false,
+    "main_addin_output_written": false,
+    "compiler_diagnostics": "none emitted on final compile",
+    "execution_kind": "MANAGED_PROXY_NO_SOLIDWORKS_PROCESS",
+    "references": [
+      "System.Core",
+      "System.Drawing",
+      "System.Web.Extensions",
+      "System.Windows.Forms",
+      "SolidWorks.Interop.sldworks",
+      "SolidWorks.Interop.swconst",
+      "SolidWorks.Interop.swpublished"
+    ]
+  },
+  {
+    "variant": "branch",
+    "compiler": "Visual Studio 18 Roslyn csc.exe",
+    "target": "standalone x64 exe, C# 7.3, TRACE",
+    "exit_code": 0,
+    "sources": [
+      {
+        "source": "ManagedUiFlowHarness.cs",
+        "sha256": "6e23897d98b88e52853ad60b151b548d2a5ece723061946d21ba1df91be2f142"
+      },
+      {
+        "source": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+        "sha256": "67da39aca6e4c43440558c5628b66c5628cee4516434843c6136796c427ec411"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+        "sha256": "8e6c35e17e100d2604a2a9c8dc9ff3fe28f60c5f5c9594554d0726696fb4d061"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+        "sha256": "eccedf4edb649bf81d2d51ec4fe528e9d18d2197b5441f6055f29f340cb0b7fd"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+        "sha256": "4e0fd2bbc1aa1fcf03c0e4c2e6af11a282d31ff3b32d58f520270ae0a7b06c0a"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+        "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5"
+      },
+      {
+        "source": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+        "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b"
+      }
+    ],
+    "output_filename": "R52Managed_branch.exe",
+    "output_sha256": "85eab8c86b5f20ac2176d245be578810036e458585c0c162fd2e7332747f773b",
+    "main_project_invoked": false,
+    "main_addin_output_written": false,
+    "compiler_diagnostics": "none emitted on final compile",
+    "execution_kind": "MANAGED_PROXY_NO_SOLIDWORKS_PROCESS",
+    "references": [
+      "System.Core",
+      "System.Drawing",
+      "System.Web.Extensions",
+      "System.Windows.Forms",
+      "SolidWorks.Interop.sldworks",
+      "SolidWorks.Interop.swconst",
+      "SolidWorks.Interop.swpublished"
+    ]
+  }
+]

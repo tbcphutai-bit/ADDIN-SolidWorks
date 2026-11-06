@@ -1,0 +1,54 @@
+[
+  {
+    "case": "3615-02-bh-T1",
+    "fixture": "AFJ-R05",
+    "cover_tests": [
+      {
+        "a_covers": true,
+        "native_symmetric_difference_m3": 1.2028083596902934e-06,
+        "derivation": "Common seam from Bend tangencies; near seam constrained to inner Wall; Wall assembly gap=0.1 mm; outer Return coverage; analytic NormalCut cap; web gap=0",
+        "seam_near_m": [
+          0.0021,
+          0.002
+        ],
+        "seam_far_m": [
+          0.0479,
+          0.0479
+        ],
+        "status": "DIFF"
+      },
+      {
+        "a_covers": false,
+        "native_symmetric_difference_m3": 0,
+        "derivation": "Common seam from Bend tangencies; near seam constrained to inner Wall; Wall assembly gap=0.1 mm; outer Return coverage; analytic NormalCut cap; web gap=0",
+        "seam_near_m": [
+          0.0021,
+          0.002
+        ],
+        "seam_far_m": [
+          0.0479,
+          0.0479
+        ],
+        "status": "NATIVE_MATCH"
+      }
+    ],
+    "best_native_symmetric_difference_m3": 0,
+    "native_a_covers": false,
+    "native_status": "PASS_PARAMETRIC_NATIVE_MATCH",
+    "closest_a_common_m": [
+      0.047800000000000065,
+      0.0479,
+      0.0009999999999998862
+    ],
+    "closest_b_common_m": [
+      0.04785010905112452,
+      0.04785000011892161,
+      0.0009999999999998862
+    ],
+    "production_gap_m": 7.078774690895653e-05,
+    "production_overlap_m3": 0,
+    "production_cut_a_m3": 5.280294315683159e-05,
+    "production_cut_b_m3": 0.00024254777116194284,
+    "production_status": "UNVERIFIED_CLEARANCE"
+  }
+]

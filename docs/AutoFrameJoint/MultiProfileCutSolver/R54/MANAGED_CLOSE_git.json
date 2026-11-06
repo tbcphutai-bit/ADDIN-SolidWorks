@@ -1,0 +1,68 @@
+{
+  "status": "PASS_MANAGED_CONTRACT",
+  "mode": "R54_CONTRACTS",
+  "failure_count": 0,
+  "real_com_calls": 0,
+  "forbidden_interface_proxy_calls": 0,
+  "native_windows_created": 0,
+  "installed_addin_test": "NOT_RUN",
+  "real_solidworks_api": "NOT_RUN",
+  "scope": "Reflection-supplied managed state; actual OnClose and AfterClose methods; no native lifecycle integration",
+  "tests": [
+    {
+      "test": "EMPTY_OK_SKIPS_APPLY_AND_CLEANS",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "A_ONLY_REVISION_2_COMMITTED_0_OK_NO_THROW",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "STALE_COMPLETE_PAIR_OK_SKIPS_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "INVALID_COMPLETE_PAIR_OK_SKIPS_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "BUSY_handlingAnalyze_OK_SKIPS_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "BUSY_handlingShowBodies_OK_SKIPS_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "BUSY_handlingCutPreview_OK_SKIPS_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "QUEUED_BACKEND_OK_SKIPS_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "CURRENT_VALID_OK_APPLIES_ONLY_IN_AFTER_CLOSE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "CANCEL_WITH_VALID_PAIR_SKIPS_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    },
+    {
+      "test": "DUPLICATE_CLOSE_AND_AFTER_CLOSE_APPLY_AT_MOST_ONCE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    }
+  ]
+}

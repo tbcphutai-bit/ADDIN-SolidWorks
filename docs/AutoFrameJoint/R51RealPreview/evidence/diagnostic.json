@@ -1,0 +1,1381 @@
+[
+  {
+    "connection": "existing_PID_ROT_only",
+    "pid": 27808,
+    "revision": "33.5.0",
+    "apartment": "STA"
+  },
+  {
+    "private_assembly_open": true,
+    "error": 0,
+    "warning": 64
+  },
+  {
+    "frame": "A",
+    "raw_profile": {
+      "features": [
+        {
+          "name": "Configuration Comments",
+          "type": "ConfigCommentsFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Favorites",
+          "type": "FavoriteFolder",
+          "suppressed": false
+        },
+        {
+          "name": "History",
+          "type": "HistoryFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Selection Sets",
+          "type": "SelectionSetFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Sensors",
+          "type": "SensorFolder",
+          "suppressed": false
+        },
+        {
+          "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+          "type": "DocsFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Annotations",
+          "type": "DetailCabinet",
+          "suppressed": false
+        },
+        {
+          "name": "Markups",
+          "type": "InkMarkupFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Lights and Cameras",
+          "type": "EnvFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Solid Bodies",
+          "type": "SolidBodyFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Surface Bodies",
+          "type": "SurfaceBodyFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Comments",
+          "type": "CommentsFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Equations",
+          "type": "EqnFolder",
+          "suppressed": false
+        },
+        {
+          "name": "A3003-",
+          "type": "MaterialFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Front",
+          "type": "RefPlane",
+          "suppressed": false
+        },
+        {
+          "name": "Top",
+          "type": "RefPlane",
+          "suppressed": false
+        },
+        {
+          "name": "Right",
+          "type": "RefPlane",
+          "suppressed": false
+        },
+        {
+          "name": "Origin",
+          "type": "OriginProfileFeature",
+          "suppressed": false
+        },
+        {
+          "name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature",
+          "suppressed": false
+        },
+        {
+          "name": "板金19",
+          "type": "SheetMetal",
+          "suppressed": false
+        },
+        {
+          "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange",
+          "suppressed": false
+        },
+        {
+          "name": "Sheet<1>",
+          "type": "CutListFolder",
+          "suppressed": false
+        },
+        {
+          "name": "ｽｹｯﾁ4",
+          "type": "ProfileFeature",
+          "suppressed": false
+        },
+        {
+          "name": "ｶｯﾄ - 押し出し1",
+          "type": "Cut",
+          "suppressed": true
+        },
+        {
+          "name": "平面1",
+          "type": "RefPlane",
+          "suppressed": true
+        },
+        {
+          "name": "ｽｹｯﾁ8",
+          "type": "ProfileFeature",
+          "suppressed": true
+        },
+        {
+          "name": "ｶｯﾄ - 押し出し3",
+          "type": "Cut",
+          "suppressed": true
+        },
+        {
+          "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+          "type": "FlatPattern",
+          "suppressed": true
+        }
+      ],
+      "base_flange": [
+        {
+          "before_access": {
+            "thickness_m": 0.0025,
+            "radius_m": 0.0001,
+            "reverse_thickness": false,
+            "reverse_direction": false,
+            "d1_length_m": 1.5,
+            "d1_type": 1,
+            "d2_type": 1,
+            "offset_directions": 1
+          },
+          "access_selections_on_private_copy": true,
+          "after_access": {
+            "thickness_m": 0.0025,
+            "radius_m": 0.0001,
+            "reverse_thickness": false,
+            "reverse_direction": false,
+            "d1_length_m": 1.5,
+            "d1_type": 1,
+            "d2_type": 1,
+            "offset_directions": 1
+          },
+          "profile_segments_model_m": [
+            {
+              "kind": "line",
+              "a": [
+                0,
+                -0.06999999999999999,
+                -0.04
+              ],
+              "b": [
+                0,
+                -0.07,
+                0
+              ]
+            },
+            {
+              "kind": "line",
+              "a": [
+                0,
+                -0.07,
+                0
+              ],
+              "b": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "kind": "line",
+              "a": [
+                0,
+                0,
+                0
+              ],
+              "b": [
+                0,
+                0,
+                -0.06
+              ]
+            }
+          ]
+        }
+      ],
+      "faces": [
+        {
+          "kind": "plane",
+          "area_m2": 5.30143760293278e-06,
+          "parameters": [
+            1,
+            0,
+            0,
+            1.5,
+            -0.0674,
+            0
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.000162,
+          "parameters": [
+            1,
+            0,
+            0,
+            1.5,
+            -0.0675,
+            -0.002599999999999999
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 5.3014376029327734e-06,
+          "parameters": [
+            -1,
+            0,
+            0,
+            0,
+            -0.07,
+            -0.002599999999999998
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 9.350000000000009e-05,
+          "parameters": [
+            -1,
+            0,
+            0,
+            0,
+            -0.0674,
+            -0.0025
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 5.30143760293278e-06,
+          "parameters": [
+            1,
+            0,
+            0,
+            1.5,
+            0,
+            -0.0026
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.0001435,
+          "parameters": [
+            1,
+            0,
+            0,
+            1.5,
+            -0.0026000000000000025,
+            -0.0025
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 5.301437602932779e-06,
+          "parameters": [
+            -1,
+            0,
+            0,
+            0,
+            -0.002600000000000005,
+            0
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.000162,
+          "parameters": [
+            -1,
+            0,
+            0,
+            0,
+            -0.0025,
+            -0.0026
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.0861,
+          "parameters": [
+            0,
+            1,
+            0,
+            1.5,
+            -0.0025,
+            0
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.00375,
+          "parameters": [
+            0,
+            0,
+            -1,
+            1.5,
+            0,
+            -0.06
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.0861,
+          "parameters": [
+            0,
+            1,
+            0,
+            1.5,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "cylinder",
+          "area_m2": 0.0061261056745001,
+          "parameters": [
+            1.5,
+            -0.0026000000000000025,
+            -0.0026,
+            -1,
+            0,
+            0,
+            0.0026
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.0972,
+          "parameters": [
+            0,
+            0,
+            1,
+            1.5,
+            -0.07,
+            0
+          ]
+        },
+        {
+          "kind": "cylinder",
+          "area_m2": 0.006126105674500096,
+          "parameters": [
+            1.5,
+            -0.0674,
+            -0.002599999999999999,
+            -1,
+            0,
+            0,
+            0.0026
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.056100000000000004,
+          "parameters": [
+            0,
+            -1,
+            -3.469446951953614e-16,
+            1.5,
+            -0.06999999999999999,
+            -0.04
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.0037500000000000033,
+          "parameters": [
+            0,
+            0,
+            -1,
+            1.5,
+            -0.06749999999999999,
+            -0.04
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.056100000000000004,
+          "parameters": [
+            0,
+            -1,
+            -3.469446951953614e-16,
+            1.5,
+            -0.06749999999999999,
+            -0.04
+          ]
+        },
+        {
+          "kind": "cylinder",
+          "area_m2": 0.00023561944901923408,
+          "parameters": [
+            1.5,
+            -0.0674,
+            -0.002599999999999999,
+            -1,
+            0,
+            0,
+            9.999999999999983e-05
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.0972,
+          "parameters": [
+            0,
+            0,
+            1,
+            1.5,
+            -0.07,
+            -0.0025
+          ]
+        },
+        {
+          "kind": "cylinder",
+          "area_m2": 0.00023561944901923408,
+          "parameters": [
+            1.5,
+            -0.0026000000000000025,
+            -0.0026,
+            -1,
+            0,
+            0,
+            9.999999999999983e-05
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 9.350000000000009e-05,
+          "parameters": [
+            1,
+            0,
+            0,
+            1.5,
+            -0.0026000000000000025,
+            -0.0026
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.0001435,
+          "parameters": [
+            1,
+            0,
+            0,
+            0,
+            -0.0026000000000000025,
+            -0.0026
+          ]
+        }
+      ],
+      "body": {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 0.0006144043128087985,
+        "faces": 22,
+        "edges": 44,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      }
+    },
+    "transform": [
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      -1,
+      2.947000000000001,
+      -0.0030000000000000443,
+      1,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "frame": "B",
+    "raw_profile": {
+      "features": [
+        {
+          "name": "Configuration Comments",
+          "type": "ConfigCommentsFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Favorites",
+          "type": "FavoriteFolder",
+          "suppressed": false
+        },
+        {
+          "name": "History",
+          "type": "HistoryFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Selection Sets",
+          "type": "SelectionSetFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Sensors",
+          "type": "SensorFolder",
+          "suppressed": false
+        },
+        {
+          "name": "ﾃﾞｻﾞｲﾝ ﾊﾞｲﾝﾀﾞｰ",
+          "type": "DocsFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Annotations",
+          "type": "DetailCabinet",
+          "suppressed": false
+        },
+        {
+          "name": "Markups",
+          "type": "InkMarkupFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Lights and Cameras",
+          "type": "EnvFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Solid Bodies",
+          "type": "SolidBodyFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Surface Bodies",
+          "type": "SurfaceBodyFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Comments",
+          "type": "CommentsFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Equations",
+          "type": "EqnFolder",
+          "suppressed": false
+        },
+        {
+          "name": "A3003-",
+          "type": "MaterialFolder",
+          "suppressed": false
+        },
+        {
+          "name": "Front",
+          "type": "RefPlane",
+          "suppressed": false
+        },
+        {
+          "name": "Top",
+          "type": "RefPlane",
+          "suppressed": false
+        },
+        {
+          "name": "Right",
+          "type": "RefPlane",
+          "suppressed": false
+        },
+        {
+          "name": "Origin",
+          "type": "OriginProfileFeature",
+          "suppressed": false
+        },
+        {
+          "name": "ｽｹｯﾁ1",
+          "type": "ProfileFeature",
+          "suppressed": false
+        },
+        {
+          "name": "板金19",
+          "type": "SheetMetal",
+          "suppressed": false
+        },
+        {
+          "name": "ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1",
+          "type": "SMBaseFlange",
+          "suppressed": false
+        },
+        {
+          "name": "Sheet<1>",
+          "type": "CutListFolder",
+          "suppressed": false
+        },
+        {
+          "name": "ｽｹｯﾁ4",
+          "type": "ProfileFeature",
+          "suppressed": false
+        },
+        {
+          "name": "ｶｯﾄ - 押し出し1",
+          "type": "Cut",
+          "suppressed": true
+        },
+        {
+          "name": "ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ19",
+          "type": "FlatPattern",
+          "suppressed": true
+        }
+      ],
+      "base_flange": [
+        {
+          "before_access": {
+            "thickness_m": 0.0025,
+            "radius_m": 0.0001,
+            "reverse_thickness": false,
+            "reverse_direction": false,
+            "d1_length_m": 3.2,
+            "d1_type": 1,
+            "d2_type": 1,
+            "offset_directions": 1
+          },
+          "access_selections_on_private_copy": true,
+          "after_access": {
+            "thickness_m": 0.0025,
+            "radius_m": 0.0001,
+            "reverse_thickness": false,
+            "reverse_direction": false,
+            "d1_length_m": 3.2,
+            "d1_type": 1,
+            "d2_type": 1,
+            "offset_directions": 1
+          },
+          "profile_segments_model_m": [
+            {
+              "kind": "line",
+              "a": [
+                0,
+                -0.07,
+                -0.04
+              ],
+              "b": [
+                0,
+                -0.07,
+                0
+              ]
+            },
+            {
+              "kind": "line",
+              "a": [
+                0,
+                -0.07,
+                0
+              ],
+              "b": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "kind": "line",
+              "a": [
+                0,
+                0,
+                0
+              ],
+              "b": [
+                0,
+                0,
+                -0.042
+              ]
+            }
+          ]
+        }
+      ],
+      "faces": [
+        {
+          "kind": "plane",
+          "area_m2": 5.30143760293278e-06,
+          "parameters": [
+            1,
+            0,
+            0,
+            3.2,
+            -0.0674,
+            0
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.000162,
+          "parameters": [
+            1,
+            0,
+            0,
+            3.2,
+            -0.0675,
+            -0.002599999999999999
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 5.3014376029327734e-06,
+          "parameters": [
+            -1,
+            0,
+            0,
+            0,
+            -0.07,
+            -0.002599999999999998
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 9.350000000000009e-05,
+          "parameters": [
+            -1,
+            0,
+            0,
+            0,
+            -0.0674,
+            -0.0025
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 5.301437602932775e-06,
+          "parameters": [
+            1,
+            0,
+            0,
+            3.2,
+            0,
+            -0.002599999999999998
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 9.850000000000001e-05,
+          "parameters": [
+            1,
+            0,
+            0,
+            3.2,
+            -0.0026000000000000025,
+            -0.0025
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 5.301437602932775e-06,
+          "parameters": [
+            -1,
+            0,
+            0,
+            0,
+            -0.002600000000000005,
+            0
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.000162,
+          "parameters": [
+            -1,
+            0,
+            0,
+            0,
+            -0.0025,
+            -0.002599999999999998
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.12608000000000003,
+          "parameters": [
+            0,
+            1,
+            0,
+            3.2,
+            -0.0025,
+            0
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.008,
+          "parameters": [
+            0,
+            0,
+            -1,
+            3.2,
+            0,
+            -0.042
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.12608,
+          "parameters": [
+            0,
+            1,
+            0,
+            3.2,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "cylinder",
+          "area_m2": 0.01306902543893354,
+          "parameters": [
+            3.2,
+            -0.0026000000000000025,
+            -0.0026,
+            -1,
+            0,
+            0,
+            0.0026
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.20736,
+          "parameters": [
+            0,
+            0,
+            1,
+            3.2,
+            -0.07,
+            0
+          ]
+        },
+        {
+          "kind": "cylinder",
+          "area_m2": 0.013069025438933539,
+          "parameters": [
+            3.2,
+            -0.0674,
+            -0.002599999999999999,
+            -1,
+            0,
+            0,
+            0.0026
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.11968000000000001,
+          "parameters": [
+            0,
+            -1,
+            0,
+            3.2,
+            -0.07,
+            -0.04
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.008000000000000007,
+          "parameters": [
+            0,
+            0,
+            -1,
+            3.2,
+            -0.0675,
+            -0.04
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.11968000000000001,
+          "parameters": [
+            0,
+            -1,
+            0,
+            3.2,
+            -0.0675,
+            -0.04
+          ]
+        },
+        {
+          "kind": "cylinder",
+          "area_m2": 0.0005026548245743661,
+          "parameters": [
+            3.2,
+            -0.0674,
+            -0.002599999999999999,
+            -1,
+            0,
+            0,
+            9.999999999999983e-05
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 0.20736,
+          "parameters": [
+            0,
+            0,
+            1,
+            3.2,
+            -0.07,
+            -0.0025
+          ]
+        },
+        {
+          "kind": "cylinder",
+          "area_m2": 0.0005026548245743606,
+          "parameters": [
+            3.2,
+            -0.0026000000000000025,
+            -0.0026,
+            -1,
+            0,
+            0,
+            9.999999999999983e-05
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 9.350000000000009e-05,
+          "parameters": [
+            1,
+            0,
+            0,
+            3.2,
+            -0.0026000000000000025,
+            -0.0026
+          ]
+        },
+        {
+          "kind": "plane",
+          "area_m2": 9.850000000000001e-05,
+          "parameters": [
+            1,
+            0,
+            0,
+            0,
+            -0.0026000000000000025,
+            -0.0026
+          ]
+        }
+      ],
+      "body": {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 0.0011667292006587698,
+        "faces": 22,
+        "edges": 44,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      }
+    },
+    "transform": [
+      0,
+      1,
+      -1.3877787807814457e-17,
+      -1,
+      0,
+      0,
+      -4.622231866529366e-33,
+      1.3877787807814466e-17,
+      0.9999999999999999,
+      -0.855,
+      -0.10000000000000007,
+      -0.0030000000000000027,
+      1,
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "legacy_readonly_analysis": "AUTO FRAME JOINT - READ ONLY\r\nAssembly: AFJ_PAIR_2354-02-lc-B11\r\n\r\nFrame A: AFJ_PAIR_2354-04-lc-B11-fr04-1\r\n  Path: <LOCAL_PATH_REDACTED>\r\n  Config: Default\r\n  Status: ANALYZED (provisional)\r\n  Reason: ESTIMATE from long linear B-rep edges; NOT verified frame design axis.\r\n  Straight edges: 36  Sampled endpoints: 88\r\n  Estimated length: 1500 mm\r\n  Estimated axis: (-1, 0, 0)\r\n  Edge support fraction: 1\r\nFrame B: AFJ_PAIR_2354-04-lc-B11-fr03-1\r\n  Path: <LOCAL_PATH_REDACTED>\r\n  Config: Default\r\n  Status: ANALYZED (provisional)\r\n  Reason: ESTIMATE from long linear B-rep edges; NOT verified frame design axis.\r\n  Straight edges: 36  Sampled endpoints: 88\r\n  Estimated length: 3200 mm\r\n  Estimated axis: (0, -1, 0)\r\n  Edge support fraction: 1\r\n\r\nAngle between UNDIRECTED axes: 90 deg\r\nThis is NOT the interior corner angle.\r\nROLE: B = LONG / A = SHORT\r\n\r\nJOINT_STATUS: FINITE_AXES_NEAREST\r\nJOINT_ANGLE_DEG: 90\r\nJOINT_XYZ_MM: (-820, 2912, -16.809)\r\nJOINT_NEAREST_A_MM: (-820, 2912, -18.036)\r\nJOINT_NEAREST_B_MM: (-820, 2912, -15.582)\r\nJOINT_FINITE_AXIS_GAP_MM: 2.455\r\nJOINT_INFINITE_AXIS_GAP_MM: 2.455\r\nJOINT_NEAR_POINTS_INSIDE_SPANS: YES\r\nJOINT_VERTEX_ENVELOPE_OVERLAP_CANDIDATE: YES\r\nJOINT_VERTEX_ENVELOPE_SIZE_MM: (70, 70, 42)\r\nJOINT_BISECTOR_NORMAL_CANDIDATE_1: (-0.707, -0.707, 0)\r\nJOINT_BISECTOR_NORMAL_CANDIDATE_2: (-0.707, 0.707, 0)\r\nJOINT_GEOMETRY_NOTE: Estimated centroid axes and vertex envelopes, NOT exact solid intersection.\r\nJOINT_GEOMETRY_REASON: Nearest estimated axes inside both members; does NOT prove solid collision.\r\nJOINT_KCC26003: SHORT_WINS_LONG_IF_APPLICABLE; DRAWING_OVERRIDE_FIRST; APPLICABILITY_NOT_VERIFIED.\r\nWinner/Loser: UNCONFIRMED for this Assembly.\r\nProfile Web/Wall/Lip: NOT YET ANALYZED.\r\nCut geometry: NOT GENERATED. No SolidWorks document was changed.\r\n"
+  },
+  {
+    "operation": "legacy A intersect B",
+    "reset_edge_tolerances": false,
+    "target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 0.0006144043128087924,
+      "faces": 22,
+      "edges": 44,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 0.0011667292006587696,
+      "faces": 22,
+      "edges": 44,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "code": 0,
+    "name": "swBodyOperationNoError",
+    "results": [
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 1.2801401618389509e-05,
+        "faces": 34,
+        "edges": 80,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      }
+    ]
+  },
+  {
+    "operation": "legacy shared intersect positive",
+    "reset_edge_tolerances": false,
+    "target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 1.2801401618389512e-05,
+      "faces": 34,
+      "edges": 80,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 1.0000000000000004,
+      "faces": 6,
+      "edges": 12,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "code": 0,
+    "name": "swBodyOperationNoError",
+    "results": [
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 6.4007018446910975e-06,
+        "faces": 20,
+        "edges": 48,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      }
+    ]
+  },
+  {
+    "operation": "legacy shared intersect negative",
+    "reset_edge_tolerances": false,
+    "target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 1.2801401618389524e-05,
+      "faces": 34,
+      "edges": 80,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 1.0000000000000004,
+      "faces": 6,
+      "edges": 12,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "code": 0,
+    "name": "swBodyOperationNoError",
+    "results": [
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 6.400699773701042e-06,
+        "faces": 20,
+        "edges": 48,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      }
+    ]
+  },
+  {
+    "operation": "legacy subtract A",
+    "reset_edge_tolerances": false,
+    "target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 0.0006144043128087923,
+      "faces": 22,
+      "edges": 44,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 6.400701844691097e-06,
+      "faces": 20,
+      "edges": 48,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "code": 547,
+    "name": "swBodyOperationNonManifold",
+    "results": []
+  },
+  {
+    "legacy_failure": "A",
+    "exception": {
+      "type": "System.InvalidOperationException",
+      "hresult": "0x80131509",
+      "message": "legacy subtract A code=547 name=swBodyOperationNonManifold",
+      "stack": "   場所 DiagnosticHarness.Op(Body2 a, Body2 b, Int32 operation, String name, Boolean reset)\r\n   場所 DiagnosticHarness.Run(String[] args)"
+    }
+  },
+  {
+    "operation": "legacy one reset diagnostic A",
+    "reset_edge_tolerances": true,
+    "target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 0.0006144043128087923,
+      "faces": 22,
+      "edges": 44,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 6.400701844691097e-06,
+      "faces": 20,
+      "edges": 48,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "reset_target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 0.0006144043128087928,
+      "faces": 22,
+      "edges": 44,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "reset_tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 6.400701844691097e-06,
+      "faces": 20,
+      "edges": 48,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "code": 547,
+    "name": "swBodyOperationNonManifold",
+    "results": []
+  },
+  {
+    "single_reset_failure": {
+      "type": "System.InvalidOperationException",
+      "hresult": "0x80131509",
+      "message": "legacy one reset diagnostic A code=547 name=swBodyOperationNonManifold",
+      "stack": "   場所 DiagnosticHarness.Op(Body2 a, Body2 b, Int32 operation, String name, Boolean reset)\r\n   場所 DiagnosticHarness.Run(String[] args)"
+    }
+  },
+  {
+    "operation": "legacy subtract B",
+    "reset_edge_tolerances": false,
+    "target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 0.0011667292006587694,
+      "faces": 22,
+      "edges": 44,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 6.400699773701043e-06,
+      "faces": 20,
+      "edges": 48,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "code": 0,
+    "name": "swBodyOperationNoError",
+    "results": [
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 6.09387522085143e-06,
+        "faces": 10,
+        "edges": 20,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      },
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 5.5884073137297436e-05,
+        "faces": 20,
+        "edges": 42,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      },
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 0.0010983527546769992,
+        "faces": 18,
+        "edges": 40,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      }
+    ]
+  },
+  {
+    "legacy_failure": "B",
+    "exception": {
+      "type": "System.InvalidOperationException",
+      "hresult": "0x80131509",
+      "message": "シーケンスに複数の要素が含まれています",
+      "stack": "   場所 System.Linq.Enumerable.Single[TSource](IEnumerable`1 source)\r\n   場所 DiagnosticHarness.Run(String[] args)"
+    }
+  },
+  {
+    "operation": "legacy one reset diagnostic B",
+    "reset_edge_tolerances": true,
+    "target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 0.00116672920065877,
+      "faces": 22,
+      "edges": 44,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 6.400699773701043e-06,
+      "faces": 20,
+      "edges": 48,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "reset_target": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 0.0011667292006587694,
+      "faces": 22,
+      "edges": 44,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "reset_tool": {
+      "check2": 0,
+      "temporary": true,
+      "type": 0,
+      "volume_m3": 6.4006997737010454e-06,
+      "faces": 20,
+      "edges": 48,
+      "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+      "non_two_face_edges": 0
+    },
+    "code": 0,
+    "name": "swBodyOperationNoError",
+    "results": [
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 6.09387522085143e-06,
+        "faces": 10,
+        "edges": 20,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      },
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 5.5884073137297436e-05,
+        "faces": 20,
+        "edges": 42,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      },
+      {
+        "check2": 0,
+        "temporary": true,
+        "type": 0,
+        "volume_m3": 0.0010983527546769996,
+        "faces": 18,
+        "edges": 40,
+        "edge_tolerance_api": "NOT_AVAILABLE: no documented IEdge scalar tolerance accessor used",
+        "non_two_face_edges": 0
+      }
+    ]
+  },
+  {
+    "pr40_refusal": {
+      "type": "System.InvalidOperationException",
+      "hresult": "0x80131509",
+      "message": "UNVERIFIED_RULE: base skin/thickness side differs from verified formed family",
+      "stack": "   場所 ADDIN.Commands.AutoFrameJoint.AfjProfileAnalyzer.Analyze(ModelDoc2 model, Body2 nativeBody)\r\n   場所 ADDIN.Commands.AutoFrameJoint.AfjJointSolver.Solve(ISldWorks sw, ModelDoc2 assembly, Component2 ca, Component2 cb)\r\n   場所 DiagnosticHarness.Run(String[] args)"
+    }
+  }
+]

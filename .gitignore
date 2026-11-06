@@ -59,3 +59,10 @@ _codex_backup/
 backups/
 scratch_*
 /CreateMirrorPartPackage.cs
+
+# Local backups and temporary scratch
+Backup_*/
+*.bak_*
+Images/logo_candidates*/
+apply_selected_logo.py
+test_render_new.ps1

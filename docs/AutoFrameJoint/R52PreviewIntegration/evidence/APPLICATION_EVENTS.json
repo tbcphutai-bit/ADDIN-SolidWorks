@@ -1,0 +1,26 @@
+[
+  {
+    "TimeCreated": "2026-10-22T11:35:59.6536412+07:00",
+    "Id": 1001,
+    "ProviderName": "Windows Error Reporting",
+    "Message": "障害バケット 1272552209578192996、種類 4\r\nイベント名: APPCRASH\r\n応答: 使用不可\r\nCab ID: 0\r\n\r\n問題の署名:\r\nP1: SLDWORKS.exe\r\nP2: 32.5.0.48\r\nP3: 6706bcbc\r\nP4: StackHash_ad45\r\nP5: 10.0.26100.9711\r\nP6: 5fd39a05\r\nP7: c0000374\r\nP8: PCH_0F_FROM_ntdll+0x00000000001628A4\r\nP9: \r\nP10: \r\n\r\n添付ファイル:\r\n<LOCAL_PATH_REDACTED>\r\n<LOCAL_PATH_REDACTED>\r\nWPR_initiated_DiagTrackMiniLogger_OneTrace_User_Logger_20261016_1_EC_0_inject.etl\r\n<LOCAL_PATH_REDACTED>\r\nWPR_initiated_DiagTrackMiniLogger_WPR System Collector_inject.etl\r\n<LOCAL_PATH_REDACTED>\r\n<LOCAL_PATH_REDACTED>\r\n<LOCAL_PATH_REDACTED>\r\n<LOCAL_PATH_REDACTED>\r\n\r\nこれらのファイルは次の場所にある可能性があります:\r\n<LOCAL_PATH_REDACTED>\r\n\r\n分析記号: \r\n解決策を再確認中: 0\r\nレポート ID: 3527318d-40fe-4b36-8d4d-8ea31485b7c0\r\nレポートの状態: 268435456\r\nハッシュされたバケット: fd43549dc95445b191a9037e0a0bf064\r\nCab GUID: 0"
+  },
+  {
+    "TimeCreated": "2026-10-22T11:35:47.1480015+07:00",
+    "Id": 1000,
+    "ProviderName": "Application Error",
+    "Message": "障害が発生しているアプリケーション名: SLDWORKS.exe、バージョン: 32.5.0.48、タイム スタンプ: 0x6706bcbc\r\n障害が発生したモジュール名: ntdll.dll、 バージョン: 10.0.26100.9711、タイム スタンプ: 0x5fd39a05\r\n例外コード: 0xc0000374\r\nフォールト オフセット: 0x0000000000118095\r\nフォールト プロセス ID: 0x960\r\nアプリケーションのフォールトの開始時刻: 0x1DD61DE0B33E6D4\r\nFaulting アプリケーション パス:  <LOCAL_PATH_REDACTED>\r\nFaulting モジュール パス:  <LOCAL_PATH_REDACTED>\r\nReport Id: 3527318d-40fe-4b36-8d4d-8ea31485b7c0\r\nFaulting パッケージの完全名: \r\nFaulting パッケージ相対アプリケーション ID: "
+  },
+  {
+    "TimeCreated": "2026-10-22T11:28:21.1186352+07:00",
+    "Id": 1001,
+    "ProviderName": "Windows Error Reporting",
+    "Message": "障害バケット 1272552209578192996、種類 4\r\nイベント名: APPCRASH\r\n応答: 使用不可\r\nCab ID: 0\r\n\r\n問題の署名:\r\nP1: SLDWORKS.exe\r\nP2: 32.5.0.48\r\nP3: 6706bcbc\r\nP4: StackHash_ad45\r\nP5: 10.0.26100.9711\r\nP6: 5fd39a05\r\nP7: c0000374\r\nP8: PCH_0F_FROM_ntdll+0x00000000001628A4\r\nP9: \r\nP10: \r\n\r\n添付ファイル:\r\n<LOCAL_PATH_REDACTED>\r\n<LOCAL_PATH_REDACTED>\r\nWPR_initiated_DiagTrackMiniLogger_OneTrace_User_Logger_20261016_1_EC_0_inject.etl\r\n<LOCAL_PATH_REDACTED>\r\nWPR_initiated_DiagTrackMiniLogger_WPR System Collector_inject.etl\r\n<LOCAL_PATH_REDACTED>\r\n<LOCAL_PATH_REDACTED>\r\n<LOCAL_PATH_REDACTED>\r\n<LOCAL_PATH_REDACTED>\r\n\r\nこれらのファイルは次の場所にある可能性があります:\r\n<LOCAL_PATH_REDACTED>\r\n\r\n分析記号: \r\n解決策を再確認中: 0\r\nレポート ID: 3693436e-0d56-4b36-ac93-9e357d9ad803\r\nレポートの状態: 268435456\r\nハッシュされたバケット: fd43549dc95445b191a9037e0a0bf064\r\nCab GUID: 0"
+  },
+  {
+    "TimeCreated": "2026-10-22T11:28:09.9494134+07:00",
+    "Id": 1000,
+    "ProviderName": "Application Error",
+    "Message": "障害が発生しているアプリケーション名: SLDWORKS.exe、バージョン: 32.5.0.48、タイム スタンプ: 0x6706bcbc\r\n障害が発生したモジュール名: ntdll.dll、 バージョン: 10.0.26100.9711、タイム スタンプ: 0x5fd39a05\r\n例外コード: 0xc0000374\r\nフォールト オフセット: 0x0000000000118095\r\nフォールト プロセス ID: 0x8878\r\nアプリケーションのフォールトの開始時刻: 0x1DD61DD7BB313B8\r\nFaulting アプリケーション パス:  <LOCAL_PATH_REDACTED>\r\nFaulting モジュール パス:  <LOCAL_PATH_REDACTED>\r\nReport Id: 3693436e-0d56-4b36-ac93-9e357d9ad803\r\nFaulting パッケージの完全名: \r\nFaulting パッケージ相対アプリケーション ID: "
+  }
+]

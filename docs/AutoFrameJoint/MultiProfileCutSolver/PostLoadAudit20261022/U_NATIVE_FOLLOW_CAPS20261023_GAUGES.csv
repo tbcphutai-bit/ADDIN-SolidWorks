@@ -1,0 +1,4 @@
+phase,source_dimension_mm,actual_brep_width_mm,normal_gap_mm,signed_gap_mm,parallel_cosine,master_status,loser_status,master_error,loser_error,master_dangling,master_over,loser_dangling,loser_over
+BEFORE_WIDTH_CHANGE,70.0,70.0,0.10000000000020841,-0.10000000000020841,0.9999999999999999,3,3,0,0,0,0,0,0
+AFTER_PLUS_1MM,71.00000000000001,71.00000000000001,0.1000000000003135,-0.1000000000003135,1.0000000000000002,3,3,0,0,0,0,0,0
+RESTORED_ORIGINAL_WIDTH,70.0,70.0,0.09999999999981588,-0.09999999999981588,0.9999999999999999,3,3,0,0,0,0,0,0

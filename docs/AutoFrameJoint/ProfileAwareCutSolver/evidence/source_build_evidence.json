@@ -1,0 +1,50 @@
+{
+  "source_base": "423300132a4011a1e534b5c98adf94ceeef02269",
+  "main_project_built": false,
+  "detached_full_source_compile": {
+    "compiler": "Roslyn /langversion:7.3 /platform:x64; .NET Framework references",
+    "project_file_used": false,
+    "main_addin_entry_SWAddin_included": false,
+    "included_addin_source_count": 6,
+    "errors": "",
+    "status": "PASS"
+  },
+  "native_runtime_harness": {
+    "name": "ParametricRuntimeHarness.exe",
+    "sha256": "ed39fb63efddbd08b5842b9deba96fa1dc23036594a3a23191c62ca558991a2f",
+    "ghost_source_sha256_at_compile": "f2f99116a0dacfc887eb66fbdf796b3fd1eeac74ecb807f0ada2ce32e198b328",
+    "same_meaningful_tokens_as_final_source": true,
+    "ghost_meaningful_tokens_sha256": "e68d7550e493408f3ffc00bacabe1a72785dc5a0b75b548fca527f5f11ffb3d8"
+  },
+  "variant_runtime_harness": {
+    "name": "ParametricRuntimeVariants.exe",
+    "sha256": "502a434cf46198ed9989403025443b0bbd0ccf4c57b69f441411a7c93f40e319",
+    "final_ghost_source_sha256": "645ed4435391d77ab58000bbeddcfee7214355f3ac843e70ce53781dd27505f3"
+  },
+  "final_sources": [
+    {
+      "path": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+      "sha256_lf": "4d5fbc3c043e35b5038b7bcb7e4ecac1aee1e3140496e9cf974d84dee5b59528"
+    },
+    {
+      "path": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+      "sha256_lf": "645ed4435391d77ab58000bbeddcfee7214355f3ac843e70ce53781dd27505f3"
+    },
+    {
+      "path": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+      "sha256_lf": "b375be33f54cb7a68a18d350e392fc442c95b5a840a519efc3d58e8c91b651b8"
+    },
+    {
+      "path": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+      "sha256_lf": "792d415726154268ceace16c8c564575a927784f20f8c3a57f030094470f4d81"
+    }
+  ],
+  "formatting": {
+    "method": "Whitespace-only helper formatting; string/comment token-aware lexical comparison; all meaningful source tokens unchanged",
+    "before_sha256": "f2f99116a0dacfc887eb66fbdf796b3fd1eeac74ecb807f0ada2ce32e198b328",
+    "after_sha256": "645ed4435391d77ab58000bbeddcfee7214355f3ac843e70ce53781dd27505f3",
+    "non_whitespace_token_sha256": "e68d7550e493408f3ffc00bacabe1a72785dc5a0b75b548fca527f5f11ffb3d8",
+    "all_meaningful_tokens_unchanged": true,
+    "final_eof_normalized": true
+  }
+}

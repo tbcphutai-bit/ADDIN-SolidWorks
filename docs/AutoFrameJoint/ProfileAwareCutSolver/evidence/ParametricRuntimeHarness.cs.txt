@@ -1,0 +1,38 @@
+using System;
+using System.IO;
+using System.Text;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using ADDIN.Commands.AutoFrameJoint;
+class ParametricRuntimeHarness {
+ [DllImport("ole32.dll")]static extern int CreateStreamOnHGlobal(IntPtr p,bool delete,out IStream stream);
+ static JavaScriptSerializer J=new JavaScriptSerializer{MaxJsonLength=int.MaxValue,RecursionLimit=200};
+ static Dictionary<string,object> D(params object[] a){var d=new Dictionary<string,object>();for(int i=0;i<a.Length;i+=2)d[(string)a[i]]=a[i+1];return d;}
+ static object[] A(object a){return ((Array)a).Cast<object>().ToArray();}static Dictionary<string,object> O(object o){return (Dictionary<string,object>)o;}
+ static Body2 Restore(ISldWorks sw,string path){IStream s;Marshal.ThrowExceptionForHR(CreateStreamOnHGlobal(IntPtr.Zero,true,out s));try{byte[] b=File.ReadAllBytes(path);s.Write(b,b.Length,IntPtr.Zero);s.Seek(0,0,IntPtr.Zero);return ((IModeler)sw.GetModeler()).Restore(s) as Body2;}finally{Marshal.ReleaseComObject(s);}}
+ static object Metrics(AfjBooleanResult r){return D("before_m3",r.BeforeVolume,"after_m3",r.AfterVolume,"removed_m3",r.RemovedVolume,"kept_count",r.Kept.Count,"kept_check2",r.Kept.Select(x=>x.Check2()).ToArray(),"removed_check2",r.Removed.Select(x=>x.Check2()).ToArray(),"mass_residual_m3",Math.Abs(r.BeforeVolume-r.AfterVolume-r.RemovedVolume));}
+ static void Error(Dictionary<string,object> row,Exception ex){row["status"]=ex.Message.StartsWith("UNVERIFIED_RULE")?"UNVERIFIED_RULE":"FAIL";row["exception_type"]=ex.GetType().FullName;row["hresult"]="0x"+ex.HResult.ToString("X8");row["message"]=ex.Message;row["stack_trace"]=ex.StackTrace;}
+ static void Solution(Dictionary<string,object> row,AfjJointSolution r){row["status"]="PASS_GEOMETRY";row["rule"]=r.Plan.RuleId;row["short_cover"]=r.CoverA?"A":"B";row["actual_length_a_m"]=r.LengthA;row["actual_length_b_m"]=r.LengthB;row["a"]=Metrics(r.A);row["b"]=Metrics(r.B);row["gap_m"]=r.AfterGap;row["overlap_m3"]=r.AfterOverlap;}
+ static void Save(string root,List<object> rows){File.WriteAllText(Path.Combine(root,"parametric_runtime_results.json"),J.Serialize(rows),new UTF8Encoding(false));}
+ [STAThread]static int Main(string[] args){string root=Path.GetFullPath(args[0]);var sw=(ISldWorks)Marshal.GetActiveObject("SldWorks.Application");var rows=new List<object>();var maps=A(J.DeserializeObject(File.ReadAllText(Path.Combine(root,"pair_copies","all_assembly_maps.json")))).Select(O).ToList();var fixtures=A(J.DeserializeObject(File.ReadAllText(Path.Combine(root,"joint_rules.json")))).Select(O).ToList();
+  foreach(var map in maps){string name=(string)map["case"],path=(string)map["copy_assembly_path"];if(!Path.GetFullPath(path).StartsWith(Path.Combine(root,"pair_copies"),StringComparison.OrdinalIgnoreCase)||!Path.GetFileName(path).StartsWith("AFJ_PAIR_"))throw new Exception("COPY GUARD");int e=0,w=0;ModelDoc2 model=sw.OpenDoc6(path,2,3,"",ref e,ref w) as ModelDoc2;if(model==null){rows.Add(D("case",name,"status","FAIL_OPEN","error",e,"warning",w));Save(root,rows);continue;}
+   try{int ae=0;sw.ActivateDoc3(model.GetTitle(),false,0,ref ae);var components=A(((AssemblyDoc)model).GetComponents(false)).Cast<Component2>().ToDictionary(c=>c.Name2);
+    var selected=fixtures.Where(f=>(string)f["case"]==name).ToList();if(name.StartsWith("2354"))selected.Add(D("id","DEBUG_PAIR_1","occurrence_a",components.Keys.First(k=>k.EndsWith("-fr03-1")),"occurrence_b",components.Keys.First(k=>k.EndsWith("-fr04-1"))));
+    foreach(var fixture in selected){string id=(string)fixture["id"];Console.WriteLine("START "+id);var row=D("case",name,"fixture",id,"a",fixture["occurrence_a"],"b",fixture["occurrence_b"]);rows.Add(row);Component2 ca=components[(string)fixture["occurrence_a"]],cb=components[(string)fixture["occurrence_b"]];var native=D();row["native_final"]=native;
+     try{AfjJointSolution result=AfjJointSolver.Solve(sw,model,ca,cb);Solution(native,result);var swapped=AfjJointSolver.Solve(sw,model,cb,ca);row["swap_status"]=swapped.CoverA!=result.CoverA&&Math.Abs(swapped.A.AfterVolume-result.B.AfterVolume)<2e-12&&Math.Abs(swapped.B.AfterVolume-result.A.AfterVolume)<2e-12?"PASS":"FAIL";}catch(Exception ex){Error(native,ex);}
+     if(!name.StartsWith("3615")){var ghost=new AutoFrameJointGhostPreview(sw,model);string msg;bool ok=ghost.TryShowCutCandidate(ca,cb,2,out msg);row["public_preview_status"]=ok?"UNEXPECTED_ADMISSION":"REFUSED";row["public_preview_message"]=msg;string clean;row["cleanup"]=ghost.TryClear(out clean);row["cleanup_message"]=clean;Save(root,rows);Console.WriteLine(id+" "+native["status"]);continue;}
+     ModelDoc2 pa,pb;MathTransform ta,tb;Body2 fa=AfjJointSolver.NativeBody(ca,out pa,out ta),fb=AfjJointSolver.NativeBody(cb,out pb,out tb);var pfa=AfjProfileAnalyzer.Analyze(pa,fa);var pfb=AfjProfileAnalyzer.Analyze(pb,fb);var opA=O(A(fixture["a_operations"])[0]);var opB=O(A(fixture["b_operations"])[0]);int ia=Convert.ToInt32(opA["native_ordinal"]),ib=Convert.ToInt32(opB["native_ordinal"]);var before=D();row["native_before_copies"]=before;
+     try{Body2 a=Restore(sw,Path.Combine(root,"study","AFJ_STUDY_"+(string)fixture["a"],ia+"_before.brep")),b=Restore(sw,Path.Combine(root,"study","AFJ_STUDY_"+(string)fixture["b"],ib+"_before.brep"));Solution(before,AfjJointSolver.SolveBodies(sw,model,a,b,pfa,pfb,pa,pb,ta,tb));}catch(Exception ex){Error(before,ex);}
+     var rollback=D();row["private_rollback_public_preview"]=rollback;var preview=new AutoFrameJointGhostPreview(sw,model);
+     try{bool ra=pa.FeatureManager.EditRollback(3,(string)opA["feature_name"]),rb=pb.FeatureManager.EditRollback(3,(string)opB["feature_name"]);rollback["rollback_a"]=ra;rollback["rollback_b"]=rb;if(!ra||!rb)throw new Exception("private rollback refused");int active=0;sw.ActivateDoc3(model.GetTitle(),false,0,ref active);string msg;bool ok=preview.TryShowCutCandidate(ca,cb,2,out msg);rollback["preview_message"]=msg;rollback["is_showing"]=preview.IsShowing;if(!ok)throw new InvalidOperationException(msg);rollback["status"]="PASS_DISPLAY3_API";}catch(Exception ex){Error(rollback,ex);}finally{string clean;rollback["cleanup"]=preview.TryClear(out clean);rollback["cleanup_message"]=clean;rollback["restore_end_a"]=pa.FeatureManager.EditRollback(1,"");rollback["restore_end_b"]=pb.FeatureManager.EditRollback(1,"");}
+     Save(root,rows);Console.WriteLine(id+" final="+native["status"]+" before="+before["status"]+" preview="+rollback["status"]);
+    }
+   }finally{sw.CloseDoc(model.GetTitle());}
+  }
+  rows.Add(D("case","DEBUG_PAIR_2","status","NOT_IDENTIFIED","reason","No second distinct pair in the supplied Debug logs. No PASS claimed."));Save(root,rows);return 0;
+ }
+}

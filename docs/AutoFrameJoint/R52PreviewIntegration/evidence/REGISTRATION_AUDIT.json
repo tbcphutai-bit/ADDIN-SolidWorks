@@ -1,0 +1,7 @@
+{
+  "hive": "HKLM",
+  "Class": "ADDIN.SwAddin",
+  "Assembly": "ADDIN, Version=1.0.0.0, Culture=neutral, PublicKeyToken=36eed1a140b4715f",
+  "RuntimeVersion": "v4.0.30319",
+  "CodeBase": "<EXISTING_ADDIN_OUTPUT>/ADDIN.dll"
+}

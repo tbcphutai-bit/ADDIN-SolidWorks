@@ -1,0 +1,23 @@
+{
+  "status": "PASS_MANAGED_CONTRACT",
+  "mode": "OLD_REPRO",
+  "failure_count": 0,
+  "real_com_calls": 0,
+  "forbidden_interface_proxy_calls": 0,
+  "native_windows_created": 0,
+  "installed_addin_test": "NOT_RUN",
+  "real_solidworks_api": "NOT_RUN",
+  "scope": "Reflection-supplied managed state; actual OnClose and AfterClose methods; no native lifecycle integration",
+  "tests": [
+    {
+      "evidence": "OLD_THROW_OBSERVED",
+      "hresult": 1,
+      "message": "Auto Frame Joint is finishing the current Preview"
+    },
+    {
+      "test": "OLD_A_ONLY_OK_REPRODUCES_HRESULT_1_EXCEPTION",
+      "status": "PASS_MANAGED_CONTRACT",
+      "interface_calls": 0
+    }
+  ]
+}

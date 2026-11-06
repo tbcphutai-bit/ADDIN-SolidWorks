@@ -1,0 +1,112 @@
+{
+  "research_only": true,
+  "manufacturing_rule_approval": "UNVERIFIED",
+  "loser_section": {
+    "origin": [
+      -0.7849999999999999,
+      -0.10000000000000007,
+      -0.0030000000000000027
+    ],
+    "axis": [
+      0,
+      1,
+      -1.3877787807814457e-17
+    ],
+    "width_direction": [
+      -1,
+      0,
+      0
+    ],
+    "depth_direction": [
+      0,
+      -1.3877787807814457e-17,
+      -0.9999999999999999
+    ],
+    "width_m": 0.07,
+    "t_m": 0.0025,
+    "r_m": 0.0001,
+    "near_height_m": 0.04,
+    "far_height_m": 0.042
+  },
+  "winner_section": {
+    "origin": [
+      -1,
+      2.877000000000001,
+      -0.0030000000000000443
+    ],
+    "axis": [
+      1,
+      0,
+      0
+    ],
+    "width_direction": [
+      0,
+      1,
+      0
+    ],
+    "depth_direction": [
+      0,
+      4.440892098500626e-16,
+      -1
+    ],
+    "width_m": 0.07,
+    "t_m": 0.0025,
+    "r_m": 0.0001,
+    "near_height_m": 0.04,
+    "far_height_m": 0.06
+  },
+  "joint_origin": [
+    -0.7849999999999999,
+    2.877000000000001,
+    -0.003000000000000044
+  ],
+  "out_loser": [
+    0,
+    1,
+    -1.3877787807814457e-17
+  ],
+  "out_winner": [
+    -1,
+    0,
+    0
+  ],
+  "plan": {},
+  "a": {
+    "before_m3": 0.0006144043128087986,
+    "after_m3": 0.0005426509151279814,
+    "removed_m3": 7.175339768081623e-05,
+    "kept_check2": [
+      0
+    ],
+    "removed_check2": [
+      0,
+      0
+    ],
+    "kept_count": 1
+  },
+  "b": {
+    "before_m3": 0.0011667292006587696,
+    "after_m3": 0.0010980635066544953,
+    "removed_m3": 6.866569400427415e-05,
+    "kept_check2": [
+      0
+    ],
+    "removed_check2": [
+      0,
+      0
+    ],
+    "kept_count": 1
+  },
+  "gap_m": 9.999999999976694e-05,
+  "overlap_m3": 0,
+  "geometry_status": "PASS_GEOMETRY_CANDIDATE_ONLY",
+  "native_symmetric_a_m3": 2.554411087992781e-07,
+  "native_symmetric_b_m3": 2.6535900295124915e-07,
+  "native_addition_a_m3": 0,
+  "native_addition_b_m3": 0,
+  "display3_status": "PASS_DISPLAY3_API_CANDIDATE_ONLY",
+  "preview_message": "ORTHOGONAL_U_TALLER_COVER: Đã kiểm tra B-rep tạm. A bỏ 71753.398 mm³; B bỏ 68665.694 mm³. Frame ngắn A che; khe hở 0.1 mm. Bản sao nâng Z +120 mm. Hồng/tím: CUT; xanh/cam: KEEP.",
+  "is_showing": true,
+  "hide_status": true,
+  "hide_message": null
+}

@@ -58,6 +58,8 @@ namespace ADDIN.Commands
                 candidate.MaterialEvidence = "NOT_TESTED";
                 candidate.MaterialSpanMm = 0.0;
                 candidate.MaterialHitCount = 0;
+                candidate.Cg22GeometryStatus = "NOT_TESTED";
+                candidate.Cg22ProbeStatus = "NOT_TESTED";
             }
 
             object[] components = ToObjectArray(assembly.GetComponents(false));
@@ -125,6 +127,10 @@ namespace ADDIN.Commands
                     continue;
                 }
 
+                // CG2.2: the source hole is in assembly coordinates.
+                row.Cg22SourceCenterWorldMm = Cg22FormatPointMm(holes[holeIndex].Center);
+                row.Cg22SourceAxisWorld = Cg22FormatDirection(holes[holeIndex].Direction);
+
                 Component2 target;
                 if (!lookup.TryGetValue(row.TargetOccurrence, out target))
                 {
@@ -169,6 +175,7 @@ namespace ADDIN.Commands
                 string evidence;
                 double spanM;
                 int hitCount;
+                double[] primaryRawSnapshot = null;
                 try
                 {
                     // Ray intersections work in the target part-local frame.
@@ -176,8 +183,25 @@ namespace ADDIN.Commands
                     // bounding-center calibration in Cg2LoadTargetBodyContext
                     // detects suspicious coordinate mismatch and refuses to claim.
                     evidence = Cg2ReadRayEvidence(context.PartModel, context.Bodies,
-                        rayStartLocal, rayDirLocal, maxDistanceM, out spanM, out hitCount);
+                        rayStartLocal, rayDirLocal, maxDistanceM, out spanM, out hitCount, out primaryRawSnapshot);
+                    // Read primary BREP hit details BEFORE any diagnostic probe
+                    // replaces SOLIDWORKS' cached ray-intersection point array.
+                    try
+                    {
+                        Cg22CaptureCandidateEvidence(row, context, holes[holeIndex],
+                            rayStartLocal, rayDirLocal, maxDistanceM,
+                            evidence, hitCount, cg2BrepTimer, primaryRawSnapshot);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception cg22Error)
+                    {
+                        // Fail closed in CG2.2 only; retain primary CG2 BREP verdict.
+                        row.Cg22GeometryStatus = "UNVERIFIED_CG22_" +
+                            cg22Error.GetType().Name;
+                        row.Cg22ProbeStatus = "UNVERIFIED_CG22_EXCEPTION";
+                    }
                 }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
                     Cg2Warn(report, "BREP ray API error on a target occurrence: "
@@ -202,6 +226,9 @@ namespace ADDIN.Commands
                     report.IsPartial = true;
                 }
             }
+
+            // Debug summary; never changes any candidate verdict.
+            Cg22Fix1WriteSummary(report);
 
             if (report.BrepNotTestedCount > 0)
                 Cg2Warn(report, "BREP ray/time budget reached: "
@@ -420,6 +447,18 @@ namespace ADDIN.Commands
             double[] start, double[] direction, double limitM,
             out double longestSpanM, out int hitCount)
         {
+            // Original signature stays available for CG2.2 offset probe calls.
+            double[] unusedSnapshot;
+            return Cg2ReadRayEvidence(model, bodies, start, direction,
+                limitM, out longestSpanM, out hitCount, out unusedSnapshot);
+        }
+
+        private static string Cg2ReadRayEvidence(
+            ModelDoc2 model, Body2[] bodies,
+            double[] start, double[] direction, double limitM,
+            out double longestSpanM, out int hitCount, out double[] rawSnapshot)
+        {
+            rawSnapshot = null;
             longestSpanM = 0;
             hitCount = 0;
             if (model == null || bodies == null || bodies.Length == 0)
@@ -438,6 +477,7 @@ namespace ADDIN.Commands
             if (count == 0) return "BREP_NO_AXIS_HIT";
             if (count > 200) return "UNVERIFIED_TOO_MANY_RAY_HITS";
             double[] points = ToDoubleArray(model.GetRayIntersectionsPoints());
+            rawSnapshot = points == null ? null : (double[])points.Clone();
             return Cg2ClassifyRayPointData(points, count, bodies.Length,
                 start, direction, limitM, out longestSpanM);
         }

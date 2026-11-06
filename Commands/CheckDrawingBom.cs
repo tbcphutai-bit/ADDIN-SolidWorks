@@ -19,6 +19,16 @@ namespace ADDIN.Commands
         Warning
     }
 
+    // Link integrity must be checked independently of displayed values.
+    internal enum DrawingGobanLinkAuditState
+    {
+        NotApplicable,
+        Valid,
+        Invalid,
+        Unavailable,
+        Ambiguous
+    }
+
     internal sealed class DrawingValueLocation
     {
         public double X { get; set; }
@@ -51,6 +61,13 @@ namespace ADDIN.Commands
 
         // Cụm góc dưới bên phải (Bảng 合番)
         public string Goban { get; set; } = "";
+        // True only if Drawing itself contains an unresolved display link in
+        // the 合番 value cell. This is not a real empty user-entered string.
+        public bool GobanDisplayUnavailable { get; set; }
+        public DrawingGobanLinkAuditState GobanLinkAuditState { get; set; } =
+            DrawingGobanLinkAuditState.NotApplicable;
+        public string GobanLinkRawExpression { get; set; } = "";
+        public int GobanLinkTableIndex { get; set; } = -1;
 
         // Cụm góc dưới bên trái (Tên file & DXF)
         public string PartFileName { get; set; } = "";
@@ -84,6 +101,18 @@ namespace ADDIN.Commands
         public string DrawingViewName { get; set; } = "";
     }
 
+    internal sealed class DrawingPropertyLinkReportRow
+    {
+        public string FieldName { get; set; } = "";
+        public string DrawingRaw { get; set; } = "";
+        public string PropertyValue { get; set; } = "";
+        public string BomValue { get; set; } = "";
+        public DrawingBomCheckStatus LinkStatus { get; set; } = DrawingBomCheckStatus.Warning;
+        public DrawingBomCheckStatus PropertyStatus { get; set; } = DrawingBomCheckStatus.Warning;
+        public DrawingBomCheckStatus DisplayStatus { get; set; } = DrawingBomCheckStatus.Warning;
+        public string Note { get; set; } = "";
+    }
+
     internal sealed class ModelPropertyLinkAudit
     {
         public string PropertyName { get; set; } = "";
@@ -105,6 +134,8 @@ namespace ADDIN.Commands
         public DrawingBomCheckStatus Status { get; set; } = DrawingBomCheckStatus.OK;
         public List<DrawingBomFieldResult> Fields { get; } = new List<DrawingBomFieldResult>();
         public string Note { get; set; } = "";
+        public List<DrawingPropertyLinkReportRow> PropertyLinkRows { get; } =
+            new List<DrawingPropertyLinkReportRow>();
     }
 
     internal sealed class DrawingBatchCheckResult
@@ -161,6 +192,16 @@ namespace ADDIN.Commands
         //   Không dùng Custom Property 数量/Qty của 3D Part/Assembly làm Expected.
         private readonly ISldWorks swApp;
         private readonly DataGridView bomGrid;
+        // Diagnostic-only switch: strictly hidden Drawing API, not the native UI hook.
+        private bool strictHiddenBatch;
+        // Probe at most one linked-Goban Drawing table export per batch.
+        // Result is diagnostic evidence only, never a BOM comparison source.
+        private bool gobanTableExportProbeDone;
+        private const int MaxHiddenDiagnosticDrawings = 12;
+        // One bounded experiment per SOLIDWORKS process. Re-running without
+        // restarting could accumulate hidden native models indefinitely.
+        private static readonly HashSet<string> RetainedHiddenDrawingPaths =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private const double NumericTolerance = 0.01; // 0.01 mm tolerance cho W, L, 板厚
         private const double HeaderYBandTolerance = 0.010; // 10mm band độ chênh Y giữa các Header
@@ -221,6 +262,9 @@ namespace ADDIN.Commands
                 LogDebug("==================================================");
                 LogDebug("START CHECK DRAWING BOM — PRECISE MULTI-BLOCK BATCH");
                 LogDebug("==================================================");
+#if DEBUG
+                RunGobanLinkSelfTests();
+#endif
 
                 if (swApp == null)
                 {
@@ -256,6 +300,23 @@ namespace ADDIN.Commands
                 }
 
                 LogDebug($"Total selected BOM rows = {checkedRows.Count}");
+                if (silent && RetainedHiddenDrawingPaths.Count > 0)
+                {
+                    result.Message = "Đã giữ " + RetainedHiddenDrawingPaths.Count +
+                        " Drawing ẩn trong phiên SOLIDWORKS. Hãy khởi động lại SOLIDWORKS " +
+                        "trước khi thử tiếp để tránh tích lũy tài liệu native.";
+                    LogDebug("[STRICT HIDDEN SESSION LIMIT] " + result.Message);
+                    return result;
+                }
+                if (silent && checkedRows.Count > MaxHiddenDiagnosticDrawings)
+                {
+                    result.Message = "STRICT HIDDEN diagnostic chỉ hỗ trợ tối đa " +
+                        MaxHiddenDiagnosticDrawings + " Drawing; không thực thi để tránh giữ quá nhiều tài liệu.";
+                    LogDebug("[STRICT HIDDEN LIMIT] " + result.Message);
+                    return result;
+                }
+                strictHiddenBatch = silent;
+                gobanTableExportProbeDone = false;
 
                 ModelDoc2 originalDocument = swApp.ActiveDoc as ModelDoc2;
                 originalTitle = originalDocument != null ? originalDocument.GetTitle() : "";
@@ -270,7 +331,8 @@ namespace ADDIN.Commands
                     result.Message = "Đã hủy CHECK DRAWING.";
                     return result;
                 }
-                if (silent) displayScope = new DrawingCommandDisplayScope(swApp);
+                if (silent)
+                    LogDebug("[STRICT HIDDEN SCOPE] DrawingCommandDisplayScope=SKIPPED; native GUI untouched");
 
                 for (int i = 0; i < checkedRows.Count; i++)
                 {
@@ -340,7 +402,36 @@ namespace ADDIN.Commands
                             continue;
                         }
 
+                        // A/B source: existing document reuse versus newly hidden
+                        // OpenDoc6. Never claim an existing document is visible
+                        // solely because it was already open.
+                        string actualOpenPath = "";
+                        try { actualOpenPath = drawingDoc.GetPathName() ?? ""; } catch { }
+                        LogDebug("[GOBAN AB OPEN] row=" + (i + 1) +
+                            " source=" + (openedByCommand
+                                ? (strictHiddenBatch ? "NEW_HIDDEN" : "NEW_COMMAND_OPEN")
+                                : "REUSED_EXISTING") +
+                            " process=" + Process.GetCurrentProcess().Id +
+                            " target=\"" + drawingPath + "\"" +
+                            " actual=\"" + actualOpenPath + "\"" +
+                            " exactPath=" + PathsEqualSafe(drawingPath, actualOpenPath));
+
                         itemResult = CheckOneDrawing(drawingDoc, row, drawingPath, resolvedPartPath);
+                        if (strictHiddenBatch)
+                        {
+                            // Diagnostic metadata is not a real BOM/Drawing field.
+                            // Keep the overall result unverified, but do not add a
+                            // fake table row to the user's comparison details.
+                            LogDebug("[STRICT HIDDEN LINK VALIDATION] row=" + (i + 1) +
+                                " linked title-block values are not independently verified");
+                            // Never overwrite a proven NG with diagnostic Warning.
+                            if (itemResult.Status == DrawingBomCheckStatus.OK)
+                                itemResult.Status = DrawingBomCheckStatus.Warning;
+                            LogDebug("[STRICT HIDDEN STATUS] row=" + (i + 1) +
+                                " result=" + itemResult.Status + " NG_PRESERVED=True");
+                            itemResult.Note = (itemResult.Note ?? "") +
+                                " | HIDDEN_PROBE: linked text not independently verified.";
+                        }
 
                         LogDebug(
                             $"[DRAWING RESULT] component={itemResult.Component} " +
@@ -360,16 +451,72 @@ namespace ADDIN.Commands
                     }
                     finally
                     {
+                        if (strictHiddenBatch)
+                        {
+                            // A/B isolation: both CloseDoc and QuitDoc crashed natively.
+                            // Intentionally keep only command-opened hidden Drawings in memory.
+                            // SOLIDWORKS must be restarted after this <=12 Drawing experiment.
+                            if (openedByCommand && drawingDoc != null &&
+                                !string.IsNullOrWhiteSpace(itemResult.DrawingPath))
+                                RetainedHiddenDrawingPaths.Add(itemResult.DrawingPath);
+                            LogDebug("[STRICT HIDDEN HOLD] row=" + (i + 1) +
+                                " openedByCommand=" + openedByCommand +
+                                " path=" + (itemResult.DrawingPath ?? "") + " close=SKIPPED");
+                        }
+                        else
+                        {
+                        // Checkpoint logging: native crashes may occur inside CloseDoc
+                        // before any managed catch block or batch summary can run.
+                        LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDrawing BEGIN openedByCommand=" + openedByCommand);
                         if (openedByCommand && drawingDoc != null)
                         {
-                            try { swApp.CloseDoc(drawingDoc.GetTitle()); }
-                            catch { }
+                            try
+                            {
+                                // The failed run crashed *inside* CloseDoc on an owned, read-only Drawing.
+                                // Change exactly this close path for an A/B test. Never close a document
+                                // that was already open before the batch, is no longer read-only, or has
+                                // a different path than the one resolved for the current BOM row.
+                                string closeTitle = drawingDoc.GetTitle();
+                                string actualPath = drawingDoc.GetPathName();
+                                string intendedPath = itemResult.DrawingPath ?? "";
+                                bool samePath =
+                                    !string.IsNullOrWhiteSpace(actualPath) &&
+                                    !string.IsNullOrWhiteSpace(intendedPath) &&
+                                    string.Equals(Path.GetFullPath(actualPath), Path.GetFullPath(intendedPath),
+                                        StringComparison.OrdinalIgnoreCase);
+                                bool readOnly = drawingDoc.IsOpenedReadOnly();
+                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) +
+                                    " OwnedDrawingVerify samePath=" + samePath +
+                                    " readOnly=" + readOnly + " title=" + closeTitle);
+                                if (!samePath || !readOnly)
+                                {
+                                    // Fail closed: do not risk closing a user-owned/modified document.
+                                    // The document is left open and this diagnostic must be reviewed.
+                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc SKIPPED unsafe target");
+                                }
+                                else
+                                {
+                                    // QuitDoc closes without saving. This is safe ONLY for our own
+                                    // OpenDoc6(Silent|ReadOnly) Drawing verified above.
+                                    // This does NOT prove native crashes are fixed; it is one A/B variable.
+                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc CALL title=" + closeTitle);
+                                    swApp.QuitDoc(closeTitle);
+                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc RETURN");
+                                }
+                            }
+                            catch (Exception closeError)
+                            {
+                                LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc ERROR " + closeError);
+                            }
                         }
+                        LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive CALL");
                         RestoreBatchActiveDocument(originalTitle);
+                        LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive RETURN");
+                        }
                     }
                 }
 
-                if (originalDocument != null && !string.IsNullOrEmpty(originalTitle))
+                if (!strictHiddenBatch && originalDocument != null && !string.IsNullOrEmpty(originalTitle))
                 {
                     try
                     {
@@ -403,7 +550,13 @@ namespace ADDIN.Commands
                     else ExcelDrawingCheckExporter.Export(result);
                 }
 
-                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " + result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning."; if (!silent) ShowBatchSummaryDialog(result);
+                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " +
+                    result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning.";
+                if (strictHiddenBatch)
+                    result.Message += " | TEST STRICT HIDDEN: linked text/chức năng 表/ウラ chưa được " +
+                        "xác minh; Drawing mở bởi batch được giữ trong bộ nhớ. Khởi động lại SOLIDWORKS " +
+                        "sau lần thử này.";
+                if (!silent) ShowBatchSummaryDialog(result);
             }
             catch (Exception ex)
             {
@@ -420,6 +573,9 @@ namespace ADDIN.Commands
             {
                 RestoreBatchActiveDocument(originalTitle);
                 displayScope?.Dispose();
+                if (strictHiddenBatch)
+                    LogDebug("[STRICT HIDDEN END] diagnostic retained command-opened Drawings in memory; restart SOLIDWORKS.");
+                strictHiddenBatch = false;
                 if (progressStarted && !progressFinished)
                 {
                     progressFinished = true;
@@ -432,6 +588,21 @@ namespace ADDIN.Commands
         #endregion
 
         internal sealed class DrawingReferenceSnapshot : BomDrawingReference { }
+
+        [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptions]
+        [System.Security.SecurityCritical]
+        private void SafeCloseDocument(string title)
+        {
+            if (string.IsNullOrWhiteSpace(title) || swApp == null) return;
+            try
+            {
+                swApp.CloseDoc(title);
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[SAFE CLOSE DOC] " + title + ": " + ex.Message);
+            }
+        }
 
         private void RestoreBatchActiveDocument(string title)
         {
@@ -492,9 +663,11 @@ namespace ADDIN.Commands
                 return itemResult;
             }
 
-            // Linked drawing tables need an active document window. Opening them
-            // with DocumentVisible(false) leaves $PRPSHEET display evaluation empty.
-            ActivateDrawingForDisplayRead(drawingModel, drawing);
+            // Hide without activating. Linked text will be explicitly marked unverified.
+            if (!strictHiddenBatch)
+                ActivateDrawingForDisplayRead(drawingModel, drawing);
+            else
+                LogDebug("[STRICT HIDDEN READ] ActivateDoc3=SKIPPED");
             Sheet activeSheet = drawing.GetCurrentSheet() as Sheet;
             string sheetName = ResolveCurrentSheetName(drawing, activeSheet);
 
@@ -505,10 +678,10 @@ namespace ADDIN.Commands
             // Read the current displayed Drawing after activation. Forcing a
             // full rebuild here also rebuilds referenced models and can fail on
             // in-context parts with missing assembly references.
-            RefreshDrawingBeforeCheck(
-                drawingModel,
-                drawing,
-                sheetName);
+            if (!strictHiddenBatch)
+                RefreshDrawingBeforeCheck(drawingModel, drawing, sheetName);
+            else
+                LogDebug("[STRICT HIDDEN READ] GraphicsRedraw2=SKIPPED");
 
             // 2. Chỉ quét Notes/Tables nằm TRONG phạm vi khung Sheet hiện tại.
             // Nếu SolidWorks trả tên sheet rỗng/space khi Drawing mở silent,
@@ -521,6 +694,10 @@ namespace ADDIN.Commands
 
             List<TableDiagnosticInfo> tables =
                 ScanCurrentSheetTables(drawing, sheetName, drawingModel, frameBounds);
+
+            // Read-only A/B evidence from the SAME Drawing table that the
+            // comparer uses. No property-model fallback, activation or rebuild.
+            LogGobanAbDisplayProbe(drawingModel, tables);
 
             // 3. Trích xuất toàn bộ giá trị Displayed Text từ khung tên
             DrawingDisplayedData drawingData = ExtractAllTitleBlockValues(notes, tables, drawingModel);
@@ -554,9 +731,21 @@ namespace ADDIN.Commands
                     bomQuantity);
             }
 
+            // Part Drawing template audit uses RAW table text only, not BOM/Part.
+            AuditCompactGobanTemplateLink(drawingData, tables);
+
             // 表/ウラ applies only to Part drawings. UNIT/Assembly drawings
             // return above without inspecting or reporting the flat view side.
-            AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
+            if (strictHiddenBatch)
+                itemResult.Fields.Add(new DrawingBomFieldResult
+                {
+                    FieldName = "表/ウラ ↔ 展開",
+                    Source = "STRICT_HIDDEN_DIAGNOSTIC",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = "NOT CHECKED: tạm bỏ Working Copy để cô lập lỗi đóng tài liệu native."
+                });
+            else
+                AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
 
             BomNumberValues bomNumbers = GetBomNumberValues(bomRow);
             itemResult.Fields.Add(CompareBomNumbers(bomNumbers));
@@ -642,7 +831,30 @@ namespace ADDIN.Commands
             itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
                 CompareThicknessField(drawingData.Thickness, bomThickness),
                 GetPropertyLinkAudit(propertyLinkAudits, "板厚")));
-            itemResult.Fields.Add(CompareGobanField(drawingData.Goban, bomGoban));
+            DrawingBomFieldResult gobanComparison =
+                CompareGobanField(drawingData.Goban, bomGoban);
+            if (drawingData.GobanDisplayUnavailable)
+            {
+                // Never replace a Drawing value with $PRPSHEET, the model
+                // property, or a value from BOM. All verified values must
+                // have come from the Drawing displayed-text accessors.
+                gobanComparison.DrawingValue = "(Chưa đọc được chữ hiển thị)";
+                gobanComparison.Source = "DRAWING_TABLE_DISPLAY_UNAVAILABLE";
+                gobanComparison.Status = DrawingBomCheckStatus.Warning;
+                gobanComparison.Message =
+                    "Drawing có ô 合番 liên kết, nhưng các API DisplayedText2/DisplayedText " +
+                    "đều không trả về chữ thực tế khi bản vẽ đang ẩn. " +
+                    "Không sử dụng $PRPSHEET hoặc Custom Property làm giá trị Drawing.";
+            }
+            // A hard-coded Drawing cell may equal BOM but must still be NG.
+            ApplyGobanTemplateLinkAudit(gobanComparison, drawingData);
+            itemResult.Fields.Add(gobanComparison);
+
+            // Reporting-only: never replace Drawing displayed text with Model/BOM data.
+            AddGobanPropertyLinkReportRow(
+                itemResult, drawingData, gobanComparison, bomRow, referencedModel,
+                referencedConfiguration, sheetName, drawing, activeSheet);
+
             itemResult.Fields.Add(CompareFileNameField(drawingData.PartFileName, componentName));
             itemResult.Fields.Add(CompareDxfField(drawingData.DxfFileName, expectedDxf));
             itemResult.Fields.Add(CompareOptionalStringField("品名", drawingData.ProductName, bomProductName));
@@ -1105,6 +1317,8 @@ namespace ADDIN.Commands
             // 数量 của COMPONENT phải lấy đúng ô 数量 trong title block ở CỤM 1,
             // sau đó so với 数量 của đúng dòng Component trong SolidWorks BOM.
             ApplyPartGobanQuantityTableData(data, tables);
+            if (string.IsNullOrWhiteSpace(data.Goban))
+                MarkUnavailableGobanDisplay(data, tables);
 
             // =========================================================================
             // CỤM 3: GÓC DƯỚI BÊN TRÁI (Bottom-Left Block: DXFファイル名 & Part-ファイル名)
@@ -1369,7 +1583,29 @@ namespace ADDIN.Commands
                 ReadPartGobanQuantityEntries(tables);
 
             if (entries.Count == 0)
+            {
+                // Log the actual source-side evidence, never substitute BOM's
+                // expected value for a Drawing value.
+                foreach (TableDiagnosticInfo tab in tables)
+                {
+                    if (tab == null) continue;
+                    foreach (TableCellDiagnosticInfo cell in tab.Cells)
+                    {
+                        if (cell == null) continue;
+                        string displayed = CleanTableCellText(cell.DisplayedText);
+                        string raw = CleanTableCellText(cell.RawText);
+                        if (displayed.Contains("合番") || displayed.Contains("単品搬入") ||
+                            raw.Contains("合番") || raw.Contains("単品搬入"))
+                            LogDebug("[GOBAN SOURCE DIAG] table=" + tab.Index +
+                                " r=" + cell.Row + " c=" + cell.Column +
+                                " source=" + cell.ValueSource +
+                                " shown=\"" + displayed + "\" raw=\"" + raw + "\"");
+                    }
+                }
+                LogDebug("[GOBAN SOURCE MISSING] all candidate tables scanned; " +
+                    "no verified 合番 value from Drawing. Keep Warning.");
                 return;
+            }
 
             // Hợp nhất 合番 theo đúng thứ tự xuất hiện, KHÔNG làm mất 数量 đi kèm.
             // Ví dụ:
@@ -1460,6 +1696,459 @@ namespace ADDIN.Commands
                     $"[PART GOBAN TABLE INFO] goban=\"{data.Goban}\" " +
                     $"parsedQtyTotal=\"{FormatQuantityNumber(quantityTotal)}\" " +
                     $"drawingTitleQty=\"{data.Quantity}\" entries={entries.Count}");
+            }
+        }
+
+        // Display-only contract:
+        // The Drawing column must be sourced from displayed text returned by
+        // the Drawing table API. A raw $PRPSHEET expression is NOT displayed
+        // text and must NEVER be expanded from a model or BOM as a substitute.
+        private static void MarkUnavailableGobanDisplay(
+            DrawingDisplayedData data, List<TableDiagnosticInfo> tables)
+        {
+            if (data == null || tables == null) return;
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.Cells == null) continue;
+                foreach (TableCellDiagnosticInfo label in table.Cells)
+                {
+                    if (label == null ||
+                        !string.Equals(CleanTableCellText(label.DisplayedText),
+                            "合番", StringComparison.Ordinal))
+                        continue;
+
+                    TableCellDiagnosticInfo cell =
+                        FindTableCell(table, label.Row, label.Column + 1);
+                    if (cell == null) continue;
+
+                    // DisplayedText was already computed from DisplayedText2,
+                    // DisplayedText2(includeHidden), and legacy DisplayedText.
+                    // Never read RawText as an actual displayed value.
+                    if (!string.IsNullOrWhiteSpace(cell.DisplayedText) &&
+                        !ContainsTablePropertyExpression(cell.DisplayedText))
+                        continue;
+
+                    string raw = cell.RawText ?? "";
+                    if (!Regex.IsMatch(raw,
+                        @"^\s*\$PRPSHEET\s*:\s*[""“”]?合番[""“”]?\s*$",
+                        RegexOptions.IgnoreCase))
+                        continue;
+                    data.GobanDisplayUnavailable = true;
+                    LogDebug("[GOBAN DISPLAY UNAVAILABLE] table=" + table.Index +
+                        " row=" + cell.Row + " col=" + cell.Column +
+                        " source=" + cell.ValueSource +
+                        " displayedText2=\"" + (cell.ApiDisplayedText ?? "") +
+                        "\" displayedText2Hidden=\"" +
+                        (cell.ApiDisplayedTextWithHidden ?? "") +
+                        "\" rawExpressionPresent=True modelFallback=DISABLED");
+                    return;
+                }
+            }
+        }
+
+        // Protect the compact, linked title-block template: exactly
+        // one row and two cells [合番 | $PRPSHEET:"合番"].
+        // Do NOT impose this rule on multi-row 合番/数量 layouts.
+        private static void AuditCompactGobanTemplateLink(
+            DrawingDisplayedData data, List<TableDiagnosticInfo> tables)
+        {
+            if (data == null || tables == null) return;
+            List<TableDiagnosticInfo> matches = new List<TableDiagnosticInfo>();
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.RowCount != 1 || table.ColumnCount != 2)
+                    continue;
+                TableCellDiagnosticInfo label = FindTableCell(table, 0, 0);
+                if (label != null &&
+                    string.Equals(CleanTableCellText(label.DisplayedText),
+                        "合番", StringComparison.Ordinal))
+                    matches.Add(table);
+            }
+
+            if (matches.Count == 0)
+            {
+                LogDebug("[GOBAN LINK AUDIT] status=NOT_APPLICABLE " +
+                    "reason=NO_COMPACT_1X2_GOBAN_TEMPLATE");
+                return;
+            }
+            if (matches.Count != 1)
+            {
+                data.GobanLinkAuditState = DrawingGobanLinkAuditState.Ambiguous;
+                LogDebug("[GOBAN LINK AUDIT] status=AMBIGUOUS " +
+                    "reason=MULTIPLE_COMPACT_GOBAN_TABLES count=" + matches.Count);
+                return;
+            }
+
+            TableDiagnosticInfo target = matches[0];
+            data.GobanLinkTableIndex = target.Index;
+            TableCellDiagnosticInfo value = FindTableCell(target, 0, 1);
+            if (value == null || !value.RawTextReadSucceeded)
+            {
+                data.GobanLinkAuditState = DrawingGobanLinkAuditState.Unavailable;
+                LogDebug("[GOBAN LINK AUDIT] status=UNAVAILABLE table=" +
+                    target.Index + " reason=RAW_CELL_API_UNAVAILABLE");
+                return;
+            }
+
+            data.GobanLinkRawExpression = value.RawText ?? "";
+            const string expected = "$PRPSHEET:\"合番\"";
+            data.GobanLinkAuditState = EvaluateGobanLink(
+                data.GobanLinkRawExpression, value.RawTextReadSucceeded);
+
+            LogDebug("[GOBAN LINK AUDIT] status=" +
+                data.GobanLinkAuditState + " table=" + target.Index +
+                " raw=\"" + data.GobanLinkRawExpression + "\" expected=\"" +
+                expected + "\" displayed=\"" + (value.DisplayedText ?? "") + "\"");
+        }
+
+        private static void ApplyGobanTemplateLinkAudit(
+            DrawingBomFieldResult result, DrawingDisplayedData data,
+            bool emitDiagnosticLog = true)
+        {
+            if (result == null || data == null) return;
+            if (data.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid)
+            {
+                // A lost/wrong formula is NG even if the displayed text equals BOM.
+                result.Status = DrawingBomCheckStatus.NG;
+                result.Source = "DRAWING_GOBAN_LINK_INVALID";
+                result.Message =
+                    "Ô 合番 mất/sai liên kết bắt buộc $PRPSHEET:\"合番\". Raw=\"" +
+                    data.GobanLinkRawExpression + "\". " +
+                    "Giá trị hiển thị trùng BOM cũng không được coi là OK.";
+                if (emitDiagnosticLog)
+                    LogDebug("[GOBAN LINK NG] table=" + data.GobanLinkTableIndex +
+                        " raw=\"" + data.GobanLinkRawExpression + "\"");
+            }
+            else if (data.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable ||
+                     data.GobanLinkAuditState == DrawingGobanLinkAuditState.Ambiguous)
+            {
+                // Missing COM evidence cannot be equated with a broken link.
+                if (result.Status == DrawingBomCheckStatus.OK)
+                    result.Status = DrawingBomCheckStatus.Warning;
+                result.Message = (result.Message ?? "") +
+                    " | Chưa xác minh được link ô 合番 (" +
+                    data.GobanLinkAuditState + ").";
+                if (result.Status != DrawingBomCheckStatus.NG)
+                    result.Source = "DRAWING_GOBAN_LINK_UNVERIFIED";
+            }
+        }
+
+        private static void AddGobanPropertyLinkReportRow(
+            DrawingCheckItemResult item,
+            DrawingDisplayedData drawingData,
+            DrawingBomFieldResult comparison,
+            DataGridViewRow bomRow,
+            ModelDoc2 referencedModel,
+            string referencedConfiguration,
+            string sheetName,
+            DrawingDoc drawing,
+            Sheet sheet)
+        {
+            if (item == null || drawingData == null ||
+                drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.NotApplicable)
+                return;
+
+            var row = new DrawingPropertyLinkReportRow
+            {
+                FieldName = "合番",
+                DrawingRaw = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable
+                    ? "(Không đọc được Raw Text)" : (drawingData.GobanLinkRawExpression ?? ""),
+                LinkStatus = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Valid
+                    ? DrawingBomCheckStatus.OK
+                    : drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid
+                        ? DrawingBomCheckStatus.NG
+                        : DrawingBomCheckStatus.Warning
+            };
+            var reasons = new List<string>();
+            if (row.LinkStatus == DrawingBomCheckStatus.NG)
+                reasons.Add("Mất hoặc sai công thức bắt buộc $PRPSHEET:\"合番\".");
+            else if (row.LinkStatus == DrawingBomCheckStatus.Warning)
+                reasons.Add("Không xác minh được raw link hoặc có nhiều bảng phù hợp.");
+
+            string bomDirect;
+            bool hasBomValue = TryReadBomGobanColumn(bomRow, out bomDirect);
+            row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番)";
+
+            string propValue;
+            string propSource;
+            bool gotProperty = TryGetVerifiedSheetGobanProperty(
+                drawing, sheet, sheetName, referencedModel, referencedConfiguration,
+                item.PartPath, out propValue, out propSource);
+            row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh Property)";
+
+            // Property↔BOM can be OK only if BOTH independent sources were read.
+            // ReadBomAndComponentProperties() falls back to Model property, so NEVER
+            // use its bomGoban variable as independent BOM evidence here.
+            if (gotProperty && hasBomValue && !string.IsNullOrWhiteSpace(bomDirect))
+            {
+                row.PropertyStatus = string.Equals(
+                    NormalizeText(propValue), NormalizeText(bomDirect),
+                    StringComparison.OrdinalIgnoreCase)
+                    ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+                if (row.PropertyStatus == DrawingBomCheckStatus.NG)
+                    reasons.Add("Giá trị Property khác BOM.");
+            }
+            else
+            {
+                row.PropertyStatus = DrawingBomCheckStatus.Warning;
+                reasons.Add(!gotProperty
+                    ? "Chưa xác nhận được Property từ đúng model/config của Sheet: " + propSource
+                    : "Thiếu dữ liệu 合番 độc lập trong BOM.");
+            }
+
+            string actualDisplayed = drawingData.Goban ?? "";
+            if (drawingData.GobanDisplayUnavailable ||
+                string.IsNullOrWhiteSpace(actualDisplayed) || !gotProperty)
+            {
+                row.DisplayStatus = DrawingBomCheckStatus.Warning;
+                reasons.Add("Chưa đối chiếu được chữ hiển thị thực tế trên Drawing.");
+            }
+            else
+            {
+                row.DisplayStatus = string.Equals(
+                    NormalizeText(actualDisplayed), NormalizeText(propValue),
+                    StringComparison.OrdinalIgnoreCase)
+                    ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+                if (row.DisplayStatus == DrawingBomCheckStatus.NG)
+                    reasons.Add("Chữ hiển thị Drawing khác Property.");
+            }
+
+            // A verified mismatch must also affect the existing field result, not
+            // merely the new presentation tab. Existing NG is never downgraded.
+            if (comparison != null &&
+                (row.PropertyStatus == DrawingBomCheckStatus.NG ||
+                 row.DisplayStatus == DrawingBomCheckStatus.NG))
+            {
+                comparison.Status = DrawingBomCheckStatus.NG;
+                comparison.Message = (comparison.Message ?? "") +
+                    " | Property/BOM/DisplayedValue mismatch confirmed.";
+            }
+            row.Note = string.Join(" | ", reasons);
+            item.PropertyLinkRows.Add(row);
+            LogDebug("[GOBAN REPORT ROW] link=" + row.LinkStatus +
+                " property=" + row.PropertyStatus + " display=" + row.DisplayStatus +
+                " source=" + propSource + " raw=\"" + row.DrawingRaw + "\"");
+        }
+
+        private static bool TryReadBomGobanColumn(DataGridViewRow row, out string value)
+        {
+            value = "";
+            if (row == null || row.DataGridView == null) return false;
+            for (int c = 0; c < row.DataGridView.Columns.Count; c++)
+            {
+                if (!string.Equals(NormalizeText(row.DataGridView.Columns[c].HeaderText),
+                    "合番", StringComparison.Ordinal)) continue;
+                value = Convert.ToString(row.Cells[c].Value ?? "").Trim();
+                return true;
+            }
+            return false;
+        }
+
+        private static bool TryGetVerifiedSheetGobanProperty(
+            DrawingDoc drawing,
+            Sheet sheet,
+            string sheetName,
+            ModelDoc2 fallbackModel,
+            string fallbackConfiguration,
+            string expectedPartPath,
+            out string value,
+            out string source)
+        {
+            value = "";
+            source = "SHEET_SOURCE_UNVERIFIED";
+            if (drawing == null || sheet == null) return false;
+
+            // Sheet.CustomPropertyView must point to the actual property-source view.
+            // Do not guess the source by taking the first Drawing View or BOM model.
+            string propertyView = "";
+            try { propertyView = sheet.CustomPropertyView ?? ""; }
+            catch { source = "CUSTOM_PROPERTY_VIEW_API_ERROR"; return false; }
+
+            if (string.IsNullOrWhiteSpace(propertyView))
+            {
+                source = "CUSTOM_PROPERTY_VIEW_UNSPECIFIED";
+                return false; // conservative: no false Property OK
+            }
+
+            SolidWorks.Interop.sldworks.View targetView = null;
+            try
+            {
+                SolidWorks.Interop.sldworks.View view = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                while (view != null)
+                {
+                    string name = "";
+                    try { name = view.GetName2() ?? ""; } catch { }
+                    if (string.Equals(name, propertyView, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetView = view;
+                        break;
+                    }
+                    view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
+                }
+            }
+            catch { source = "PROPERTY_VIEW_LOOKUP_ERROR"; return false; }
+            if (targetView == null)
+            {
+                source = "PROPERTY_VIEW_NOT_FOUND";
+                return false;
+            }
+
+            ModelDoc2 model = null;
+            try { model = targetView.ReferencedDocument as ModelDoc2; }
+            catch { source = "REFERENCED_MODEL_API_ERROR"; return false; }
+            if (model == null)
+            {
+                source = "REFERENCED_MODEL_NOT_LOADED";
+                return false;
+            }
+            string modelPath = "";
+            try { modelPath = model.GetPathName() ?? ""; }
+            catch { source = "MODEL_PATH_API_ERROR"; return false; }
+            if (!string.IsNullOrWhiteSpace(expectedPartPath) &&
+                !PathsEqualSafe(modelPath, expectedPartPath))
+            {
+                source = "PROPERTY_SOURCE_MODEL_MISMATCH";
+                return false;
+            }
+
+            string configuration = "";
+            try { configuration = targetView.ReferencedConfiguration ?? ""; }
+            catch { source = "VIEW_CONFIGURATION_API_ERROR"; return false; }
+            if (string.IsNullOrWhiteSpace(configuration))
+            {
+                source = "VIEW_CONFIGURATION_UNKNOWN";
+                return false;
+            }
+
+            string[] scopes = new[] { configuration, "" };
+            foreach (string scope in scopes)
+            {
+                try
+                {
+                    CustomPropertyManager mgr = model.Extension.get_CustomPropertyManager(scope);
+                    if (mgr == null) continue;
+                    string raw, resolved;
+                    bool wasResolved, linkedToParent;
+                    mgr.Get6("合番", true, out raw, out resolved,
+                        out wasResolved, out linkedToParent); // cached, no activation
+                    if (!wasResolved || string.IsNullOrWhiteSpace(resolved))
+                        continue;
+                    value = resolved;
+                    source = "SHEET_VIEW:" + propertyView + "|CONFIG:" +
+                        (string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope);
+                    return true;
+                }
+                catch { source = "PROPERTY_GET6_API_ERROR"; }
+            }
+            if (source == "SHEET_SOURCE_UNVERIFIED")
+                source = "PROPERTY_NOT_RESOLVED";
+            return false;
+        }
+
+        // Pure link validation: the fixed Drawing value and the linked Drawing
+        // value may look identical, but only the expression retains template
+        // integrity. An API failure must not be reported as a broken link.
+        private static DrawingGobanLinkAuditState EvaluateGobanLink(
+            string raw, bool rawApiSucceeded)
+        {
+            if (!rawApiSucceeded) return DrawingGobanLinkAuditState.Unavailable;
+            return Regex.IsMatch(raw ?? "",
+                    @"^\s*\$PRPSHEET\s*:\s*[""“”]合番[""“”]\s*$",
+                    RegexOptions.IgnoreCase)
+                ? DrawingGobanLinkAuditState.Valid
+                : DrawingGobanLinkAuditState.Invalid;
+        }
+
+#if DEBUG
+        // No SOLIDWORKS document, user file, BOM grid, or COM object is touched.
+        // This is a regression guard for the exact scenario requested by user.
+        private static void RunGobanLinkSelfTests()
+        {
+            CheckGobanSyntheticCase("LINKED_VALUE_MATCHES_BOM",
+                "$PRPSHEET:\"合番\"", true, "※単品搬入", "※単品搬入",
+                DrawingGobanLinkAuditState.Valid, DrawingBomCheckStatus.OK);
+            CheckGobanSyntheticCase("HARDCODE_VALUE_MATCHES_BOM",
+                "※単品搬入", true, "※単品搬入", "※単品搬入",
+                DrawingGobanLinkAuditState.Invalid, DrawingBomCheckStatus.NG);
+            CheckGobanSyntheticCase("WRONG_PROPERTY_LINK",
+                "$PRPSHEET:\"材質\"", true, "※単品搬入", "※単品搬入",
+                DrawingGobanLinkAuditState.Invalid, DrawingBomCheckStatus.NG);
+            CheckGobanSyntheticCase("MISSING_DISPLAY",
+                "$PRPSHEET:\"合番\"", true, "", "※単品搬入",
+                DrawingGobanLinkAuditState.Valid, DrawingBomCheckStatus.Warning);
+            CheckGobanSyntheticCase("RAW_API_ERROR",
+                "", false, "※単品搬入", "※単品搬入",
+                DrawingGobanLinkAuditState.Unavailable, DrawingBomCheckStatus.Warning);
+            LogDebug("[GOBAN LINK SELFTEST] ALL_PASS count=5 source=SYNTHETIC_ONLY");
+        }
+
+        private static void CheckGobanSyntheticCase(
+            string name, string raw, bool rawReadSucceeded,
+            string drawingValue, string bomValue,
+            DrawingGobanLinkAuditState expectedLink,
+            DrawingBomCheckStatus expectedStatus)
+        {
+            var data = new DrawingDisplayedData
+            {
+                GobanLinkAuditState = EvaluateGobanLink(raw, rawReadSucceeded),
+                GobanLinkRawExpression = raw
+            };
+            DrawingBomFieldResult field = CompareGobanField(drawingValue, bomValue);
+            ApplyGobanTemplateLinkAudit(field, data, false);
+            if (data.GobanLinkAuditState != expectedLink ||
+                field.Status != expectedStatus)
+            {
+                throw new InvalidOperationException(
+                    "[GOBAN LINK SELFTEST] FAIL case=" + name +
+                    " link=" + data.GobanLinkAuditState +
+                    " status=" + field.Status);
+            }
+            LogDebug("[GOBAN LINK SELFTEST] PASS case=" + name +
+                " link=" + data.GobanLinkAuditState +
+                " status=" + field.Status);
+        }
+#endif
+
+        private static bool PathsEqualSafe(string first, string second)
+        {
+            try
+            {
+                return !string.IsNullOrWhiteSpace(first) &&
+                    !string.IsNullOrWhiteSpace(second) &&
+                    string.Equals(Path.GetFullPath(first), Path.GetFullPath(second),
+                        StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private void LogGobanAbDisplayProbe(
+            ModelDoc2 drawingModel, List<TableDiagnosticInfo> tables)
+        {
+            if (tables == null) return;
+            string currentDrawingPath = "";
+            try { currentDrawingPath = drawingModel.GetPathName() ?? ""; }
+            catch { }
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.RowCount != 1 || table.ColumnCount != 2)
+                    continue;
+                TableCellDiagnosticInfo label = FindTableCell(table, 0, 0);
+                TableCellDiagnosticInfo value = FindTableCell(table, 0, 1);
+                if (label == null || value == null ||
+                    !string.Equals(CleanTableCellText(label.DisplayedText),
+                        "合番", StringComparison.Ordinal))
+                    continue;
+                LogDebug("[GOBAN AB DISPLAY] mode=" +
+                    (strictHiddenBatch ? "STRICT_HIDDEN_BATCH" : "NORMAL_BATCH") +
+                    " process=" + Process.GetCurrentProcess().Id +
+                    " drawing=\"" + currentDrawingPath + "\"" +
+                    " table=" + table.Index +
+                    " rawRead=" + value.RawTextReadSucceeded +
+                    " raw=\"" + (value.RawText ?? "") + "\"" +
+                    " display2=\"" + (value.ApiDisplayedText ?? "") + "\"" +
+                    " display2Hidden=\"" + (value.ApiDisplayedTextWithHidden ?? "") + "\"" +
+                    " selected=\"" + (value.DisplayedText ?? "") + "\"" +
+                    " source=" + (value.ValueSource ?? ""));
             }
         }
 
@@ -2768,8 +3457,10 @@ namespace ADDIN.Commands
             {
                 if (openedAssemblyByCommand && assemblyModel != null && swApp != null)
                 {
-                    try { swApp.CloseDoc(assemblyModel.GetTitle()); }
-                    catch { }
+                    string closeTitle = "";
+                    try { closeTitle = assemblyModel.GetTitle(); } catch { }
+                    SafeCloseDocument(closeTitle);
+                    assemblyModel = null;
                 }
             }
         }
@@ -5283,7 +5974,12 @@ namespace ADDIN.Commands
                 {
                     try
                     {
-                        drawing.ActivateSheet(sheetName);
+                        Sheet curSheet = drawing.GetCurrentSheet() as Sheet;
+                        string curName = curSheet != null ? (curSheet.GetName() ?? "").Trim() : "";
+                        if (!string.Equals(curName, sheetName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            drawing.ActivateSheet(sheetName);
+                        }
                     }
                     catch
                     {
@@ -5312,6 +6008,100 @@ namespace ADDIN.Commands
             }
         }
 
+        // Diagnostic: enumerate open documents in the same SOLIDWORKS
+        // process. Never reuse a same-named Drawing from a different folder.
+        // Never activate or close a user-owned document.
+        private ModelDoc2 FindOpenDrawingByExactPath(string expectedDrawingPath)
+        {
+            if (swApp == null || string.IsNullOrWhiteSpace(expectedDrawingPath))
+                return null;
+
+            string expected;
+            try { expected = Path.GetFullPath(expectedDrawingPath); }
+            catch (Exception ex)
+            {
+                LogDebug("[DRAWING OPEN DOC SCAN] invalid expected path " +
+                    ex.GetType().Name);
+                return null;
+            }
+
+            try
+            {
+                ModelDoc2 direct = swApp.GetOpenDocumentByName(expected) as ModelDoc2;
+                if (direct != null)
+                {
+                    string directPath = direct.GetPathName() ?? "";
+                    string fullDirect = "";
+                    try { fullDirect = Path.GetFullPath(directPath); } catch { }
+                    if (string.Equals(expected, fullDirect,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        LogDebug("[DRAWING OPEN DOC SCAN] direct=EXACT_MATCH " +
+                            "path=" + fullDirect);
+                        return direct;
+                    }
+                    LogDebug("[DRAWING OPEN DOC SCAN] direct=PATH_MISMATCH " +
+                        "path=" + directPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[DRAWING OPEN DOC SCAN] direct=ERROR " +
+                    ex.GetType().Name + " " + ex.Message);
+            }
+
+            int scanned = 0, sameNameDifferentPath = 0;
+            ModelDoc2 exact = null;
+            try
+            {
+                object openDocs = swApp.GetDocuments();
+                Array docs = openDocs as Array;
+                if (docs != null)
+                {
+                    foreach (object entry in docs)
+                    {
+                        ModelDoc2 doc = entry as ModelDoc2;
+                        if (doc == null) continue;
+                        string candidatePath = "";
+                        try { candidatePath = doc.GetPathName() ?? ""; }
+                        catch { continue; }
+                        scanned++;
+                        if (string.IsNullOrWhiteSpace(candidatePath)) continue;
+                        string fullPath;
+                        try { fullPath = Path.GetFullPath(candidatePath); }
+                        catch { continue; }
+
+                        if (string.Equals(fullPath, expected,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            exact = doc;
+                            break;
+                        }
+                        if (string.Equals(Path.GetFileName(fullPath),
+                                Path.GetFileName(expected),
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            sameNameDifferentPath++;
+                            LogDebug("[DRAWING OPEN DOC SCAN] SAME_NAME_DIFFERENT_PATH " +
+                                "target=" + expected + " open=" + fullPath);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[DRAWING OPEN DOC SCAN] enumeration=ERROR " +
+                    ex.GetType().Name + " " + ex.Message);
+            }
+
+            LogDebug("[DRAWING OPEN DOC SCAN] process=" +
+                Process.GetCurrentProcess().Id + " scanned=" + scanned +
+                " exactMatch=" + (exact != null) +
+                " sameNameOtherPath=" + sameNameDifferentPath +
+                " target=" + expected);
+            return exact;
+        }
+
         private ModelDoc2 OpenDrawingDocumentSilent(string drawingPath, out bool openedByCommand)
         {
             openedByCommand = false;
@@ -5319,42 +6109,55 @@ namespace ADDIN.Commands
             if (string.IsNullOrWhiteSpace(drawingPath) || !File.Exists(drawingPath))
                 return null;
 
-            ModelDoc2 openDoc = swApp.GetOpenDocumentByName(drawingPath) as ModelDoc2;
+            // GetOpenDocumentByName can return null for a document that the
+            // user believes is already open (different folder, session, etc.).
+            // Verify full path and enumerate THIS ISldWorks session before
+            // concluding the Drawing must be opened invisibly.
+            ModelDoc2 openDoc = FindOpenDrawingByExactPath(drawingPath);
             if (openDoc != null)
+            {
+                LogDebug("[DRAWING REUSE] path=" + drawingPath +
+                    " openedByCommand=False (user-owned document preserved)");
                 return openDoc;
+            }
+            LogDebug("[DRAWING REUSE] exact match unavailable; hidden OpenDoc6 required");
 
             int errors = 0;
             int warnings = 0;
-            bool restoreVisibility = false;
-
+            int docType = (int)swDocumentTypes_e.swDocDRAWING;
+            bool visibilityChanged = false;
+            bool restoreTo = true;
             try
             {
-                // A visible document window is required for drawing-side linked
-                // text evaluation. Silent still suppresses opening prompts.
-                swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocDRAWING);
-                restoreVisibility = true;
+                if (strictHiddenBatch)
+                {
+                    restoreTo = swApp.GetDocumentVisible(docType);
+                    swApp.DocumentVisible(false, docType);
+                    visibilityChanged = true;
+                    LogDebug("[STRICT HIDDEN OPEN] visible=false path=" + drawingPath);
+                }
+                else
+                {
+                    swApp.DocumentVisible(true, docType);
+                    visibilityChanged = true;
+                }
 
-                int openOptions = (int)(swOpenDocOptions_e.swOpenDocOptions_Silent | swOpenDocOptions_e.swOpenDocOptions_ReadOnly);
-                ModelDoc2 openedDoc = swApp.OpenDoc6(
-                    drawingPath,
-                    (int)swDocumentTypes_e.swDocDRAWING,
-                    openOptions,
-                    "",
-                    ref errors,
-                    ref warnings) as ModelDoc2;
-
-                openedByCommand = (openedDoc != null);
+                int openOptions = (int)(swOpenDocOptions_e.swOpenDocOptions_Silent |
+                    swOpenDocOptions_e.swOpenDocOptions_ReadOnly);
+                ModelDoc2 openedDoc = swApp.OpenDoc6(drawingPath, docType,
+                    openOptions, "", ref errors, ref warnings) as ModelDoc2;
+                openedByCommand = openedDoc != null;
+                LogDebug("[DRAWING OPEN] hidden=" + strictHiddenBatch +
+                    " success=" + openedByCommand + " errors=" + errors +
+                    " warnings=" + warnings);
                 return openedDoc;
             }
             finally
             {
-                if (restoreVisibility)
+                if (visibilityChanged)
                 {
-                    try
-                    {
-                        swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocDRAWING);
-                    }
-                    catch { }
+                    try { swApp.DocumentVisible(restoreTo, docType); }
+                    catch (Exception ex) { LogDebug("[DRAWING VISIBILITY RESTORE ERROR] " + ex); }
                 }
             }
         }
@@ -5844,6 +6647,78 @@ namespace ADDIN.Commands
             return Regex.IsMatch(text ?? "", @"\$PRP(?:SHEET|MODEL|VIEW)?\s*:", RegexOptions.IgnoreCase);
         }
 
+        // Only used when a table's anchor is outside the sheet. Compare the
+        // actual table rectangle with sheet bounds rather than dropping it from
+        // an anchor-point test. Dimensions returned by the API are in meters.
+        // On unknown anchors / invalid dimensions, fail closed to avoid using
+        // content outside the sheet as Drawing evidence.
+        private static bool TableFootprintOverlapsSheet(
+            ITableAnnotation table, double x, double y, int rows, int columns,
+            SheetFrameBounds sheet, out string diagnostic)
+        {
+            diagnostic = "geometry=UNAVAILABLE";
+            if (table == null || sheet == null || !sheet.IsValid ||
+                rows < 1 || columns < 1 || rows > 500 || columns > 500)
+                return false;
+
+            try
+            {
+                double width = 0.0, height = 0.0;
+                for (int c = 0; c < columns; c++)
+                    width += table.GetColumnWidth(c);
+                for (int r = 0; r < rows; r++)
+                    height += table.GetRowHeight(r);
+                if (!(width > 0.0 && height > 0.0) ||
+                    double.IsNaN(width) || double.IsNaN(height) ||
+                    double.IsInfinity(width) || double.IsInfinity(height))
+                    return false;
+
+                double minX, maxX, minY, maxY;
+                int anchorType = table.AnchorType;
+                switch ((swBOMConfigurationAnchorType_e)anchorType)
+                {
+                    case swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_TopLeft:
+                        minX = x; maxX = x + width;
+                        minY = y - height; maxY = y;
+                        break;
+                    case swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_TopRight:
+                        minX = x - width; maxX = x;
+                        minY = y - height; maxY = y;
+                        break;
+                    case swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_BottomLeft:
+                        minX = x; maxX = x + width;
+                        minY = y; maxY = y + height;
+                        break;
+                    case swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_BottomRight:
+                        minX = x - width; maxX = x;
+                        minY = y; maxY = y + height;
+                        break;
+                    default:
+                        diagnostic = "anchorType=" + anchorType + " unsupported";
+                        return false;
+                }
+
+                // Rectangle intersection is not evidence that every cell is
+                // visible. Subsequent parsing still requires the exact 合番
+                // header and the Drawing's own displayed cell value.
+                bool overlaps = maxX >= sheet.MinX - DrawingFrameEpsilon &&
+                    minX <= sheet.MaxX + DrawingFrameEpsilon &&
+                    maxY >= sheet.MinY - DrawingFrameEpsilon &&
+                    minY <= sheet.MaxY + DrawingFrameEpsilon;
+                diagnostic = "anchorType=" + anchorType +
+                    " X=[" + minX.ToString("F6", CultureInfo.InvariantCulture) +
+                    "," + maxX.ToString("F6", CultureInfo.InvariantCulture) +
+                    "] Y=[" + minY.ToString("F6", CultureInfo.InvariantCulture) +
+                    "," + maxY.ToString("F6", CultureInfo.InvariantCulture) + "]";
+                return overlaps;
+            }
+            catch (Exception e)
+            {
+                diagnostic = "geometry=ERROR " + e.GetType().Name;
+                return false;
+            }
+        }
+
         private TableDiagnosticInfo ExtractTableInfo(
             ITableAnnotation table,
             string viewName,
@@ -5903,10 +6778,27 @@ namespace ADDIN.Commands
 
                         if (!tableAnchorInside)
                         {
+                            // GetPosition() refers to AnchorType, not necessarily the
+                            // top-left corner. A BottomLeft/BottomRight anchor may be
+                            // a few mm below Y=0 while table cells remain on the sheet.
+                            // Use real row/column dimensions and anchor orientation.
+                            string footprintDetails;
+                            bool footprintOverlaps = TableFootprintOverlapsSheet(
+                                table, tableX, tableY, rowCount, colCount,
+                                frameBounds, out footprintDetails);
                             LogDebug(
-                                $"[TABLE FRAME FILTER] table={index} " +
-                                "SKIP_TABLE reason=ANCHOR_OUTSIDE_SHEET");
-                            return null;
+                                $"[TABLE FRAME FOOTPRINT] table={index} " +
+                                $"intersects={footprintOverlaps} {footprintDetails}");
+                            if (!footprintOverlaps)
+                            {
+                                LogDebug(
+                                    $"[TABLE FRAME FILTER] table={index} " +
+                                    "SKIP_TABLE reason=FOOTPRINT_OUTSIDE_SHEET");
+                                return null;
+                            }
+                            LogDebug(
+                                $"[TABLE FRAME RECOVER] table={index} " +
+                                "anchor outside but table footprint intersects sheet");
                         }
                     }
                     else
@@ -5940,9 +6832,10 @@ namespace ADDIN.Commands
                         string apiDisplayedText = "";
                         string apiDisplayedTextWithHidden = "";
                         string rawText = "";
+                        bool rawReadSucceeded = false;
                         try { apiDisplayedText = table.get_DisplayedText2(r, c, false) ?? ""; } catch { }
                         try { apiDisplayedTextWithHidden = table.get_DisplayedText2(r, c, true) ?? ""; } catch { }
-                        try { rawText = table.get_Text(r, c) ?? ""; } catch { }
+                        try { rawText = table.get_Text(r, c) ?? ""; rawReadSucceeded = true; } catch { }
 
                         string valueSource;
                         string displayText = SelectDrawingTableText(
@@ -5975,6 +6868,7 @@ namespace ADDIN.Commands
                             ApiDisplayedText = apiDisplayedText,
                             ApiDisplayedTextWithHidden = apiDisplayedTextWithHidden,
                             RawText = rawText,
+                            RawTextReadSucceeded = rawReadSucceeded,
                             ValueSource = valueSource,
                             X = cellX,
                             Y = cellY
@@ -5990,11 +6884,103 @@ namespace ADDIN.Commands
                         $"anchorX={tableX:F6} anchorY={tableY:F6}");
                 }
 
+                if (strictHiddenBatch)
+                    ProbeExportedGobanTableText(table, tableInfo);
+
                 return tableInfo;
             }
             catch
             {
                 return null;
+            }
+        }
+
+        // A/B diagnostic ONLY. Save the Drawing's *own* table to a temporary
+        // text file to check whether SOLIDWORKS exposes its rendered cell text
+        // through a second API while the Drawing is invisible. This does not
+        // read custom properties and NEVER sets a value or status.
+        private void ProbeExportedGobanTableText(
+            ITableAnnotation table, TableDiagnosticInfo info)
+        {
+            if (gobanTableExportProbeDone || table == null || info == null)
+                return;
+
+            bool hasUnresolvedGobanCell = false;
+            foreach (TableCellDiagnosticInfo label in info.Cells)
+            {
+                if (label == null ||
+                    !string.Equals(CleanTableCellText(label.DisplayedText),
+                        "合番", StringComparison.Ordinal))
+                    continue;
+                TableCellDiagnosticInfo value =
+                    FindTableCell(info, label.Row, label.Column + 1);
+                if (value == null || !string.IsNullOrWhiteSpace(value.DisplayedText))
+                    continue;
+                string raw = value.RawText ?? "";
+                if (Regex.IsMatch(raw,
+                    @"^\s*\$PRPSHEET\s*:\s*[""“”]?合番[""“”]?\s*$",
+                    RegexOptions.IgnoreCase))
+                {
+                    hasUnresolvedGobanCell = true;
+                    break;
+                }
+            }
+            if (!hasUnresolvedGobanCell)
+                return;
+
+            // Exactly one table probe, even if the COM export fails. The probe
+            // is intentionally not invoked for every Drawing in a 12-row batch.
+            gobanTableExportProbeDone = true;
+            string tempFile = Path.Combine(Path.GetTempPath(),
+                "TAI_GOBAN_TABLE_PROBE_" + Guid.NewGuid().ToString("N") + ".txt");
+            try
+            {
+                bool exported = table.SaveAsText2(tempFile, "\t", false);
+                if (!exported || !File.Exists(tempFile))
+                {
+                    LogDebug("[GOBAN TABLE EXPORT PROBE] success=False fileCreated=" +
+                        File.Exists(tempFile));
+                    return;
+                }
+
+                // Limit log content and read effort; Japanese Windows commonly
+                // writes Shift-JIS. Detect BOM when present.
+                FileInfo fi = new FileInfo(tempFile);
+                if (fi.Length > 1024 * 1024)
+                {
+                    LogDebug("[GOBAN TABLE EXPORT PROBE] skipped=TOO_LARGE");
+                    return;
+                }
+                string exportedText;
+                using (var reader = new StreamReader(tempFile,
+                    Encoding.GetEncoding(932), true))
+                    exportedText = reader.ReadToEnd();
+                string normalized = exportedText.Replace("\r", "\\r")
+                    .Replace("\n", "\\n").Replace("\t", " | ");
+                if (normalized.Length > 400)
+                    normalized = normalized.Substring(0, 400) + "...";
+                LogDebug("[GOBAN TABLE EXPORT PROBE] success=True table=" +
+                    info.Index + " bytes=" + fi.Length +
+                    " formulaPresent=" +
+                    (exportedText.IndexOf("$PRPSHEET",
+                        StringComparison.OrdinalIgnoreCase) >= 0) +
+                    " preview=\"" + normalized + "\"");
+                LogDebug("[GOBAN TABLE EXPORT PROBE] status=DIAGNOSTIC_ONLY " +
+                    "neverPromoteExportToDrawing=True");
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[GOBAN TABLE EXPORT PROBE] ERROR " +
+                    ex.GetType().Name + " " + ex.Message);
+            }
+            finally
+            {
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); }
+                catch (Exception ex)
+                {
+                    LogDebug("[GOBAN TABLE EXPORT PROBE] TEMP_DELETE_FAILED " +
+                        ex.GetType().Name);
+                }
             }
         }
 
@@ -7577,6 +8563,7 @@ namespace ADDIN.Commands
             public string ApiDisplayedText { get; set; }
             public string ApiDisplayedTextWithHidden { get; set; }
             public string RawText { get; set; }
+            public bool RawTextReadSucceeded { get; set; }
             public string ValueSource { get; set; }
 
             public double X { get; set; }

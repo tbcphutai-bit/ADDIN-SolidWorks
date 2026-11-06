@@ -1,0 +1,94 @@
+case,run,observation_role,ordinal,status,support_type,original_support_owner_preserved,fixed_relation_count,convert_useedge_relation_count,dangling,overdefining,native_identity_exact,created_corner,checked_after_corner,kind
+2222 fr5 x fr6,native2222_26,selected_final_candidate,1,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,2,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,3,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,4,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,5,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,6,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,7,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,8,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,9,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,10,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,11,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,12,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,13,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,14,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,15,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,16,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,17,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,18,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,19,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,20,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,21,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,22,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2222 fr5 x fr6,native2222_26,selected_final_candidate,23,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,24,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,25,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,26,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,27,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,28,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,29,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,30,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,31,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,32,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2222 fr5 x fr6,native2222_26,selected_final_candidate,33,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2354 fr04 x fr03 non90,native2354_final27,selected_final_candidate,1,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2354 fr04 x fr03 non90,native2354_final27,selected_final_candidate,2,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2354 fr04 x fr03 non90,native2354_final27,selected_final_candidate,3,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2354 fr04 x fr03 non90,native2354_final27,selected_final_candidate,4,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2354 fr04 x fr03 non90,native2354_final27,selected_final_candidate,5,3,2,True,0,0,0,0,True,1,1,OWNED_GUIDE
+2354 fr04 x fr03 non90,native2354_final27,selected_final_candidate,6,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2354 fr04 x fr03 non90,native2354_final27,selected_final_candidate,7,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+2354 fr04 x fr03 non90,native2354_final27,selected_final_candidate,8,3,2,True,0,0,0,0,True,1,1,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,1,3,2,True,0,0,0,0,True,1,4,OWNED_GUIDE
+4458 four corner regression,regression4458_final29,required_regression,2,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,3,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,4,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,5,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,6,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,7,3,2,True,0,0,0,0,True,2,4,OWNED_GUIDE
+4458 four corner regression,regression4458_final29,required_regression,8,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,9,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,10,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,11,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,12,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,13,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,14,3,2,True,0,0,0,0,True,1,4,OWNED_GUIDE
+4458 four corner regression,regression4458_final29,required_regression,15,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,16,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,17,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,18,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,19,3,2,True,0,0,0,0,True,1,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,20,3,2,True,0,0,0,0,True,2,4,OWNED_GUIDE
+4458 four corner regression,regression4458_final29,required_regression,21,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,22,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,23,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,24,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,25,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,26,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,27,3,2,True,0,0,0,0,True,2,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,28,3,2,True,0,0,0,0,True,3,4,OWNED_GUIDE
+4458 four corner regression,regression4458_final29,required_regression,29,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,30,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,31,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,32,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,33,3,2,True,0,0,0,0,True,4,4,OWNED_GUIDE
+4458 four corner regression,regression4458_final29,required_regression,34,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,35,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,36,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,37,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,38,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,39,3,2,True,0,0,0,0,True,3,4,OWNED_GUIDE
+4458 four corner regression,regression4458_final29,required_regression,40,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,41,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,42,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,43,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,44,3,2,True,0,0,0,0,True,3,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,45,3,2,True,0,0,0,0,True,4,4,OWNED_GUIDE
+4458 four corner regression,regression4458_final29,required_regression,46,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,47,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,48,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,49,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,50,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,51,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH
+4458 four corner regression,regression4458_final29,required_regression,52,3,2,True,0,0,0,0,True,4,4,CUT_SKETCH

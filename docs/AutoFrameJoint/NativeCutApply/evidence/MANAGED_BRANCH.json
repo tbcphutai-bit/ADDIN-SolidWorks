@@ -1,0 +1,294 @@
+{
+  "status": "PASS_MANAGED_CONTRACT",
+  "installed_addin_test": "NOT_RUN",
+  "real_api_or_body2": "NOT_RUN",
+  "preview_delegate_calls": 6,
+  "simulated_interface_calls": 1758,
+  "interface_access_inside_selection_callbacks": 0,
+  "native_label_interface_calls": 0,
+  "page_message_proxy_calls": 11,
+  "tests": [
+    {
+      "test": "A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "BUTTON_107_DEFERRED_PREVIEW_DELEGATE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "BUTTON_108_DEFERRED_PREVIEW_DELEGATE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "FOREIGN_THREAD_SUBMIT_REFUSED",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "FINISH_CANCELS_QUEUED_PREVIEW_AND_CLOSES_ONCE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "FINISH_DURING_RUNNING_BACKEND_IS_RETAINED",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "FINISH_PRIORITY_BLOCKS_NEW_BACKEND_AND_SELECTION_REFRESH",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "STANDARD_NATIVE_CLOSE_INVALIDATES_PENDING_FINISH",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "NORMAL_CLOSE_EXCEPTION_ALLOWS_EXPLICIT_FINISH_RETRY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CACHE_REPEATED_P1_HAS_NO_BODY_COPY_DISPLAY_HIDE_OR_REDRAW",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CACHE_P1_TO_P2_DISPLAYS_ONLY_REMOVED_AND_REDRAWS_ONCE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CACHE_P2_TO_P1_HIDES_ONLY_REMOVED_AND_REDRAWS_ONCE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CACHE_INVALIDATED_BY_DOCUMENT_AND_BODY_STAMPS",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CACHE_INVALIDATED_BY_CONFIGURATION_AND_FULL_TRANSFORM",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CACHE_INVALIDATED_BY_SOURCE_BODY_IDENTITY_AND_AB_ORDER",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CACHE_REQUIRES_CONCLUSIVE_COMPONENT_AND_PART_IDENTITY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CACHE_STAMP_FAILURE_AND_NONFINITE_TRANSFORM_DISABLE_REUSE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CLEAR_DROPS_CACHE_AFTER_HIDING_ALL_DISPLAYED_BODIES",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "HIDE_FAILURE_RETAINS_OWNERSHIP_FOR_EXPLICIT_RETRY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "NONZERO_DISPLAY3_STATUS_IS_FAILURE_AND_DROPS_CACHE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CLOSE_WHILE_COMPUTING_WITH_NO_BODY_RETAINS_SESSION",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "REENTRANT_NATIVE_CLOSE_STOPS_FURTHER_DISPLAY_AND_DRAINS_SESSION",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "GREEN_OK_RECORDS_INTENT_ONLY_APPLY_RUNS_AFTER_CLOSE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CANCEL_ESCAPE_OTHER_CLOSE_REASONS_NEVER_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "BUTTON_106_USES_SAME_OK_INTENT_OUTSIDE_BUTTON_CALLBACK",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "BUSY_GREEN_OK_RETURNS_DOCUMENTED_S_FALSE_WITHOUT_INVALIDATING_PAGE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CANCEL_AFTER_DEFERRED_OK_CLEARS_APPLY_INTENT",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "APPLY_EXCEPTION_STILL_CLEANS_GHOST_AND_CLOSES_OWNER",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "NATIVE_WRITER_REJECTS_STALE_OR_CONSUMED_TICKET_BEFORE_PART_ACCESS",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "NATIVE_WRITER_REFUSES_UNVERIFIED_RULE_MAPPING",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "NATIVE_WRITER_FOREIGN_APARTMENT_HAS_ZERO_COM_CALLS",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "CUT_DIRECTION_COMES_FROM_NATIVE_SKETCH_ALIGNMENT",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "NATIVE_NORMAL_CUT_IS_EXPLICIT_SINGLE_LAYER_POLICY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "NO_REVIEWED_PREVIEW_CANNOT_PREPARE_NATIVE_TICKET",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "COUNT_ONE_PAIR_REPLACEMENT_DEFERS_OK_UNTIL_FRESH_IDENTITY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "ACCEPTED_SUBMIT_INVALIDATES_OK_BEFORE_LIST_NOTIFICATION",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "REMOVED_SELECTION_PREVENTS_OK_AND_FINISH_APPLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "REFERENCE_PATH_CHECK_COVERS_UNRESOLVED_OCCURRENCE_IDENTITY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "FAILED_UNDO_RECORDING_CLOSURE_CANNOT_REPORT_VERIFIED_ROLLBACK",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    }
+  ]
+}

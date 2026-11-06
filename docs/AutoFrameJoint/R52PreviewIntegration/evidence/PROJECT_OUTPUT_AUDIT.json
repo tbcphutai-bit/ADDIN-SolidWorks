@@ -1,0 +1,63 @@
+{
+  "groups": [
+    {
+      "condition": "unconditional",
+      "properties": {
+        "Deterministic": "true"
+      }
+    },
+    {
+      "condition": " '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ",
+      "properties": {
+        "DebugType": "full",
+        "OutputPath": "bin\\Debug\\",
+        "DefineConstants": "DEBUG;TRACE"
+      }
+    },
+    {
+      "condition": " '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ",
+      "properties": {
+        "DebugType": "pdbonly",
+        "OutputPath": "bin\\Release\\",
+        "DefineConstants": "TRACE"
+      }
+    },
+    {
+      "condition": "'$(Configuration)|$(Platform)' == 'Debug|x64'",
+      "properties": {
+        "OutputPath": "<EXISTING_ADDIN_OUTPUT>/",
+        "DefineConstants": "DEBUG;TRACE",
+        "DebugType": "full",
+        "PlatformTarget": "x64"
+      }
+    },
+    {
+      "condition": "'$(Configuration)|$(Platform)' == 'Release|x64'",
+      "properties": {
+        "OutputPath": "bin\\x64\\Release\\",
+        "DefineConstants": "TRACE",
+        "DebugType": "pdbonly",
+        "PlatformTarget": "x64"
+      }
+    },
+    {
+      "condition": "unconditional",
+      "properties": {
+        "PreBuildEvent": "",
+        "PostBuildEvent": ""
+      }
+    }
+  ],
+  "afj_compile_includes": [
+    "UI\\AutoFrameJointTaskPaneLauncher.cs",
+    "UI\\AutoFrameJoint\\AutoFrameJointSelectionPage.cs",
+    "Commands\\AutoFrameJoint\\AutoFrameJointCommandEntry.cs",
+    "Commands\\AutoFrameJoint\\AutoFrameJointReadOnlyProbe.cs",
+    "Commands\\AutoFrameJoint\\AutoFrameJointGeometryMath.cs",
+    "Commands\\AutoFrameJoint\\AutoFrameJointGhostPreview.cs",
+    "Commands\\AutoFrameJoint\\AutoFrameJointGhostSessionManager.cs"
+  ],
+  "project_changed": false,
+  "evaluated_by": "XML_READ_ONLY_NO_MSBUILD",
+  "post_build_copy_commands": 0
+}

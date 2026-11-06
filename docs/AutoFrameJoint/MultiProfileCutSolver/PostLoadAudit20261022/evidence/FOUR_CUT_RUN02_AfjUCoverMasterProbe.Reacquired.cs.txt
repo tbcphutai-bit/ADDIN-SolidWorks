@@ -1,0 +1,366 @@
+// PRIVATE GATE 2. Compile only with a detached AFJ harness candidate.
+// No Cut, new plane, Convert or FIX; one ToolClosureMargin dimension only.
+// Caller supplies fresh COPIED assembly/Parts and the current U generated plan.
+// Caller closes copies without Save and owns all source/copy hash checks.
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+namespace ADDIN.Commands.AutoFrameJoint
+{
+    internal static class AfjUCoverMasterProbe
+    {
+        internal sealed class Datum
+        {
+            internal Component2 Component;
+            internal object Native,Context;
+            internal string Kind,Role;
+            internal int OwnerFeatureId;
+            internal double[] PlaneWorld,SeedWorld;
+            internal bool SeedOnFiniteTrim;
+            internal double ClosestDistance;
+        }
+        internal sealed class PointEvidence
+        {
+            internal string Role,PointId;
+            internal double[] ExpectedWorld,ExpectedSketch,ObservedSketch;
+            internal Datum First,Second;
+            internal int[] AllowedFirst,AllowedSecond;
+            internal int FirstRelationType,SecondRelationType;
+            internal string Qualification;
+        }
+        internal sealed class Result
+        {
+            internal string Status="UNVERIFIED",Error,CoordinateContext="ASSEMBLY_WORLD_TO_TARGET_PART_TO_SKETCH",Scope="FULL_U_WINNER_SKETCH_ONLY_ONE_MARGIN_DIM_NO_CUT";
+            internal bool NativeApi,InstalledAddin=false,CutCreated=false,SaveApiCalled=false,OwnSupportVerified,SketchOwnerVerified,ContextRestored;
+            internal bool CriticalSeamNearMatchesPlan,AllPointsFullyConstrained,NoDimensions,NoNewPlanes;
+            internal int SketchFeatureId=-1,SupportReferenceType=-1,ConstraintStatus=-1,Relations=-1,Dangling=-1,Overdefining=-1;
+            internal int NewPlanes=-1,Dimensions=-1,ExternalReferences=-1;
+            internal string SketchName;
+            internal readonly List<PointEvidence> Points=new List<PointEvidence>();
+            internal int ProfileVertexCount,AxisRelations,CriticalDatumRelations,ClosureGuides,EqualMarginRelations;
+            internal double ToolClosureMargin,MarginDimensionValue;
+            internal string AxialClosureDatum,MarginDimensionName;
+            internal bool SeedPolygonUnchanged;
+            internal readonly List<Datum> ClosureDatums=new List<Datum>();
+        }
+        static void Need(bool b,string reason){if(!b)throw new InvalidOperationException("U_GATE2_UNVERIFIED: "+reason);}
+        static double Dot(double[] a,double[] b){return AfjParametricRules.Dot(a,b);}
+        static double[] Add(double[] a,double[] b){return AfjParametricRules.Add(a,b);}
+        static double[] Sub(double[] a,double[] b){return AfjParametricRules.Sub(a,b);}
+        static double[] Mul(double[] a,double b){return AfjParametricRules.Scale(a,b);}
+        static double Norm(double[] a){return Math.Sqrt(Dot(a,a));}
+        static double[] Unit(double[] a){return AfjParametricRules.Unit(a);}
+        static double[] Point(ISldWorks app,double[] p,MathTransform t){var math=app.GetMathUtility() as MathUtility;Need(math!=null,"MathUtility unavailable");var q=math.CreatePoint(p) as MathPoint;return ((MathPoint)q.MultiplyTransform(t)).ArrayData as double[];}
+        static double[] World(ISldWorks app,double[] p,Component2 c){return Point(app,p,c.GetTotalTransform(false));}
+        static double[] WorldVector(ISldWorks app,double[] p,Component2 c){var t=c.GetTotalTransform(false);return Unit(Sub(Point(app,p,t),Point(app,new double[3],t)));}
+        static bool Same(ISldWorks app,object a,object b){return a!=null&&b!=null&&app.IsSame(a,b)==(int)swObjectEquality.swObjectSame;}
+        static Body2 NativeBody(Component2 c){object info;var raw=c.GetBodies3((int)swBodyType_e.swSolidBody,out info) as Array;Need(raw!=null&&raw.Length==1,"one native body required");return raw.GetValue(0) as Body2;}
+        static int Planes(ModelDoc2 part){int n=0,seen=0;for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(++seen<2000,"plane traversal bound");if(f.GetTypeName2()=="RefPlane")n++;}return n;}
+        static HashSet<int> Ids(ModelDoc2 part){var ids=new HashSet<int>();for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(ids.Count<2000,"feature traversal bound");ids.Add(f.GetID());}return ids;}
+        static Feature FindFeature(ModelDoc2 part,int id){int n=0;for(Feature f=part.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature){Need(++n<2000,"owned feature traversal bound");if(f.GetID()==id)return f;}return null;}
+        static double[] Common(AfjParametricPlan plan,double s,double q){return Add(plan.JointOrigin,Add(Mul(plan.OutLoser,s),Mul(plan.OutWinner,q)));}
+        // PRIVATE SKETCH-ONLY per-Run cache. Never carry it across native Cuts,
+        // rebuilds, component movement, configuration changes or Run returns.
+        private sealed class CachedDatumFrame
+        {
+            internal Component2 Component;
+            internal double[] WorldMatrix,InverseMatrix;
+            internal readonly List<CachedDatumFace> Faces=new List<CachedDatumFace>();
+        }
+        private sealed class CachedDatumFace
+        {
+            internal Face2 Native;
+            internal double[] NormalWorld,PointWorld;
+            internal double Area=-1;
+            internal int Owner=-1;
+            internal object Context;
+            internal List<CachedDatumEdge> Edges;
+        }
+        private sealed class CachedDatumEdge
+        {
+            internal Edge Native;
+            internal double[] A,B,Direction;
+            internal double Length;
+            internal object Context;
+        }
+        private static readonly List<CachedDatumFrame> NativeDatumFrames=new List<CachedDatumFrame>();
+        private static void ClearNativeDatumCache(){NativeDatumFrames.Clear();}
+        private static double[] CachedWorld(CachedDatumFrame frame,double[] point){return AfjProfileAnalyzer.Transform(point,frame.WorldMatrix);}
+        private static double[] CachedNative(CachedDatumFrame frame,double[] point){return AfjProfileAnalyzer.Transform(point,frame.InverseMatrix);}
+        private static CachedDatumFrame NativeDatumFrame(Component2 component)
+        {
+            var existing=NativeDatumFrames.FirstOrDefault(f=>Object.ReferenceEquals(f.Component,component));if(existing!=null)return existing;
+            var timer=System.Diagnostics.Stopwatch.StartNew();var transform=component.GetTotalTransform(false);Need(transform!=null,"datum component transform unavailable");
+            var inverse=transform.Inverse() as MathTransform;Need(inverse!=null,"datum inverse unavailable");
+            var world=transform.ArrayData as double[];var native=inverse.ArrayData as double[];
+            Need(world!=null&&native!=null&&world.Length==16&&native.Length==16&&world.Concat(native).All(AfjTemporaryBoolean.Finite),"datum transform nonfinite or malformed");
+            var frame=new CachedDatumFrame{Component=component,WorldMatrix=(double[])world.Clone(),InverseMatrix=(double[])native.Clone()};
+            var raw=NativeBody(component).GetFaces() as Array;Need(raw!=null&&raw.Length<50000,"bounded native faces required");
+            double[] zero=CachedWorld(frame,new double[3]);
+            foreach(Face2 face in raw.Cast<object>().OfType<Face2>())
+            {
+                var surface=face.GetSurface() as Surface;if(surface==null||!surface.IsPlane())continue;
+                var p=surface.PlaneParams as double[];if(p==null||p.Length!=6||p.Any(v=>!AfjTemporaryBoolean.Finite(v)))continue;
+                frame.Faces.Add(new CachedDatumFace{Native=face,NormalWorld=Unit(Sub(CachedWorld(frame,p.Take(3).ToArray()),zero)),PointWorld=CachedWorld(frame,p.Skip(3).Take(3).ToArray())});
+            }
+            NativeDatumFrames.Add(frame);
+            System.Diagnostics.Trace.WriteLine("[U-DATUM-CACHE] phase=one_native_face_snapshot faces="+raw.Length+" planar="+frame.Faces.Count+" ms="+timer.ElapsedMilliseconds);
+            return frame;
+        }
+        private static int CachedOwner(CachedDatumFace face)
+        {
+            if(face.Owner>=0)return face.Owner;var owner=face.Native.GetFeature() as Feature;Need(owner!=null,"native datum owner unavailable");face.Owner=owner.GetID();return face.Owner;
+        }
+        private static List<CachedDatumEdge> CachedEdges(CachedDatumFrame frame,CachedDatumFace face)
+        {
+            if(face.Edges!=null)return face.Edges;var result=new List<CachedDatumEdge>();var raw=face.Native.GetEdges() as Array;Need(raw!=null&&raw.Length<10000,"bounded native support edges required");
+            foreach(Edge edge in raw.Cast<object>().OfType<Edge>())
+            {
+                var curve=edge.GetCurve() as Curve;if(curve==null||!curve.IsLine())continue;
+                var a=edge.GetStartVertex() as Vertex;var b=edge.GetEndVertex() as Vertex;if(a==null||b==null)continue;
+                var pa=a.GetPoint() as double[];var pb=b.GetPoint() as double[];if(pa==null||pb==null||pa.Length!=3||pb.Length!=3||pa.Concat(pb).Any(v=>!AfjTemporaryBoolean.Finite(v)))continue;
+                var wa=CachedWorld(frame,pa);var wb=CachedWorld(frame,pb);double length=Norm(Sub(wb,wa));if(length<1e-7)continue;
+                result.Add(new CachedDatumEdge{Native=edge,A=wa,B=wb,Length=length,Direction=Unit(Sub(wb,wa))});
+            }
+            face.Edges=result;return result;
+        }
+        static Datum FaceDatum(ISldWorks app,Component2 c,double[] expectedNormal,double[] seed,string role)
+        {
+            var frame=NativeDatumFrame(c);double support=Dot(seed,expectedNormal);
+            var matches=frame.Faces.Where(f=>Math.Abs(Math.Abs(Dot(f.NormalWorld,expectedNormal))-1)<1e-7&&Math.Abs(Dot(f.PointWorld,expectedNormal)-support)<1e-8).ToArray();
+            Need(matches.Length>0,"cached native Face plane datum unavailable: "+role);
+            // Area/owner/context/trim calls happen only for actual matching
+            // native planes, not for every face for every requested datum.
+            foreach(var face in matches)if(face.Area<0)face.Area=face.Native.GetArea();
+            foreach(var face in matches.OrderByDescending(f=>f.Area))
+            {
+                var local=CachedNative(frame,seed);var closest=face.Native.GetClosestPointOn(local[0],local[1],local[2]) as double[];if(closest==null||closest.Length<3)continue;
+                if(face.Context==null)face.Context=c.GetCorrespondingEntity(face.Native);if(!(face.Context is Face2))continue;
+                double distance=Norm(Sub(CachedWorld(frame,closest.Take(3).ToArray()),seed));
+                return new Datum{Component=c,Native=face.Native,Context=face.Context,Kind="ACTUAL_NATIVE_FACE_UNDERLYING_PLANE",Role=role,OwnerFeatureId=CachedOwner(face),PlaneWorld=face.NormalWorld.Concat(face.PointWorld).ToArray(),SeedWorld=seed,SeedOnFiniteTrim=distance<1e-8,ClosestDistance=distance};
+            }
+            throw new InvalidOperationException("U_GATE2_UNVERIFIED: matching native Face trim/context unavailable: "+role);
+        }
+        static Datum EdgeDatum(ISldWorks app,Component2 c,Face2 support,double[] worldDirection,double[] seed,string role)
+        {
+            var frame=NativeDatumFrame(c);var face=frame.Faces.FirstOrDefault(f=>Object.ReferenceEquals(f.Native,support));
+            Need(face!=null,"support Face is not from current per-Run native snapshot");
+            foreach(var edge in CachedEdges(frame,face))
+            {
+                if(Math.Abs(Math.Abs(Dot(edge.Direction,worldDirection))-1)>1e-7)continue;double along=Dot(Sub(seed,edge.A),edge.Direction);
+                var projection=Add(edge.A,Mul(edge.Direction,along));if(Norm(Sub(projection,seed))>1e-8||along< -1e-8||along>edge.Length+1e-8)continue;
+                if(edge.Context==null)edge.Context=c.GetCorrespondingEntity(edge.Native);if(!(edge.Context is Edge))continue;
+                return new Datum{Component=c,Native=edge.Native,Context=edge.Context,Kind="ACTUAL_NATIVE_FINITE_EDGE",Role=role,OwnerFeatureId=CachedOwner(face),SeedWorld=seed,SeedOnFiniteTrim=true,ClosestDistance=Norm(Sub(projection,seed))};
+            }
+            throw new InvalidOperationException("U_GATE2_UNVERIFIED: actual finite cached Web tangent edge unavailable: "+role);
+        }
+
+        static Datum AtSeed(ISldWorks app,Datum source,double[] seed)
+        {
+            double[] local=Point(app,seed,source.Component.GetTotalTransform(false).Inverse() as MathTransform),closest=null;
+            var face=source.Native as Face2;var edge=source.Native as Edge;
+            if(face!=null)closest=face.GetClosestPointOn(local[0],local[1],local[2]) as double[];
+            else if(edge!=null)closest=edge.GetClosestPointOn(local[0],local[1],local[2]) as double[];
+            Need(closest!=null&&closest.Length>=3,"datum trimmed witness unavailable at individual critical point");
+            double distance=Norm(Sub(World(app,closest.Take(3).ToArray(),source.Component),seed));
+            if(edge!=null)Need(distance<1e-8,"critical point outside actual finite tangent edge "+source.Role);
+            return new Datum{Component=source.Component,Native=source.Native,Context=source.Context,Kind=source.Kind,Role=source.Role,
+                OwnerFeatureId=source.OwnerFeatureId,PlaneWorld=source.PlaneWorld,SeedWorld=seed,SeedOnFiniteTrim=distance<1e-8,ClosestDistance=distance};
+        }
+        static int[] Allowed(Sketch sketch,params object[] entities){var values=sketch.RelationManager.GetAllowedRelations(entities.Select(e=>new DispatchWrapper(e)).ToArray()) as Array;return values==null?new int[0]:values.Cast<object>().Select(Convert.ToInt32).ToArray();}
+        static int Relate(Sketch sketch,SketchPoint point,object target){var relation=sketch.RelationManager.AddRelation(new[]{new DispatchWrapper(point),new DispatchWrapper(target)},(int)swConstraintType_e.swConstraintType_COINCIDENT) as SketchRelation;Need(relation!=null,"Coincident native relation returned null");return relation.GetRelationType();}
+        static string PointId(SketchPoint point){var raw=point.GetID() as Array;return raw==null?Convert.ToString(point.GetID()):String.Join(",",raw.Cast<object>().Select(Convert.ToString));}
+        static SketchPoint LineStart(SketchSegment segment){var line=segment as SketchLine;Need(line!=null,"only straight current winner contour supported");return line.GetStartPoint2() as SketchPoint;}
+        static SketchPoint LineEnd(SketchSegment segment){var line=segment as SketchLine;Need(line!=null,"only straight current winner contour supported");return line.GetEndPoint2() as SketchPoint;}
+        static int AddRelation(Sketch sketch,int kind,params object[] entities){Trace.WriteLine("[AFJ-U-MASTER] RELATION_BEGIN kind="+kind+" "+DateTime.UtcNow.ToString("o"));Trace.WriteLine("[AFJ-U-MASTER] ALLOWED="+String.Join(",",Allowed(sketch,entities)));var relation=sketch.RelationManager.AddRelation(entities.Select(e=>new DispatchWrapper(e)).ToArray(),kind) as SketchRelation;Need(relation!=null,"native relation returned null: "+kind);Trace.WriteLine("[AFJ-U-MASTER] RELATION_END kind="+kind);return relation.GetRelationType();}
+        static int Coincident(Sketch sketch,SketchPoint point,Datum datum){Need(Allowed(sketch,point,datum.Context).Contains((int)swConstraintType_e.swConstraintType_COINCIDENT),"Coincident not advertised: "+datum.Role);return Relate(sketch,point,datum.Context);}
+        static void CheckPolygon(SketchSegment[] segments,double[][] local)
+        {
+            for(int i=0;i<segments.Length;i++)
+            {
+                var a=LineStart(segments[i]);var b=LineEnd(segments[i]);
+                Need(Norm(Sub(new[]{a.X,a.Y,a.Z},local[i]))<1e-8&&Norm(Sub(new[]{b.X,b.Y,b.Z},local[(i+1)%local.Length]))<1e-8,"native constraint changed exact reviewed contour seed at index "+i);
+            }
+        }
+        internal static Result Run(ISldWorks app,ModelDoc2 model,Component2 longFrame,Component2 shortFrame,AfjParametricPlan plan)
+        {
+            ClearNativeDatumCache();
+            var result=new Result();var assembly=model as AssemblyDoc;ModelDoc2 part=null;Sketch sketch=null;bool editing=false,opened=false;
+            bool inputPreferenceRead=false,oldInputPreference=false;
+            try
+            {
+                Need(app!=null&&assembly!=null,"bound application/assembly required");result.NativeApi=true;
+                Need(Same(app,app.ActiveDoc,model)&&Same(app,assembly.GetEditTarget(),model),"active bound assembly outside edit context required");
+                Need(plan!=null&&plan.Folded==null&&(plan.Plan.RuleId=="ORTHOGONAL_U_COVER"||plan.Plan.RuleId=="ORTHOGONAL_U_TALLER_COVER"),"current U miter plan required");
+                Need(plan.Winner!=null&&plan.Loser!=null&&Math.Abs(plan.SeamNear[1]-plan.Loser.Thickness)<1e-8,"bounded eight-point clamped near seam mode required");result.CriticalSeamNearMatchesPlan=true;
+                part=shortFrame.GetModelDoc2() as ModelDoc2;var longPart=longFrame.GetModelDoc2() as ModelDoc2;
+                Need(part!=null&&longPart!=null&&!Same(app,part,longPart),"two independent resolved Parts required");
+                foreach(var source in new[]{part,longPart})
+                {
+                    int seen=0;for(Feature f=source.FirstFeature() as Feature;f!=null;f=f.GetNextFeature() as Feature)
+                    {Need(++seen<2000,"source tree bound");Need(!f.Name.StartsWith("AFJ_",StringComparison.Ordinal),"fresh pre-AFJ source history required");}
+                }
+                var cfg=part.ConfigurationManager.ActiveConfiguration;Need(cfg!=null&&cfg.Name==shortFrame.ReferencedConfiguration,"target configuration mismatch");
+                HashSet<int> beforeIds=Ids(part),longBeforeIds=Ids(longPart);int beforePlanes=Planes(part);
+                var operations=plan.Plan.A.Operations.Concat(plan.Plan.B.Operations).Where(o=>o.EvidenceId=="U_RULE:COVER_WEB_WALL").ToArray();
+                Need(operations.Length==1&&operations[0].Tools.Count==1,"exact current winner tool missing");var tool=operations[0].Tools[0];
+                Need(tool.Polygon.Length==8&&(tool.ArcCenters==null||tool.ArcCenters.All(a=>a==null)),"only current eight-line winner contour qualified");
+                double m=Math.Max(.01,5*Math.Max(plan.Loser.Thickness+plan.Loser.Radius,plan.Winner.Thickness+plan.Winner.Radius));result.ToolClosureMargin=m;
+                double sn=plan.SeamNear[0],sf=plan.SeamFar[0],qf=plan.SeamFar[1],innerFar=plan.Winner.Width-plan.Winner.Thickness;
+                double shortEnd=AfjParametricRules.Extreme(NativeBody(shortFrame),shortFrame.GetTotalTransform(false),plan.OutWinner,plan.JointOrigin);
+                double qMax=Math.Max(shortEnd,plan.Loser.MaxWidth)+m,sMin=plan.Winner.MinWidth-m,sMax=plan.Winner.MaxWidth+m;
+                double[][] sourceCoordinates={new[]{sMin,plan.Loser.Thickness},new[]{sn,plan.Loser.Thickness},new[]{sf,qf},new[]{innerFar,qf},new[]{innerFar,plan.Loser.Width},new[]{sMax,plan.Loser.Width},new[]{sMax,qMax},new[]{sMin,qMax}};
+                var seeds=sourceCoordinates.Select(p=>Common(plan,p[0],p[1])).ToArray();result.ProfileVertexCount=seeds.Length;
+                for(int i=0;i<seeds.Length;i++)
+                {
+                    double[] actual=Add(World(app,tool.Polygon[i],shortFrame),Mul(Unit(plan.Depth),AfjManufacturingConventions.CutterEnvelopeOverrun));
+                    Need(Norm(Sub(actual,seeds[i]))<1e-8,"derived intent does not equal current reviewed projected winner polygon at "+i);
+                }
+                Trace.WriteLine("[AFJ-U-MASTER] DATUMS_BEGIN "+DateTime.UtcNow.ToString("o"));
+                var ownWeb=FaceDatum(app,shortFrame,Unit(plan.Depth),seeds[1],"SHORT_OUTER_WEB_SUPPORT");
+                var longWeb=FaceDatum(app,longFrame,Unit(plan.Depth),seeds[2],"LONG_OUTER_WEB_DATUM");
+                var nearOwn=EdgeDatum(app,shortFrame,(Face2)ownWeb.Native,Unit(plan.OutWinner),seeds[1],"SHORT_NEAR_WEB_BEND_TANGENT");
+                var farOwn=EdgeDatum(app,shortFrame,(Face2)ownWeb.Native,Unit(plan.OutWinner),seeds[2],"SHORT_FAR_WEB_BEND_TANGENT");
+                var nearOther=FaceDatum(app,longFrame,Unit(plan.OutWinner),seeds[1],"LONG_INNER_NEAR_WALL_PLANE");
+                var farOther=EdgeDatum(app,longFrame,(Face2)longWeb.Native,Unit(plan.OutLoser),seeds[2],"LONG_FAR_WEB_BEND_TANGENT");
+                var innerOwn=FaceDatum(app,shortFrame,Unit(plan.OutLoser),seeds[3],"SHORT_INNER_FAR_WALL_PLANE");
+                var outerOther=FaceDatum(app,longFrame,Unit(plan.OutWinner),seeds[4],"LONG_OUTER_FAR_WALL_PLANE");
+                double[][] closureWorld={Common(plan,plan.Winner.MinWidth,plan.Loser.Thickness),Common(plan,plan.Winner.MaxWidth,plan.Loser.Width),Common(plan,sMax,qMax-m)};
+                var closureNear=FaceDatum(app,shortFrame,Unit(plan.OutLoser),closureWorld[0],"SHORT_NEAR_OUTER_SUPPORT_FOR_MARGIN");
+                var closureFar=FaceDatum(app,shortFrame,Unit(plan.OutLoser),closureWorld[1],"SHORT_MAX_PROFILE_SUPPORT_FOR_MARGIN");
+                bool endDominates=shortEnd>=plan.Loser.MaxWidth;
+                var closureAxial=FaceDatum(app,endDominates?shortFrame:longFrame,Unit(plan.OutWinner),closureWorld[2],endDominates?"SHORT_ACTUAL_AXIAL_END_FOR_MARGIN":"LONG_MAX_PROFILE_SUPPORT_FOR_MARGIN");
+                result.AxialClosureDatum=closureAxial.Role;
+                foreach(var source in new[]{ownWeb,longWeb,nearOwn,farOwn,nearOther,farOther,innerOwn,outerOther,closureNear,closureFar,closureAxial})
+                    Need((Same(app,source.Component,shortFrame)?beforeIds:longBeforeIds).Contains(source.OwnerFeatureId),"datum owner does not predate new Sketch");
+                Trace.WriteLine("[AFJ-U-MASTER] DATUMS_READY "+DateTime.UtcNow.ToString("o"));
+                model.ClearSelection2(true);Need(shortFrame.Select4(false,null,false),"target select failed");int information=0;assembly.EditPart2(true,false,ref information);editing=true;
+                Need(Same(app,assembly.GetEditTarget(),part)&&Same(app,assembly.GetEditTargetComponent(),shortFrame),"exact target context missing");
+                model.ClearSelection2(true);Need(((IEntity)ownWeb.Context).Select4(false,null),"own Web select failed");model.SketchManager.InsertSketch(true);opened=true;
+                sketch=model.SketchManager.ActiveSketch??part.SketchManager.ActiveSketch;Need(sketch!=null&&!sketch.Is3D(),"2D native Sketch unavailable");
+                Feature feature=sketch as Feature;Need(feature!=null,"Sketch QI Feature unavailable");result.SketchFeatureId=feature.GetID();
+                int refType=0;object reference=sketch.GetReferenceEntity(ref refType);result.SupportReferenceType=refType;
+                result.OwnSupportVerified=reference is Face2&&(Same(app,reference,ownWeb.Context)||Same(app,reference,ownWeb.Native));Need(result.OwnSupportVerified,"actual own Web attachment unavailable");
+                Trace.WriteLine("[AFJ-U-MASTER] SKETCH_OPENED "+DateTime.UtcNow.ToString("o"));
+                MathTransform inverseTarget=shortFrame.GetTotalTransform(false).Inverse() as MathTransform;Need(inverseTarget!=null,"component inverse unavailable");
+                Func<double[],double[]> localPoint=world=>Point(app,Point(app,world,inverseTarget),sketch.ModelToSketchTransform);
+                var local=seeds.Select(localPoint).ToArray();var closureLocal=closureWorld.Select(localPoint).ToArray();
+                double[][] marginWorld={Common(plan,sMin,qf),Common(plan,sMax,plan.Loser.Thickness),Common(plan,sn,qMax)};
+                closureWorld=new[]{Common(plan,plan.Winner.MinWidth,qf),Common(plan,plan.Winner.MaxWidth,plan.Loser.Thickness),Common(plan,sn,qMax-m)};
+                closureLocal=closureWorld.Select(localPoint).ToArray();var marginLocal=marginWorld.Select(localPoint).ToArray();
+                Need(local.Concat(closureLocal).All(p=>Math.Abs(p[2])<1e-8),"target Part→Sketch point off native plane");
+                Trace.WriteLine("[AFJ-U-MASTER] CREATE_LINES "+DateTime.UtcNow.ToString("o"));
+                var segments=new SketchSegment[8];var margin=new SketchSegment[3];int[] closureIndices={0,5,6};
+                bool previousAdd=model.SketchManager.AddToDB;
+                try
+                {
+                    model.SketchManager.AddToDB=true;
+                    for(int i=0;i<8;i++){var a=local[i];var b=local[(i+1)%8];segments[i]=model.SketchManager.CreateLine(a[0],a[1],0,b[0],b[1],0);Need(segments[i]!=null,"profile line null");}
+                    for(int i=0;i<3;i++){var a=marginLocal[i];var b=closureLocal[i];Need(Math.Abs(Norm(Sub(a,b))-m)<1e-8,"margin line not actual m");margin[i]=model.SketchManager.CreateLine(a[0],a[1],0,b[0],b[1],0);Need(margin[i]!=null,"margin line null");margin[i].ConstructionGeometry=true;}
+                }
+                finally{model.SketchManager.AddToDB=previousAdd;}
+                // SOLIDWORKS API context matrix proved that direct CreateLine
+                // handles are not usable for line relations in this assembly
+                // edit context. Reacquire from the ASSEMBLY-context Sketch
+                // Feature, not the native Part Feature with the same ID.
+                Func<SketchSegment,string> segmentId=segment=>String.Join(",",((Array)segment.GetID()).Cast<object>().Select(Convert.ToString));
+                var profileIds=segments.Select(segmentId).ToArray();var marginIds=margin.Select(segmentId).ToArray();
+                var actualContextSketch=feature.GetSpecificFeature2() as Sketch;Need(actualContextSketch!=null,"original assembly-context Sketch feature unavailable");
+                var actualSegments=actualContextSketch.GetSketchSegments() as Array;Need(actualSegments!=null&&actualSegments.Length==11,"exact eight profile and three guide segments required");
+                var contextLines=actualSegments.Cast<object>().OfType<SketchSegment>().ToArray();
+                for(int i=0;i<segments.Length;i++)segments[i]=contextLines.Single(line=>segmentId(line)==profileIds[i]&&!line.ConstructionGeometry);
+                for(int i=0;i<margin.Length;i++)margin[i]=contextLines.Single(line=>segmentId(line)==marginIds[i]&&line.ConstructionGeometry);
+                sketch=actualContextSketch;CheckPolygon(segments,local);
+                Trace.WriteLine("[AFJ-U-MASTER] CONTEXT_HANDLES_REACQUIRED profile=8 guides=3 single_allowed="+String.Join(",",Allowed(sketch,segments[0])));
+                Trace.WriteLine("[AFJ-U-MASTER] CONNECT_PROFILE "+DateTime.UtcNow.ToString("o"));
+                for(int i=0;i<8;i++){var a=LineEnd(segments[i]);var b=LineStart(segments[(i+1)%8]);if(!Same(app,a,b))AddRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,a,b);}
+                Trace.WriteLine("[AFJ-U-MASTER] FIRST_SEGMENT id="+String.Join(",",((Array)segments[0].GetID()).Cast<object>().Select(Convert.ToString))+" type="+segments[0].GetType()+" construction="+segments[0].ConstructionGeometry+" sketch_id="+((Feature)segments[0].GetSketch()).GetID()+" active_id="+((Feature)sketch).GetID()+" AddToDB="+model.SketchManager.AddToDB);
+                Trace.WriteLine("[AFJ-U-MASTER] ALLOWED_FIRST_SINGLE="+String.Join(",",Allowed(sketch,segments[0]))+" line="+String.Join(",",Allowed(sketch,segments[0] as SketchLine))+" own_context="+String.Join(",",Allowed(sketch,segments[0],nearOwn.Context))+" own_native="+String.Join(",",Allowed(sketch,segments[0],nearOwn.Native))+" line_context="+String.Join(",",Allowed(sketch,segments[0] as SketchLine,nearOwn.Context)));
+                CheckPolygon(segments,local);
+                Trace.WriteLine("[AFJ-U-MASTER] AXIS_RELATIONS "+DateTime.UtcNow.ToString("o"));
+                for(int i=0;i<8;i++)
+                {
+                    if(i==1)continue;double[] worldDirection=Unit(Sub(seeds[(i+1)%8],seeds[i]));
+                    Datum axis=Math.Abs(Dot(worldDirection,Unit(plan.OutWinner)))>.999999?nearOwn:Math.Abs(Dot(worldDirection,Unit(plan.OutLoser)))>.999999?farOther:null;
+                    Need(axis!=null,"unexpected non-axis contour edge");AddRelation(sketch,Math.Abs(Dot(worldDirection,Unit(plan.OutWinner)))>.999999?(int)swConstraintType_e.swConstraintType_PARALLEL:(int)swConstraintType_e.swConstraintType_PERPENDICULAR,segments[i],nearOwn.Context);result.AxisRelations++;
+                }
+                Trace.WriteLine("[AFJ-U-MASTER] CRITICAL_RELATIONS "+DateTime.UtcNow.ToString("o"));
+                SketchPoint[] points=segments.Select(LineStart).ToArray();int[] critical={1,2,3,4};
+                Datum[][] datumPairs={new[]{nearOwn,nearOther},new[]{farOwn,farOther},new[]{innerOwn,farOther},new[]{innerOwn,outerOther}};
+                string[] roles={"MASTER_NEAR","MASTER_FAR","INNER_FAR_ROW_SHARED","OUTER_FAR_COLUMN_SHARED"};
+                for(int i=0;i<4;i++)
+                {
+                    int index=critical[i];var first=AtSeed(app,datumPairs[i][0],seeds[index]);var second=AtSeed(app,datumPairs[i][1],seeds[index]);
+                    var row=new PointEvidence{Role=roles[i],PointId=PointId(points[index]),ExpectedWorld=seeds[index],ExpectedSketch=local[index],First=first,Second=second};result.Points.Add(row);
+                    row.AllowedFirst=Allowed(sketch,points[index],first.Context);row.AllowedSecond=Allowed(sketch,points[index],second.Context);
+                    // Six independent coordinate constraints. The other two
+                    // gate2 relations are implied by connected row/column edges.
+                    if(i<=2){row.FirstRelationType=Coincident(sketch,points[index],first);result.CriticalDatumRelations++;}
+                    if(i<=1||i==3){row.SecondRelationType=Coincident(sketch,points[index],second);result.CriticalDatumRelations++;}
+                    row.ObservedSketch=new[]{points[index].X,points[index].Y,points[index].Z};
+                    row.Qualification=i<2?"TWO_DIRECT_NATIVE_DATUMS":"ONE_DIRECT_NATIVE_DATUM_OTHER_COORDINATE_SHARED_BY_PROFILE";
+                }
+                Trace.WriteLine("[AFJ-U-MASTER] CLOSURE_RELATIONS "+DateTime.UtcNow.ToString("o"));
+                Datum[] closureDatums={closureNear,closureFar,closureAxial};
+                for(int i=0;i<3;i++)
+                {
+                    var a=LineStart(margin[i]);
+                    if(i<2){AddRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,a,segments[i==0?7:5]);AddRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,a,segments[i==0?2:0]);}
+                    else{AddRelation(sketch,(int)swConstraintType_e.swConstraintType_COINCIDENT,a,segments[6]);
+                        var p=points[1];Need(Math.Abs(a.X-p.X)<1e-8||Math.Abs(a.Y-p.Y)<1e-8,"native Sketch basis not aligned to Frame guide");
+                        AddRelation(sketch,Math.Abs(a.X-p.X)<1e-8?(int)swConstraintType_e.swConstraintType_VERTPOINTS:(int)swConstraintType_e.swConstraintType_HORIZPOINTS,a,p);}
+                    AddRelation(sketch,i<2?(int)swConstraintType_e.swConstraintType_PERPENDICULAR:(int)swConstraintType_e.swConstraintType_PARALLEL,margin[i],nearOwn.Context);
+                    Datum datum=AtSeed(app,closureDatums[i],closureWorld[i]);Coincident(sketch,LineEnd(margin[i]),datum);result.ClosureDatums.Add(datum);result.ClosureGuides++;
+                    if(i>0){AddRelation(sketch,(int)swConstraintType_e.swConstraintType_SAMELENGTH,margin[0],margin[i]);result.EqualMarginRelations++;}
+                }
+                CheckPolygon(segments,local);
+                // Exactly one manufacturing dimension, created at its measured
+                // seed length. Never set or overwrite a source dimension.
+                Trace.WriteLine("[AFJ-U-MASTER] DIMENSION_BEGIN "+DateTime.UtcNow.ToString("o"));
+                oldInputPreference=app.GetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate);inputPreferenceRead=true;
+                app.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate,false);
+                model.ClearSelection2(true);Need(margin[0].Select4(false,null),"margin line select failed");
+                double[] label=Add(closureWorld[0],Add(Mul(plan.OutLoser,-.004),Mul(plan.OutWinner,.004)));
+                Trace.WriteLine("[AFJ-U-MASTER] DIMENSION_CREATE "+DateTime.UtcNow.ToString("o"));
+                var display=model.AddDimension2(label[0],label[1],label[2]) as DisplayDimension;var dimension=display==null?null:display.GetDimension2(0) as Dimension;
+                Trace.WriteLine("[AFJ-U-MASTER] DIMENSION_READBACK "+DateTime.UtcNow.ToString("o"));
+                Need(dimension!=null&&dimension.DrivenState==(int)swDimensionDrivenState_e.swDimensionDriving&&Math.Abs(Math.Abs(dimension.SystemValue)-m)<1e-8,"one native ToolClosureMargin driving dimension did not read back actual m");
+                dimension.Name="AFJ_ToolClosureMargin";result.MarginDimensionName=dimension.FullName;result.MarginDimensionValue=dimension.SystemValue;
+                app.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate,oldInputPreference);inputPreferenceRead=false;
+                Trace.WriteLine("[AFJ-U-MASTER] CONSTRAINT_READBACK "+DateTime.UtcNow.ToString("o"));
+                CheckPolygon(segments,local);result.SeedPolygonUnchanged=true;
+                result.ConstraintStatus=sketch.GetConstrainedStatus();result.Relations=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+                result.Dangling=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling);result.Overdefining=sketch.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining);
+                result.AllPointsFullyConstrained=result.ConstraintStatus==(int)swConstrainedStatus_e.swFullyConstrained&&result.Dangling==0&&result.Overdefining==0;
+                Need(result.AllPointsFullyConstrained,"full cover profile did not become valid native status3");
+                Trace.WriteLine("[AFJ-U-MASTER] CLOSE_SKETCH "+DateTime.UtcNow.ToString("o"));
+                model.SketchManager.InsertSketch(true);opened=false;assembly.EditAssembly();editing=false;
+                Trace.WriteLine("[AFJ-U-MASTER] CLOSED_READBACK "+DateTime.UtcNow.ToString("o"));
+                var owned=FindFeature(part,result.SketchFeatureId);result.SketchOwnerVerified=owned!=null&&!beforeIds.Contains(owned.GetID());Need(result.SketchOwnerVerified,"new Sketch not proven owned by short Part");
+                owned.Name="AFJ_U_COVER_MASTER_PROBE";result.SketchName=owned.Name;var final=owned.GetSpecificFeature2() as Sketch;Need(final!=null,"closed Sketch unavailable");
+                result.Dimensions=0;for(DisplayDimension dim=owned.GetFirstDisplayDimension() as DisplayDimension;dim!=null;dim=owned.GetNextDisplayDimension(dim) as DisplayDimension)Need(++result.Dimensions<64,"dimension traversal bound");
+                result.NoDimensions=false;Need(result.Dimensions==1,"exactly one native manufacturing dimension required");
+                result.NewPlanes=Planes(part)-beforePlanes;result.NoNewPlanes=result.NewPlanes==0;result.ExternalReferences=part.Extension.ListExternalFileReferencesCount();
+                Need(result.NoNewPlanes&&result.ExternalReferences>0,"plane/external-reference result unqualified");
+                Need(final.GetConstrainedStatus()==(int)swConstrainedStatus_e.swFullyConstrained&&final.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swDangling)==0&&final.RelationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swOverDefining)==0,"closed full profile lost native constraint proof");
+                result.ContextRestored=Same(app,assembly.GetEditTarget(),model);Need(result.ContextRestored,"context not restored");
+                Trace.WriteLine("[AFJ-U-MASTER] COMPLETE "+DateTime.UtcNow.ToString("o"));
+                result.Status="PASS_NATIVE_FULL_COVER_SKETCH_ONLY_ONE_MARGIN_DIM_NO_CUT_NO_FOLLOW_TEST";
+            }
+            catch(Exception ex){result.Status="FAIL_OR_UNVERIFIED";result.Error="HRESULT=0x"+ex.HResult.ToString("X8")+" "+ex;}
+            finally
+            {
+                try{if(inputPreferenceRead&&app!=null)app.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate,oldInputPreference);}catch(Exception ex){result.Error+=" INPUT_PREFERENCE_RESTORE "+ex;result.Status="FAIL_OR_UNVERIFIED";}
+                try{if(opened&&model!=null)model.SketchManager.InsertSketch(true);}catch(Exception ex){result.Error+=" SKETCH_CLOSE "+ex;result.Status="FAIL_OR_UNVERIFIED";}
+                try{if(editing&&assembly!=null)assembly.EditAssembly();}catch(Exception ex){result.Error+=" EDIT_ASSEMBLY "+ex;result.Status="FAIL_OR_UNVERIFIED";}
+                try{if(assembly!=null&&app!=null)result.ContextRestored=Same(app,assembly.GetEditTarget(),model);}catch(Exception ex){result.Error+=" CONTEXT_RECHECK "+ex;result.Status="FAIL_OR_UNVERIFIED";}
+            }
+            ClearNativeDatumCache();
+            return result;
+        }
+    }
+}

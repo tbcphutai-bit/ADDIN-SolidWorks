@@ -1,0 +1,26 @@
+[
+  {
+    "file": "ADDIN.dll",
+    "mvid": "023f24dd-0f95-4cdd-9352-2629defdfab7",
+    "native_apply_type_present": false,
+    "assembly_executed_by_metadata_inspection": false
+  },
+  {
+    "file": "NativeApply_branch.exe",
+    "mvid": "b7d2f9ac-4f9a-42df-b5ff-d0ff9e7a1271",
+    "native_apply_type_present": true,
+    "assembly_executed_by_metadata_inspection": false
+  },
+  {
+    "file": "NativeApply_local.exe",
+    "mvid": "f888ba27-7d23-42c6-90de-d708a2102d12",
+    "native_apply_type_present": true,
+    "assembly_executed_by_metadata_inspection": false
+  },
+  {
+    "file": "ManagedContracts.exe",
+    "mvid": "cbb2b6d4-0fe9-400b-a99c-af9a58a9989c",
+    "native_apply_type_present": true,
+    "assembly_executed_by_metadata_inspection": false
+  }
+]

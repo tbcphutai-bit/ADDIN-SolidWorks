@@ -1,0 +1,18 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Diagnostics;
+using System.Web.Script.Serialization;
+using SolidWorks.Interop.sldworks;
+using SolidWorks.Interop.swconst;
+using ADDIN.Commands.AutoFrameJoint;
+class SheetLayerGuardHarness {
+ static Body2 Box(ISldWorks sw,double z,double width,double depth,double height,double x){return AfjTemporaryBoolean.CreatePrism(sw,new AfjToolDefinition{Polygon=new[]{new[]{x-width/2,0d,z},new[]{x+width/2,0d,z},new[]{x+width/2,depth,z},new[]{x-width/2,depth,z}},Direction=new[]{0d,0d,1d},Length=height});}
+ [STAThread] static int Main(string[] args){var sw=HarnessConnection.AttachVisible();Trace.Listeners.Add(new TextWriterTraceListener(Path.Combine(args[0],"sheet_layer_guard_api.log")));Trace.AutoFlush=true;var row=new System.Collections.Generic.Dictionary<string,object>();
+  try{double t=.0025;Body2 top=Box(sw,0,.1,.1,t,.05),bottom=Box(sw,-.00105,.1,.1,.001,.05),connector=Box(sw,-.00105,.01,.1,t+.00105,.005);int code;Body2 joined=AfjTemporaryBoolean.Boolean(top,connector,(int)swBodyOperationType_e.SWBODYADD,out code,"negative_fixture:connect_top").Single();joined=AfjTemporaryBoolean.Boolean(joined,bottom,(int)swBodyOperationType_e.SWBODYADD,out code,"negative_fixture:connect_return").Single();
+   var boundary=new[]{new[]{.03,.03,t},new[]{.07,.03,t},new[]{.07,.07,t},new[]{.03,.07,t}};var cut=AfjSheetCutTools.BlindBetweenSkins("NEGATIVE_ADDITIONAL_LAYER",boundary,new[]{.03,.03,t},new[]{.03,.03,0},new[]{0d,0,-1},t,false,false);var plan=new AfjCutPlan();plan.Operations.Add(cut);
+   row["fixture"]="CONNECTED_SECOND_LAYER_0_05_MM_BEHIND_INNER_SKIN";row["before_volume_m3"]=AfjTemporaryBoolean.Volume(joined);row["check2"]=joined.Check2();row["check3_faults"]=joined.Check3==null?0:joined.Check3.Count;
+   try{AfjTemporaryBoolean.Execute(sw,joined,plan);row["status"]="FAIL_UNEXPECTED_ADMISSION";}catch(InvalidOperationException e){row["status"]=e.Message.StartsWith("UNVERIFIED_RULE: single-sheet overrun reaches")?"UNVERIFIED_RULE":"FAIL";row["message"]=e.Message;row["expected_refusal_matched"]=(string)row["status"]=="UNVERIFIED_RULE";}
+  }catch(Exception e){row["status"]="FAIL";row["error"]=e.ToString();}File.WriteAllText(Path.Combine(args[0],"sheet_layer_guard_results.json"),new JavaScriptSerializer().Serialize(row));Console.WriteLine(new JavaScriptSerializer().Serialize(row));return row.ContainsKey("expected_refusal_matched")&&(bool)row["expected_refusal_matched"]?0:1;
+ }
+}

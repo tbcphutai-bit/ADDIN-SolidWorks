@@ -1,0 +1,68 @@
+{
+  "id": "ORTHOGONAL_U_COVER",
+  "status": "GEOMETRY_VERIFIED within recorded tests; manufacturing applicability outside evidence remains INFERRED",
+  "policy": {
+    "cover": "shorter actual body longitudinal span from exact GetExtremePoint",
+    "equal_lengths": "UNVERIFIED_RULE; drawing side required",
+    "assembly_gap_m": 0.0001,
+    "single_sheet_depth_m": "t + 0.0001",
+    "policy_source": "User confirmation, 2026-10-22 Asia/Bangkok. This is the requested Frame policy, not a universal inference from KCC."
+  },
+  "preconditions": [
+    "resolved top-level folded single solid Parts; active and occurrence configurations agree",
+    "one sheet-metal base flange, ReverseThickness=true; base Sketch is connected straight U with optional far outward Return",
+    "unique Web between perpendicular parallel same-side Walls; no near Return/inward Return/multi-step",
+    "rigid non-mirrored assembly placement, orthogonal axes, coplanar outer Web skins and same depth orientation",
+    "equal sheet thickness and Bend R between pair; separate pairs may vary t/R",
+    "same near-Wall height and same far outer contour depth (return wall H+t equals bare wall H)",
+    "ideal formed stock in the joint band must contain all required KEEP material; no unverified holes or missing stock there"
+  ],
+  "coordinates": {
+    "s": "outgoing longitudinal coordinate of losing member, measured from cover near outer Wall",
+    "q": "outgoing cover coordinate, measured from loser near outer Wall",
+    "z": "depth from coplanar outer Web skin into folded section"
+  },
+  "equations": {
+    "sf": "W_cover - t_cover - R_cover",
+    "qf": "W_loser - t_loser - R_loser",
+    "sn": "t_cover + R_cover",
+    "qn": "qf - (sf-sn); if this enters loser near Bend, constrain qn=t_loser",
+    "slope": "(sf-sn)/(qf-qn)",
+    "loser_web": "s = sn + (q-qn)*slope - g*sqrt(1+slope^2)",
+    "loser_near_wall": "s=-g",
+    "loser_far_wall": "s=W_cover-t_cover-g",
+    "loser_far_return": "preserve outer contour to cover outer Return tip; relief transition at q=W_loser+g",
+    "cover_wall_web": "near end q=t_loser; Web seam uses (sn,qn)->(sf,qf); farWall q=W_loser",
+    "normal_bend_cap": "cover far inner Wall plane s=W_cover-t_cover, q from qf to W_loser, depth through t_cover+R_cover",
+    "far_bend_gap_guard": "loser: s>=sf-g*sqrt(1+slope^2), q>=qf-g, through both Web Bend tangent depths +g",
+    "near_bend_gap_guard": "loser: s>=-g, q<=t_loser+g, same tangent depths"
+  },
+  "ordered_operations": {
+    "loser": [
+      "Web/Wall/Return stepped envelope",
+      "far Bend clearance guard",
+      "near Bend clearance guard"
+    ],
+    "cover": [
+      "Web/Wall envelope",
+      "analytic NormalCut Bend cap"
+    ]
+  },
+  "validation": [
+    "temporary-only operands and tools",
+    "Body2.Check2=0; one connected kept solid per Frame",
+    "positive finite volume and volume conservation",
+    "no removal behind selected-end root more than g",
+    "ideal parametric joint stock after same plan minus actual kept stock must be <=2e-12 m3",
+    "kept pair interference <=1e-12 m3",
+    "exact minimum body distance =0.1 mm within 1 micrometre numerical tolerance"
+  ],
+  "not_runtime_inputs": [
+    "Part filename",
+    "Feature name",
+    "saved native cut polyline",
+    "native tool B-rep",
+    "signature/stock-size/pose lookup table",
+    "original assembly absolute coordinates"
+  ]
+}

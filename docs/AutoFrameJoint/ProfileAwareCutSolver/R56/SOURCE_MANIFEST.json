@@ -1,0 +1,16 @@
+{
+  "source_repository": "tbcphutai-bit/ADDIN-SolidWorks",
+  "source_path": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+  "source_sha256": "09f0e9708a11ce962e2ee70348f6d5cae5a57269f8754545e8a0768637af748d",
+  "source15_four_corner_audit_sha256": "bb245d94fa67109ff5d7f3ec8ca8a11cc536b4a3910f6cace8b089331009e191",
+  "source15_four_corner_harness_sha256": "47dc48cf1f714e121f06262409d896211bc40a5bc8fca77fa41385977fb55c0f",
+  "source15_four_corner_harness_mvid": "ad11f243-915c-4376-9a78-b55905824942",
+  "historical12_source_sha256": "6bd0957dc0ca8b49be8c42a0648740c5ce3977bbd469fe85b2d8645785427add",
+  "source15_raw_audit_sha256": "808bf0a0e0e5a677f0dc3c1bf893f5d66189cfb160cfbcbad70556429cb67bfc",
+  "source_delivery_status": "MAIN_SOURCE_COPIED_USER_MANUAL_REBUILD_REQUIRED",
+  "main_project_build": false,
+  "deployment": false,
+  "installed_addin_test": false,
+  "production_local_wall_prototypes_included": false,
+  "original_cad_payload_included": false
+}

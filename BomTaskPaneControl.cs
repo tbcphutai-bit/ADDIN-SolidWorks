@@ -542,6 +542,10 @@ namespace ADDIN
 
             paintHoleSummaryCommand = null;
 
+            if (vCutBendAssignmentControl != null)
+            {
+                try { vCutBendAssignmentControl.Clear(); vCutBendAssignmentControl.Visible = false; } catch { }
+            }
             vCutPropertySetupCommand = null;
 
             drawingBomChecker = null;
@@ -1493,11 +1497,59 @@ namespace ADDIN
 
         {
 
-            vCutBendAssignmentControl.Visible = false;
+            if (vCutBendAssignmentControl != null)
+            {
+                vCutBendAssignmentControl.Clear();
+                vCutBendAssignmentControl.Visible = false;
+            }
 
             vCutPropertySetupCommand = null;
 
             SetModelMacroCommandsCollapsed(false);
+
+        }
+
+        private void SyncVCutControlWithActiveDocument()
+
+        {
+
+            if (vCutBendAssignmentControl == null)
+
+                return;
+
+            if (vCutBendAssignmentControl.Visible || vCutPropertySetupCommand != null)
+
+            {
+
+                ModelDoc2 active = null;
+
+                try
+
+                {
+
+                    active = swApp?.ActiveDoc as ModelDoc2;
+
+                }
+
+                catch (InvalidComObjectException) { }
+
+                catch (COMException) { }
+
+                if (active == null || vCutPropertySetupCommand == null || !vCutPropertySetupCommand.IsLoadedPart(active))
+
+                {
+
+                    vCutBendAssignmentControl.Clear();
+
+                    vCutBendAssignmentControl.Visible = false;
+
+                    vCutPropertySetupCommand = null;
+
+                    SetModelMacroCommandsCollapsed(false);
+
+                }
+
+            }
 
         }
 
@@ -2582,7 +2634,8 @@ namespace ADDIN
 
                 btnVCutPropertySetup,
 
-                btnCheckDxfMacro
+                btnCheckDxfMacro,
+                btnAutoFrameJoint
 
             };
 
@@ -6120,6 +6173,12 @@ namespace ADDIN
             DismissNativeModelCommand();
             StopComponentDrawingTimer();
 
+            if (vCutBendAssignmentControl != null)
+            {
+                try { vCutBendAssignmentControl.Clear(); vCutBendAssignmentControl.Visible = false; } catch { }
+            }
+            vCutPropertySetupCommand = null;
+
             DetachSolidWorksEvents();
 
             swApp = null;
@@ -6135,21 +6194,19 @@ namespace ADDIN
             if (grpComponentSize == null || btnGetWL == null)
                 return;
 
-            tabComponentDrawing.AutoScroll = true;
-
             int pageMargin = 8;
             int pageWidth = Math.Max(230, tabComponentDrawing.ClientSize.Width - (pageMargin * 2));
             int margin = 10;
             int gap = 6;
 
             int fieldH = 36;
-            int row1Y = 40;
-            int row2Y = row1Y + fieldH + 4; // 80
-            int btnH = 32;
-            int row3Y = row2Y + fieldH + 6; // 122
+            int row1Y = 38;
+            int row2Y = row1Y + fieldH + 4; // 78
+            int btnH = 30;
+            int row3Y = row2Y + fieldH + 6; // 120
 
             int availableWidth = Math.Max(200, pageWidth - (margin * 2));
-            bool singleRowButtons = availableWidth >= 305;
+            bool singleRowButtons = availableWidth >= CommandPixels(200);
             int cardHeight = singleRowButtons ? (row3Y + btnH + 10) : (row3Y + btnH * 2 + 14);
 
             grpComponentSize.SetBounds(pageMargin, 6, pageWidth, cardHeight);
@@ -6187,7 +6244,7 @@ namespace ADDIN
             availableWidth = grpComponentSize.ClientSize.Width - (margin * 2);
             if (singleRowButtons)
             {
-                int horizW = Math.Max(120, (int)(availableWidth * 0.44));
+                int horizW = Math.Max(100, (int)(availableWidth * 0.44));
                 int rotW = (availableWidth - horizW - (gap * 2)) / 2;
 
                 btnHorizontalAlignment.SetBounds(margin, row3Y, horizW, btnH);
@@ -6208,197 +6265,102 @@ namespace ADDIN
 
             LayoutComponentTextGroup(pageMargin, pageWidth, gap, narrow);
             LayoutComponentMacroGroup(pageMargin, pageWidth, gap, narrow);
-            tabComponentDrawing.AutoScrollMinSize = new System.Drawing.Size(0, groupBox3.Bottom + pageMargin);
+
+            tabComponentDrawing.AutoScroll = false;
+            tabComponentDrawing.AutoScrollMinSize = System.Drawing.Size.Empty;
+            tabComponentDrawing.AutoScrollPosition = Point.Empty;
         }
-
-
 
         private void LayoutComponentTextGroup(int pageMargin, int pageWidth, int gap, bool narrow)
-
         {
-
             int groupTop = grpComponentSize.Bottom + 8;
-
-            int cardHeight = 162;
-
+            int cardHeight = 158;
             grpComponentBom.SetBounds(pageMargin, groupTop, pageWidth, cardHeight);
 
-
-
-            int margin = 12;
-
-            int buttonWidth = narrow ? 72 : 105;
-
+            int margin = 10;
+            int buttonWidth = narrow ? 72 : 100;
             int deleteWidth = 28;
 
-
-
             btnNote.Text = "Note";
-
             btnText.Text = "Text";
-
             int rightGap = narrow ? 6 : margin;
-
             int smallGap = narrow ? 6 : gap;
-
             int buttonX = Math.Max(margin + 80, grpComponentBom.ClientSize.Width - rightGap - buttonWidth);
-
             int deleteX = buttonX - smallGap - deleteWidth;
-
             int comboWidth = Math.Max(110, deleteX - margin - gap);
-
             int balloonBtnWidth = grpComponentBom.ClientSize.Width - rightGap - deleteX;
-
             btnInsertBalloon.Text = balloonBtnWidth >= 120 ? "Insert Balloon" : "Balloon";
 
-
-
-            int row1Y = 40;
-
-            int row2Y = 78;
-
-            int row3Y = 116;
-
+            int row1Y = 38;
+            int row2Y = 76;
+            int row3Y = 114;
             int inputH = 30;
-
             int btnH = 30;
 
-
-
             cboBendLine.SetBounds(margin, row1Y, comboWidth, inputH);
-
             cboSide.SetBounds(margin, row2Y, comboWidth, inputH);
-
             cboBalloonProperty.SetBounds(margin, row3Y, comboWidth, inputH);
 
-
-
-
             btnDeleteNote.SetBounds(deleteX, row1Y, deleteWidth, btnH);
-
             btnDeleteText.SetBounds(deleteX, row2Y, deleteWidth, btnH);
 
-
-
             btnNote.SetBounds(buttonX, row1Y, buttonWidth, btnH);
-
             btnText.SetBounds(buttonX, row2Y, buttonWidth, btnH);
-
             btnInsertBalloon.SetBounds(deleteX, row3Y, balloonBtnWidth, btnH);
 
-
-
             grpComponentBom.Invalidate(true);
-
         }
-
-
 
         private void LayoutComponentMacroGroup(int pageMargin, int pageWidth, int gap, bool narrow)
-
         {
-
             int groupTop = grpComponentBom.Bottom + 8;
-
-            int minHeight = CommandPixels(252);
-
+            int minHeight = CommandPixels(210);
             groupBox3.SetBounds(pageMargin, groupTop, pageWidth, minHeight);
 
-
-
-
             Button[] buttons =
-
             {
-
                 dimvang,
-
                 btnDimMatCat,
-
                 btnSplineToArcs,
-
                 btnDimKegaki,
-
                 btnDimKichThuocLo,
-
                 btnFixScale,
-
                 btnRepairDim,
-
                 btnVCutSection
-
             };
 
-
-
-            int innerLeft = CommandPixels(12);
-
-            int innerTop = CommandPixels(40);
-
-            int innerGap = CommandPixels(8);
-
+            int innerLeft = CommandPixels(10);
+            int innerTop = CommandPixels(38);
+            int innerGap = CommandPixels(6);
             int availableWidth = Math.Max(1, groupBox3.ClientSize.Width - (innerLeft * 2));
-
-            int tileWidth = CommandPixels(176);
-
-            int columnCount = availableWidth >= (tileWidth * 2 + innerGap) ? 2 : 1;
-
+            int columnCount = 2;
             int buttonWidth = Math.Max(1, (availableWidth - innerGap * (columnCount - 1)) / columnCount);
-
-            int buttonHeight = CommandPixels(50);
-
-
+            int buttonHeight = CommandPixels(32);
 
             for (int i = 0; i < buttons.Length; i++)
-
             {
-
                 Button button = buttons[i];
-
                 if (button == null)
-
                     continue;
 
-
-
                 int column = i % columnCount;
-
                 int row = i / columnCount;
-
                 int gridWidth = columnCount * buttonWidth + (columnCount - 1) * innerGap;
-
                 int gridLeft = innerLeft + Math.Max(0, (availableWidth - gridWidth) / 2);
-
                 int x = gridLeft + column * (buttonWidth + innerGap);
-
                 int y = innerTop + row * (buttonHeight + innerGap);
 
-
-
                 button.SetBounds(x, y, buttonWidth, buttonHeight);
-
             }
 
-
-
             int rowCount = (buttons.Length + columnCount - 1) / columnCount;
-
             int requiredHeight = innerTop + rowCount * buttonHeight +
-
-                (rowCount - 1) * innerGap + CommandPixels(12);
-
+                (rowCount - 1) * innerGap + CommandPixels(10);
             // The card ends where its tiles end.
-
             groupBox3.Height = requiredHeight;
 
-
-
             groupBox3.Invalidate(true);
-
         }
-
-
-
 
         private void LoadWidthLengthFromSelectedView(bool forceRefresh)
 
@@ -7111,6 +7073,8 @@ namespace ADDIN
 
             {
 
+                SyncVCutControlWithActiveDocument();
+
                 if (drawingBomCommandInProgress)
 
                 {
@@ -7200,6 +7164,8 @@ namespace ADDIN
 
             {
 
+                SyncVCutControlWithActiveDocument();
+
                 UpdateModelMacroCommandAvailability(0);
 
                 SetModelCommandAvailability(false);
@@ -7256,7 +7222,8 @@ namespace ADDIN
 
         private bool IsModelMacroSupported(Control button, int documentType)
         {
-            if (ReferenceEquals(button, btnCheckAssemblyHole))
+            if (ReferenceEquals(button, btnCheckAssemblyHole) ||
+                ReferenceEquals(button, btnAutoFrameJoint))
                 return documentType == (int)swDocumentTypes_e.swDocASSEMBLY;
             if (ReferenceEquals(button, btnMirrorPart) || ReferenceEquals(button, btnCheckBendMinimum))
                 return documentType == (int)swDocumentTypes_e.swDocPART ||
@@ -7292,6 +7259,7 @@ namespace ADDIN
             UpdateModelMacroButton(btnRepair3DSpline, documentType, "Part");
             UpdateModelMacroButton(btnVCutPropertySetup, documentType, "Part");
             UpdateModelMacroButton(btnCheckBendMinimum, documentType, "Part hoặc Assembly");
+            UpdateModelMacroButton(btnAutoFrameJoint, documentType, "Assembly");
             // CHECK DXF works on files in a folder, independent of the active SW document.
             if (btnCheckDxfMacro != null) btnCheckDxfMacro.Enabled = true;
         }

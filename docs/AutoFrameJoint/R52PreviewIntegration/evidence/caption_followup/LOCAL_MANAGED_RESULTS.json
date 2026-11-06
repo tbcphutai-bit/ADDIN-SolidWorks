@@ -1,0 +1,84 @@
+{
+  "status": "PASS_MANAGED_CONTRACT",
+  "installed_addin_test": "NOT_RUN",
+  "real_api_or_body2": "NOT_RUN",
+  "preview_delegate_calls": 5,
+  "simulated_interface_calls": 440,
+  "interface_access_inside_selection_callbacks": 0,
+  "native_label_interface_calls": 0,
+  "page_message_proxy_calls": 11,
+  "tests": [
+    {
+      "test": "A_ACCEPT_AND_DEFERRED_AUTOFOCUS_WITHOUT_SELECTING_B",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "B_COMMIT_AUTOANALYZE_WITHOUT_AUTOPREVIEW",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "BUTTON_107_DEFERRED_PREVIEW_DELEGATE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "BUTTON_108_DEFERRED_PREVIEW_DELEGATE",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "REJECTION_REASONS_AND_NO_SELECTION_INTERFACE_READ",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "ENTITY_OWNER_AND_DUPLICATE_IDENTITY_DEFERRED",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "FOREIGN_THREAD_SUBMIT_REFUSED",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "VIEWPORT_RECTANGLE_DIAGNOSTIC_ONLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "LONG_UNICODE_STATUS_AND_GEOMETRY_USE_PAGE_MESSAGE_NOT_LABEL",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "MESSAGE_FALSE_DOES_NOT_BLOCK_PREVIEW_OR_RETRY_LABEL",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "MESSAGE_COM_EXCEPTION_IS_CHANNEL_FAILURE_ONLY",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    },
+    {
+      "test": "QUEUED_PREVIEW_DROPPED_AFTER_CLOSE_EPOCH",
+      "status": "PASS_MANAGED_CONTRACT",
+      "installed_addin": false,
+      "real_solidworks_api": false
+    }
+  ]
+}

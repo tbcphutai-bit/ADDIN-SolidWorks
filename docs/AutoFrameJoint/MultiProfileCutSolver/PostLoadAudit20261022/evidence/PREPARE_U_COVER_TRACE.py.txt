@@ -1,0 +1,36 @@
+from pathlib import Path
+r=Path(__file__).parent
+s=(r/'AfjUCoverMasterProbe.cs.txt').read_text(encoding='utf-8-sig')
+s=s.replace('using System;','using System;\nusing System.Diagnostics;')
+def stage(name,needle):
+ global s
+ assert s.count(needle)==1,(name,s.count(needle))
+ s=s.replace(needle,'Trace.WriteLine("[AFJ-U-MASTER] '+name+' "+DateTime.UtcNow.ToString("o"));\n                '+needle)
+for name,needle in [
+ ('DATUMS_BEGIN','var ownWeb=FaceDatum'),
+ ('DATUMS_READY','model.ClearSelection2(true);Need(shortFrame.Select4'),
+ ('SKETCH_OPENED','MathTransform inverseTarget='),
+ ('CREATE_LINES','var segments=new SketchSegment[8]'),
+ ('CONNECT_PROFILE','for(int i=0;i<8;i++){var a=LineEnd'),
+ ('AXIS_RELATIONS','for(int i=0;i<8;i++)\n                {\n                    if(i==1)'),
+ ('CRITICAL_RELATIONS','SketchPoint[] points=segments.Select'),
+ ('CLOSURE_RELATIONS','Datum[] closureDatums='),
+ ('DIMENSION_BEGIN','oldInputPreference=app.GetUserPreferenceToggle'),
+ ('DIMENSION_CREATE','var display=model.AddDimension2'),
+ ('DIMENSION_READBACK','Need(dimension!=null&&dimension.DrivenState'),
+ ('CONSTRAINT_READBACK','CheckPolygon(segments,local);result.SeedPolygonUnchanged'),
+ ('CLOSE_SKETCH','model.SketchManager.InsertSketch(true);opened=false;'),
+ ('CLOSED_READBACK','var owned=FindFeature'),
+ ('COMPLETE','result.Status="PASS_NATIVE_FULL_COVER_SKETCH'),
+]: stage(name,needle)
+s=s.replace('static int AddRelation(Sketch sketch,int kind,params object[] entities){var relation=', 'static int AddRelation(Sketch sketch,int kind,params object[] entities){Trace.WriteLine("[AFJ-U-MASTER] RELATION_BEGIN kind="+kind+" "+DateTime.UtcNow.ToString("o"));var relation=')
+s=s.replace('Need(relation!=null,"native relation returned null: "+kind);return relation.GetRelationType();','Need(relation!=null,"native relation returned null: "+kind);Trace.WriteLine("[AFJ-U-MASTER] RELATION_END kind="+kind);return relation.GetRelationType();')
+s=s.replace('var relation=sketch.RelationManager.AddRelation(entities.Select', 'Trace.WriteLine("[AFJ-U-MASTER] ALLOWED="+String.Join(",",Allowed(sketch,entities)));var relation=sketch.RelationManager.AddRelation(entities.Select')
+(r/'AfjUCoverMasterProbe.Trace1.cs').write_text(s,encoding='utf-8')
+# A separate comparison candidate: directions reference the target's own
+# actual longitudinal Web Edge, avoiding a foreign edge direction relation.
+needle='AddRelation(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,segments[i],axis.Context);result.AxisRelations++;'
+assert s.count(needle)==1
+s=s.replace(needle,'AddRelation(sketch,Math.Abs(Dot(worldDirection,Unit(plan.OutWinner)))>.999999?(int)swConstraintType_e.swConstraintType_PARALLEL:(int)swConstraintType_e.swConstraintType_PERPENDICULAR,segments[i],nearOwn.Context);result.AxisRelations++;')
+s=s.replace('AddRelation(sketch,(int)swConstraintType_e.swConstraintType_PARALLEL,margin[i],(i<2?farOther:nearOwn).Context);','AddRelation(sketch,i<2?(int)swConstraintType_e.swConstraintType_PERPENDICULAR:(int)swConstraintType_e.swConstraintType_PARALLEL,margin[i],nearOwn.Context);')
+(r/'AfjUCoverMasterProbe.Trace.cs').write_text(s,encoding='utf-8')

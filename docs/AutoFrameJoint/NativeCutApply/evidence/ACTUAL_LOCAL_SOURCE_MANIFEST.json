@@ -1,0 +1,26 @@
+[
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointCommandEntry.cs",
+    "sha256": "fe853fe4e53c38143c8713b3e96c26d3f63d9a713f841a6251b9f549aeb374e3"
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostSessionManager.cs",
+    "sha256": "a5b825c59258b5e54ea809201350e12a067730b48e63001c39632bc18d9dc0c7"
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGhostPreview.cs",
+    "sha256": "45ac41caa1d97bb0f5868956c4bc2cb78e08ebfd51e61467d3f9ba395e06b52f"
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointGeometryMath.cs",
+    "sha256": "8678133ee61c94fb0d1262a33585803579760cb3b0f088c3bdc71142f04980f5"
+  },
+  {
+    "file": "Commands/AutoFrameJoint/AutoFrameJointReadOnlyProbe.cs",
+    "sha256": "5b233792c7ea6d9042eddbdd2e5529be52dad354392bd8699ba2981cd6ef4a9b"
+  },
+  {
+    "file": "UI/AutoFrameJoint/AutoFrameJointSelectionPage.cs",
+    "sha256": "8f9c358eabfc2b67cd4a32e1b032493a5a4c6916876d43e0ee8a3acf167dccc2"
+  }
+]
