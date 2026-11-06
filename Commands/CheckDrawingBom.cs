@@ -1934,13 +1934,19 @@ namespace ADDIN.Commands
         {
             value = "";
             if (row == null || row.DataGridView == null) return false;
+            var columnHeaders = new List<string>();
             for (int c = 0; c < row.DataGridView.Columns.Count; c++)
             {
-                if (!string.Equals(NormalizeText(row.DataGridView.Columns[c].HeaderText),
+                string header = row.DataGridView.Columns[c].HeaderText ?? "";
+                columnHeaders.Add($"[{c}]=\"{header}\"");
+                if (!string.Equals(NormalizeText(header),
                     "合番", StringComparison.Ordinal)) continue;
                 value = Convert.ToString(row.Cells[c].Value ?? "").Trim();
                 return true;
             }
+            LogDebug("[GOBAN BOM DIAG] row=" + row.Index + " columnsCount=" +
+                row.DataGridView.Columns.Count + " headers: " + string.Join(", ", columnHeaders) +
+                " -> No column matched '合番'");
             return false;
         }
 
@@ -1962,15 +1968,28 @@ namespace ADDIN.Commands
             // Do not guess the source by taking the first Drawing View or BOM model.
             string propertyView = "";
             try { propertyView = sheet.CustomPropertyView ?? ""; }
-            catch { source = "CUSTOM_PROPERTY_VIEW_API_ERROR"; return false; }
+            catch (Exception ex)
+            {
+                source = "CUSTOM_PROPERTY_VIEW_API_ERROR";
+                LogDebug("[GOBAN PROP DIAG] sheet=\"" + sheetName + "\" CustomPropertyView API error: " + ex.Message);
+                return false;
+            }
+
+            string actualSheetName = "";
+            try { actualSheetName = sheet.GetName() ?? ""; } catch { }
+
+            LogDebug("[GOBAN PROP DIAG] sheet=\"" + sheetName + "\" (actual=\"" + actualSheetName +
+                "\") CustomPropertyView=\"" + propertyView + "\" expectedPart=\"" + expectedPartPath + "\"");
 
             if (string.IsNullOrWhiteSpace(propertyView))
             {
                 source = "CUSTOM_PROPERTY_VIEW_UNSPECIFIED";
+                LogDebug("[GOBAN PROP DIAG] CustomPropertyView is empty or whitespace.");
                 return false; // conservative: no false Property OK
             }
 
             SolidWorks.Interop.sldworks.View targetView = null;
+            var viewDiagnostics = new List<string>();
             try
             {
                 SolidWorks.Interop.sldworks.View view = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
@@ -1978,6 +1997,21 @@ namespace ADDIN.Commands
                 {
                     string name = "";
                     try { name = view.GetName2() ?? ""; } catch { }
+                    int vType = -1;
+                    try { vType = view.Type; } catch { }
+                    bool onSheet = IsViewOnSheet(view, sheetName);
+                    ModelDoc2 refDoc = null;
+                    try { refDoc = view.ReferencedDocument as ModelDoc2; } catch { }
+                    string refDocPath = "";
+                    try { refDocPath = refDoc != null ? (refDoc.GetPathName() ?? "") : ""; } catch { }
+                    string refCfg = "";
+                    try { refCfg = view.ReferencedConfiguration ?? ""; } catch { }
+                    bool pathMatch = !string.IsNullOrWhiteSpace(expectedPartPath) &&
+                        !string.IsNullOrWhiteSpace(refDocPath) &&
+                        PathsEqualSafe(refDocPath, expectedPartPath);
+
+                    viewDiagnostics.Add($"[name=\"{name}\" type={vType} onSheet={onSheet} model=\"{Path.GetFileName(refDocPath)}\" cfg=\"{refCfg}\" match={pathMatch}]");
+
                     if (string.Equals(name, propertyView, StringComparison.OrdinalIgnoreCase))
                     {
                         targetView = view;
@@ -1986,12 +2020,23 @@ namespace ADDIN.Commands
                     view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
                 }
             }
-            catch { source = "PROPERTY_VIEW_LOOKUP_ERROR"; return false; }
+            catch (Exception ex)
+            {
+                source = "PROPERTY_VIEW_LOOKUP_ERROR";
+                LogDebug("[GOBAN PROP DIAG] View lookup exception: " + ex.Message);
+                return false;
+            }
+
             if (targetView == null)
             {
                 source = "PROPERTY_VIEW_NOT_FOUND";
+                LogDebug("[GOBAN PROP DIAG NOT_FOUND] propertyView=\"" + propertyView +
+                    "\" not found on sheet=\"" + sheetName + "\". Views scanned (" + viewDiagnostics.Count + "): " +
+                    string.Join("; ", viewDiagnostics));
                 return false;
             }
+
+            LogDebug("[GOBAN PROP DIAG TARGET] matched view=\"" + propertyView + "\"");
 
             ModelDoc2 model = null;
             try { model = targetView.ReferencedDocument as ModelDoc2; }
@@ -1999,6 +2044,7 @@ namespace ADDIN.Commands
             if (model == null)
             {
                 source = "REFERENCED_MODEL_NOT_LOADED";
+                LogDebug("[GOBAN PROP DIAG] targetView=\"" + propertyView + "\" has null ReferencedDocument");
                 return false;
             }
             string modelPath = "";
@@ -2008,6 +2054,7 @@ namespace ADDIN.Commands
                 !PathsEqualSafe(modelPath, expectedPartPath))
             {
                 source = "PROPERTY_SOURCE_MODEL_MISMATCH";
+                LogDebug("[GOBAN PROP DIAG MISMATCH] targetView modelPath=\"" + modelPath + "\" != expectedPart=\"" + expectedPartPath + "\"");
                 return false;
             }
 
@@ -2017,6 +2064,7 @@ namespace ADDIN.Commands
             if (string.IsNullOrWhiteSpace(configuration))
             {
                 source = "VIEW_CONFIGURATION_UNKNOWN";
+                LogDebug("[GOBAN PROP DIAG] targetView=\"" + propertyView + "\" ReferencedConfiguration is empty");
                 return false;
             }
 
@@ -2032,16 +2080,25 @@ namespace ADDIN.Commands
                     mgr.Get6("合番", true, out raw, out resolved,
                         out wasResolved, out linkedToParent); // cached, no activation
                     if (!wasResolved || string.IsNullOrWhiteSpace(resolved))
+                    {
+                        LogDebug("[GOBAN PROP DIAG GET6] scope=\"" + scope + "\" wasResolved=" + wasResolved + " raw=\"" + raw + "\" resolved=\"" + resolved + "\"");
                         continue;
+                    }
                     value = resolved;
                     source = "SHEET_VIEW:" + propertyView + "|CONFIG:" +
                         (string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope);
+                    LogDebug("[GOBAN PROP DIAG SUCCESS] " + source + " value=\"" + value + "\"");
                     return true;
                 }
-                catch { source = "PROPERTY_GET6_API_ERROR"; }
+                catch (Exception ex)
+                {
+                    source = "PROPERTY_GET6_API_ERROR";
+                    LogDebug("[GOBAN PROP DIAG GET6 ERROR] scope=\"" + scope + "\": " + ex.Message);
+                }
             }
             if (source == "SHEET_SOURCE_UNVERIFIED")
                 source = "PROPERTY_NOT_RESOLVED";
+            LogDebug("[GOBAN PROP DIAG UNRESOLVED] source=" + source);
             return false;
         }
 
