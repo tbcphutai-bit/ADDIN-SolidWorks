@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -25,8 +25,11 @@ namespace ADDIN.Commands
         public string DebugLogPath { get; set; }
         public List<SamePartGroupResult> Groups { get; } = new List<SamePartGroupResult>();
         public List<SamePartItemResult> Errors { get; } = new List<SamePartItemResult>();
+        // Items successfully read but not assigned to a similarity group.
+        public List<SamePartItemResult> UnmatchedItems { get; } = new List<SamePartItemResult>();
         public HashSet<int> HighlightRowIndexes { get; } = new HashSet<int>();
         public string ReportPath { get; set; }
+        public string OutputDirectory { get; set; }
         public string Message { get; set; }
     }
 
@@ -627,6 +630,8 @@ namespace ADDIN.Commands
                     toleranceUsed.Add(item);
                 }
             }
+            // Unmatched != confirmed different from every other Part.
+            result.UnmatchedItems.AddRange(items.Where(item => !groupedItems.Contains(item)));
         }
 
         private bool AreSameWithinTolerance(
@@ -3399,4 +3404,381 @@ namespace ADDIN.Commands
             try { Marshal.FinalReleaseComObject(value); } catch { }
         }
     }
+    // CHECK SAME PART V2 - report-first.  Insert inside namespace ADDIN.Commands.
+    // The report is a snapshot, shared by the on-screen viewer and the optional Excel export.
+    internal sealed class SamePartReportV2Row
+    {
+        public string RowId { get; set; }
+        public string Kind { get; set; }
+        public string StatusCode { get; set; }
+        public string StatusLabel { get; set; }
+        public string GroupLabel { get; set; }
+        public string PartNumbers { get; set; }
+        public int ItemCount { get; set; }
+        public string Materials { get; set; }
+        public string Thicknesses { get; set; }
+        public string Configurations { get; set; }
+        public string FlatConfigurations { get; set; }
+        public string Details { get; set; }
+        public string Paths { get; set; }
+        public string AssemblyPaths { get; set; }
+    }
+
+    internal sealed class SamePartReportV2Snapshot
+    {
+        public readonly string ReportId = Guid.NewGuid().ToString("N");
+        public readonly DateTime CreatedAt = DateTime.Now;
+        public readonly List<SamePartReportV2Row> Rows = new List<SamePartReportV2Row>();
+        public int CheckedRows { get; private set; }
+        public int ProcessedRows { get; private set; }
+        public int GroupCount { get { return Rows.Count(x => x.Kind == "GROUP"); } }
+        public int GroupMembers { get { return Rows.Where(x => x.Kind == "GROUP").Sum(x => x.ItemCount); } }
+        public int NotVerifiedCount { get { return Rows.Count(x => x.StatusCode == "UNVERIFIED"); } }
+        public int ErrorCount { get { return Rows.Count(x => x.StatusCode == "ERROR"); } }
+        public int NoMatchCount { get { return Rows.Count(x => x.StatusCode == "NO_MATCH"); } }
+
+        public static SamePartReportV2Snapshot From(SamePartCheckResult source)
+        {
+            if (source == null) throw new ArgumentNullException("source");
+            SamePartReportV2Snapshot snapshot = new SamePartReportV2Snapshot();
+            snapshot.CheckedRows = source.CheckedCount;
+            snapshot.ProcessedRows = source.ProcessedCount;
+            foreach (SamePartGroupResult group in source.Groups)
+            {
+                if (group == null) continue;
+                List<SamePartItemResult> members = group.Items.Where(x => x != null).ToList();
+                string code = group.Status ?? "UNVERIFIED";
+                snapshot.Rows.Add(CreateRow("GROUP", "G" + group.GroupNumber,
+                    code, members, group.Note ?? "", group.GroupNumber));
+            }
+            int errorOrdinal = 0;
+            foreach (SamePartItemResult issue in source.Errors)
+            {
+                if (issue == null) continue;
+                ++errorOrdinal;
+                string code = ClassifyFailure(issue.Error);
+                snapshot.Rows.Add(CreateRow("ISSUE", "-", code,
+                    new[] { issue }, issue.Error ?? "", errorOrdinal));
+            }
+            int unmatchedOrdinal = 0;
+            foreach (SamePartItemResult unmatched in source.UnmatchedItems)
+            {
+                if (unmatched == null) continue;
+                ++unmatchedOrdinal;
+                snapshot.Rows.Add(CreateRow("UNMATCHED", "-", "NO_MATCH",
+                    new[] { unmatched }, "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.", unmatchedOrdinal));
+            }
+            return snapshot;
+        }
+
+        public static string ClassifyFailure(string message)
+        {
+            string x = (message ?? "").ToUpperInvariant();
+            // Geometry verification unavailable != file/API failure.
+            if (x.Contains("KHONG DU DU LIEU HINH HOC") ||
+                x.Contains("INSUFFICIENT ROTATION-INDEPENDENT ANCHORS") ||
+                x.Contains("UNSUPPORTED CURVED B-REP") ||
+                x.Contains("MANUAL REVIEW") ||
+                x.Contains("NO VALID ALIGNMENT") ||
+                x.Contains("NOT VERIFIED") ||
+                x.Contains("INCONCLUSIVE"))
+                return "UNVERIFIED";
+            // Unknown exceptions are not silently labelled as geometric differences.
+            return "ERROR";
+        }
+
+        public static string DisplayStatus(string code)
+        {
+            switch (code ?? "")
+            {
+                case "SAME FULL": return "TRÙNG 100%";
+                case "SAME TOLERANCE": return "TRÙNG TRONG DUNG SAI";
+                case "SAME GEOMETRY": return "TRÙNG HÌNH HỌC 3D";
+                case "SAME FLAT": return "TRÙNG PHÔI (FLAT)";
+                case "CHECK MIRROR": return "CẦN KIỂM TRA ĐỐI XỨNG";
+                case "UNVERIFIED": return "CHƯA XÁC MINH";
+                case "ERROR": return "LỖI ĐỌC / XỬ LÝ";
+                case "NO_MATCH": return "KHÔNG CÓ NHÓM TRÙNG";
+                default: return "CHƯA XÁC MINH";
+            }
+        }
+
+        private static SamePartReportV2Row CreateRow(string kind, string groupLabel, string status,
+            IEnumerable<SamePartItemResult> members, string details, int ordinal)
+        {
+            List<SamePartItemResult> list = members.ToList();
+            List<string> paths = list.Select(x => NormalizePath(x.PartPath))
+                .Where(x => x.Length != 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            Dictionary<string, int> numberCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (SamePartItemResult item in list)
+            {
+                string id = (item.BuhinNo ?? "").Trim();
+                if (id.Length == 0) id = System.IO.Path.GetFileName(item.PartPath ?? "");
+                if (id.Length == 0) id = "?";
+                if (!numberCounts.ContainsKey(id)) numberCounts[id] = 0;
+                numberCounts[id]++;
+            }
+            // Preserve duplicate BOM numbers (e.g. 22 x 2) instead of JoinDistinct(22,22)=22.
+            string partText = string.Join(", ", numberCounts.Select(x =>
+                x.Value > 1 ? x.Key + " x" + x.Value : x.Key));
+            string copiesNote = "";
+            if (list.Count > 1 && paths.Count > 1 && numberCounts.Any(x => x.Value > 1))
+                copiesNote = " [Cùng số BOM xuất hiện ở nhiều đường dẫn; cần đối chiếu nguồn]";
+            return new SamePartReportV2Row
+            {
+                RowId = kind + ":" + ordinal + ":" + string.Join("|", paths),
+                Kind = kind,
+                GroupLabel = groupLabel,
+                StatusCode = status,
+                StatusLabel = DisplayStatus(status),
+                PartNumbers = partText,
+                ItemCount = list.Count,
+                Materials = Join(list.Select(x => x.Material)),
+                Thicknesses = Join(list.Select(x => x.Thickness)),
+                Configurations = Join(list.Select(x => x.Configuration)),
+                FlatConfigurations = Join(list.Select(x => x.FlatConfiguration)),
+                Paths = string.Join(System.Environment.NewLine, paths),
+                AssemblyPaths = Join(list.SelectMany(x => x.AssemblyPaths)),
+                Details = details + copiesNote
+            };
+        }
+
+        private static string Join(IEnumerable<string> items)
+        {
+            return string.Join(" | ", items.Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim()).Distinct(StringComparer.OrdinalIgnoreCase));
+        }
+        private static string NormalizePath(string source)
+        {
+            string value = (source ?? "").Trim();
+            if (value.Length == 0) return "";
+            try { return System.IO.Path.GetFullPath(value); }
+            catch { return value; }
+        }
+    }
+
+    internal static class SamePartReportV2Excel
+    {
+        // CALL THIS ONLY FROM A USER-INITIATED CLICK EVENT. Never from scan/run/show.
+        public static bool SaveWithDialog(SamePartReportV2Snapshot snapshot, IWin32Window owner,
+            string preferredDirectory, out string writtenPath)
+        {
+            writtenPath = "";
+            if (snapshot == null) throw new ArgumentNullException("snapshot");
+            using (SaveFileDialog dialog = new SaveFileDialog())
+            {
+                dialog.Title = "Xuat Excel - CHECK SAME PART";
+                dialog.Filter = "Excel Workbook (*.xlsx)|*.xlsx";
+                dialog.DefaultExt = "xlsx";
+                dialog.AddExtension = true;
+                dialog.OverwritePrompt = true;
+                dialog.CheckPathExists = true;
+                dialog.FileName = "CHECK_SAME_PART_" + snapshot.CreatedAt.ToString("yyyyMMdd_HHmmss") + ".xlsx";
+                if (!string.IsNullOrWhiteSpace(preferredDirectory) &&
+                    System.IO.Directory.Exists(preferredDirectory))
+                    dialog.InitialDirectory = preferredDirectory;
+                if (dialog.ShowDialog(owner) != DialogResult.OK)
+                    return false;
+                writtenPath = dialog.FileName;
+            }
+
+            object excelObject = null;
+            object bookObject = null;
+            object sheetObject = null;
+            try
+            {
+                Type excelType = Type.GetTypeFromProgID("Excel.Application");
+                if (excelType == null) throw new InvalidOperationException("Microsoft Excel chua duoc cai dat.");
+                excelObject = Activator.CreateInstance(excelType);
+                dynamic excel = excelObject;
+                excel.DisplayAlerts = false;
+                bookObject = excel.Workbooks.Add();
+                dynamic workbook = bookObject;
+                sheetObject = workbook.Worksheets[1];
+                dynamic sheet = sheetObject;
+                sheet.Name = "CHECK SAME PART";
+                string[] headers = { "Nhom", "Ket qua", "So BOM", "So muc", "Vat lieu", "Be day",
+                    "Cau hinh", "Flat-Pattern", "Ghi chu / Ly do", "Duong dan Part", "Assembly" };
+                for (int col = 0; col < headers.Length; col++)
+                    sheet.Cells[1, col + 1] = headers[col];
+                int rowIndex = 2;
+                foreach (SamePartReportV2Row row in snapshot.Rows)
+                {
+                    // Identical row/status text as the on-screen report: no reclassification.
+                    sheet.Cells[rowIndex, 1] = row.GroupLabel;
+                    sheet.Cells[rowIndex, 2] = row.StatusLabel;
+                    sheet.Cells[rowIndex, 3] = row.PartNumbers;
+                    sheet.Cells[rowIndex, 4] = row.ItemCount;
+                    sheet.Cells[rowIndex, 5] = row.Materials;
+                    sheet.Cells[rowIndex, 6] = row.Thicknesses;
+                    sheet.Cells[rowIndex, 7] = row.Configurations;
+                    sheet.Cells[rowIndex, 8] = row.FlatConfigurations;
+                    sheet.Cells[rowIndex, 9] = row.Details;
+                    sheet.Cells[rowIndex, 10] = row.Paths;
+                    sheet.Cells[rowIndex, 11] = row.AssemblyPaths;
+                    rowIndex++;
+                }
+                dynamic range = sheet.Range[sheet.Cells[1, 1], sheet.Cells[Math.Max(1,rowIndex - 1), headers.Length]];
+                range.Font.Name = "Meiryo UI";
+                range.Font.Size = 10;
+                range.Columns.AutoFit();
+                range.VerticalAlignment = -4160;
+                sheet.Rows[1].Font.Bold = true;
+                sheet.Columns[9].ColumnWidth = 55;
+                sheet.Columns[10].ColumnWidth = 55;
+                sheet.Columns[11].ColumnWidth = 55;
+                sheet.Columns[9].WrapText = true;
+                sheet.Columns[10].WrapText = true;
+                sheet.Columns[11].WrapText = true;
+                dynamic info = workbook.Worksheets.Add();
+                info.Name = "SUMMARY";
+                info.Cells[1, 1] = "ReportId"; info.Cells[1, 2] = snapshot.ReportId;
+                info.Cells[2, 1] = "CreatedAt"; info.Cells[2, 2] = snapshot.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss");
+                info.Cells[3, 1] = "CheckedRows"; info.Cells[3, 2] = snapshot.CheckedRows;
+                info.Cells[4, 1] = "ProcessedRows"; info.Cells[4, 2] = snapshot.ProcessedRows;
+                info.Cells[5, 1] = "Groups"; info.Cells[5, 2] = snapshot.GroupCount;
+                info.Cells[6, 1] = "GroupMembers"; info.Cells[6, 2] = snapshot.GroupMembers;
+                info.Cells[7, 1] = "Unverified"; info.Cells[7, 2] = snapshot.NotVerifiedCount;
+                info.Cells[8, 1] = "Errors"; info.Cells[8, 2] = snapshot.ErrorCount;
+                info.Cells[9, 1] = "NoGroup"; info.Cells[9, 2] = snapshot.NoMatchCount;
+                info.Columns.AutoFit();
+                workbook.SaveAs(writtenPath, 51); // 51 = xlOpenXMLWorkbook (.xlsx)
+                workbook.Close(false);
+                excel.Quit();
+                System.Diagnostics.Debug.WriteLine("[CHECK SAME PART][EXCEL_CLICK] report=" + snapshot.ReportId
+                    + " rows=" + snapshot.Rows.Count + " path=" + writtenPath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[CHECK SAME PART][EXCEL_CLICK][ERROR] " + ex);
+                try { if (bookObject != null) { dynamic wb = bookObject; wb.Close(false); } } catch { }
+                try { if (excelObject != null) { dynamic xl = excelObject; xl.Quit(); } } catch { }
+                writtenPath = "";
+                MessageBox.Show(owner, "Khong xuat duoc Excel: " + ex.Message,
+                    "CHECK SAME PART", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            finally
+            {
+                // A worksheet COM object must be released before its workbook and application.
+                Release(sheetObject);
+                Release(bookObject);
+                Release(excelObject);
+            }
+        }
+        private static void Release(object com)
+        {
+            if (com == null) return;
+            try { if (System.Runtime.InteropServices.Marshal.IsComObject(com))
+                System.Runtime.InteropServices.Marshal.FinalReleaseComObject(com); } catch { }
+        }
+    }
+
+    // Fallback UI for the repository's older revision. If the local branch already
+    // contains the screenshot's rich results form, bind THAT form to the snapshot instead.
+    internal sealed class SamePartReportV2Form : Form
+    {
+        private readonly SamePartReportV2Snapshot snapshot;
+        private readonly string preferredDirectory;
+        private readonly DataGridView grid;
+        private readonly TextBox details;
+        private readonly Button exportButton;
+        public SamePartReportV2Form(SamePartReportV2Snapshot source, string directory)
+        {
+            snapshot = source ?? throw new ArgumentNullException("source");
+            preferredDirectory = directory;
+            Text = "KET QUA CHECK SAME PART - BAO CAO TRUOC, EXCEL THEO YEU CAU";
+            StartPosition = FormStartPosition.CenterScreen;
+            MinimumSize = new Size(850, 520);
+            Size = new Size(1100, 700);
+            Font = new Font("Meiryo UI", 9F);
+            TableLayoutPanel root = new TableLayoutPanel();
+            root.Dock = DockStyle.Fill;
+            root.RowCount = 4;
+            root.ColumnCount = 1;
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 57));
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 49));
+            Controls.Add(root);
+            Label summary = new Label();
+            summary.Dock = DockStyle.Fill;
+            summary.Padding = new Padding(14, 8, 4, 4);
+            summary.Font = new Font("Meiryo UI", 10F, FontStyle.Bold);
+            summary.Text = "NHOM: " + snapshot.GroupCount + "  |  MUC TRONG NHOM: " + snapshot.GroupMembers
+                + "  |  CHƯA XÁC MINH: " + snapshot.NotVerifiedCount
+                + "  |  LOI: " + snapshot.ErrorCount
+                + "  |  KHONG CO NHOM: " + snapshot.NoMatchCount;
+            root.Controls.Add(summary, 0, 0);
+            grid = new DataGridView();
+            grid.Dock = DockStyle.Fill;
+            grid.ReadOnly = true;
+            grid.MultiSelect = false;
+            grid.AllowUserToAddRows = false;
+            grid.AllowUserToDeleteRows = false;
+            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            grid.Columns.Add("Group", "Nhom");
+            grid.Columns.Add("Result", "Ket qua");
+            grid.Columns.Add("BOM", "Bo phan / BOM");
+            grid.Columns.Add("Count", "So muc");
+            grid.Columns.Add("Material", "Vat lieu");
+            grid.Columns.Add("Thickness", "Be day");
+            foreach (SamePartReportV2Row row in snapshot.Rows)
+            {
+                int index = grid.Rows.Add(row.GroupLabel, row.StatusLabel,
+                    row.PartNumbers, row.ItemCount, row.Materials, row.Thicknesses);
+                grid.Rows[index].Tag = row;
+                if (row.StatusCode == "ERROR") grid.Rows[index].DefaultCellStyle.BackColor = Color.MistyRose;
+                else if (row.StatusCode == "UNVERIFIED") grid.Rows[index].DefaultCellStyle.BackColor = Color.Moccasin;
+                else if (row.StatusCode == "SAME FULL") grid.Rows[index].DefaultCellStyle.BackColor = Color.Honeydew;
+                else if (row.StatusCode == "SAME FLAT") grid.Rows[index].DefaultCellStyle.BackColor = Color.LemonChiffon;
+            }
+            root.Controls.Add(grid, 0, 1);
+            details = new TextBox();
+            details.Dock = DockStyle.Fill;
+            details.Multiline = true;
+            details.ReadOnly = true;
+            details.ScrollBars = ScrollBars.Vertical;
+            root.Controls.Add(details, 0, 2);
+            grid.SelectionChanged += (sender, args) =>
+            {
+                if (grid.SelectedRows.Count == 0) return;
+                SamePartReportV2Row row = grid.SelectedRows[0].Tag as SamePartReportV2Row;
+                if (row == null) return;
+                details.Text = "Ket qua: " + row.StatusLabel + System.Environment.NewLine
+                    + "Ly do: " + row.Details + System.Environment.NewLine
+                    + "Part: " + row.Paths + System.Environment.NewLine
+                    + "Assembly: " + row.AssemblyPaths;
+            };
+            FlowLayoutPanel actions = new FlowLayoutPanel();
+            actions.FlowDirection = FlowDirection.RightToLeft;
+            actions.Dock = DockStyle.Fill;
+            exportButton = new Button();
+            exportButton.Text = "Xuat Excel...";
+            exportButton.Size = new Size(138, 34);
+            exportButton.Click += OnExportClicked;
+            Button close = new Button();
+            close.Text = "Dong";
+            close.Size = new Size(98, 34);
+            close.Click += (sender, args) => Close();
+            actions.Controls.Add(close);
+            actions.Controls.Add(exportButton);
+            root.Controls.Add(actions, 0, 3);
+        }
+        private void OnExportClicked(object sender, EventArgs e)
+        {
+            exportButton.Enabled = false;
+            try
+            {
+                string path;
+                if (SamePartReportV2Excel.SaveWithDialog(snapshot, this, preferredDirectory, out path))
+                    MessageBox.Show(this, "Da xuat Excel theo yeu cau:\n" + path,
+                        "CHECK SAME PART", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            finally { exportButton.Enabled = true; }
+        }
+    }
+
 }

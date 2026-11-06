@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -13,6 +13,8 @@ namespace ADDIN.UI
     internal sealed class SamePartCheckReviewForm : Form
     {
         private readonly SamePartCheckResult result;
+        private readonly SamePartReportV2Snapshot reportSnapshot;
+        private readonly string excelOutputDirectory;
         private readonly Action<SamePartItemResult, string> navigate;
 
         private readonly DataGridView groupGrid = Grid("groupGrid");
@@ -32,13 +34,14 @@ namespace ADDIN.UI
         private readonly ModernButton btnOpenPart = Button("Mở Part 3D", true, 140);
         private readonly ModernButton btnOpenAssembly = Button("Mở Assembly", false, 130);
         private readonly ModernButton btnOpenFolder = Button("Mở thư mục", false, 120);
-        private readonly ModernButton report = Button("Mở báo cáo", false, 128);
+        private readonly ModernButton btnExportExcel = Button("Xuất Excel...", false, 130);
 
         private readonly FilterPillButton pillAll;
         private readonly FilterPillButton pillFull;
         private readonly FilterPillButton pillGeo;
         private readonly FilterPillButton pillFlat;
         private readonly FilterPillButton pillMirror;
+        private readonly FilterPillButton pillUnverified;
         private readonly FilterPillButton pillError;
 
         private string activeFilter;
@@ -55,13 +58,16 @@ namespace ADDIN.UI
         }
 
         internal SamePartCheckReviewForm(SamePartCheckResult completed,
-            Action<SamePartItemResult, string> openLocation)
+            Action<SamePartItemResult, string> openLocation,
+            string excelDir = null)
         {
             result = completed ?? throw new ArgumentNullException(nameof(completed));
+            reportSnapshot = SamePartReportV2Snapshot.From(result);
+            excelOutputDirectory = !string.IsNullOrWhiteSpace(excelDir) ? excelDir : result.OutputDirectory;
             navigate = openLocation;
             Name = "SamePartCheckReviewForm";
             Text = "TAI TOOL — KẾT QUẢ CHECK SAME PART";
-            Size = new Size(1300, 820);
+            Size = new Size(1320, 820);
             MinimumSize = new Size(1020, 640);
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 10F, FontStyle.Regular);
@@ -95,7 +101,7 @@ namespace ADDIN.UI
             };
             ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 330));
             ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 136));
+            ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 138));
 
             var brandPanel = new Panel { Dock = DockStyle.Fill, BackColor = TaiTheme.Surface, Margin = Padding.Empty };
             brandPanel.Paint += PaintBrandHeader;
@@ -115,14 +121,16 @@ namespace ADDIN.UI
             int countGeo = result.Groups.Count(g => g.Status == "SAME GEOMETRY");
             int countFlat = result.Groups.Count(g => g.Status == "SAME FLAT");
             int countMirror = result.Groups.Count(g => g.Status == "CHECK MIRROR");
-            int countError = result.Errors.Count;
-            int totalGroups = result.Groups.Count + (countError > 0 ? 1 : 0);
+            int countUnverified = reportSnapshot.NotVerifiedCount;
+            int countError = reportSnapshot.ErrorCount;
+            int totalCards = result.Groups.Count + (countUnverified > 0 ? 1 : 0) + (countError > 0 ? 1 : 0);
 
-            pillAll = new FilterPillButton("Tổng", totalGroups, null, TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
+            pillAll = new FilterPillButton("Tổng", totalCards, null, TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
             pillFull = new FilterPillButton("Trùng 100%", countFull, "FULL", TaiTheme.Success, TaiTheme.SuccessSoft, TaiTheme.SuccessBorder);
             pillGeo = new FilterPillButton("Trùng 3D", countGeo, "GEOMETRY", TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
             pillFlat = new FilterPillButton("Trùng Phôi", countFlat, "FLAT", TaiTheme.Warning, TaiTheme.WarningSoft, TaiTheme.WarningBorder);
             pillMirror = new FilterPillButton("Mirror", countMirror, "MIRROR", Color.FromArgb(124, 58, 237), Color.FromArgb(245, 243, 255), Color.FromArgb(221, 214, 254));
+            pillUnverified = new FilterPillButton("Chưa xác minh", countUnverified, "UNVERIFIED", Color.FromArgb(217, 119, 6), Color.FromArgb(254, 243, 199), Color.FromArgb(253, 230, 138));
             pillError = new FilterPillButton("Lỗi", countError, "ERROR", TaiTheme.Danger, TaiTheme.DangerSoft, TaiTheme.DangerBorder);
 
             pillAll.Click += (s, e) => ApplyFilter(null);
@@ -130,9 +138,11 @@ namespace ADDIN.UI
             pillGeo.Click += (s, e) => ApplyFilter(activeFilter == "GEOMETRY" ? null : "GEOMETRY");
             pillFlat.Click += (s, e) => ApplyFilter(activeFilter == "FLAT" ? null : "FLAT");
             pillMirror.Click += (s, e) => ApplyFilter(activeFilter == "MIRROR" ? null : "MIRROR");
+            pillUnverified.Click += (s, e) => ApplyFilter(activeFilter == "UNVERIFIED" ? null : "UNVERIFIED");
             pillError.Click += (s, e) => ApplyFilter(activeFilter == "ERROR" ? null : "ERROR");
 
             if (countError > 0) filterBar.Controls.Add(pillError);
+            if (countUnverified > 0) filterBar.Controls.Add(pillUnverified);
             filterBar.Controls.Add(pillMirror);
             filterBar.Controls.Add(pillFlat);
             filterBar.Controls.Add(pillGeo);
@@ -141,10 +151,12 @@ namespace ADDIN.UI
             ribbon.Controls.Add(filterBar, 1, 0);
 
             var reportWrap = new Panel { Dock = DockStyle.Fill, BackColor = TaiTheme.Surface, Padding = new Padding(4, 9, 0, 9), Margin = Padding.Empty };
-            report.Name = "report";
-            report.Height = 34;
-            report.Dock = DockStyle.Fill;
-            reportWrap.Controls.Add(report);
+            btnExportExcel.Name = "btnExportExcel";
+            btnExportExcel.Height = 34;
+            btnExportExcel.Dock = DockStyle.Fill;
+            btnExportExcel.Click += btnExportExcel_Click;
+            btnExportExcel.Enabled = true;
+            reportWrap.Controls.Add(btnExportExcel);
             ribbon.Controls.Add(reportWrap, 2, 0);
 
             ribbonCard.Controls.Add(ribbon);
@@ -363,9 +375,6 @@ namespace ADDIN.UI
             btnOpenAssembly.Click += (sender, args) => NavigateSelected("assembly");
             btnOpenFolder.Click += (sender, args) => NavigateSelected("folder");
 
-            report.Click += (sender, args) => OpenReport();
-            report.Enabled = !string.IsNullOrWhiteSpace(result.ReportPath) && File.Exists(result.ReportPath);
-
             UpdateFilterPills();
             DisplayGroups();
         }
@@ -423,6 +432,7 @@ namespace ADDIN.UI
             pillGeo.IsActive = string.Equals(activeFilter, "GEOMETRY", StringComparison.OrdinalIgnoreCase);
             pillFlat.IsActive = string.Equals(activeFilter, "FLAT", StringComparison.OrdinalIgnoreCase);
             pillMirror.IsActive = string.Equals(activeFilter, "MIRROR", StringComparison.OrdinalIgnoreCase);
+            pillUnverified.IsActive = string.Equals(activeFilter, "UNVERIFIED", StringComparison.OrdinalIgnoreCase);
             pillError.IsActive = string.Equals(activeFilter, "ERROR", StringComparison.OrdinalIgnoreCase);
         }
 
@@ -467,7 +477,7 @@ namespace ADDIN.UI
 
                 foreach (SamePartGroupResult group in filtered)
                 {
-                    string partList = string.Join(", ", group.Items.Select(i => i.BuhinNo ?? i.ComponentName ?? ""));
+                    string partList = FormatBuhinList(group.Items);
                     int index = groupGrid.Rows.Add(
                         FormatStatusLabel(group.Status),
                         "G" + group.GroupNumber,
@@ -477,31 +487,65 @@ namespace ADDIN.UI
                     ColorGroupRow(groupGrid.Rows[index], group.Status);
                 }
 
-                // If Error filter or no groups
-                if (string.Equals(activeFilter, "ERROR", StringComparison.OrdinalIgnoreCase) && result.Errors.Count > 0)
+                // Unverified items (from result.Errors classified as UNVERIFIED)
+                var unverifiedItems = result.Errors.Where(e => e != null && SamePartReportV2Snapshot.ClassifyFailure(e.Error) == "UNVERIFIED").ToList();
+                if ((string.IsNullOrEmpty(activeFilter) || string.Equals(activeFilter, "UNVERIFIED", StringComparison.OrdinalIgnoreCase)) && unverifiedItems.Count > 0)
+                {
+                    var fakeUnverifiedGroup = new SamePartGroupResult
+                    {
+                        GroupNumber = 0,
+                        Status = "UNVERIFIED",
+                        Note = "Chi tiết chưa đủ dữ liệu hình học hoặc biên dạng cong phức tạp để xác minh tự động (chưa chứng minh khác nhau từng cặp)."
+                    };
+                    fakeUnverifiedGroup.Items.AddRange(unverifiedItems);
+                    string partList = FormatBuhinList(unverifiedItems);
+                    int index = groupGrid.Rows.Add("CHƯA XÁC MINH", "UNV", unverifiedItems.Count.ToString(), partList);
+                    groupGrid.Rows[index].Tag = fakeUnverifiedGroup;
+                    ColorGroupRow(groupGrid.Rows[index], "UNVERIFIED");
+                }
+
+                // Error items (from result.Errors classified as ERROR)
+                var errorItems = result.Errors.Where(e => e != null && SamePartReportV2Snapshot.ClassifyFailure(e.Error) == "ERROR").ToList();
+                if ((string.IsNullOrEmpty(activeFilter) || string.Equals(activeFilter, "ERROR", StringComparison.OrdinalIgnoreCase)) && errorItems.Count > 0)
                 {
                     var fakeErrorGroup = new SamePartGroupResult
                     {
                         GroupNumber = 0,
                         Status = "ERROR",
-                        Note = "Danh sách chi tiết gặp lỗi khi phân tích."
+                        Note = "Chi tiết gặp lỗi đọc file hoặc lỗi SOLIDWORKS API khi xử lý."
                     };
-                    fakeErrorGroup.Items.AddRange(result.Errors);
-                    string partList = string.Join(", ", result.Errors.Select(i => i.BuhinNo ?? i.ComponentName ?? ""));
-                    int index = groupGrid.Rows.Add("LỖI", "ERR", result.Errors.Count.ToString(), partList);
+                    fakeErrorGroup.Items.AddRange(errorItems);
+                    string partList = FormatBuhinList(errorItems);
+                    int index = groupGrid.Rows.Add("LỖI", "ERR", errorItems.Count.ToString(), partList);
                     groupGrid.Rows[index].Tag = fakeErrorGroup;
                     ColorGroupRow(groupGrid.Rows[index], "ERROR");
                 }
 
+                int totalCount = allGroups.Count + (unverifiedItems.Count > 0 ? 1 : 0) + (errorItems.Count > 0 ? 1 : 0);
                 groupCountBadge.Text = activeFilter == null
-                    ? allGroups.Count + " nhóm"
-                    : filtered.Count + " / " + allGroups.Count + " nhóm";
+                    ? totalCount + " nhóm"
+                    : groupGrid.Rows.Count + " / " + totalCount + " nhóm";
 
                 if (groupGrid.Rows.Count > 0)
                     groupGrid.CurrentCell = groupGrid.Rows[0].Cells[0];
             }
             finally { selecting = false; }
             SelectGroup();
+        }
+
+        private static string FormatBuhinList(IEnumerable<SamePartItemResult> items)
+        {
+            if (items == null) return "";
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in items)
+            {
+                string id = (item.BuhinNo ?? "").Trim();
+                if (id.Length == 0) id = Path.GetFileName(item.PartPath ?? "");
+                if (id.Length == 0) id = "?";
+                if (!counts.ContainsKey(id)) counts[id] = 0;
+                counts[id]++;
+            }
+            return string.Join(", ", counts.Select(kv => kv.Value > 1 ? kv.Key + " x" + kv.Value : kv.Key));
         }
 
         private void SelectGroup()
@@ -522,7 +566,8 @@ namespace ADDIN.UI
                 else
                 {
                     string statusDesc = FormatStatusDescription(group.Status);
-                    selectedGroupTitle.Text = (group.GroupNumber > 0 ? "Nhóm " + group.GroupNumber + "  ·  " : "")
+                    string prefix = group.Status == "UNVERIFIED" ? "Chưa xác minh: " : (group.Status == "ERROR" ? "Lỗi: " : (group.GroupNumber > 0 ? "Nhóm " + group.GroupNumber + "  ·  " : ""));
+                    selectedGroupTitle.Text = prefix
                         + FormatStatusLabel(group.Status) + " (" + group.Items.Count + " chi tiết)";
                     selectedGroupSubtext.Text = !string.IsNullOrWhiteSpace(group.Note)
                         ? group.Note
@@ -569,10 +614,15 @@ namespace ADDIN.UI
             string status = group.Status ?? "";
             if (status == "SAME FULL" || status == "SAME TOLERANCE")
             {
-                calloutHeader.Text = "✔ TRÙNG KHỚP HOÀN TOÀN  —  [ Cùng hình học 3D, vật liệu, bề dày & phôi trải ]";
+                calloutHeader.Text = status == "SAME TOLERANCE"
+                    ? "✔ TRÙNG KHỚP TRONG DUNG SAI CHO PHÉP  —  [ Đã xác minh B-Rep đạt dung sai ]"
+                    : "✔ TRÙNG KHỚP HOÀN TOÀN  —  [ Cùng hình học 3D, vật liệu, bề dày & phôi trải ]";
                 calloutHeader.ForeColor = TaiTheme.Success;
-                calloutBody.Text = ExcelSamePartExporter.FormatNoteForExcel(group)
-                    + "\r\nCác chi tiết trong nhóm này hoàn toàn giống nhau, có thể tái sử dụng chung phôi dập và chương trình CNC.";
+                string diff = ExcelSamePartExporter.FormatDifferenceValues(group);
+                calloutBody.Text = string.IsNullOrWhiteSpace(diff)
+                    ? ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\nCác chi tiết trong nhóm này hoàn toàn giống nhau, có thể tái sử dụng chung phôi dập và chương trình CNC."
+                    : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
+                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
             }
             else if (status == "SAME GEOMETRY")
             {
@@ -582,6 +632,7 @@ namespace ADDIN.UI
                 calloutBody.Text = string.IsNullOrWhiteSpace(diff)
                     ? ExcelSamePartExporter.FormatNoteForExcel(group)
                     : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
+                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
             }
             else if (status == "SAME FLAT")
             {
@@ -591,6 +642,7 @@ namespace ADDIN.UI
                 calloutBody.Text = string.IsNullOrWhiteSpace(diff)
                     ? ExcelSamePartExporter.FormatNoteForExcel(group)
                     : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
+                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
             }
             else if (status == "CHECK MIRROR")
             {
@@ -600,15 +652,24 @@ namespace ADDIN.UI
                 calloutBody.Text = string.IsNullOrWhiteSpace(diff)
                     ? ExcelSamePartExporter.FormatNoteForExcel(group)
                     : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
+                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
+            }
+            else if (status == "UNVERIFIED")
+            {
+                calloutHeader.Text = "⚠ CHI TIẾT CHƯA ĐỦ DỮ LIỆU HÌNH HỌC ĐỂ XÁC MINH (UNVERIFIED)";
+                calloutHeader.ForeColor = Color.FromArgb(217, 119, 6);
+                calloutBody.Text = (group.Note ?? "Chưa đủ dữ liệu hình học.")
+                    + "\r\nCác chi tiết này có biên dạng cong phức tạp hoặc chưa đủ anchor độc lập phép quay để kiểm chứng tự động. Để đảm bảo an toàn, hệ thống từ chối kết luận giống nhau; điều này KHÔNG đồng nghĩa chi tiết bị lỗi hay khác nhau.";
+                calloutFooter.Text = "Bấm 'Mở Part 3D' hoặc Double-click vào dòng để kiểm tra thủ công trong SOLIDWORKS.";
             }
             else
             {
-                calloutHeader.Text = "■ CHI TIẾT CẦN KIỂM TRA LỖI";
+                calloutHeader.Text = "■ CHI TIẾT GẶP LỖI ĐỌC / XỬ LÝ (ERROR)";
                 calloutHeader.ForeColor = TaiTheme.Danger;
-                calloutBody.Text = group.Note ?? "Chi tiết gặp lỗi trong quá trình đọc thông số.";
+                calloutBody.Text = group.Note ?? "Chi tiết gặp lỗi trong quá trình đọc thông số hoặc gọi SOLIDWORKS API.";
+                calloutFooter.Text = "Kiểm tra lại đường dẫn file hoặc quyền truy cập của chi tiết.";
             }
 
-            calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
             calloutCard.Invalidate();
         }
 
@@ -636,14 +697,24 @@ namespace ADDIN.UI
             }
         }
 
-        private void OpenReport()
+        private void btnExportExcel_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(result.ReportPath) || !File.Exists(result.ReportPath)) return;
-            try { Process.Start(new ProcessStartInfo(result.ReportPath) { UseShellExecute = true }); }
-            catch (Exception ex)
+            if (reportSnapshot == null) return;
+            btnExportExcel.Enabled = false;
+            try
             {
-                status.ForeColor = TaiTheme.Warning;
-                status.Text = "Đã lưu báo cáo nhưng không mở được: " + ex.Message;
+                string path;
+                if (SamePartReportV2Excel.SaveWithDialog(reportSnapshot, this, excelOutputDirectory, out path))
+                {
+                    status.ForeColor = TaiTheme.Success;
+                    status.Text = "Đã xuất Excel thành công: " + Path.GetFileName(path);
+                    MessageBox.Show(this, "Đã xuất Excel thành công:\n" + path,
+                        "CHECK SAME PART", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            finally
+            {
+                btnExportExcel.Enabled = true;
             }
         }
 
@@ -656,6 +727,7 @@ namespace ADDIN.UI
                 case "SAME GEOMETRY": return "Trùng 3D";
                 case "SAME FLAT": return "Trùng Phôi";
                 case "CHECK MIRROR": return "Mirror";
+                case "UNVERIFIED": return "Chưa xác minh";
                 case "ERROR": return "Lỗi";
                 default: return status ?? "";
             }
@@ -670,6 +742,7 @@ namespace ADDIN.UI
                 case "SAME GEOMETRY": return "Biên dạng 3D giống nhau nhưng vật liệu hoặc bề dày tôn khác nhau.";
                 case "SAME FLAT": return "Biên dạng trải phẳng giống nhau nhưng trạng thái uốn/chấn khác nhau.";
                 case "CHECK MIRROR": return "Biên dạng tương đương đối xứng Mirror qua mặt phẳng.";
+                case "UNVERIFIED": return "Chi tiết chưa đủ dữ liệu hình học hoặc biên dạng cong phức tạp để xác minh tự động.";
                 case "ERROR": return "Có lỗi phát sinh trong quá trình đọc chi tiết.";
                 default: return "";
             }
@@ -700,19 +773,23 @@ namespace ADDIN.UI
             // Draw overlapping squares icon (symbolizing Same / Duplication)
             using (var pen = new Pen(Color.White, 2F))
             {
-                g.DrawRectangle(pen, iconRect.X + 8, iconRect.Y + 8, 14, 14);
-                g.DrawRectangle(pen, iconRect.X + 14, iconRect.Y + 14, 14, 14);
+                pen.LineJoin = LineJoin.Round;
+                Rectangle sq1 = new Rectangle(iconRect.X + 7, iconRect.Y + 7, 14, 14);
+                Rectangle sq2 = new Rectangle(iconRect.X + 13, iconRect.Y + 13, 14, 14);
+
+                g.DrawRectangle(pen, sq2);
+                using (var fillBrush = new SolidBrush(TaiTheme.Accent))
+                    g.FillRectangle(fillBrush, sq1);
+                g.DrawRectangle(pen, sq1);
             }
 
+            int textLeft = iconRect.Right + 12;
             using (var titleFont = new Font("Segoe UI", 12F, FontStyle.Bold))
             using (var subFont = new Font("Segoe UI", 9F, FontStyle.Regular))
             {
-                TextRenderer.DrawText(g, "CHECK SAME PART", titleFont, new Point(48, 5), TaiTheme.Text,
+                TextRenderer.DrawText(g, "KẾT QUẢ CHECK SAME PART", titleFont, new Point(textLeft, 6), TaiTheme.Text,
                     TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
-                string subText = result.Canceled
-                    ? "Đã dừng giữa chừng · Đối chiếu chi tiết đồng dạng"
-                    : "Đối chiếu chi tiết đồng dạng & trùng lặp hình học";
-                TextRenderer.DrawText(g, subText, subFont, new Point(49, 27), TaiTheme.TextMuted,
+                TextRenderer.DrawText(g, "So khớp hình học 3D, phôi trải và đối xứng", subFont, new Point(textLeft, 28), TaiTheme.TextMuted,
                     TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
             }
         }
@@ -775,6 +852,12 @@ namespace ADDIN.UI
                 fill = Color.FromArgb(245, 243, 255);
                 border = Color.FromArgb(221, 214, 254);
                 stripe = Color.FromArgb(124, 58, 237);
+            }
+            else if (status == "UNVERIFIED")
+            {
+                fill = Color.FromArgb(254, 243, 199);
+                border = Color.FromArgb(253, 230, 138);
+                stripe = Color.FromArgb(217, 119, 6);
             }
             else if (status == "ERROR")
             {
@@ -853,6 +936,12 @@ namespace ADDIN.UI
                 fill = Color.FromArgb(245, 243, 255);
                 border = Color.FromArgb(221, 214, 254);
                 fg = Color.FromArgb(124, 58, 237);
+            }
+            else if (status == "UNVERIFIED")
+            {
+                fill = Color.FromArgb(254, 243, 199);
+                border = Color.FromArgb(253, 230, 138);
+                fg = Color.FromArgb(217, 119, 6);
             }
             else if (status == "ERROR")
             {

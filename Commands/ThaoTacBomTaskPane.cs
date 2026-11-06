@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -565,6 +565,7 @@ namespace ADDIN.Commands
             if (result == null)
                 return null;
 
+            result.OutputDirectory = excelOutputDirectory;
             HighlightRows(result.HighlightRowIndexes);
             AutoFitBomGrid();
             ShowSamePartResult(result, excelOutputDirectory);
@@ -1029,35 +1030,30 @@ namespace ADDIN.Commands
                 return;
             }
 
-            string exportedPath;
-            int exportedCount = ExcelSamePartExporter.Export(
-                result,
-                excelOutputDirectory,
-                out exportedPath);
-            int sameFull = result.Groups.Count(group => group.Status == "SAME FULL");
+            result.OutputDirectory = excelOutputDirectory;
+            SamePartReportV2Snapshot snapshot = SamePartReportV2Snapshot.From(result);
+
+            int sameFull = result.Groups.Count(group => group.Status == "SAME FULL" || group.Status == "SAME TOLERANCE");
             int sameGeometry = result.Groups.Count(group => group.Status == "SAME GEOMETRY");
             int sameFlat = result.Groups.Count(group => group.Status == "SAME FLAT");
             int mirrorCheck = result.Groups.Count(group => group.Status == "CHECK MIRROR");
-            string message = "CHECK SAME PART xong. Nhóm trùng hoàn toàn: " + sameFull
-                + ", trùng hình học: " + sameGeometry
-                + ", chỉ trùng Flat-Pattern: " + sameFlat
-                + ", mirror/cần đối chiếu: " + mirrorCheck
-                + ", cần kiểm tra: " + result.Errors.Count + ".";
 
-            if (exportedCount > 0)
-            {
-                message += " Đã xuất Excel " + exportedCount + " dòng.";
-                if (!string.IsNullOrWhiteSpace(exportedPath))
-                    message += " File: " + exportedPath;
-            }
-            else
-                message += " Không tìm thấy nhóm chi tiết giống nhau.";
+            string message = "CHECK SAME PART xong. Nhóm trùng 100%: " + sameFull
+                + ", trùng hình học: " + sameGeometry
+                + ", trùng phôi: " + sameFlat
+                + ", mirror: " + mirrorCheck
+                + ", chưa xác minh: " + snapshot.NotVerifiedCount
+                + ", lỗi: " + snapshot.ErrorCount + ". Bấm 'Xuất Excel...' trong bảng kết quả để lưu file.";
+
             if (!string.IsNullOrWhiteSpace(result.DebugLogPath))
                 message += " Debug: " + result.DebugLogPath;
 
-            result.ReportPath = exportedPath;
             result.Message = message;
             lblStatus.Text = message;
+
+            System.Diagnostics.Debug.WriteLine("[CHECK SAME PART][REPORT_FIRST] id=" + snapshot.ReportId
+                + " groups=" + snapshot.GroupCount + " unverified=" + snapshot.NotVerifiedCount
+                + " errors=" + snapshot.ErrorCount + " rows=" + snapshot.Rows.Count);
         }
 
         private void WriteCheckDebugResult(KetQuaSoSanhDfTk result)

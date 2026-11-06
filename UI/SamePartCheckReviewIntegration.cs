@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -17,7 +17,10 @@ namespace ADDIN
         {
             if (drawingBomCommandInProgress || result == null || result.CheckedCount == 0) return;
             if (samePartReviewForm != null && !samePartReviewForm.IsDisposed) samePartReviewForm.Close();
-            samePartReviewForm = new UI.SamePartCheckReviewForm(result, NavigateSamePartLocation);
+            string excelDir = !string.IsNullOrWhiteSpace(result.OutputDirectory)
+                ? result.OutputDirectory
+                : "";
+            samePartReviewForm = new UI.SamePartCheckReviewForm(result, NavigateSamePartLocation, excelDir);
             samePartReviewForm.PositionOnScreen(Screen.FromControl(this).WorkingArea);
             samePartReviewForm.FormClosed += (sender, args) => samePartReviewForm = null;
             samePartReviewForm.Show(this);

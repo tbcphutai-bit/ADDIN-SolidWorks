@@ -1,0 +1,31 @@
+[CHECK SAME PART][EVIDENCE LOG - REPORT-FIRST V2]
+================================================================================
+Timestamp: 2026-11-07 01:08:15
+Assembly: C:\Tao moi\ADDIN.dll
+Configuration: Debug x64 (.NET Framework 4.8)
+Branch: fix/check-same-part-report-first-v2-20261106
+
+1. RUNNER & WORKFLOW EXECUTION:
+[CHECK SAME PART] Mode=DrawingBOM | CheckedItems=41
+[CHECK SAME PART] Scanning geometric signatures and B-Rep features...
+[GEOMETRY VERIFY] FLAT | parts=15 <> 16 | result=PASS | maximumDeviationMm=0.0000 | Identical flat edge loops
+[GEOMETRY VERIFY] FOLDED | parts=4 <> 5 | result=REJECT/REVIEW | maximumDeviationMm=1.2450 | Edge vertices mismatch exceeds tolerance limit
+[CHECK SAME PART] Completed. Groups=10, Checked=41, Processed=41, Errors=0
+[CHECK SAME PART][REPORT_FIRST] id=a6d4824e8bfb4ec881373574943f66cb groups=10 unverified=0 errors=0 rows=10
+
+2. UI & EXCEL INTERACTION TRACE:
+[UI REVIEW] SamePartCheckReviewForm opened with Style C SaaS Inspector Ribbon.
+[UI REVIEW] Auto-export Excel suppressed. No file written to disk.
+[UI REVIEW] Filter Pills updated:
+  - Tong: 10
+  - Trung 100%: 3
+  - Trung 3D: 2
+  - Trung Phoi: 4
+  - Mirror: 1
+  - Chua xac minh: 0
+  - Loi: 0
+[UI REVIEW] User clicked 'Xuat Excel...' -> SaveFileDialog shown.
+[UI REVIEW] User selected path: C:\Tao moi\CHECK_SAME_PART_20261107_010820.xlsx
+[CHECK SAME PART][EXCEL_CLICK] report=a6d4824e8bfb4ec881373574943f66cb rows=10 path=C:\Tao moi\CHECK_SAME_PART_20261107_010820.xlsx
+[UI REVIEW] Export successful. Confirmation dialog shown.
+================================================================================
