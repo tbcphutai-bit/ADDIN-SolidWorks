@@ -104,6 +104,8 @@ namespace ADDIN.Commands
     internal sealed class DrawingPropertyLinkReportRow
     {
         public string FieldName { get; set; } = "";
+        public string DisplayOrReferenceValue { get; set; } = "";
+        public string DisplayOrReferenceSource { get; set; } = "";
         public string DrawingRaw { get; set; } = "";
         public string PropertyValue { get; set; } = "";
         public string BomValue { get; set; } = "";
@@ -1867,14 +1869,14 @@ namespace ADDIN.Commands
 
             string bomDirect;
             bool hasBomValue = TryReadBomGobanColumn(bomRow, out bomDirect);
-            row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番)";
+            row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番 riêng)";
 
             string propValue;
             string propSource;
             bool gotProperty = TryGetVerifiedSheetGobanProperty(
                 drawing, sheet, sheetName, referencedModel, referencedConfiguration,
                 item.PartPath, out propValue, out propSource);
-            row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh Property)";
+            row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh được Property)";
 
             // Property↔BOM can be OK only if BOTH independent sources were read.
             // ReadBomAndComponentProperties() falls back to Model property, so NEVER
@@ -1923,7 +1925,71 @@ namespace ADDIN.Commands
                 comparison.Message = (comparison.Message ?? "") +
                     " | Property/BOM/DisplayedValue mismatch confirmed.";
             }
-            row.Note = string.Join(" | ", reasons);
+            bool displayedWasRead =
+                !drawingData.GobanDisplayUnavailable &&
+                !string.IsNullOrWhiteSpace(drawingData.Goban);
+
+            if (displayedWasRead)
+            {
+                row.DisplayOrReferenceValue = drawingData.Goban;
+                row.DisplayOrReferenceSource = "Drawing API";
+            }
+            else if (row.LinkStatus == DrawingBomCheckStatus.OK && gotProperty)
+            {
+                // Reference value only; not proof of actual Drawing display.
+                row.DisplayOrReferenceValue = propValue;
+                row.DisplayOrReferenceSource = "Property (tham chiếu)";
+            }
+            else if (row.LinkStatus == DrawingBomCheckStatus.NG &&
+                     !string.IsNullOrWhiteSpace(drawingData.GobanLinkRawExpression) &&
+                     !drawingData.GobanLinkRawExpression.TrimStart().StartsWith(
+                         "$", StringComparison.Ordinal))
+            {
+                row.DisplayOrReferenceValue = drawingData.GobanLinkRawExpression;
+                row.DisplayOrReferenceSource = "Raw Text (nhập tay)";
+            }
+            else
+            {
+                row.DisplayOrReferenceValue = "(Chưa đọc được)";
+                row.DisplayOrReferenceSource = "Chưa xác minh";
+            }
+
+            var readable = new List<string>();
+            if (row.LinkStatus == DrawingBomCheckStatus.OK)
+                readable.Add("Liên kết 合番 đúng công thức.");
+            else if (row.LinkStatus == DrawingBomCheckStatus.NG)
+                readable.Add("Liên kết 合番 sai hoặc đã bị nhập tay. Công thức cần có: " +
+                    "$PRPSHEET:\"合番\".");
+            else
+                readable.Add("Chưa xác minh được công thức gốc trong ô 合番.");
+
+            if (gotProperty)
+                readable.Add("Đã đọc giá trị từ Property của model tham chiếu (" +
+                    propSource + ").");
+            else
+                readable.Add("Chưa đọc được Property từ đúng View/Configuration (" +
+                    propSource + ").");
+
+            if (!hasBomValue)
+                readable.Add("BOM không có cột 合番 riêng nên chưa thể đối chiếu Property với BOM.");
+            else if (row.PropertyStatus == DrawingBomCheckStatus.NG)
+                readable.Add("Property không trùng giá trị 合番 của BOM.");
+            else if (row.PropertyStatus == DrawingBomCheckStatus.OK)
+                readable.Add("Property trùng giá trị 合番 của BOM.");
+            else
+                readable.Add("Chưa đủ dữ liệu để đối chiếu Property và BOM.");
+
+            if (row.DisplayStatus == DrawingBomCheckStatus.NG)
+                readable.Add("Chữ đọc trực tiếp từ Drawing khác Property.");
+            else if (row.DisplayStatus == DrawingBomCheckStatus.OK)
+                readable.Add("Đã xác minh chữ trực tiếp từ Drawing.");
+            else if (row.DisplayOrReferenceSource == "Property (tham chiếu)")
+                readable.Add("Chữ ở cột Giá trị chữ lấy từ Property; " +
+                    "chưa xác minh trực tiếp chữ Drawing.");
+            else
+                readable.Add("Chưa xác minh trực tiếp chữ đang hiển thị trên Drawing.");
+
+            row.Note = string.Join(" ", readable);
             item.PropertyLinkRows.Add(row);
             LogDebug("[GOBAN REPORT ROW] link=" + row.LinkStatus +
                 " property=" + row.PropertyStatus + " display=" + row.DisplayStatus +
@@ -1947,6 +2013,111 @@ namespace ADDIN.Commands
             LogDebug("[GOBAN BOM DIAG] row=" + row.Index + " columnsCount=" +
                 row.DataGridView.Columns.Count + " headers: " + string.Join(", ", columnHeaders) +
                 " -> No column matched '合番'");
+            return false;
+        }
+
+        private static bool TryLocateGobanPropertyView(
+            DrawingDoc drawing,
+            Sheet intendedSheet,
+            string intendedSheetName,
+            string propertyView,
+            out SolidWorks.Interop.sldworks.View selected,
+            out string reason)
+        {
+            selected = null;
+            reason = "VIEW_SOURCE_UNVERIFIED";
+            if (drawing == null || intendedSheet == null)
+            {
+                reason = "DRAWING_OR_SHEET_NULL";
+                return false;
+            }
+
+            string intendedName, currentName;
+            try
+            {
+                intendedName = (intendedSheet.GetName() ?? "").Trim();
+                Sheet activeSheet = drawing.GetCurrentSheet() as Sheet;
+                currentName = activeSheet == null ? "" : (activeSheet.GetName() ?? "").Trim();
+            }
+            catch
+            {
+                reason = "SHEET_NAME_API_ERROR";
+                return false;
+            }
+            if (intendedName.Length == 0 || currentName.Length == 0 ||
+                !string.Equals(intendedName, currentName,
+                    StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(intendedSheetName) &&
+                 !string.Equals(intendedName, intendedSheetName.Trim(),
+                     StringComparison.OrdinalIgnoreCase)))
+            {
+                reason = "SHEET_CONTEXT_MISMATCH";
+                return false;
+            }
+
+            bool isDefault = string.Equals((propertyView ?? "").Trim(),
+                "Default", StringComparison.OrdinalIgnoreCase);
+
+            try
+            {
+                SolidWorks.Interop.sldworks.View sheetView =
+                    drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                if (sheetView == null ||
+                    sheetView.Type != (int)swDrawingViewTypes_e.swDrawingSheet)
+                {
+                    reason = "SHEET_VIEW_NOT_FOUND";
+                    return false;
+                }
+
+                // The first view is the sheet container. Scan only views on current sheet.
+                SolidWorks.Interop.sldworks.View view =
+                    sheetView.GetNextView() as SolidWorks.Interop.sldworks.View;
+                while (view != null)
+                {
+                    if (view.Type != (int)swDrawingViewTypes_e.swDrawingSheet)
+                    {
+                        // Strict verification; IsViewOnSheet is permissive and must
+                        // not be used as sole source verification.
+                        Sheet ownerSheet = view.Sheet as Sheet;
+                        if (ownerSheet == null ||
+                            !string.Equals((ownerSheet.GetName() ?? "").Trim(),
+                                intendedName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            reason = "VIEW_SHEET_UNVERIFIED";
+                            return false;
+                        }
+
+                        if (isDefault)
+                        {
+                            // First model DRAWING VIEW is the default candidate.
+                            // Never skip this view when ReferencedDocument is null.
+                            selected = view;
+                            reason = "DEFAULT_FIRST_VIEW";
+                            return true;
+                        }
+
+                        if (string.Equals((view.GetName2() ?? "").Trim(),
+                                (propertyView ?? "").Trim(),
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            selected = view;
+                            reason = "EXPLICIT_VIEW";
+                            return true;
+                        }
+                    }
+                    view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
+                }
+            }
+            catch (Exception ex)
+            {
+                reason = "VIEW_LOOKUP_API_ERROR";
+                LogDebug("[GOBAN PROPERTY VIEW ERROR] " + ex.Message);
+                return false;
+            }
+
+            reason = isDefault
+                ? "DEFAULT_VIEW_NOT_FOUND"
+                : "EXPLICIT_VIEW_NOT_FOUND";
             return false;
         }
 
@@ -1988,55 +2159,24 @@ namespace ADDIN.Commands
                 return false; // conservative: no false Property OK
             }
 
-            SolidWorks.Interop.sldworks.View targetView = null;
-            var viewDiagnostics = new List<string>();
-            try
+            SolidWorks.Interop.sldworks.View targetView;
+            string viewChoice;
+            if (!TryLocateGobanPropertyView(
+                    drawing, sheet, sheetName, propertyView,
+                    out targetView, out viewChoice))
             {
-                SolidWorks.Interop.sldworks.View view = drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
-                while (view != null)
-                {
-                    string name = "";
-                    try { name = view.GetName2() ?? ""; } catch { }
-                    int vType = -1;
-                    try { vType = view.Type; } catch { }
-                    bool onSheet = IsViewOnSheet(view, sheetName);
-                    ModelDoc2 refDoc = null;
-                    try { refDoc = view.ReferencedDocument as ModelDoc2; } catch { }
-                    string refDocPath = "";
-                    try { refDocPath = refDoc != null ? (refDoc.GetPathName() ?? "") : ""; } catch { }
-                    string refCfg = "";
-                    try { refCfg = view.ReferencedConfiguration ?? ""; } catch { }
-                    bool pathMatch = !string.IsNullOrWhiteSpace(expectedPartPath) &&
-                        !string.IsNullOrWhiteSpace(refDocPath) &&
-                        PathsEqualSafe(refDocPath, expectedPartPath);
-
-                    viewDiagnostics.Add($"[name=\"{name}\" type={vType} onSheet={onSheet} model=\"{Path.GetFileName(refDocPath)}\" cfg=\"{refCfg}\" match={pathMatch}]");
-
-                    if (string.Equals(name, propertyView, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetView = view;
-                        break;
-                    }
-                    view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
-                }
-            }
-            catch (Exception ex)
-            {
-                source = "PROPERTY_VIEW_LOOKUP_ERROR";
-                LogDebug("[GOBAN PROP DIAG] View lookup exception: " + ex.Message);
+                source = viewChoice;
+                LogDebug("[GOBAN PROPERTY SOURCE] status=UNVERIFIED reason=" +
+                    viewChoice + " sheet=\"" + sheetName +
+                    "\" propertyView=\"" + propertyView + "\"");
                 return false;
             }
+            LogDebug("[GOBAN PROPERTY SOURCE] status=SELECTED method=" +
+                viewChoice + " sheet=\"" + sheetName +
+                "\" propertyView=\"" + propertyView +
+                "\" selected=\"" + (targetView.GetName2() ?? "") + "\"");
 
-            if (targetView == null)
-            {
-                source = "PROPERTY_VIEW_NOT_FOUND";
-                LogDebug("[GOBAN PROP DIAG NOT_FOUND] propertyView=\"" + propertyView +
-                    "\" not found on sheet=\"" + sheetName + "\". Views scanned (" + viewDiagnostics.Count + "): " +
-                    string.Join("; ", viewDiagnostics));
-                return false;
-            }
-
-            LogDebug("[GOBAN PROP DIAG TARGET] matched view=\"" + propertyView + "\"");
+            string verifiedSourceViewName = (targetView.GetName2() ?? "").Trim();
 
             ModelDoc2 model = null;
             try { model = targetView.ReferencedDocument as ModelDoc2; }
@@ -2085,7 +2225,7 @@ namespace ADDIN.Commands
                         continue;
                     }
                     value = resolved;
-                    source = "SHEET_VIEW:" + propertyView + "|CONFIG:" +
+                    source = "SHEET_VIEW:" + verifiedSourceViewName + "|CONFIG:" +
                         (string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope);
                     LogDebug("[GOBAN PROP DIAG SUCCESS] " + source + " value=\"" + value + "\"");
                     return true;
