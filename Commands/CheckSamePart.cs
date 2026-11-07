@@ -465,8 +465,8 @@ namespace ADDIN.Commands
             string status = group.Status ?? "";
             string mat = string.Join(", ", group.Items.Select(x => x.Material).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase));
             string thk = string.Join(", ", group.Items.Select(x => x.Thickness).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase));
-            if (string.IsNullOrEmpty(mat)) mat = "Tiêu chuẩn";
-            if (string.IsNullOrEmpty(thk)) thk = "Tiêu chuẩn";
+            if (string.IsNullOrEmpty(mat)) mat = "Theo mô hình";
+            if (string.IsNullOrEmpty(thk)) thk = "Theo mô hình";
 
             switch (status)
             {
@@ -501,21 +501,40 @@ namespace ADDIN.Commands
 
                 case "SAME FLAT":
                     group.FlatCheckStatus = "VERIFIED_SAME";
-                    if (group.FoldedCheckStatus != "VERIFIED_DIFFERENT")
+                    if (group.FoldedCheckStatus == "INCONCLUSIVE")
+                    {
+                        group.VerificationStatus = "INCONCLUSIVE";
+                        group.MeaningExplanation = "Các chi tiết có biên dạng phôi phẳng (Flat-Pattern) tương đương nhau, nhưng trạng thái uốn/chấn 3D chưa đủ điều kiện để tự động xác minh.";
+                        group.ComparisonExplanation = "Biên dạng phẳng và các vị trí đột lỗ khi trải phẳng giống nhau. Trạng thái uốn gấp 3D chưa được kiểm chứng tự động; " + (group.Note ?? "");
+                        group.NextStepGuidance = "Cần mở mô hình 3D trên SOLIDWORKS để kiểm tra trực tiếp các bước uốn gấp trước khi quyết định dùng chung.";
+                    }
+                    else
+                    {
                         group.FoldedCheckStatus = "VERIFIED_DIFFERENT";
-                    group.VerificationStatus = "VERIFIED_SAME";
-                    group.MeaningExplanation = "Các chi tiết có biên dạng phôi phẳng (Flat-Pattern) tương đương nhau, nhưng trạng thái uốn/chấn 3D khác nhau.";
-                    group.ComparisonExplanation = "Biên dạng phẳng và các vị trí đột lỗ khi trải phẳng giống nhau. Khác biệt ở các bước uốn gấp (góc uốn, chiều dài cạnh bẻ hoặc hướng bẻ).";
-                    group.NextStepGuidance = "Có thể tham khảo cắt chung phôi tấm phẳng (laser/turret punch), nhưng cần chạy chương trình chấn bẻ uốn riêng.";
+                        group.VerificationStatus = "VERIFIED_SAME";
+                        group.MeaningExplanation = "Các chi tiết có biên dạng phôi phẳng (Flat-Pattern) tương đương nhau, nhưng trạng thái uốn/chấn 3D khác nhau.";
+                        group.ComparisonExplanation = "Biên dạng phẳng và các vị trí đột lỗ khi trải phẳng giống nhau. Khác biệt ở các bước uốn gấp (góc uốn, chiều dài cạnh bẻ hoặc hướng bẻ).";
+                        group.NextStepGuidance = "Có thể tham khảo cắt chung phôi tấm phẳng (laser/turret punch), nhưng cần chạy chương trình chấn bẻ uốn riêng.";
+                    }
                     break;
 
                 case "CHECK MIRROR":
-                    group.VerificationStatus = "VERIFIED_SAME";
                     group.FlatCheckStatus = "VERIFIED_SAME";
-                    group.FoldedCheckStatus = "VERIFIED_SAME";
-                    group.MeaningExplanation = "Các chi tiết là cặp đối xứng gương (Mirror) của nhau (chi tiết bên trái / bên phải).";
-                    group.ComparisonExplanation = "Kích thước và biên dạng tương đương nhưng ngược chiều nhau qua mặt phẳng đối xứng (chirality đảo ngược).";
-                    group.NextStepGuidance = "Không được lắp lẫn cho nhau vì đối xứng trái/phải. Cần phân biệt rõ khi cấp phôi vào đồ gá uốn/hàn.";
+                    if (group.VerificationStatus == "INCONCLUSIVE")
+                    {
+                        group.FoldedCheckStatus = "INCONCLUSIVE";
+                        group.MeaningExplanation = "Các chi tiết có dấu hiệu đối xứng gương (Mirror), nhưng thuật toán chưa đủ dữ liệu hình học để tự động xác minh kết luận.";
+                        group.ComparisonExplanation = "Phát hiện dấu hiệu đối xứng qua chiều uốn hoặc lịch sử mô hình. Cần kiểm chứng trực tiếp bằng mắt hoặc đo đạc 3D.";
+                        group.NextStepGuidance = "Mở mô hình 3D để đối chiếu vị trí chấn uốn và lỗ đột; không được tự ý đổi chỗ chi tiết trái/phải.";
+                    }
+                    else
+                    {
+                        group.VerificationStatus = "VERIFIED_SAME";
+                        group.FoldedCheckStatus = "VERIFIED_SAME";
+                        group.MeaningExplanation = "Các chi tiết là cặp đối xứng gương (Mirror) của nhau (chi tiết bên trái / bên phải).";
+                        group.ComparisonExplanation = "Kích thước và biên dạng tương đương nhưng ngược chiều nhau qua mặt phẳng đối xứng (chirality đảo ngược).";
+                        group.NextStepGuidance = "Không được lắp lẫn cho nhau vì đối xứng trái/phải. Cần phân biệt rõ khi cấp phôi vào đồ gá uốn/hàn.";
+                    }
                     break;
 
                 case "UNVERIFIED":
@@ -626,61 +645,116 @@ namespace ADDIN.Commands
                     .Select(item => item.FeatureOperationSignature ?? "")
                     .Distinct(StringComparer.Ordinal)
                     .Count();
-                bool sameFolded = foldedCandidateCount == 1
-                    && groupItems.Skip(1).All(item => ConfirmSameGeometry(
-                        groupItems[0], item, false, 0.02));
+                double toleranceMm = Math.Max(0.001, Math.Min(0.20,
+                    Math.Min(toleranceOptions.EdgeLengthMm, toleranceOptions.HoleLinearMm)));
+
                 bool sameMaterial = groupItems.Select(item => item.MaterialKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
                 bool sameThickness = groupItems.Select(item => item.ThicknessKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
-                // Phan 2: Khong xac nhan MIRROR chi dua vao ten feature hoac thu tu xay dung model.
-                // Phai dua vao doi xung hinh hoc thuc su: chirality nguoc nhau hoac doi xung qua mat phang.
-                bool mirrorByChirality = foldedChiralityCount > 1;
-                bool mirrorByGeometry = false;
-                if (!mirrorByChirality && groupItems.Count == 2)
+
+                // Evaluate Folded comparison between seed and each member
+                bool allSameFolded = true;
+                double? foldedMaxDev = null;
+                string foldedOverallStatus = "VERIFIED_SAME";
+                string foldedOverallReason = "";
+
+                // Evaluate Mirror comparison between seed and each member
+                bool allMirrorFolded = true;
+                double? mirrorMaxDev = null;
+                string mirrorOverallStatus = "VERIFIED_SAME";
+                string mirrorOverallReason = "";
+
+                for (int i = 1; i < groupItems.Count; i++)
                 {
-                    var a = groupItems[0].FoldedBroadMetrics;
-                    var b = groupItems[1].FoldedBroadMetrics;
-                    if (a != null && b != null)
+                    double? fDev;
+                    string fStatus, fReason;
+                    bool isFoldedSame = ConfirmSameGeometry(groupItems[0], groupItems[i], false, toleranceMm, out fDev, out fStatus, out fReason);
+                    if (isFoldedSame)
                     {
-                        double dMirrorX = Math.Sqrt(Math.Pow(a.CenterOfMassX + b.CenterOfMassX, 2) + Math.Pow(a.CenterOfMassY - b.CenterOfMassY, 2) + Math.Pow(a.CenterOfMassZ - b.CenterOfMassZ, 2));
-                        double dMirrorY = Math.Sqrt(Math.Pow(a.CenterOfMassX - b.CenterOfMassX, 2) + Math.Pow(a.CenterOfMassY + b.CenterOfMassY, 2) + Math.Pow(a.CenterOfMassZ - b.CenterOfMassZ, 2));
-                        double dMirrorZ = Math.Sqrt(Math.Pow(a.CenterOfMassX - b.CenterOfMassX, 2) + Math.Pow(a.CenterOfMassY - b.CenterOfMassY, 2) + Math.Pow(a.CenterOfMassZ + b.CenterOfMassZ, 2));
-                        mirrorByGeometry = (dMirrorX < 0.1 || dMirrorY < 0.1 || dMirrorZ < 0.1);
+                        foldedMaxDev = foldedMaxDev.HasValue ? Math.Max(foldedMaxDev.Value, fDev ?? 0.0) : fDev;
+                    }
+                    else
+                    {
+                        allSameFolded = false;
+                        if (fStatus == "INCONCLUSIVE")
+                            foldedOverallStatus = "INCONCLUSIVE";
+                        else if (foldedOverallStatus != "INCONCLUSIVE")
+                            foldedOverallStatus = "VERIFIED_DIFFERENT";
+                        foldedOverallReason = fReason;
+                    }
+
+                    double? mDev;
+                    string mStatus, mReason;
+                    bool isMirror = ConfirmMirrorGeometry(groupItems[0], groupItems[i], false, toleranceMm, out mDev, out mStatus, out mReason);
+                    if (isMirror)
+                    {
+                        mirrorMaxDev = mirrorMaxDev.HasValue ? Math.Max(mirrorMaxDev.Value, mDev ?? 0.0) : mDev;
+                    }
+                    else
+                    {
+                        allMirrorFolded = false;
+                        if (mStatus == "INCONCLUSIVE")
+                            mirrorOverallStatus = "INCONCLUSIVE";
+                        else if (mirrorOverallStatus != "INCONCLUSIVE")
+                            mirrorOverallStatus = "VERIFIED_DIFFERENT";
+                        mirrorOverallReason = mReason;
                     }
                 }
 
                 SamePartGroupResult group = new SamePartGroupResult
                 {
                     GroupNumber = groupNumber++,
-                    AppliedToleranceMm = 0.02
+                    AppliedToleranceMm = toleranceMm
                 };
+                // Ensure items are populated BEFORE calling PopulateGroupExplanations
                 group.Items.AddRange(groupItems);
 
-                if (mirrorByChirality || mirrorByGeometry)
+                if (allMirrorFolded)
                 {
                     group.Status = "CHECK MIRROR";
                     group.VerificationStatus = "VERIFIED_SAME";
                     group.FlatCheckStatus = "VERIFIED_SAME";
                     group.FoldedCheckStatus = "VERIFIED_SAME";
-                    group.ActualDeviationMm = 0.0000;
-                    group.Note = "Biên dạng kích thước tương đương nhưng đối xứng gương (Mirror) qua mặt phẳng; cần lưu ý chiều uốn.";
+                    group.ActualDeviationMm = mirrorMaxDev ?? 0.0000;
+                    group.Note = "Đã xác minh hình học đối xứng gương (Mirror) qua kiểm tra phản chiếu 3D; cần lưu ý chiều uốn.";
                 }
-                else if (sameFolded && sameMaterial && sameThickness)
+                else if (mirrorOverallStatus == "INCONCLUSIVE" && (foldedChiralityCount > 1 || mirrorFeatureCount > 0))
                 {
-                    group.Status = "SAME FULL";
-                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.Status = "CHECK MIRROR";
+                    group.VerificationStatus = "INCONCLUSIVE";
                     group.FlatCheckStatus = "VERIFIED_SAME";
-                    group.FoldedCheckStatus = "VERIFIED_SAME";
-                    group.ActualDeviationMm = (flatExactCount == 1 && foldedInvariantCount == 1) ? 0.0000 : (double?)null;
-                    group.Note = flatExactCount == 1 && foldedInvariantCount == 1
-                        ? "Giống Flat-Pattern, trạng thái gấp, vật liệu và chiều dày hoàn toàn."
-                        : "Giống hình học trong dung sai, trạng thái gấp, vật liệu và chiều dày.";
+                    group.FoldedCheckStatus = "INCONCLUSIVE";
+                    group.ActualDeviationMm = null;
+                    group.Note = "Có dấu hiệu đối xứng gương (chirality hoặc feature), nhưng chưa đủ dữ liệu hình học để tự động xác minh; cần kiểm tra thủ công.";
                 }
-                else if (sameFolded)
+                else if (allSameFolded && sameMaterial && sameThickness)
+                {
+                    bool isExact = (foldedMaxDev.HasValue && foldedMaxDev.Value <= 0.0001) || (flatExactCount == 1 && foldedInvariantCount == 1);
+                    if (isExact)
+                    {
+                        group.Status = "SAME FULL";
+                        group.VerificationStatus = "VERIFIED_SAME";
+                        group.FlatCheckStatus = "VERIFIED_SAME";
+                        group.FoldedCheckStatus = "VERIFIED_SAME";
+                        group.ActualDeviationMm = 0.0000;
+                        group.Note = "Giống Flat-Pattern, trạng thái gấp, vật liệu và chiều dày hoàn toàn.";
+                    }
+                    else
+                    {
+                        group.Status = "SAME TOLERANCE";
+                        group.VerificationStatus = "VERIFIED_SAME";
+                        group.FlatCheckStatus = "VERIFIED_SAME";
+                        group.FoldedCheckStatus = "VERIFIED_SAME";
+                        group.ActualDeviationMm = foldedMaxDev;
+                        group.Note = "Đã xác minh hình học trùng khớp trong dung sai quy định.";
+                    }
+                }
+                else if (allSameFolded)
                 {
                     group.Status = "SAME GEOMETRY";
                     group.VerificationStatus = "VERIFIED_SAME";
                     group.FlatCheckStatus = "VERIFIED_SAME";
                     group.FoldedCheckStatus = "VERIFIED_SAME";
+                    group.ActualDeviationMm = foldedMaxDev;
                     List<string> differences = new List<string>();
                     if (!sameMaterial)
                         differences.Add("vật liệu");
@@ -690,12 +764,24 @@ namespace ADDIN.Commands
                 }
                 else
                 {
-                    // Phan 2: Khong duoc tu ket luan SAME_FLAT chi vi buoc xac minh trang thai gap bi inconclusive.
-                    group.Status = "SAME FLAT";
-                    group.FlatCheckStatus = "VERIFIED_SAME";
-                    group.FoldedCheckStatus = "VERIFIED_DIFFERENT";
-                    group.VerificationStatus = "VERIFIED_SAME";
-                    group.Note = "Giống biên dạng Flat-Pattern nhưng trạng thái gấp uốn 3D khác nhau.";
+                    if (foldedOverallStatus == "VERIFIED_DIFFERENT")
+                    {
+                        group.Status = "SAME FLAT";
+                        group.FlatCheckStatus = "VERIFIED_SAME";
+                        group.FoldedCheckStatus = "VERIFIED_DIFFERENT";
+                        group.VerificationStatus = "VERIFIED_SAME";
+                        group.ActualDeviationMm = null;
+                        group.Note = "Giống biên dạng Flat-Pattern nhưng trạng thái gấp uốn 3D đã chứng minh khác nhau.";
+                    }
+                    else
+                    {
+                        group.Status = "SAME FLAT";
+                        group.FlatCheckStatus = "VERIFIED_SAME";
+                        group.FoldedCheckStatus = "INCONCLUSIVE";
+                        group.VerificationStatus = "INCONCLUSIVE";
+                        group.ActualDeviationMm = null;
+                        group.Note = "Giống biên dạng Flat-Pattern; trạng thái gấp uốn 3D chưa đủ dữ liệu để tự động kiểm chứng, cần kiểm tra trực tiếp.";
+                    }
                 }
 
                 PopulateGroupExplanations(group);
@@ -778,8 +864,8 @@ namespace ADDIN.Commands
                     FlatCheckStatus = "VERIFIED_SAME",
                     FoldedCheckStatus = "VERIFIED_SAME"
                 };
-                PopulateGroupExplanations(group);
                 group.Items.AddRange(groupItems);
+                PopulateGroupExplanations(group);
                 result.Groups.Add(group);
                 Log("GROUP " + group.GroupNumber + " | SAME TOLERANCE | Buhin="
                     + string.Join(",", groupItems.Select(item => item.BuhinNo)));
@@ -859,6 +945,7 @@ namespace ADDIN.Commands
         private bool ConfirmSameGeometry(SamePartItemResult a, SamePartItemResult b,
             bool flat, double toleranceMm, out double? maximumDeviationMm, out string verificationStatus, out string reason)
         {
+            maximumDeviationMm = null;
             double maximumMm;
             string matchReason;
             bool same = SamePartGeometryVerifier.TryMatch(
@@ -866,20 +953,28 @@ namespace ADDIN.Commands
                 flat ? b.FlatGeometry : b.FoldedGeometry,
                 toleranceMm, out maximumMm, out matchReason);
 
-            maximumDeviationMm = same ? (double?)maximumMm : null;
             if (same)
             {
                 verificationStatus = "VERIFIED_SAME";
+                maximumDeviationMm = maximumMm;
+                reason = matchReason ?? "Đã xác minh hình học trùng khớp";
             }
-            else if (matchReason != null && (matchReason.Contains("failed") || matchReason.Contains("Degenerate") || matchReason.Contains("ambiguous") || matchReason.Contains("Insuff")))
+            else if (matchReason != null && (
+                matchReason.Contains("failed") ||
+                matchReason.Contains("Degenerate") ||
+                matchReason.Contains("ambiguous") ||
+                matchReason.Contains("Insuff") ||
+                matchReason.Contains("Empty") ||
+                matchReason.Contains("too complex")))
             {
                 verificationStatus = "INCONCLUSIVE";
+                reason = matchReason;
             }
             else
             {
                 verificationStatus = "VERIFIED_DIFFERENT";
+                reason = matchReason ?? "Không trùng khớp hình học";
             }
-            reason = matchReason ?? "";
 
             Log("[GEOMETRY VERIFY] " + (flat ? "FLAT" : "FOLDED")
                 + " | parts=" + a.BuhinNo + " <> " + b.BuhinNo
@@ -887,6 +982,48 @@ namespace ADDIN.Commands
                 + " | maximumDeviationMm=" + (maximumDeviationMm.HasValue ? maximumDeviationMm.Value.ToString("F4", CultureInfo.InvariantCulture) : "N/A")
                 + " | " + reason);
             return same;
+        }
+
+        private bool ConfirmMirrorGeometry(SamePartItemResult a, SamePartItemResult b,
+            bool flat, double toleranceMm, out double? maximumDeviationMm, out string verificationStatus, out string reason)
+        {
+            maximumDeviationMm = null;
+            double maximumMm;
+            string matchReason;
+            bool mirror = SamePartGeometryVerifier.TryMatchMirror(
+                flat ? a.FlatGeometry : a.FoldedGeometry,
+                flat ? b.FlatGeometry : b.FoldedGeometry,
+                toleranceMm, out maximumMm, out matchReason);
+
+            if (mirror)
+            {
+                verificationStatus = "VERIFIED_SAME";
+                maximumDeviationMm = maximumMm;
+                reason = matchReason ?? "Đã xác minh hình học đối xứng phản chiếu trong dung sai";
+            }
+            else if (matchReason != null && (
+                matchReason.Contains("failed") ||
+                matchReason.Contains("Degenerate") ||
+                matchReason.Contains("ambiguous") ||
+                matchReason.Contains("Insuff") ||
+                matchReason.Contains("Empty") ||
+                matchReason.Contains("too complex")))
+            {
+                verificationStatus = "INCONCLUSIVE";
+                reason = matchReason;
+            }
+            else
+            {
+                verificationStatus = "VERIFIED_DIFFERENT";
+                reason = matchReason ?? "Không đối xứng hình học";
+            }
+
+            Log("[MIRROR VERIFY] " + (flat ? "FLAT" : "FOLDED")
+                + " | parts=" + a.BuhinNo + " <> " + b.BuhinNo
+                + " | status=" + verificationStatus
+                + " | maximumDeviationMm=" + (maximumDeviationMm.HasValue ? maximumDeviationMm.Value.ToString("F4", CultureInfo.InvariantCulture) : "N/A")
+                + " | " + reason);
+            return mirror;
         }
 
         private static bool AreChiralitiesCompatible(string first, string second)
@@ -914,13 +1051,9 @@ namespace ADDIN.Commands
                 toleranceOptions.VolumeAbsoluteMm3,
                 toleranceOptions.VolumeRelativePercent / 100.0))
                 return false;
-            double comDelta = Math.Sqrt(
-                Math.Pow(first.CenterOfMassX - second.CenterOfMassX, 2) +
-                Math.Pow(first.CenterOfMassY - second.CenterOfMassY, 2) +
-                Math.Pow(first.CenterOfMassZ - second.CenterOfMassZ, 2));
-            double comTolerance = Math.Max(0.05, toleranceOptions.HoleLinearMm * 2.0);
-            if (comDelta > comTolerance)
-                return false;
+            // Translation & rotation invariant metric filter:
+            // Absolute CenterOfMass coordinates depend on origin placement and MUST NOT be used as a hard filter.
+            // Instead, principal moments of inertia about the center of mass are coordinate-independent scalars:
             if (first.PrincipalMoments.Count != second.PrincipalMoments.Count)
                 return false;
             for (int i = 0; i < first.PrincipalMoments.Count; i++)
@@ -2635,6 +2768,71 @@ namespace ADDIN.Commands
                 snapshot.InvalidReason = ex.GetType().Name + ": " + ex.Message;
             }
             return snapshot;
+        }
+
+        internal static SamePartGeometrySnapshot CreateReflectedSnapshot(SamePartGeometrySnapshot source)
+        {
+            if (source == null || !string.IsNullOrEmpty(source.InvalidReason))
+                return source;
+
+            SamePartGeometrySnapshot reflected = new SamePartGeometrySnapshot
+            {
+                BodyCount = source.BodyCount,
+                InvalidReason = source.InvalidReason
+            };
+
+            foreach (var face in source.Faces)
+            {
+                reflected.Faces.Add(new SamePartGeometryFace
+                {
+                    Type = face.Type,
+                    AreaMm2 = face.AreaMm2
+                });
+            }
+
+            foreach (var edge in source.Edges)
+            {
+                SamePartGeometryEdge re = new SamePartGeometryEdge
+                {
+                    Kind = edge.Kind,
+                    LengthMm = edge.LengthMm,
+                    RadiusMm = edge.RadiusMm,
+                    FullCircle = edge.FullCircle
+                };
+                if (edge.Center != null)
+                    re.Center = new double[] { -edge.Center[0], edge.Center[1], edge.Center[2] };
+                if (edge.Axis != null)
+                    re.Axis = new double[] { -edge.Axis[0], edge.Axis[1], edge.Axis[2] };
+
+                foreach (var sample in edge.Samples)
+                {
+                    re.Samples.Add(new double[] { -sample[0], sample[1], sample[2] });
+                }
+                reflected.Edges.Add(re);
+            }
+
+            foreach (var anchor in source.Anchors)
+            {
+                reflected.Anchors.Add(new double[] { -anchor[0], anchor[1], anchor[2] });
+            }
+
+            return reflected;
+        }
+
+        internal static bool TryMatchMirror(
+            SamePartGeometrySnapshot a, SamePartGeometrySnapshot b,
+            double distanceToleranceMm, out double maxDeviationMm, out string reason)
+        {
+            maxDeviationMm = 0;
+            reason = "";
+            if (a == null || b == null || a.InvalidReason.Length != 0 || b.InvalidReason.Length != 0)
+            {
+                reason = "Geometry extraction failed: " + (a == null ? "null A" : a.InvalidReason)
+                    + " / " + (b == null ? "null B" : b.InvalidReason);
+                return false;
+            }
+            SamePartGeometrySnapshot reflectedA = CreateReflectedSnapshot(a);
+            return TryMatch(reflectedA, b, distanceToleranceMm, out maxDeviationMm, out reason);
         }
 
         // Only proper 3-D rotations and translations are permitted, NOT reflections.

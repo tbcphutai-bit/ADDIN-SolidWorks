@@ -127,11 +127,31 @@ namespace ADDIN.UI
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = true,
-                AutoScroll = false,
+                AutoScroll = true,
                 BackColor = TaiTheme.Surface,
                 Margin = Padding.Empty,
                 Padding = new Padding(0, 4, 0, 0)
             };
+
+            Action updateFilterHeight = () =>
+            {
+                if (filterBar.Controls.Count == 0) return;
+                int maxBottom = 0;
+                foreach (Control c in filterBar.Controls)
+                {
+                    if (c.Visible)
+                        maxBottom = Math.Max(maxBottom, c.Bottom);
+                }
+                int neededH = Math.Max(42, maxBottom + 6);
+                if (ribbon.RowStyles.Count >= 2 && Math.Abs(ribbon.RowStyles[1].Height - neededH) > 2)
+                {
+                    ribbon.RowStyles[1].Height = neededH;
+                    if (root.RowStyles.Count >= 1)
+                        root.RowStyles[0].Height = 44 + neededH + 8;
+                }
+            };
+            filterBar.Layout += (s, e) => updateFilterHeight();
+            Resize += (s, e) => updateFilterHeight();
 
             int countFull = result.Groups.Count(g => g.Status == "SAME FULL");
             int countTolerance = result.Groups.Count(g => g.Status == "SAME TOLERANCE");
