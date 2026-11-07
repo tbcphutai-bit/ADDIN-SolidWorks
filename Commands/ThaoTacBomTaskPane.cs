@@ -1044,7 +1044,7 @@ namespace ADDIN.Commands
                 + ", trùng hình học: " + sameGeometry
                 + ", trùng phôi: " + sameFlat
                 + ", mirror: " + mirrorCheck
-                + (snapshot.NoMatchCount > 0 ? ", không trùng: " + snapshot.NoMatchCount : "")
+                + (snapshot.NoMatchCount > 0 ? ", chưa tìm thấy nhóm trùng: " + snapshot.NoMatchCount : "")
                 + ", chưa xác minh: " + snapshot.NotVerifiedCount
                 + ", lỗi: " + snapshot.ErrorCount + ". Bấm 'Xuất Excel...' trong bảng kết quả để lưu file.";
 

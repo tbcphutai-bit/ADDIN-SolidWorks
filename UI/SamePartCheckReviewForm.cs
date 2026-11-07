@@ -137,7 +137,7 @@ namespace ADDIN.UI
             pillMirror = new FilterPillButton("Mirror", countMirror, "MIRROR", Color.FromArgb(124, 58, 237), Color.FromArgb(245, 243, 255), Color.FromArgb(221, 214, 254));
             pillUnverified = new FilterPillButton("Chưa xác minh", countUnverified, "UNVERIFIED", Color.FromArgb(217, 119, 6), Color.FromArgb(254, 243, 199), Color.FromArgb(253, 230, 138));
             pillError = new FilterPillButton("Lỗi", countError, "ERROR", TaiTheme.Danger, TaiTheme.DangerSoft, TaiTheme.DangerBorder);
-            pillNoMatch = new FilterPillButton("Không trùng", countNoMatch, "NO_MATCH", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249), Color.FromArgb(203, 213, 225));
+            pillNoMatch = new FilterPillButton("Chưa tìm thấy nhóm trùng", countNoMatch, "NO_MATCH", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249), Color.FromArgb(203, 213, 225));
 
             pillAll.Click += (s, e) => ApplyFilter(null);
             pillFull.Click += (s, e) => ApplyFilter(activeFilter == "FULL" ? null : "FULL");
@@ -396,7 +396,7 @@ namespace ADDIN.UI
             groupGrid.Columns.Add("Group", "Nhóm");
             groupGrid.Columns.Add("Count", "SL");
             groupGrid.Columns.Add("Parts", "Chi tiết trong nhóm");
-            groupGrid.Columns[0].Width = 110;
+            groupGrid.Columns[0].Width = 175;
             groupGrid.Columns[1].Width = 60;
             groupGrid.Columns[1].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             groupGrid.Columns[1].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
@@ -545,11 +545,11 @@ namespace ADDIN.UI
                     {
                         GroupNumber = 0,
                         Status = "NO_MATCH",
-                        Note = "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp."
+                        Note = "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp."
                     };
                     fakeNoMatchGroup.Items.AddRange(unmatchedItems);
                     string partList = FormatBuhinList(unmatchedItems);
-                    int index = groupGrid.Rows.Add("Không trùng", "-", unmatchedItems.Count.ToString(), partList);
+                    int index = groupGrid.Rows.Add("Chưa tìm thấy nhóm trùng", "-", unmatchedItems.Count.ToString(), partList);
                     groupGrid.Rows[index].Tag = fakeNoMatchGroup;
                     ColorGroupRow(groupGrid.Rows[index], "NO_MATCH");
                 }
@@ -604,7 +604,7 @@ namespace ADDIN.UI
                         : (group.Status == "NO_MATCH" ? ""
                         : (group.GroupNumber > 0 ? "Nhóm " + group.GroupNumber + "  ·  " : "")));
                     string titleText = group.Status == "NO_MATCH"
-                        ? "Không có nhóm trùng (" + group.Items.Count + " chi tiết)"
+                        ? "Chưa tìm thấy nhóm trùng (" + group.Items.Count + " chi tiết)"
                         : prefix + FormatStatusLabel(group.Status) + " (" + group.Items.Count + " chi tiết)";
                     selectedGroupTitle.Text = titleText;
                     selectedGroupSubtext.Text = !string.IsNullOrWhiteSpace(group.Note)
@@ -710,10 +710,10 @@ namespace ADDIN.UI
             }
             else if (status == "NO_MATCH")
             {
-                calloutHeader.Text = "○ CHI TIẾT KHÔNG CÓ NHÓM TRÙNG (NO MATCH)";
+                calloutHeader.Text = "○ CHI TIẾT CHƯA TÌM THẤY NHÓM TRÙNG (NO MATCH)";
                 calloutHeader.ForeColor = Color.FromArgb(100, 116, 139);
-                calloutBody.Text = (group.Note ?? "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.")
-                    + "\r\nCác chi tiết này không tìm thấy đối tượng trùng trong phạm vi các chi tiết được chọn. Lưu ý: Điều này chỉ xác nhận không có nhóm trùng trong đợt quét hiện tại, chưa chứng minh khác nhau từng cặp đối với mọi chi tiết.";
+                calloutBody.Text = (group.Note ?? "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.")
+                    + "\r\nCác chi tiết này không tìm thấy đối tượng trùng trong phạm vi các chi tiết được chọn. Lưu ý: Điều này chỉ xác nhận chưa tìm thấy nhóm trùng trong đợt quét hiện tại, chưa chứng minh khác nhau từng cặp đối với mọi chi tiết.";
                 calloutFooter.Text = "Bấm 'Mở Part 3D' hoặc Double-click vào dòng để xem chi tiết trong SOLIDWORKS.";
             }
             else
@@ -783,7 +783,7 @@ namespace ADDIN.UI
                 case "CHECK MIRROR": return "Mirror";
                 case "UNVERIFIED": return "Chưa xác minh";
                 case "ERROR": return "Lỗi";
-                case "NO_MATCH": return "Không trùng";
+                case "NO_MATCH": return "Chưa tìm thấy nhóm trùng";
                 default: return status ?? "";
             }
         }
@@ -799,7 +799,7 @@ namespace ADDIN.UI
                 case "CHECK MIRROR": return "Biên dạng tương đương đối xứng Mirror qua mặt phẳng.";
                 case "UNVERIFIED": return "Chi tiết chưa đủ dữ liệu hình học hoặc biên dạng cong phức tạp để xác minh tự động.";
                 case "ERROR": return "Có lỗi phát sinh trong quá trình đọc chi tiết.";
-                case "NO_MATCH": return "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.";
+                case "NO_MATCH": return "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.";
                 default: return "";
             }
         }
@@ -876,7 +876,7 @@ namespace ADDIN.UI
             SamePartGroupResult group = SelectedGroup;
             if (group == null) return;
 
-            Rectangle badgeRect = new Rectangle(detailBanner.Width - 116, (detailBanner.Height - 28) / 2, 102, 28);
+            Rectangle badgeRect = new Rectangle(detailBanner.Width - 180, (detailBanner.Height - 28) / 2, 168, 28);
             DrawStatusPill(g, badgeRect, group.Status);
         }
 
@@ -966,7 +966,7 @@ namespace ADDIN.UI
                 object tag = grid.Rows[e.RowIndex].Tag;
                 if (tag is SamePartGroupResult groupTag) cellStatus = groupTag.Status;
 
-                int pillW = Math.Min(96, e.CellBounds.Width - 10);
+                int pillW = Math.Min(165, e.CellBounds.Width - 10);
                 int pillH = 24;
                 Rectangle pillRect = new Rectangle(
                     e.CellBounds.X + (e.CellBounds.Width - pillW) / 2,

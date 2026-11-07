@@ -3497,7 +3497,7 @@ namespace ADDIN.Commands
                 if (unmatched == null) continue;
                 ++unmatchedOrdinal;
                 SamePartReportV2Row row = CreateRow("UNMATCHED", "-", "NO_MATCH",
-                    new[] { unmatched }, "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.", unmatchedOrdinal);
+                    new[] { unmatched }, "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.", unmatchedOrdinal);
                 unmatched.RowId = row.RowId;
                 unmatched.StatusCode = "NO_MATCH";
                 snapshot.Rows.Add(row);
@@ -3532,7 +3532,7 @@ namespace ADDIN.Commands
                 case "CHECK MIRROR": return "CẦN KIỂM TRA ĐỐI XỨNG";
                 case "UNVERIFIED": return "CHƯA XÁC MINH";
                 case "ERROR": return "LỖI ĐỌC / XỬ LÝ";
-                case "NO_MATCH": return "KHÔNG CÓ NHÓM TRÙNG";
+                case "NO_MATCH": return "CHƯA TÌM THẤY NHÓM TRÙNG";
                 default: return "CHƯA XÁC MINH";
             }
         }
@@ -3754,7 +3754,7 @@ namespace ADDIN.Commands
                 + "  |  MIRROR: " + snapshot.CheckMirrorCount
                 + "  |  CHUA XAC MINH: " + snapshot.NotVerifiedCount
                 + "  |  LOI: " + snapshot.ErrorCount
-                + "  |  KHONG TRUNG: " + snapshot.NoMatchCount;
+                + "  |  CHƯA TÌM THẤY NHÓM TRÙNG: " + snapshot.NoMatchCount;
             root.Controls.Add(summary, 0, 0);
             grid = new DataGridView();
             grid.Dock = DockStyle.Fill;
