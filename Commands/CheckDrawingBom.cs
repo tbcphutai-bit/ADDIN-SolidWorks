@@ -1967,8 +1967,7 @@ namespace ADDIN.Commands
                 readable.Add("Đã đọc giá trị từ Property của model tham chiếu (" +
                     propSource + ").");
             else
-                readable.Add("Chưa đọc được Property từ đúng View/Configuration (" +
-                    propSource + ").");
+                readable.Add("Chưa xác định được giá trị Property 合番 từ Model mà Drawing tham chiếu.");
 
             if (!hasBomValue)
                 readable.Add("BOM không có cột 合番 riêng nên chưa thể đối chiếu Property với BOM.");
@@ -2016,6 +2015,22 @@ namespace ADDIN.Commands
             return false;
         }
 
+        // SOLIDWORKS may localize the Sheet Properties "Default" choice.
+        // FormKC converts half-width Japanese Katakana (ﾃﾞﾌｫﾙﾄ) to デフォルト.
+        // Do not treat unrelated Drawing View names as default.
+        private static bool IsDefaultPropertyViewName(string propertyView)
+        {
+            if (string.IsNullOrWhiteSpace(propertyView))
+                return false;
+
+            string normalized = propertyView.Trim()
+                .Normalize(System.Text.NormalizationForm.FormKC);
+            return string.Equals(normalized, "Default",
+                       StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "デフォルト",
+                       StringComparison.Ordinal);
+        }
+
         private static bool TryLocateGobanPropertyView(
             DrawingDoc drawing,
             Sheet intendedSheet,
@@ -2055,8 +2070,13 @@ namespace ADDIN.Commands
                 return false;
             }
 
-            bool isDefault = string.Equals((propertyView ?? "").Trim(),
-                "Default", StringComparison.OrdinalIgnoreCase);
+            bool isDefault = IsDefaultPropertyViewName(propertyView);
+            string normalizedPropertyView = (propertyView ?? "").Trim()
+                .Normalize(System.Text.NormalizationForm.FormKC);
+            LogDebug("[GOBAN DEFAULT VIEW] raw=\"" + (propertyView ?? "") +
+                "\" normalized=\"" + normalizedPropertyView +
+                "\" isDefault=" + isDefault);
+
 
             try
             {
