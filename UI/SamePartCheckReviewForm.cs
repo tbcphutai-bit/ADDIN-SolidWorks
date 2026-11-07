@@ -34,6 +34,7 @@ namespace ADDIN.UI
         private readonly ModernButton btnOpenPart = Button("Mở Part 3D", true, 140);
         private readonly ModernButton btnOpenAssembly = Button("Mở Assembly", false, 130);
         private readonly ModernButton btnOpenFolder = Button("Mở thư mục", false, 120);
+        private readonly ModernButton btnTechnicalDetails = Button("🔍 Chi tiết kỹ thuật", false, 140);
         private readonly ModernButton btnExportExcel = Button("Xuất Excel...", false, 130);
 
         private readonly FilterPillButton pillAll;
@@ -87,36 +88,49 @@ namespace ADDIN.UI
                 Padding = new Padding(12, 10, 12, 8),
                 BackColor = TaiTheme.Page
             };
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
 
-            // 1. Top Header Card (Style C: Modern SaaS Inspector Ribbon)
-            var ribbonCard = CreateCardPanel(new Padding(12, 6, 12, 6));
+            // 1. Top Header Card (Style C: Modern SaaS Inspector Ribbon - 2-row layout de khong bao gio bi khuat nut loc)
+            var ribbonCard = CreateCardPanel(new Padding(10, 4, 10, 4));
             var ribbon = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 3,
-                RowCount = 1,
+                RowCount = 2,
                 BackColor = TaiTheme.Surface,
                 Margin = Padding.Empty
             };
-            ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 330));
+            ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 360));
             ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 138));
+            ribbon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+            ribbon.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+            ribbon.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
 
             var brandPanel = new Panel { Dock = DockStyle.Fill, BackColor = TaiTheme.Surface, Margin = Padding.Empty };
             brandPanel.Paint += PaintBrandHeader;
             ribbon.Controls.Add(brandPanel, 0, 0);
 
+            var summaryInfoLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular),
+                ForeColor = TaiTheme.TextMuted,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = TaiTheme.Surface
+            };
+            ribbon.Controls.Add(summaryInfoLabel, 1, 0);
+
             var filterBar = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.RightToLeft,
-                WrapContents = false,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                AutoScroll = false,
                 BackColor = TaiTheme.Surface,
                 Margin = Padding.Empty,
-                Padding = new Padding(0, 9, 8, 0)
+                Padding = new Padding(0, 4, 0, 0)
             };
 
             int countFull = result.Groups.Count(g => g.Status == "SAME FULL");
@@ -149,18 +163,20 @@ namespace ADDIN.UI
             pillError.Click += (s, e) => ApplyFilter(activeFilter == "ERROR" ? null : "ERROR");
             pillNoMatch.Click += (s, e) => ApplyFilter(activeFilter == "NO_MATCH" ? null : "NO_MATCH");
 
-            if (countNoMatch > 0) filterBar.Controls.Add(pillNoMatch);
-            if (countError > 0) filterBar.Controls.Add(pillError);
-            if (countUnverified > 0) filterBar.Controls.Add(pillUnverified);
-            if (countMirror > 0 || (countFull == 0 && countTolerance == 0 && countGeo == 0 && countFlat == 0)) filterBar.Controls.Add(pillMirror);
-            filterBar.Controls.Add(pillFlat);
-            filterBar.Controls.Add(pillGeo);
-            if (countTolerance > 0) filterBar.Controls.Add(pillTolerance);
-            filterBar.Controls.Add(pillFull);
             filterBar.Controls.Add(pillAll);
-            ribbon.Controls.Add(filterBar, 1, 0);
+            filterBar.Controls.Add(pillFull);
+            if (countTolerance > 0) filterBar.Controls.Add(pillTolerance);
+            filterBar.Controls.Add(pillGeo);
+            filterBar.Controls.Add(pillFlat);
+            if (countMirror > 0 || (countFull == 0 && countTolerance == 0 && countGeo == 0 && countFlat == 0)) filterBar.Controls.Add(pillMirror);
+            if (countUnverified > 0) filterBar.Controls.Add(pillUnverified);
+            if (countError > 0) filterBar.Controls.Add(pillError);
+            if (countNoMatch > 0) filterBar.Controls.Add(pillNoMatch);
 
-            var reportWrap = new Panel { Dock = DockStyle.Fill, BackColor = TaiTheme.Surface, Padding = new Padding(4, 9, 0, 9), Margin = Padding.Empty };
+            ribbon.Controls.Add(filterBar, 0, 1);
+            ribbon.SetColumnSpan(filterBar, 3);
+
+            var reportWrap = new Panel { Dock = DockStyle.Fill, BackColor = TaiTheme.Surface, Padding = new Padding(0, 4, 0, 4), Margin = Padding.Empty };
             btnExportExcel.Name = "btnExportExcel";
             btnExportExcel.Height = 34;
             btnExportExcel.Dock = DockStyle.Fill;
@@ -168,6 +184,8 @@ namespace ADDIN.UI
             btnExportExcel.Enabled = true;
             reportWrap.Controls.Add(btnExportExcel);
             ribbon.Controls.Add(reportWrap, 2, 0);
+
+            summaryInfoLabel.Text = $"Quét BOM: {reportSnapshot.CheckedRows} chi tiết  ·  {result.Groups.Count} nhóm trùng ({reportSnapshot.GroupMembers} part)  ·  {countUnverified} chưa xác minh  ·  {countNoMatch} chưa tìm thấy nhóm trùng";
 
             ribbonCard.Controls.Add(ribbon);
             root.Controls.Add(ribbonCard, 0, 0);
@@ -338,6 +356,7 @@ namespace ADDIN.UI
             actions.Controls.Add(btnOpenPart);
             actions.Controls.Add(btnOpenAssembly);
             actions.Controls.Add(btnOpenFolder);
+            actions.Controls.Add(btnTechnicalDetails);
 
             var hintLabel = TextLabel("Double-click vào dòng chi tiết để mở nhanh Part 3D trong SOLIDWORKS", false);
             hintLabel.Dock = DockStyle.Fill;
@@ -384,6 +403,7 @@ namespace ADDIN.UI
             btnOpenPart.Click += (sender, args) => NavigateSelected("part");
             btnOpenAssembly.Click += (sender, args) => NavigateSelected("assembly");
             btnOpenFolder.Click += (sender, args) => NavigateSelected("folder");
+            btnTechnicalDetails.Click += (sender, args) => ShowTechnicalDetailsDialog();
 
             UpdateFilterPills();
             DisplayGroups();
@@ -650,79 +670,64 @@ namespace ADDIN.UI
             }
 
             string status = group.Status ?? "";
-            if (status == "SAME FULL")
+            SamePartItemResult selItem = SelectedItem;
+
+            string headerTitle = "THÔNG TIN CHI TIẾT";
+            Color headerColor = TaiTheme.Text;
+
+            switch (status)
             {
-                calloutHeader.Text = "✔ TRÙNG KHỚP HOÀN TOÀN  —  [ Cùng hình học 3D, vật liệu, bề dày & phôi trải ]";
-                calloutHeader.ForeColor = TaiTheme.Success;
-                string diff = ExcelSamePartExporter.FormatDifferenceValues(group);
-                calloutBody.Text = string.IsNullOrWhiteSpace(diff)
-                    ? ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\nCác chi tiết trong nhóm này hoàn toàn giống nhau, có thể tái sử dụng chung phôi dập và chương trình CNC."
-                    : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
-                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
+                case "SAME FULL":
+                    headerTitle = "✔ TRÙNG KHỚP HOÀN TOÀN  ·  [ VERIFIED_SAME ]";
+                    headerColor = TaiTheme.Success;
+                    break;
+                case "SAME TOLERANCE":
+                    headerTitle = "✔ TRÙNG KHỚP TRONG DUNG SAI  ·  [ VERIFIED_SAME ]";
+                    headerColor = Color.FromArgb(13, 148, 136);
+                    break;
+                case "SAME GEOMETRY":
+                    headerTitle = "● TRÙNG HÌNH HỌC 3D (KHÁC VẬT LIỆU/BỀ DÀY)  ·  [ VERIFIED_SAME ]";
+                    headerColor = TaiTheme.Accent;
+                    break;
+                case "SAME FLAT":
+                    headerTitle = "▲ TRÙNG PHÔI TRẢI FLAT-PATTERN (UỐN KHÁC NHAU)  ·  [ VERIFIED_SAME ]";
+                    headerColor = TaiTheme.Warning;
+                    break;
+                case "CHECK MIRROR":
+                    headerTitle = "◆ CHI TIẾT ĐỐI XỨNG GƯƠNG (MIRROR)  ·  [ VERIFIED_SAME ]";
+                    headerColor = Color.FromArgb(124, 58, 237);
+                    break;
+                case "UNVERIFIED":
+                    headerTitle = "⚠ CHƯA ĐỦ DỮ LIỆU HÌNH HỌC ĐỂ XÁC MINH  ·  [ INCONCLUSIVE ]";
+                    headerColor = Color.FromArgb(217, 119, 6);
+                    break;
+                case "NO_MATCH":
+                    headerTitle = "○ CHƯA TÌM THẤY NHÓM TRÙNG  ·  [ INCONCLUSIVE ]";
+                    headerColor = Color.FromArgb(100, 116, 139);
+                    break;
+                default:
+                    headerTitle = "■ LỖI ĐỌC FILE HOẶC SOLIDWORKS API  ·  [ ERROR ]";
+                    headerColor = TaiTheme.Danger;
+                    break;
             }
-            else if (status == "SAME TOLERANCE")
+
+            calloutHeader.Text = headerTitle;
+            calloutHeader.ForeColor = headerColor;
+
+            string meaning = !string.IsNullOrWhiteSpace(group.MeaningExplanation) ? group.MeaningExplanation : group.Note;
+            string comparison = !string.IsNullOrWhiteSpace(group.ComparisonExplanation) ? group.ComparisonExplanation : group.Note;
+            string nextStep = !string.IsNullOrWhiteSpace(group.NextStepGuidance) ? group.NextStepGuidance : "Bấm 'Mở Part 3D' để kiểm tra mô hình.";
+
+            if (status == "UNVERIFIED" && selItem != null && !string.IsNullOrWhiteSpace(selItem.UnverifiedReasonFriendly))
             {
-                calloutHeader.Text = "✔ TRÙNG KHỚP TRONG DUNG SAI  —  [ Đã xác minh B-Rep đạt dung sai cho phép ]";
-                calloutHeader.ForeColor = Color.FromArgb(13, 148, 136);
-                string diff = ExcelSamePartExporter.FormatDifferenceValues(group);
-                calloutBody.Text = string.IsNullOrWhiteSpace(diff)
-                    ? ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\nCác chi tiết trong nhóm này có hình học sai lệch nằm trong dung sai cho phép (" + (group.GeometryToleranceMm > 0 ? group.GeometryToleranceMm + " mm" : "dung sai chuẩn") + ")."
-                    : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
-                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
+                comparison = $"Chi tiết BOM {selItem.BuhinNo} ({Path.GetFileName(selItem.PartPath)}): {selItem.UnverifiedReasonFriendly}";
             }
-            else if (status == "SAME GEOMETRY")
-            {
-                calloutHeader.Text = "● TRÙNG HÌNH HỌC 3D  —  [ Khác vật liệu hoặc bề dày tôn ]";
-                calloutHeader.ForeColor = TaiTheme.Accent;
-                string diff = ExcelSamePartExporter.FormatDifferenceValues(group);
-                calloutBody.Text = string.IsNullOrWhiteSpace(diff)
-                    ? ExcelSamePartExporter.FormatNoteForExcel(group)
-                    : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
-                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
-            }
-            else if (status == "SAME FLAT")
-            {
-                calloutHeader.Text = "▲ TRÙNG PHÔI TRẢI FLAT-PATTERN  —  [ Trải ra giống nhau nhưng uốn/chấn khác ]";
-                calloutHeader.ForeColor = TaiTheme.Warning;
-                string diff = ExcelSamePartExporter.FormatDifferenceValues(group);
-                calloutBody.Text = string.IsNullOrWhiteSpace(diff)
-                    ? ExcelSamePartExporter.FormatNoteForExcel(group)
-                    : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
-                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
-            }
-            else if (status == "CHECK MIRROR")
-            {
-                calloutHeader.Text = "◆ CHI TIẾT ĐỐI XỨNG (MIRROR)  —  [ Cần kiểm tra đối chiếu chiều uốn trái/phải ]";
-                calloutHeader.ForeColor = Color.FromArgb(124, 58, 237);
-                string diff = ExcelSamePartExporter.FormatDifferenceValues(group);
-                calloutBody.Text = string.IsNullOrWhiteSpace(diff)
-                    ? ExcelSamePartExporter.FormatNoteForExcel(group)
-                    : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
-                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
-            }
-            else if (status == "UNVERIFIED")
-            {
-                calloutHeader.Text = "⚠ CHI TIẾT CHƯA ĐỦ DỮ LIỆU HÌNH HỌC ĐỂ XÁC MINH (UNVERIFIED)";
-                calloutHeader.ForeColor = Color.FromArgb(217, 119, 6);
-                calloutBody.Text = (group.Note ?? "Chưa đủ dữ liệu hình học.")
-                    + "\r\nCác chi tiết này có biên dạng cong phức tạp hoặc chưa đủ anchor độc lập phép quay để kiểm chứng tự động. Để đảm bảo an toàn, hệ thống từ chối kết luận giống nhau; điều này KHÔNG đồng nghĩa chi tiết bị lỗi hay khác nhau.";
-                calloutFooter.Text = "Bấm 'Mở Part 3D' hoặc Double-click vào dòng để kiểm tra thủ công trong SOLIDWORKS.";
-            }
-            else if (status == "NO_MATCH")
-            {
-                calloutHeader.Text = "○ CHI TIẾT CHƯA TÌM THẤY NHÓM TRÙNG (NO MATCH)";
-                calloutHeader.ForeColor = Color.FromArgb(100, 116, 139);
-                calloutBody.Text = (group.Note ?? "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.")
-                    + "\r\nCác chi tiết này không tìm thấy đối tượng trùng trong phạm vi các chi tiết được chọn. Lưu ý: Điều này chỉ xác nhận chưa tìm thấy nhóm trùng trong đợt quét hiện tại, chưa chứng minh khác nhau từng cặp đối với mọi chi tiết.";
-                calloutFooter.Text = "Bấm 'Mở Part 3D' hoặc Double-click vào dòng để xem chi tiết trong SOLIDWORKS.";
-            }
-            else
-            {
-                calloutHeader.Text = "■ CHI TIẾT GẶP LỖI ĐỌC / XỬ LÝ (ERROR)";
-                calloutHeader.ForeColor = TaiTheme.Danger;
-                calloutBody.Text = group.Note ?? "Chi tiết gặp lỗi trong quá trình đọc thông số hoặc gọi SOLIDWORKS API.";
-                calloutFooter.Text = "Kiểm tra lại đường dẫn file hoặc quyền truy cập của chi tiết.";
-            }
+
+            calloutBody.Text = $"💡 Ý nghĩa: {meaning}\r\n🔍 Chi tiết: {comparison}\r\n📋 Khuyến nghị: {nextStep}";
+
+            string tolText = group.AppliedToleranceMm.HasValue ? group.AppliedToleranceMm.Value.ToString("F3") + " mm" : "N/A";
+            string devText = group.ActualDeviationMm.HasValue ? group.ActualDeviationMm.Value.ToString("F4") + " mm" : "N/A";
+            calloutFooter.Text = $"Trạng thái: {group.VerificationStatus}  ·  Dung sai: {tolText}  ·  Sai lệch: {devText}  ·  Flat: {group.FlatCheckStatus}  ·  Folded: {group.FoldedCheckStatus}";
 
             calloutCard.Invalidate();
         }
@@ -1044,6 +1049,44 @@ namespace ADDIN.UI
                 TextRenderer.DrawText(g, FormatStatusLabel(status), font, textRect, fg,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
             }
+        }
+
+        private void ShowTechnicalDetailsDialog()
+        {
+            SamePartGroupResult group = SelectedGroup;
+            SamePartItemResult item = SelectedItem;
+            if (group == null && item == null) return;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("=== THÔNG TIN KỸ THUẬT CHECK SAME PART ===");
+            if (group != null)
+            {
+                sb.AppendLine($"Nhóm: {group.GroupNumber} ({group.Status})");
+                sb.AppendLine($"VerificationStatus: {group.VerificationStatus}");
+                sb.AppendLine($"AppliedToleranceMm: {(group.AppliedToleranceMm.HasValue ? group.AppliedToleranceMm.Value.ToString() : "N/A")}");
+                sb.AppendLine($"ActualDeviationMm: {(group.ActualDeviationMm.HasValue ? group.ActualDeviationMm.Value.ToString() : "N/A")}");
+                sb.AppendLine($"FlatCheckStatus: {group.FlatCheckStatus}");
+                sb.AppendLine($"FoldedCheckStatus: {group.FoldedCheckStatus}");
+                if (!string.IsNullOrWhiteSpace(group.TechnicalDetails))
+                    sb.AppendLine($"TechnicalDetails: {group.TechnicalDetails}");
+            }
+            if (item != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"Chi tiết đang chọn: BOM {item.BuhinNo} - {item.ComponentName}");
+                sb.AppendLine($"PartPath: {item.PartPath}");
+                sb.AppendLine($"Material: {item.Material} | Thickness: {item.Thickness}");
+                sb.AppendLine($"FoldedChirality: {item.FoldedChiralitySignature}");
+                sb.AppendLine($"FeatureMirror: {item.FeatureMirrorSignature}");
+                sb.AppendLine($"Raw Error/Reason: {item.Error}");
+                if (item.FoldedBroadMetrics != null)
+                {
+                    sb.AppendLine($"Folded COM: ({item.FoldedBroadMetrics.CenterOfMassX:F2}, {item.FoldedBroadMetrics.CenterOfMassY:F2}, {item.FoldedBroadMetrics.CenterOfMassZ:F2}) mm");
+                    sb.AppendLine($"Folded Volume: {item.FoldedBroadMetrics.VolumeMm3:F2} mm3 | Area: {item.FoldedBroadMetrics.AreaMm2:F2} mm2");
+                }
+            }
+
+            MessageBox.Show(this, sb.ToString(), "Thông tin kỹ thuật", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private static Panel CreateCardPanel(Padding padding)

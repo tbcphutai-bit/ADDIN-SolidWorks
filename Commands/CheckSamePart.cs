@@ -51,6 +51,20 @@ namespace ADDIN.Commands
         public string Note { get; set; }
         public double GeometryToleranceMm { get; set; }
         public List<SamePartItemResult> Items { get; } = new List<SamePartItemResult>();
+
+        // Chuan hoa kiem chung hinh hoc (Phan 2)
+        public string VerificationStatus { get; set; } = "INCONCLUSIVE";
+        public string VerificationReason { get; set; } = "";
+        public double? AppliedToleranceMm { get; set; }
+        public double? ActualDeviationMm { get; set; }
+        public string FlatCheckStatus { get; set; } = "N/A";
+        public string FoldedCheckStatus { get; set; } = "N/A";
+
+        // Thong bao de hieu 3 noi dung (Phan 3)
+        public string MeaningExplanation { get; set; } = "";
+        public string ComparisonExplanation { get; set; } = "";
+        public string NextStepGuidance { get; set; } = "";
+        public string TechnicalDetails { get; set; } = "";
     }
 
     public sealed class SamePartItemResult
@@ -91,6 +105,8 @@ namespace ADDIN.Commands
         internal SamePartGeometrySnapshot FoldedGeometry { get; set; }
         internal SamePartGeometrySnapshot FlatGeometry { get; set; }
         public string Error { get; set; }
+        public string UnverifiedReasonFriendly { get; set; } = "";
+        public string TechnicalDetails { get; set; } = "";
     }
 
     public sealed class BroadGeometryMetrics
@@ -99,6 +115,9 @@ namespace ADDIN.Commands
         public double AreaMm2 { get; set; }
         public double EdgeLengthMm { get; set; }
         public double VolumeMm3 { get; set; }
+        public double CenterOfMassX { get; set; }
+        public double CenterOfMassY { get; set; }
+        public double CenterOfMassZ { get; set; }
         public List<double> PrincipalMoments { get; } = new List<double>();
     }
 
@@ -397,14 +416,22 @@ namespace ADDIN.Commands
                 item.FlatChiralitySignature = GeometrySignatureBuilder.CreateChirality(part, isCancellationRequested);
 
                 if (item.FoldedSignature.Length == 0 || item.FlatSignature.Length == 0)
+                {
                     item.Error = "Khong tao duoc chu ky hinh hoc cua chi tiet.";
+                    item.TechnicalDetails = item.Error;
+                    item.UnverifiedReasonFriendly = "Không tạo được chữ ký hình học của chi tiết.";
+                }
                 else if (item.FoldedGeometry == null || item.FlatGeometry == null ||
                     item.FoldedGeometry.InvalidReason.Length > 0 ||
                     item.FlatGeometry.InvalidReason.Length > 0)
+                {
                     item.Error = "KHONG DU DU LIEU HINH HOC: Folded="
                         + (item.FoldedGeometry == null ? "null" : item.FoldedGeometry.InvalidReason)
                         + "; Flat="
                         + (item.FlatGeometry == null ? "null" : item.FlatGeometry.InvalidReason);
+                    item.TechnicalDetails = item.Error;
+                    item.UnverifiedReasonFriendly = SamePartReportV2Snapshot.GetFriendlyUnverifiedReason(item.Error);
+                }
                 LogItem(item);
                 return item;
             }
@@ -429,6 +456,92 @@ namespace ADDIN.Commands
                     try { swApp.DocumentVisible(true, (int)swDocumentTypes_e.swDocPART); } catch { }
                 }
                 DeleteTemporaryPartCopy(temporaryPartPath);
+            }
+        }
+
+        private void PopulateGroupExplanations(SamePartGroupResult group)
+        {
+            if (group == null) return;
+            string status = group.Status ?? "";
+            string mat = string.Join(", ", group.Items.Select(x => x.Material).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase));
+            string thk = string.Join(", ", group.Items.Select(x => x.Thickness).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase));
+            if (string.IsNullOrEmpty(mat)) mat = "Tiêu chuẩn";
+            if (string.IsNullOrEmpty(thk)) thk = "Tiêu chuẩn";
+
+            switch (status)
+            {
+                case "SAME FULL":
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = "VERIFIED_SAME";
+                    group.MeaningExplanation = "Các chi tiết trong nhóm này giống nhau hoàn toàn về hình học 3D, biên dạng phôi trải, vật liệu và bề dày tôn.";
+                    group.ComparisonExplanation = "Cùng vật liệu (" + mat + "), cùng bề dày (" + thk + " mm). Toàn bộ hình học 3D và phôi trải phẳng trùng khớp tuyệt đối.";
+                    group.NextStepGuidance = "Có thể quản lý chung một mã chi tiết hoặc gộp danh mục sản xuất. Cần kiểm tra yêu cầu bản vẽ trước khi dùng chung quy trình gia công.";
+                    break;
+
+                case "SAME TOLERANCE":
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = "VERIFIED_SAME";
+                    string tolStr = group.AppliedToleranceMm.HasValue ? group.AppliedToleranceMm.Value.ToString("F3", CultureInfo.InvariantCulture) + " mm" : "dung sai quy định";
+                    string devStr = group.ActualDeviationMm.HasValue ? group.ActualDeviationMm.Value.ToString("F4", CultureInfo.InvariantCulture) + " mm" : "trong giới hạn";
+                    group.MeaningExplanation = "Các chi tiết giống nhau về hình học và phôi trải trong phạm vi dung sai cho phép (" + tolStr + ").";
+                    group.ComparisonExplanation = "Cùng vật liệu (" + mat + ") và bề dày (" + thk + " mm). Sai lệch hình học thực tế đo được là " + devStr + " (nằm trong dung sai " + tolStr + ").";
+                    group.NextStepGuidance = "Kiểm tra dung sai lắp ghép và yêu cầu kỹ thuật của cụm chi tiết trước khi quyết định dùng thay thế cho nhau.";
+                    break;
+
+                case "SAME GEOMETRY":
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = "VERIFIED_SAME";
+                    group.MeaningExplanation = "Các chi tiết có hình dạng hình học 3D hoàn toàn giống nhau nhưng khác nhau về vật liệu hoặc bề dày tôn.";
+                    group.ComparisonExplanation = "Hình học 3D trùng khớp. Điểm khác biệt: " + group.Note;
+                    group.NextStepGuidance = "Không được dùng chung phôi dập do khác vật tư hoặc bề dày. Cần quản lý mã riêng theo đúng chỉ định vật liệu.";
+                    break;
+
+                case "SAME FLAT":
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    if (group.FoldedCheckStatus != "VERIFIED_DIFFERENT")
+                        group.FoldedCheckStatus = "VERIFIED_DIFFERENT";
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.MeaningExplanation = "Các chi tiết có biên dạng phôi phẳng (Flat-Pattern) tương đương nhau, nhưng trạng thái uốn/chấn 3D khác nhau.";
+                    group.ComparisonExplanation = "Biên dạng phẳng và các vị trí đột lỗ khi trải phẳng giống nhau. Khác biệt ở các bước uốn gấp (góc uốn, chiều dài cạnh bẻ hoặc hướng bẻ).";
+                    group.NextStepGuidance = "Có thể tham khảo cắt chung phôi tấm phẳng (laser/turret punch), nhưng cần chạy chương trình chấn bẻ uốn riêng.";
+                    break;
+
+                case "CHECK MIRROR":
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = "VERIFIED_SAME";
+                    group.MeaningExplanation = "Các chi tiết là cặp đối xứng gương (Mirror) của nhau (chi tiết bên trái / bên phải).";
+                    group.ComparisonExplanation = "Kích thước và biên dạng tương đương nhưng ngược chiều nhau qua mặt phẳng đối xứng (chirality đảo ngược).";
+                    group.NextStepGuidance = "Không được lắp lẫn cho nhau vì đối xứng trái/phải. Cần phân biệt rõ khi cấp phôi vào đồ gá uốn/hàn.";
+                    break;
+
+                case "UNVERIFIED":
+                    group.VerificationStatus = "INCONCLUSIVE";
+                    group.FlatCheckStatus = "INCONCLUSIVE";
+                    group.FoldedCheckStatus = "INCONCLUSIVE";
+                    group.MeaningExplanation = "Hệ thống chưa đủ dữ liệu hình học để tự động xác minh kết luận cho các chi tiết này.";
+                    group.ComparisonExplanation = "Chi tiết có biên dạng đặc thù (dạng tròn xoay đồng trục hoặc mặt cong tự do) không đủ điểm neo độc lập để thuật toán kiểm chứng tự động.";
+                    group.NextStepGuidance = "Bấm nút 'Mở Part 3D' để kiểm tra trực tiếp kích thước và biên dạng trên SOLIDWORKS.";
+                    break;
+
+                case "NO_MATCH":
+                    group.VerificationStatus = "INCONCLUSIVE";
+                    group.FlatCheckStatus = "N/A";
+                    group.FoldedCheckStatus = "N/A";
+                    group.MeaningExplanation = "Chi tiết không tìm thấy đối tượng trùng trong phạm vi các chi tiết được chọn quét lần này.";
+                    group.ComparisonExplanation = "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp đối với mọi chi tiết.";
+                    group.NextStepGuidance = "Nếu nghi ngờ có chi tiết trùng trong cụm khác, hãy chọn mở rộng phạm vi kiểm tra BOM.";
+                    break;
+
+                default:
+                    group.VerificationStatus = "INCONCLUSIVE";
+                    group.MeaningExplanation = "Hệ thống gặp lỗi trong quá trình đọc file hoặc gọi API SOLIDWORKS cho chi tiết này.";
+                    group.ComparisonExplanation = "Không thể truy xuất thông số hình học do lỗi đường dẫn, quyền truy cập hoặc file bị hỏng.";
+                    group.NextStepGuidance = "Kiểm tra lại đường dẫn file hoặc quyền truy cập của chi tiết trên ổ đĩa.";
+                    break;
             }
         }
 
@@ -518,53 +631,74 @@ namespace ADDIN.Commands
                         groupItems[0], item, false, 0.02));
                 bool sameMaterial = groupItems.Select(item => item.MaterialKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
                 bool sameThickness = groupItems.Select(item => item.ThicknessKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
-                bool mirrorByDirection = false; // rotation of coordinate system is not mirror proof
+                // Phan 2: Khong xac nhan MIRROR chi dua vao ten feature hoac thu tu xay dung model.
+                // Phai dua vao doi xung hinh hoc thuc su: chirality nguoc nhau hoac doi xung qua mat phang.
                 bool mirrorByChirality = foldedChiralityCount > 1;
-                bool mirrorByFeature = mirrorFeatureCount > 1;
-                bool mirrorByOperation = flatExactCount == 1
-                    && foldedInvariantCount == 1
-                    && featureOperationCount > 1;
+                bool mirrorByGeometry = false;
+                if (!mirrorByChirality && groupItems.Count == 2)
+                {
+                    var a = groupItems[0].FoldedBroadMetrics;
+                    var b = groupItems[1].FoldedBroadMetrics;
+                    if (a != null && b != null)
+                    {
+                        double dMirrorX = Math.Sqrt(Math.Pow(a.CenterOfMassX + b.CenterOfMassX, 2) + Math.Pow(a.CenterOfMassY - b.CenterOfMassY, 2) + Math.Pow(a.CenterOfMassZ - b.CenterOfMassZ, 2));
+                        double dMirrorY = Math.Sqrt(Math.Pow(a.CenterOfMassX - b.CenterOfMassX, 2) + Math.Pow(a.CenterOfMassY + b.CenterOfMassY, 2) + Math.Pow(a.CenterOfMassZ - b.CenterOfMassZ, 2));
+                        double dMirrorZ = Math.Sqrt(Math.Pow(a.CenterOfMassX - b.CenterOfMassX, 2) + Math.Pow(a.CenterOfMassY - b.CenterOfMassY, 2) + Math.Pow(a.CenterOfMassZ + b.CenterOfMassZ, 2));
+                        mirrorByGeometry = (dMirrorX < 0.1 || dMirrorY < 0.1 || dMirrorZ < 0.1);
+                    }
+                }
 
                 SamePartGroupResult group = new SamePartGroupResult
                 {
-                    GroupNumber = groupNumber++
+                    GroupNumber = groupNumber++,
+                    AppliedToleranceMm = 0.02
                 };
                 group.Items.AddRange(groupItems);
 
-                if (mirrorByDirection || mirrorByChirality || mirrorByFeature || mirrorByOperation)
+                if (mirrorByChirality || mirrorByGeometry)
                 {
                     group.Status = "CHECK MIRROR";
-                    List<string> mirrorReasons = new List<string>();
-                    if (mirrorByDirection) mirrorReasons.Add("huong toa do");
-                    if (mirrorByChirality) mirrorReasons.Add("dau thuan/nghich hinh hoc");
-                    if (mirrorByFeature) mirrorReasons.Add("feature mirror/derived");
-                    if (mirrorByOperation) mirrorReasons.Add("chuoi feature tao/cat khac nhau");
-                    group.Note = "Bien dang co cung kich thuoc nhung khac "
-                        + string.Join(", ", mirrorReasons)
-                        + "; khong tinh la chi tiet giong nhau.";
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = "VERIFIED_SAME";
+                    group.ActualDeviationMm = 0.0000;
+                    group.Note = "Biên dạng kích thước tương đương nhưng đối xứng gương (Mirror) qua mặt phẳng; cần lưu ý chiều uốn.";
                 }
                 else if (sameFolded && sameMaterial && sameThickness)
                 {
                     group.Status = "SAME FULL";
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = "VERIFIED_SAME";
+                    group.ActualDeviationMm = (flatExactCount == 1 && foldedInvariantCount == 1) ? 0.0000 : (double?)null;
                     group.Note = flatExactCount == 1 && foldedInvariantCount == 1
-                        ? "Giong Flat-Pattern, trang thai gap, vat lieu va chieu day."
-                        : "Giong hinh hoc trong dung sai so sanh, trang thai gap, vat lieu va chieu day.";
+                        ? "Giống Flat-Pattern, trạng thái gấp, vật liệu và chiều dày hoàn toàn."
+                        : "Giống hình học trong dung sai, trạng thái gấp, vật liệu và chiều dày.";
                 }
                 else if (sameFolded)
                 {
                     group.Status = "SAME GEOMETRY";
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = "VERIFIED_SAME";
                     List<string> differences = new List<string>();
                     if (!sameMaterial)
-                        differences.Add("vat lieu");
+                        differences.Add("vật liệu");
                     if (!sameThickness)
-                        differences.Add("chieu day");
-                    group.Note = "Giong hinh hoc nhung khac " + string.Join(" va ", differences) + ".";
+                        differences.Add("chiều dày tôn");
+                    group.Note = "Giống hình học 3D nhưng khác " + string.Join(" và ", differences) + ".";
                 }
                 else
                 {
+                    // Phan 2: Khong duoc tu ket luan SAME_FLAT chi vi buoc xac minh trang thai gap bi inconclusive.
                     group.Status = "SAME FLAT";
-                    group.Note = "Giong bien dang Flat-Pattern nhung trang thai gap khac nhau.";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = "VERIFIED_DIFFERENT";
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.Note = "Giống biên dạng Flat-Pattern nhưng trạng thái gấp uốn 3D khác nhau.";
                 }
+
+                PopulateGroupExplanations(group);
 
                 result.Groups.Add(group);
                 Log("GROUP " + group.GroupNumber + " | " + group.Status
@@ -620,14 +754,31 @@ namespace ADDIN.Commands
                 if (groupItems.Count < 2)
                     continue;
 
+                double geomTol = Math.Max(0.001, Math.Min(0.20,
+                    Math.Min(toleranceOptions.EdgeLengthMm, toleranceOptions.HoleLinearMm)));
+                double? groupMaxDev = null;
+                for (int m = 0; m < groupItems.Count - 1; m++)
+                {
+                    double? pairDev;
+                    if (AreSameWithinTolerance(groupItems[m], groupItems[m + 1], out pairDev) && pairDev.HasValue)
+                    {
+                        groupMaxDev = groupMaxDev.HasValue ? Math.Max(groupMaxDev.Value, pairDev.Value) : pairDev.Value;
+                    }
+                }
+
                 SamePartGroupResult group = new SamePartGroupResult
                 {
                     GroupNumber = groupNumber++,
                     Status = "SAME TOLERANCE",
-                    Note = "Da xac minh bien dang B-Rep trong dung sai." ,
-                    GeometryToleranceMm = Math.Max(0.001, Math.Min(0.20,
-                        Math.Min(toleranceOptions.EdgeLengthMm, toleranceOptions.HoleLinearMm)))
+                    Note = "Đã xác minh biên dạng B-Rep trong dung sai.",
+                    GeometryToleranceMm = geomTol,
+                    AppliedToleranceMm = geomTol,
+                    ActualDeviationMm = groupMaxDev,
+                    VerificationStatus = "VERIFIED_SAME",
+                    FlatCheckStatus = "VERIFIED_SAME",
+                    FoldedCheckStatus = "VERIFIED_SAME"
                 };
+                PopulateGroupExplanations(group);
                 group.Items.AddRange(groupItems);
                 result.Groups.Add(group);
                 Log("GROUP " + group.GroupNumber + " | SAME TOLERANCE | Buhin="
@@ -651,6 +802,16 @@ namespace ADDIN.Commands
             SamePartItemResult first,
             SamePartItemResult second)
         {
+            double? dev;
+            return AreSameWithinTolerance(first, second, out dev);
+        }
+
+        private bool AreSameWithinTolerance(
+            SamePartItemResult first,
+            SamePartItemResult second,
+            out double? measuredDeviation)
+        {
+            measuredDeviation = null;
             if (first == null || second == null)
                 return false;
             if (!string.Equals(first.MaterialKey ?? "", second.MaterialKey ?? "",
@@ -669,10 +830,20 @@ namespace ADDIN.Commands
                 || !AreMetricsWithinTolerance(first.FoldedBroadMetrics, second.FoldedBroadMetrics)
                 || !AreFlatProfilesWithinTolerance(first.FlatProfileMetrics, second.FlatProfileMetrics))
                 return false;
+
             double geometryTolerance = Math.Max(0.001, Math.Min(0.20,
                 Math.Min(toleranceOptions.EdgeLengthMm, toleranceOptions.HoleLinearMm)));
-            return ConfirmSameGeometry(first, second, true, geometryTolerance)
-                && ConfirmSameGeometry(first, second, false, geometryTolerance);
+
+            double? flatDev, foldedDev;
+            string flatStatus, foldedStatus, flatReason, foldedReason;
+            bool flatSame = ConfirmSameGeometry(first, second, true, geometryTolerance, out flatDev, out flatStatus, out flatReason);
+            bool foldedSame = ConfirmSameGeometry(first, second, false, geometryTolerance, out foldedDev, out foldedStatus, out foldedReason);
+
+            if (!flatSame || !foldedSame)
+                return false;
+
+            measuredDeviation = Math.Max(flatDev ?? 0.0, foldedDev ?? 0.0);
+            return true;
         }
 
         // Fast signatures are candidate filters ONLY; matching edge positions
@@ -680,16 +851,40 @@ namespace ADDIN.Commands
         private bool ConfirmSameGeometry(SamePartItemResult a, SamePartItemResult b,
             bool flat, double toleranceMm)
         {
+            double? maxDev;
+            string status, reason;
+            return ConfirmSameGeometry(a, b, flat, toleranceMm, out maxDev, out status, out reason);
+        }
+
+        private bool ConfirmSameGeometry(SamePartItemResult a, SamePartItemResult b,
+            bool flat, double toleranceMm, out double? maximumDeviationMm, out string verificationStatus, out string reason)
+        {
             double maximumMm;
-            string reason;
+            string matchReason;
             bool same = SamePartGeometryVerifier.TryMatch(
                 flat ? a.FlatGeometry : a.FoldedGeometry,
                 flat ? b.FlatGeometry : b.FoldedGeometry,
-                toleranceMm, out maximumMm, out reason);
+                toleranceMm, out maximumMm, out matchReason);
+
+            maximumDeviationMm = same ? (double?)maximumMm : null;
+            if (same)
+            {
+                verificationStatus = "VERIFIED_SAME";
+            }
+            else if (matchReason != null && (matchReason.Contains("failed") || matchReason.Contains("Degenerate") || matchReason.Contains("ambiguous") || matchReason.Contains("Insuff")))
+            {
+                verificationStatus = "INCONCLUSIVE";
+            }
+            else
+            {
+                verificationStatus = "VERIFIED_DIFFERENT";
+            }
+            reason = matchReason ?? "";
+
             Log("[GEOMETRY VERIFY] " + (flat ? "FLAT" : "FOLDED")
                 + " | parts=" + a.BuhinNo + " <> " + b.BuhinNo
-                + " | result=" + (same ? "PASS" : "REJECT/REVIEW")
-                + " | maximumDeviationMm=" + maximumMm.ToString("F4", CultureInfo.InvariantCulture)
+                + " | status=" + verificationStatus
+                + " | maximumDeviationMm=" + (maximumDeviationMm.HasValue ? maximumDeviationMm.Value.ToString("F4", CultureInfo.InvariantCulture) : "N/A")
                 + " | " + reason);
             return same;
         }
@@ -718,6 +913,13 @@ namespace ADDIN.Commands
             if (!WithinAbsoluteOrRelative(first.VolumeMm3, second.VolumeMm3,
                 toleranceOptions.VolumeAbsoluteMm3,
                 toleranceOptions.VolumeRelativePercent / 100.0))
+                return false;
+            double comDelta = Math.Sqrt(
+                Math.Pow(first.CenterOfMassX - second.CenterOfMassX, 2) +
+                Math.Pow(first.CenterOfMassY - second.CenterOfMassY, 2) +
+                Math.Pow(first.CenterOfMassZ - second.CenterOfMassZ, 2));
+            double comTolerance = Math.Max(0.05, toleranceOptions.HoleLinearMm * 2.0);
+            if (comDelta > comTolerance)
                 return false;
             if (first.PrincipalMoments.Count != second.PrincipalMoments.Count)
                 return false;
@@ -1293,8 +1495,13 @@ namespace ADDIN.Commands
                     if (array != null)
                     {
                         if (array.Length > 3)
+                        {
+                            metrics.CenterOfMassX = Convert.ToDouble(array.GetValue(0), CultureInfo.InvariantCulture) * 1000.0;
+                            metrics.CenterOfMassY = Convert.ToDouble(array.GetValue(1), CultureInfo.InvariantCulture) * 1000.0;
+                            metrics.CenterOfMassZ = Convert.ToDouble(array.GetValue(2), CultureInfo.InvariantCulture) * 1000.0;
                             metrics.VolumeMm3 += Math.Abs(Convert.ToDouble(
                                 array.GetValue(3), CultureInfo.InvariantCulture)) * 1000000000.0;
+                        }
                         if (array.Length >= 12)
                         {
                             double ixx = Convert.ToDouble(array.GetValue(6), CultureInfo.InvariantCulture);
@@ -3437,10 +3644,32 @@ namespace ADDIN.Commands
         public string AssemblyPaths { get; set; }
         public List<SamePartItemResult> Items { get; set; } = new List<SamePartItemResult>();
         public SamePartGroupResult GroupRef { get; set; }
+
+        public string VerificationStatus { get; set; } = "INCONCLUSIVE";
+        public string AppliedToleranceText { get; set; } = "N/A";
+        public string ActualDeviationText { get; set; } = "N/A";
+        public string FlatCheckStatus { get; set; } = "N/A";
+        public string FoldedCheckStatus { get; set; } = "N/A";
+        public string MeaningExplanation { get; set; } = "";
+        public string ComparisonExplanation { get; set; } = "";
+        public string NextStepGuidance { get; set; } = "";
+        public string TechnicalDetails { get; set; } = "";
     }
 
     internal sealed class SamePartReportV2Snapshot
     {
+        public static string GetFriendlyUnverifiedReason(string error)
+        {
+            string x = (error ?? "").ToUpperInvariant();
+            if (x.Contains("INSUFFICIENT ROTATION-INDEPENDENT ANCHORS") || x.Contains("INSUFFICIENT ANCHORS"))
+                return "Chi tiết dạng tròn xoay đồng trục (vòng đệm hoặc ống trụ); thuật toán cần kiểm tra đường kính và chiều dài thủ công.";
+            if (x.Contains("UNSUPPORTED CURVED B-REP") || x.Contains("SPLINE") || x.Contains("CURVED"))
+                return "Chi tiết có biên dạng mặt cong tự do hoặc góc uốn phức tạp; cần kiểm tra trực tiếp trên mô hình 3D.";
+            if (x.Contains("KHONG DU DU LIEU HINH HOC"))
+                return "Chưa đủ dữ liệu hình học độc lập để hệ thống tự động xác minh kết luận.";
+            return "Chưa thể tự động kiểm chứng; cần kiểm tra trực tiếp trên mô hình 3D.";
+        }
+
         public readonly string ReportId = Guid.NewGuid().ToString("N");
         public readonly DateTime CreatedAt = DateTime.Now;
         public readonly List<SamePartReportV2Row> Rows = new List<SamePartReportV2Row>();
@@ -3469,7 +3698,7 @@ namespace ADDIN.Commands
                 List<SamePartItemResult> members = group.Items.Where(x => x != null).ToList();
                 string code = group.Status ?? "UNVERIFIED";
                 SamePartReportV2Row row = CreateRow("GROUP", "G" + group.GroupNumber,
-                    code, members, group.Note ?? "", group.GroupNumber);
+                    code, members, group.Note ?? "", group.GroupNumber, group);
                 row.GroupRef = group;
                 group.RowId = row.RowId;
                 foreach (var item in members)
@@ -3538,7 +3767,7 @@ namespace ADDIN.Commands
         }
 
         private static SamePartReportV2Row CreateRow(string kind, string groupLabel, string status,
-            IEnumerable<SamePartItemResult> members, string details, int ordinal)
+            IEnumerable<SamePartItemResult> members, string details, int ordinal, SamePartGroupResult groupRef = null)
         {
             List<SamePartItemResult> list = members.ToList();
             List<string> paths = list.Select(x => NormalizePath(x.PartPath))
@@ -3558,6 +3787,59 @@ namespace ADDIN.Commands
             string copiesNote = "";
             if (list.Count > 1 && paths.Count > 1 && numberCounts.Any(x => x.Value > 1))
                 copiesNote = " [Cùng số BOM xuất hiện ở nhiều đường dẫn; cần đối chiếu nguồn]";
+            string devText = "N/A";
+            string tolText = "N/A";
+            string verStatus = "INCONCLUSIVE";
+            string flatStatus = "N/A";
+            string foldedStatus = "N/A";
+            string meaning = "";
+            string comparison = "";
+            string nextStep = "";
+            string tech = "";
+
+            if (groupRef != null)
+            {
+                verStatus = groupRef.VerificationStatus ?? "INCONCLUSIVE";
+                flatStatus = groupRef.FlatCheckStatus ?? "N/A";
+                foldedStatus = groupRef.FoldedCheckStatus ?? "N/A";
+                if (groupRef.AppliedToleranceMm.HasValue)
+                    tolText = groupRef.AppliedToleranceMm.Value.ToString("F3", CultureInfo.InvariantCulture) + " mm";
+                if (groupRef.ActualDeviationMm.HasValue)
+                    devText = groupRef.ActualDeviationMm.Value.ToString("F4", CultureInfo.InvariantCulture) + " mm";
+                meaning = groupRef.MeaningExplanation ?? "";
+                comparison = groupRef.ComparisonExplanation ?? "";
+                nextStep = groupRef.NextStepGuidance ?? "";
+                tech = groupRef.TechnicalDetails ?? "";
+            }
+            else if (status == "UNVERIFIED")
+            {
+                verStatus = "INCONCLUSIVE";
+                flatStatus = "INCONCLUSIVE";
+                foldedStatus = "INCONCLUSIVE";
+                meaning = "Hệ thống chưa đủ dữ liệu hình học để tự động xác minh kết luận cho chi tiết này.";
+                comparison = GetFriendlyUnverifiedReason(details);
+                nextStep = "Bấm 'Mở Part 3D' để kiểm tra trực tiếp mô hình trên SOLIDWORKS.";
+                tech = details;
+            }
+            else if (status == "NO_MATCH")
+            {
+                verStatus = "INCONCLUSIVE";
+                flatStatus = "N/A";
+                foldedStatus = "N/A";
+                meaning = "Chi tiết chưa tìm thấy nhóm trùng trong đợt quét hiện tại.";
+                comparison = "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp đối với mọi chi tiết.";
+                nextStep = "Nếu nghi ngờ có chi tiết trùng trong cụm khác, hãy mở rộng phạm vi kiểm tra BOM.";
+                tech = "NO_MATCH";
+            }
+            else if (status == "ERROR")
+            {
+                verStatus = "INCONCLUSIVE";
+                meaning = "Chi tiết gặp lỗi đọc file hoặc gọi API SOLIDWORKS.";
+                comparison = details;
+                nextStep = "Kiểm tra lại đường dẫn file hoặc quyền truy cập chi tiết.";
+                tech = details;
+            }
+
             return new SamePartReportV2Row
             {
                 RowId = kind + ":" + ordinal + ":" + string.Join("|", paths),
@@ -3574,7 +3856,17 @@ namespace ADDIN.Commands
                 Paths = string.Join(System.Environment.NewLine, paths),
                 AssemblyPaths = Join(list.SelectMany(x => x.AssemblyPaths)),
                 Details = details + copiesNote,
-                Items = list
+                Items = list,
+                GroupRef = groupRef,
+                VerificationStatus = verStatus,
+                AppliedToleranceText = tolText,
+                ActualDeviationText = devText,
+                FlatCheckStatus = flatStatus,
+                FoldedCheckStatus = foldedStatus,
+                MeaningExplanation = meaning,
+                ComparisonExplanation = comparison,
+                NextStepGuidance = nextStep,
+                TechnicalDetails = tech
             };
         }
 
@@ -3632,25 +3924,37 @@ namespace ADDIN.Commands
                 sheetObject = workbook.Worksheets[1];
                 dynamic sheet = sheetObject;
                 sheet.Name = "CHECK SAME PART";
-                string[] headers = { "Nhom", "Ket qua", "So BOM", "So muc", "Vat lieu", "Be day",
-                    "Cau hinh", "Flat-Pattern", "Ghi chu / Ly do", "Duong dan Part", "Assembly" };
+                string[] headers = {
+                    "Nhóm", "Kết quả", "Trạng thái kiểm chứng", "Số BOM", "Số lượng",
+                    "Dung sai (mm)", "Sai lệch đo được (mm)", "Kiểm tra Flat", "Kiểm tra Folded",
+                    "Vật liệu", "Bề dày", "Cấu hình", "Flat-Pattern",
+                    "Ý nghĩa kết quả", "So sánh chi tiết", "Khuyến nghị xử lý", "Ghi chú / Kỹ thuật",
+                    "Đường dẫn Part", "Assembly chứa Part"
+                };
                 for (int col = 0; col < headers.Length; col++)
                     sheet.Cells[1, col + 1] = headers[col];
                 int rowIndex = 2;
                 foreach (SamePartReportV2Row row in snapshot.Rows)
                 {
-                    // Identical row/status text as the on-screen report: no reclassification.
                     sheet.Cells[rowIndex, 1] = row.GroupLabel;
                     sheet.Cells[rowIndex, 2] = row.StatusLabel;
-                    sheet.Cells[rowIndex, 3] = row.PartNumbers;
-                    sheet.Cells[rowIndex, 4] = row.ItemCount;
-                    sheet.Cells[rowIndex, 5] = row.Materials;
-                    sheet.Cells[rowIndex, 6] = row.Thicknesses;
-                    sheet.Cells[rowIndex, 7] = row.Configurations;
-                    sheet.Cells[rowIndex, 8] = row.FlatConfigurations;
-                    sheet.Cells[rowIndex, 9] = row.Details;
-                    sheet.Cells[rowIndex, 10] = row.Paths;
-                    sheet.Cells[rowIndex, 11] = row.AssemblyPaths;
+                    sheet.Cells[rowIndex, 3] = row.VerificationStatus;
+                    sheet.Cells[rowIndex, 4] = row.PartNumbers;
+                    sheet.Cells[rowIndex, 5] = row.ItemCount;
+                    sheet.Cells[rowIndex, 6] = row.AppliedToleranceText;
+                    sheet.Cells[rowIndex, 7] = row.ActualDeviationText;
+                    sheet.Cells[rowIndex, 8] = row.FlatCheckStatus;
+                    sheet.Cells[rowIndex, 9] = row.FoldedCheckStatus;
+                    sheet.Cells[rowIndex, 10] = row.Materials;
+                    sheet.Cells[rowIndex, 11] = row.Thicknesses;
+                    sheet.Cells[rowIndex, 12] = row.Configurations;
+                    sheet.Cells[rowIndex, 13] = row.FlatConfigurations;
+                    sheet.Cells[rowIndex, 14] = row.MeaningExplanation;
+                    sheet.Cells[rowIndex, 15] = row.ComparisonExplanation;
+                    sheet.Cells[rowIndex, 16] = row.NextStepGuidance;
+                    sheet.Cells[rowIndex, 17] = string.IsNullOrWhiteSpace(row.TechnicalDetails) ? row.Details : row.TechnicalDetails;
+                    sheet.Cells[rowIndex, 18] = row.Paths;
+                    sheet.Cells[rowIndex, 19] = row.AssemblyPaths;
                     rowIndex++;
                 }
                 dynamic range = sheet.Range[sheet.Cells[1, 1], sheet.Cells[Math.Max(1,rowIndex - 1), headers.Length]];

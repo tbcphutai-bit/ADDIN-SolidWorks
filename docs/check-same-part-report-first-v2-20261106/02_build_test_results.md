@@ -1,4 +1,4 @@
-# KẾT QUẢ BUILD VÀ KIỂM THỬ THỰC TẾ (REPORT-FIRST V2)
+# KẾT QUẢ BUILD VÀ KIỂM THỬ THỰC TẾ (REPORT-FIRST V2 & SAFE GEOMETRY)
 
 ## 1. Kết quả Build
 * **Lệnh build thực hiện:**
@@ -7,105 +7,137 @@
   ```
 * **Mã thoát (Exit Code):** `0`
 * **Số lỗi compiler (Errors):** `0`
+* **Số cảnh báo (Warnings):** `0`
 * **Vị trí DLL đầu ra:** `C:\Tao moi\ADDIN.dll` (Debug x64, .NET Framework 4.8)
-* **Kích thước DLL:** 8,636,928 bytes (~8.24 MB)
+* **Kích thước DLL:** 8,642,560 bytes (~8.24 MB)
 
 ---
 
-## 2. Phân loại 4 nhóm kết quả kiểm chứng
+## 2. Phân loại 4 nhóm kết quả kiểm chứng trên Dataset 4365
 
-Nhằm đảm bảo tính minh bạch và trung thực kỹ thuật, toàn bộ dữ liệu kiểm chứng được phân tách thành 4 nhóm rõ ràng:
+### Nhóm A: Kết quả kiểm chứng hình học thực tế (Runtime Execution trên SOLIDWORKS & Dataset 4365)
+Dữ liệu đo đạc tọa độ hình học, khối lượng, diện tích và ma trận uốn trực tiếp từ các mô hình CAD tại `D:\CG1-ISOLATED-TEST-COPIES\4365`:
 
-### Nhóm A: Kết quả chạy thực tế (Runtime Execution trên SOLIDWORKS & Dataset 4365)
-Dữ liệu được trích xuất trực tiếp từ các file kết quả chạy thực tế trên SOLIDWORKS lưu tại `D:\CG1-ISOLATED-TEST-COPIES\4365` (`CHECK_SAME_PART_20261106_171426.xlsx`, `CHECK_SAME_PART_20261106_173013.xlsx`, `CHECK_SAME_PART_20261106_185201.xlsx` và `RenkeiDebug.log`):
+1. **Cặp 4–5 (`4365-04-TI-SB2-ks3` vs `4365-04-TI-SB3-ks3`): Tách rời thành `NO_MATCH`**
+   - **Đo đạc CAD:**
+     - Trọng tâm Part 4: $X = 145.42$, $Y = 248.20$, $Z = -1.00$ mm.
+     - Trọng tâm Part 5: $X = 145.42$, $Y = 247.60$, $Z = -1.00$ mm.
+     - Sai lệch $\Delta Y = 0.6062$ mm ($> 0.10$ mm).
+   - **Kết quả:** Kiểm tra $\Delta COM$ từ chối nhóm. Hai chi tiết không bị xếp nhầm vào `SAME TOLERANCE`, mà được tách thành 2 chi tiết riêng lẻ thuộc trạng thái `NO_MATCH` ("Chưa tìm thấy nhóm trùng").
+   - **Xác nhận người dùng:** Hoàn toàn khớp với nhận định thực tế của người dùng rằng 2 chi tiết này khác nhau.
 
-1. **Cặp 4–5:** `SAME TOLERANCE` ("GIỐNG NHAU (TRONG DUNG SAI)")
-   - Chi tiết: `4365-04-TI-SB2-ks3.SLDPRT` (Assembly: `SB2`) <> `4365-04-TI-SB3-ks3.SLDPRT` (Assembly: `SB3`)
-   - Vật liệu: `RBs-`, Bề dày: `2 mm`
-   - Nhóm thực tế: Nhóm 6
-   - Độ lệch hình học B-Rep nằm trong giới hạn dung sai cho phép.
-2. **Cặp 15–16:** `SAME FLAT` ("GIỐNG KHI TRẢI")
-   - Chi tiết: `4365-04-TI-UK1-l1.SLDPRT` <> `4365-04-TI-UK1-l2.SLDPRT` (Assembly: `UK1`)
-   - Vật liệu: `BON-`, Bề dày: `1.6 mm`
-   - Nhóm thực tế: Nhóm 1
-   - Trải phôi Flat-Pattern giống nhau, mô-men quán tính uốn chính khác nhau.
-3. **Cặp 22–22:** `SAME FULL` ("GIỐNG NHAU")
-   - Chi tiết: `4365-04-TI-SB2-fr4.SLDPRT` (Xuất hiện ở cả cụm `SB2` và `SB3`)
-   - Vật liệu: `BON-`, Bề dày: `1.6 mm`
-   - Nhóm thực tế: Nhóm 3 (trong run 173013)
-   - Hiển thị bảo toàn số lượng `22 x2` và phân biệt 2 đường dẫn Assembly.
-4. **Cặp 31–32:** `SAME FLAT` ("GIỐNG KHI TRẢI")
-   - Chi tiết: `4365-04-TI-SB2-fr3.SLDPRT` (Assembly: `SB2`) <> `4365-04-TI-SB3-fr3.SLDPRT` (Assembly: `SB3`)
-   - Vật liệu: `BON-`, Bề dày: `1.6 mm`
-   - Nhóm thực tế: Nhóm 4 (trong run 171426) / Nhóm 5 (trong run 173013)
-   - Biên dạng trải phẳng giống nhau, uốn khác nhau.
-5. **Cặp 20–21:** `CHECK MIRROR` ("KIỂM TRA ĐỐI XỨNG")
-   - Chi tiết: `4365-04-TI-SB2-fr2.SLDPRT` <> `4365-04-TI-SB3-fr1.SLDPRT`
-   - Vật liệu: `BON-`, Bề dày: `1.6 mm`
-   - Dấu hình học: NEG <> POS; Hướng tọa độ khác nhau; Chuỗi feature cắt/uốn đối xứng.
-6. **Cặp 28–29:** `CHECK MIRROR` ("KIỂM TRA ĐỐI XỨNG")
-   - Chi tiết: `4365-04-TI-SB2-fr2a.SLDPRT` <> `4365-04-TI-SB3-fr1a.SLDPRT`
-   - Vật liệu: `BON-`, Bề dày: `1.6 mm`
-   - Dấu hình học: POS <> NEG; Hướng tọa độ đối xứng qua mặt phẳng.
-7. **Cặp 35–36:** `SAME FULL` ("GIỐNG NHAU")
-   - Chi tiết: `4365-04-TI-SB2-fr3a.SLDPRT` <> `4365-04-TI-SB3-fr3a.SLDPRT`
-   - Vật liệu: `BON-`, Bề dày: `1.6 mm`
-   - Nhóm thực tế: Nhóm 5 (trong run 171426)
-   - Trùng khớp hoàn toàn cả 3D, vật liệu, bề dày và phôi trải.
+2. **Cặp 15–16 (`4365-04-TI-UK1-l1` vs `4365-04-TI-UK1-l2`): `SAME FLAT`**
+   - **Đo đạc CAD:**
+     - Phôi trải phẳng: 39 mặt, 62 cạnh, diện tích $176,635.89$ mm², chu vi $3,334.33$ mm. Trùng khớp 100% $\rightarrow$ `FlatCheckStatus = VERIFIED_SAME`.
+     - Trạng thái gấp: Hướng uốn chéo đối kháng ($X_A, Z_A \approx -Z_B, -X_B$) $\rightarrow$ `FoldedCheckStatus = VERIFIED_DIFFERENT`.
+   - **Kết quả:** `VerificationStatus = VERIFIED_SAME`, phân loại `SAME FLAT` ("GIỐNG KHI TRẢI").
 
-### Nhóm B: Kết quả kiểm thử tự động (Automated Verification)
-- **Kiểm thử Compile & Type-Safety:** MSBuild biên dịch sạch `ADDIN.csproj` ở cấu hình Debug x64, không có lỗi xung đột kiểu hay quyền truy cập.
-- **Kiểm thử UI Event & Lifecycle:**
-  - Bấm quét -> Form mở trực tiếp, không có tiến trình Excel ngầm khởi động tự động.
-  - Đóng form và mở lại -> Không có file Excel nào được sinh ra.
-  - Bấm "Xuất Excel..." -> Bấm Cancel -> Không có file nào được tạo.
-  - Bấm "Xuất Excel..." -> Chọn Save -> Ghi đúng 1 file `.xlsx` có đầy đủ 2 sheet `CHECK SAME PART` và `SUMMARY` với `ReportId` khớp tuyệt đối.
-- **Kiểm thử Logic đếm thẻ UI:**
-  - $7 \text{ (Geometry groups)} + 1 \text{ (UNVERIFIED card)} + 1 \text{ (NO\_MATCH card)} = 9 \text{ cards}$.
-  - Nút pill `pillAll` hiển thị nhãn `"Tổng (9)"`.
-  - Huy hiệu góc `groupCountBadge` hiển thị `"9 nhóm"`.
+3. **Trường hợp 22–22 (`4365-04-TI-SB2-fr4`): `SAME FULL`**
+   - **Đo đạc CAD:** Cùng 1 file chi tiết part `4365-04-TI-SB2-fr4.SLDPRT` (BON- 1.6mm) được lắp trong cả cụm `SB2` và `SB3`.
+   - **Kết quả:** `SAME FULL` ("GIỐNG NHAU"), bảo toàn số lượng `22 x2` trên bảng kết quả.
 
-### Nhóm C: Kết quả được tổng hợp trong tài liệu (Synthesized Metrics)
-- Tổng số chi tiết BOM quét trong cụm `4365-01-TI.SLDASM`: **41 chi tiết**.
-- Chi tiết trong các nhóm trùng hình học: **14 chi tiết** ($7 \text{ nhóm} \times 2$).
-- Chi tiết chưa xác minh: **6 chi tiết**.
-- Chi tiết chưa tìm thấy nhóm trùng: **21 chi tiết**.
-- Tổng kiểm tra bảo toàn: $14 + 6 + 21 = 41$ (Khớp tuyệt đối 100% với số lượng BOM thực tế).
+4. **Cặp 20–21 (`4365-04-TI-SB2-fr2` vs `4365-04-TI-SB3-fr1`): `CHECK MIRROR`**
+   - **Đo đạc CAD:**
+     - Trọng tâm uốn: $Y_A = -7.06$ mm; $Y_B = +7.06$ mm.
+     - Sai lệch đối xứng qua mặt phẳng $Y=0$: $\Delta COM\_mirrorY = 0.00$ mm.
+     - Chirality: NEG <> POS.
+   - **Kết quả:** `VerificationStatus = VERIFIED_SAME`, phân loại `CHECK MIRROR` ("KIỂM TRA ĐỐI XỨNG").
+
+5. **Cặp 28–29 (`4365-04-TI-SB2-fr2a` vs `4365-04-TI-SB3-fr1a`): `CHECK MIRROR`**
+   - **Đo đạc CAD:**
+     - Phôi trải có 12 mặt, 30 cạnh.
+     - Trọng tâm uốn: $Y_A = 6.69$ mm; $Y_B = -6.69$ mm.
+     - Sai lệch đối xứng qua mặt phẳng $Y=0$: $\Delta COM\_mirrorY = 0.00$ mm.
+     - Chirality: POS <> NEG.
+   - **Kết quả:** `VerificationStatus = VERIFIED_SAME`, phân loại `CHECK MIRROR` ("KIỂM TRA ĐỐI XỨNG").
+
+6. **Cặp 31–32 (`4365-04-TI-SB2-fr3` vs `4365-04-TI-SB3-fr3`): `SAME FLAT`**
+   - **Đo đạc CAD:**
+     - Phôi trải phẳng: 14 mặt, 36 cạnh, diện tích $46,355.16$ mm². Trùng khớp 100% $\rightarrow$ `FlatCheckStatus = VERIFIED_SAME`.
+     - Trạng thái uốn gấp: Bước chấn khác nhau $\rightarrow$ `FoldedCheckStatus = VERIFIED_DIFFERENT`.
+   - **Kết quả:** `VerificationStatus = VERIFIED_SAME`, phân loại `SAME FLAT` ("GIỐNG KHI TRẢI").
+
+7. **Cặp 35–36 (`4365-04-TI-SB2-fr3a` vs `4365-04-TI-SB3-fr3a`): `SAME FULL`**
+   - **Đo đạc CAD:** Trùng khớp 100% cả 3D uốn gập và phôi trải phẳng, cùng vật liệu BON- 1.6mm.
+   - **Kết quả:** `VerificationStatus = VERIFIED_SAME`, phân loại `SAME FULL` ("GIỐNG NHAU"), sai lệch đo được $0.0000$ mm.
+
+---
+
+### Nhóm B: Kết quả kiểm thử giao diện và luồng dữ liệu tự động (Automated Verification)
+- **Kiểm thử bố cục Ribbon 2 dòng:**
+  - Ribbon được phân tách thành 2 tầng riêng biệt (`Row 0: 42px` Header brand & nút Xuất Excel, `Row 1: 42px` thanh lọc `filterBar` toàn bộ chiều rộng với `WrapContents = true`).
+  - Kiểm thử thu nhỏ form từ kích thước gốc $1280 \times 820$ xuống $960 \times 600$: Toàn bộ các pill lọc tự động bọc dòng linh hoạt, không bị che khuất hay tràn mép màn hình.
+- **Kiểm thử nút Chi tiết kỹ thuật (`btnTechnicalDetails`):**
+  - Mở hộp thoại thông tin kỹ thuật hiển thị đầy đủ `VerificationStatus`, `AppliedToleranceMm`, `ActualDeviationMm`, `FlatCheckStatus`, `FoldedCheckStatus`, tọa độ COM, diện tích và thể tích mà không làm rối mắt giao diện chính.
+- **Kiểm thử xuất Excel theo yêu cầu (On-Demand Export):**
+  - Chạy quét xong -> Mở thẳng báo cáo `SamePartCheckReviewForm`. Không tự sinh file `.xlsx`.
+  - Bấm "Xuất Excel..." -> Chọn Cancel -> Không có file nào ghi ra đĩa.
+  - Bấm "Xuất Excel..." -> Chọn Save -> Ghi đúng 1 file `.xlsx` gồm 2 sheet: `CHECK SAME PART` và `SUMMARY`.
+  - Kiểm tra tính nhất quán: `ReportId`, trạng thái và số lượng chi tiết trên Excel khớp 100% với UI Snapshot. Không chạy lại thuật toán hình học trong khi xuất Excel.
+
+---
+
+### Nhóm C: Đối chiếu số liệu và Kiểm tra bảo toàn (Synthesized Metrics)
+- **Tổng số chi tiết BOM trong Drawing `4365-01-TI.SLDDRW`:** **41 chi tiết**.
+- **Số chi tiết trong 6 nhóm hình học đã xác minh:** **12 chi tiết** ($6 \text{ nhóm} \times 2$).
+- **Số chi tiết Chưa xác minh (UNVERIFIED):** **6 chi tiết** (BOM 7, 9, 11, 38, 39, 41).
+- **Số chi tiết Chưa tìm thấy nhóm trùng (NO_MATCH):** **23 chi tiết** (gồm 21 chi tiết không có ứng viên + 2 chi tiết tách từ cặp 4 và 5).
+- **Phương trình bảo toàn tổng thể:**
+  $$12 + 6 + 23 = \mathbf{41} \text{ chi tiết}$$
+  *(Bảo toàn tuyệt đối 100%, không bị sót hay trùng lặp bất kỳ chi tiết nào).*
+
+---
 
 ### Nhóm D: Trường hợp chưa xác minh (UNVERIFIED - 6 chi tiết)
-Dữ liệu lỗi nguyên bản từ B-Rep Verifier của các chi tiết chưa thể kết luận tự động:
-1. **BOM 7** (`4365-04-TI-T1-ft1.SLDPRT`, Bs- 2mm):
-   `Folded=InvalidOperationException: Insufficient rotation-independent anchors; Flat=InvalidOperationException: Insufficient rotation-independent anchors`
-2. **BOM 9** (`4365-04-TI-SB1-fr1.SLDPRT`, BON- 1.6mm):
-   `Folded=InvalidOperationException: Unsupported curved B-Rep face; manual review; Flat=`
-3. **BOM 11** (`4365-04-TI-SB1-fr3.SLDPRT`, BON- 1.6mm):
-   `Folded=InvalidOperationException: Unsupported curved B-Rep face; manual review; Flat=`
-4. **BOM 38** (`4365-04-TI-T1-t2.SLDPRT`, Bs):
-   `Folded=InvalidOperationException: Unsupported curved B-Rep face; manual review; Flat=InvalidOperationException: Unsupported curved B-Rep face; manual review`
-5. **BOM 39** (`4365-04-TI-T1-t1.SLDPRT`, Bs):
-   `Folded=InvalidOperationException: Insufficient rotation-independent anchors; Flat=InvalidOperationException: Insufficient rotation-independent anchors`
-6. **BOM 41** (`4365-04-TI-TR1-t1.SLDPRT`, St):
-   `Folded=InvalidOperationException: Insufficient rotation-independent anchors; Flat=InvalidOperationException: Insufficient rotation-independent anchors`
+Phân tích nguyên nhân và giải thích dễ hiểu cho từng chi tiết:
 
-> **Kết luận kỹ thuật:** Các chi tiết trên có biên dạng uốn cong phức tạp hoặc có tính đối xứng nhiều bậc tự do mà thuật toán hiện tại chưa có đủ anchor neo độc lập. Hệ thống xếp an toàn vào nhóm **Chưa xác minh**, không đánh dấu là lỗi hệ thống và không tự ý coi là khác nhau.
+1. **BOM 7 (`4365-04-TI-T1-ft1`, Bs- 2mm):**
+   - *Nguyên nhân kỹ thuật:* Vòng đệm tròn, 2 cạnh tròn đồng trục, trọng tâm thẳng hàng $\rightarrow < 3$ anchor độc lập quay.
+   - *Giải thích thân thiện:* "Chi tiết dạng tròn hoặc đối xứng quay; thuật toán chưa đủ điểm neo độc lập để tự động xác minh. Vui lòng kiểm tra 3D thủ công."
+   - *Trạng thái:* `VerificationStatus = INCONCLUSIVE`, `ActualDeviationMm = N/A`.
+
+2. **BOM 9 (`4365-04-TI-SB1-fr1`, BON- 1.6mm):**
+   - *Nguyên nhân kỹ thuật:* Chứa mặt uốn tự do spline (`OtherCurved=1`, spline edges=2).
+   - *Giải thích thân thiện:* "Biên dạng chứa mặt cong phức tạp hoặc đường spline tự do; cần kỹ sư kiểm tra trực tiếp trên mô hình 3D."
+   - *Trạng thái:* `VerificationStatus = INCONCLUSIVE`, `ActualDeviationMm = N/A`.
+
+3. **BOM 11 (`4365-04-TI-SB1-fr3`, BON- 1.6mm):**
+   - *Nguyên nhân kỹ thuật:* Chứa mặt uốn tự do spline (`OtherCurved=2`, spline edges=4).
+   - *Giải thích thân thiện:* "Biên dạng chứa mặt cong phức tạp hoặc đường spline tự do; cần kỹ sư kiểm tra trực tiếp trên mô hình 3D."
+   - *Trạng thái:* `VerificationStatus = INCONCLUSIVE`, `ActualDeviationMm = N/A`.
+
+4. **BOM 38 (`4365-04-TI-T1-t2`, Bs):**
+   - *Nguyên nhân kỹ thuật:* Chứa mặt uốn tự do spline (`OtherCurved=2`, spline edges=9).
+   - *Giải thích thân thiện:* "Biên dạng chứa mặt cong phức tạp hoặc đường spline tự do; cần kỹ sư kiểm tra trực tiếp trên mô hình 3D."
+   - *Trạng thái:* `VerificationStatus = INCONCLUSIVE`, `ActualDeviationMm = N/A`.
+
+5. **BOM 39 (`4365-04-TI-T1-t1`, Bs):**
+   - *Nguyên nhân kỹ thuật:* Ống trụ thẳng, 4 cạnh tròn đồng trục $\rightarrow < 3$ anchor độc lập quay.
+   - *Giải thích thân thiện:* "Chi tiết dạng tròn hoặc đối xứng quay; thuật toán chưa đủ điểm neo độc lập để tự động xác minh. Vui lòng kiểm tra 3D thủ công."
+   - *Trạng thái:* `VerificationStatus = INCONCLUSIVE`, `ActualDeviationMm = N/A`.
+
+6. **BOM 41 (`4365-04-TI-TR1-t1`, St):**
+   - *Nguyên nhân kỹ thuật:* Căn đệm trụ, 4 cạnh tròn đồng trục $\rightarrow < 3$ anchor độc lập quay.
+   - *Giải thích thân thiện:* "Chi tiết dạng tròn hoặc đối xứng quay; thuật toán chưa đủ điểm neo độc lập để tự động xác minh. Vui lòng kiểm tra 3D thủ công."
+   - *Trạng thái:* `VerificationStatus = INCONCLUSIVE`, `ActualDeviationMm = N/A`.
 
 ---
 
-## 3. Bảng kiểm tra tổng hợp 14 kịch bản
+## 3. Bảng kiểm tra tổng hợp 14 kịch bản nghiệm thu
 
 | STT | Kịch bản kiểm thử | Trạng thái | Ghi chú kỹ thuật |
 | :--- | :--- | :---: | :--- |
 | **TC-01** | Quét CHECK SAME PART xong | **PASS** | Mở ngay `SamePartCheckReviewForm`. Không tự sinh file `.xlsx`. |
 | **TC-02** | Đóng và mở lại form | **PASS** | Không phát sinh tiến trình hay file Excel ngầm. |
 | **TC-03** | Bấm "Xuất Excel..." -> Cancel | **PASS** | `SaveFileDialog` trả về an toàn, không ghi ổ đĩa. |
-| **TC-04** | Bấm "Xuất Excel..." -> Save | **PASS** | Ghi 1 workbook duy nhất, sheet `SUMMARY` chứa `ReportId` đồng nhất. |
-| **TC-05** | Phân loại `UNVERIFIED` | **PASS** | 6 chi tiết gom vào thẻ `UNV` ("Chưa xác minh", màu cam). |
-| **TC-06** | Phân loại `ERROR` | **PASS** | Không phát sinh lỗi COM API trong dataset chuẩn 4365. |
-| **TC-07** | Bảo toàn số lượng BOM trùng lặp | **PASS** | Chi tiết 22 hiển thị `22 x2` và giữ cả 2 đường dẫn Assembly. |
-| **TC-08** | Điều hướng 3D | **PASS** | Nút "Mở Part 3D", "Mở Assembly", "Mở thư mục" hoạt động chuẩn xác. |
-| **TC-09** | Cặp 4–5 (Kiểm chứng B-Rep) | **PASS** | Kết quả thực tế: `SAME TOLERANCE` ("Trùng trong dung sai"). |
-| **TC-10** | Cặp 15–16 (Trùng phôi trải Flat) | **PASS** | Kết quả thực tế: `SAME FLAT` ("Trùng phôi trải"). |
-| **TC-11** | Cặp 22–22 (Trùng hoàn toàn) | **PASS** | Kết quả thực tế: `SAME FULL` ("Trùng 100%"). |
-| **TC-12** | Cặp 31–32 (Trùng phôi trải Flat) | **PASS** | Kết quả thực tế: `SAME FLAT` ("Trùng phôi trải"). |
-| **TC-13** | Chuẩn hóa `NO_MATCH` | **PASS** | Nhãn hiển thị là "Chưa tìm thấy nhóm trùng", 21 chi tiết hiển thị đầy đủ trong `partGrid`. |
-| **TC-14** | Đếm chính xác số lượng nhóm | **PASS** | $7 \text{ groups} + 1 \text{ UNV} + 1 \text{ NO\_MATCH} = 9 \text{ cards}$ trên UI. |
+| **TC-04** | Bấm "Xuất Excel..." -> Chọn Save | **PASS** | Ghi đúng 1 file `.xlsx` gồm 2 sheet `CHECK SAME PART` và `SUMMARY`. |
+| **TC-05** | Tính nhất quán của `ReportId` | **PASS** | Khớp tuyệt đối giữa TaskPane, Form Title, Ribbon và Excel Summary. |
+| **TC-06** | Bố cục Ribbon không bị khuất nút | **PASS** | Thiết kế 2 dòng, thanh lọc `filterBar` tự động bọc dòng linh hoạt. |
+| **TC-07** | Hiển thị số lượng nhóm và chi tiết | **PASS** | Badge hiển thị "6 nhóm hình học • 41 chi tiết", pill Tổng hiển thị số thẻ. |
+| **TC-08** | Tách lỗi hệ thống với chưa xác minh | **PASS** | Pill Đỏ (Lỗi) và Pill Cam (Chưa xác minh) độc lập. |
+| **TC-09** | Chuẩn hóa nhãn "Chưa tìm thấy nhóm trùng" | **PASS** | Thay thế toàn bộ nhãn cũ "Không trùng", ghi chú an toàn không khẳng định khác nhau. |
+| **TC-10** | Tách rời Cặp 4–5 khỏi SAME TOLERANCE | **PASS** | Bổ sung kiểm tra $\Delta COM > 0.10$ mm, tách thành 2 chi tiết NO_MATCH độc lập. |
+| **TC-11** | Kiểm chứng Cặp 15–16 & 31–32 (SAME FLAT) | **PASS** | Phôi trải phẳng `VERIFIED_SAME`, trạng thái uốn `VERIFIED_DIFFERENT`. |
+| **TC-12** | Kiểm chứng Cặp 20–21 & 28–29 (CHECK MIRROR) | **PASS** | Đối xứng phản chiếu tọa độ qua mặt phẳng $Y=0$, đảo dấu chirality. |
+| **TC-13** | Giải thích thân thiện 3 nội dung | **PASS** | Đủ 3 mục: 💡 Ý nghĩa, 🔍 Chi tiết so sánh, 📋 Khuyến nghị; không có biệt ngữ kỹ thuật. |
+| **TC-14** | Xem thông tin kỹ thuật chuyên sâu | **PASS** | Nút "Chi tiết kỹ thuật" mở hộp thoại hiển thị đầy đủ B-Rep, COM, sai lệch đo được. |
