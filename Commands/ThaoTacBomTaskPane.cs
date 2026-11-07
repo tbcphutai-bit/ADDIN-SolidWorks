@@ -1031,17 +1031,20 @@ namespace ADDIN.Commands
             }
 
             result.OutputDirectory = excelOutputDirectory;
-            SamePartReportV2Snapshot snapshot = SamePartReportV2Snapshot.From(result);
+            SamePartReportV2Snapshot snapshot = result.EnsureSnapshot();
 
-            int sameFull = result.Groups.Count(group => group.Status == "SAME FULL" || group.Status == "SAME TOLERANCE");
+            int sameFull = result.Groups.Count(group => group.Status == "SAME FULL");
+            int sameTolerance = result.Groups.Count(group => group.Status == "SAME TOLERANCE");
             int sameGeometry = result.Groups.Count(group => group.Status == "SAME GEOMETRY");
             int sameFlat = result.Groups.Count(group => group.Status == "SAME FLAT");
             int mirrorCheck = result.Groups.Count(group => group.Status == "CHECK MIRROR");
 
             string message = "CHECK SAME PART xong. Nhóm trùng 100%: " + sameFull
+                + (sameTolerance > 0 ? ", trong dung sai: " + sameTolerance : "")
                 + ", trùng hình học: " + sameGeometry
                 + ", trùng phôi: " + sameFlat
                 + ", mirror: " + mirrorCheck
+                + (snapshot.NoMatchCount > 0 ? ", không trùng: " + snapshot.NoMatchCount : "")
                 + ", chưa xác minh: " + snapshot.NotVerifiedCount
                 + ", lỗi: " + snapshot.ErrorCount + ". Bấm 'Xuất Excel...' trong bảng kết quả để lưu file.";
 
@@ -1052,8 +1055,10 @@ namespace ADDIN.Commands
             lblStatus.Text = message;
 
             System.Diagnostics.Debug.WriteLine("[CHECK SAME PART][REPORT_FIRST] id=" + snapshot.ReportId
-                + " groups=" + snapshot.GroupCount + " unverified=" + snapshot.NotVerifiedCount
-                + " errors=" + snapshot.ErrorCount + " rows=" + snapshot.Rows.Count);
+                + " groups=" + snapshot.GroupCount + " full=" + sameFull + " tol=" + sameTolerance
+                + " geo=" + sameGeometry + " flat=" + sameFlat + " mirror=" + mirrorCheck
+                + " unverified=" + snapshot.NotVerifiedCount + " errors=" + snapshot.ErrorCount
+                + " noMatch=" + snapshot.NoMatchCount + " rows=" + snapshot.Rows.Count);
         }
 
         private void WriteCheckDebugResult(KetQuaSoSanhDfTk result)

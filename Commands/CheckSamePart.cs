@@ -31,10 +31,21 @@ namespace ADDIN.Commands
         public string ReportPath { get; set; }
         public string OutputDirectory { get; set; }
         public string Message { get; set; }
+        internal SamePartReportV2Snapshot Snapshot { get; set; }
+
+        internal SamePartReportV2Snapshot EnsureSnapshot()
+        {
+            if (Snapshot == null)
+            {
+                Snapshot = SamePartReportV2Snapshot.From(this);
+            }
+            return Snapshot;
+        }
     }
 
     public sealed class SamePartGroupResult
     {
+        public string RowId { get; set; }
         public int GroupNumber { get; set; }
         public string Status { get; set; }
         public string Note { get; set; }
@@ -44,6 +55,8 @@ namespace ADDIN.Commands
 
     public sealed class SamePartItemResult
     {
+        public string RowId { get; set; }
+        public string StatusCode { get; set; }
         public int BomRowIndex { get; set; }
         public string BuhinNo { get; set; }
         public string BomFileName { get; set; }
@@ -3422,6 +3435,8 @@ namespace ADDIN.Commands
         public string Details { get; set; }
         public string Paths { get; set; }
         public string AssemblyPaths { get; set; }
+        public List<SamePartItemResult> Items { get; set; } = new List<SamePartItemResult>();
+        public SamePartGroupResult GroupRef { get; set; }
     }
 
     internal sealed class SamePartReportV2Snapshot
@@ -3433,6 +3448,11 @@ namespace ADDIN.Commands
         public int ProcessedRows { get; private set; }
         public int GroupCount { get { return Rows.Count(x => x.Kind == "GROUP"); } }
         public int GroupMembers { get { return Rows.Where(x => x.Kind == "GROUP").Sum(x => x.ItemCount); } }
+        public int SameFullCount { get { return Rows.Count(x => x.StatusCode == "SAME FULL"); } }
+        public int SameToleranceCount { get { return Rows.Count(x => x.StatusCode == "SAME TOLERANCE"); } }
+        public int SameGeometryCount { get { return Rows.Count(x => x.StatusCode == "SAME GEOMETRY"); } }
+        public int SameFlatCount { get { return Rows.Count(x => x.StatusCode == "SAME FLAT"); } }
+        public int CheckMirrorCount { get { return Rows.Count(x => x.StatusCode == "CHECK MIRROR"); } }
         public int NotVerifiedCount { get { return Rows.Count(x => x.StatusCode == "UNVERIFIED"); } }
         public int ErrorCount { get { return Rows.Count(x => x.StatusCode == "ERROR"); } }
         public int NoMatchCount { get { return Rows.Count(x => x.StatusCode == "NO_MATCH"); } }
@@ -3448,8 +3468,16 @@ namespace ADDIN.Commands
                 if (group == null) continue;
                 List<SamePartItemResult> members = group.Items.Where(x => x != null).ToList();
                 string code = group.Status ?? "UNVERIFIED";
-                snapshot.Rows.Add(CreateRow("GROUP", "G" + group.GroupNumber,
-                    code, members, group.Note ?? "", group.GroupNumber));
+                SamePartReportV2Row row = CreateRow("GROUP", "G" + group.GroupNumber,
+                    code, members, group.Note ?? "", group.GroupNumber);
+                row.GroupRef = group;
+                group.RowId = row.RowId;
+                foreach (var item in members)
+                {
+                    item.RowId = row.RowId;
+                    item.StatusCode = code;
+                }
+                snapshot.Rows.Add(row);
             }
             int errorOrdinal = 0;
             foreach (SamePartItemResult issue in source.Errors)
@@ -3457,16 +3485,22 @@ namespace ADDIN.Commands
                 if (issue == null) continue;
                 ++errorOrdinal;
                 string code = ClassifyFailure(issue.Error);
-                snapshot.Rows.Add(CreateRow("ISSUE", "-", code,
-                    new[] { issue }, issue.Error ?? "", errorOrdinal));
+                SamePartReportV2Row row = CreateRow("ISSUE", "-", code,
+                    new[] { issue }, issue.Error ?? "", errorOrdinal);
+                issue.RowId = row.RowId;
+                issue.StatusCode = code;
+                snapshot.Rows.Add(row);
             }
             int unmatchedOrdinal = 0;
             foreach (SamePartItemResult unmatched in source.UnmatchedItems)
             {
                 if (unmatched == null) continue;
                 ++unmatchedOrdinal;
-                snapshot.Rows.Add(CreateRow("UNMATCHED", "-", "NO_MATCH",
-                    new[] { unmatched }, "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.", unmatchedOrdinal));
+                SamePartReportV2Row row = CreateRow("UNMATCHED", "-", "NO_MATCH",
+                    new[] { unmatched }, "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.", unmatchedOrdinal);
+                unmatched.RowId = row.RowId;
+                unmatched.StatusCode = "NO_MATCH";
+                snapshot.Rows.Add(row);
             }
             return snapshot;
         }
@@ -3539,7 +3573,8 @@ namespace ADDIN.Commands
                 FlatConfigurations = Join(list.Select(x => x.FlatConfiguration)),
                 Paths = string.Join(System.Environment.NewLine, paths),
                 AssemblyPaths = Join(list.SelectMany(x => x.AssemblyPaths)),
-                Details = details + copiesNote
+                Details = details + copiesNote,
+                Items = list
             };
         }
 
@@ -3637,10 +3672,15 @@ namespace ADDIN.Commands
                 info.Cells[3, 1] = "CheckedRows"; info.Cells[3, 2] = snapshot.CheckedRows;
                 info.Cells[4, 1] = "ProcessedRows"; info.Cells[4, 2] = snapshot.ProcessedRows;
                 info.Cells[5, 1] = "Groups"; info.Cells[5, 2] = snapshot.GroupCount;
-                info.Cells[6, 1] = "GroupMembers"; info.Cells[6, 2] = snapshot.GroupMembers;
-                info.Cells[7, 1] = "Unverified"; info.Cells[7, 2] = snapshot.NotVerifiedCount;
-                info.Cells[8, 1] = "Errors"; info.Cells[8, 2] = snapshot.ErrorCount;
-                info.Cells[9, 1] = "NoGroup"; info.Cells[9, 2] = snapshot.NoMatchCount;
+                info.Cells[6, 1] = "SameFull"; info.Cells[6, 2] = snapshot.SameFullCount;
+                info.Cells[7, 1] = "SameTolerance"; info.Cells[7, 2] = snapshot.SameToleranceCount;
+                info.Cells[8, 1] = "SameGeometry"; info.Cells[8, 2] = snapshot.SameGeometryCount;
+                info.Cells[9, 1] = "SameFlat"; info.Cells[9, 2] = snapshot.SameFlatCount;
+                info.Cells[10, 1] = "CheckMirror"; info.Cells[10, 2] = snapshot.CheckMirrorCount;
+                info.Cells[11, 1] = "GroupMembers"; info.Cells[11, 2] = snapshot.GroupMembers;
+                info.Cells[12, 1] = "Unverified"; info.Cells[12, 2] = snapshot.NotVerifiedCount;
+                info.Cells[13, 1] = "Errors"; info.Cells[13, 2] = snapshot.ErrorCount;
+                info.Cells[14, 1] = "NoMatch"; info.Cells[14, 2] = snapshot.NoMatchCount;
                 info.Columns.AutoFit();
                 workbook.SaveAs(writtenPath, 51); // 51 = xlOpenXMLWorkbook (.xlsx)
                 workbook.Close(false);
@@ -3706,10 +3746,15 @@ namespace ADDIN.Commands
             summary.Dock = DockStyle.Fill;
             summary.Padding = new Padding(14, 8, 4, 4);
             summary.Font = new Font("Meiryo UI", 10F, FontStyle.Bold);
-            summary.Text = "NHOM: " + snapshot.GroupCount + "  |  MUC TRONG NHOM: " + snapshot.GroupMembers
-                + "  |  CHƯA XÁC MINH: " + snapshot.NotVerifiedCount
+            summary.Text = "NHOM: " + snapshot.GroupCount
+                + "  |  TRUNG 100%: " + snapshot.SameFullCount
+                + (snapshot.SameToleranceCount > 0 ? "  |  DUNG SAI: " + snapshot.SameToleranceCount : "")
+                + "  |  TRUNG 3D: " + snapshot.SameGeometryCount
+                + "  |  TRUNG PHOI: " + snapshot.SameFlatCount
+                + "  |  MIRROR: " + snapshot.CheckMirrorCount
+                + "  |  CHUA XAC MINH: " + snapshot.NotVerifiedCount
                 + "  |  LOI: " + snapshot.ErrorCount
-                + "  |  KHONG CO NHOM: " + snapshot.NoMatchCount;
+                + "  |  KHONG TRUNG: " + snapshot.NoMatchCount;
             root.Controls.Add(summary, 0, 0);
             grid = new DataGridView();
             grid.Dock = DockStyle.Fill;
@@ -3733,7 +3778,10 @@ namespace ADDIN.Commands
                 if (row.StatusCode == "ERROR") grid.Rows[index].DefaultCellStyle.BackColor = Color.MistyRose;
                 else if (row.StatusCode == "UNVERIFIED") grid.Rows[index].DefaultCellStyle.BackColor = Color.Moccasin;
                 else if (row.StatusCode == "SAME FULL") grid.Rows[index].DefaultCellStyle.BackColor = Color.Honeydew;
+                else if (row.StatusCode == "SAME TOLERANCE") grid.Rows[index].DefaultCellStyle.BackColor = Color.Azure;
                 else if (row.StatusCode == "SAME FLAT") grid.Rows[index].DefaultCellStyle.BackColor = Color.LemonChiffon;
+                else if (row.StatusCode == "CHECK MIRROR") grid.Rows[index].DefaultCellStyle.BackColor = Color.Lavender;
+                else if (row.StatusCode == "NO_MATCH") grid.Rows[index].DefaultCellStyle.BackColor = Color.WhiteSmoke;
             }
             root.Controls.Add(grid, 0, 1);
             details = new TextBox();

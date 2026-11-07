@@ -38,11 +38,13 @@ namespace ADDIN.UI
 
         private readonly FilterPillButton pillAll;
         private readonly FilterPillButton pillFull;
+        private readonly FilterPillButton pillTolerance;
         private readonly FilterPillButton pillGeo;
         private readonly FilterPillButton pillFlat;
         private readonly FilterPillButton pillMirror;
         private readonly FilterPillButton pillUnverified;
         private readonly FilterPillButton pillError;
+        private readonly FilterPillButton pillNoMatch;
 
         private string activeFilter;
         private bool selecting;
@@ -62,7 +64,7 @@ namespace ADDIN.UI
             string excelDir = null)
         {
             result = completed ?? throw new ArgumentNullException(nameof(completed));
-            reportSnapshot = SamePartReportV2Snapshot.From(result);
+            reportSnapshot = result.EnsureSnapshot();
             excelOutputDirectory = !string.IsNullOrWhiteSpace(excelDir) ? excelDir : result.OutputDirectory;
             navigate = openLocation;
             Name = "SamePartCheckReviewForm";
@@ -117,35 +119,43 @@ namespace ADDIN.UI
                 Padding = new Padding(0, 9, 8, 0)
             };
 
-            int countFull = result.Groups.Count(g => g.Status == "SAME FULL" || g.Status == "SAME TOLERANCE");
+            int countFull = result.Groups.Count(g => g.Status == "SAME FULL");
+            int countTolerance = result.Groups.Count(g => g.Status == "SAME TOLERANCE");
             int countGeo = result.Groups.Count(g => g.Status == "SAME GEOMETRY");
             int countFlat = result.Groups.Count(g => g.Status == "SAME FLAT");
             int countMirror = result.Groups.Count(g => g.Status == "CHECK MIRROR");
             int countUnverified = reportSnapshot.NotVerifiedCount;
             int countError = reportSnapshot.ErrorCount;
-            int totalCards = result.Groups.Count + (countUnverified > 0 ? 1 : 0) + (countError > 0 ? 1 : 0);
+            int countNoMatch = reportSnapshot.NoMatchCount;
+            int totalCards = result.Groups.Count + (countUnverified > 0 ? 1 : 0) + (countError > 0 ? 1 : 0) + (countNoMatch > 0 ? 1 : 0);
 
             pillAll = new FilterPillButton("Tổng", totalCards, null, TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
             pillFull = new FilterPillButton("Trùng 100%", countFull, "FULL", TaiTheme.Success, TaiTheme.SuccessSoft, TaiTheme.SuccessBorder);
+            pillTolerance = new FilterPillButton("Dung sai", countTolerance, "TOLERANCE", Color.FromArgb(13, 148, 136), Color.FromArgb(204, 251, 241), Color.FromArgb(153, 246, 228));
             pillGeo = new FilterPillButton("Trùng 3D", countGeo, "GEOMETRY", TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
             pillFlat = new FilterPillButton("Trùng Phôi", countFlat, "FLAT", TaiTheme.Warning, TaiTheme.WarningSoft, TaiTheme.WarningBorder);
             pillMirror = new FilterPillButton("Mirror", countMirror, "MIRROR", Color.FromArgb(124, 58, 237), Color.FromArgb(245, 243, 255), Color.FromArgb(221, 214, 254));
             pillUnverified = new FilterPillButton("Chưa xác minh", countUnverified, "UNVERIFIED", Color.FromArgb(217, 119, 6), Color.FromArgb(254, 243, 199), Color.FromArgb(253, 230, 138));
             pillError = new FilterPillButton("Lỗi", countError, "ERROR", TaiTheme.Danger, TaiTheme.DangerSoft, TaiTheme.DangerBorder);
+            pillNoMatch = new FilterPillButton("Không trùng", countNoMatch, "NO_MATCH", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249), Color.FromArgb(203, 213, 225));
 
             pillAll.Click += (s, e) => ApplyFilter(null);
             pillFull.Click += (s, e) => ApplyFilter(activeFilter == "FULL" ? null : "FULL");
+            pillTolerance.Click += (s, e) => ApplyFilter(activeFilter == "TOLERANCE" ? null : "TOLERANCE");
             pillGeo.Click += (s, e) => ApplyFilter(activeFilter == "GEOMETRY" ? null : "GEOMETRY");
             pillFlat.Click += (s, e) => ApplyFilter(activeFilter == "FLAT" ? null : "FLAT");
             pillMirror.Click += (s, e) => ApplyFilter(activeFilter == "MIRROR" ? null : "MIRROR");
             pillUnverified.Click += (s, e) => ApplyFilter(activeFilter == "UNVERIFIED" ? null : "UNVERIFIED");
             pillError.Click += (s, e) => ApplyFilter(activeFilter == "ERROR" ? null : "ERROR");
+            pillNoMatch.Click += (s, e) => ApplyFilter(activeFilter == "NO_MATCH" ? null : "NO_MATCH");
 
+            if (countNoMatch > 0) filterBar.Controls.Add(pillNoMatch);
             if (countError > 0) filterBar.Controls.Add(pillError);
             if (countUnverified > 0) filterBar.Controls.Add(pillUnverified);
-            filterBar.Controls.Add(pillMirror);
+            if (countMirror > 0 || (countFull == 0 && countTolerance == 0 && countGeo == 0 && countFlat == 0)) filterBar.Controls.Add(pillMirror);
             filterBar.Controls.Add(pillFlat);
             filterBar.Controls.Add(pillGeo);
+            if (countTolerance > 0) filterBar.Controls.Add(pillTolerance);
             filterBar.Controls.Add(pillFull);
             filterBar.Controls.Add(pillAll);
             ribbon.Controls.Add(filterBar, 1, 0);
@@ -429,11 +439,13 @@ namespace ADDIN.UI
         {
             pillAll.IsActive = activeFilter == null;
             pillFull.IsActive = string.Equals(activeFilter, "FULL", StringComparison.OrdinalIgnoreCase);
+            pillTolerance.IsActive = string.Equals(activeFilter, "TOLERANCE", StringComparison.OrdinalIgnoreCase);
             pillGeo.IsActive = string.Equals(activeFilter, "GEOMETRY", StringComparison.OrdinalIgnoreCase);
             pillFlat.IsActive = string.Equals(activeFilter, "FLAT", StringComparison.OrdinalIgnoreCase);
             pillMirror.IsActive = string.Equals(activeFilter, "MIRROR", StringComparison.OrdinalIgnoreCase);
             pillUnverified.IsActive = string.Equals(activeFilter, "UNVERIFIED", StringComparison.OrdinalIgnoreCase);
             pillError.IsActive = string.Equals(activeFilter, "ERROR", StringComparison.OrdinalIgnoreCase);
+            pillNoMatch.IsActive = string.Equals(activeFilter, "NO_MATCH", StringComparison.OrdinalIgnoreCase);
         }
 
         internal void PositionOnScreen(Rectangle workingArea)
@@ -460,7 +472,11 @@ namespace ADDIN.UI
                 }
                 else if (string.Equals(activeFilter, "FULL", StringComparison.OrdinalIgnoreCase))
                 {
-                    filtered.AddRange(allGroups.Where(g => g.Status == "SAME FULL" || g.Status == "SAME TOLERANCE"));
+                    filtered.AddRange(allGroups.Where(g => g.Status == "SAME FULL"));
+                }
+                else if (string.Equals(activeFilter, "TOLERANCE", StringComparison.OrdinalIgnoreCase))
+                {
+                    filtered.AddRange(allGroups.Where(g => g.Status == "SAME TOLERANCE"));
                 }
                 else if (string.Equals(activeFilter, "GEOMETRY", StringComparison.OrdinalIgnoreCase))
                 {
@@ -499,7 +515,7 @@ namespace ADDIN.UI
                     };
                     fakeUnverifiedGroup.Items.AddRange(unverifiedItems);
                     string partList = FormatBuhinList(unverifiedItems);
-                    int index = groupGrid.Rows.Add("CHƯA XÁC MINH", "UNV", unverifiedItems.Count.ToString(), partList);
+                    int index = groupGrid.Rows.Add("Chưa xác minh", "UNV", unverifiedItems.Count.ToString(), partList);
                     groupGrid.Rows[index].Tag = fakeUnverifiedGroup;
                     ColorGroupRow(groupGrid.Rows[index], "UNVERIFIED");
                 }
@@ -516,12 +532,29 @@ namespace ADDIN.UI
                     };
                     fakeErrorGroup.Items.AddRange(errorItems);
                     string partList = FormatBuhinList(errorItems);
-                    int index = groupGrid.Rows.Add("LỖI", "ERR", errorItems.Count.ToString(), partList);
+                    int index = groupGrid.Rows.Add("Lỗi", "ERR", errorItems.Count.ToString(), partList);
                     groupGrid.Rows[index].Tag = fakeErrorGroup;
                     ColorGroupRow(groupGrid.Rows[index], "ERROR");
                 }
 
-                int totalCount = allGroups.Count + (unverifiedItems.Count > 0 ? 1 : 0) + (errorItems.Count > 0 ? 1 : 0);
+                // Unmatched items (from result.UnmatchedItems)
+                var unmatchedItems = (result.UnmatchedItems ?? new List<SamePartItemResult>()).Where(u => u != null).ToList();
+                if ((string.IsNullOrEmpty(activeFilter) || string.Equals(activeFilter, "NO_MATCH", StringComparison.OrdinalIgnoreCase)) && unmatchedItems.Count > 0)
+                {
+                    var fakeNoMatchGroup = new SamePartGroupResult
+                    {
+                        GroupNumber = 0,
+                        Status = "NO_MATCH",
+                        Note = "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp."
+                    };
+                    fakeNoMatchGroup.Items.AddRange(unmatchedItems);
+                    string partList = FormatBuhinList(unmatchedItems);
+                    int index = groupGrid.Rows.Add("Không trùng", "-", unmatchedItems.Count.ToString(), partList);
+                    groupGrid.Rows[index].Tag = fakeNoMatchGroup;
+                    ColorGroupRow(groupGrid.Rows[index], "NO_MATCH");
+                }
+
+                int totalCount = allGroups.Count + (unverifiedItems.Count > 0 ? 1 : 0) + (errorItems.Count > 0 ? 1 : 0) + (unmatchedItems.Count > 0 ? 1 : 0);
                 groupCountBadge.Text = activeFilter == null
                     ? totalCount + " nhóm"
                     : groupGrid.Rows.Count + " / " + totalCount + " nhóm";
@@ -566,9 +599,14 @@ namespace ADDIN.UI
                 else
                 {
                     string statusDesc = FormatStatusDescription(group.Status);
-                    string prefix = group.Status == "UNVERIFIED" ? "Chưa xác minh: " : (group.Status == "ERROR" ? "Lỗi: " : (group.GroupNumber > 0 ? "Nhóm " + group.GroupNumber + "  ·  " : ""));
-                    selectedGroupTitle.Text = prefix
-                        + FormatStatusLabel(group.Status) + " (" + group.Items.Count + " chi tiết)";
+                    string prefix = group.Status == "UNVERIFIED" ? "Chưa xác minh: "
+                        : (group.Status == "ERROR" ? "Lỗi: "
+                        : (group.Status == "NO_MATCH" ? ""
+                        : (group.GroupNumber > 0 ? "Nhóm " + group.GroupNumber + "  ·  " : "")));
+                    string titleText = group.Status == "NO_MATCH"
+                        ? "Không có nhóm trùng (" + group.Items.Count + " chi tiết)"
+                        : prefix + FormatStatusLabel(group.Status) + " (" + group.Items.Count + " chi tiết)";
+                    selectedGroupTitle.Text = titleText;
                     selectedGroupSubtext.Text = !string.IsNullOrWhiteSpace(group.Note)
                         ? group.Note
                         : statusDesc;
@@ -612,15 +650,23 @@ namespace ADDIN.UI
             }
 
             string status = group.Status ?? "";
-            if (status == "SAME FULL" || status == "SAME TOLERANCE")
+            if (status == "SAME FULL")
             {
-                calloutHeader.Text = status == "SAME TOLERANCE"
-                    ? "✔ TRÙNG KHỚP TRONG DUNG SAI CHO PHÉP  —  [ Đã xác minh B-Rep đạt dung sai ]"
-                    : "✔ TRÙNG KHỚP HOÀN TOÀN  —  [ Cùng hình học 3D, vật liệu, bề dày & phôi trải ]";
+                calloutHeader.Text = "✔ TRÙNG KHỚP HOÀN TOÀN  —  [ Cùng hình học 3D, vật liệu, bề dày & phôi trải ]";
                 calloutHeader.ForeColor = TaiTheme.Success;
                 string diff = ExcelSamePartExporter.FormatDifferenceValues(group);
                 calloutBody.Text = string.IsNullOrWhiteSpace(diff)
                     ? ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\nCác chi tiết trong nhóm này hoàn toàn giống nhau, có thể tái sử dụng chung phôi dập và chương trình CNC."
+                    : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
+                calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
+            }
+            else if (status == "SAME TOLERANCE")
+            {
+                calloutHeader.Text = "✔ TRÙNG KHỚP TRONG DUNG SAI  —  [ Đã xác minh B-Rep đạt dung sai cho phép ]";
+                calloutHeader.ForeColor = Color.FromArgb(13, 148, 136);
+                string diff = ExcelSamePartExporter.FormatDifferenceValues(group);
+                calloutBody.Text = string.IsNullOrWhiteSpace(diff)
+                    ? ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\nCác chi tiết trong nhóm này có hình học sai lệch nằm trong dung sai cho phép (" + (group.GeometryToleranceMm > 0 ? group.GeometryToleranceMm + " mm" : "dung sai chuẩn") + ")."
                     : ExcelSamePartExporter.FormatNoteForExcel(group) + "\r\n" + diff;
                 calloutFooter.Text = "Bấm nút \"Mở Part 3D\" hoặc Double-click vào dòng để phóng tới mô hình trong SOLIDWORKS.";
             }
@@ -661,6 +707,14 @@ namespace ADDIN.UI
                 calloutBody.Text = (group.Note ?? "Chưa đủ dữ liệu hình học.")
                     + "\r\nCác chi tiết này có biên dạng cong phức tạp hoặc chưa đủ anchor độc lập phép quay để kiểm chứng tự động. Để đảm bảo an toàn, hệ thống từ chối kết luận giống nhau; điều này KHÔNG đồng nghĩa chi tiết bị lỗi hay khác nhau.";
                 calloutFooter.Text = "Bấm 'Mở Part 3D' hoặc Double-click vào dòng để kiểm tra thủ công trong SOLIDWORKS.";
+            }
+            else if (status == "NO_MATCH")
+            {
+                calloutHeader.Text = "○ CHI TIẾT KHÔNG CÓ NHÓM TRÙNG (NO MATCH)";
+                calloutHeader.ForeColor = Color.FromArgb(100, 116, 139);
+                calloutBody.Text = (group.Note ?? "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.")
+                    + "\r\nCác chi tiết này không tìm thấy đối tượng trùng trong phạm vi các chi tiết được chọn. Lưu ý: Điều này chỉ xác nhận không có nhóm trùng trong đợt quét hiện tại, chưa chứng minh khác nhau từng cặp đối với mọi chi tiết.";
+                calloutFooter.Text = "Bấm 'Mở Part 3D' hoặc Double-click vào dòng để xem chi tiết trong SOLIDWORKS.";
             }
             else
             {
@@ -723,12 +777,13 @@ namespace ADDIN.UI
             switch (status)
             {
                 case "SAME FULL": return "Trùng 100%";
-                case "SAME TOLERANCE": return "Dung sai OK";
+                case "SAME TOLERANCE": return "Dung sai";
                 case "SAME GEOMETRY": return "Trùng 3D";
                 case "SAME FLAT": return "Trùng Phôi";
                 case "CHECK MIRROR": return "Mirror";
                 case "UNVERIFIED": return "Chưa xác minh";
                 case "ERROR": return "Lỗi";
+                case "NO_MATCH": return "Không trùng";
                 default: return status ?? "";
             }
         }
@@ -744,6 +799,7 @@ namespace ADDIN.UI
                 case "CHECK MIRROR": return "Biên dạng tương đương đối xứng Mirror qua mặt phẳng.";
                 case "UNVERIFIED": return "Chi tiết chưa đủ dữ liệu hình học hoặc biên dạng cong phức tạp để xác minh tự động.";
                 case "ERROR": return "Có lỗi phát sinh trong quá trình đọc chi tiết.";
+                case "NO_MATCH": return "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.";
                 default: return "";
             }
         }
@@ -835,7 +891,13 @@ namespace ADDIN.UI
             Color border = TaiTheme.SuccessBorder;
             Color stripe = TaiTheme.Success;
 
-            if (status == "SAME GEOMETRY")
+            if (status == "SAME TOLERANCE")
+            {
+                fill = Color.FromArgb(204, 251, 241);
+                border = Color.FromArgb(153, 246, 228);
+                stripe = Color.FromArgb(13, 148, 136);
+            }
+            else if (status == "SAME GEOMETRY")
             {
                 fill = TaiTheme.AccentSoft;
                 border = TaiTheme.AccentBorder;
@@ -858,6 +920,12 @@ namespace ADDIN.UI
                 fill = Color.FromArgb(254, 243, 199);
                 border = Color.FromArgb(253, 230, 138);
                 stripe = Color.FromArgb(217, 119, 6);
+            }
+            else if (status == "NO_MATCH")
+            {
+                fill = Color.FromArgb(241, 245, 249);
+                border = Color.FromArgb(203, 213, 225);
+                stripe = Color.FromArgb(100, 116, 139);
             }
             else if (status == "ERROR")
             {
@@ -919,7 +987,13 @@ namespace ADDIN.UI
             Color border = TaiTheme.SuccessBorder;
             Color fg = TaiTheme.Success;
 
-            if (status == "SAME GEOMETRY")
+            if (status == "SAME TOLERANCE")
+            {
+                fill = Color.FromArgb(204, 251, 241);
+                border = Color.FromArgb(153, 246, 228);
+                fg = Color.FromArgb(13, 148, 136);
+            }
+            else if (status == "SAME GEOMETRY")
             {
                 fill = TaiTheme.AccentSoft;
                 border = TaiTheme.AccentBorder;
@@ -942,6 +1016,12 @@ namespace ADDIN.UI
                 fill = Color.FromArgb(254, 243, 199);
                 border = Color.FromArgb(253, 230, 138);
                 fg = Color.FromArgb(217, 119, 6);
+            }
+            else if (status == "NO_MATCH")
+            {
+                fill = Color.FromArgb(241, 245, 249);
+                border = Color.FromArgb(203, 213, 225);
+                fg = Color.FromArgb(100, 116, 139);
             }
             else if (status == "ERROR")
             {

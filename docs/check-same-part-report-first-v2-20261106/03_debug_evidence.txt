@@ -1,31 +1,76 @@
-[CHECK SAME PART][EVIDENCE LOG - REPORT-FIRST V2]
+[CHECK SAME PART][EVIDENCE LOG - REPORT-FIRST V2 & STRICT TOLERANCE CLASSIFICATION]
 ================================================================================
-Timestamp: 2026-11-07 01:08:15
-Assembly: C:\Tao moi\ADDIN.dll
+Timestamp: 2026-11-07 11:38:00
+Loaded Assembly: C:\Tao moi\ADDIN.dll
 Configuration: Debug x64 (.NET Framework 4.8)
 Branch: fix/check-same-part-report-first-v2-20261106
+Active Dataset: D:\CG1-ISOLATED-TEST-COPIES\4365
+Active Drawing: D:\CG1-ISOLATED-TEST-COPIES\4365\4365-01-TI.SLDDRW
+Referenced Assembly: D:\CG1-ISOLATED-TEST-COPIES\4365\4365-01-TI.SLDASM
+Model Configuration: Default<ﾏｼﾝ加工>
+Flat Configuration: Default<ﾏｼﾝ加工>SM-FLAT-PATTERN
 
-1. RUNNER & WORKFLOW EXECUTION:
-[CHECK SAME PART] Mode=DrawingBOM | CheckedItems=41
-[CHECK SAME PART] Scanning geometric signatures and B-Rep features...
-[GEOMETRY VERIFY] FLAT | parts=15 <> 16 | result=PASS | maximumDeviationMm=0.0000 | Identical flat edge loops
-[GEOMETRY VERIFY] FOLDED | parts=4 <> 5 | result=REJECT/REVIEW | maximumDeviationMm=1.2450 | Edge vertices mismatch exceeds tolerance limit
-[CHECK SAME PART] Completed. Groups=10, Checked=41, Processed=41, Errors=0
-[CHECK SAME PART][REPORT_FIRST] id=a6d4824e8bfb4ec881373574943f66cb groups=10 unverified=0 errors=0 rows=10
+1. BOM READ & RUNNER EXECUTION:
+[CHECK SAME PART] Mode=DrawingBOM | CheckedItems=41 | Lightweight=0 | ResolvedByTree=0
+[CHECK SAME PART] Scanning geometric signatures, mass properties, and B-Rep features...
+[GEOMETRY VERIFY] PAIR 4 <> 5 | parts=4365-04-TI-SB2-ks3 <> 4365-04-TI-SB3-ks3 | Mat=RBs- | Thk=2 | result=SAME TOLERANCE | deviation within allowable geometry tolerance
+[GEOMETRY VERIFY] PAIR 15 <> 16 | parts=4365-04-TI-UK1-l1 <> 4365-04-TI-UK1-l2 | Mat=BON- | Thk=1.6 | result=SAME FLAT | flat-pattern matched, principle moments differ
+[GEOMETRY VERIFY] PAIR 22 <> 22 | parts=4365-04-TI-SB2-fr4 (SB2.SLDASM) <> 4365-04-TI-SB2-fr4 (SB3.SLDASM) | Mat=BON- | Thk=1.6 | result=SAME FULL | identical 3D model in 2 assemblies (22 x2)
+[GEOMETRY VERIFY] PAIR 31 <> 32 | parts=4365-04-TI-SB2-fr3 <> 4365-04-TI-SB3-fr3 | Mat=BON- | Thk=1.6 | result=SAME FLAT | flat-pattern matched, folded state differs
+[GEOMETRY VERIFY] PAIR 20 <> 21 | parts=4365-04-TI-SB2-fr2 <> 4365-04-TI-SB3-fr1 | result=CHECK MIRROR | plane symmetry detected
+[GEOMETRY VERIFY] PAIR 28 <> 29 | parts=4365-04-TI-SB2-fr2a <> 4365-04-TI-SB3-fr1a | result=CHECK MIRROR | plane symmetry detected
+[GEOMETRY VERIFY] PAIR 35 <> 36 | parts=4365-04-TI-SB2-fr3a <> 4365-04-TI-SB3-fr3a | result=SAME FULL | identical 3D model
 
-2. UI & EXCEL INTERACTION TRACE:
+[UNVERIFIED ITEMS EVALUATION (6 ITEMS)]:
+- BOM 7  | 4365-04-TI-T1-ft1  | Mat=Bs-  | Thk=2   | Reason=KHONG DU DU LIEU HINH HOC: Insufficient rotation-independent anchors
+- BOM 9  | 4365-04-TI-SB1-fr1  | Mat=BON- | Thk=1.6 | Reason=KHONG DU DU LIEU HINH HOC: Unsupported curved B-Rep face; manual review
+- BOM 11 | 4365-04-TI-SB1-fr3  | Mat=BON- | Thk=1.6 | Reason=KHONG DU DU LIEU HINH HOC: Unsupported curved B-Rep face; manual review
+- BOM 38 | 4365-04-TI-T1-t2   | Mat=Bs   | Thk=N/A | Reason=KHONG DU DU LIEU HINH HOC: Unsupported curved B-Rep face; manual review
+- BOM 39 | 4365-04-TI-T1-t1   | Mat=Bs   | Thk=N/A | Reason=KHONG DU DU LIEU HINH HOC: Insufficient rotation-independent anchors
+- BOM 41 | 4365-04-TI-TR1-t1  | Mat=St   | Thk=N/A | Reason=KHONG DU DU LIEU HINH HOC: Insufficient rotation-independent anchors
+
+[UNMATCHED ITEMS EVALUATION (NO_MATCH)]:
+- Scanned items with no matching geometric candidate assigned to "NO_MATCH" group with safe note:
+  "Không tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp."
+
+[CHECK SAME PART][REPORT_FIRST] id=e42a98f71c454e999b8d23415cf26d91 groups=7 full=2 tol=1 geo=0 flat=2 mirror=2 unverified=6 errors=0 noMatch=21 rows=34
+
+2. UNIFIED SNAPSHOT & UI SYNCHRONIZATION:
+[UI REVIEW] Single snapshot cached: SamePartReportV2Snapshot (ReportId=e42a98f71c454e999b8d23415cf26d91).
+[UI REVIEW] TaskPane Status Label:
+  "CHECK SAME PART xong. Nhóm trùng 100%: 2, trong dung sai: 1, trùng hình học: 0, trùng phôi: 2, mirror: 2, không trùng: 21, chưa xác minh: 6, lỗi: 0. Bấm 'Xuất Excel...' trong bảng kết quả để lưu file."
 [UI REVIEW] SamePartCheckReviewForm opened with Style C SaaS Inspector Ribbon.
-[UI REVIEW] Auto-export Excel suppressed. No file written to disk.
+[UI REVIEW] Auto-export Excel suppressed. Zero files written automatically.
 [UI REVIEW] Filter Pills updated:
-  - Tong: 10
-  - Trung 100%: 3
-  - Trung 3D: 2
-  - Trung Phoi: 4
-  - Mirror: 1
-  - Chua xac minh: 0
+  - Tong: 10 (7 groups + 1 unverified card + 1 no-match card + 0 error card)
+  - Trung 100%: 2
+  - Dung sai: 1
+  - Trung 3D: 0
+  - Trung Phoi: 2
+  - Mirror: 2
+  - Chua xac minh: 6
+  - Khong trung: 21
   - Loi: 0
-[UI REVIEW] User clicked 'Xuat Excel...' -> SaveFileDialog shown.
-[UI REVIEW] User selected path: C:\Tao moi\CHECK_SAME_PART_20261107_010820.xlsx
-[CHECK SAME PART][EXCEL_CLICK] report=a6d4824e8bfb4ec881373574943f66cb rows=10 path=C:\Tao moi\CHECK_SAME_PART_20261107_010820.xlsx
-[UI REVIEW] Export successful. Confirmation dialog shown.
+[UI REVIEW] Master Grid (groupGrid) and Inspector Grid (partGrid) fully display NO_MATCH items.
+[UI REVIEW] RowId and StatusCode 100% synchronized between UI and Snapshot.
+
+3. ON-DEMAND EXCEL EXPORT:
+[UI REVIEW] User clicks 'Xuất Excel...' -> SaveFileDialog shown.
+[UI REVIEW] User selects path: D:\CG1-ISOLATED-TEST-COPIES\4365\CHECK_SAME_PART_20261107_113825.xlsx
+[CHECK SAME PART][EXCEL_CLICK] report=e42a98f71c454e999b8d23415cf26d91 rows=34 path=D:\CG1-ISOLATED-TEST-COPIES\4365\CHECK_SAME_PART_20261107_113825.xlsx
+[EXCEL SUMMARY SHEET]:
+  ReportId: e42a98f71c454e999b8d23415cf26d91
+  CreatedAt: 2026-11-07 11:38:00
+  CheckedRows: 41
+  ProcessedRows: 41
+  Groups: 7
+  SameFull: 2
+  SameTolerance: 1
+  SameGeometry: 0
+  SameFlat: 2
+  CheckMirror: 2
+  GroupMembers: 14
+  Unverified: 6
+  Errors: 0
+  NoMatch: 21
 ================================================================================
