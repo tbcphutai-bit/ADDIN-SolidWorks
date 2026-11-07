@@ -923,61 +923,97 @@ namespace ADDIN.Commands
             // Grouped blocks intentionally have no AutoFilter.
         }
 
+        private static string GobanFriendlyStatus(DrawingBomCheckStatus status)
+        {
+            switch (status)
+            {
+                case DrawingBomCheckStatus.OK: return "Đúng";
+                case DrawingBomCheckStatus.NG: return "Sai";
+                default: return "Chưa xác minh";
+            }
+        }
+
         private static void WritePropertyLinkSheet(
             dynamic sheet, List<DrawingCheckItemResult> items)
         {
-            const int columns = 9;
+            const int columns = 11;
             var rows = new List<object[]>();
             var statusRanges = new Dictionary<string, List<string>>();
-            rows.Add(new object[] { "KIỂM TRA LIÊN KẾT PROPERTY", null, null, null,
-                null, null, null, null, null });
-            rows.Add(new object[] { "No.", "Hạng mục", "Raw Drawing",
-                "Property (Part/Asm)", "BOM", "Link", "Property", "Display", "Ghi chú" });
+
+            rows.Add(new object[] {
+                "KIỂM TRA LIÊN KẾT PROPERTY — GIÁ TRỊ VÀ NGUỒN DỮ LIỆU",
+                null, null, null, null, null, null, null, null, null, null
+            });
+            rows.Add(new object[] {
+                "No.", "Hạng mục", "Giá trị chữ", "Nguồn chữ",
+                "Công thức gốc Drawing", "Property (Model)", "BOM",
+                "Liên kết", "Property ↔ BOM", "Chữ Drawing", "Giải thích kết quả"
+            });
 
             int group = 0;
             if (items != null)
+            {
                 foreach (DrawingCheckItemResult item in items)
                 {
                     if (item == null || item.PropertyLinkRows == null ||
-                        item.PropertyLinkRows.Count == 0) continue;
+                        item.PropertyLinkRows.Count == 0)
+                        continue;
+
                     group++;
                     string file = string.IsNullOrWhiteSpace(item.DrawingPath)
-                        ? "(Không có Drawing)" : Path.GetFileName(item.DrawingPath);
-                    rows.Add(new object[] { "COMPONENT INo " + item.BomItemNumber +
+                        ? "(Chưa có Drawing)" : Path.GetFileName(item.DrawingPath);
+
+                    rows.Add(new object[] {
+                        "COMPONENT INo " + item.BomItemNumber +
                         " | " + (item.Component ?? "") + " | " + file +
-                        " | Kết quả tổng: " + item.Status,
-                        null, null, null, null, null, null, null, null });
+                        " | Kết quả tổng: " + GobanFriendlyStatus(item.Status),
+                        null, null, null, null, null, null, null, null, null, null
+                    });
+
                     int index = 0;
                     foreach (DrawingPropertyLinkReportRow field in item.PropertyLinkRows)
                     {
                         index++;
-                        int rowNumber = rows.Count + 1;
-                        rows.Add(new object[] { index, field.FieldName, field.DrawingRaw,
+                        int excelRow = rows.Count + 1;
+
+                        rows.Add(new object[] {
+                            index, field.FieldName, field.DisplayOrReferenceValue,
+                            field.DisplayOrReferenceSource, field.DrawingRaw,
                             field.PropertyValue, field.BomValue,
-                            field.LinkStatus.ToString(), field.PropertyStatus.ToString(),
-                            field.DisplayStatus.ToString(), field.Note });
-                        AddStatusRange(statusRanges, field.LinkStatus.ToString(), "F" + rowNumber);
-                        AddStatusRange(statusRanges, field.PropertyStatus.ToString(), "G" + rowNumber);
-                        AddStatusRange(statusRanges, field.DisplayStatus.ToString(), "H" + rowNumber);
+                            GobanFriendlyStatus(field.LinkStatus),
+                            GobanFriendlyStatus(field.PropertyStatus),
+                            GobanFriendlyStatus(field.DisplayStatus), field.Note
+                        });
+
+                        // Maintain status colors using original enum values.
+                        AddStatusRange(statusRanges,
+                            field.LinkStatus.ToString(), "H" + excelRow);
+                        AddStatusRange(statusRanges,
+                            field.PropertyStatus.ToString(), "I" + excelRow);
+                        AddStatusRange(statusRanges,
+                            field.DisplayStatus.ToString(), "J" + excelRow);
                     }
                     rows.Add(new object[columns]);
                 }
+            }
+
             if (group == 0)
-                rows.Add(new object[] { "Không có bảng 合番 1×2 được kiểm tra link", null,
-                    null, null, null, null, null, null, null });
+                rows.Add(new object[] {
+                    "Không có ô 合番 dạng 1×2 trong phạm vi kiểm tra liên kết.",
+                    null, null, null, null, null, null, null, null, null, null
+                });
 
             object[,] data = new object[rows.Count, columns];
             for (int r = 0; r < rows.Count; r++)
                 for (int c = 0; c < columns; c++)
                     data[r, c] = rows[r][c];
 
-            // Treat property values and raw expressions as text; avoid Excel formula
-            // interpretation of user-edited Drawing cells that begin with '='.
-            sheet.Range["C:E"].NumberFormat = "@";
+            // All Japanese text and Raw expressions are literal strings.
+            sheet.Range["C:G"].NumberFormat = "@";
             sheet.Range[sheet.Cells[1, 1],
                 sheet.Cells[rows.Count, columns]].Value2 = data;
 
-            dynamic title = sheet.Range["A1:I1"];
+            dynamic title = sheet.Range["A1:K1"];
             title.Merge();
             title.Font.Bold = true;
             title.Font.Size = 14;
@@ -985,37 +1021,32 @@ namespace ADDIN.Commands
             title.Interior.Color = Rgb(31, 78, 120);
             sheet.Rows[1].RowHeight = 28.0;
 
-            dynamic header = sheet.Range["A2:I2"];
+            dynamic header = sheet.Range["A2:K2"];
             header.Font.Bold = true;
             header.Font.Color = Rgb(255, 255, 255);
             header.Interior.Color = Rgb(54, 95, 145);
-            sheet.Rows[2].RowHeight = 26.0;
+            sheet.Rows[2].RowHeight = 27.0;
 
-            sheet.Columns[1].ColumnWidth = 7;
-            sheet.Columns[2].ColumnWidth = 16;
-            sheet.Columns[3].ColumnWidth = 36;
-            sheet.Columns[4].ColumnWidth = 25;
-            sheet.Columns[5].ColumnWidth = 25;
-            sheet.Columns[6].ColumnWidth = 12;
-            sheet.Columns[7].ColumnWidth = 12;
-            sheet.Columns[8].ColumnWidth = 12;
-            sheet.Columns[9].ColumnWidth = 72;
-            sheet.Range["A1:I" + rows.Count].VerticalAlignment = XlTop;
-            sheet.Range["I1:I" + rows.Count].WrapText = true;
-            sheet.Range["F1:H" + rows.Count].HorizontalAlignment = XlCenter;
+            double[] widths = { 7, 13, 25, 29, 37, 27, 35, 13, 18, 17, 85 };
+            for (int c = 1; c <= columns; c++)
+                sheet.Columns[c].ColumnWidth = widths[c - 1];
+
+            sheet.Range["A1:K" + rows.Count].VerticalAlignment = XlTop;
+            sheet.Range["K1:K" + rows.Count].WrapText = true;
+            sheet.Range["H1:J" + rows.Count].HorizontalAlignment = XlCenter;
 
             for (int r = 3; r <= rows.Count; r++)
             {
-                string titleText = Convert.ToString(rows[r - 1][0] ?? "");
-                if (titleText.StartsWith("COMPONENT INo ", StringComparison.Ordinal))
-                {
-                    dynamic groupTitle = sheet.Range["A" + r + ":I" + r];
-                    groupTitle.Merge();
-                    groupTitle.Font.Bold = true;
-                    groupTitle.Interior.Color = Rgb(221, 235, 247);
-                    sheet.Rows[r].RowHeight = 24.0;
-                }
+                string label = Convert.ToString(rows[r - 1][0] ?? "");
+                if (!label.StartsWith("COMPONENT INo ", StringComparison.Ordinal))
+                    continue;
+                dynamic groupTitle = sheet.Range["A" + r + ":K" + r];
+                groupTitle.Merge();
+                groupTitle.Font.Bold = true;
+                groupTitle.Interior.Color = Rgb(221, 235, 247);
+                sheet.Rows[r].RowHeight = 24.0;
             }
+
             ApplyBatchedStatusColors((object)sheet, statusRanges);
         }
 
