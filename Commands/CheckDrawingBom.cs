@@ -12,11 +12,12 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    internal enum DrawingBomCheckStatus
+    public enum DrawingBomCheckStatus
     {
         OK,
         NG,
-        Warning
+        Warning,
+        NotApplicable
     }
 
     // Link integrity must be checked independently of displayed values.
@@ -421,18 +422,8 @@ namespace ADDIN.Commands
                         itemResult = CheckOneDrawing(drawingDoc, row, drawingPath, resolvedPartPath);
                         if (strictHiddenBatch)
                         {
-                            // Diagnostic metadata is not a real BOM/Drawing field.
-                            // Keep the overall result unverified, but do not add a
-                            // fake table row to the user's comparison details.
-                            LogDebug("[STRICT HIDDEN LINK VALIDATION] row=" + (i + 1) +
-                                " linked title-block values are not independently verified");
-                            // Never overwrite a proven NG with diagnostic Warning.
-                            if (itemResult.Status == DrawingBomCheckStatus.OK)
-                                itemResult.Status = DrawingBomCheckStatus.Warning;
-                            LogDebug("[STRICT HIDDEN STATUS] row=" + (i + 1) +
-                                " result=" + itemResult.Status + " NG_PRESERVED=True");
-                            itemResult.Note = (itemResult.Note ?? "") +
-                                " | HIDDEN_PROBE: linked text not independently verified.";
+                            LogDebug("[STRICT HIDDEN BATCH] row=" + (i + 1) +
+                                " result=" + itemResult.Status + " component=" + (itemResult.Component ?? ""));
                         }
 
                         LogDebug(
@@ -554,10 +545,7 @@ namespace ADDIN.Commands
 
                 result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " +
                     result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning.";
-                if (strictHiddenBatch)
-                    result.Message += " | TEST STRICT HIDDEN: linked text/chức năng 表/ウラ chưa được " +
-                        "xác minh; Drawing mở bởi batch được giữ trong bộ nhớ. Khởi động lại SOLIDWORKS " +
-                        "sau lần thử này.";
+
                 if (!silent) ShowBatchSummaryDialog(result);
             }
             catch (Exception ex)
@@ -863,12 +851,13 @@ namespace ADDIN.Commands
             }
             // A hard-coded Drawing cell may equal BOM but must still be NG.
             ApplyGobanTemplateLinkAudit(gobanComparison, drawingData);
-            itemResult.Fields.Add(gobanComparison);
 
-            // Reporting-only: never replace Drawing displayed text with Model/BOM data.
+            // Detailed Property link verification: updates gobanComparison and itemResult.PropertyLinkRows
             AddGobanPropertyLinkReportRow(
                 itemResult, drawingData, gobanComparison, bomRow, referencedModel,
                 referencedConfiguration, sheetName, drawing, activeSheet);
+
+            itemResult.Fields.Add(gobanComparison);
 
             itemResult.Fields.Add(CompareFileNameField(drawingData.PartFileName, componentName));
             itemResult.Fields.Add(CompareDxfField(drawingData.DxfFileName, expectedDxf));
@@ -1867,23 +1856,10 @@ namespace ADDIN.Commands
             {
                 FieldName = "合番",
                 DrawingRaw = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable
-                    ? "(Không đọc được Raw Text)" : (drawingData.GobanLinkRawExpression ?? ""),
-                LinkStatus = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Valid
-                    ? DrawingBomCheckStatus.OK
-                    : drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid
-                        ? DrawingBomCheckStatus.NG
-                        : DrawingBomCheckStatus.Warning
+                    ? "(Không đọc được Raw Text)" : (drawingData.GobanLinkRawExpression ?? "")
             };
-            var reasons = new List<string>();
-            if (row.LinkStatus == DrawingBomCheckStatus.NG)
-                reasons.Add("Mất hoặc sai công thức bắt buộc $PRPSHEET:\"合番\".");
-            else if (row.LinkStatus == DrawingBomCheckStatus.Warning)
-                reasons.Add("Không xác minh được raw link hoặc có nhiều bảng phù hợp.");
 
-            string bomDirect;
-            bool hasBomValue = TryReadBomGobanColumn(bomRow, out bomDirect);
-            row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番 riêng)";
-
+            // 1. Đọc giá trị Property từ Model/Config đã xác minh
             string propValue;
             string propSource;
             bool gotProperty = TryGetVerifiedSheetGobanProperty(
@@ -1891,184 +1867,183 @@ namespace ADDIN.Commands
                 item.PartPath, out propValue, out propSource);
             row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh được Property)";
 
-            // Retry the Drawing's own DISPLAY accessor after the referenced
-            // model/configuration has been resolved. This is an independent
-            // drawing-side read, NOT the resolved Property copied into Drawing.
-            // Some invisible Drawings still return an empty string; keep Warning.
-            if (drawingData.GobanDisplayUnavailable &&
-                row.LinkStatus == DrawingBomCheckStatus.OK)
+            // 2. Đọc giá trị BOM nếu có
+            string bomDirect;
+            bool hasBomValue = TryReadBomGobanColumn(bomRow, out bomDirect);
+            row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番 riêng)";
+
+            // 3. Thử đọc trực tiếp DisplayedText từ ô Drawing nếu có thể
+            bool directDisplayRead = !drawingData.GobanDisplayUnavailable && !string.IsNullOrWhiteSpace(drawingData.Goban);
+            if (!directDisplayRead && drawingData.GobanDisplayUnavailable &&
+                drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Valid)
             {
                 string recoveredDisplay;
                 string recoveredSource;
-                if (TryRetryCompactGobanDisplayedText(
-                        drawing, sheetName, out recoveredDisplay, out recoveredSource))
+                if (TryRetryCompactGobanDisplayedText(drawing, sheetName, out recoveredDisplay, out recoveredSource))
                 {
                     drawingData.Goban = recoveredDisplay;
                     drawingData.GobanDisplayUnavailable = false;
-                    if (comparison != null &&
-                        comparison.Status == DrawingBomCheckStatus.Warning)
-                    {
-                        comparison.DrawingValue = recoveredDisplay;
-                        comparison.Source = recoveredSource;
-                        if (gotProperty)
-                        {
-                            bool verifiedEqual = string.Equals(
-                                NormalizeText(recoveredDisplay), NormalizeText(propValue),
-                                StringComparison.OrdinalIgnoreCase);
-                            comparison.Status = verifiedEqual
-                                ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
-                            comparison.Message = verifiedEqual
-                                ? "Đã đọc trực tiếp chữ 合番 từ ô Drawing sau khi xác minh Model/Configuration; giá trị trùng Property và liên kết hợp lệ."
-                                : "Giá trị 合番 đọc trực tiếp từ Drawing không khớp Property của Model tham chiếu.";
-                        }
-                    }
-                    LogDebug("[GOBAN DISPLAY RETRY SUCCESS] value=\"" +
-                        recoveredDisplay + "\" source=" + recoveredSource +
-                        " propertyVerified=" + gotProperty);
+                    directDisplayRead = true;
+                    LogDebug("[GOBAN DISPLAY RETRY SUCCESS] value=\"" + recoveredDisplay + "\" source=" + recoveredSource);
+                }
+            }
+
+            // 4. Đánh giá trạng thái Link Integrity (Công thức + Model/Config tham chiếu)
+            if (drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid)
+            {
+                row.LinkStatus = DrawingBomCheckStatus.NG;
+            }
+            else if (drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Valid)
+            {
+                row.LinkStatus = gotProperty ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.Warning;
+            }
+            else
+            {
+                row.LinkStatus = DrawingBomCheckStatus.Warning;
+            }
+
+            // 5. Đánh giá trạng thái Display Verification
+            if (directDisplayRead)
+            {
+                string actualDisplayed = drawingData.Goban ?? "";
+                row.DisplayOrReferenceValue = actualDisplayed;
+                row.DisplayOrReferenceSource = "DRAWING_DISPLAY_VERIFIED";
+                if (gotProperty)
+                {
+                    bool displayMatch = string.Equals(
+                        NormalizeText(actualDisplayed), NormalizeText(propValue),
+                        StringComparison.OrdinalIgnoreCase);
+                    row.DisplayStatus = displayMatch ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
                 }
                 else
                 {
-                    LogDebug("[GOBAN DISPLAY RETRY UNAVAILABLE] drawing=\"" +
-                        (item.DrawingPath ?? "") + "\" propertyVerified=" +
-                        gotProperty + " status=Warning");
+                    row.DisplayStatus = DrawingBomCheckStatus.Warning;
+                }
+            }
+            else
+            {
+                // Display không đọc được trong chế độ ẩn
+                row.DisplayStatus = DrawingBomCheckStatus.Warning;
+                if (row.LinkStatus == DrawingBomCheckStatus.OK && gotProperty)
+                {
+                    row.DisplayOrReferenceValue = propValue;
+                    row.DisplayOrReferenceSource = "PROPERTY_RESOLVED_REFERENCE_ONLY";
+                }
+                else if (row.LinkStatus == DrawingBomCheckStatus.NG)
+                {
+                    row.DisplayOrReferenceValue = !string.IsNullOrWhiteSpace(drawingData.GobanLinkRawExpression)
+                        ? drawingData.GobanLinkRawExpression : "(Chữ nhập tay)";
+                    row.DisplayOrReferenceSource = "DRAWING_RAW_LINK";
+                }
+                else
+                {
+                    row.DisplayOrReferenceValue = "(Chưa đọc được chữ Drawing)";
+                    row.DisplayOrReferenceSource = "DISPLAY_UNAVAILABLE";
                 }
             }
 
-            // Property↔BOM can be OK only if BOTH independent sources were read.
-            // ReadBomAndComponentProperties() falls back to Model property, so NEVER
-            // use its bomGoban variable as independent BOM evidence here.
-            if (gotProperty && hasBomValue && !string.IsNullOrWhiteSpace(bomDirect))
+            // 6. Đánh giá Property ↔ BOM
+            if (hasBomValue && !string.IsNullOrWhiteSpace(bomDirect))
             {
-                row.PropertyStatus = string.Equals(
-                    NormalizeText(propValue), NormalizeText(bomDirect),
-                    StringComparison.OrdinalIgnoreCase)
-                    ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
-                if (row.PropertyStatus == DrawingBomCheckStatus.NG)
-                    reasons.Add("Giá trị Property khác BOM.");
+                if (gotProperty)
+                {
+                    row.PropertyStatus = string.Equals(
+                        NormalizeText(propValue), NormalizeText(bomDirect),
+                        StringComparison.OrdinalIgnoreCase)
+                        ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+                }
+                else
+                {
+                    row.PropertyStatus = DrawingBomCheckStatus.Warning;
+                }
             }
             else
             {
-                row.PropertyStatus = DrawingBomCheckStatus.Warning;
-                reasons.Add(!gotProperty
-                    ? "Chưa xác nhận được Property từ đúng model/config của Sheet: " + propSource
-                    : "Thiếu dữ liệu 合番 độc lập trong BOM.");
+                row.PropertyStatus = DrawingBomCheckStatus.NotApplicable;
             }
 
-            string actualDisplayed = drawingData.Goban ?? "";
-            if (drawingData.GobanDisplayUnavailable ||
-                string.IsNullOrWhiteSpace(actualDisplayed) || !gotProperty)
+            // 7. Đồng bộ kết quả vào field so sánh chính (comparison / gobanComparison)
+            if (comparison != null)
             {
-                row.DisplayStatus = DrawingBomCheckStatus.Warning;
-                reasons.Add("Chưa đối chiếu được chữ hiển thị thực tế trên Drawing.");
-            }
-            else
-            {
-                row.DisplayStatus = string.Equals(
-                    NormalizeText(actualDisplayed), NormalizeText(propValue),
-                    StringComparison.OrdinalIgnoreCase)
-                    ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
-                if (row.DisplayStatus == DrawingBomCheckStatus.NG)
-                    reasons.Add("Chữ hiển thị Drawing khác Property.");
+                if (row.LinkStatus == DrawingBomCheckStatus.NG)
+                {
+                    comparison.Status = DrawingBomCheckStatus.NG;
+                    comparison.DrawingValue = row.DisplayOrReferenceValue;
+                    comparison.Source = "DRAWING_RAW_LINK";
+                    comparison.Message = "Phát hiện ô 合番 đã bị chỉnh sửa hoặc nhập tay chữ cố định (" +
+                        drawingData.GobanLinkRawExpression + "). Bảng mẫu Drawing bị mất công thức liên kết $PRPSHEET:\"合番\".";
+                    LogDebug("[GOBAN LINK NG] component=" + (item.Component ?? "") + " raw=\"" + drawingData.GobanLinkRawExpression + "\"");
+                }
+                else if (row.DisplayStatus == DrawingBomCheckStatus.NG)
+                {
+                    comparison.Status = DrawingBomCheckStatus.NG;
+                    comparison.DrawingValue = row.DisplayOrReferenceValue;
+                    comparison.Source = "DRAWING_DISPLAY_VERIFIED";
+                    comparison.Message = "Chữ hiển thị đọc trực tiếp từ Drawing (" + row.DisplayOrReferenceValue +
+                        ") không khớp Property của Model tham chiếu (" + propValue + ").";
+                    LogDebug("[GOBAN DISPLAY NG] component=" + (item.Component ?? "") + " display=\"" + row.DisplayOrReferenceValue + "\" prop=\"" + propValue + "\"");
+                }
+                else if (row.PropertyStatus == DrawingBomCheckStatus.NG)
+                {
+                    comparison.Status = DrawingBomCheckStatus.NG;
+                    comparison.DrawingValue = propValue;
+                    comparison.Source = "PROPERTY_BOM_MISMATCH";
+                    comparison.Message = "Giá trị Property của Model (" + propValue + ") không khớp với dòng BOM (" + bomDirect + ").";
+                }
+                else if (row.LinkStatus == DrawingBomCheckStatus.OK && gotProperty)
+                {
+                    // Link Integrity hợp lệ!
+                    comparison.Status = DrawingBomCheckStatus.OK;
+                    if (row.DisplayStatus == DrawingBomCheckStatus.OK)
+                    {
+                        comparison.DrawingValue = row.DisplayOrReferenceValue;
+                        comparison.Source = "DRAWING_DISPLAY_VERIFIED";
+                        comparison.Message = "Liên kết 合番 hợp lệ và chữ hiển thị trên Drawing trùng khớp với Property của Model tham chiếu (" + propSource + ").";
+                        LogDebug("[GOBAN FULL OK] component=" + (item.Component ?? "") + " display=\"" + row.DisplayOrReferenceValue + "\" prop=\"" + propValue + "\"");
+                    }
+                    else
+                    {
+                        comparison.DrawingValue = propValue;
+                        comparison.Source = "PROPERTY_RESOLVED_REFERENCE_ONLY";
+                        comparison.Message = "Liên kết 合番 hợp lệ, đã xác minh được Property từ Model tham chiếu (" + propSource + "). Chưa xác minh độc lập giá trị chữ hiển thị trên Drawing (chế độ ẩn).";
+                        LogDebug("[GOBAN LINK INTEGRITY OK] component=" + (item.Component ?? "") + " property=\"" + propValue + "\" source=" + propSource + " status=OK");
+                    }
+                }
+                else
+                {
+                    comparison.Status = DrawingBomCheckStatus.Warning;
+                    comparison.DrawingValue = "(Chưa xác minh)";
+                    comparison.Source = propSource;
+                    comparison.Message = "Chưa xác minh được Model hoặc Configuration tham chiếu của ô 合番: " + propSource;
+                }
             }
 
-            // A verified mismatch must also affect the existing field result, not
-            // merely the new presentation tab. Existing NG is never downgraded.
-            if (comparison != null &&
-                (row.PropertyStatus == DrawingBomCheckStatus.NG ||
-                 row.DisplayStatus == DrawingBomCheckStatus.NG))
-            {
-                comparison.Status = DrawingBomCheckStatus.NG;
-                comparison.Message = (comparison.Message ?? "") +
-                    " | Property/BOM/DisplayedValue mismatch confirmed.";
-            }
-            bool displayedWasRead =
-                !drawingData.GobanDisplayUnavailable &&
-                !string.IsNullOrWhiteSpace(drawingData.Goban);
-
-            if (displayedWasRead)
-            {
-                row.DisplayOrReferenceValue = drawingData.Goban;
-                row.DisplayOrReferenceSource = "Drawing API";
-            }
-            else if (row.LinkStatus == DrawingBomCheckStatus.OK && gotProperty)
-            {
-                // Reference value only; not proof of actual Drawing display.
-                row.DisplayOrReferenceValue = propValue;
-                row.DisplayOrReferenceSource = "Property (tham chiếu)";
-            }
-            else if (row.LinkStatus == DrawingBomCheckStatus.NG &&
-                     !string.IsNullOrWhiteSpace(drawingData.GobanLinkRawExpression) &&
-                     !drawingData.GobanLinkRawExpression.TrimStart().StartsWith(
-                         "$", StringComparison.Ordinal))
-            {
-                row.DisplayOrReferenceValue = drawingData.GobanLinkRawExpression;
-                row.DisplayOrReferenceSource = "Raw Text (nhập tay)";
-            }
-            else
-            {
-                row.DisplayOrReferenceValue = "(Chưa đọc được)";
-                row.DisplayOrReferenceSource = "Chưa xác minh";
-            }
-
+            // 8. Tạo ghi chú chi tiết và dễ hiểu
             var readable = new List<string>();
             if (row.LinkStatus == DrawingBomCheckStatus.OK)
-                readable.Add("Liên kết 合番 đúng công thức.");
+                readable.Add("Liên kết 合番 hợp lệ, đã xác minh được Property từ Model tham chiếu (" + propSource + ").");
             else if (row.LinkStatus == DrawingBomCheckStatus.NG)
-                readable.Add("Liên kết 合番 sai hoặc đã bị nhập tay. Công thức cần có: " +
-                    "$PRPSHEET:\"合番\".");
+                readable.Add("Liên kết 合番 sai hoặc đã bị nhập tay. Công thức bắt buộc: $PRPSHEET:\"合番\".");
             else
-                readable.Add("Chưa xác minh được công thức gốc trong ô 合番.");
-
-            if (gotProperty)
-                readable.Add("Đã đọc giá trị từ Property của model tham chiếu (" +
-                    propSource + ").");
-            else
-                readable.Add("Chưa xác định được giá trị Property 合番 từ Model mà Drawing tham chiếu.");
+                readable.Add("Chưa xác minh được công thức gốc trong ô 合番 (" + propSource + ").");
 
             if (!hasBomValue)
-                readable.Add("BOM không có cột 合番 riêng nên chưa thể đối chiếu Property với BOM.");
+                readable.Add("BOM không có cột 合番 riêng nên không áp dụng đối chiếu Property với BOM.");
             else if (row.PropertyStatus == DrawingBomCheckStatus.NG)
                 readable.Add("Property không trùng giá trị 合番 của BOM.");
             else if (row.PropertyStatus == DrawingBomCheckStatus.OK)
                 readable.Add("Property trùng giá trị 合番 của BOM.");
-            else
-                readable.Add("Chưa đủ dữ liệu để đối chiếu Property và BOM.");
 
             if (row.DisplayStatus == DrawingBomCheckStatus.NG)
                 readable.Add("Chữ đọc trực tiếp từ Drawing khác Property.");
             else if (row.DisplayStatus == DrawingBomCheckStatus.OK)
                 readable.Add("Đã xác minh chữ trực tiếp từ Drawing.");
-            else if (row.DisplayOrReferenceSource == "Property (tham chiếu)")
-                readable.Add("Chữ ở cột Giá trị chữ lấy từ Property; " +
-                    "chưa xác minh trực tiếp chữ Drawing.");
+            else if (row.DisplayOrReferenceSource == "PROPERTY_RESOLVED_REFERENCE_ONLY")
+                readable.Add("Chữ ở cột Giá trị chữ lấy từ Property; chưa xác minh độc lập chữ hiển thị trên Drawing (chế độ ẩn).");
             else
-                readable.Add("Chưa xác minh trực tiếp chữ đang hiển thị trên Drawing.");
+                readable.Add("Chưa xác minh độc lập chữ đang hiển thị trên Drawing.");
 
             row.Note = string.Join(" ", readable);
-
-            // The primary result grid and the first two Excel sheets read
-            // comparison.DrawingValue, not PropertyLinkRows. Show a verified
-            // reference value when the Drawing display API is unavailable,
-            // without claiming that the Drawing's rendered text was read.
-            // Never overwrite a known NG (for example, manually typed "aa").
-            if (comparison != null &&
-                row.LinkStatus == DrawingBomCheckStatus.OK &&
-                comparison.Status == DrawingBomCheckStatus.Warning &&
-                drawingData.GobanDisplayUnavailable &&
-                gotProperty &&
-                !string.IsNullOrWhiteSpace(propValue))
-            {
-                comparison.DrawingValue = propValue;
-                comparison.Source = "PROPERTY_RESOLVED_REFERENCE_ONLY";
-                comparison.Message =
-                    "Ô 合番 có công thức liên kết đúng. " +
-                    "Giá trị đang hiển thị trong báo cáo được lấy từ Property " +
-                    "của Model tham chiếu; chưa đọc được trực tiếp chữ trên Drawing.";
-                LogDebug("[GOBAN MAIN REPORT VALUE] component=" +
-                    (item.Component ?? "") + " value=\"" + propValue +
-                    "\" source=PROPERTY_RESOLVED_REFERENCE_ONLY status=" +
-                    comparison.Status);
-            }
 
             item.PropertyLinkRows.Add(row);
             LogDebug("[GOBAN REPORT ROW] link=" + row.LinkStatus +
@@ -2467,7 +2442,55 @@ namespace ADDIN.Commands
             CheckGobanSyntheticCase("RAW_API_ERROR",
                 "", false, "※単品搬入", "※単品搬入",
                 DrawingGobanLinkAuditState.Unavailable, DrawingBomCheckStatus.Warning);
+            // Regression guard for BOM Goban total and Item Finalize
+            RunGobanTotalSelfTests();
+            RunItemFinalizeSelfTests();
             LogDebug("[GOBAN LINK SELFTEST] ALL_PASS count=5 source=SYNTHETIC_ONLY");
+        }
+
+        private static void RunGobanTotalSelfTests()
+        {
+            // Case 1: Empty Goban -> NotApplicable
+            var res1 = CompareBomGobanTotal(new BomNumberValues { Goban = "", Quantity = "1" });
+            if (res1.Status != DrawingBomCheckStatus.NotApplicable) throw new InvalidOperationException("Fail total test 1");
+
+            // Case 2: Note without breakdown (※単品搬入) -> NotApplicable
+            var res2 = CompareBomGobanTotal(new BomNumberValues { Goban = "※単品搬入", Quantity = "1" });
+            if (res2.Status != DrawingBomCheckStatus.NotApplicable) throw new InvalidOperationException("Fail total test 2");
+
+            // Case 3: Breakdown matches sum
+            var res3 = CompareBomGobanTotal(new BomNumberValues { Goban = "A: 2 / B: 3", Quantity = "5" });
+            if (res3.Status != DrawingBomCheckStatus.OK) throw new InvalidOperationException("Fail total test 3");
+
+            // Case 4: Breakdown mismatch sum
+            var res4 = CompareBomGobanTotal(new BomNumberValues { Goban = "A: 2 / B: 3", Quantity = "4" });
+            if (res4.Status != DrawingBomCheckStatus.NG) throw new InvalidOperationException("Fail total test 4");
+            LogDebug("[GOBAN TOTAL SELFTEST] ALL_PASS count=4");
+        }
+
+        private static void RunItemFinalizeSelfTests()
+        {
+            // All mandatory OK + optional NotApplicable -> OK
+            var item1 = new DrawingCheckItemResult();
+            item1.Fields.Add(new DrawingBomFieldResult { FieldName = "部品番号", Status = DrawingBomCheckStatus.OK });
+            item1.Fields.Add(new DrawingBomFieldResult { FieldName = "合番合計 ↔ 数量 (BOM)", Status = DrawingBomCheckStatus.NotApplicable });
+            FinalizeItemResult(item1, "BOM");
+            if (item1.Status != DrawingBomCheckStatus.OK) throw new InvalidOperationException("Fail finalize test 1");
+
+            // Mandatory Warning -> Item Warning
+            var item2 = new DrawingCheckItemResult();
+            item2.Fields.Add(new DrawingBomFieldResult { FieldName = "W", Status = DrawingBomCheckStatus.Warning, Message = "Static" });
+            item2.Fields.Add(new DrawingBomFieldResult { FieldName = "合番合計 ↔ 数量 (BOM)", Status = DrawingBomCheckStatus.NotApplicable });
+            FinalizeItemResult(item2, "BOM");
+            if (item2.Status != DrawingBomCheckStatus.Warning) throw new InvalidOperationException("Fail finalize test 2");
+
+            // Mandatory NG -> Item NG
+            var item3 = new DrawingCheckItemResult();
+            item3.Fields.Add(new DrawingBomFieldResult { FieldName = "合番", Status = DrawingBomCheckStatus.NG });
+            item3.Fields.Add(new DrawingBomFieldResult { FieldName = "W", Status = DrawingBomCheckStatus.Warning, Message = "Static" });
+            FinalizeItemResult(item3, "BOM");
+            if (item3.Status != DrawingBomCheckStatus.NG) throw new InvalidOperationException("Fail finalize test 3");
+            LogDebug("[ITEM FINALIZE SELFTEST] ALL_PASS count=3");
         }
 
         private static void CheckGobanSyntheticCase(
@@ -2960,25 +2983,44 @@ namespace ADDIN.Commands
             {
                 FieldName = "合番合計 ↔ 数量 (BOM)",
                 BomValue = values?.Quantity ?? "",
+                DrawingValue = "-",
                 Source = "BOM: tổng 合番 / 数量 cùng dòng",
-                Status = DrawingBomCheckStatus.Warning,
-                Message = "Không đọc đầy đủ được số lượng của từng 合番 hoặc 数量 trong dòng BOM."
+                Status = DrawingBomCheckStatus.NotApplicable,
+                Message = "BOM không sử dụng cấu trúc phân bổ số lượng 合番; không áp dụng phép kiểm tra tổng."
             };
-            decimal expected;
-            if (string.IsNullOrWhiteSpace(goban) ||
-                !decimal.TryParse(quantity.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
-                    CultureInfo.InvariantCulture, out expected))
+
+            // Nếu không có giá trị 合番 trong dòng BOM
+            if (string.IsNullOrWhiteSpace(goban))
+            {
                 return field;
+            }
 
             // Consume the complete cell, including multiline and slash-separated
             // entries. Repeated 合番 entries contribute separately to the total.
             MatchCollection entries = Regex.Matches(goban,
                 @"\G[\s/,、;]*(?<goban>[^\s:/,、;]+)(?:\s*:\s*|\s+)(?<qty>[0-9]+(?:[.,][0-9]+)?)\s*枚?(?=$|[\s/,、;])");
             if (entries.Count == 0)
+            {
+                // Ô 合番 có nội dung nhưng không phải cấu trúc phân bổ số lượng (ví dụ ※単品搬入, mã đơn) -> Không áp dụng
                 return field;
+            }
+
+            decimal expected;
+            if (!decimal.TryParse(quantity.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture, out expected))
+            {
+                field.Status = DrawingBomCheckStatus.Warning;
+                field.Message = "BOM có phân bổ 合番 nhưng không đọc được số lượng 数量 hợp lệ: '" + quantity + "'.";
+                return field;
+            }
+
             Match last = entries[entries.Count - 1];
             if (!Regex.IsMatch(goban.Substring(last.Index + last.Length), @"^[\s/,、;]*$"))
+            {
+                field.Status = DrawingBomCheckStatus.Warning;
+                field.Message = "Cú pháp phân bổ 合番 trong BOM không hợp lệ: '" + goban + "'.";
                 return field;
+            }
 
             decimal total = 0;
             var terms = new List<string>();
@@ -2987,9 +3029,18 @@ namespace ADDIN.Commands
                 decimal amount;
                 if (!decimal.TryParse(entry.Groups["qty"].Value.Replace(',', '.'),
                     NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount))
+                {
+                    field.Status = DrawingBomCheckStatus.Warning;
+                    field.Message = "Không đọc được số lượng của mã 合番: " + entry.Groups["goban"].Value;
                     return field;
+                }
                 try { total += amount; }
-                catch (OverflowException) { return field; }
+                catch (OverflowException)
+                {
+                    field.Status = DrawingBomCheckStatus.Warning;
+                    field.Message = "Tràn số khi tính tổng số lượng 合番.";
+                    return field;
+                }
                 terms.Add(entry.Groups["goban"].Value + ": " + amount.ToString(CultureInfo.InvariantCulture));
             }
             field.DrawingValue = total.ToString(CultureInfo.InvariantCulture);
@@ -5708,7 +5759,7 @@ namespace ADDIN.Commands
 
             foreach (DrawingBomFieldResult field in itemResult.Fields)
             {
-                if (field == null)
+                if (field == null || field.Status == DrawingBomCheckStatus.NotApplicable)
                     continue;
 
                 if (field.Status == DrawingBomCheckStatus.NG)

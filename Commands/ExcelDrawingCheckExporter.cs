@@ -531,13 +531,17 @@ namespace ADDIN.Commands
 
         private static string GetEffectiveSummaryStatus(DrawingCheckItemResult item)
         {
-            return (item?.Status ?? DrawingBomCheckStatus.Warning).ToString();
+            if (item == null) return "Warning";
+            if (item.Status == DrawingBomCheckStatus.NotApplicable) return "N/A";
+            return item.Status.ToString();
         }
 
         private static string GetEffectiveFieldStatus(
             string fieldName, DrawingBomFieldResult field)
         {
-            return field == null ? "-" : field.Status.ToString();
+            if (field == null) return "-";
+            if (field.Status == DrawingBomCheckStatus.NotApplicable) return "N/A";
+            return field.Status.ToString();
         }
 
         private static bool ContainsField(
@@ -929,6 +933,7 @@ namespace ADDIN.Commands
             {
                 case DrawingBomCheckStatus.OK: return "Đúng";
                 case DrawingBomCheckStatus.NG: return "Sai";
+                case DrawingBomCheckStatus.NotApplicable: return "N/A";
                 default: return "Chưa xác minh";
             }
         }
@@ -1778,6 +1783,23 @@ namespace ADDIN.Commands
 
                 range.Font.Bold =
                     true;
+            }
+            else if (normalized == "NOTAPPLICABLE" || normalized == "N/A" || normalized == "-")
+            {
+                range.Interior.Color =
+                    Rgb(
+                        245,
+                        245,
+                        245);
+
+                range.Font.Color =
+                    Rgb(
+                        128,
+                        128,
+                        128);
+
+                range.Font.Bold =
+                    false;
             }
         }
 

@@ -517,6 +517,11 @@ namespace ADDIN.UI
                 calloutHeader.Text = "▲ CẢNH BÁO CẦN LƯU Ý (WARNING)  —  [ Nguồn: " + field.Source + " ]";
                 calloutHeader.ForeColor = TaiTheme.Warning;
             }
+            else if (st == DrawingBomCheckStatus.NotApplicable)
+            {
+                calloutHeader.Text = "— KHÔNG ÁP DỤNG (N/A)  —  [ Nguồn: " + field.Source + " ]";
+                calloutHeader.ForeColor = TaiTheme.TextMuted;
+            }
             else
             {
                 calloutHeader.Text = "✔ ĐỐI CHIẾU KHỚP HOÀN TOÀN (OK)  —  [ Nguồn: " + field.Source + " ]";
@@ -565,7 +570,9 @@ namespace ADDIN.UI
 
         private static string StatusText(DrawingBomCheckStatus value)
         {
-            return value == DrawingBomCheckStatus.Warning ? "Warning" : value.ToString();
+            if (value == DrawingBomCheckStatus.Warning) return "Warning";
+            if (value == DrawingBomCheckStatus.NotApplicable) return "N/A";
+            return value.ToString();
         }
 
         private static void ColorRow(DataGridViewRow row, DrawingBomCheckStatus value, bool isFieldGrid)
@@ -576,7 +583,8 @@ namespace ADDIN.UI
             row.DefaultCellStyle.SelectionForeColor = TaiTheme.Text;
 
             Color statusColor = value == DrawingBomCheckStatus.NG ? TaiTheme.Danger
-                : value == DrawingBomCheckStatus.Warning ? TaiTheme.Warning : TaiTheme.Success;
+                : value == DrawingBomCheckStatus.Warning ? TaiTheme.Warning
+                : value == DrawingBomCheckStatus.NotApplicable ? TaiTheme.TextMuted : TaiTheme.Success;
             row.Cells[0].Style.ForeColor = statusColor;
 
             if (isFieldGrid && value != DrawingBomCheckStatus.OK && row.Cells.Count > 3)
@@ -721,12 +729,15 @@ namespace ADDIN.UI
             TaiTheme.Prepare(g);
             Color fill = status == DrawingBomCheckStatus.NG ? TaiTheme.DangerSoft
                 : status == DrawingBomCheckStatus.Warning ? TaiTheme.WarningSoft
+                : status == DrawingBomCheckStatus.NotApplicable ? Color.FromArgb(245, 245, 245)
                 : TaiTheme.SuccessSoft;
             Color border = status == DrawingBomCheckStatus.NG ? TaiTheme.DangerBorder
                 : status == DrawingBomCheckStatus.Warning ? TaiTheme.WarningBorder
+                : status == DrawingBomCheckStatus.NotApplicable ? Color.FromArgb(210, 210, 210)
                 : TaiTheme.SuccessBorder;
             Color fg = status == DrawingBomCheckStatus.NG ? TaiTheme.Danger
                 : status == DrawingBomCheckStatus.Warning ? TaiTheme.Warning
+                : status == DrawingBomCheckStatus.NotApplicable ? TaiTheme.TextMuted
                 : TaiTheme.Success;
 
             TaiTheme.FillRound(g, bounds, bounds.Height / 2, fill, border);
