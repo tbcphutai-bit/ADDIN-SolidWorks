@@ -745,7 +745,7 @@ namespace ADDIN.Commands
             // on isolated test files before this change is merged.
             LogDebug("[FLAT SIDE RESTORED] mode=" +
                 (strictHiddenBatch ? "STRICT_HIDDEN_BATCH" : "NORMAL") +
-                " drawing=\"" + (currentDrawingPath ?? "") + "\"");
+                " drawing=\"" + (itemResult.DrawingPath ?? "") + "\"");
             try
             {
                 AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
