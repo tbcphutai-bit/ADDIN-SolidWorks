@@ -738,16 +738,29 @@ namespace ADDIN.Commands
 
             // 表/ウラ applies only to Part drawings. UNIT/Assembly drawings
             // return above without inspecting or reporting the flat view side.
-            if (strictHiddenBatch)
+            // Restore the existing 表/ウラ ↔ 展開 check for Part Drawings in
+            // hidden batch as requested. Never replace the real result with an
+            // unconditional diagnostic Warning. CheckFlatDrawingView uses its
+            // own disposable Part working copy; keep native crash verification
+            // on isolated test files before this change is merged.
+            LogDebug("[FLAT SIDE RESTORED] mode=" +
+                (strictHiddenBatch ? "STRICT_HIDDEN_BATCH" : "NORMAL") +
+                " drawing=\"" + (currentDrawingPath ?? "") + "\"");
+            try
+            {
+                AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
+            }
+            catch (Exception ex)
+            {
                 itemResult.Fields.Add(new DrawingBomFieldResult
                 {
                     FieldName = "表/ウラ ↔ 展開",
-                    Source = "STRICT_HIDDEN_DIAGNOSTIC",
+                    Source = "DRAWING_FLAT_SIDE_API_ERROR",
                     Status = DrawingBomCheckStatus.Warning,
-                    Message = "NOT CHECKED: tạm bỏ Working Copy để cô lập lỗi đóng tài liệu native."
+                    Message = "Không thể xác minh mặt 表/ウラ của view 展開: " + ex.Message
                 });
-            else
-                AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
+                LogDebug("[FLAT SIDE ERROR] " + ex.Message);
+            }
 
             BomNumberValues bomNumbers = GetBomNumberValues(bomRow);
             itemResult.Fields.Add(CompareBomNumbers(bomNumbers));
@@ -1878,6 +1891,49 @@ namespace ADDIN.Commands
                 item.PartPath, out propValue, out propSource);
             row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh được Property)";
 
+            // Retry the Drawing's own DISPLAY accessor after the referenced
+            // model/configuration has been resolved. This is an independent
+            // drawing-side read, NOT the resolved Property copied into Drawing.
+            // Some invisible Drawings still return an empty string; keep Warning.
+            if (drawingData.GobanDisplayUnavailable &&
+                row.LinkStatus == DrawingBomCheckStatus.OK)
+            {
+                string recoveredDisplay;
+                string recoveredSource;
+                if (TryRetryCompactGobanDisplayedText(
+                        drawing, sheetName, out recoveredDisplay, out recoveredSource))
+                {
+                    drawingData.Goban = recoveredDisplay;
+                    drawingData.GobanDisplayUnavailable = false;
+                    if (comparison != null &&
+                        comparison.Status == DrawingBomCheckStatus.Warning)
+                    {
+                        comparison.DrawingValue = recoveredDisplay;
+                        comparison.Source = recoveredSource;
+                        if (gotProperty)
+                        {
+                            bool verifiedEqual = string.Equals(
+                                NormalizeText(recoveredDisplay), NormalizeText(propValue),
+                                StringComparison.OrdinalIgnoreCase);
+                            comparison.Status = verifiedEqual
+                                ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+                            comparison.Message = verifiedEqual
+                                ? "Đã đọc trực tiếp chữ 合番 từ ô Drawing sau khi xác minh Model/Configuration; giá trị trùng Property và liên kết hợp lệ."
+                                : "Giá trị 合番 đọc trực tiếp từ Drawing không khớp Property của Model tham chiếu.";
+                        }
+                    }
+                    LogDebug("[GOBAN DISPLAY RETRY SUCCESS] value=\"" +
+                        recoveredDisplay + "\" source=" + recoveredSource +
+                        " propertyVerified=" + gotProperty);
+                }
+                else
+                {
+                    LogDebug("[GOBAN DISPLAY RETRY UNAVAILABLE] drawing=\"" +
+                        (item.DrawingPath ?? "") + "\" propertyVerified=" +
+                        gotProperty + " status=Warning");
+                }
+            }
+
             // Property↔BOM can be OK only if BOTH independent sources were read.
             // ReadBomAndComponentProperties() falls back to Model property, so NEVER
             // use its bomGoban variable as independent BOM evidence here.
@@ -2018,6 +2074,96 @@ namespace ADDIN.Commands
             LogDebug("[GOBAN REPORT ROW] link=" + row.LinkStatus +
                 " property=" + row.PropertyStatus + " display=" + row.DisplayStatus +
                 " source=" + propSource + " raw=\"" + row.DrawingRaw + "\"");
+        }
+
+        // One bounded, read-only retry for the COM displayed value of the
+        // unique compact table [合番 | $PRPSHEET:"合番"] on this sheet.
+        // Raw $PRPSHEET or resolved Model Property are NEVER display evidence.
+        private static bool TryRetryCompactGobanDisplayedText(
+            DrawingDoc drawing, string sheetName, out string value, out string source)
+        {
+            value = "";
+            source = "DRAWING_DISPLAY_RETRY_UNAVAILABLE";
+            if (drawing == null) return false;
+
+            int linkedCells = 0;
+            string candidate = "";
+            try
+            {
+                SolidWorks.Interop.sldworks.View view =
+                    drawing.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                while (view != null)
+                {
+                    if (IsViewOnSheet(view, sheetName))
+                    {
+                        object[] annotations = view.GetTableAnnotations() as object[];
+                        if (annotations != null)
+                        {
+                            foreach (object annotation in annotations)
+                            {
+                                ITableAnnotation table = annotation as ITableAnnotation;
+                                if (table == null || table.RowCount != 1 ||
+                                    table.ColumnCount != 2) continue;
+
+                                string label = "";
+                                string raw = "";
+                                bool rawRead = false;
+                                try { label = table.get_DisplayedText2(0, 0, false) ?? ""; }
+                                catch { }
+                                if (string.IsNullOrWhiteSpace(label))
+                                {
+                                    try { label = table.get_Text(0, 0) ?? ""; }
+                                    catch { }
+                                }
+                                if (!string.Equals(CleanTableCellText(label), "合番",
+                                        StringComparison.Ordinal)) continue;
+                                try { raw = table.get_Text(0, 1) ?? ""; rawRead = true; }
+                                catch { }
+                                if (EvaluateGobanLink(raw, rawRead) !=
+                                    DrawingGobanLinkAuditState.Valid) continue;
+
+                                linkedCells++;
+                                string text = "";
+                                try { text = table.get_DisplayedText2(0, 1, false) ?? ""; }
+                                catch { }
+                                if (string.IsNullOrWhiteSpace(text) ||
+                                    ContainsTablePropertyExpression(text))
+                                {
+                                    try { text = table.get_DisplayedText2(0, 1, true) ?? ""; }
+                                    catch { text = ""; }
+                                }
+                                if (string.IsNullOrWhiteSpace(text) ||
+                                    ContainsTablePropertyExpression(text))
+                                {
+                                    try { text = table.get_DisplayedText(0, 1) ?? ""; }
+                                    catch { text = ""; }
+                                }
+                                if (!string.IsNullOrWhiteSpace(text) &&
+                                    !ContainsTablePropertyExpression(text) &&
+                                    !text.TrimStart().StartsWith("$", StringComparison.Ordinal))
+                                    candidate = text;
+                            }
+                        }
+                    }
+                    view = view.GetNextView() as SolidWorks.Interop.sldworks.View;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("[GOBAN DISPLAY RETRY ERROR] " + ex.Message);
+                return false;
+            }
+            // Never choose between multiple candidates by coincidence.
+            if (linkedCells != 1 || string.IsNullOrWhiteSpace(candidate))
+            {
+                LogDebug("[GOBAN DISPLAY RETRY PROBE] linkedCells=" +
+                    linkedCells + " displayAvailable=" +
+                    !string.IsNullOrWhiteSpace(candidate));
+                return false;
+            }
+            value = candidate;
+            source = "DRAWING_DISPLAY_RETRY_POST_PROPERTY";
+            return true;
         }
 
         private static bool TryReadBomGobanColumn(DataGridViewRow row, out string value)
