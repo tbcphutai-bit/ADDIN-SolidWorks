@@ -161,7 +161,10 @@ namespace ADDIN.UI
             int countUnverified = reportSnapshot.NotVerifiedCount;
             int countError = reportSnapshot.ErrorCount;
             int countNoMatch = reportSnapshot.NoMatchCount;
-            int totalCards = result.Groups.Count + (countUnverified > 0 ? 1 : 0) + (countError > 0 ? 1 : 0) + (countNoMatch > 0 ? 1 : 0);
+            int unverifiedErrorCards = result.Errors.Any(e => e != null &&
+                SamePartReportV2Snapshot.ClassifyFailure(e.Error) == "UNVERIFIED") ? 1 : 0;
+            int totalCards = result.Groups.Count + unverifiedErrorCards +
+                (countError > 0 ? 1 : 0) + (countNoMatch > 0 ? 1 : 0);
 
             pillAll = new FilterPillButton("Tổng", totalCards, null, TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
             pillFull = new FilterPillButton("Trùng 100%", countFull, "FULL", TaiTheme.Success, TaiTheme.SuccessSoft, TaiTheme.SuccessBorder);
@@ -530,6 +533,10 @@ namespace ADDIN.UI
                 {
                     filtered.AddRange(allGroups.Where(g => g.Status == "CHECK MIRROR"));
                 }
+                else if (string.Equals(activeFilter, "UNVERIFIED", StringComparison.OrdinalIgnoreCase))
+                {
+                    filtered.AddRange(allGroups.Where(g => g.Status == "UNVERIFIED"));
+                }
 
                 foreach (SamePartGroupResult group in filtered)
                 {
@@ -731,6 +738,14 @@ namespace ADDIN.UI
                     break;
             }
 
+            // CHECK_SAME_PART_V4_REVIEWED_20261107: friendly status header.
+            headerTitle = headerTitle.Replace("  ·  [ VERIFIED_SAME ]", "")
+                .Replace("  ·  [ INCONCLUSIVE ]", "")
+                .Replace("  ·  [ ERROR ]", "");
+            if (status == "SAME FLAT" && group.FoldedCheckStatus == "INCONCLUSIVE")
+                headerTitle = "▲ PHÔI TRẢI GIỐNG — CHƯA XÁC MINH HÌNH DẠNG SAU CHẤN";
+            if (status == "CHECK MIRROR" && group.VerificationStatus == "INCONCLUSIVE")
+                headerTitle = "◆ CÓ DẤU HIỆU ĐỐI XỨNG — CẦN KIỂM TRA 3D";
             calloutHeader.Text = headerTitle;
             calloutHeader.ForeColor = headerColor;
 
@@ -747,7 +762,14 @@ namespace ADDIN.UI
 
             string tolText = group.AppliedToleranceMm.HasValue ? group.AppliedToleranceMm.Value.ToString("F3") + " mm" : "N/A";
             string devText = group.ActualDeviationMm.HasValue ? group.ActualDeviationMm.Value.ToString("F4") + " mm" : "N/A";
-            calloutFooter.Text = $"Trạng thái: {group.VerificationStatus}  ·  Dung sai: {tolText}  ·  Sai lệch: {devText}  ·  Flat: {group.FlatCheckStatus}  ·  Folded: {group.FoldedCheckStatus}";
+            string verificationUser = group.VerificationStatus == "VERIFIED_SAME"
+                ? "Đã xác minh theo mức dung sai" :
+                (group.VerificationStatus == "VERIFIED_DIFFERENT" ? "Đã phát hiện khác biệt" : "Cần kiểm tra thêm");
+            string flatUser = group.FlatCheckStatus == "VERIFIED_SAME" ? "Đã xác minh" :
+                (group.FlatCheckStatus == "VERIFIED_DIFFERENT" ? "Khác nhau" : "Chưa xác minh");
+            string foldedUser = group.FoldedCheckStatus == "VERIFIED_SAME" ? "Đã xác minh" :
+                (group.FoldedCheckStatus == "VERIFIED_DIFFERENT" ? "Khác nhau" : "Chưa xác minh");
+            calloutFooter.Text = $"{verificationUser}  ·  Giới hạn: {tolText}  ·  Sai lệch đo: {devText}  ·  Phôi trải: {flatUser}  ·  Sau chấn: {foldedUser}";
 
             calloutCard.Invalidate();
         }

@@ -651,137 +651,158 @@ namespace ADDIN.Commands
                 bool sameMaterial = groupItems.Select(item => item.MaterialKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
                 bool sameThickness = groupItems.Select(item => item.ThicknessKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
 
-                // Evaluate Folded comparison between seed and each member
-                bool allSameFolded = true;
-                double? foldedMaxDev = null;
-                string foldedOverallStatus = "VERIFIED_SAME";
-                string foldedOverallReason = "";
+                // CHECK_SAME_PART_V4_REVIEWED_20261107:
+                // Independent all-pairs measurements. Never infer difference from a
+                // B-Rep registration search that merely failed to find a match.
+                bool allFlatVerified = true;
+                bool allFoldedVerified = true;
+                bool allMirrorVerified = true;
+                bool anyFoldedInconclusive = false;
+                bool anyFoldedDifferent = false;
+                bool anyMirrorInconclusive = false;
+                double flatMax = 0.0;
+                double foldedMax = 0.0;
+                double mirrorMax = 0.0;
+                string foldedFailureReason = "";
+                string mirrorFailureReason = "";
+                string flatFailureReason = "";
 
-                // Evaluate Mirror comparison between seed and each member
-                bool allMirrorFolded = true;
-                double? mirrorMaxDev = null;
-                string mirrorOverallStatus = "VERIFIED_SAME";
-                string mirrorOverallReason = "";
-
-                for (int i = 1; i < groupItems.Count; i++)
+                for (int i = 0; i < groupItems.Count; i++)
                 {
-                    double? fDev;
-                    string fStatus, fReason;
-                    bool isFoldedSame = ConfirmSameGeometry(groupItems[0], groupItems[i], false, toleranceMm, out fDev, out fStatus, out fReason);
-                    if (isFoldedSame)
+                    for (int j = i + 1; j < groupItems.Count; j++)
                     {
-                        foldedMaxDev = foldedMaxDev.HasValue ? Math.Max(foldedMaxDev.Value, fDev ?? 0.0) : fDev;
-                    }
-                    else
-                    {
-                        allSameFolded = false;
-                        if (fStatus == "INCONCLUSIVE")
-                            foldedOverallStatus = "INCONCLUSIVE";
-                        else if (foldedOverallStatus != "INCONCLUSIVE")
-                            foldedOverallStatus = "VERIFIED_DIFFERENT";
-                        foldedOverallReason = fReason;
-                    }
+                        SamePartItemResult a = groupItems[i];
+                        SamePartItemResult b = groupItems[j];
+                        double? measured;
+                        string state, why;
+                        bool flatOK = ConfirmSameGeometry(a, b, true, toleranceMm,
+                            out measured, out state, out why);
+                        if (!flatOK || !measured.HasValue)
+                        {
+                            allFlatVerified = false;
+                            flatFailureReason = why;
+                        }
+                        else
+                        {
+                            flatMax = Math.Max(flatMax, measured.Value);
+                        }
 
-                    double? mDev;
-                    string mStatus, mReason;
-                    bool isMirror = ConfirmMirrorGeometry(groupItems[0], groupItems[i], false, toleranceMm, out mDev, out mStatus, out mReason);
-                    if (isMirror)
-                    {
-                        mirrorMaxDev = mirrorMaxDev.HasValue ? Math.Max(mirrorMaxDev.Value, mDev ?? 0.0) : mDev;
-                    }
-                    else
-                    {
-                        allMirrorFolded = false;
-                        if (mStatus == "INCONCLUSIVE")
-                            mirrorOverallStatus = "INCONCLUSIVE";
-                        else if (mirrorOverallStatus != "INCONCLUSIVE")
-                            mirrorOverallStatus = "VERIFIED_DIFFERENT";
-                        mirrorOverallReason = mReason;
+                        bool foldedOK = ConfirmSameGeometry(a, b, false, toleranceMm,
+                            out measured, out state, out why);
+                        if (foldedOK && measured.HasValue)
+                        {
+                            foldedMax = Math.Max(foldedMax, measured.Value);
+                            // An ordinary rigid match wins over reflection; symmetric
+                            // shapes should never be mislabeled as mirror-only parts.
+                            allMirrorVerified = false;
+                        }
+                        else
+                        {
+                            allFoldedVerified = false;
+                            foldedFailureReason = why;
+                            if (state == "VERIFIED_DIFFERENT")
+                                anyFoldedDifferent = true;
+                            else
+                                anyFoldedInconclusive = true;
+
+                            bool mirrorOK = ConfirmMirrorGeometry(a, b, false,
+                                toleranceMm, out measured, out state, out why);
+                            if (mirrorOK && measured.HasValue)
+                                mirrorMax = Math.Max(mirrorMax, measured.Value);
+                            else
+                            {
+                                allMirrorVerified = false;
+                                mirrorFailureReason = why;
+                                if (state != "VERIFIED_DIFFERENT")
+                                    anyMirrorInconclusive = true;
+                            }
+                        }
                     }
                 }
 
                 SamePartGroupResult group = new SamePartGroupResult
                 {
                     GroupNumber = groupNumber++,
-                    AppliedToleranceMm = toleranceMm
+                    AppliedToleranceMm = toleranceMm,
+                    GeometryToleranceMm = toleranceMm
                 };
-                // Ensure items are populated BEFORE calling PopulateGroupExplanations
                 group.Items.AddRange(groupItems);
 
-                if (allMirrorFolded)
+                if (!allFlatVerified)
                 {
-                    group.Status = "CHECK MIRROR";
-                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.Status = "UNVERIFIED";
+                    group.VerificationStatus = "INCONCLUSIVE";
+                    group.FlatCheckStatus = "INCONCLUSIVE";
+                    group.FoldedCheckStatus = "INCONCLUSIVE";
+                    group.ActualDeviationMm = null;
+                    group.VerificationReason = flatFailureReason;
+                    group.Note = "Không thể xác minh toàn bộ các cặp phôi trải trong nhóm.";
+                }
+                else if (allFoldedVerified)
+                {
                     group.FlatCheckStatus = "VERIFIED_SAME";
                     group.FoldedCheckStatus = "VERIFIED_SAME";
-                    group.ActualDeviationMm = mirrorMaxDev ?? 0.0000;
-                    group.Note = "Đã xác minh hình học đối xứng gương (Mirror) qua kiểm tra phản chiếu 3D; cần lưu ý chiều uốn.";
+                    group.VerificationStatus = "VERIFIED_SAME";
+                    group.ActualDeviationMm = Math.Max(flatMax, foldedMax);
+                    group.VerificationReason = "All-pairs Flat and Folded rigid checks passed";
+                    if (!sameMaterial || !sameThickness)
+                    {
+                        group.Status = "SAME GEOMETRY";
+                        group.Note = "Hình học tương đương trong dung sai, nhưng vật liệu hoặc bề dày khác nhau.";
+                    }
+                    else if (SameOriginalReference(groupItems) &&
+                        flatMax <= 0.0001 && foldedMax <= 0.0001)
+                    {
+                        // SAME FULL is reserved for the very same Part reference,
+                        // configuration and near-zero measured deviation in BOTH states.
+                        group.Status = "SAME FULL";
+                        group.Note = "Cùng Part gốc, cùng cấu hình; Flat và Folded đạt kiểm tra mức chặt.";
+                    }
+                    else
+                    {
+                        group.Status = "SAME TOLERANCE";
+                        group.Note = "Hai trạng thái Flat và Folded đã khớp trong dung sai; không khẳng định giống tuyệt đối.";
+                    }
                 }
-                else if (mirrorOverallStatus == "INCONCLUSIVE" && (foldedChiralityCount > 1 || mirrorFeatureCount > 0))
+                else if (allMirrorVerified)
+                {
+                    group.Status = "CHECK MIRROR";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    // The reflection succeeds, but until a rigid mismatch is
+                    // conclusively proven we must not label mirror-only as certain.
+                    group.FoldedCheckStatus = anyFoldedInconclusive
+                        ? "INCONCLUSIVE" : "VERIFIED_DIFFERENT";
+                    group.VerificationStatus = anyFoldedInconclusive
+                        ? "INCONCLUSIVE" : "VERIFIED_SAME";
+                    group.ActualDeviationMm = mirrorMax;
+                    group.VerificationReason = "Reflection fits; rigid check: " + foldedFailureReason;
+                    group.Note = anyFoldedInconclusive
+                        ? "Hình học khớp sau phản chiếu; chưa loại trừ khả năng khớp bằng phép xoay. Cần kiểm tra 3D."
+                        : "Hình học khớp sau phản chiếu, không khớp bằng phép xoay.";
+                }
+                else if (anyMirrorInconclusive &&
+                    (foldedChiralityCount > 1 || mirrorFeatureCount > 0))
                 {
                     group.Status = "CHECK MIRROR";
                     group.VerificationStatus = "INCONCLUSIVE";
                     group.FlatCheckStatus = "VERIFIED_SAME";
                     group.FoldedCheckStatus = "INCONCLUSIVE";
                     group.ActualDeviationMm = null;
-                    group.Note = "Có dấu hiệu đối xứng gương (chirality hoặc feature), nhưng chưa đủ dữ liệu hình học để tự động xác minh; cần kiểm tra thủ công.";
-                }
-                else if (allSameFolded && sameMaterial && sameThickness)
-                {
-                    bool isExact = (foldedMaxDev.HasValue && foldedMaxDev.Value <= 0.0001) || (flatExactCount == 1 && foldedInvariantCount == 1);
-                    if (isExact)
-                    {
-                        group.Status = "SAME FULL";
-                        group.VerificationStatus = "VERIFIED_SAME";
-                        group.FlatCheckStatus = "VERIFIED_SAME";
-                        group.FoldedCheckStatus = "VERIFIED_SAME";
-                        group.ActualDeviationMm = 0.0000;
-                        group.Note = "Giống Flat-Pattern, trạng thái gấp, vật liệu và chiều dày hoàn toàn.";
-                    }
-                    else
-                    {
-                        group.Status = "SAME TOLERANCE";
-                        group.VerificationStatus = "VERIFIED_SAME";
-                        group.FlatCheckStatus = "VERIFIED_SAME";
-                        group.FoldedCheckStatus = "VERIFIED_SAME";
-                        group.ActualDeviationMm = foldedMaxDev;
-                        group.Note = "Đã xác minh hình học trùng khớp trong dung sai quy định.";
-                    }
-                }
-                else if (allSameFolded)
-                {
-                    group.Status = "SAME GEOMETRY";
-                    group.VerificationStatus = "VERIFIED_SAME";
-                    group.FlatCheckStatus = "VERIFIED_SAME";
-                    group.FoldedCheckStatus = "VERIFIED_SAME";
-                    group.ActualDeviationMm = foldedMaxDev;
-                    List<string> differences = new List<string>();
-                    if (!sameMaterial)
-                        differences.Add("vật liệu");
-                    if (!sameThickness)
-                        differences.Add("chiều dày tôn");
-                    group.Note = "Giống hình học 3D nhưng khác " + string.Join(" và ", differences) + ".";
+                    group.VerificationReason = mirrorFailureReason;
+                    group.Note = "Có dấu hiệu đối xứng nhưng kiểm tra hình học chưa đủ kết luận.";
                 }
                 else
                 {
-                    if (foldedOverallStatus == "VERIFIED_DIFFERENT")
-                    {
-                        group.Status = "SAME FLAT";
-                        group.FlatCheckStatus = "VERIFIED_SAME";
-                        group.FoldedCheckStatus = "VERIFIED_DIFFERENT";
-                        group.VerificationStatus = "VERIFIED_SAME";
-                        group.ActualDeviationMm = null;
-                        group.Note = "Giống biên dạng Flat-Pattern nhưng trạng thái gấp uốn 3D đã chứng minh khác nhau.";
-                    }
-                    else
-                    {
-                        group.Status = "SAME FLAT";
-                        group.FlatCheckStatus = "VERIFIED_SAME";
-                        group.FoldedCheckStatus = "INCONCLUSIVE";
-                        group.VerificationStatus = "INCONCLUSIVE";
-                        group.ActualDeviationMm = null;
-                        group.Note = "Giống biên dạng Flat-Pattern; trạng thái gấp uốn 3D chưa đủ dữ liệu để tự động kiểm chứng, cần kiểm tra trực tiếp.";
-                    }
+                    group.Status = "SAME FLAT";
+                    group.VerificationStatus = "INCONCLUSIVE";
+                    group.FlatCheckStatus = "VERIFIED_SAME";
+                    group.FoldedCheckStatus = anyFoldedInconclusive
+                        ? "INCONCLUSIVE" : (anyFoldedDifferent ? "VERIFIED_DIFFERENT" : "INCONCLUSIVE");
+                    group.ActualDeviationMm = null;
+                    group.VerificationReason = foldedFailureReason;
+                    group.Note = anyFoldedInconclusive
+                        ? "Phôi trải đã xác minh tương đương; hình dạng 3D sau chấn chưa kết luận được."
+                        : "Phôi trải tương đương; trạng thái Folded có dấu hiệu khác và cần kiểm tra.";
                 }
 
                 PopulateGroupExplanations(group);
@@ -959,21 +980,10 @@ namespace ADDIN.Commands
                 maximumDeviationMm = maximumMm;
                 reason = matchReason ?? "Đã xác minh hình học trùng khớp";
             }
-            else if (matchReason != null && (
-                matchReason.Contains("failed") ||
-                matchReason.Contains("Degenerate") ||
-                matchReason.Contains("ambiguous") ||
-                matchReason.Contains("Insuff") ||
-                matchReason.Contains("Empty") ||
-                matchReason.Contains("too complex")))
-            {
-                verificationStatus = "INCONCLUSIVE";
-                reason = matchReason;
-            }
             else
             {
-                verificationStatus = "VERIFIED_DIFFERENT";
-                reason = matchReason ?? "Không trùng khớp hình học";
+                verificationStatus = ClassifyGeometryVerificationFailure(matchReason);
+                reason = matchReason ?? "Chưa có bằng chứng kết luận hình học";
             }
 
             Log("[GEOMETRY VERIFY] " + (flat ? "FLAT" : "FOLDED")
@@ -1001,21 +1011,10 @@ namespace ADDIN.Commands
                 maximumDeviationMm = maximumMm;
                 reason = matchReason ?? "Đã xác minh hình học đối xứng phản chiếu trong dung sai";
             }
-            else if (matchReason != null && (
-                matchReason.Contains("failed") ||
-                matchReason.Contains("Degenerate") ||
-                matchReason.Contains("ambiguous") ||
-                matchReason.Contains("Insuff") ||
-                matchReason.Contains("Empty") ||
-                matchReason.Contains("too complex")))
-            {
-                verificationStatus = "INCONCLUSIVE";
-                reason = matchReason;
-            }
             else
             {
-                verificationStatus = "VERIFIED_DIFFERENT";
-                reason = matchReason ?? "Không đối xứng hình học";
+                verificationStatus = ClassifyGeometryVerificationFailure(matchReason);
+                reason = matchReason ?? "Chưa có bằng chứng kết luận hình học";
             }
 
             Log("[MIRROR VERIFY] " + (flat ? "FLAT" : "FOLDED")
@@ -1024,6 +1023,43 @@ namespace ADDIN.Commands
                 + " | maximumDeviationMm=" + (maximumDeviationMm.HasValue ? maximumDeviationMm.Value.ToString("F4", CultureInfo.InvariantCulture) : "N/A")
                 + " | " + reason);
             return mirror;
+        }
+
+        // CHECK_SAME_PART_V4_REVIEWED_20261107:
+        // Failure to find registration is NOT proof of geometric difference.
+        // A demonstrated mismatch in solid-body count is conclusive for rigid solids;
+        // B-Rep edge counts/topology and capped registration searches are not.
+        private static string ClassifyGeometryVerificationFailure(string reason)
+        {
+            return string.Equals(reason, "Verified distinct solid-body count",
+                StringComparison.Ordinal)
+                ? "VERIFIED_DIFFERENT"
+                : "INCONCLUSIVE";
+        }
+
+        private static bool SameOriginalReference(IList<SamePartItemResult> members)
+        {
+            if (members == null || members.Count < 2 || members[0] == null)
+                return false;
+            try
+            {
+                string firstPath = Path.GetFullPath(members[0].PartPath ?? "");
+                string firstConfiguration = members[0].Configuration ?? "";
+                string firstFlat = members[0].FlatConfiguration ?? "";
+                if (firstConfiguration.Length == 0 || firstFlat.Length == 0)
+                    return false;
+                return members.Skip(1).All(item => item != null &&
+                    string.Equals(Path.GetFullPath(item.PartPath ?? ""), firstPath,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(item.Configuration ?? "", firstConfiguration,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(item.FlatConfiguration ?? "", firstFlat,
+                        StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         private static bool AreChiralitiesCompatible(string first, string second)
@@ -1271,62 +1307,72 @@ namespace ADDIN.Commands
             };
         }
 
+        // Select precisely the BOM-requested folded configuration. If the BOM has
+        // no configuration, accept active folded configuration or the sole folded
+        // configuration only. Never silently select an unrelated configuration.
         private string FindSourceConfiguration(ModelDoc2 model, string requested)
         {
+            if (model == null) return "";
             string requestedName = (requested ?? "").Trim();
-            object[] names = ToObjectArray(model.GetConfigurationNames());
-            if (requestedName.Length > 0 &&
-                !requestedName.ToUpperInvariant().Contains("FLAT-PATTERN") &&
-                names.Any(value => string.Equals(Convert.ToString(value), requestedName, StringComparison.OrdinalIgnoreCase)))
-            {
-                return requestedName;
-            }
+            string[] names = ToObjectArray(model.GetConfigurationNames())
+                .Select(v => Convert.ToString(v ?? "").Trim())
+                .Where(v => v.Length > 0 &&
+                    v.IndexOf("FLAT-PATTERN", StringComparison.OrdinalIgnoreCase) < 0)
+                .ToArray();
+            if (requestedName.Length > 0)
+                return names.FirstOrDefault(v => string.Equals(v, requestedName,
+                    StringComparison.OrdinalIgnoreCase)) ?? "";
 
-            foreach (object value in names)
+            try
             {
-                string name = Convert.ToString(value ?? "").Trim();
-                if (name.Length > 0 && !name.ToUpperInvariant().Contains("FLAT-PATTERN"))
-                    return name;
+                Configuration active = model.ConfigurationManager == null
+                    ? null : model.ConfigurationManager.ActiveConfiguration;
+                string activeName = active == null ? "" : (active.Name ?? "");
+                string exact = names.FirstOrDefault(v => string.Equals(v, activeName,
+                    StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(exact)) return exact;
             }
-            return "";
+            catch { }
+            return names.Length == 1 ? names[0] : "";
         }
 
         private string FindFlatConfiguration(ModelDoc2 model, string sourceConfiguration)
         {
-            object[] names = ToObjectArray(model.GetConfigurationNames());
-            string source = (sourceConfiguration ?? "").Trim().ToUpperInvariant();
-            string fallback = "";
-            foreach (object value in names)
-            {
-                string name = Convert.ToString(value ?? "").Trim();
-                string upper = name.ToUpperInvariant();
-                if (!upper.Contains("FLAT-PATTERN"))
-                    continue;
-                if (fallback.Length == 0)
-                    fallback = name;
-                if (source.Length > 0 && upper.StartsWith(source, StringComparison.OrdinalIgnoreCase))
-                    return name;
-            }
-            return fallback;
+            if (model == null || string.IsNullOrWhiteSpace(sourceConfiguration))
+                return "";
+            string source = sourceConfiguration.Trim();
+            // Only exact derived configurations; no fallback across unrelated Part configurations.
+            string[] expected = {
+                source + "SM-FLAT-PATTERN",
+                source + "-SM-FLAT-PATTERN",
+                source + "_SM-FLAT-PATTERN"
+            };
+            var matches = ToObjectArray(model.GetConfigurationNames())
+                .Select(v => Convert.ToString(v ?? "").Trim())
+                .Where(name => expected.Any(e => string.Equals(name, e,
+                    StringComparison.OrdinalIgnoreCase)))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return matches.Count == 1 ? matches[0] : "";
         }
 
         private bool TryShowConfiguration(ModelDoc2 model, string configurationName)
         {
             if (model == null || string.IsNullOrWhiteSpace(configurationName))
                 return false;
-            bool shown = false;
-            try { shown = model.ShowConfiguration2(configurationName); } catch { }
             try
             {
+                // SOLIDWORKS may report success while another configuration remains
+                // active. Check ActiveConfiguration unconditionally.
+                model.ShowConfiguration2(configurationName);
                 Configuration active = model.ConfigurationManager == null
-                    ? null
-                    : model.ConfigurationManager.ActiveConfiguration;
-                return shown || (active != null && string.Equals(
-                    active.Name, configurationName, StringComparison.OrdinalIgnoreCase));
+                    ? null : model.ConfigurationManager.ActiveConfiguration;
+                return active != null && string.Equals(active.Name,
+                    configurationName, StringComparison.OrdinalIgnoreCase);
             }
             catch
             {
-                return shown;
+                return false;
             }
         }
 
@@ -2850,10 +2896,15 @@ namespace ADDIN.Commands
                     + " / " + (b == null ? "null B" : b.InvalidReason);
                 return false;
             }
-            if (a.BodyCount != b.BodyCount || a.Edges.Count != b.Edges.Count ||
-                a.Faces.Count != b.Faces.Count || a.Anchors.Count != b.Anchors.Count)
+            if (a.BodyCount != b.BodyCount)
             {
-                reason = "B-Rep body/face/edge/anchor counts differ";
+                reason = "Verified distinct solid-body count";
+                return false;
+            }
+            if (a.Edges.Count != b.Edges.Count || a.Faces.Count != b.Faces.Count ||
+                a.Anchors.Count != b.Anchors.Count)
+            {
+                reason = "B-Rep partition counts differ; shape not disproven";
                 return false;
             }
             double tol = Math.Max(0.001, Math.Min(0.20, distanceToleranceMm));
@@ -3880,7 +3931,7 @@ namespace ADDIN.Commands
         public int SameGeometryCount { get { return Rows.Count(x => x.StatusCode == "SAME GEOMETRY"); } }
         public int SameFlatCount { get { return Rows.Count(x => x.StatusCode == "SAME FLAT"); } }
         public int CheckMirrorCount { get { return Rows.Count(x => x.StatusCode == "CHECK MIRROR"); } }
-        public int NotVerifiedCount { get { return Rows.Count(x => x.StatusCode == "UNVERIFIED"); } }
+        public int NotVerifiedCount { get { return Rows.Where(x => x.StatusCode == "UNVERIFIED").Sum(x => x.ItemCount); } }
         public int ErrorCount { get { return Rows.Count(x => x.StatusCode == "ERROR"); } }
         public int NoMatchCount { get { return Rows.Count(x => x.StatusCode == "NO_MATCH"); } }
 
