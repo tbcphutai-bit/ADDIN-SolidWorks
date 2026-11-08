@@ -1989,6 +1989,31 @@ namespace ADDIN.Commands
                 readable.Add("Chưa xác minh trực tiếp chữ đang hiển thị trên Drawing.");
 
             row.Note = string.Join(" ", readable);
+
+            // The primary result grid and the first two Excel sheets read
+            // comparison.DrawingValue, not PropertyLinkRows. Show a verified
+            // reference value when the Drawing display API is unavailable,
+            // without claiming that the Drawing's rendered text was read.
+            // Never overwrite a known NG (for example, manually typed "aa").
+            if (comparison != null &&
+                row.LinkStatus == DrawingBomCheckStatus.OK &&
+                comparison.Status == DrawingBomCheckStatus.Warning &&
+                drawingData.GobanDisplayUnavailable &&
+                gotProperty &&
+                !string.IsNullOrWhiteSpace(propValue))
+            {
+                comparison.DrawingValue = propValue;
+                comparison.Source = "PROPERTY_RESOLVED_REFERENCE_ONLY";
+                comparison.Message =
+                    "Ô 合番 có công thức liên kết đúng. " +
+                    "Giá trị đang hiển thị trong báo cáo được lấy từ Property " +
+                    "của Model tham chiếu; chưa đọc được trực tiếp chữ trên Drawing.";
+                LogDebug("[GOBAN MAIN REPORT VALUE] component=" +
+                    (item.Component ?? "") + " value=\"" + propValue +
+                    "\" source=PROPERTY_RESOLVED_REFERENCE_ONLY status=" +
+                    comparison.Status);
+            }
+
             item.PropertyLinkRows.Add(row);
             LogDebug("[GOBAN REPORT ROW] link=" + row.LinkStatus +
                 " property=" + row.PropertyStatus + " display=" + row.DisplayStatus +
