@@ -85,6 +85,17 @@ namespace ADDIN.Commands
                     return "Kiểm tra mặt trải phẳng (表/ウラ)";
                 case "BOM_QUANTITY":
                     return "Số lượng từ dòng BOM";
+                case "DRAWING_PART_DIMENSION_MATCH":
+                case "DRAWING_PART_BOM_DIMENSION_MATCH":
+                case "DRAWING_PART_DIMENSION_MISMATCH":
+                    return "Đối chiếu kích thước Drawing 2D và Part 3D";
+                case "DRAWING_PART_BOM_DIMENSION_MISMATCH":
+                    return "Đối chiếu kích thước Drawing 2D, Part 3D và BOM";
+                case "DRAWING_DIMENSION_UNVERIFIED":
+                    return "Chưa đọc được kích thước trên Drawing 2D";
+                case "PART_DIMENSION_UNVERIFIED":
+                case "DRAWING_AND_PART_DIMENSION_UNVERIFIED":
+                    return "Chưa xác minh được Custom Property của Part 3D";
                 case "MANUAL_OR_STATIC":
                     return "Giá trị đọc trên Drawing";
                 default:

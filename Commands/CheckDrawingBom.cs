@@ -802,14 +802,40 @@ namespace ADDIN.Commands
             else if (!string.IsNullOrWhiteSpace(buhinNoBom))
                 expectedDxf = buhinNoBom;
 
+            string bomColumnW;
+            bool hasBomColumnW = TryGetBomDimensionCellValue(bomRow, "W", out bomColumnW);
+            string bomColumnL;
+            bool hasBomColumnL = TryGetBomDimensionCellValue(bomRow, "L", out bomColumnL);
+
+            string partWValue, partWSource;
+            bool partWIsLinked;
+            bool hasVerifiedPartW = TryGetVerifiedPartDimensionProperty(
+                drawing, activeSheet, sheetName, bomRow, referencedModel,
+                referencedConfiguration, itemResult.PartPath, "W",
+                out partWValue, out partWSource, out partWIsLinked);
+
+            string partLValue, partLSource;
+            bool partLIsLinked;
+            bool hasVerifiedPartL = TryGetVerifiedPartDimensionProperty(
+                drawing, activeSheet, sheetName, bomRow, referencedModel,
+                referencedConfiguration, itemResult.PartPath, "L",
+                out partLValue, out partLSource, out partLIsLinked);
+
             // 7. So sánh 12 trường Part hiện tại
             itemResult.Fields.Add(ComparePartNumber(drawingData.PartNumber, buhinNoBom, drawingData.PartNumberSource));
-            itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
-                CompareNumericField("W", drawingData.Width, bomW, drawingData.WidthSource),
-                GetPropertyLinkAudit(propertyLinkAudits, "W")));
-            itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
-                CompareNumericField("L", drawingData.Length, bomL, drawingData.LengthSource),
-                GetPropertyLinkAudit(propertyLinkAudits, "L")));
+            DrawingBomFieldResult widthField = CompareWidthLengthField(
+                "W", drawingData.Width,
+                hasVerifiedPartW, partWValue, partWSource, partWIsLinked,
+                hasBomColumnW, bomColumnW);
+            itemResult.Fields.Add(widthField);
+            LogDebug($"[PART DIM W] component=\"{componentName}\" drawing=\"{drawingData.Width}\" part=\"{partWValue}\" verifiedPart={hasVerifiedPartW} partSource=\"{partWSource}\" linked={partWIsLinked} hasBom={hasBomColumnW} bom=\"{bomColumnW}\" status={widthField.Status}");
+
+            DrawingBomFieldResult lengthField = CompareWidthLengthField(
+                "L", drawingData.Length,
+                hasVerifiedPartL, partLValue, partLSource, partLIsLinked,
+                hasBomColumnL, bomColumnL);
+            itemResult.Fields.Add(lengthField);
+            LogDebug($"[PART DIM L] component=\"{componentName}\" drawing=\"{drawingData.Length}\" part=\"{partLValue}\" verifiedPart={hasVerifiedPartL} partSource=\"{partLSource}\" linked={partLIsLinked} hasBom={hasBomColumnL} bom=\"{bomColumnL}\" status={lengthField.Status}");
             itemResult.Fields.Add(CompareQuantityField(
                 drawingData.Quantity,
                 bomQuantity,
@@ -2485,7 +2511,10 @@ namespace ADDIN.Commands
             // --- V. 裏表 (Cases 26..29) ---
             RunUraOmoteSelfTests();
 
-            LogDebug("[CHECK DRAWING SELFTEST] ALL_PASS count=29 source=SYNTHETIC_ONLY");
+            // --- VI. W/L Value Validation (Cases 30..41 - 12 Required Cases) ---
+            RunWidthLengthSelfTests();
+
+            LogDebug("[CHECK DRAWING SELFTEST] ALL_PASS count=41 source=SYNTHETIC_ONLY");
         }
 
         private static void VerifyGobanFullCase(
@@ -2608,10 +2637,10 @@ namespace ADDIN.Commands
                 throw new InvalidOperationException("Fail case 15");
             LogDebug("[SELFTEST PASS] case=15_OVERALL_ALL_OK status=" + item15.Status);
 
-            // Case 16: Có một WARNING (vd W nhập tay) -> WARNING
+            // Case 16: Có một WARNING (vd W lệch giữa Drawing và Part 3D) -> WARNING
             var item16 = new DrawingCheckItemResult();
             item16.Fields.Add(new DrawingBomFieldResult { FieldName = "部品番号", Status = DrawingBomCheckStatus.OK });
-            item16.Fields.Add(new DrawingBomFieldResult { FieldName = "W", Status = DrawingBomCheckStatus.Warning, Message = "Custom Property 'W' đang là giá trị nhập tay" });
+            item16.Fields.Add(CompareWidthLengthField("W", "68.3", true, "70.0", "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", false, false, ""));
             item16.Fields.Add(new DrawingBomFieldResult { FieldName = "合番", Status = DrawingBomCheckStatus.OK });
             FinalizeItemResult(item16, "BOM");
             if (item16.Status != DrawingBomCheckStatus.Warning)
@@ -2693,15 +2722,11 @@ namespace ADDIN.Commands
                     Source = "DRAWING_FLAT_SIDE",
                     Status = CompareFlatSideMarker("表", false)
                 });
-                item.Fields.Add(new DrawingBomFieldResult
-                {
-                    FieldName = "W",
-                    DrawingValue = "68.3",
-                    BomValue = "68.3",
-                    Source = "MODEL_PROPERTY_MANUAL",
-                    Status = DrawingBomCheckStatus.Warning,
-                    Message = "Custom Property 'W' đang là giá trị nhập tay, không có liên kết. Cần kiểm tra trong file chi tiết."
-                });
+                item.Fields.Add(CompareWidthLengthField(
+                    "W", "68.3",
+                    hasVerifiedPartValue: true, partRawValue: "68.3",
+                    partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                    hasIndependentBomValue: false, bomRawValue: ""));
                 FinalizeItemResult(item, "BOM");
                 batch.Items.Add(item);
 
@@ -2829,6 +2854,184 @@ namespace ADDIN.Commands
                 CompareFlatSideMarker("ウラ", null) != DrawingBomCheckStatus.Warning)
                 throw new InvalidOperationException("Fail case 29");
             LogDebug("[SELFTEST PASS] case=29_URAOMOTE_UNKNOWN_WARNING");
+        }
+
+        private static void RunWidthLengthSelfTests()
+        {
+            // WL Case 1: W nhập tay nhưng đúng giá trị -> OK
+            var wl01 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.3",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl01.Status != DrawingBomCheckStatus.OK ||
+                wl01.DrawingValue != "68.3" ||
+                wl01.BomValue != "68.3" ||
+                wl01.Message != "Drawing: 68.3 | Part 3D: 68.3 — Giá trị W trên Drawing và Part 3D khớp nhau.")
+            {
+                throw new InvalidOperationException("Fail WL Case 01: " + wl01.Status + " | " + wl01.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_01_W_MANUAL_MATCH_OK message=\"" + wl01.Message + "\"");
+
+            // WL Case 2: L nhập tay nhưng đúng giá trị -> OK
+            var wl02 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: true, partRawValue: "1810.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl02.Status != DrawingBomCheckStatus.OK ||
+                wl02.DrawingValue != "1810.0" ||
+                wl02.BomValue != "1810.0" ||
+                wl02.Message != "Drawing: 1810.0 | Part 3D: 1810.0 — Giá trị L trên Drawing và Part 3D khớp nhau.")
+            {
+                throw new InvalidOperationException("Fail WL Case 02: " + wl02.Status + " | " + wl02.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_02_L_MANUAL_MATCH_OK message=\"" + wl02.Message + "\"");
+
+            // WL Case 3: W có link và đúng giá trị -> OK
+            var wl03 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.3",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl03.Status != DrawingBomCheckStatus.OK ||
+                wl03.Message != "Drawing: 68.3 | Part 3D: 68.3 — Giá trị W trên Drawing và Part 3D khớp nhau.")
+            {
+                throw new InvalidOperationException("Fail WL Case 03: " + wl03.Status + " | " + wl03.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_03_W_LINKED_MATCH_OK message=\"" + wl03.Message + "\"");
+
+            // WL Case 4: L có link và đúng giá trị -> OK
+            var wl04 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: true, partRawValue: "1810.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl04.Status != DrawingBomCheckStatus.OK ||
+                wl04.Message != "Drawing: 1810.0 | Part 3D: 1810.0 — Giá trị L trên Drawing và Part 3D khớp nhau.")
+            {
+                throw new InvalidOperationException("Fail WL Case 04: " + wl04.Status + " | " + wl04.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_04_L_LINKED_MATCH_OK message=\"" + wl04.Message + "\"");
+
+            // WL Case 5: W có link nhưng khác Drawing -> WARNING
+            var wl05 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "70.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl05.Status != DrawingBomCheckStatus.Warning ||
+                wl05.Message != "Drawing: 68.3 | Part 3D: 70.0 — Giá trị W trên Drawing khác Custom Property của Part 3D.")
+            {
+                throw new InvalidOperationException("Fail WL Case 05: " + wl05.Status + " | " + wl05.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_05_W_LINKED_MISMATCH_WARNING message=\"" + wl05.Message + "\"");
+
+            // WL Case 6: L có link nhưng khác Drawing -> WARNING
+            var wl06 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: true, partRawValue: "1825.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl06.Status != DrawingBomCheckStatus.Warning ||
+                wl06.Message != "Drawing: 1810.0 | Part 3D: 1825.0 — Giá trị L trên Drawing khác Custom Property của Part 3D.")
+            {
+                throw new InvalidOperationException("Fail WL Case 06: " + wl06.Status + " | " + wl06.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_06_L_LINKED_MISMATCH_WARNING message=\"" + wl06.Message + "\"");
+
+            // WL Case 7: Drawing đúng với BOM nhưng khác Part -> WARNING (không dùng BOM thay thế Part 3D)
+            var wl07 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "70.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: true, bomRawValue: "68.3");
+            if (wl07.Status != DrawingBomCheckStatus.Warning ||
+                !wl07.Message.Contains("Giá trị W trên Drawing khác Custom Property của Part 3D"))
+            {
+                throw new InvalidOperationException("Fail WL Case 07: " + wl07.Status + " | " + wl07.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_07_DRAWING_MATCHES_BOM_DIFFERS_PART_WARNING message=\"" + wl07.Message + "\"");
+
+            // WL Case 8: Drawing đúng với Part nhưng khác BOM (khi BOM có giá trị riêng) -> WARNING
+            var wl08 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.3",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: true, bomRawValue: "70.0");
+            if (wl08.Status != DrawingBomCheckStatus.Warning ||
+                !wl08.Message.Contains("khác giá trị cột W trong BOM"))
+            {
+                throw new InvalidOperationException("Fail WL Case 08: " + wl08.Status + " | " + wl08.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_08_DRAWING_MATCHES_PART_DIFFERS_BOM_WARNING message=\"" + wl08.Message + "\"");
+
+            // WL Case 9: Không đọc được Drawing W/L -> WARNING
+            var wl09 = CompareWidthLengthField(
+                "W", "",
+                hasVerifiedPartValue: true, partRawValue: "68.3",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl09.Status != DrawingBomCheckStatus.Warning ||
+                wl09.Message != "Drawing: Chưa đọc được | Part 3D: 68.3 — Chưa thể xác minh giá trị W trên Drawing.")
+            {
+                throw new InvalidOperationException("Fail WL Case 09: " + wl09.Status + " | " + wl09.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_09_DRAWING_UNREADABLE_WARNING message=\"" + wl09.Message + "\"");
+
+            // WL Case 10: Không đọc được Part hoặc Configuration -> WARNING
+            var wl10 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: false, partRawValue: "",
+                partSource: "REFERENCED_MODEL_NOT_LOADED", partIsLinked: false,
+                hasIndependentBomValue: true, bomRawValue: "1810.0");
+            if (wl10.Status != DrawingBomCheckStatus.Warning ||
+                wl10.Message != "Drawing: 1810.0 | Part 3D: Chưa đọc được — Chưa thể xác minh giá trị L của Part 3D.")
+            {
+                throw new InvalidOperationException("Fail WL Case 10: " + wl10.Status + " | " + wl10.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_10_PART_OR_CONFIG_UNREADABLE_WARNING message=\"" + wl10.Message + "\"");
+
+            // WL Case 11: Giá trị số tương đương 1810 và 1810.0 -> OK
+            var wl11 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: true, partRawValue: "1810",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl11.Status != DrawingBomCheckStatus.OK ||
+                wl11.DrawingValue != "1810.0" ||
+                wl11.BomValue != "1810.0")
+            {
+                throw new InvalidOperationException("Fail WL Case 11: " + wl11.Status + " | " + wl11.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_11_EQUIVALENT_NUMERIC_1810_AND_1810_0_OK message=\"" + wl11.Message + "\"");
+
+            // WL Case 12: Kiểm tra dung sai 0.01 mm và làm tròn biên (không bỏ sót sai lệch thật như 68.21 vs 68.29 hoặc 68.3 vs 68.32)
+            var wl12WithinTol = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.305",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            var wl12CeilingTrap = CompareWidthLengthField(
+                "W", "68.21",
+                hasVerifiedPartValue: true, partRawValue: "68.29",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            var wl12OutsideTol = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.32",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl12WithinTol.Status != DrawingBomCheckStatus.OK ||
+                wl12CeilingTrap.Status != DrawingBomCheckStatus.Warning ||
+                wl12OutsideTol.Status != DrawingBomCheckStatus.Warning)
+            {
+                throw new InvalidOperationException(
+                    "Fail WL Case 12: withinTol=" + wl12WithinTol.Status +
+                    " ceilingTrap=" + wl12CeilingTrap.Status +
+                    " outsideTol=" + wl12OutsideTol.Status);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_12_TOLERANCE_AND_BOUNDARY_ROUNDING withinTol=OK ceilingTrap=Warning outsideTol=Warning");
         }
 #endif
 
@@ -3478,6 +3681,460 @@ namespace ADDIN.Commands
                 "\" raw=\"" + audit.RawExpression + "\"");
 
             return field;
+        }
+
+        private static bool TryGetBomDimensionCellValue(
+            DataGridViewRow row,
+            string dimensionHeaderName,
+            out string value)
+        {
+            value = "";
+            if (row == null || row.DataGridView == null || string.IsNullOrWhiteSpace(dimensionHeaderName))
+                return false;
+
+            for (int c = 0; c < row.DataGridView.Columns.Count; c++)
+            {
+                string header = NormalizeText(row.DataGridView.Columns[c].HeaderText ?? "");
+                if (!string.Equals(header, dimensionHeaderName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string cellText = Convert.ToString(row.Cells[c].Value ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(cellText))
+                {
+                    value = cellText;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool TryGetVerifiedPartDimensionProperty(
+            DrawingDoc drawing,
+            Sheet sheet,
+            string sheetName,
+            DataGridViewRow bomRow,
+            ModelDoc2 fallbackReferencedModel,
+            string fallbackReferencedConfiguration,
+            string expectedPartPath,
+            string propertyName,
+            out string value,
+            out string source,
+            out bool isLinked)
+        {
+            value = "";
+            source = "PART_SOURCE_UNVERIFIED";
+            isLinked = false;
+
+            if (string.IsNullOrWhiteSpace(propertyName))
+                return false;
+
+            // Priority 1: Verified Sheet CustomPropertyView on current Drawing
+            if (drawing != null && sheet != null)
+            {
+                try
+                {
+                    string propertyView = sheet.CustomPropertyView ?? "";
+                    if (!string.IsNullOrWhiteSpace(propertyView))
+                    {
+                        SolidWorks.Interop.sldworks.View targetView;
+                        string viewReason;
+                        if (TryLocateGobanPropertyView(
+                                drawing, sheet, sheetName, propertyView,
+                                out targetView, out viewReason) &&
+                            targetView != null)
+                        {
+                            ModelDoc2 viewModel = targetView.ReferencedDocument as ModelDoc2;
+                            string viewCfg = targetView.ReferencedConfiguration ?? "";
+                            string viewName = (targetView.GetName2() ?? "").Trim();
+                            if (TryReadVerifiedModelDimensionProperty(
+                                    viewModel,
+                                    viewCfg,
+                                    expectedPartPath,
+                                    propertyName,
+                                    "SHEET_VIEW:" + viewName,
+                                    out value,
+                                    out source,
+                                    out isLinked))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogDebug("[PART DIM VIEW ERROR] prop=\"" + propertyName + "\" err=" + ex.Message);
+                }
+            }
+
+            // Priority 2: Primary Referenced Model of Drawing
+            if (fallbackReferencedModel != null)
+            {
+                if (TryReadVerifiedModelDimensionProperty(
+                        fallbackReferencedModel,
+                        fallbackReferencedConfiguration,
+                        expectedPartPath,
+                        propertyName,
+                        "DRAWING_VIEW_MODEL",
+                        out value,
+                        out source,
+                        out isLinked))
+                {
+                    return true;
+                }
+            }
+
+            // Priority 3: BOM Row Component / Snapshot Model
+            if (bomRow != null)
+            {
+                try
+                {
+                    object tag = bomRow.Tag;
+                    var snapshot = tag as BomDrawingReference;
+                    if (snapshot != null && swApp != null)
+                    {
+                        ModelDoc2 compModel = swApp.GetOpenDocumentByName(snapshot.ModelPath ?? "") as ModelDoc2;
+                        if (compModel != null &&
+                            TryReadVerifiedModelDimensionProperty(
+                                compModel,
+                                snapshot.Configuration ?? "",
+                                expectedPartPath,
+                                propertyName,
+                                "BOM_SNAPSHOT_MODEL",
+                                out value,
+                                out source,
+                                out isLinked))
+                        {
+                            return true;
+                        }
+                    }
+
+                    if (tag is object[] comps && comps.Length > 0)
+                    {
+                        foreach (object obj in comps)
+                        {
+                            Component2 comp = obj as Component2;
+                            if (comp == null) continue;
+                            ModelDoc2 compModel = comp.GetModelDoc2() as ModelDoc2;
+                            if (compModel != null &&
+                                TryReadVerifiedModelDimensionProperty(
+                                    compModel,
+                                    comp.ReferencedConfiguration ?? "",
+                                    expectedPartPath,
+                                    propertyName,
+                                    "BOM_COMPONENT_MODEL",
+                                    out value,
+                                    out source,
+                                    out isLinked))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogDebug("[PART DIM BOM MODEL ERROR] prop=\"" + propertyName + "\" err=" + ex.Message);
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryReadVerifiedModelDimensionProperty(
+            ModelDoc2 model,
+            string configurationName,
+            string expectedPartPath,
+            string propertyName,
+            string originPrefix,
+            out string value,
+            out string source,
+            out bool isLinked)
+        {
+            value = "";
+            source = originPrefix + "_UNVERIFIED";
+            isLinked = false;
+
+            if (model == null)
+            {
+                source = originPrefix + "_MODEL_NULL";
+                return false;
+            }
+
+            string modelPath = "";
+            try { modelPath = model.GetPathName() ?? ""; }
+            catch
+            {
+                source = originPrefix + "_PATH_API_ERROR";
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(expectedPartPath) &&
+                !string.IsNullOrWhiteSpace(modelPath) &&
+                !PathsEqualSafe(modelPath, expectedPartPath))
+            {
+                source = "PROPERTY_SOURCE_MODEL_MISMATCH";
+                return false;
+            }
+
+            string cfg = (configurationName ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(cfg))
+                cfg = GetSafeActiveConfigurationName(model);
+
+            if (string.IsNullOrWhiteSpace(cfg))
+            {
+                source = originPrefix + "_CONFIGURATION_UNKNOWN";
+                return false;
+            }
+
+            string[] scopes = new[] { cfg, "" };
+            foreach (string scope in scopes)
+            {
+                try
+                {
+                    CustomPropertyManager mgr = model.Extension.get_CustomPropertyManager(scope ?? "");
+                    if (mgr == null) continue;
+
+                    string raw;
+                    string resolved;
+                    bool wasResolved;
+                    bool linkedToParent;
+                    int getResult = mgr.Get6(
+                        propertyName,
+                        false,
+                        out raw,
+                        out resolved,
+                        out wasResolved,
+                        out linkedToParent);
+
+                    string effective = !string.IsNullOrWhiteSpace(resolved)
+                        ? resolved.Trim()
+                        : (raw ?? "").Trim();
+
+                    bool exists =
+                        getResult == (int)swCustomInfoGetResult_e.swCustomInfoGetResult_ResolvedValue ||
+                        !string.IsNullOrWhiteSpace(effective);
+
+                    if (!exists || string.IsNullOrWhiteSpace(effective) || LooksLikeUnresolvedPropertyToken(effective))
+                        continue;
+
+                    value = effective;
+                    isLinked = linkedToParent || LooksLikePropertyExpression(raw);
+                    string scopeLabel = string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope;
+                    source = originPrefix + "|CONFIG:" + scopeLabel + (isLinked ? "|LINKED" : "|MANUAL");
+                    return true;
+                }
+                catch
+                {
+                    source = originPrefix + "_GET6_ERROR";
+                }
+            }
+
+            source = originPrefix + "_PROPERTY_NOT_FOUND";
+            return false;
+        }
+
+        private static bool LooksLikeUnresolvedPropertyToken(string text)
+        {
+            string trimmed = (text ?? "").Trim();
+            if (trimmed.Length == 0)
+                return true;
+
+            return trimmed.IndexOf("$PRP", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   string.Equals(trimmed, "###", StringComparison.Ordinal);
+        }
+
+        private static bool TryParseDimensionValueMm(string rawText, out double value)
+        {
+            value = 0.0;
+            if (string.IsNullOrWhiteSpace(rawText))
+                return false;
+
+            string cleaned = NormalizeText(rawText)
+                .Replace(',', '.')
+                .Trim();
+
+            if (cleaned.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+                cleaned = cleaned.Substring(0, cleaned.Length - 2).Trim();
+
+            return double.TryParse(
+                cleaned,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value);
+        }
+
+        private static string FormatDimensionDisplayValue(string rawText)
+        {
+            double parsed;
+            if (TryParseDimensionValueMm(rawText, out parsed))
+            {
+                return Math.Round(parsed, 4)
+                    .ToString("0.0###", CultureInfo.InvariantCulture);
+            }
+
+            return (rawText ?? "").Trim();
+        }
+
+        private static DrawingBomFieldResult CompareWidthLengthField(
+            string fieldName,
+            string drawingRawValue,
+            bool hasVerifiedPartValue,
+            string partRawValue,
+            string partSource,
+            bool partIsLinked,
+            bool hasIndependentBomValue,
+            string bomRawValue)
+        {
+            string drawTrimmed = (drawingRawValue ?? "").Trim();
+            string partTrimmed = (partRawValue ?? "").Trim();
+            string bomTrimmed = (bomRawValue ?? "").Trim();
+
+            double dVal = 0.0;
+            bool hasValidDrawing =
+                !string.IsNullOrWhiteSpace(drawTrimmed) &&
+                !LooksLikeUnresolvedPropertyToken(drawTrimmed) &&
+                TryParseDimensionValueMm(drawTrimmed, out dVal);
+
+            double pVal = 0.0;
+            bool hasValidPart =
+                hasVerifiedPartValue &&
+                !string.IsNullOrWhiteSpace(partTrimmed) &&
+                !LooksLikeUnresolvedPropertyToken(partTrimmed) &&
+                TryParseDimensionValueMm(partTrimmed, out pVal);
+
+            double bVal = 0.0;
+            bool hasValidBom =
+                hasIndependentBomValue &&
+                !string.IsNullOrWhiteSpace(bomTrimmed) &&
+                TryParseDimensionValueMm(bomTrimmed, out bVal);
+
+            string drawDisplay = hasValidDrawing
+                ? FormatDimensionDisplayValue(drawTrimmed)
+                : "Chưa đọc được";
+
+            string partDisplay = hasValidPart
+                ? FormatDimensionDisplayValue(partTrimmed)
+                : "Chưa đọc được";
+
+            string bomDisplay = hasValidBom
+                ? FormatDimensionDisplayValue(bomTrimmed)
+                : (hasIndependentBomValue && !string.IsNullOrWhiteSpace(bomTrimmed) ? bomTrimmed : "");
+
+            // Rule 5: Không đọc được một trong hai nguồn (Drawing 2D hoặc Part 3D) -> WARNING, ghi rõ chưa xác minh.
+            // Tuyệt đối không dùng BOM để thay thế cho Part 3D khi xác minh Drawing <-> Part 3D.
+            if (!hasValidDrawing && !hasValidPart)
+            {
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = "Chưa đọc được",
+                    BomValue = !string.IsNullOrWhiteSpace(bomDisplay)
+                        ? $"Part 3D: Chưa đọc được (BOM: {bomDisplay})"
+                        : "Chưa đọc được",
+                    Source = "DRAWING_AND_PART_DIMENSION_UNVERIFIED",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = $"Drawing: Chưa đọc được | Part 3D: Chưa đọc được — Chưa thể xác minh giá trị {fieldName} trên Drawing và Part 3D."
+                };
+            }
+
+            if (!hasValidDrawing)
+            {
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = "Chưa đọc được",
+                    BomValue = partDisplay,
+                    Source = "DRAWING_DIMENSION_UNVERIFIED",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = $"Drawing: Chưa đọc được | Part 3D: {partDisplay} — Chưa thể xác minh giá trị {fieldName} trên Drawing."
+                };
+            }
+
+            if (!hasValidPart)
+            {
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = drawDisplay,
+                    BomValue = !string.IsNullOrWhiteSpace(bomDisplay)
+                        ? $"Part 3D: Chưa đọc được (BOM: {bomDisplay})"
+                        : "Chưa đọc được",
+                    Source = "PART_DIMENSION_UNVERIFIED",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = $"Drawing: {drawDisplay} | Part 3D: Chưa đọc được — Chưa thể xác minh giá trị {fieldName} của Part 3D."
+                };
+            }
+
+            // Cả Drawing 2D và Part 3D đều đã đọc và xác minh được số thực.
+            // Quy tắc 1, 2, 6, 7: So sánh giá trị thực với dung sai NumericTolerance (0.01 mm).
+            // Không bắt buộc Custom Property W/L trong Part phải có công thức liên kết.
+            bool drawMatchesPart = Math.Abs(dVal - pVal) <= NumericTolerance;
+
+            if (hasIndependentBomValue && !string.IsNullOrWhiteSpace(bomTrimmed))
+            {
+                bool drawMatchesBom = hasValidBom && Math.Abs(dVal - bVal) <= NumericTolerance;
+                bool partMatchesBom = hasValidBom && Math.Abs(pVal - bVal) <= NumericTolerance;
+
+                if (drawMatchesPart && drawMatchesBom && partMatchesBom)
+                {
+                    return new DrawingBomFieldResult
+                    {
+                        FieldName = fieldName,
+                        DrawingValue = drawDisplay,
+                        BomValue = partDisplay,
+                        Source = "DRAWING_PART_BOM_DIMENSION_MATCH",
+                        Status = DrawingBomCheckStatus.OK,
+                        Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} — Giá trị {fieldName} trên Drawing và Part 3D khớp nhau."
+                    };
+                }
+
+                if (!drawMatchesPart)
+                {
+                    return new DrawingBomFieldResult
+                    {
+                        FieldName = fieldName,
+                        DrawingValue = drawDisplay,
+                        BomValue = $"{partDisplay} (BOM: {bomDisplay})",
+                        Source = "DRAWING_PART_DIMENSION_MISMATCH",
+                        Status = DrawingBomCheckStatus.Warning,
+                        Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} | BOM: {bomDisplay} — Giá trị {fieldName} trên Drawing khác Custom Property của Part 3D."
+                    };
+                }
+
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = drawDisplay,
+                    BomValue = $"{partDisplay} (BOM: {bomDisplay})",
+                    Source = "DRAWING_PART_BOM_DIMENSION_MISMATCH",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} | BOM: {bomDisplay} — Giá trị {fieldName} trên Drawing và Part 3D khớp nhau nhưng khác giá trị cột {fieldName} trong BOM."
+                };
+            }
+
+            if (drawMatchesPart)
+            {
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = drawDisplay,
+                    BomValue = partDisplay,
+                    Source = "DRAWING_PART_DIMENSION_MATCH",
+                    Status = DrawingBomCheckStatus.OK,
+                    Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} — Giá trị {fieldName} trên Drawing và Part 3D khớp nhau."
+                };
+            }
+
+            return new DrawingBomFieldResult
+            {
+                FieldName = fieldName,
+                DrawingValue = drawDisplay,
+                BomValue = partDisplay,
+                Source = "DRAWING_PART_DIMENSION_MISMATCH",
+                Status = DrawingBomCheckStatus.Warning,
+                Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} — Giá trị {fieldName} trên Drawing khác Custom Property của Part 3D."
+            };
         }
 
         private static DrawingBomFieldResult CompareNumericField(string fieldName, string drawVal, string bomVal, string source)
@@ -6375,7 +7032,7 @@ namespace ADDIN.Commands
             if (model == null || audits == null)
                 return;
 
-            string[] requiredProperties = { "W", "L", "材質", "板厚" };
+            string[] requiredProperties = { "材質", "板厚" };
             foreach (string propertyName in requiredProperties)
             {
                 ModelPropertyLinkAudit audit = ReadModelPropertyLinkAudit(
