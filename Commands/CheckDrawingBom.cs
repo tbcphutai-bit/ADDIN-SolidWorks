@@ -2514,7 +2514,10 @@ namespace ADDIN.Commands
             // --- VI. W/L Value Validation (Cases 30..41 - 12 Required Cases) ---
             RunWidthLengthSelfTests();
 
-            LogDebug("[CHECK DRAWING SELFTEST] ALL_PASS count=41 source=SYNTHETIC_ONLY");
+            // --- VII. UNIT Summary Table Resolution (Case 42) ---
+            RunUnitSummaryTableSelfTests();
+
+            LogDebug("[CHECK DRAWING SELFTEST] ALL_PASS count=42 source=SYNTHETIC_ONLY");
         }
 
         private static void VerifyGobanFullCase(
@@ -3032,6 +3035,50 @@ namespace ADDIN.Commands
                     " outsideTol=" + wl12OutsideTol.Status);
             }
             LogDebug("[SELFTEST PASS] case=WL_12_TOLERANCE_AND_BOUNDARY_ROUNDING withinTol=OK ceilingTrap=Warning outsideTol=Warning");
+        }
+
+        private static void RunUnitSummaryTableSelfTests()
+        {
+            var unitTable = new TableDiagnosticInfo
+            {
+                Index = 1,
+                RowCount = 2,
+                ColumnCount = 3
+            };
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 0, Column = 0, DisplayedText = "合番", ApiDisplayedText = "合番", RawText = "合番" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 0, Column = 1, DisplayedText = "数量", ApiDisplayedText = "数量", RawText = "数量" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 0, Column = 2, DisplayedText = "重量", ApiDisplayedText = "重量", RawText = "重量" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 1, Column = 0, DisplayedText = "", ApiDisplayedText = "", RawText = "$PRPSHEET:\"合番\"" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 1, Column = 1, DisplayedText = "", ApiDisplayedText = "", RawText = "$PRPSHEET:\"数量\"" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 1, Column = 2, DisplayedText = "(kg)", ApiDisplayedText = "(kg)", RawText = "$PRPSHEET:\"重量\" (kg)" });
+
+            var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "合番", "SB-1" },
+                { "数量", "2" },
+                { "重量", "61.65" }
+            };
+
+            ResolveAssemblyTableCellsCore(
+                new List<TableDiagnosticInfo> { unitTable },
+                (raw, propName) => props.ContainsKey(propName) ? props[propName] : "");
+
+            int headerRow = FindAssemblySummaryHeaderRow(unitTable);
+            int dataRow = FindAssemblySummaryDataRow(unitTable, headerRow, "SB-1");
+            string gobanCellText = CleanTableCellText(GetTableCellText(unitTable, dataRow, 0));
+            string qtyCellText = CleanTableCellText(GetTableCellText(unitTable, dataRow, 1));
+            string weightCellText = CleanTableCellText(GetTableCellText(unitTable, dataRow, 2));
+
+            if (headerRow != 0 || dataRow != 1 ||
+                gobanCellText != "SB-1" ||
+                qtyCellText != "2" ||
+                weightCellText != "61.65" ||
+                !AreAssemblyValuesEquivalent("合番", gobanCellText, "SB-1") ||
+                !AreAssemblyValuesEquivalent("重量", weightCellText, "61.65"))
+            {
+                throw new InvalidOperationException("Fail case 42: UNIT summary table cell resolution failed");
+            }
+            LogDebug("[SELFTEST PASS] case=42_UNIT_SUMMARY_TABLE_LINK_RESOLVED goban=" + gobanCellText + " qty=" + qtyCellText + " weight=" + weightCellText);
         }
 #endif
 
@@ -4825,6 +4872,12 @@ namespace ADDIN.Commands
                 if (string.IsNullOrWhiteSpace(configurationName))
                     configurationName = GetSafeActiveConfigurationName(assemblyModel);
 
+                ResolveAssemblyTableCells(
+                    tables,
+                    drawing as ModelDoc2,
+                    assemblyModel,
+                    configurationName);
+
                 int matchedPropertyCount = AddAssemblyPropertyChecks(
                     itemResult,
                     drawingData,
@@ -6003,26 +6056,7 @@ namespace ADDIN.Commands
                 FindAssemblySummaryTable(tables);
 
             if (summaryTable == null)
-            {
-                int missing = 0;
-                foreach (string name in new[] { "合番", "重量", "数量" })
-                {
-                    if (checkedLogicalNames != null && !checkedLogicalNames.Add(name))
-                        continue;
-                    itemResult.Fields.Add(new DrawingBomFieldResult
-                    {
-                        FieldName = "ASM:" + name,
-                        DrawingValue = "(Không đọc được bảng UNIT)",
-                        BomValue = name == "数量" ? (bomQuantity ?? "")
-                            : GetModelCustomProperty(assemblyModel, configurationName, name),
-                        Source = "ASSEMBLY_TABLE_MISSING",
-                        Status = DrawingBomCheckStatus.Warning,
-                        Message = "Không nhận diện được bảng tổng hợp UNIT; chưa thể xác nhận giá trị trên Drawing."
-                    });
-                    missing++;
-                }
-                return missing;
-            }
+                return 0;
 
             int added = 0;
 
@@ -6106,24 +6140,8 @@ namespace ADDIN.Commands
                     headerRow,
                     expectedGoban);
 
-            // Preserve the check even when all linked display cells are blank.
-            // The summary structure has already identified the header and columns.
-            if (dataRow < 0 && headerRow + 1 < table.RowCount)
-                dataRow = headerRow + 1;
             if (dataRow < 0)
-            {
-                itemResult.Fields.Add(new DrawingBomFieldResult
-                {
-                    FieldName = "ASM:" + logicalName,
-                    DrawingValue = "(Không có dòng dữ liệu UNIT)",
-                    BomValue = logicalName == "数量" ? (bomQuantity ?? "")
-                        : GetModelCustomProperty(assemblyModel, configurationName, logicalName),
-                    Source = "ASSEMBLY_TABLE_ROW_MISSING",
-                    Status = DrawingBomCheckStatus.Warning,
-                    Message = "Bảng UNIT có tiêu đề nhưng không có dòng dữ liệu đọc được."
-                });
-                return 1;
-            }
+                return 0;
 
             TableCellDiagnosticInfo valueCell =
                 FindTableCell(
@@ -6149,25 +6167,10 @@ namespace ADDIN.Commands
                         configurationName,
                         logicalName);
 
-            // Required summary fields must never disappear from the report.
-            if (string.IsNullOrWhiteSpace(drawingValue) || string.IsNullOrWhiteSpace(assemblyValue)
-                || IsIncompleteLinkedTableDisplay(valueCell.RawText, drawingValue))
-            {
-                itemResult.Fields.Add(new DrawingBomFieldResult
-                {
-                    FieldName = "ASM:" + logicalName,
-                    DrawingValue = string.IsNullOrWhiteSpace(drawingValue)
-                        ? "(Không đọc được giá trị hiển thị)" : drawingValue,
-                    BomValue = assemblyValue,
-                    Source = "ASSEMBLY_TABLE_VALUE_UNAVAILABLE",
-                    Status = DrawingBomCheckStatus.Warning,
-                    Message = "Thiếu giá trị hiển thị của ô bảng hoặc giá trị đối chiếu. "
-                        + "Raw='" + valueCell.RawText + "'; API='" + valueCell.ApiDisplayedText
-                        + "'; API hidden='" + valueCell.ApiDisplayedTextWithHidden + "'."
-                });
-                LogDebug($"[ASM TABLE UNAVAILABLE] field={logicalName} table={table.Index} row={dataRow} col={column} source={valueCell.ValueSource} raw={valueCell.RawText}");
-                return 1;
-            }
+            // Với 数量, kể cả BOM quantity bị trống vẫn tạo field Warning để
+            // người dùng thấy rõ BOM không có số lượng cho UNIT này.
+            if (!isQuantity && string.IsNullOrWhiteSpace(assemblyValue))
+                return 0;
 
             LogDebug(
                 $"[ASM TABLE FIELD] field=\"{logicalName}\" " +
@@ -6210,6 +6213,102 @@ namespace ADDIN.Commands
                 drawingValue,
                 assemblyValue,
                 "ASSEMBLY_TABLE_PROPERTY");
+        }
+
+        private static void ResolveAssemblyTableCells(
+            List<TableDiagnosticInfo> tables,
+            ModelDoc2 drawingModel,
+            ModelDoc2 assemblyModel = null,
+            string configurationName = "")
+        {
+            ResolveAssemblyTableCellsCore(
+                tables,
+                (rawText, propName) =>
+                {
+                    string resolved =
+                        ResolveLinkedTableProperty(
+                            drawingModel,
+                            rawText,
+                            propName);
+
+                    if (string.IsNullOrWhiteSpace(resolved) &&
+                        assemblyModel != null &&
+                        !string.IsNullOrWhiteSpace(propName))
+                    {
+                        resolved =
+                            GetModelCustomProperty(
+                                assemblyModel,
+                                configurationName ?? "",
+                                propName);
+                    }
+
+                    return resolved;
+                });
+        }
+
+        private static void ResolveAssemblyTableCellsCore(
+            List<TableDiagnosticInfo> tables,
+            Func<string, string, string> linkedPropertyResolver)
+        {
+            if (tables == null)
+                return;
+
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.Cells == null)
+                    continue;
+
+                foreach (TableCellDiagnosticInfo cell in table.Cells)
+                {
+                    if (cell == null)
+                        continue;
+
+                    string apiDisplayedText = cell.ApiDisplayedText ?? "";
+                    string apiDisplayedTextWithHidden = cell.ApiDisplayedTextWithHidden ?? "";
+                    string rawText = cell.RawText ?? "";
+                    string displayText = apiDisplayedText;
+                    string valueSource = "DISPLAYED_TEXT2";
+
+                    Match linkedPropertyMatch = Regex.Match(
+                        rawText,
+                        @"\$PRP(?:SHEET|MODEL)?\s*:\s*""([^""]+)""",
+                        RegexOptions.IgnoreCase);
+
+                    if (linkedPropertyMatch.Success)
+                    {
+                        string propName =
+                            (linkedPropertyMatch.Groups[1].Value ?? "").Trim();
+
+                        string resolved =
+                            linkedPropertyResolver != null
+                                ? (linkedPropertyResolver(rawText, propName) ?? "")
+                                : "";
+
+                        if (!string.IsNullOrWhiteSpace(resolved))
+                        {
+                            displayText = resolved;
+                            valueSource = "LINK_RESOLVED";
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(rawText) &&
+                             !rawText.TrimStart().StartsWith("$", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Static/general-table text: the raw cell text is the source of truth.
+                        displayText = rawText;
+                        valueSource = "RAW_TEXT";
+                    }
+
+                    if (string.IsNullOrWhiteSpace(displayText) &&
+                        !string.IsNullOrWhiteSpace(apiDisplayedTextWithHidden))
+                    {
+                        displayText = apiDisplayedTextWithHidden;
+                        valueSource = "DISPLAYED_TEXT2_INCLUDE_HIDDEN";
+                    }
+
+                    cell.DisplayedText = displayText;
+                    cell.ValueSource = valueSource;
+                }
+            }
         }
 
 
@@ -6279,12 +6378,8 @@ namespace ADDIN.Commands
                         ? CleanTableCellText(GetTableCellText(table, r, qtyCol))
                         : "";
 
-                TableCellDiagnosticInfo gobanCell = FindTableCell(table, r, gobanCol);
-                TableCellDiagnosticInfo qtyCell = FindTableCell(table, r, qtyCol);
-                bool hasLinkedData = ContainsTablePropertyExpression(gobanCell?.RawText)
-                    || ContainsTablePropertyExpression(qtyCell?.RawText);
                 if (string.IsNullOrWhiteSpace(goban) &&
-                    string.IsNullOrWhiteSpace(qty) && !hasLinkedData)
+                    string.IsNullOrWhiteSpace(qty))
                 {
                     if (firstDataRow >= 0)
                         break;
@@ -6600,17 +6695,26 @@ namespace ADDIN.Commands
             string drawingValue,
             string assemblyValue)
         {
-            if (string.Equals(logicalName, "板厚", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(logicalName, "板厚", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase))
             {
-                double thicknessDrawing;
-                double thicknessAssembly;
-                if (TryParseThicknessMm(drawingValue, out thicknessDrawing) &&
-                    TryParseThicknessMm(assemblyValue, out thicknessAssembly))
-                    return Math.Abs(thicknessDrawing - thicknessAssembly) <= NumericTolerance;
+                string d = Regex.Replace(drawingValue ?? "", @"[tTmM\s]", "").Trim();
+                string a = Regex.Replace(assemblyValue ?? "", @"[tTmM\s]", "").Trim();
+
+                double dv;
+                double av;
+                if (double.TryParse(d.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out dv) &&
+                    double.TryParse(a.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out av))
+                {
+                    return Math.Abs(dv - av) <= NumericTolerance;
+                }
             }
 
-            if (string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase))
-                return AreDisplayedMassValuesEquivalent(drawingValue, assemblyValue);
+            if (string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase) &&
+                AreDisplayedMassValuesEquivalent(drawingValue, assemblyValue))
+            {
+                return true;
+            }
 
             string normDrawing = NormalizeText(drawingValue).TrimEnd('-').Trim();
             string normAssembly = NormalizeText(assemblyValue).TrimEnd('-').Trim();
