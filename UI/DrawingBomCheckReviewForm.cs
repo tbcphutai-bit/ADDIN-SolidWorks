@@ -28,13 +28,18 @@ namespace ADDIN.UI
         private readonly Panel detailBanner = new Panel();
         private readonly ModernButton openDrawing = Button("Mở Drawing", true, 140);
         private readonly ModernButton location = Button("Đến vị trí", false, 130);
-        private readonly ModernButton report = Button("Mở báo cáo", false, 128);
+        private readonly ModernButton report = Button("Xuất Excel", false, 128);
         private readonly FilterPillButton pillAll;
         private readonly FilterPillButton pillOk;
         private readonly FilterPillButton pillNg;
         private readonly FilterPillButton pillWarning;
         private DrawingBomCheckStatus? activeFilter;
         private bool selecting;
+        private bool exportingReport;
+
+        internal string ReportButtonText => report.Text;
+        internal bool IsReportButtonEnabled => report.Enabled;
+        internal string StatusMessage => status.Text;
 
         internal DrawingCheckItemResult SelectedItem
         {
@@ -349,7 +354,7 @@ namespace ADDIN.UI
             openDrawing.Click += (sender, args) => NavigateSelected(false);
             location.Click += (sender, args) => NavigateSelected(true);
             report.Click += (sender, args) => OpenReport();
-            report.Enabled = !string.IsNullOrWhiteSpace(result.ReportPath) && File.Exists(result.ReportPath);
+            UpdateReportButtonState();
 
             UpdateFilterPills();
             DisplayResults();
@@ -507,24 +512,25 @@ namespace ADDIN.UI
             }
 
             DrawingBomCheckStatus st = field.Status;
+            string friendlySource = ExcelDrawingCheckExporter.FormatReadableSource(field.Source);
             if (st == DrawingBomCheckStatus.NG)
             {
-                calloutHeader.Text = "● PHÁT HIỆN SAI LỆCH (NG)  —  [ Nguồn: " + field.Source + " ]";
+                calloutHeader.Text = "● PHÁT HIỆN SAI LỆCH (NG)  —  [ Nguồn: " + friendlySource + " ]";
                 calloutHeader.ForeColor = TaiTheme.Danger;
             }
             else if (st == DrawingBomCheckStatus.Warning)
             {
-                calloutHeader.Text = "▲ CẢNH BÁO CẦN LƯU Ý (WARNING)  —  [ Nguồn: " + field.Source + " ]";
+                calloutHeader.Text = "▲ CẢNH BÁO CẦN LƯU Ý (WARNING)  —  [ Nguồn: " + friendlySource + " ]";
                 calloutHeader.ForeColor = TaiTheme.Warning;
             }
             else if (st == DrawingBomCheckStatus.NotApplicable)
             {
-                calloutHeader.Text = "— KHÔNG ÁP DỤNG (N/A)  —  [ Nguồn: " + field.Source + " ]";
+                calloutHeader.Text = "— KHÔNG ÁP DỤNG (N/A)  —  [ Nguồn: " + friendlySource + " ]";
                 calloutHeader.ForeColor = TaiTheme.TextMuted;
             }
             else
             {
-                calloutHeader.Text = "✔ ĐỐI CHIẾU KHỚP HOÀN TOÀN (OK)  —  [ Nguồn: " + field.Source + " ]";
+                calloutHeader.Text = "✔ ĐỐI CHIẾU KHỚP HOÀN TOÀN (OK)  —  [ Nguồn: " + friendlySource + " ]";
                 calloutHeader.ForeColor = TaiTheme.Success;
             }
 
@@ -533,7 +539,7 @@ namespace ADDIN.UI
                 ? "View: " + field.DrawingViewName + "   ·   Bấm nút \"Đến vị trí\" hoặc Double-click để phóng tới vị trí trên Drawing."
                 : "Bấm nút \"Đến vị trí\" hoặc Double-click để phóng tới vị trí trên Drawing.";
 
-            fieldDetails.Text = field.Message + "\r\nNguồn: " + field.Source + "\r\n" + calloutFooter.Text;
+            fieldDetails.Text = field.Message + "\r\nNguồn: " + friendlySource + "\r\n" + calloutFooter.Text;
             calloutCard.Invalidate();
         }
 
@@ -557,18 +563,158 @@ namespace ADDIN.UI
             }
         }
 
+        private bool HasExistingReportFile()
+        {
+            return result != null &&
+                   !string.IsNullOrWhiteSpace(result.ReportPath) &&
+                   File.Exists(result.ReportPath);
+        }
+
+        private void UpdateReportButtonState()
+        {
+            if (IsDisposed) return;
+            bool hasFile = HasExistingReportFile();
+            bool hasItems = result != null && result.Items != null && result.Items.Count > 0;
+            report.Text = exportingReport ? "Đang xuất..." : (hasFile ? "Mở báo cáo" : "Xuất Excel");
+            report.Enabled = !exportingReport && (hasFile || hasItems);
+        }
+
         private void OpenReport()
         {
-            if (string.IsNullOrWhiteSpace(result.ReportPath) || !File.Exists(result.ReportPath)) return;
-            try { Process.Start(new ProcessStartInfo(result.ReportPath) { UseShellExecute = true }); }
-            catch (Exception ex)
+            TriggerReportAction(null, true, Visible);
+        }
+
+        internal bool TriggerReportAction(
+            Action<DrawingBatchCheckResult, string> customExporter = null,
+            bool openAfterExport = false,
+            bool showErrorDialog = false)
+        {
+            if (exportingReport || IsDisposed || result == null)
+                return false;
+
+            // Nếu đã tạo báo cáo hợp lệ trước đó, chỉ mở lại file hiện có, không tạo file trùng lặp
+            if (HasExistingReportFile())
+            {
+                UpdateReportButtonState();
+                if (openAfterExport)
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo(result.ReportPath) { UseShellExecute = true });
+                        status.ForeColor = TaiTheme.TextMuted;
+                        status.Text = "Đã mở báo cáo Excel: " + Path.GetFileName(result.ReportPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        status.ForeColor = TaiTheme.Warning;
+                        status.Text = "Đã lưu báo cáo nhưng không mở được: " + ex.Message;
+                        if (showErrorDialog && !IsDisposed)
+                        {
+                            MessageBox.Show(this,
+                                "Đã có file báo cáo tại:\n" + result.ReportPath + "\n\nNhưng không thể mở tự động:\n" + ex.Message,
+                                "CHECK DRAWING — MỞ BÁO CÁO",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                        }
+                        return false;
+                    }
+                }
+                else
+                {
+                    status.ForeColor = TaiTheme.TextMuted;
+                    status.Text = "Báo cáo Excel đã sẵn sàng: " + Path.GetFileName(result.ReportPath);
+                }
+                return true;
+            }
+
+            if (result.Items == null || result.Items.Count == 0)
             {
                 status.ForeColor = TaiTheme.Warning;
-                status.Text = "Đã lưu báo cáo nhưng không mở được: " + ex.Message;
+                status.Text = "Không có dữ liệu kết quả để xuất Excel.";
+                UpdateReportButtonState();
+                return false;
+            }
+
+            exportingReport = true;
+            UpdateReportButtonState();
+            status.ForeColor = TaiTheme.TextMuted;
+            status.Text = "Đang xuất báo cáo Excel từ kết quả hiện tại...";
+            Cursor previousCursor = Cursor.Current;
+            if (Visible)
+            {
+                Cursor.Current = Cursors.WaitCursor;
+                report.Refresh();
+                status.Refresh();
+            }
+
+            string targetPath = "";
+            try
+            {
+                targetPath = ExcelDrawingCheckExporter.ResolveDefaultReportPath(result);
+                if (customExporter != null)
+                {
+                    customExporter(result, targetPath);
+                }
+                else
+                {
+                    ExcelDrawingCheckExporter.ExportToFile(result, targetPath);
+                }
+
+                if (string.IsNullOrWhiteSpace(targetPath) || !File.Exists(targetPath))
+                    throw new IOException("File báo cáo Excel chưa được tạo tại đường dẫn đích.");
+
+                result.ReportPath = targetPath;
+                if (!IsDisposed)
+                {
+                    status.ForeColor = TaiTheme.Success;
+                    status.Text = "Đã xuất báo cáo Excel: " + Path.GetFileName(result.ReportPath);
+                }
+
+                if (openAfterExport && !IsDisposed)
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo(result.ReportPath) { UseShellExecute = true });
+                    }
+                    catch (Exception openEx)
+                    {
+                        status.ForeColor = TaiTheme.Warning;
+                        status.Text = "Đã xuất Excel nhưng không mở tự động được: " + openEx.Message;
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (!string.IsNullOrWhiteSpace(targetPath) && !File.Exists(targetPath))
+                    result.ReportPath = "";
+
+                if (!IsDisposed)
+                {
+                    status.ForeColor = TaiTheme.Warning;
+                    status.Text = "Không thể xuất Excel: " + ex.Message;
+                    if (showErrorDialog)
+                    {
+                        MessageBox.Show(this,
+                            "Không thể xuất báo cáo Excel:\n" + ex.Message,
+                            "CHECK DRAWING — LỖI XUẤT EXCEL",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                    }
+                }
+                return false;
+            }
+            finally
+            {
+                exportingReport = false;
+                if (Visible)
+                    Cursor.Current = previousCursor;
+                if (!IsDisposed)
+                    UpdateReportButtonState();
             }
         }
 
-        private static string StatusText(DrawingBomCheckStatus value)
+        internal static string StatusText(DrawingBomCheckStatus value)
         {
             if (value == DrawingBomCheckStatus.Warning) return "Warning";
             if (value == DrawingBomCheckStatus.NotApplicable) return "N/A";
@@ -587,7 +733,7 @@ namespace ADDIN.UI
                 : value == DrawingBomCheckStatus.NotApplicable ? TaiTheme.TextMuted : TaiTheme.Success;
             row.Cells[0].Style.ForeColor = statusColor;
 
-            if (isFieldGrid && value != DrawingBomCheckStatus.OK && row.Cells.Count > 3)
+            if (isFieldGrid && value != DrawingBomCheckStatus.OK && value != DrawingBomCheckStatus.NotApplicable && row.Cells.Count > 3)
             {
                 row.Cells[3].Style.ForeColor = statusColor;
                 row.Cells[3].Style.SelectionForeColor = statusColor;
@@ -668,12 +814,15 @@ namespace ADDIN.UI
 
             Color fill = currentStatus == DrawingBomCheckStatus.NG ? TaiTheme.DangerSoft
                 : currentStatus == DrawingBomCheckStatus.Warning ? TaiTheme.WarningSoft
+                : currentStatus == DrawingBomCheckStatus.NotApplicable ? Color.FromArgb(245, 245, 245)
                 : TaiTheme.SuccessSoft;
             Color border = currentStatus == DrawingBomCheckStatus.NG ? TaiTheme.DangerBorder
                 : currentStatus == DrawingBomCheckStatus.Warning ? TaiTheme.WarningBorder
+                : currentStatus == DrawingBomCheckStatus.NotApplicable ? Color.FromArgb(210, 210, 210)
                 : TaiTheme.SuccessBorder;
             Color stripe = currentStatus == DrawingBomCheckStatus.NG ? TaiTheme.Danger
                 : currentStatus == DrawingBomCheckStatus.Warning ? TaiTheme.Warning
+                : currentStatus == DrawingBomCheckStatus.NotApplicable ? TaiTheme.TextMuted
                 : TaiTheme.Success;
 
             e.Graphics.Clear(TaiTheme.Surface);
