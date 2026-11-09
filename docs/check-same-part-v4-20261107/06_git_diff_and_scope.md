@@ -83,4 +83,12 @@ git diff --check
      - `▲ PHÔI TRẢI GIỐNG — CHƯA XÁC MINH HÌNH DẠNG SAU CHẤN`
      - `◆ CÓ DẤU HIỆU ĐỐI XỨNG — CẦN KIỂM TRA 3D`
 4. **Chuẩn hóa Chân trang Callout Card (Footer):**
-   - Hiển thị tiếng Việt dễ hiểu: Giới hạn dung sai, sai lệch đo thực tế (hoặc N/A), trạng thái kiểm tra phôi trải và sau chấn.
+   - Hiển thị tiếng Việt dễ hiểu: Giới hạn dung sai, sai lệch đo thực tế (hoặc N/A), trạng thái kiểm tra phôi phẳng và uốn 3D.
+5. **Chuẩn hóa Thuật ngữ Cơ khí & Loại bỏ Thuật ngữ Hàn lâm (UX Professional):**
+   - Đổi `CHECK MIRROR` / `"Đối xứng gương (Mirror)"` thành **`"Đối xứng Trái / Phải (L/R)"`** (Pill: `Đối xứng (L/R)`), loại bỏ từ ngữ trừu tượng `"chirality đảo ngược"`.
+   - Đổi `SAME TOLERANCE` từ `"Dung sai"` cộc lốc thành **`"Trong dung sai"`** (`✔ TRÙNG KHỚP TRONG DUNG SAI CHO PHÉP`).
+   - Đổi `SAME GEOMETRY` từ `"Trùng 3D"` thành **`"Khác vật liệu"`** (`● TRÙNG HÌNH HỌC 3D (KHÁC VẬT LIỆU / ĐỘ DÀY)`).
+   - Đổi `SAME FLAT` từ `"Trùng Phôi"` thành **`"Trùng phôi cắt"`** (`▲ DÙNG CHUNG PHÔI TRẢI (KHÁC BƯỚC CHẤN UỐN)`).
+   - Đổi `NO_MATCH` từ `"Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp"` thành **`"Không trùng"`** (`○ CHI TIẾT ĐỘC LẬP — KHÔNG CÓ PART TRÙNG LẶP`).
+   - Đổi tiêu đề cột `BOM (部品番号)` thành **`Vị trí BOM (Item No)`** (loại bỏ tiếng Nhật).
+   - Đổi banner `"NHÓM CHI TIẾT ĐỒNG DẠNG"` thành **`"DANH SÁCH NHÓM CHI TIẾT TRÙNG LẶP"`**.

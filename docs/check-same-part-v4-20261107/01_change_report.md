@@ -1,4 +1,4 @@
-# BÁO CÁO KỸ THUẬT VÀ NGUYÊN NHÂN SỬA ĐỔI — CHECK SAME PART V4
+﻿# BÁO CÁO KỸ THUẬT VÀ NGUYÊN NHÂN SỬA ĐỔI — CHECK SAME PART V4
 
 **Mã tham chiếu:** `CHECK_SAME_PART_V4_REVIEWED_20261107`  
 **Git Baseline:** `dc7cc875961cbcfd2357879d68dc0cb7c56680bd`  
@@ -76,3 +76,36 @@ Bản vá được áp dụng tự động thông qua script `apply_check_same_p
    - `Commands/CheckSamePart.cs`
    - `UI/SamePartCheckReviewForm.cs`
 4. `git diff --check` sạch hoàn toàn, không có lỗi khoảng trắng thừa.
+
+---
+
+## 4. Chuẩn hóa Thuật ngữ Cơ khí & Tối ưu hóa UX Chuyên nghiệp (UX Refinement)
+
+Nhằm giúp kỹ sư chế tạo, công nghệ dập uốn tôn tấm và lắp ráp máy dễ dàng nắm bắt kết quả mà không bị nhầm lẫn bởi các thuật ngữ toán học hoặc từ ngữ dịch thô, toàn bộ thuật ngữ trên giao diện đã được rà soát và nâng cấp chuyên nghiệp:
+
+1. **Khái niệm "Đối xứng gương" (Mirror) $\rightarrow$ "Đối xứng Trái / Phải (L/R)":**
+   - *Bản chất kỹ thuật:* Hai chi tiết có kích thước và hình học 3D đối xứng nghịch chiều qua mặt phẳng (như bàn tay Trái và bàn tay Phải).
+   - *Ý nghĩa sản xuất:* **TUYỆT ĐỐI KHÔNG LẮP LẪN** cho nhau được! Trong gia công uốn chấn, hai chi tiết này phải dùng chương trình uốn ngược cữ/ngược hướng.
+   - *Loại bỏ thuật ngữ hàn lâm:* Đã bỏ hoàn toàn cụm từ khó hiểu `"chirality đảo ngược"` khỏi phần giải thích chi tiết; thay bằng `"ngược chiều uốn / hướng lắp ráp (vế Trái - vế Phải)"`.
+   - *Nhãn nút bấm / Bảng:* Đổi từ `Mirror` / `"Đối xứng gương (Mirror)"` thành **`"Đối xứng (L/R)"`** và **`"◆ CẶP CHI TIẾT ĐỐI XỨNG TRÁI / PHẢI (VẾ L / R)"`**.
+
+2. **Khái niệm "Dung sai" (SAME TOLERANCE) $\rightarrow$ "Trong dung sai":**
+   - Đổi nhãn cộc lốc `"Dung sai"` thành **`"Trong dung sai"`** / **`"✔ TRÙNG KHỚP TRONG DUNG SAI CHO PHÉP"`**, làm rõ rằng chi tiết trùng khớp hình học trong sai số cho phép ($< 0.05$ mm).
+
+3. **Khái niệm "Trùng 3D" (SAME GEOMETRY) $\rightarrow$ "Khác vật liệu":**
+   - Bản chất là hình học 3D giống nhau nhưng khác vật tư hoặc khác bề dày tôn.
+   - Đổi nhãn thành **`"Khác vật liệu"`** / **`"● TRÙNG HÌNH HỌC 3D (KHÁC VẬT LIỆU / ĐỘ DÀY)"`** để cảnh báo kỹ sư tuyệt đối không dùng chung phôi tấm.
+
+4. **Khái niệm "Trùng Phôi" (SAME FLAT) $\rightarrow$ "Trùng phôi cắt":**
+   - Bản chất là các chi tiết dùng chung một phôi trải phẳng (có thể cắt Laser hoặc đột CNC chung), nhưng các bước uốn 3D khác nhau.
+   - Đổi nhãn thành **`"Trùng phôi cắt"`** / **`"▲ DÙNG CHUNG PHÔI TRẢI (KHÁC BƯỚC CHẤN UỐN)"`**.
+
+5. **Khái niệm "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp" (NO_MATCH) $\rightarrow$ "Không trùng":**
+   - Loại bỏ câu văn logic toán học phức tạp `"chưa chứng minh khác nhau từng cặp"`.
+   - Đổi thành **`"Không trùng"`** (Pill gọn gàng) và **`"○ CHI TIẾT ĐỘC LẬP — KHÔNG CÓ PART TRÙNG LẶP"`**.
+
+6. **Loại bỏ chữ tiếng Nhật trong giao diện tiếng Việt:**
+   - Đổi tiêu đề cột `BOM (部品番号)` thành **`Vị trí BOM (Item No)`**.
+
+7. **Chuẩn hóa Banner danh sách:**
+   - Đổi `"NHÓM CHI TIẾT ĐỒNG DẠNG"` (từ toán học dễ hiểu nhầm là phóng to thu nhỏ) thành **`"DANH SÁCH NHÓM CHI TIẾT TRÙNG LẶP"`**.

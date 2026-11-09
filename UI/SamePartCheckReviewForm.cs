@@ -166,15 +166,15 @@ namespace ADDIN.UI
             int totalCards = result.Groups.Count + unverifiedErrorCards +
                 (countError > 0 ? 1 : 0) + (countNoMatch > 0 ? 1 : 0);
 
-            pillAll = new FilterPillButton("Tổng", totalCards, null, TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
+            pillAll = new FilterPillButton("Tất cả", totalCards, null, TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
             pillFull = new FilterPillButton("Trùng 100%", countFull, "FULL", TaiTheme.Success, TaiTheme.SuccessSoft, TaiTheme.SuccessBorder);
-            pillTolerance = new FilterPillButton("Dung sai", countTolerance, "TOLERANCE", Color.FromArgb(13, 148, 136), Color.FromArgb(204, 251, 241), Color.FromArgb(153, 246, 228));
-            pillGeo = new FilterPillButton("Trùng 3D", countGeo, "GEOMETRY", TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
-            pillFlat = new FilterPillButton("Trùng Phôi", countFlat, "FLAT", TaiTheme.Warning, TaiTheme.WarningSoft, TaiTheme.WarningBorder);
-            pillMirror = new FilterPillButton("Mirror", countMirror, "MIRROR", Color.FromArgb(124, 58, 237), Color.FromArgb(245, 243, 255), Color.FromArgb(221, 214, 254));
+            pillTolerance = new FilterPillButton("Trong dung sai", countTolerance, "TOLERANCE", Color.FromArgb(13, 148, 136), Color.FromArgb(204, 251, 241), Color.FromArgb(153, 246, 228));
+            pillGeo = new FilterPillButton("Khác vật liệu", countGeo, "GEOMETRY", TaiTheme.Accent, TaiTheme.AccentSoft, TaiTheme.AccentBorder);
+            pillFlat = new FilterPillButton("Trùng phôi cắt", countFlat, "FLAT", TaiTheme.Warning, TaiTheme.WarningSoft, TaiTheme.WarningBorder);
+            pillMirror = new FilterPillButton("Đối xứng (L/R)", countMirror, "MIRROR", Color.FromArgb(124, 58, 237), Color.FromArgb(245, 243, 255), Color.FromArgb(221, 214, 254));
             pillUnverified = new FilterPillButton("Chưa xác minh", countUnverified, "UNVERIFIED", Color.FromArgb(217, 119, 6), Color.FromArgb(254, 243, 199), Color.FromArgb(253, 230, 138));
             pillError = new FilterPillButton("Lỗi", countError, "ERROR", TaiTheme.Danger, TaiTheme.DangerSoft, TaiTheme.DangerBorder);
-            pillNoMatch = new FilterPillButton("Chưa tìm thấy nhóm trùng", countNoMatch, "NO_MATCH", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249), Color.FromArgb(203, 213, 225));
+            pillNoMatch = new FilterPillButton("Không trùng", countNoMatch, "NO_MATCH", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249), Color.FromArgb(203, 213, 225));
 
             pillAll.Click += (s, e) => ApplyFilter(null);
             pillFull.Click += (s, e) => ApplyFilter(activeFilter == "FULL" ? null : "FULL");
@@ -208,7 +208,7 @@ namespace ADDIN.UI
             reportWrap.Controls.Add(btnExportExcel);
             ribbon.Controls.Add(reportWrap, 2, 0);
 
-            summaryInfoLabel.Text = $"Quét BOM: {reportSnapshot.CheckedRows} chi tiết  ·  {result.Groups.Count} nhóm trùng ({reportSnapshot.GroupMembers} part)  ·  {countUnverified} chưa xác minh  ·  {countNoMatch} chưa tìm thấy nhóm trùng";
+            summaryInfoLabel.Text = $"Quét BOM: {reportSnapshot.CheckedRows} chi tiết  ·  {result.Groups.Count} nhóm trùng ({reportSnapshot.GroupMembers} part)  ·  {countUnverified} chưa xác minh  ·  {countNoMatch} không trùng";
 
             ribbonCard.Controls.Add(ribbon);
             root.Controls.Add(ribbonCard, 0, 0);
@@ -250,7 +250,7 @@ namespace ADDIN.UI
             };
             itemHeader.Paint += PaintLeftHeader;
 
-            var itemTitle = TextLabel("NHÓM CHI TIẾT ĐỒNG DẠNG", true);
+            var itemTitle = TextLabel("DANH SÁCH NHÓM CHI TIẾT TRÙNG LẶP", true);
             itemTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             itemTitle.ForeColor = Color.White;
 
@@ -450,7 +450,7 @@ namespace ADDIN.UI
             groupGrid.Columns[3].DefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
 
             // Right Inspector Grid (Parts in selected group)
-            partGrid.Columns.Add("BuhinNo", "BOM (部品番号)");
+            partGrid.Columns.Add("BuhinNo", "Vị trí BOM (Item No)");
             partGrid.Columns.Add("ComponentName", "Tên chi tiết / Model");
             partGrid.Columns.Add("Material", "Vật liệu");
             partGrid.Columns.Add("Thickness", "Bề dày");
@@ -558,11 +558,11 @@ namespace ADDIN.UI
                     {
                         GroupNumber = 0,
                         Status = "UNVERIFIED",
-                        Note = "Chi tiết chưa đủ dữ liệu hình học hoặc biên dạng cong phức tạp để xác minh tự động (chưa chứng minh khác nhau từng cặp)."
+                        Note = "Chi tiết chưa đủ dữ liệu hình học hoặc biên dạng cong phức tạp để xác minh tự động."
                     };
                     fakeUnverifiedGroup.Items.AddRange(unverifiedItems);
                     string partList = FormatBuhinList(unverifiedItems);
-                    int index = groupGrid.Rows.Add("Chưa xác minh", "UNV", unverifiedItems.Count.ToString(), partList);
+                    int index = groupGrid.Rows.Add(FormatStatusLabel("UNVERIFIED"), "UNV", unverifiedItems.Count.ToString(), partList);
                     groupGrid.Rows[index].Tag = fakeUnverifiedGroup;
                     ColorGroupRow(groupGrid.Rows[index], "UNVERIFIED");
                 }
@@ -592,11 +592,11 @@ namespace ADDIN.UI
                     {
                         GroupNumber = 0,
                         Status = "NO_MATCH",
-                        Note = "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp."
+                        Note = "Chi tiết độc lập, không tìm thấy đối tượng trùng trong đợt quét này."
                     };
                     fakeNoMatchGroup.Items.AddRange(unmatchedItems);
                     string partList = FormatBuhinList(unmatchedItems);
-                    int index = groupGrid.Rows.Add("Chưa tìm thấy nhóm trùng", "-", unmatchedItems.Count.ToString(), partList);
+                    int index = groupGrid.Rows.Add(FormatStatusLabel("NO_MATCH"), "-", unmatchedItems.Count.ToString(), partList);
                     groupGrid.Rows[index].Tag = fakeNoMatchGroup;
                     ColorGroupRow(groupGrid.Rows[index], "NO_MATCH");
                 }
@@ -639,7 +639,7 @@ namespace ADDIN.UI
                 if (group == null)
                 {
                     selectedGroupTitle.Text = string.IsNullOrEmpty(activeFilter)
-                        ? "Không tìm thấy nhóm chi tiết đồng dạng."
+                        ? "Không tìm thấy nhóm chi tiết trùng lặp."
                         : "Không có nhóm ở bộ lọc đã chọn.";
                     selectedGroupSubtext.Text = "Chọn bộ lọc khác trên thanh thống kê để xem danh sách.";
                 }
@@ -651,7 +651,7 @@ namespace ADDIN.UI
                         : (group.Status == "NO_MATCH" ? ""
                         : (group.GroupNumber > 0 ? "Nhóm " + group.GroupNumber + "  ·  " : "")));
                     string titleText = group.Status == "NO_MATCH"
-                        ? "Chưa tìm thấy nhóm trùng (" + group.Items.Count + " chi tiết)"
+                        ? "Chi tiết độc lập — Không trùng lặp (" + group.Items.Count + " chi tiết)"
                         : prefix + FormatStatusLabel(group.Status) + " (" + group.Items.Count + " chi tiết)";
                     selectedGroupTitle.Text = titleText;
                     selectedGroupSubtext.Text = !string.IsNullOrWhiteSpace(group.Note)
@@ -705,47 +705,43 @@ namespace ADDIN.UI
             switch (status)
             {
                 case "SAME FULL":
-                    headerTitle = "✔ TRÙNG KHỚP HOÀN TOÀN  ·  [ VERIFIED_SAME ]";
+                    headerTitle = "✔ TRÙNG KHỚP HOÀN TOÀN 100%";
                     headerColor = TaiTheme.Success;
                     break;
                 case "SAME TOLERANCE":
-                    headerTitle = "✔ TRÙNG KHỚP TRONG DUNG SAI  ·  [ VERIFIED_SAME ]";
+                    headerTitle = "✔ TRÙNG KHỚP TRONG DUNG SAI CHO PHÉP";
                     headerColor = Color.FromArgb(13, 148, 136);
                     break;
                 case "SAME GEOMETRY":
-                    headerTitle = "● TRÙNG HÌNH HỌC 3D (KHÁC VẬT LIỆU/BỀ DÀY)  ·  [ VERIFIED_SAME ]";
+                    headerTitle = "● TRÙNG HÌNH HỌC 3D (KHÁC VẬT LIỆU / ĐỘ DÀY)";
                     headerColor = TaiTheme.Accent;
                     break;
                 case "SAME FLAT":
-                    headerTitle = "▲ TRÙNG PHÔI TRẢI FLAT-PATTERN (UỐN KHÁC NHAU)  ·  [ VERIFIED_SAME ]";
+                    headerTitle = "▲ DÙNG CHUNG PHÔI TRẢI (KHÁC BƯỚC CHẤN UỐN)";
                     headerColor = TaiTheme.Warning;
                     break;
                 case "CHECK MIRROR":
-                    headerTitle = "◆ CHI TIẾT ĐỐI XỨNG GƯƠNG (MIRROR)  ·  [ VERIFIED_SAME ]";
+                    headerTitle = "◆ CẶP CHI TIẾT ĐỐI XỨNG TRÁI / PHẢI (VẾ L / R)";
                     headerColor = Color.FromArgb(124, 58, 237);
                     break;
                 case "UNVERIFIED":
-                    headerTitle = "⚠ CHƯA ĐỦ DỮ LIỆU HÌNH HỌC ĐỂ XÁC MINH  ·  [ INCONCLUSIVE ]";
+                    headerTitle = "⚠ CHƯA ĐỦ DỮ LIỆU HÌNH HỌC ĐỂ XÁC MINH TỰ ĐỘNG";
                     headerColor = Color.FromArgb(217, 119, 6);
                     break;
                 case "NO_MATCH":
-                    headerTitle = "○ CHƯA TÌM THẤY NHÓM TRÙNG  ·  [ INCONCLUSIVE ]";
+                    headerTitle = "○ CHI TIẾT ĐỘC LẬP — KHÔNG CÓ PART TRÙNG LẶP";
                     headerColor = Color.FromArgb(100, 116, 139);
                     break;
                 default:
-                    headerTitle = "■ LỖI ĐỌC FILE HOẶC SOLIDWORKS API  ·  [ ERROR ]";
+                    headerTitle = "■ LỖI ĐỌC FILE HOẶC SOLIDWORKS API";
                     headerColor = TaiTheme.Danger;
                     break;
             }
 
-            // CHECK_SAME_PART_V4_REVIEWED_20261107: friendly status header.
-            headerTitle = headerTitle.Replace("  ·  [ VERIFIED_SAME ]", "")
-                .Replace("  ·  [ INCONCLUSIVE ]", "")
-                .Replace("  ·  [ ERROR ]", "");
             if (status == "SAME FLAT" && group.FoldedCheckStatus == "INCONCLUSIVE")
-                headerTitle = "▲ PHÔI TRẢI GIỐNG — CHƯA XÁC MINH HÌNH DẠNG SAU CHẤN";
+                headerTitle = "▲ PHÔI TRẢI GIỐNG NHAU — CHƯA XÁC MINH HÌNH DẠNG SAU CHẤN";
             if (status == "CHECK MIRROR" && group.VerificationStatus == "INCONCLUSIVE")
-                headerTitle = "◆ CÓ DẤU HIỆU ĐỐI XỨNG — CẦN KIỂM TRA 3D";
+                headerTitle = "◆ CÓ DẤU HIỆU ĐỐI XỨNG — CẦN KIỂM TRA TRỰC TIẾP TRÊN 3D";
             calloutHeader.Text = headerTitle;
             calloutHeader.ForeColor = headerColor;
 
@@ -763,13 +759,13 @@ namespace ADDIN.UI
             string tolText = group.AppliedToleranceMm.HasValue ? group.AppliedToleranceMm.Value.ToString("F3") + " mm" : "N/A";
             string devText = group.ActualDeviationMm.HasValue ? group.ActualDeviationMm.Value.ToString("F4") + " mm" : "N/A";
             string verificationUser = group.VerificationStatus == "VERIFIED_SAME"
-                ? "Đã xác minh theo mức dung sai" :
-                (group.VerificationStatus == "VERIFIED_DIFFERENT" ? "Đã phát hiện khác biệt" : "Cần kiểm tra thêm");
+                ? "Đã xác minh theo dung sai" :
+                (group.VerificationStatus == "VERIFIED_DIFFERENT" ? "Phát hiện khác biệt" : "Cần kiểm tra thêm");
             string flatUser = group.FlatCheckStatus == "VERIFIED_SAME" ? "Đã xác minh" :
                 (group.FlatCheckStatus == "VERIFIED_DIFFERENT" ? "Khác nhau" : "Chưa xác minh");
             string foldedUser = group.FoldedCheckStatus == "VERIFIED_SAME" ? "Đã xác minh" :
                 (group.FoldedCheckStatus == "VERIFIED_DIFFERENT" ? "Khác nhau" : "Chưa xác minh");
-            calloutFooter.Text = $"{verificationUser}  ·  Giới hạn: {tolText}  ·  Sai lệch đo: {devText}  ·  Phôi trải: {flatUser}  ·  Sau chấn: {foldedUser}";
+            calloutFooter.Text = $"{verificationUser}  ·  Dung sai: {tolText}  ·  Sai lệch đo: {devText}  ·  Phôi phẳng: {flatUser}  ·  Sau uốn: {foldedUser}";
 
             calloutCard.Invalidate();
         }
@@ -824,13 +820,13 @@ namespace ADDIN.UI
             switch (status)
             {
                 case "SAME FULL": return "Trùng 100%";
-                case "SAME TOLERANCE": return "Dung sai";
-                case "SAME GEOMETRY": return "Trùng 3D";
-                case "SAME FLAT": return "Trùng Phôi";
-                case "CHECK MIRROR": return "Mirror";
+                case "SAME TOLERANCE": return "Trong dung sai";
+                case "SAME GEOMETRY": return "Khác vật liệu";
+                case "SAME FLAT": return "Trùng phôi cắt";
+                case "CHECK MIRROR": return "Đối xứng (L/R)";
                 case "UNVERIFIED": return "Chưa xác minh";
                 case "ERROR": return "Lỗi";
-                case "NO_MATCH": return "Chưa tìm thấy nhóm trùng";
+                case "NO_MATCH": return "Không trùng";
                 default: return status ?? "";
             }
         }
@@ -839,14 +835,14 @@ namespace ADDIN.UI
         {
             switch (status)
             {
-                case "SAME FULL": return "Các chi tiết hoàn toàn giống nhau về cả hình học 3D, vật liệu, bề dày và phôi trải.";
-                case "SAME TOLERANCE": return "Các chi tiết giống nhau trong phạm vi dung sai cho phép.";
-                case "SAME GEOMETRY": return "Biên dạng 3D giống nhau nhưng vật liệu hoặc bề dày tôn khác nhau.";
-                case "SAME FLAT": return "Biên dạng trải phẳng giống nhau nhưng trạng thái uốn/chấn khác nhau.";
-                case "CHECK MIRROR": return "Biên dạng tương đương đối xứng Mirror qua mặt phẳng.";
+                case "SAME FULL": return "Các chi tiết hoàn toàn trùng khớp 100% về hình học 3D, vật liệu, bề dày và phôi trải.";
+                case "SAME TOLERANCE": return "Các chi tiết trùng khớp hình học trong phạm vi dung sai cho phép.";
+                case "SAME GEOMETRY": return "Hình học 3D giống nhau nhưng khác nhau về vật liệu hoặc bề dày tôn.";
+                case "SAME FLAT": return "Dùng chung phôi trải phẳng nhưng quy trình uốn/chấn 3D khác nhau.";
+                case "CHECK MIRROR": return "Cặp chi tiết đối xứng Trái / Phải (L/R) qua mặt phẳng.";
                 case "UNVERIFIED": return "Chi tiết chưa đủ dữ liệu hình học hoặc biên dạng cong phức tạp để xác minh tự động.";
                 case "ERROR": return "Có lỗi phát sinh trong quá trình đọc chi tiết.";
-                case "NO_MATCH": return "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp.";
+                case "NO_MATCH": return "Chi tiết độc lập, không tìm thấy đối tượng trùng lặp trong đợt quét này.";
                 default: return "";
             }
         }
@@ -892,7 +888,7 @@ namespace ADDIN.UI
             {
                 TextRenderer.DrawText(g, "KẾT QUẢ CHECK SAME PART", titleFont, new Point(textLeft, 6), TaiTheme.Text,
                     TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
-                TextRenderer.DrawText(g, "So khớp hình học 3D, phôi trải và đối xứng", subFont, new Point(textLeft, 28), TaiTheme.TextMuted,
+                TextRenderer.DrawText(g, "So khớp hình học 3D, phôi trải và đối xứng Trái / Phải (L/R)", subFont, new Point(textLeft, 28), TaiTheme.TextMuted,
                     TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
             }
         }

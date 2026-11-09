@@ -474,9 +474,9 @@ namespace ADDIN.Commands
                     group.VerificationStatus = "VERIFIED_SAME";
                     group.FlatCheckStatus = "VERIFIED_SAME";
                     group.FoldedCheckStatus = "VERIFIED_SAME";
-                    group.MeaningExplanation = "Các chi tiết trong nhóm này giống nhau hoàn toàn về hình học 3D, biên dạng phôi trải, vật liệu và bề dày tôn.";
+                    group.MeaningExplanation = "Các chi tiết trong nhóm này trùng khớp hoàn toàn 100% về hình học 3D, biên dạng phôi trải, vật liệu và bề dày tôn.";
                     group.ComparisonExplanation = "Cùng vật liệu (" + mat + "), cùng bề dày (" + thk + " mm). Toàn bộ hình học 3D và phôi trải phẳng trùng khớp tuyệt đối.";
-                    group.NextStepGuidance = "Có thể quản lý chung một mã chi tiết hoặc gộp danh mục sản xuất. Cần kiểm tra yêu cầu bản vẽ trước khi dùng chung quy trình gia công.";
+                    group.NextStepGuidance = "Có thể quản lý chung một mã chi tiết (Part No.) hoặc gộp danh mục sản xuất. Hoàn toàn lắp lẫn được cho nhau.";
                     break;
 
                 case "SAME TOLERANCE":
@@ -485,18 +485,18 @@ namespace ADDIN.Commands
                     group.FoldedCheckStatus = "VERIFIED_SAME";
                     string tolStr = group.AppliedToleranceMm.HasValue ? group.AppliedToleranceMm.Value.ToString("F3", CultureInfo.InvariantCulture) + " mm" : "dung sai quy định";
                     string devStr = group.ActualDeviationMm.HasValue ? group.ActualDeviationMm.Value.ToString("F4", CultureInfo.InvariantCulture) + " mm" : "trong giới hạn";
-                    group.MeaningExplanation = "Các chi tiết giống nhau về hình học và phôi trải trong phạm vi dung sai cho phép (" + tolStr + ").";
-                    group.ComparisonExplanation = "Cùng vật liệu (" + mat + ") và bề dày (" + thk + " mm). Sai lệch hình học thực tế đo được là " + devStr + " (nằm trong dung sai " + tolStr + ").";
-                    group.NextStepGuidance = "Kiểm tra dung sai lắp ghép và yêu cầu kỹ thuật của cụm chi tiết trước khi quyết định dùng thay thế cho nhau.";
+                    group.MeaningExplanation = "Các chi tiết trùng khớp hình học trong phạm vi dung sai cho phép (" + tolStr + ").";
+                    group.ComparisonExplanation = "Cùng vật liệu (" + mat + ") và bề dày (" + thk + " mm). Sai lệch hình học thực tế đo được là " + devStr + " (nằm trong dung sai cho phép " + tolStr + ").";
+                    group.NextStepGuidance = "Kiểm tra yêu cầu kỹ thuật và độ hở lắp ghép của cụm máy trước khi quyết định thay thế hoặc gộp mã dùng chung.";
                     break;
 
                 case "SAME GEOMETRY":
                     group.VerificationStatus = "VERIFIED_SAME";
                     group.FlatCheckStatus = "VERIFIED_SAME";
                     group.FoldedCheckStatus = "VERIFIED_SAME";
-                    group.MeaningExplanation = "Các chi tiết có hình dạng hình học 3D hoàn toàn giống nhau nhưng khác nhau về vật liệu hoặc bề dày tôn.";
+                    group.MeaningExplanation = "Các chi tiết có hình dạng 3D giống nhau nhưng KHÁC VẬT LIỆU hoặc KHÁC BỀ DÀY TÔN.";
                     group.ComparisonExplanation = "Hình học 3D trùng khớp. Điểm khác biệt: " + group.Note;
-                    group.NextStepGuidance = "Không được dùng chung phôi dập do khác vật tư hoặc bề dày. Cần quản lý mã riêng theo đúng chỉ định vật liệu.";
+                    group.NextStepGuidance = "Tuyệt đối KHÔNG DÙNG CHUNG PHÔI do khác chủng loại vật tư hoặc bề dày tấm. Cần quản lý mã riêng biệt cho từng loại vật liệu.";
                     break;
 
                 case "SAME FLAT":
@@ -504,17 +504,17 @@ namespace ADDIN.Commands
                     if (group.FoldedCheckStatus == "INCONCLUSIVE")
                     {
                         group.VerificationStatus = "INCONCLUSIVE";
-                        group.MeaningExplanation = "Các chi tiết có biên dạng phôi phẳng (Flat-Pattern) tương đương nhau, nhưng trạng thái uốn/chấn 3D chưa đủ điều kiện để tự động xác minh.";
-                        group.ComparisonExplanation = "Biên dạng phẳng và các vị trí đột lỗ khi trải phẳng giống nhau. Trạng thái uốn gấp 3D chưa được kiểm chứng tự động; " + (group.Note ?? "");
-                        group.NextStepGuidance = "Cần mở mô hình 3D trên SOLIDWORKS để kiểm tra trực tiếp các bước uốn gấp trước khi quyết định dùng chung.";
+                        group.MeaningExplanation = "Các chi tiết dùng chung phôi trải phẳng (Flat-Pattern), nhưng hình dạng uốn 3D chưa đủ điều kiện để tự động xác minh.";
+                        group.ComparisonExplanation = "Biên dạng cắt phẳng và các vị trí đột lỗ giống nhau. Trạng thái uốn gấp 3D cần được đối chiếu trực tiếp trên mô hình: " + (group.Note ?? "");
+                        group.NextStepGuidance = "Mở mô hình 3D trên SOLIDWORKS để kiểm tra trực tiếp các bước uốn gấp trước khi quyết định dùng chung.";
                     }
                     else
                     {
                         group.FoldedCheckStatus = "VERIFIED_DIFFERENT";
                         group.VerificationStatus = "VERIFIED_SAME";
-                        group.MeaningExplanation = "Các chi tiết có biên dạng phôi phẳng (Flat-Pattern) tương đương nhau, nhưng trạng thái uốn/chấn 3D khác nhau.";
-                        group.ComparisonExplanation = "Biên dạng phẳng và các vị trí đột lỗ khi trải phẳng giống nhau. Khác biệt ở các bước uốn gấp (góc uốn, chiều dài cạnh bẻ hoặc hướng bẻ).";
-                        group.NextStepGuidance = "Có thể tham khảo cắt chung phôi tấm phẳng (laser/turret punch), nhưng cần chạy chương trình chấn bẻ uốn riêng.";
+                        group.MeaningExplanation = "Các chi tiết dùng chung phôi trải phẳng (Flat-Pattern), nhưng các bước uốn/chấn 3D khác nhau.";
+                        group.ComparisonExplanation = "Biên dạng phẳng và các vị trí đột lỗ khi trải phẳng giống nhau. Khác biệt ở các bước uốn gấp (góc uốn, hướng uốn hoặc thứ tự bẻ cạnh).";
+                        group.NextStepGuidance = "Có thể gom cắt chung phôi tấm phẳng (Laser / Đột CNC), nhưng bắt buộc phải chấn bẻ trên chương trình riêng biệt.";
                     }
                     break;
 
@@ -523,17 +523,17 @@ namespace ADDIN.Commands
                     if (group.VerificationStatus == "INCONCLUSIVE")
                     {
                         group.FoldedCheckStatus = "INCONCLUSIVE";
-                        group.MeaningExplanation = "Các chi tiết có dấu hiệu đối xứng gương (Mirror), nhưng thuật toán chưa đủ dữ liệu hình học để tự động xác minh kết luận.";
-                        group.ComparisonExplanation = "Phát hiện dấu hiệu đối xứng qua chiều uốn hoặc lịch sử mô hình. Cần kiểm chứng trực tiếp bằng mắt hoặc đo đạc 3D.";
-                        group.NextStepGuidance = "Mở mô hình 3D để đối chiếu vị trí chấn uốn và lỗ đột; không được tự ý đổi chỗ chi tiết trái/phải.";
+                        group.MeaningExplanation = "Phát hiện dấu hiệu đối xứng Trái / Phải (L/R), nhưng hệ thống cần kiểm tra thêm dữ liệu 3D.";
+                        group.ComparisonExplanation = "Có dấu hiệu đối xứng qua chiều uốn hoặc lịch sử mô hình. Cần kiểm chứng trực tiếp bằng mắt hoặc đo đạc 3D.";
+                        group.NextStepGuidance = "Mở mô hình 3D để đối chiếu vị trí uốn và lỗ đột; kiểm tra kỹ vế Trái / Phải trước khi gia công.";
                     }
                     else
                     {
                         group.VerificationStatus = "VERIFIED_SAME";
                         group.FoldedCheckStatus = "VERIFIED_SAME";
-                        group.MeaningExplanation = "Các chi tiết là cặp đối xứng gương (Mirror) của nhau (chi tiết bên trái / bên phải).";
-                        group.ComparisonExplanation = "Kích thước và biên dạng tương đương nhưng ngược chiều nhau qua mặt phẳng đối xứng (chirality đảo ngược).";
-                        group.NextStepGuidance = "Không được lắp lẫn cho nhau vì đối xứng trái/phải. Cần phân biệt rõ khi cấp phôi vào đồ gá uốn/hàn.";
+                        group.MeaningExplanation = "Cặp chi tiết đối xứng Trái / Phải (Vế trái - Vế phải, đối xứng L/R).";
+                        group.ComparisonExplanation = "Kích thước và biên dạng tương đương nhưng ngược chiều nhau qua mặt phẳng đối xứng (như bàn tay Trái và Phải).";
+                        group.NextStepGuidance = "TUYỆT ĐỐI KHÔNG LẮP LẪN cho nhau vì ngược vế Trái / Phải. Cần phân loại riêng khi cấp phôi vào đồ gá uốn/hàn và quản lý mã chi tiết riêng.";
                     }
                     break;
 
@@ -541,8 +541,8 @@ namespace ADDIN.Commands
                     group.VerificationStatus = "INCONCLUSIVE";
                     group.FlatCheckStatus = "INCONCLUSIVE";
                     group.FoldedCheckStatus = "INCONCLUSIVE";
-                    group.MeaningExplanation = "Hệ thống chưa đủ dữ liệu hình học để tự động xác minh kết luận cho các chi tiết này.";
-                    group.ComparisonExplanation = "Chi tiết có biên dạng đặc thù (dạng tròn xoay đồng trục hoặc mặt cong tự do) không đủ điểm neo độc lập để thuật toán kiểm chứng tự động.";
+                    group.MeaningExplanation = "Chưa đủ dữ liệu hình học độc lập để hệ thống tự động đưa ra kết luận cho chi tiết này.";
+                    group.ComparisonExplanation = "Chi tiết có biên dạng tròn xoay hoặc mặt cong tự do không đủ điểm mốc độc lập để thuật toán kiểm chứng tự động.";
                     group.NextStepGuidance = "Bấm nút 'Mở Part 3D' để kiểm tra trực tiếp kích thước và biên dạng trên SOLIDWORKS.";
                     break;
 
@@ -550,9 +550,9 @@ namespace ADDIN.Commands
                     group.VerificationStatus = "INCONCLUSIVE";
                     group.FlatCheckStatus = "N/A";
                     group.FoldedCheckStatus = "N/A";
-                    group.MeaningExplanation = "Chi tiết không tìm thấy đối tượng trùng trong phạm vi các chi tiết được chọn quét lần này.";
-                    group.ComparisonExplanation = "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp đối với mọi chi tiết.";
-                    group.NextStepGuidance = "Nếu nghi ngờ có chi tiết trùng trong cụm khác, hãy chọn mở rộng phạm vi kiểm tra BOM.";
+                    group.MeaningExplanation = "Chi tiết độc lập, không tìm thấy chi tiết nào trùng lặp trong đợt quét này.";
+                    group.ComparisonExplanation = "Hình học của chi tiết này là duy nhất trong danh sách BOM được chọn quét.";
+                    group.NextStepGuidance = "Chi tiết này là độc lập. Nếu nghi ngờ có chi tiết trùng trong cụm lắp khác, hãy chọn mở rộng phạm vi quét BOM.";
                     break;
 
                 default:
@@ -4003,15 +4003,15 @@ namespace ADDIN.Commands
         {
             switch (code ?? "")
             {
-                case "SAME FULL": return "TRÙNG 100%";
-                case "SAME TOLERANCE": return "TRÙNG TRONG DUNG SAI";
-                case "SAME GEOMETRY": return "TRÙNG HÌNH HỌC 3D";
-                case "SAME FLAT": return "TRÙNG PHÔI (FLAT)";
-                case "CHECK MIRROR": return "CẦN KIỂM TRA ĐỐI XỨNG";
-                case "UNVERIFIED": return "CHƯA XÁC MINH";
-                case "ERROR": return "LỖI ĐỌC / XỬ LÝ";
-                case "NO_MATCH": return "CHƯA TÌM THẤY NHÓM TRÙNG";
-                default: return "CHƯA XÁC MINH";
+                case "SAME FULL": return "Trùng 100%";
+                case "SAME TOLERANCE": return "Trong dung sai";
+                case "SAME GEOMETRY": return "Khác vật liệu";
+                case "SAME FLAT": return "Trùng phôi cắt";
+                case "CHECK MIRROR": return "Đối xứng (L/R)";
+                case "UNVERIFIED": return "Chưa xác minh";
+                case "ERROR": return "Lỗi đọc / Xử lý";
+                case "NO_MATCH": return "Không trùng";
+                default: return "Chưa xác minh";
             }
         }
 
@@ -4075,8 +4075,8 @@ namespace ADDIN.Commands
                 verStatus = "INCONCLUSIVE";
                 flatStatus = "N/A";
                 foldedStatus = "N/A";
-                meaning = "Chi tiết chưa tìm thấy nhóm trùng trong đợt quét hiện tại.";
-                comparison = "Chưa tìm thấy nhóm trùng trong lần quét này; chưa chứng minh khác nhau từng cặp đối với mọi chi tiết.";
+                meaning = "Chi tiết độc lập, không tìm thấy chi tiết nào trùng lặp trong đợt quét này.";
+                comparison = "Hình học của chi tiết này là duy nhất trong danh sách BOM được chọn quét.";
                 nextStep = "Nếu nghi ngờ có chi tiết trùng trong cụm khác, hãy mở rộng phạm vi kiểm tra BOM.";
                 tech = "NO_MATCH";
             }
