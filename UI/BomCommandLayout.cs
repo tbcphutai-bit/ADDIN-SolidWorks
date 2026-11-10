@@ -381,15 +381,36 @@ namespace ADDIN
             LayoutModelMacroCommands();
         }
 
+        private ModernButton btnCircleAlongFace;
+
+        private void EnsureCircleAlongFaceButton()
+        {
+            if (btnCircleAlongFace != null || tabModelMacroPage == null) return;
+            btnCircleAlongFace = new ModernButton
+            {
+                Name = "btnCircleAlongFace",
+                Text = "Circle Along Face",
+                Subtitle = "Part / Assembly · 3D Sketch",
+                Kind = ModernButtonKind.Tile,
+                Tone = ModernButtonTone.Accent,
+                TabIndex = 33
+            };
+            btnCircleAlongFace.Click += (sender, args) =>
+                new ADDIN.Commands.CircleFaceTubeLayout.CircleFaceTubeLayoutCommand(swApp).Run(this);
+            tabModelMacroPage.Controls.Add(btnCircleAlongFace);
+            SetBomCommandToolTip(btnCircleAlongFace, "Chọn một mặt tấm, xem trước và tạo 3D Sketch đường tâm ống.");
+        }
+
         private void EnsureModelMacroControls()
         {
             EnsureBendMinimumButton();
+            EnsureCircleAlongFaceButton();
             if (tabModelMacroPage == null || cardMacroCommands != null) return;
 
             cardMacroCommands = new ModernCard { Name = "cardMacroCommands", Text = "Lệnh macro" };
             tabModelMacroPage.Controls.Add(cardMacroCommands);
             foreach (Button tile in new Button[] { btnCheckAssemblyHole, btnMirrorPart, btnEdgeToEqualSpline,
-                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum })
+                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum, btnCircleAlongFace })
                 MoveControlToCard(tile, cardMacroCommands);
             btnToggleMacroCommands = new ModernButton
             {
@@ -485,7 +506,7 @@ namespace ADDIN
             bool vCutOpen = vCutBendAssignmentControl != null && vCutBendAssignmentControl.Visible;
 
             Button[] macroTiles = { btnCheckAssemblyHole, btnMirrorPart, btnEdgeToEqualSpline,
-                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum };
+                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum, btnCircleAlongFace };
             foreach (Button tile in macroTiles)
                 if (tile != null) tile.Visible = !macroCommandsCollapsed;
 

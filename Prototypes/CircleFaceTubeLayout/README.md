@@ -1,32 +1,34 @@
-# CircleFaceTubeLayout — isolated prototype
+# Circle Along Face
 
-**Status:** Prototype source and Codex task are pushed. **Not integrated, not built, not run in SolidWorks.** This directory is intentionally OUTSIDE the existing legacy .csproj Compile list. Existing commands and runtime behavior remain unchanged.
+The integrated command is available under **Model → Macro → Circle Along Face**. Select one face of the sheet in a Part, or one face of a resolved top-level Part component in an Assembly. In an Assembly the resulting sketch belongs to the Assembly. The settings start at Ø20 mm, base count 40, **Add +1** on, and 5 mm large-end clearance.
 
-## Files
-- `Commands/CircleFaceTubeLayoutCommand.cs`: initial face-selection, four-edge rail analysis, arc-length spacing, provisional 3D centerline placement, rough clash precheck, named 3D Sketch creation after Yes, incremental debug.
-- `Commands/CircleFaceTubeLayoutForm.cs`: experimental settings for OD, count, Add +1, Flip, large-end margin.
-- `CODEX_PROMPT.md`: full implementation requirements and acceptance tests for Codex.
+**Preview** shows temporary axes and two end rails on the model. Green means the geometry checks passed. **Flip Side** and **Add +1** recalculate the preview. **Create 3D Sketch** creates one named sketch containing construction lines. **Cancel** clears the temporary graphics. The success dialog offers **Undo Sketch** to remove the new feature directly. SOLIDWORKS may decline a grouped Ctrl+Z entry for an Assembly sketch. The command writes an incremental UTF-8 log under `%LOCALAPPDATA%\TAI_TOOL\CircleFaceTubeLayout`.
 
-## Why isolated?
-The user's twisted face requires 3D cylinder placement and verification beyond a simple circular pattern. Initial math is approximate and COM signatures have NOT been validated against a local SolidWorks 2024 installation. Merging this directly into the add-in could cause compile failures or unsafe modeling.
+The exploratory files in this directory and `CODEX_PROMPT.md` describe the original prototype. The compiled command is in `Commands/CircleFaceTubeLayout`.
 
-## User workflow target
-Select ONE Part face -> infer short and long curved boundaries -> arrange 41 straight φ20 tubes touching at small end and evenly spaced at large end -> Flip if necessary -> transient graphic preview and debug -> explicit confirmation -> create one 3D Sketch of 41 construction axes. No Solid bodies until the user chooses that later.
+## Geometry decisions
 
-## Reference numerical test
-- Small: R3247 mm, length 811.35 mm
-- Large: R4323.16 mm, length 1421.97 mm
-- N41, OD20, big-end edge margin 5 mm: big-end pitch 34.79925 mm
-- Small-end approximate arc pitch for a 20 mm chord is 20.00003162 mm; **this is not proof of tube/tube contact on a twisted surface**.
+- The exterior coedge loop determines connectivity and orientation. Smooth splits are combined into chains and four discernible corners are required. Opposite-chain shape and taper determine the end pair, subject to a 3D pairing check. Ambiguous boundaries are rejected.
+- Arc lengths are measured on SolidWorks curves. A managed station cache is used for the iteration, followed by exact curve evaluation of the chosen stations. The large stations are evenly spaced in arc length. The edge clearance is measured from the outer support of each terminal cap to the plane normal to the inward rail tangent at the corresponding corner.
+- Small-end contact is measured on the first OD-length section of each finite 3D cylinder, using convex support for the barrel and flat caps. A 0.005 mm nominal solver gap allows numerical headroom. The contact band is 0–0.05 mm and positive separation is required over the full length for every pair.
+- SolidWorks B-rep intersection checks use temporary cylinder envelopes and the selected trimmed sheet face or the owning solid sheet body. A sampled signed clearance guides a bounded shared normal lift. Tube positions are re-solved and rechecked after a lift. The lift and the sampled clearance are reported separately from the kernel intersection result.
+- A straight tube can bridge a twisted face. This search allows at most two diameters of common lift and does not prove that no solution exists outside its search family. A component's other Assembly neighbors are outside the collision scope. Assembly-level geometry overrides, subassembly components and unresolved components require the underlying Part or owning subassembly to be opened directly.
 
-## Geometry and safety limitations
-- Only exactly four face edges and one outer loop.
-- Assumes two opposite bowed edges; can misdetect on other faces.
-- Provisional straight axes are calculated by interpolated endpoint normals, not optimized for true tangent contact.
-- Reported collisions are sampled/axis-distance estimates, not SolidWorks interference certification.
-- Only numeric `MessageBox` preview; no transient 3D graphics.
-- Sketch creation can leave a partial sketch after exceptions: Codex must implement rollback.
-- Debug target `%LOCALAPPDATA%\TAI_TOOL\CircleFaceTubeLayout`.
-- No uploaded proprietary `.SLDPRT` file is committed here.
+## Verification
 
-**Next action:** Give Codex this branch and ask it to execute `CODEX_PROMPT.md`. Integrate only after architecture review, API checks, compile tests, and real CAD validation. Open a draft PR and do not merge to main without user approval.
+Use the Visual Studio Developer PowerShell from the repository root to run the pure geometry regression suite.
+
+```powershell
+New-Item -ItemType Directory -Force bin/CircleFace | Out-Null
+csc /nologo /langversion:7.3 /platform:x64 /out:bin/CircleFace/GeometryTests.exe Tests/CircleFaceTubeLayout/GeometryTests.cs Commands/CircleFaceTubeLayout/TubeGeometry.cs Commands/CircleFaceTubeLayout/TubeLayoutSolver.cs Commands/CircleFaceTubeLayout/BoundaryRails.cs
+& .\bin\CircleFace\GeometryTests.exe
+```
+
+Build `ADDIN.csproj` with x64 Debug and Release against the SolidWorks 2024 Interop DLLs. To build without installing, pass `/p:PostBuildEvent= /p:RegisterForComInterop=false` and choose an output directory inside the checkout.
+
+Manual SolidWorks 2024 checks on a disposable copy:
+
+1. Select the broad sheet face. Check that the preview rails match the small and large ends from a view where both are visible.
+2. Toggle **Flip Side** and **Add +1**. Confirm side, 40/41 count, pitch, and cap margins in the report. Hide existing tube components if they obscure the preview.
+3. Cancel once and check the feature tree. Run again, create the 3D sketch, verify construction geometry, then use Undo Sketch in the success dialog.
+4. Try no selection, multiple faces, a split or spline rail, a sheet with an inner loop, an ambiguous boundary and a count that does not fit. Inspect the debug log for the reason and check that a rejected preview cannot create a sketch.

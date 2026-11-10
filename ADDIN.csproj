@@ -132,6 +132,12 @@
     <Compile Include="BomOccurrenceCounter.cs" />
     <Compile Include="Commands\CreateMirrorPartPackage.cs" />
     <Compile Include="Commands\Repair3DSplineCommand.cs" />
+    <Compile Include="Commands\CircleFaceTubeLayout\BoundaryRails.cs" />
+    <Compile Include="Commands\CircleFaceTubeLayout\CircleFaceTubeLayoutCommand.cs" />
+    <Compile Include="Commands\CircleFaceTubeLayout\CircleFaceTubeLayoutForm.cs" />
+    <Compile Include="Commands\CircleFaceTubeLayout\SwFaceLayout.cs" />
+    <Compile Include="Commands\CircleFaceTubeLayout\TubeGeometry.cs" />
+    <Compile Include="Commands\CircleFaceTubeLayout\TubeLayoutSolver.cs" />
     <Compile Include="Diagnostics\SketchReferenceDiagnostic.cs" />
     <Compile Include="Commands\MirrorV7\BipartiteEquivalenceMatcherV7.cs" />
     <Compile Include="Commands\MirrorV7\BodyMirrorVerifierV7.cs" />
