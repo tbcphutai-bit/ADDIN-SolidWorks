@@ -21,6 +21,11 @@ internal static class GeometryTests
             Require(Math.Abs(flat.LargePitch / Mm - 34.79925) < 0.01, "reference large-end pitch");
             Require(flat.SmallStations[0] < Diameter / 2, "small-end overhang");
             Summary("flat", flat);
+            var auto = Layout(null, 0.07, false, Quiet);
+            AssertLayout(auto, 41);
+            ExpectFailure(() => Layout(42, 0.07, false, Quiet), "42 tubes exceed the small-end 3D fit");
+            Summary("auto_twisted", auto);
+            TestAutoDifferentCount();
             var forty = Layout(40, 0, false, Quiet);
             AssertLayout(forty, 40);
             Summary("base40", forty);
@@ -122,7 +127,7 @@ internal static class GeometryTests
         return new Point3(radius * Math.Cos(angle), y * Math.Cos(rotation), y * Math.Sin(rotation));
     }
 
-    private static TubeLayout Layout(int count, double twist, bool flip, Action<string> log)
+    private static TubeLayout Layout(int? count, double twist, bool flip, Action<string> log)
     {
         Point3 Small(double s) => Arc(SmallRadius, SmallLength, s, 0);
         Point3 Large(double s) => Arc(LargeRadius, LargeLength, s, twist);
@@ -135,8 +140,22 @@ internal static class GeometryTests
             var tangent = point(s + 1e-7) - point(s - 1e-7);
             return new RailStation(outer ? q : p, (q - p).Cross(tangent).Unit() * (flip ? -1 : 1));
         }
-        return Solve(s => Station(s / SmallLength, false), SmallLength,
-            s => Station(s / LargeLength, true), LargeLength, count, Diameter, 0.005, 0.00001, log);
+        RailStation SmallStation(double s) => Station(s / SmallLength, false);
+        RailStation LargeStation(double s) => Station(s / LargeLength, true);
+        return count.HasValue
+            ? Solve(SmallStation, SmallLength, LargeStation, LargeLength, count.Value, Diameter, 0.005, 0.00001, log)
+            : SolveAutomatic(SmallStation, SmallLength, LargeStation, LargeLength, Diameter, 0.005, 0.00001, log);
+    }
+
+    private static void TestAutoDifferentCount()
+    {
+        const double smallLength = 0.062, largeLength = 0.115;
+        var normal = new Point3(0, 0, 1);
+        RailStation Small(double s) => new RailStation(new Point3(s - smallLength / 2, 0, 0), normal);
+        RailStation Large(double s) => new RailStation(new Point3(s - largeLength / 2, 1, 0), normal);
+        var layout = SolveAutomatic(Small, smallLength, Large, largeLength, Diameter, 0.005, 0.00001, Quiet);
+        Require(layout.Axes.Length == 4 && layout.Issue == null, "automatic count must adapt to a shorter small rail");
+        Summary("auto_short_rail", layout);
     }
 
     private static void AssertLayout(TubeLayout layout, int count)

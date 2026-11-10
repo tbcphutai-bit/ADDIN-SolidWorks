@@ -9,21 +9,22 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
     internal sealed class CircleFaceTubeLayoutForm : Form
     {
         private readonly NumericUpDown diameter = Number(20, 1, 500, 2);
-        private readonly NumericUpDown quantity = Number(40, 2, 199, 0);
+        private readonly NumericUpDown quantity = Number(40, 2, MaximumCount - 1, 0);
         private readonly NumericUpDown margin = Number(5, 0, 1000, 2);
+        private readonly CheckBox autoCount = new CheckBox { Text = "Auto count", Checked = true, AutoSize = true };
         private readonly CheckBox addOne = new CheckBox { Text = "Add +1", Checked = true, AutoSize = true };
         private readonly CheckBox flip = new CheckBox { Text = "Flip Side", AutoSize = true };
         private readonly Label total = new Label { AutoSize = true };
         private readonly Label report = new Label { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
         private readonly Button create = new Button { Text = "Create 3D Sketch", AutoSize = true, Enabled = false };
         private readonly Timer refresh = new Timer { Interval = 350 };
-        private readonly Func<int, double, double, bool, TubeLayout> analyze;
+        private readonly Func<int?, double, double, bool, TubeLayout> analyze;
         private readonly BoundaryRails rails;
         private bool previewed;
         public TubeLayout Accepted { get; private set; }
-        private int Count => (int)quantity.Value + (addOne.Checked ? 1 : 0);
+        private int? Count => autoCount.Checked ? (int?)null : (int)quantity.Value + (addOne.Checked ? 1 : 0);
 
-        public CircleFaceTubeLayoutForm(string logPath, BoundaryRails rails, Func<int, double, double, bool, TubeLayout> analyze)
+        public CircleFaceTubeLayoutForm(string logPath, BoundaryRails rails, Func<int?, double, double, bool, TubeLayout> analyze)
         {
             this.rails = rails;
             this.analyze = analyze;
@@ -49,7 +50,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             Row(grid, 2, "Large-end edge margin (mm)", margin);
             grid.Controls.Add(addOne, 0, 3);
             grid.Controls.Add(flip, 1, 3);
-            grid.Controls.Add(total, 0, 4);
+            grid.Controls.Add(autoCount, 0, 4);
+            grid.Controls.Add(total, 1, 4);
 
             var legend = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
             legend.Controls.Add(new Label { Text = "● Small end", ForeColor = Color.DeepSkyBlue, AutoSize = true });
@@ -83,7 +85,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             refresh.Tick += (sender, args) => Preview();
             foreach (NumericUpDown control in new[] { diameter, quantity, margin })
                 control.ValueChanged += (sender, args) => InvalidatePreview();
-            foreach (CheckBox control in new[] { addOne, flip })
+            foreach (CheckBox control in new[] { autoCount, addOne, flip })
                 control.CheckedChanged += (sender, args) => InvalidatePreview();
             FormClosed += (sender, args) => refresh.Stop();
             InvalidatePreview();
@@ -137,7 +139,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         {
             Accepted = null;
             create.Enabled = false;
-            total.Text = "Total axes: " + Count;
+            quantity.Enabled = addOne.Enabled = !autoCount.Checked;
+            total.Text = Count.HasValue ? "Total axes: " + Count.Value : "Total axes: Auto";
             report.Text = RailsText() + (previewed ? "\nUpdating preview…" : "\nChoose Preview to verify the layout.");
             if (!previewed) return;
             refresh.Stop();
@@ -161,6 +164,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 report.Text = RailsText() + F("\nLarge-end pitch {0:F3} mm  ·  lift {1:F3} mm\nSmall-end 3D gap {2:F4}–{3:F4} mm\nLarge cap margins {4:F3} / {5:F3} mm\n",
                     result.LargePitch / Mm, result.Lift / Mm, result.MinimumContact / Mm, result.MaximumContact / Mm, result.LargeLeftClearance / Mm, result.LargeRightClearance / Mm) +
                     (result.Issue == null ? "Verified separation for every pair and the sheet." : "INFEASIBLE: " + result.Issue);
+                total.Text = "Total axes: " + result.Axes.Length + (autoCount.Checked && result.Axes.Length == MaximumCount ? " (limit)" : "");
                 Accepted = result;
                 create.Enabled = result.Issue == null;
             }

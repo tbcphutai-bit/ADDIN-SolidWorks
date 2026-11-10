@@ -18,6 +18,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private readonly Action<string> log;
         public readonly BoundaryRails Rails;
 
+        private enum SheetCheck { Clear, Intersecting, Inconclusive }
+
         public SwFaceLayout(Face2 face, Modeler modeler, Action<string> log)
         {
             this.face = face;
@@ -51,10 +53,11 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 Rails.Small.Length / Mm, Rails.Large.Length / Mm, Rails.Small.PieceCount, Rails.Large.PieceCount));
         }
 
-        public TubeLayout Analyze(int count, double diameter, double margin, bool flip)
+        public TubeLayout Analyze(int? count, double diameter, double margin, bool flip)
         {
             double sign = faceSense * (flip ? -1 : 1);
-            log(F("SETTINGS flip={0} selected_normal_sign={1} large_edge_margin_nominal_mm={2:F6}", flip, sign, margin / Mm));
+            log(F("SETTINGS flip={0} selected_normal_sign={1} large_edge_margin_mm={2:F6} count={3}",
+                flip, sign, margin / Mm, count?.ToString() ?? "auto"));
             RailStation Small(double s) => Station(Rails.Small.At(s), sign);
             RailStation Large(double s) => Station(Rails.Large.At(Rails.Large.Length - s), sign);
             var smallCache = CacheRail(Small, Rails.Small.Length, diameter, "small");
@@ -64,25 +67,44 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             // lift. A bounded search deliberately rejects faces that require more.
             double lift = 0.01 * Mm;
             TubeLayout layout = null;
+            int uncertain = 0;
             for (int pass = 0; pass < 9 && lift <= 2 * diameter; pass++)
             {
-                layout = Solve(smallCache, Rails.Small.Length, largeCache, Rails.Large.Length,
-                    count, diameter, margin, lift, log, verify: false);
-                VerifyExact(layout, Small, Large, Rails.Large.Length, diameter, margin, log);
+                if (count.HasValue)
+                {
+                    layout = Solve(smallCache, Rails.Small.Length, largeCache, Rails.Large.Length,
+                        count.Value, diameter, margin, lift, log, verify: false);
+                    VerifyExact(layout, Small, Large, Rails.Large.Length, diameter, margin, log);
+                }
+                else
+                {
+                    int limit = MaximumCount;
+                    while (true)
+                    {
+                        layout = SolveAutomatic(smallCache, Rails.Small.Length, largeCache, Rails.Large.Length,
+                            diameter, margin, lift, log, limit);
+                        VerifyExact(layout, Small, Large, Rails.Large.Length, diameter, margin, log);
+                        if (layout.Issue == null) break;
+                        log(F("AUTO_COUNT exact_rejected={0} reason={1}", layout.Axes.Length, layout.Issue));
+                        limit = layout.Axes.Length - 1;
+                    }
+                }
                 int clashes = 0;
+                uncertain = 0;
                 layout.MinimumSheetEstimate = double.PositiveInfinity;
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < layout.Axes.Length; i++)
                 {
                     TubeAxis axis = layout.Axes[i];
                     double estimate = EstimateFaceClearance(axis, diameter / 2, sign);
                     layout.MinimumSheetEstimate = Math.Min(layout.MinimumSheetEstimate, estimate);
-                    bool intersects = IntersectsSheet(axis, diameter / 2, i + 1);
-                    if (intersects) clashes++;
-                    log(F("SHEET axis={0} sampled_min_mm={1:F6} brep_intersection={2}", i + 1, estimate / Mm, intersects));
+                    SheetCheck check = CheckSheet(axis, diameter / 2, i + 1);
+                    if (check == SheetCheck.Intersecting) clashes++;
+                    if (check == SheetCheck.Inconclusive) uncertain++;
+                    log(F("SHEET axis={0} sampled_min_mm={1:F6} brep={2}", i + 1, estimate / Mm, check));
                 }
-                log(F("LIFT pass={0} offset_mm={1:F6} clashes={2} signed_sample_min_mm={3:F6}",
-                    pass + 1, lift / Mm, clashes, layout.MinimumSheetEstimate / Mm));
-                if (clashes == 0 && layout.MinimumSheetEstimate >= -0.02 * Mm) return layout;
+                log(F("LIFT pass={0} offset_mm={1:F6} clashes={2} signed_sample_min_mm={3:F6} inconclusive={4}",
+                    pass + 1, lift / Mm, clashes, layout.MinimumSheetEstimate / Mm, uncertain));
+                if (clashes == 0 && uncertain == 0 && layout.MinimumSheetEstimate >= -0.02 * Mm) return layout;
                 if (flip && ownerBody.GetType() == (int)swBodyType_e.swSolidBody && clashes > 0)
                 {
                     // On a solid, the opposite normal points into material. A
@@ -91,7 +113,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 }
                 lift += Math.Max(Math.Max(0.05 * Mm, lift * 0.5), -layout.MinimumSheetEstimate + 0.02 * Mm);
             }
-            layout.Issue = "The solver could not clear the sheet while staying close to the selected side.";
+            layout.Issue = uncertain > 0
+                ? "SolidWorks could not verify all tube-to-sheet checks within the allowed lift."
+                : "The solver could not clear the sheet while staying close to the selected side.";
             return layout;
         }
 
@@ -116,14 +140,43 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             };
         }
 
-        private RailStation Station(Point3 p, double sign)
+        private RailStation Station(Point3 point, double sign, double[] closest = null)
         {
-            // ISurface.EvaluateAtPoint returns normal, principal directions and
-            // curvatures, in that order. p is a point on the trimmed face.
-            var values = surface.EvaluateAtPoint(p.X, p.Y, p.Z) as double[];
-            if (values == null || values.Length != 11)
-                throw new LayoutException("SolidWorks could not evaluate the surface normal.");
-            return new RailStation(p, Point3.Read(values).Unit() * sign);
+            // XYZ evaluation can fail at a trimmed boundary even when its
+            // parent surface is regular at the corresponding UV parameters.
+            var xyz = surface.EvaluateAtPoint(point.X, point.Y, point.Z) as double[];
+            Point3 normal;
+            if (xyz != null && xyz.Length == 11 && TryReadNormal(xyz, 0, out normal))
+                return new RailStation(point, normal * sign);
+
+            closest = closest ?? face.GetClosestPointOn(point.X, point.Y, point.Z) as double[];
+            if (closest != null && closest.Length == 5 &&
+                (Point3.Read(closest) - point).Length <= 0.02 * Mm)
+            {
+                // Zero derivatives returns [point XYZ, surface normal XYZ].
+                var uv = surface.Evaluate(closest[3], closest[4], 0, 0) as double[];
+                if (uv != null && uv.Length == 6 &&
+                    (Point3.Read(uv) - point).Length <= 0.02 * Mm &&
+                    TryReadNormal(uv, 3, out normal))
+                {
+                    log(F("NORMAL_UV_FALLBACK point_m={0} u={1:R} v={2:R} normal={3}",
+                        point, closest[3], closest[4], normal * sign));
+                    return new RailStation(point, normal * sign);
+                }
+            }
+
+            log(F("NORMAL_FAILED point_m={0} xyz_count={1} closest_count={2}",
+                point, xyz?.Length ?? 0, closest?.Length ?? 0));
+            throw new LayoutException("SolidWorks could not evaluate the selected face normal at a layout point.");
+        }
+
+        private static bool TryReadNormal(double[] values, int offset, out Point3 normal)
+        {
+            normal = new Point3(values[offset], values[offset + 1], values[offset + 2]);
+            double length = normal.Length;
+            if (!(length > 1e-12) || double.IsInfinity(length)) return false;
+            normal = normal * (1 / length);
+            return true;
         }
 
         private double EstimateFaceClearance(TubeAxis axis, double radius, double sign)
@@ -133,8 +186,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             for (int i = 0; i <= divisions; i++)
             {
                 Point3 p = axis.A + axis.Direction * (axis.Length * i / divisions);
-                Point3 q = Point3.Read(face.GetClosestPointOn(p.X, p.Y, p.Z));
-                Point3 n = Station(q, sign).Normal;
+                var closest = face.GetClosestPointOn(p.X, p.Y, p.Z) as double[];
+                Point3 q = Point3.Read(closest);
+                Point3 n = Station(q, sign, closest).Normal;
                 double along = n.Dot(axis.Direction);
                 double radialExtent = radius * Math.Sqrt(Math.Max(0, 1 - along * along));
                 minimum = Math.Min(minimum, (p - q).Dot(n) - radialExtent);
@@ -142,7 +196,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             return minimum;
         }
 
-        private bool IntersectsSheet(TubeAxis axis, double radius, int index)
+        private SheetCheck CheckSheet(TubeAxis axis, double radius, int index)
         {
             Body2 target = null, tool = null;
             Array result = null;
@@ -164,13 +218,20 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 int error;
                 result = target.Operations2((int)swBodyOperationType_e.SWBODYINTERSECT, tool, out error) as Array;
                 log(F("BREP axis={0} result_count={1} error={2}", index, result?.Length ?? 0, error));
-                if (result != null && result.Length > 0) return true;
+                if (result != null && result.Length > 0) return SheetCheck.Intersecting;
                 switch ((swBodyOperationError_e)error)
                 {
                     case swBodyOperationError_e.swBodyOperationNoError:
                     case swBodyOperationError_e.swBodyOperationDisjointBodies:
                     case swBodyOperationError_e.swBodyOperationNoIntersect:
-                        return false;
+                        return SheetCheck.Clear;
+                    case swBodyOperationError_e.swBodyOperationUnknownError:
+                    case swBodyOperationError_e.swBodyOperationNonManifold:
+                    case swBodyOperationError_e.swBodyOperationPartialCoincidence:
+                    case swBodyOperationError_e.swBodyOperationBooleanFail:
+                        // Near tangency can make the Boolean indeterminate. Retry at
+                        // the next lift without treating this attempt as separated.
+                        return SheetCheck.Inconclusive;
                     default:
                         throw new LayoutException("Sheet interference check was inconclusive (SolidWorks error " + error + ").");
                 }

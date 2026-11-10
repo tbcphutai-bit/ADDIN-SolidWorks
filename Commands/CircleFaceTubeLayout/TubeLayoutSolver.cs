@@ -26,14 +26,54 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
     internal static class TubeLayoutSolver
     {
         public const double Mm = 0.001;
+        public const int MaximumCount = 200;
         private const double TargetGap = 0.005 * Mm;
         internal const double ContactTolerance = 0.05 * Mm;
         private const double StationTolerance = 0.001 * Mm;
         private const double SymmetryTolerance = 0.02 * Mm;
 
+        public static TubeLayout SolveAutomatic(Func<double, RailStation> small, double smallLength,
+            Func<double, RailStation> large, double largeLength, double diameter, double margin, double lift,
+            Action<string> log, int countLimit = MaximumCount)
+        {
+            if (!(largeLength > diameter + 2 * margin))
+                throw new LayoutException("INFEASIBLE: large end has insufficient length for the requested margins.");
+
+            // Spacing along the rail is not a bound on finite-cylinder contact.
+            // Search the supported counts in order and verify each candidate in 3D.
+            Action<string> quiet = _ => { };
+            for (int count = countLimit; count >= 2; count--)
+            {
+                TubeLayout candidate = SolveCore(small, smallLength, large, largeLength, count, diameter, margin, lift, quiet, true);
+                if (candidate == null)
+                {
+                    log(F("AUTO_COUNT rejected={0} reason=no_small_end_contact_sequence", count));
+                    continue;
+                }
+
+                if (candidate.Issue != null)
+                {
+                    log(F("AUTO_COUNT rejected={0} reason={1}", count, candidate.Issue));
+                    continue;
+                }
+
+                log(F("AUTO_COUNT selected={0} lift_mm={1:F6} search_limit={2}", count, lift / Mm, MaximumCount));
+                return candidate;
+            }
+            throw new LayoutException("INFEASIBLE: no verified small-end contact sequence was found in automatic mode.");
+        }
+
         public static TubeLayout Solve(Func<double, RailStation> small, double smallLength,
             Func<double, RailStation> large, double largeLength, int count, double diameter,
             double margin, double lift, Action<string> log, bool verify = true)
+        {
+            return SolveCore(small, smallLength, large, largeLength, count, diameter, margin, lift, log, verify)
+                ?? throw new LayoutException("INFEASIBLE: no small-end contact sequence fits within the rail.");
+        }
+
+        private static TubeLayout SolveCore(Func<double, RailStation> small, double smallLength,
+            Func<double, RailStation> large, double largeLength, int count, double diameter,
+            double margin, double lift, Action<string> log, bool verify)
         {
             double radius = diameter / 2;
             if (count < 2 || !(diameter > 0) || !(smallLength > 0) || !(margin >= 0) || !(lift >= 0))
@@ -49,6 +89,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             for (int pass = 0; pass < 6; pass++)
             {
                 result = SolveStations(small, smallLength, large, largeLength, count, diameter, first, last, lift, log);
+                if (result == null) return null;
                 result.LargeLeftClearance = CapClearance(result.Axes[0], left, leftInward, radius);
                 result.LargeRightClearance = CapClearance(result.Axes[count - 1], right, rightInward, radius);
                 double leftError = margin - result.LargeLeftClearance, rightError = margin - result.LargeRightClearance;
@@ -172,7 +213,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
 
             var resultAtFirst = new TubeLayout(count);
             if (!March(0, resultAtFirst))
-                throw new LayoutException("INFEASIBLE: no small-end contact sequence fits within the rail.");
+                return null;
             var best = resultAtFirst;
             double low = 0, high = smallLength / 2;
             for (int i = 0; i < 24; i++)
