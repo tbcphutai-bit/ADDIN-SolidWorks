@@ -65,6 +65,7 @@ namespace ADDIN.UI
             ForeColor = TaiTheme.Text;
             BackColor = TaiTheme.Page;
             DoubleBuffered = true;
+            KeyPreview = true;
 
             ConfigureGrids();
 
@@ -358,6 +359,14 @@ namespace ADDIN.UI
 
             UpdateFilterPills();
             DisplayResults();
+
+            Shown += (sender, args) =>
+            {
+                if (drawingItems.Rows.Count > 0)
+                {
+                    drawingItems.Focus();
+                }
+            };
         }
 
         private void ConfigureGrids()
@@ -451,6 +460,7 @@ namespace ADDIN.UI
             if (selecting) return;
             DrawingCheckItemResult item = SelectedItem;
             selecting = true;
+            bool itemsHadFocus = drawingItems.Focused;
             try
             {
                 drawingFields.Rows.Clear();
@@ -488,7 +498,14 @@ namespace ADDIN.UI
                     if (first != null) drawingFields.CurrentCell = first.Cells[0];
                 }
             }
-            finally { selecting = false; }
+            finally
+            {
+                selecting = false;
+                if (itemsHadFocus && !drawingItems.Focused)
+                {
+                    drawingItems.Focus();
+                }
+            }
             SelectField();
         }
 
@@ -719,6 +736,76 @@ namespace ADDIN.UI
             if (value == DrawingBomCheckStatus.Warning) return "Warning";
             if (value == DrawingBomCheckStatus.NotApplicable) return "N/A";
             return value.ToString();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            Keys keyCode = keyData & Keys.KeyCode;
+
+            if (keyCode == Keys.Up || keyCode == Keys.Down)
+            {
+                DataGridView targetGrid = drawingFields.Focused ? drawingFields : drawingItems;
+                if (!drawingItems.Focused && !drawingFields.Focused)
+                {
+                    targetGrid = drawingItems;
+                    targetGrid.Focus();
+                }
+
+                if (targetGrid.Rows.Count > 0)
+                {
+                    int currentIndex = targetGrid.CurrentRow != null ? targetGrid.CurrentRow.Index : 0;
+                    int nextIndex = keyCode == Keys.Up
+                        ? Math.Max(0, currentIndex - 1)
+                        : Math.Min(targetGrid.Rows.Count - 1, currentIndex + 1);
+
+                    if (nextIndex != currentIndex || targetGrid.CurrentRow == null)
+                    {
+                        targetGrid.CurrentCell = targetGrid.Rows[nextIndex].Cells[0];
+                    }
+
+                    if (!targetGrid.Focused)
+                    {
+                        targetGrid.Focus();
+                    }
+                    return true;
+                }
+            }
+            else if (keyCode == Keys.Left)
+            {
+                if (drawingFields.Focused && drawingItems.Rows.Count > 0)
+                {
+                    drawingItems.Focus();
+                    return true;
+                }
+            }
+            else if (keyCode == Keys.Right)
+            {
+                if (drawingItems.Focused && drawingFields.Rows.Count > 0)
+                {
+                    drawingFields.Focus();
+                    return true;
+                }
+            }
+            else if (keyCode == Keys.Enter)
+            {
+                if (drawingFields.Focused)
+                {
+                    NavigateSelected(true);
+                    return true;
+                }
+                else if (drawingItems.Focused)
+                {
+                    NavigateSelected(false);
+                    return true;
+                }
+            }
+            else if (keyCode == Keys.Escape)
+            {
+                Close();
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private static void ColorRow(DataGridViewRow row, DrawingBomCheckStatus value, bool isFieldGrid)
@@ -966,6 +1053,15 @@ namespace ADDIN.UI
                     SelectionForeColor = TaiTheme.Text,
                     Padding = new Padding(8, 2, 8, 2),
                     Font = new Font("Segoe UI", 10F, FontStyle.Regular)
+                }
+            };
+            grid.PreviewKeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down ||
+                    e.KeyCode == Keys.Left || e.KeyCode == Keys.Right ||
+                    e.KeyCode == Keys.Tab || e.KeyCode == Keys.Enter)
+                {
+                    e.IsInputKey = true;
                 }
             };
             UIHelper.EnableDoubleBuffer(grid);
