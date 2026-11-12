@@ -201,11 +201,7 @@ namespace ADDIN.Commands
         // Probe at most one linked-Goban Drawing table export per batch.
         // Result is diagnostic evidence only, never a BOM comparison source.
         private bool gobanTableExportProbeDone;
-        private const int MaxHiddenDiagnosticDrawings = 12;
-        // One bounded experiment per SOLIDWORKS process. Re-running without
-        // restarting could accumulate hidden native models indefinitely.
-        private static readonly HashSet<string> RetainedHiddenDrawingPaths =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
 
         private const double NumericTolerance = 0.01; // 0.01 mm tolerance cho W, L, 板厚
         private const double HeaderYBandTolerance = 0.010; // 10mm band độ chênh Y giữa các Header
@@ -304,21 +300,6 @@ namespace ADDIN.Commands
                 }
 
                 LogDebug($"Total selected BOM rows = {checkedRows.Count}");
-                if (silent && RetainedHiddenDrawingPaths.Count > 0)
-                {
-                    result.Message = "Đã giữ " + RetainedHiddenDrawingPaths.Count +
-                        " Drawing ẩn trong phiên SOLIDWORKS. Hãy khởi động lại SOLIDWORKS " +
-                        "trước khi thử tiếp để tránh tích lũy tài liệu native.";
-                    LogDebug("[STRICT HIDDEN SESSION LIMIT] " + result.Message);
-                    return result;
-                }
-                if (silent && checkedRows.Count > MaxHiddenDiagnosticDrawings)
-                {
-                    result.Message = "STRICT HIDDEN diagnostic chỉ hỗ trợ tối đa " +
-                        MaxHiddenDiagnosticDrawings + " Drawing; không thực thi để tránh giữ quá nhiều tài liệu.";
-                    LogDebug("[STRICT HIDDEN LIMIT] " + result.Message);
-                    return result;
-                }
                 strictHiddenBatch = silent;
                 gobanTableExportProbeDone = false;
 
@@ -445,20 +426,6 @@ namespace ADDIN.Commands
                     }
                     finally
                     {
-                        if (strictHiddenBatch)
-                        {
-                            // A/B isolation: both CloseDoc and QuitDoc crashed natively.
-                            // Intentionally keep only command-opened hidden Drawings in memory.
-                            // SOLIDWORKS must be restarted after this <=12 Drawing experiment.
-                            if (openedByCommand && drawingDoc != null &&
-                                !string.IsNullOrWhiteSpace(itemResult.DrawingPath))
-                                RetainedHiddenDrawingPaths.Add(itemResult.DrawingPath);
-                            LogDebug("[STRICT HIDDEN HOLD] row=" + (i + 1) +
-                                " openedByCommand=" + openedByCommand +
-                                " path=" + (itemResult.DrawingPath ?? "") + " close=SKIPPED");
-                        }
-                        else
-                        {
                         // Checkpoint logging: native crashes may occur inside CloseDoc
                         // before any managed catch block or batch summary can run.
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDrawing BEGIN openedByCommand=" + openedByCommand);
@@ -466,10 +433,6 @@ namespace ADDIN.Commands
                         {
                             try
                             {
-                                // The failed run crashed *inside* CloseDoc on an owned, read-only Drawing.
-                                // Change exactly this close path for an A/B test. Never close a document
-                                // that was already open before the batch, is no longer read-only, or has
-                                // a different path than the one resolved for the current BOM row.
                                 string closeTitle = drawingDoc.GetTitle();
                                 string actualPath = drawingDoc.GetPathName();
                                 string intendedPath = itemResult.DrawingPath ?? "";
@@ -485,14 +448,12 @@ namespace ADDIN.Commands
                                 if (!samePath || !readOnly)
                                 {
                                     // Fail closed: do not risk closing a user-owned/modified document.
-                                    // The document is left open and this diagnostic must be reviewed.
                                     LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc SKIPPED unsafe target");
                                 }
                                 else
                                 {
                                     // QuitDoc closes without saving. This is safe ONLY for our own
                                     // OpenDoc6(Silent|ReadOnly) Drawing verified above.
-                                    // This does NOT prove native crashes are fixed; it is one A/B variable.
                                     LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc CALL title=" + closeTitle);
                                     swApp.QuitDoc(closeTitle);
                                     LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc RETURN");
@@ -501,12 +462,12 @@ namespace ADDIN.Commands
                             catch (Exception closeError)
                             {
                                 LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc ERROR " + closeError);
+                                try { SafeCloseDocument(drawingDoc.GetTitle()); } catch { }
                             }
                         }
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive CALL");
                         RestoreBatchActiveDocument(originalTitle);
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive RETURN");
-                        }
                     }
                 }
 
@@ -549,8 +510,6 @@ namespace ADDIN.Commands
             {
                 RestoreBatchActiveDocument(originalTitle);
                 displayScope?.Dispose();
-                if (strictHiddenBatch)
-                    LogDebug("[STRICT HIDDEN END] diagnostic retained command-opened Drawings in memory; restart SOLIDWORKS.");
                 strictHiddenBatch = false;
                 if (progressStarted && !progressFinished)
                 {
