@@ -320,6 +320,8 @@ namespace ADDIN.Commands
                 if (silent)
                     LogDebug("[STRICT HIDDEN SCOPE] DrawingCommandDisplayScope=SKIPPED; native GUI untouched");
 
+                var cdAsmAtStart = CdSnapshotOpenAssemblies("BATCH_START");
+
                 for (int i = 0; i < checkedRows.Count; i++)
                 {
                     if (isCancelRequested != null && isCancelRequested())
@@ -469,6 +471,14 @@ namespace ADDIN.Commands
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive CALL");
                         RestoreBatchActiveDocument(originalTitle);
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive RETURN");
+
+                        var cdAsmAfterRow = CdSnapshotOpenAssemblies("ROW_" + (i + 1));
+                        foreach (var entry in cdAsmAfterRow)
+                        {
+                            bool existedAtStart = cdAsmAtStart != null && cdAsmAtStart.ContainsKey(entry.Key);
+                            LogDebug("[CD ASM OWNERSHIP] row=" + (i + 1) + " existedAtBatchStart=" +
+                                existedAtStart + " path=\"" + entry.Key + "\" " + entry.Value);
+                        }
                     }
                 }
 
@@ -916,7 +926,22 @@ namespace ADDIN.Commands
                     FlatDrawingViewSideResult side;
                     if (!cache.TryGetValue(name, out side))
                     {
-                        side = checker.CheckFlatDrawingView(candidates[0]);
+                        FlatDrawingViewSideResult direct =
+                            CdTryFlatSideReadOnly(candidates[0]);
+                        if (CdEnableDirectFlatSideVerdict && direct.PinkFacingViewer.HasValue)
+                        {
+                            side = direct;
+                        }
+                        else
+                        {
+                            FlatDrawingViewSideResult fallback =
+                                checker.CheckFlatDrawingView(candidates[0]);
+                            side = fallback;
+                            if (!fallback.PinkFacingViewer.HasValue)
+                            {
+                                side.Message = direct.Message + " | Working Copy: " + fallback.Message;
+                            }
+                        }
                         cache.Add(name, side);
                     }
                     status = CompareFlatSideMarker(expected, side.PinkFacingViewer);
@@ -1094,6 +1119,311 @@ namespace ADDIN.Commands
                 return DrawingBomCheckStatus.Warning;
             return pinkFacingViewer.Value == (marker == "ウラ") ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
         }
+
+        #region Direct Read-Only Flat Side Verification (PR #62 Shadow / Fail-Closed)
+
+        // Keep false until the strict direct reader is proven against known correct and
+        // reversed views in SOLIDWORKS 2024 SP5 (do NOT blindly enable in production).
+        private const bool CdEnableDirectFlatSideVerdict = false;
+
+        private static bool CdSameFace(Face2 first, Face2 second)
+        {
+            if (first == null || second == null) return false;
+            try { return first.IsSame(second); } catch { return false; }
+        }
+
+        private static bool CdPink(double[] m)
+        {
+            if (m == null || m.Length < 3) return false;
+            double r = m[0], g = m[1], b = m[2];
+            if (r < 0 || r > 1 || g < 0 || g > 1 || b < 0 || b > 1) return false;
+            double max = Math.Max(r, Math.Max(g, b));
+            double min = Math.Min(r, Math.Min(g, b));
+            // Same recognition thresholds as UraOmoteChecker.IsPinkMaterial.
+            return r > 0.45 && r >= g + 0.08 && b >= g - 0.05 && max - min > 0.08;
+        }
+
+        private static double[] CdDisplayStateFaceRgb(Array properties, int index)
+        {
+            if (properties == null || index < 0) return null;
+            try
+            {
+                object value = index < properties.Length
+                    ? properties.GetValue(index + properties.GetLowerBound(0)) : null;
+                Array nested = value as Array;
+                if (nested != null && nested.Length >= 3)
+                {
+                    int lb = nested.GetLowerBound(0);
+                    return new[] { Convert.ToDouble(nested.GetValue(lb)),
+                        Convert.ToDouble(nested.GetValue(lb + 1)),
+                        Convert.ToDouble(nested.GetValue(lb + 2)) };
+                }
+                int off = index * 9 + properties.GetLowerBound(0);
+                if (properties.Length < (index + 1) * 9) return null;
+                return new[] { Convert.ToDouble(properties.GetValue(off)),
+                    Convert.ToDouble(properties.GetValue(off + 1)),
+                    Convert.ToDouble(properties.GetValue(off + 2)) };
+            }
+            catch { return null; }
+        }
+
+        private static double CdFaceViewZ(Face2 face, MathUtility math, MathTransform viewXform)
+        {
+            try
+            {
+                double[] normal = face == null ? null : face.Normal as double[];
+                if (normal == null || normal.Length < 3) return 0;
+                MathVector v = math.CreateVector(normal) as MathVector;
+                v = v == null ? null : v.MultiplyTransform(viewXform) as MathVector;
+                double[] xyz = v == null ? null : v.ArrayData as double[];
+                if (xyz == null || xyz.Length < 3) return 0;
+                double len = Math.Sqrt(xyz[0] * xyz[0] + xyz[1] * xyz[1] + xyz[2] * xyz[2]);
+                return len > 1e-12 ? xyz[2] / len : 0;
+            }
+            catch { return 0; }
+        }
+
+        // This method MUST be fail-closed: null PinkFacingViewer means no direct verdict.
+        // Reading a face's color without verifying its exact Configuration, Display State,
+        // and actual view visibility MUST NOT produce an OK/NG verdict.
+        private FlatDrawingViewSideResult CdTryFlatSideReadOnly(
+            SolidWorks.Interop.sldworks.View view)
+        {
+            FlatDrawingViewSideResult result = new FlatDrawingViewSideResult();
+            string reason = "not started";
+            try
+            {
+                if (view == null) { reason = "view null"; return result; }
+                result.ViewName = view.Name ?? "";
+                result.Configuration = view.ReferencedConfiguration ?? "";
+                result.DisplayState = view.DisplayState ?? "";
+                ModelDoc2 model = view.ReferencedDocument as ModelDoc2;
+                PartDoc part = model as PartDoc;
+                if (model == null || part == null || result.Configuration.Length == 0 ||
+                    result.DisplayState.Length == 0)
+                { reason = "Part, config or display-state unavailable"; return result; }
+
+                // Crucial guard: GetBodies2 and geometry from PartDoc follow the active config.
+                // Never activate a different config on the user's model to force a match.
+                Configuration cfg = model.ConfigurationManager.ActiveConfiguration;
+                if (cfg == null || !string.Equals(cfg.Name, result.Configuration,
+                    StringComparison.OrdinalIgnoreCase))
+                { reason = "referenced config differs from active model config"; return result; }
+
+                Array states = cfg.GetDisplayStates() as Array;
+                bool stateFound = false;
+                if (states != null)
+                    foreach (object state in states)
+                        if (string.Equals(Convert.ToString(state), result.DisplayState,
+                            StringComparison.OrdinalIgnoreCase)) stateFound = true;
+                if (!stateFound)
+                { reason = "view display-state not found in referenced config"; return result; }
+
+                Array bodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as Array;
+                if (bodies == null || bodies.Length != 1)
+                { reason = "body count is not exactly one"; return result; }
+                Body2 body = bodies.GetValue(bodies.GetLowerBound(0)) as Body2;
+                Array bodyFaces = body == null ? null : body.GetFaces() as Array;
+                if (bodyFaces == null || bodyFaces.Length == 0)
+                { reason = "body faces unavailable"; return result; }
+
+                MathUtility math = swApp?.GetMathUtility() as MathUtility;
+                MathTransform xform = view.ModelToViewTransform;
+                if (math == null || xform == null)
+                { reason = "view transform unavailable"; return result; }
+
+                // Official SOLIDWORKS 2024 IView API. Get visible faces for THIS view.
+                Array visible = view.GetVisibleEntities2(null,
+                    (int)swViewEntityType_e.swViewEntityType_Face) as Array;
+                if (visible == null || visible.Length == 0)
+                { reason = "GetVisibleEntities2 returned no visible faces"; return result; }
+
+                double visiblePositive = 0, visibleNegative = 0;
+                foreach (object item in visible)
+                {
+                    Face2 face = item as Face2;
+                    if (face == null) continue;
+                    bool bodyMatch = false;
+                    foreach (object bodyItem in bodyFaces)
+                    {
+                        if (CdSameFace(face, bodyItem as Face2)) { bodyMatch = true; break; }
+                    }
+                    if (!bodyMatch) continue;
+                    double z = CdFaceViewZ(face, math, xform);
+                    if (Math.Abs(z) < 0.98) continue; // don't classify thickness edges
+                    double area = face.GetArea();
+                    if (area <= 0) continue;
+                    if (z > 0) visiblePositive += area;
+                    else visibleNegative += area;
+                }
+                if (visiblePositive <= 1e-12 ||
+                    visiblePositive < (visiblePositive + visibleNegative) * 0.98)
+                {
+                    // Mirrors CheckFlatDrawingView's z>0 viewer-facing convention.
+                    // If the API's visible-face normal does not support it, do NOT guess.
+                    reason = "visible faces fail viewer-side normal check";
+                    return result;
+                }
+
+                // Explicit face colors from the EXACT requested display-state.
+                // No ApplyDisplayState, ActivateDoc, rebuild, or document mutation.
+                object rawFaces;
+                Array values = cfg.GetDisplayStateFaceProperties(result.DisplayState,
+                    out rawFaces) as Array;
+                Array paintedFaces = rawFaces as Array;
+                if (values == null || paintedFaces == null || paintedFaces.Length == 0)
+                { reason = "explicit face colors unavailable"; return result; }
+
+                // Render materials can override legacy face colors. For safety, reject
+                // broad model/feature/body overrides or any render material we cannot
+                // map to an explicit solid-body Face2. Face-only render assignments are
+                // accepted as evidence only if they do not conflict with legacy colors.
+                var renderFaces = new List<Face2>();
+                var renderColors = new List<double[]>();
+                int option = (int)swDisplayStateOpts_e.swSpecifyDisplayState;
+                object stateArg = new[] { result.DisplayState };
+                int renderCount = model.Extension.GetRenderMaterialsCount2(option, stateArg);
+                Array render = model.Extension.GetRenderMaterials2(option, stateArg) as Array;
+                if (renderCount < 0 || (renderCount > 0 &&
+                    (render == null || render.Length != renderCount)))
+                { reason = "render-material list ambiguous"; return result; }
+                if (render != null)
+                {
+                    foreach (object renderObject in render)
+                    {
+                        RenderMaterial mat = renderObject as RenderMaterial;
+                        if (mat == null) { reason = "render material unavailable"; return result; }
+                        Array entities = mat.GetEntities() as Array;
+                        if (mat.GetEntitiesCount() > 0 && entities == null)
+                        { reason = "render entities unavailable"; return result; }
+                        if (entities == null) continue;
+                        int color = mat.PrimaryColor;
+                        if (color < 0 || mat.SecondaryColor != color)
+                        { reason = "complex render color"; return result; }
+                        double[] rgb = { (color & 255) / 255.0,
+                            ((color >> 8) & 255) / 255.0,
+                            ((color >> 16) & 255) / 255.0 };
+                        foreach (object entity in entities)
+                        {
+                            Face2 renderFace = entity as Face2;
+                            if (renderFace == null)
+                            { reason = "non-face render override; cannot prove effective color"; return result; }
+                            renderFaces.Add(renderFace);
+                            renderColors.Add(rgb);
+                        }
+                    }
+                }
+
+                double positiveArea = 0, negativeArea = 0;
+                double positivePink = 0, negativePink = 0;
+                foreach (object item in bodyFaces)
+                {
+                    Face2 face = item as Face2;
+                    if (face == null) continue;
+                    double z = CdFaceViewZ(face, math, xform);
+                    if (Math.Abs(z) < 0.98) continue;
+                    double area = face.GetArea();
+                    if (area <= 0) continue;
+                    if (z > 0) positiveArea += area;
+                    else negativeArea += area;
+                    // Combine face-level display-state material and render override.
+                    double[] rgb = null;
+                    for (int i = 0; i < paintedFaces.Length; i++)
+                    {
+                        Face2 coloredFace = paintedFaces.GetValue(i + paintedFaces.GetLowerBound(0)) as Face2;
+                        if (CdSameFace(face, coloredFace))
+                        {
+                            rgb = CdDisplayStateFaceRgb(values, i);
+                            break;
+                        }
+                    }
+                    for (int i = 0; i < renderFaces.Count; i++)
+                    {
+                        if (!CdSameFace(face, renderFaces[i])) continue;
+                        if (rgb != null && CdPink(rgb) != CdPink(renderColors[i]))
+                        { reason = "conflicting face paint from render and legacy sources"; return result; }
+                        rgb = renderColors[i];
+                    }
+                    if (CdPink(rgb))
+                    {
+                        if (z > 0) positivePink += area;
+                        else negativePink += area;
+                    }
+                }
+                result.FrontPinkAreaMm2 = positivePink * 1000000;
+                result.BackPinkAreaMm2 = negativePink * 1000000;
+                if (positiveArea <= 1e-12 || negativeArea <= 1e-12)
+                { reason = "sheet metal pair of planar sides not found"; return result; }
+
+                // Explicit pink must belong to exactly one side, with a clear margin.
+                // Never infer front side solely from a lack of visible pink.
+                bool frontPink = positivePink > positiveArea * 0.01;
+                bool backPink = negativePink > negativeArea * 0.01;
+                bool frontAbsent = positivePink < positiveArea * 0.001;
+                bool backAbsent = negativePink < negativeArea * 0.001;
+                if (frontPink && backAbsent) result.PinkFacingViewer = true;
+                else if (backPink && frontAbsent) result.PinkFacingViewer = false;
+                else { reason = "no unambiguous one-sided pink paint"; return result; }
+
+                result.Message = "[Direct Drawing View / verified config+state] " +
+                    (result.PinkFacingViewer.Value
+                        ? "Mặt đang nhìn có màu hồng (ウラ)."
+                        : "Mặt đang nhìn là mặt màu (表), mặt đối diện có màu hồng.");
+                LogDebug("[FLAT DIRECT OK] view=" + result.ViewName +
+                    " cfg=" + result.Configuration + " state=" + result.DisplayState +
+                    " frontPinkMm2=" + result.FrontPinkAreaMm2 +
+                    " backPinkMm2=" + result.BackPinkAreaMm2 +
+                    " isUra=" + result.PinkFacingViewer.Value);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                reason = "direct read COM/API error: " + ex.Message;
+                return result;
+            }
+            finally
+            {
+                if (!result.PinkFacingViewer.HasValue)
+                {
+                    result.Message = "[Direct Drawing View chưa xác minh] " + reason;
+                    LogDebug("[FLAT DIRECT UNKNOWN] view=" + result.ViewName + " reason=" + reason);
+                }
+            }
+        }
+
+        // ----- OPTIONAL DIAGNOSTICS (CHECK DRAWING ONLY; READ-ONLY) -----
+        // Helps test Anti's hypothesis that this command or SOLIDWORKS implicitly
+        // opens an assembly and marks it Dirty during the component-drawing batch.
+        private Dictionary<string, string> CdSnapshotOpenAssemblies(string stage)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                Array documents = swApp?.GetDocuments() as Array;
+                if (documents == null) return result;
+                foreach (object value in documents)
+                {
+                    ModelDoc2 doc = value as ModelDoc2;
+                    if (doc == null || !IsAssemblyDocument(doc)) continue;
+                    string path = doc.GetPathName() ?? "";
+                    if (path.Length == 0) continue;
+                    bool dirty = doc.GetSaveFlag();
+                    bool readOnly = doc.IsOpenedReadOnly();
+                    bool configDirty = false;
+                    try { configDirty = doc.ConfigurationManager.ActiveConfiguration.IsDirty(); }
+                    catch { }
+                    string data = "dirty=" + dirty + " cfgDirty=" + configDirty +
+                        " readOnly=" + readOnly;
+                    result[path] = data;
+                    LogDebug("[CD ASM SNAPSHOT] stage=" + stage +
+                        " path=\"" + path + "\" " + data);
+                }
+            }
+            catch (Exception ex) { LogDebug("[CD ASM SNAPSHOT ERROR] " + ex.Message); }
+            return result;
+        }
+
+        #endregion
 
         private static void SaveDrawingValueLocation(
             DrawingDisplayedData data,
