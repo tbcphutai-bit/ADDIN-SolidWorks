@@ -295,7 +295,8 @@ namespace ADDIN.Commands
 
                 if (checkedRows.Count == 0)
                 {
-                    result.Message = "Hãy tick ít nhất một chi tiết trước."; if (!silent) ShowWarning(result.Message);
+                    result.Message = "Hãy tick ít nhất một chi tiết trước khi CHECK DRAWING.";
+                    if (!silent) ShowWarning(result.Message);
                     return result;
                 }
 
@@ -445,15 +446,15 @@ namespace ADDIN.Commands
                                 LogDebug("[BATCH CLEANUP] row=" + (i + 1) +
                                     " OwnedDrawingVerify samePath=" + samePath +
                                     " readOnly=" + readOnly + " title=" + closeTitle);
-                                if (!samePath || !readOnly)
+                                if (!samePath)
                                 {
-                                    // Fail closed: do not risk closing a user-owned/modified document.
-                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc SKIPPED unsafe target");
+                                    // Fail closed: do not risk closing a different document.
+                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc SKIPPED path mismatch");
                                 }
                                 else
                                 {
-                                    // QuitDoc closes without saving. This is safe ONLY for our own
-                                    // OpenDoc6(Silent|ReadOnly) Drawing verified above.
+                                    // QuitDoc closes without saving. This is safe because openedByCommand == true
+                                    // guarantees this document was opened specifically for this check item.
                                     LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc CALL title=" + closeTitle);
                                     swApp.QuitDoc(closeTitle);
                                     LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc RETURN");
