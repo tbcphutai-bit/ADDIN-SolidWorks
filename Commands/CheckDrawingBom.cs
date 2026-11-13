@@ -1203,12 +1203,23 @@ namespace ADDIN.Commands
                     result.DisplayState.Length == 0)
                 { reason = "Part, config or display-state unavailable"; return result; }
 
-                // Crucial guard: GetBodies2 and geometry from PartDoc follow the active config.
-                // Never activate a different config on the user's model to force a match.
+                // Crucial guard: Never activate a different config or mutate the user's model.
+                // If the active config differs from the view's referenced config, resolve by name.
                 Configuration cfg = model.ConfigurationManager.ActiveConfiguration;
                 if (cfg == null || !string.Equals(cfg.Name, result.Configuration,
                     StringComparison.OrdinalIgnoreCase))
-                { reason = "referenced config differs from active model config"; return result; }
+                {
+                    Configuration namedCfg = model.GetConfigurationByName(result.Configuration) as Configuration;
+                    if (namedCfg != null)
+                    {
+                        cfg = namedCfg;
+                    }
+                    else
+                    {
+                        reason = "referenced config differs from active model config and not found by name";
+                        return result;
+                    }
+                }
 
                 Array states = cfg.GetDisplayStates() as Array;
                 bool stateFound = false;
@@ -1219,14 +1230,6 @@ namespace ADDIN.Commands
                 if (!stateFound)
                 { reason = "view display-state not found in referenced config"; return result; }
 
-                Array bodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as Array;
-                if (bodies == null || bodies.Length != 1)
-                { reason = "body count is not exactly one"; return result; }
-                Body2 body = bodies.GetValue(bodies.GetLowerBound(0)) as Body2;
-                Array bodyFaces = body == null ? null : body.GetFaces() as Array;
-                if (bodyFaces == null || bodyFaces.Length == 0)
-                { reason = "body faces unavailable"; return result; }
-
                 MathUtility math = swApp?.GetMathUtility() as MathUtility;
                 MathTransform xform = view.ModelToViewTransform;
                 if (math == null || xform == null)
@@ -1236,7 +1239,29 @@ namespace ADDIN.Commands
                 Array visible = view.GetVisibleEntities2(null,
                     (int)swViewEntityType_e.swViewEntityType_Face) as Array;
                 if (visible == null || visible.Length == 0)
+                {
+                    Component2 comp = (view.RootDrawingComponent as DrawingComponent)?.Component;
+                    if (comp != null)
+                        visible = view.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_Face) as Array;
+                }
+                if (visible == null || visible.Length == 0)
                 { reason = "GetVisibleEntities2 returned no visible faces"; return result; }
+
+                // The visible face directly belongs to the flat pattern body of this view.
+                Face2 visibleFace = visible.GetValue(visible.GetLowerBound(0)) as Face2;
+                Body2 body = visibleFace?.GetBody() as Body2;
+                if (body == null)
+                {
+                    Array bodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as Array;
+                    if (bodies != null && bodies.Length == 1)
+                        body = bodies.GetValue(bodies.GetLowerBound(0)) as Body2;
+                }
+                if (body == null)
+                { reason = "flat pattern body unavailable"; return result; }
+
+                Array bodyFaces = body.GetFaces() as Array;
+                if (bodyFaces == null || bodyFaces.Length == 0)
+                { reason = "body faces unavailable"; return result; }
 
                 double visiblePositive = 0, visibleNegative = 0;
                 foreach (object item in visible)
