@@ -1,0 +1,177 @@
+// PR #62 / COPY INTO Commands/CheckDrawingBom.cs
+// Exact replacement for the SINGLE block starting at:
+//   if (!cache.TryGetValue(name, out side))
+// in AddFlatPatternSideChecks() near line 927 of base commit cfdfa94.
+// Requires CdFlatSidePilotPolicy from PR62_FlatSidePilotPolicy.cs.txt to be
+// included in project compilation. Pilot remains OFF, baseline unchanged.
+//
+// IMPORTANT: This integration is syntactically complete, but the source-freshness
+// proof below intentionally fails closed until Antigravity implements and validates
+// a genuinely independent correspondence check. Do not set booleans to true simply
+// to make WARNINGS disappear.
+
+if (!cache.TryGetValue(name, out side))
+{
+    SolidWorks.Interop.sldworks.View candidateView = candidates[0];
+    FlatDrawingViewSideResult direct =
+        CdTryFlatSideReadOnlyCore(candidateView, drawing as ModelDoc2);
+    FlatDrawingViewSideResult workingCopy =
+        checker.CheckFlatDrawingView(candidateView);
+
+    CdFlatSideProof proof = CdBuildCandidateFlatSideProof(
+        candidateView,
+        drawing as ModelDoc2,
+        itemResult.PartPath,
+        direct);
+
+    CdFlatSidePolicyInput input = new CdFlatSidePolicyInput
+    {
+        PilotEnabled = CdEnableReviewedFlatSidePilot,
+        DirectPinkFacingViewer = direct.PinkFacingViewer,
+        WorkingCopyPinkFacingViewer = workingCopy.PinkFacingViewer,
+        WorkingCopyFrontPinkMm2 = workingCopy.FrontPinkAreaMm2,
+        WorkingCopyBackPinkMm2 = workingCopy.BackPinkAreaMm2,
+        WorkingCopyBlockedSpecificallyByDirtyAssembly =
+            CdIsDirtyAssemblyBlockingWorkingCopy(workingCopy),
+        DirectProof = proof
+    };
+
+    CdFlatSidePolicyDecision decision = CdFlatSidePilotPolicy.Evaluate(input);
+    LogDebug("[CD PILOT DECISION] view=" + name +
+        " enabled=" + input.PilotEnabled +
+        " action=" + decision.Choice +
+        " code=" + decision.Code +
+        " direct=" + direct.PinkFacingViewer +
+        " legacy=" + workingCopy.PinkFacingViewer +
+        " proofComplete=" + proof.IsComplete +
+        " reason=" + decision.Explanation);
+
+    if (decision.Choice == CdFlatSideChoice.UseDirectRead)
+    {
+        side = direct;
+        side.Message += " [PILOT direct-check; dependency freshness separately verified]";
+    }
+    else if (decision.Choice == CdFlatSideChoice.Unknown)
+    {
+        side = new FlatDrawingViewSideResult
+        {
+            ViewName = direct.ViewName,
+            Configuration = direct.Configuration,
+            DisplayState = direct.DisplayState,
+            PinkFacingViewer = null,
+            Message = "[CD PILOT " + decision.Code + "] " +
+                      decision.Explanation +
+                      " | Direct=" + direct.Message +
+                      " | Working Copy=" + workingCopy.Message
+        };
+    }
+    else
+    {
+        side = workingCopy; // exact legacy behavior when pilot OFF
+        if (!workingCopy.PinkFacingViewer.HasValue)
+            side.Message = direct.Message + " | Working Copy: " + workingCopy.Message;
+    }
+    cache.Add(name, side);
+}
+
+// ALSO COPY these 3 members INTO the SAME CheckDrawingBom class.
+// Do NOT change CdEnableDirectFlatSideVerdict until an independently
+// justified pilot is approved.
+private const bool CdEnableReviewedFlatSidePilot = false;
+
+private static bool CdExactPath(string a, string b)
+{
+    if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+        return false;
+    try
+    {
+        return string.Equals(
+            System.IO.Path.GetFullPath(a),
+            System.IO.Path.GetFullPath(b),
+            StringComparison.OrdinalIgnoreCase);
+    }
+    catch { return false; }
+}
+
+private static bool CdIsDirtyAssemblyBlockingWorkingCopy(
+    FlatDrawingViewSideResult result)
+{
+    if (result == null || result.PinkFacingViewer.HasValue)
+        return false;
+    string message = result.Message ?? "";
+    // Temporary compatibility adapter ONLY: production should get a
+    // structured failure reason from the CHECK DRAWING call boundary;
+    // do not rely on localized text alone to authorize a Direct verdict.
+    return message.IndexOf("Model tham chieu co thay doi chua luu",
+               StringComparison.OrdinalIgnoreCase) >= 0 ||
+           message.IndexOf("Model tham chiếu có thay đổi chưa lưu",
+               StringComparison.OrdinalIgnoreCase) >= 0;
+}
+
+private CdFlatSideProof CdBuildCandidateFlatSideProof(
+    SolidWorks.Interop.sldworks.View view,
+    ModelDoc2 ownerDrawing,
+    string expectedPartPath,
+    FlatDrawingViewSideResult direct)
+{
+    var proof = new CdFlatSideProof();
+    try
+    {
+        if (view == null || ownerDrawing == null || direct == null ||
+            !direct.PinkFacingViewer.HasValue)
+            return proof;
+
+        ModelDoc2 part = view.ReferencedDocument as ModelDoc2;
+        if (part == null || !System.IO.File.Exists(expectedPartPath))
+            return proof;
+
+        proof.DrawingPathVerified =
+            !string.IsNullOrWhiteSpace(ownerDrawing.GetPathName()) &&
+            System.IO.File.Exists(ownerDrawing.GetPathName());
+        proof.ReferencedPartPathVerified =
+            CdExactPath(part.GetPathName(), expectedPartPath);
+
+        string viewConfig = view.ReferencedConfiguration ?? "";
+        string viewState = view.DisplayState ?? "";
+        Configuration cfg = string.IsNullOrWhiteSpace(viewConfig)
+            ? null
+            : part.GetConfigurationByName(viewConfig) as Configuration;
+        proof.ConfigurationVerified = cfg != null &&
+            string.Equals(direct.Configuration, viewConfig,
+                StringComparison.OrdinalIgnoreCase);
+        proof.DisplayStateVerified =
+            !string.IsNullOrWhiteSpace(viewState) &&
+            string.Equals(direct.DisplayState, viewState,
+                StringComparison.OrdinalIgnoreCase);
+
+        // Base health gate: do not promote a changed Drawing or Part.
+        if (ownerDrawing.GetSaveFlag() || part.GetSaveFlag() ||
+            (cfg != null && cfg.IsDirty()))
+            return proof;
+
+        // These are *positive obligations*, not inferred from the string
+        // "[Direct Drawing View / verified config+state]":
+        //
+        // 1. FlatPatternBodyVerified: instrument CdTryFlatSideReadOnlyCore to
+        //    expose immutable face/body provenance for THIS Drawing View,
+        //    including HIDDEN_DS_FACE_BODY on zero-visible-face silent opens.
+        // 2. FaceColorCompleteAndUnambiguous: prove all relevant planar faces
+        //    have effective Face>Feature>Body>Model appearances from the
+        //    exact referenced config and display state, with no conflicts.
+        // 3. SourceFreshnessVerified: independently prove the body used for
+        //    the verdict reflects the Drawing's intended saved/loaded source,
+        //    including in-context external references. A clean Part/Draw,
+        //    stable file hash, or geometrical symmetry is not enough.
+        //
+        // The safe implementation starts false and thus can NEVER convert
+        // Assembly-Dirty WARNINGS into undocumented OKs.
+        proof.FlatPatternBodyVerified = false;
+        proof.FaceColorCompleteAndUnambiguous = false;
+        proof.SourceFreshnessVerified = false;
+    }
+    catch (Exception ex)
+    {
+        LogDebug("[CD PILOT PROOF ERROR] " + ex.Message);
+    }
+    return proof;
+}
