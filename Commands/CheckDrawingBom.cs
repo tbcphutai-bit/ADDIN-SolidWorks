@@ -926,52 +926,93 @@ namespace ADDIN.Commands
                     FlatDrawingViewSideResult side;
                     if (!cache.TryGetValue(name, out side))
                     {
+                        SolidWorks.Interop.sldworks.View candidateView = candidates[0];
+                        CdDirectFlatSideProbe probe;
                         FlatDrawingViewSideResult direct =
-                            CdTryFlatSideReadOnlyCore(candidates[0], drawing as ModelDoc2);
-                        FlatDrawingViewSideResult fallback =
-                            checker.CheckFlatDrawingView(candidates[0]);
+                            CdTryFlatSideReadOnlyDetailed(candidateView, drawing as ModelDoc2, itemResult.PartPath, out probe);
+                        FlatDrawingViewSideResult workingCopy =
+                            checker.CheckFlatDrawingView(candidateView);
 
-                        // SHADOW (default): only the old proven checker decides.
-                        if (!CdEnableDirectFlatSideVerdict ||
-                            !direct.PinkFacingViewer.HasValue)
+                        CdWorkingCopyBlockAssessment blockAssessment =
+                            CdClassifyWorkingCopyBlock(candidateView, drawing as ModelDoc2, itemResult.PartPath, workingCopy, probe);
+
+                        CdFlatSideProof proof = CdBuildCandidateFlatSideProof(
+                            candidateView,
+                            drawing as ModelDoc2,
+                            itemResult.PartPath,
+                            direct,
+                            probe,
+                            blockAssessment);
+
+                        bool pilotEnabled = CdIsReviewedFlatSidePilotEnabled();
+                        CdFlatSidePolicyInput input = new CdFlatSidePolicyInput
                         {
-                            if (direct.PinkFacingViewer.HasValue &&
-                                fallback.PinkFacingViewer.HasValue &&
-                                direct.PinkFacingViewer.Value != fallback.PinkFacingViewer.Value)
-                            {
-                                LogDebug("[DIRECT_WORKCOPY_DISAGREE] shadow view=" + name +
-                                    " direct=" + direct.PinkFacingViewer +
-                                    " fallback=" + fallback.PinkFacingViewer +
-                                    " directMsg=" + direct.Message +
-                                    " fallbackMsg=" + fallback.Message);
-                            }
-                            side = fallback;
-                            if (!fallback.PinkFacingViewer.HasValue)
-                                side.Message = direct.Message +
-                                    " | Working Copy: " + fallback.Message;
+                            PilotEnabled = pilotEnabled,
+                            DirectPinkFacingViewer = direct.PinkFacingViewer,
+                            WorkingCopyPinkFacingViewer = workingCopy.PinkFacingViewer,
+                            WorkingCopyFrontPinkMm2 = workingCopy.FrontPinkAreaMm2,
+                            WorkingCopyBackPinkMm2 = workingCopy.BackPinkAreaMm2,
+                            WorkingCopyBlockedSpecificallyByDirtyAssembly =
+                                blockAssessment.BlockedSpecificallyByDirtyAssembly,
+                            DirectProof = proof
+                        };
+
+                        CdFlatSidePolicyDecision decision = CdFlatSidePilotPolicy.Evaluate(input);
+                        LogDebug("[CD PROVENANCE] " + CdFormatProvenanceLog(probe, proof, blockAssessment, workingCopy));
+                        LogDebug("[CD PILOT DECISION] view=" + name +
+                            " enabled=" + input.PilotEnabled +
+                            " action=" + decision.Choice +
+                            " code=" + decision.Code +
+                            " direct=" + direct.PinkFacingViewer +
+                            " legacy=" + workingCopy.PinkFacingViewer +
+                            " wcFrontPinkMm2=" + workingCopy.FrontPinkAreaMm2.ToString("F1", CultureInfo.InvariantCulture) +
+                            " wcBackPinkMm2=" + workingCopy.BackPinkAreaMm2.ToString("F1", CultureInfo.InvariantCulture) +
+                            " blockKind=" + blockAssessment.BlockCategory +
+                            " proofComplete=" + proof.IsComplete +
+                            " reason=" + decision.Explanation);
+
+                        bool bothPinkLegacy = workingCopy.FrontPinkAreaMm2 > 1e-6 && workingCopy.BackPinkAreaMm2 > 1e-6;
+                        if (decision.Code == "DIRECT_WORKCOPY_DISAGREE" ||
+                            decision.Code == "WC_BOTH_SIDES_PINK_AMBIGUOUS" ||
+                            (!input.PilotEnabled && direct.PinkFacingViewer.HasValue &&
+                             ((workingCopy.PinkFacingViewer.HasValue && direct.PinkFacingViewer.Value != workingCopy.PinkFacingViewer.Value) ||
+                              bothPinkLegacy)))
+                        {
+                            LogDebug("[DIRECT_WORKCOPY_DISAGREE] view=" + name +
+                                " mode=" + (input.PilotEnabled ? "pilot" : "shadow") +
+                                " code=" + decision.Code +
+                                " direct=" + direct.PinkFacingViewer +
+                                " fallback=" + workingCopy.PinkFacingViewer +
+                                " wcFrontMm2=" + workingCopy.FrontPinkAreaMm2.ToString("F1", CultureInfo.InvariantCulture) +
+                                " wcBackMm2=" + workingCopy.BackPinkAreaMm2.ToString("F1", CultureInfo.InvariantCulture) +
+                                " directMsg=" + direct.Message +
+                                " fallbackMsg=" + workingCopy.Message);
                         }
-                        else if (fallback.PinkFacingViewer.HasValue &&
-                            fallback.PinkFacingViewer.Value != direct.PinkFacingViewer.Value)
+
+                        if (decision.Choice == CdFlatSideChoice.UseDirectRead)
                         {
-                            // Conflict must never become OK by preference.
+                            side = direct;
+                            side.Message += " [PILOT direct-check; dependency freshness separately verified]";
+                        }
+                        else if (decision.Choice == CdFlatSideChoice.Unknown)
+                        {
                             side = new FlatDrawingViewSideResult
                             {
                                 ViewName = direct.ViewName,
                                 Configuration = direct.Configuration,
                                 DisplayState = direct.DisplayState,
                                 PinkFacingViewer = null,
-                                Message = "[DIRECT_WORKCOPY_DISAGREE] Direct Read: " +
-                                    direct.Message + " | Working Copy: " + fallback.Message
+                                Message = "[CD PILOT " + decision.Code + "] " +
+                                    decision.Explanation +
+                                    " | Direct=" + direct.Message +
+                                    " | Working Copy=" + workingCopy.Message
                             };
-                            LogDebug("[DIRECT_WORKCOPY_DISAGREE] view=" + name +
-                                " direct=" + direct.PinkFacingViewer +
-                                " fallback=" + fallback.PinkFacingViewer);
                         }
                         else
                         {
-                            // Only considered if a future *reviewed* pilot enables it.
-                            // A dirty reference still needs independent freshness proof.
-                            side = direct;
+                            side = workingCopy;
+                            if (!workingCopy.PinkFacingViewer.HasValue)
+                                side.Message = direct.Message + " | Working Copy: " + workingCopy.Message;
                         }
                         cache.Add(name, side);
                     }
@@ -1153,9 +1194,514 @@ namespace ADDIN.Commands
 
         #region Direct Read-Only Flat Side Verification (PR #62 Shadow / Fail-Closed)
 
-        // Keep false until the strict direct reader is proven against known correct and
-        // reversed views in SOLIDWORKS 2024 SP5 (do NOT blindly enable in production).
+        // Keep both false in user-facing builds until independent freshness + body proof
+        // is established across all target cases.
         private const bool CdEnableDirectFlatSideVerdict = false;
+        private const bool CdEnableReviewedFlatSidePilot = false;
+
+        // Isolated test-harness opt-in ONLY (always defaults to false in production).
+        internal static bool CdReviewedFlatSidePilotOptInForTestsOnly = false;
+
+        private static bool CdIsReviewedFlatSidePilotEnabled()
+        {
+            return CdEnableReviewedFlatSidePilot ||
+                   CdEnableDirectFlatSideVerdict ||
+                   CdReviewedFlatSidePilotOptInForTestsOnly;
+        }
+
+        internal sealed class CdExternalRefRecord
+        {
+            public string FeatureName { get; set; } = "";
+            public string ReferencedPath { get; set; } = "";
+            public int Status { get; set; }
+        }
+
+        internal sealed class CdDirectFlatSideProbe
+        {
+            public string DrawingPath { get; set; } = "";
+            public bool DrawingExists { get; set; }
+            public bool DrawingDirty { get; set; }
+            public bool DrawingVisible { get; set; }
+            public string SheetName { get; set; } = "";
+            public string ViewName { get; set; } = "";
+            public bool ViewModelLoaded { get; set; }
+            public int ViewSuppressState { get; set; }
+            public bool ViewModelOutOfDate { get; set; }
+            public bool ViewDisableAutoUpdate { get; set; }
+            public bool ViewLightweight { get; set; }
+            public int ViewSelectiveBodyCount { get; set; }
+            public string ViewReferencedPartPath { get; set; } = "";
+            public string ExpectedPartPath { get; set; } = "";
+            public bool PartExists { get; set; }
+            public bool PartDirty { get; set; }
+            public int PartNeedsRebuild2 { get; set; } = -1;
+            public string ActiveModelConfig { get; set; } = "";
+            public string RequestedConfig { get; set; } = "";
+            public bool ActiveConfigMatchesRequested { get; set; }
+            public bool RequestedConfigExists { get; set; }
+            public bool RequestedConfigDirty { get; set; }
+            public bool RequestedConfigNeedsRebuild { get; set; }
+            public string DisplayState { get; set; } = "";
+            public bool DisplayStateFound { get; set; }
+            public bool DisplayStateLinkedToConfig { get; set; }
+            public string BodyResolutionMethod { get; set; } = "NONE";
+            public int VisibleFaceCount { get; set; }
+            public int MatchedVisibleFaceCount { get; set; }
+            public int BodyFaceCount { get; set; }
+            public int ActiveConfigSolidBodyCount { get; set; } = -1;
+            public int DisplayStateBodyCount { get; set; }
+            public bool MultipleBodiesAmbiguous { get; set; }
+            public bool BodyIsSheetMetal { get; set; }
+            public int FrontPlanarFaceCount { get; set; }
+            public int BackPlanarFaceCount { get; set; }
+            public double TotalPositiveAreaMm2 { get; set; }
+            public double TotalNegativeAreaMm2 { get; set; }
+            public double TotalOtherAreaMm2 { get; set; }
+            public double FrontPinkAreaMm2 { get; set; }
+            public double BackPinkAreaMm2 { get; set; }
+            public string FrontAppearanceSources { get; set; } = "";
+            public string BackAppearanceSources { get; set; } = "";
+            public string CombinedAppearanceSources { get; set; } = "";
+            public bool AllPlanarFacesResolvedUnambiguously { get; set; }
+            public bool HasExplicitPinkOnOneSideOnly { get; set; }
+            public int PartExternalRefCount { get; set; } = -1;
+            public List<CdExternalRefRecord> ExternalRefs { get; } = new List<CdExternalRefRecord>();
+            public List<string> FaceAuditSummary { get; } = new List<string>();
+            public bool? VerdictPinkFacingViewer { get; set; }
+            public string FailureReason { get; set; } = "";
+        }
+
+        internal sealed class CdWorkingCopyBlockAssessment
+        {
+            public bool BlockedSpecificallyByDirtyAssembly { get; set; }
+            public bool DrawingDirty { get; set; }
+            public bool PartDirty { get; set; }
+            public string BlockCategory { get; set; } = "NONE";
+            public List<string> MatchedDirtyAssemblyPaths { get; } = new List<string>();
+            public List<string> OtherDirtyDependencyPaths { get; } = new List<string>();
+            public string Detail { get; set; } = "";
+        }
+
+        private static bool CdExactPath(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return false;
+            try
+            {
+                return string.Equals(
+                    Path.GetFullPath(a.Trim()),
+                    Path.GetFullPath(b.Trim()),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private static string CdNormalizeFullPathOrEmpty(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return "";
+            try { return Path.GetFullPath(path.Trim()); }
+            catch { return path.Trim(); }
+        }
+
+        private bool CdDependencyArrayContainsPath(Array deps, string targetPath)
+        {
+            if (deps == null || string.IsNullOrWhiteSpace(targetPath)) return false;
+            int lb = deps.GetLowerBound(0);
+            for (int i = 1; i < deps.Length; i += 2)
+            {
+                string depPath = Convert.ToString(deps.GetValue(lb + i) ?? "");
+                if (CdExactPath(depPath, targetPath)) return true;
+            }
+            return false;
+        }
+
+        private ModelDoc2 CdFindOpenDocByPath(string targetPath)
+        {
+            if (swApp == null || string.IsNullOrWhiteSpace(targetPath)) return null;
+            try
+            {
+                Array docs = swApp.GetDocuments() as Array;
+                if (docs == null) return null;
+                foreach (object docObj in docs)
+                {
+                    ModelDoc2 doc = docObj as ModelDoc2;
+                    if (doc == null) continue;
+                    if (CdExactPath(doc.GetPathName(), targetPath))
+                        return doc;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static string CdExtractTrailingPathToken(string msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg)) return "";
+            int idx = msg.LastIndexOf(": ", StringComparison.Ordinal);
+            if (idx < 0 || idx + 2 >= msg.Length) return "";
+            string tail = msg.Substring(idx + 2).Trim();
+            return tail.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase) ||
+                   tail.EndsWith(".SLDPRT", StringComparison.OrdinalIgnoreCase) ||
+                   tail.EndsWith(".SLDDRW", StringComparison.OrdinalIgnoreCase)
+                ? tail : "";
+        }
+
+        // Structured classifier at the CHECK DRAWING call boundary:
+        // verifies dirty state using live SOLIDWORKS COM docs & dependency graph,
+        // NOT localized message strings alone.
+        private CdWorkingCopyBlockAssessment CdClassifyWorkingCopyBlock(
+            SolidWorks.Interop.sldworks.View view,
+            ModelDoc2 ownerDrawing,
+            string expectedPartPath,
+            FlatDrawingViewSideResult workingCopy,
+            CdDirectFlatSideProbe probe)
+        {
+            var assessment = new CdWorkingCopyBlockAssessment();
+            try
+            {
+                if (workingCopy == null || workingCopy.PinkFacingViewer.HasValue)
+                {
+                    assessment.BlockCategory = "NOT_BLOCKED";
+                    return assessment;
+                }
+
+                string drawingPath = ownerDrawing != null ? (ownerDrawing.GetPathName() ?? "") : "";
+                bool drawingDirty = false;
+                try { drawingDirty = ownerDrawing != null && ownerDrawing.GetSaveFlag(); } catch { }
+                assessment.DrawingDirty = drawingDirty;
+
+                ModelDoc2 partDoc = view != null ? view.ReferencedDocument as ModelDoc2 : null;
+                if (partDoc == null && !string.IsNullOrWhiteSpace(expectedPartPath))
+                    partDoc = CdFindOpenDocByPath(expectedPartPath);
+                bool partDirty = false;
+                try { partDirty = partDoc != null && partDoc.GetSaveFlag(); } catch { }
+                assessment.PartDirty = partDirty;
+
+                if (drawingDirty)
+                {
+                    assessment.BlockCategory = "DIRTY_DRAWING";
+                    assessment.Detail = "Owner drawing has unsaved changes.";
+                    return assessment;
+                }
+                if (partDirty)
+                {
+                    assessment.BlockCategory = "DIRTY_PART";
+                    assessment.Detail = "Referenced part has unsaved changes.";
+                    return assessment;
+                }
+
+                // If Working Copy actually measured pink area on either face, it was NOT
+                // blocked at CheckPartWorkingCopy's dirty-reference gate; it failed later
+                // during paint/geometry classification.
+                if (workingCopy.FrontPinkAreaMm2 > 1e-6 || workingCopy.BackPinkAreaMm2 > 1e-6)
+                {
+                    assessment.BlockCategory = "COLOR_OR_GEOMETRY_UNKNOWN";
+                    assessment.Detail = "Working Copy measured pink area but remained indeterminate.";
+                    return assessment;
+                }
+
+                if (view == null || !view.IsModelLoaded() || view.SuppressState != 0 ||
+                    string.IsNullOrWhiteSpace(view.ReferencedConfiguration) ||
+                    string.IsNullOrWhiteSpace(view.DisplayState))
+                {
+                    assessment.BlockCategory = "VIEW_OR_CONFIG_UNAVAILABLE";
+                    assessment.Detail = "Drawing view model/config/display-state is unavailable.";
+                    return assessment;
+                }
+
+                string partFullPath = !string.IsNullOrWhiteSpace(expectedPartPath)
+                    ? expectedPartPath
+                    : (partDoc != null ? (partDoc.GetPathName() ?? "") : "");
+
+                Array partDeps = !string.IsNullOrWhiteSpace(partFullPath)
+                    ? swApp?.GetDocumentDependencies2(partFullPath, true, true, false) as Array : null;
+                Array drawingDeps = !string.IsNullOrWhiteSpace(drawingPath)
+                    ? swApp?.GetDocumentDependencies2(drawingPath, true, true, false) as Array : null;
+
+                var extRefAsmPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (probe != null)
+                {
+                    foreach (CdExternalRefRecord er in probe.ExternalRefs)
+                    {
+                        if (!string.IsNullOrWhiteSpace(er.ReferencedPath) &&
+                            er.ReferencedPath.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase))
+                            extRefAsmPaths.Add(CdNormalizeFullPathOrEmpty(er.ReferencedPath));
+                    }
+                }
+
+                var openDocs = swApp?.GetDocuments() as Array;
+                if (openDocs != null)
+                {
+                    foreach (object docObj in openDocs)
+                    {
+                        ModelDoc2 doc = docObj as ModelDoc2;
+                        if (doc == null) continue;
+                        bool docDirty = false;
+                        try { docDirty = doc.GetSaveFlag(); } catch { }
+                        if (!docDirty) continue;
+
+                        string docPath = CdNormalizeFullPathOrEmpty(doc.GetPathName());
+                        if (string.IsNullOrWhiteSpace(docPath)) continue;
+                        if (CdExactPath(docPath, drawingPath)) continue;
+                        if (CdExactPath(docPath, partFullPath))
+                        {
+                            assessment.PartDirty = true;
+                            assessment.BlockCategory = "DIRTY_PART";
+                            assessment.Detail = "Open part document matches referenced part and is dirty.";
+                            return assessment;
+                        }
+
+                        bool isAsm = IsAssemblyDocument(doc);
+                        bool related = false;
+                        if (extRefAsmPaths.Contains(docPath)) related = true;
+                        else if (CdDependencyArrayContainsPath(partDeps, docPath)) related = true;
+                        else if (CdDependencyArrayContainsPath(drawingDeps, docPath)) related = true;
+                        else if (isAsm && !string.IsNullOrWhiteSpace(partFullPath))
+                        {
+                            try
+                            {
+                                Array asmDeps = swApp.GetDocumentDependencies2(docPath, true, true, false) as Array;
+                                if (CdDependencyArrayContainsPath(asmDeps, partFullPath))
+                                    related = true;
+                            }
+                            catch { }
+                        }
+
+                        if (!related) continue;
+                        if (isAsm)
+                            assessment.MatchedDirtyAssemblyPaths.Add(docPath);
+                        else
+                            assessment.OtherDirtyDependencyPaths.Add(docPath);
+                    }
+                }
+
+                if (assessment.OtherDirtyDependencyPaths.Count > 0)
+                {
+                    assessment.BlockCategory = "DIRTY_NON_ASSEMBLY_DEP";
+                    assessment.Detail = "Dirty non-assembly dependency: " + string.Join("; ", assessment.OtherDirtyDependencyPaths);
+                    return assessment;
+                }
+
+                string wcMsg = workingCopy.Message ?? "";
+                string reportedDirtyPath = CdExtractTrailingPathToken(wcMsg);
+                bool wcReportsPaintMissing =
+                    wcMsg.IndexOf("không có màu hồng", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    wcMsg.IndexOf("khong co mau hong", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                if (assessment.MatchedDirtyAssemblyPaths.Count > 0 && !wcReportsPaintMissing)
+                {
+                    if (!string.IsNullOrWhiteSpace(reportedDirtyPath))
+                    {
+                        bool reportedIsMatchedAsm = assessment.MatchedDirtyAssemblyPaths.Any(p => CdExactPath(p, reportedDirtyPath));
+                        if (!reportedIsMatchedAsm)
+                        {
+                            assessment.BlockCategory = "DIRTY_PATH_MISMATCH";
+                            assessment.Detail = "Reported dirty ref does not match structurally matched open dirty assemblies: " + reportedDirtyPath;
+                            return assessment;
+                        }
+                    }
+                    assessment.BlockedSpecificallyByDirtyAssembly = true;
+                    assessment.BlockCategory = "DIRTY_ASSEMBLY_ONLY";
+                    assessment.Detail = "Verified clean Drawing+Part; open dirty related assemblies=" +
+                        string.Join("; ", assessment.MatchedDirtyAssemblyPaths);
+                    return assessment;
+                }
+
+                assessment.BlockCategory = wcReportsPaintMissing ? "COLOR_OR_GEOMETRY_UNKNOWN" : "UNRELATED_OR_UNVERIFIED_WC_BLOCK";
+                assessment.Detail = wcMsg;
+            }
+            catch (Exception ex)
+            {
+                assessment.BlockCategory = "CLASSIFIER_ERROR";
+                assessment.Detail = ex.Message;
+            }
+            return assessment;
+        }
+
+        private CdFlatSideProof CdBuildCandidateFlatSideProof(
+            SolidWorks.Interop.sldworks.View view,
+            ModelDoc2 ownerDrawing,
+            string expectedPartPath,
+            FlatDrawingViewSideResult direct,
+            CdDirectFlatSideProbe probe,
+            CdWorkingCopyBlockAssessment blockAssessment)
+        {
+            var proof = new CdFlatSideProof();
+            try
+            {
+                if (view == null || ownerDrawing == null || direct == null || probe == null)
+                    return proof;
+
+                proof.BodyResolutionMethod = probe.BodyResolutionMethod;
+                proof.AppearanceSources = probe.CombinedAppearanceSources;
+
+                proof.DrawingPathVerified = probe.DrawingExists && !string.IsNullOrWhiteSpace(probe.DrawingPath);
+                proof.ReferencedPartPathVerified = probe.PartExists &&
+                    CdExactPath(probe.ViewReferencedPartPath, expectedPartPath);
+                proof.ConfigurationVerified = probe.RequestedConfigExists &&
+                    probe.ViewModelLoaded &&
+                    probe.ViewSuppressState == 0 &&
+                    string.Equals(direct.Configuration, probe.RequestedConfig, StringComparison.OrdinalIgnoreCase);
+                proof.DisplayStateVerified = probe.DisplayStateFound &&
+                    !string.IsNullOrWhiteSpace(probe.DisplayState) &&
+                    string.Equals(direct.DisplayState, probe.DisplayState, StringComparison.OrdinalIgnoreCase);
+
+                bool visibleBodyVerified =
+                    string.Equals(probe.BodyResolutionMethod, "VISIBLE_ENTITIES2", StringComparison.Ordinal) &&
+                    probe.VisibleFaceCount > 0 &&
+                    probe.MatchedVisibleFaceCount == probe.VisibleFaceCount &&
+                    !probe.MultipleBodiesAmbiguous &&
+                    probe.ViewSelectiveBodyCount <= 1 &&
+                    probe.FrontPlanarFaceCount >= 1 &&
+                    probe.BackPlanarFaceCount >= 1 &&
+                    probe.TotalPositiveAreaMm2 > 0 &&
+                    probe.TotalNegativeAreaMm2 > 0;
+                proof.FlatPatternBodyVerified = visibleBodyVerified;
+
+                proof.FaceColorCompleteAndUnambiguous =
+                    direct.PinkFacingViewer.HasValue &&
+                    probe.AllPlanarFacesResolvedUnambiguously &&
+                    probe.HasExplicitPinkOnOneSideOnly;
+
+                // Freshness audit: fail closed unless every link in the chain is clean AND
+                // no non-locked in-context external references link to an open dirty assembly, AND
+                // view faces were directly obtained from VISIBLE_ENTITIES2 (not hidden DS inference).
+                var freshnessBlocks = new List<string>();
+                if (probe.DrawingDirty) freshnessBlocks.Add("drawing_dirty");
+                if (probe.PartDirty) freshnessBlocks.Add("part_dirty");
+                if (probe.RequestedConfigDirty) freshnessBlocks.Add("cfg_dirty");
+                if (probe.RequestedConfigNeedsRebuild) freshnessBlocks.Add("cfg_needs_rebuild");
+                if (probe.PartNeedsRebuild2 != (int)swModelRebuildStatus_e.swModelRebuildStatus_FullyRebuilt)
+                    freshnessBlocks.Add("part_needs_rebuild=" + probe.PartNeedsRebuild2);
+                if (probe.ViewModelOutOfDate) freshnessBlocks.Add("view_out_of_date");
+                if (probe.ViewDisableAutoUpdate) freshnessBlocks.Add("view_disable_auto_update");
+                if (probe.ViewLightweight) freshnessBlocks.Add("view_lightweight");
+                if (!visibleBodyVerified)
+                    freshnessBlocks.Add("body_not_visible_entities2(" + probe.BodyResolutionMethod + ")");
+
+                if (probe.PartExternalRefCount < 0)
+                {
+                    freshnessBlocks.Add("ext_ref_count_unavailable");
+                }
+                else if (probe.PartExternalRefCount > 0)
+                {
+                    // Check whether any non-locked external reference points to an open dirty assembly
+                    // or is currently unresolved/out-of-context/broken/dangling while dirty assemblies exist.
+                    int nonLockedDirtyOrOpenExtRefs = 0;
+                    foreach (CdExternalRefRecord er in probe.ExternalRefs)
+                    {
+                        bool isLocked = er.Status == (int)swExternalReferenceStatus_e.swExternalReferenceLocked;
+                        if (isLocked) continue;
+
+                        bool targetIsDirtyOpen = blockAssessment != null &&
+                            blockAssessment.MatchedDirtyAssemblyPaths.Any(p => CdExactPath(p, er.ReferencedPath));
+                        ModelDoc2 targetDoc = CdFindOpenDocByPath(er.ReferencedPath);
+                        bool targetDocDirty = false;
+                        try { targetDocDirty = targetDoc != null && targetDoc.GetSaveFlag(); } catch { }
+
+                        if (targetIsDirtyOpen || targetDocDirty)
+                        {
+                            nonLockedDirtyOrOpenExtRefs++;
+                        }
+                        else if (er.Status != (int)swExternalReferenceStatus_e.swExternalReferenceInContext &&
+                                 blockAssessment != null &&
+                                 blockAssessment.MatchedDirtyAssemblyPaths.Count > 0)
+                        {
+                            nonLockedDirtyOrOpenExtRefs++;
+                        }
+                    }
+
+                    if (nonLockedDirtyOrOpenExtRefs > 0)
+                    {
+                        freshnessBlocks.Add("non_locked_ext_refs_to_dirty_asm=" + nonLockedDirtyOrOpenExtRefs + "/" + probe.PartExternalRefCount);
+                    }
+                    else if (blockAssessment != null && blockAssessment.MatchedDirtyAssemblyPaths.Count > 0 &&
+                             probe.ExternalRefs.Count == 0)
+                    {
+                        freshnessBlocks.Add("ext_refs_detail_unavailable_count=" + probe.PartExternalRefCount);
+                    }
+                }
+
+                proof.SourceFreshnessVerified = freshnessBlocks.Count == 0;
+                proof.FreshnessReason = freshnessBlocks.Count == 0
+                    ? "VERIFIED_CLEAN_VISIBLE_AND_NO_DIRTY_INCONTEXT_EXTREF"
+                    : "UNVERIFIED: " + string.Join("; ", freshnessBlocks);
+                proof.ProvenanceSummary =
+                    "draw=" + Path.GetFileName(probe.DrawingPath) +
+                    " sheet=" + probe.SheetName +
+                    " view=" + probe.ViewName +
+                    " cfg=" + probe.RequestedConfig +
+                    " activeCfg=" + probe.ActiveModelConfig +
+                    " ds=" + probe.DisplayState +
+                    " body=" + probe.BodyResolutionMethod +
+                    " extRefs=" + probe.PartExternalRefCount +
+                    " fresh=" + proof.SourceFreshnessVerified;
+            }
+            catch (Exception ex)
+            {
+                proof.SourceFreshnessVerified = false;
+                proof.FreshnessReason = "PROOF_ERROR: " + ex.Message;
+                LogDebug("[CD PILOT PROOF ERROR] " + ex.Message);
+            }
+            return proof;
+        }
+
+        private static string CdFormatProvenanceLog(
+            CdDirectFlatSideProbe probe,
+            CdFlatSideProof proof,
+            CdWorkingCopyBlockAssessment blockAssessment,
+            FlatDrawingViewSideResult workingCopy)
+        {
+            if (probe == null || proof == null) return "unavailable";
+            string asmList = blockAssessment != null && blockAssessment.MatchedDirtyAssemblyPaths.Count > 0
+                ? string.Join("|", blockAssessment.MatchedDirtyAssemblyPaths.Select(Path.GetFileName))
+                : "none";
+            string extStatuses = probe.ExternalRefs.Count > 0
+                ? string.Join(",", probe.ExternalRefs.Select(e => e.Status).Distinct())
+                : "none";
+            return string.Format(CultureInfo.InvariantCulture,
+                "view={0} sheet={1} draw=\"{2}\" part=\"{3}\" expectedPart=\"{4}\" activeCfg=\"{5}\" viewCfg=\"{6}\" ds=\"{7}\" bodySrc={8} vis={9}/{10} selBodies={11} activeBodies={12} frontFaces={13} backFaces={14} frontPinkMm2={15:F1} backPinkMm2={16:F1} frontSrc={17} backSrc={18} extRefs={19} extStatuses=[{20}] drawDirty={21} partDirty={22} cfgDirty={23} cfgRebuild={24} partRebuild2={25} viewOutOfDate={26} disableAuto={27} lightweight={28} wcBlock={29} dirtyAsms=[{30}] proof=[D={31},P={32},C={33},DS={34},Body={35},Color={36},Fresh={37}] freshnessReason=\"{38}\" faceAudit=[{39}]",
+                probe.ViewName,
+                probe.SheetName,
+                probe.DrawingPath,
+                probe.ViewReferencedPartPath,
+                probe.ExpectedPartPath,
+                probe.ActiveModelConfig,
+                probe.RequestedConfig,
+                probe.DisplayState,
+                probe.BodyResolutionMethod,
+                probe.MatchedVisibleFaceCount,
+                probe.VisibleFaceCount,
+                probe.ViewSelectiveBodyCount,
+                probe.ActiveConfigSolidBodyCount,
+                probe.FrontPlanarFaceCount,
+                probe.BackPlanarFaceCount,
+                probe.FrontPinkAreaMm2,
+                probe.BackPinkAreaMm2,
+                probe.FrontAppearanceSources,
+                probe.BackAppearanceSources,
+                probe.PartExternalRefCount,
+                extStatuses,
+                probe.DrawingDirty,
+                probe.PartDirty,
+                probe.RequestedConfigDirty,
+                probe.RequestedConfigNeedsRebuild,
+                probe.PartNeedsRebuild2,
+                probe.ViewModelOutOfDate,
+                probe.ViewDisableAutoUpdate,
+                probe.ViewLightweight,
+                blockAssessment != null ? blockAssessment.BlockCategory : "NONE",
+                asmList,
+                proof.DrawingPathVerified,
+                proof.ReferencedPartPathVerified,
+                proof.ConfigurationVerified,
+                proof.DisplayStateVerified,
+                proof.FlatPatternBodyVerified,
+                proof.FaceColorCompleteAndUnambiguous,
+                proof.SourceFreshnessVerified,
+                proof.FreshnessReason,
+                string.Join(" ; ", probe.FaceAuditSummary.Take(8)));
+        }
 
         private static bool CdSameFace(Face2 first, Face2 second)
         {
@@ -1192,6 +1738,32 @@ namespace ADDIN.Commands
         {
             public object Entity;
             public double[] Rgb;
+            private bool _facesLoaded;
+            private Face2[] _ownedFaces;
+
+            public Face2[] GetOwnedFaces()
+            {
+                if (_facesLoaded) return _ownedFaces;
+                _facesLoaded = true;
+                try
+                {
+                    Array raw = (Entity as Body2)?.GetFaces() as Array
+                        ?? (Entity as Feature)?.GetFaces() as Array;
+                    if (raw == null || raw.Length == 0) return null;
+                    var list = new List<Face2>(raw.Length);
+                    foreach (object item in raw)
+                    {
+                        Face2 f = item as Face2;
+                        if (f != null) list.Add(f);
+                    }
+                    _ownedFaces = list.ToArray();
+                }
+                catch
+                {
+                    _ownedFaces = null;
+                }
+                return _ownedFaces;
+            }
         }
 
         private bool CdSameObject(object first, object second)
@@ -1264,8 +1836,31 @@ namespace ADDIN.Commands
             return true;
         }
 
+        private bool CdEntryMatches(CdAppearanceEntry entry, object target, Face2 ownerFace, bool isFaceLevel)
+        {
+            if (entry == null) return false;
+            if (isFaceLevel)
+                return CdSameFace(target as Face2, entry.Entity as Face2);
+            if (CdSameObject(target, entry.Entity))
+                return true;
+            if (ownerFace == null) return false;
+            if (entry.Entity is Body2 || entry.Entity is Feature)
+            {
+                Face2[] owned = entry.GetOwnedFaces();
+                if (owned != null)
+                {
+                    foreach (Face2 f in owned)
+                    {
+                        if (CdSameFace(ownerFace, f)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         private bool CdResolveAppearanceLevel(
             object target,
+            Face2 ownerFace,
             List<CdAppearanceEntry> legacyEntries,
             List<CdAppearanceEntry> renderEntries,
             bool isFaceLevel,
@@ -1275,17 +1870,14 @@ namespace ADDIN.Commands
         {
             resolvedRgb = null;
             conflictReason = null;
-            if (target == null) return true;
+            if (target == null && (isFaceLevel || ownerFace == null)) return true;
 
             double[] legacyRgb = null;
             if (legacyEntries != null)
             {
                 foreach (CdAppearanceEntry entry in legacyEntries)
                 {
-                    bool match = isFaceLevel
-                        ? CdSameFace(target as Face2, entry.Entity as Face2)
-                        : CdSameObject(target, entry.Entity);
-                    if (!match) continue;
+                    if (!CdEntryMatches(entry, target, ownerFace, isFaceLevel)) continue;
                     if (!CdKnownRgb(entry.Rgb))
                     {
                         conflictReason = levelName + " display-state color is invalid";
@@ -1305,10 +1897,7 @@ namespace ADDIN.Commands
             {
                 foreach (CdAppearanceEntry entry in renderEntries)
                 {
-                    bool match = isFaceLevel
-                        ? CdSameFace(target as Face2, entry.Entity as Face2)
-                        : CdSameObject(target, entry.Entity);
-                    if (!match) continue;
+                    if (!CdEntryMatches(entry, target, ownerFace, isFaceLevel)) continue;
                     if (!CdKnownRgb(entry.Rgb))
                     {
                         conflictReason = levelName + " render color is invalid";
@@ -1462,28 +2051,116 @@ namespace ADDIN.Commands
             return body;
         }
 
+        private static void CdReadExternalReferences(ModelDoc2 model, CdDirectFlatSideProbe probe)
+        {
+            if (model == null || probe == null) return;
+            try
+            {
+                ModelDocExtension ext = model.Extension;
+                if (ext == null) return;
+                int count = ext.ListExternalFileReferencesCount();
+                probe.PartExternalRefCount = count;
+                if (count <= 0) return;
+
+                object mp = null, comp = null, feat = null, dt = null, st = null, rfn = null, fc = null, co = null, cn = null;
+                ext.ListExternalFileReferences2(out mp, out comp, out feat, out dt, out st, out rfn, out fc, out co, out cn);
+                Array aMp = mp as Array;
+                Array aFeat = feat as Array;
+                Array aSt = st as Array;
+                if (aMp == null) return;
+
+                int lbMp = aMp.GetLowerBound(0);
+                int lbFeat = aFeat != null ? aFeat.GetLowerBound(0) : 0;
+                int lbSt = aSt != null ? aSt.GetLowerBound(0) : 0;
+                for (int i = 0; i < aMp.Length; i++)
+                {
+                    string refPath = Convert.ToString(aMp.GetValue(lbMp + i) ?? "");
+                    string featName = aFeat != null && i < aFeat.Length
+                        ? Convert.ToString(aFeat.GetValue(lbFeat + i) ?? "") : "";
+                    int status = -1;
+                    if (aSt != null && i < aSt.Length)
+                    {
+                        try { status = Convert.ToInt32(aSt.GetValue(lbSt + i)); }
+                        catch { status = -1; }
+                    }
+                    probe.ExternalRefs.Add(new CdExternalRefRecord
+                    {
+                        FeatureName = featName,
+                        ReferencedPath = refPath,
+                        Status = status
+                    });
+                }
+            }
+            catch { }
+        }
+
         private FlatDrawingViewSideResult CdTryFlatSideReadOnly(
             SolidWorks.Interop.sldworks.View view)
         {
-            return CdTryFlatSideReadOnlyCore(view, null);
+            CdDirectFlatSideProbe _;
+            return CdTryFlatSideReadOnlyDetailed(view, null, null, out _);
+        }
+
+        private FlatDrawingViewSideResult CdTryFlatSideReadOnlyCore(
+            SolidWorks.Interop.sldworks.View view, ModelDoc2 ownerDrawing)
+        {
+            CdDirectFlatSideProbe _;
+            return CdTryFlatSideReadOnlyDetailed(view, ownerDrawing, null, out _);
         }
 
         // This method MUST be fail-closed: null PinkFacingViewer means no direct verdict.
         // Reading a face's color without verifying its exact Configuration, Display State,
         // and actual view visibility MUST NOT produce an OK/NG verdict.
-        private FlatDrawingViewSideResult CdTryFlatSideReadOnlyCore(
-            SolidWorks.Interop.sldworks.View view, ModelDoc2 ownerDrawing)
+        private FlatDrawingViewSideResult CdTryFlatSideReadOnlyDetailed(
+            SolidWorks.Interop.sldworks.View view,
+            ModelDoc2 ownerDrawing,
+            string expectedPartPath,
+            out CdDirectFlatSideProbe probe)
         {
             FlatDrawingViewSideResult result = new FlatDrawingViewSideResult();
+            probe = new CdDirectFlatSideProbe
+            {
+                ExpectedPartPath = expectedPartPath ?? ""
+            };
             string reason = "not started";
             try
             {
+                if (ownerDrawing != null)
+                {
+                    try { probe.DrawingPath = ownerDrawing.GetPathName() ?? ""; } catch { }
+                    try { probe.DrawingExists = !string.IsNullOrWhiteSpace(probe.DrawingPath) && File.Exists(probe.DrawingPath); } catch { }
+                    try { probe.DrawingDirty = ownerDrawing.GetSaveFlag(); } catch { }
+                    try { probe.DrawingVisible = ownerDrawing.Visible; } catch { }
+                }
+
                 if (view == null) { reason = "view null"; return result; }
                 result.ViewName = view.Name ?? "";
+                probe.ViewName = result.ViewName;
+                try { probe.SheetName = (view.Sheet as Sheet)?.GetName() ?? ""; } catch { }
+                try { probe.ViewModelLoaded = view.IsModelLoaded(); } catch { }
+                try { probe.ViewSuppressState = view.SuppressState; } catch { }
+                try { probe.ViewModelOutOfDate = view.IsModelOutOfDate(); } catch { }
+                try { probe.ViewDisableAutoUpdate = view.DisableAutoUpdate; } catch { }
+                try { probe.ViewLightweight = view.IsLightweight(); } catch { }
+                try { probe.ViewSelectiveBodyCount = view.GetBodiesCount(); } catch { }
+
                 result.Configuration = view.ReferencedConfiguration ?? "";
                 result.DisplayState = view.DisplayState ?? "";
+                probe.RequestedConfig = result.Configuration;
+                probe.DisplayState = result.DisplayState;
+
                 ModelDoc2 model = view.ReferencedDocument as ModelDoc2;
                 PartDoc part = model as PartDoc;
+                if (model != null)
+                {
+                    try { probe.ViewReferencedPartPath = model.GetPathName() ?? ""; } catch { }
+                    try { probe.PartExists = !string.IsNullOrWhiteSpace(probe.ViewReferencedPartPath) && File.Exists(probe.ViewReferencedPartPath); } catch { }
+                    try { probe.PartDirty = model.GetSaveFlag(); } catch { }
+                    try { probe.PartNeedsRebuild2 = model.Extension != null ? model.Extension.NeedsRebuild2 : -1; } catch { }
+                    try { probe.DisplayStateLinkedToConfig = model.ConfigurationManager != null && model.ConfigurationManager.LinkDisplayStatesToConfigurations; } catch { }
+                    CdReadExternalReferences(model, probe);
+                }
+
                 if (model == null || part == null || result.Configuration.Length == 0 ||
                     result.DisplayState.Length == 0)
                 { reason = "Part, config or display-state unavailable"; return result; }
@@ -1491,8 +2168,10 @@ namespace ADDIN.Commands
                 // Crucial guard: Never activate a different config or mutate the user's model.
                 // If the active config differs from the view's referenced config, resolve by name.
                 Configuration activeCfg = model.ConfigurationManager.ActiveConfiguration;
+                probe.ActiveModelConfig = activeCfg != null ? (activeCfg.Name ?? "") : "";
                 bool activeConfigSame = activeCfg != null && string.Equals(activeCfg.Name,
                     result.Configuration, StringComparison.OrdinalIgnoreCase);
+                probe.ActiveConfigMatchesRequested = activeConfigSame;
                 Configuration cfg = activeConfigSame
                     ? activeCfg
                     : model.GetConfigurationByName(result.Configuration) as Configuration;
@@ -1501,6 +2180,9 @@ namespace ADDIN.Commands
                     reason = "referenced config differs from active model config and not found by name";
                     return result;
                 }
+                probe.RequestedConfigExists = true;
+                try { probe.RequestedConfigDirty = cfg.IsDirty(); } catch { }
+                try { probe.RequestedConfigNeedsRebuild = cfg.NeedsRebuild; } catch { }
 
                 Array states = cfg.GetDisplayStates() as Array;
                 bool stateFound = false;
@@ -1508,6 +2190,7 @@ namespace ADDIN.Commands
                     foreach (object state in states)
                         if (string.Equals(Convert.ToString(state), result.DisplayState,
                             StringComparison.OrdinalIgnoreCase)) stateFound = true;
+                probe.DisplayStateFound = stateFound;
                 if (!stateFound)
                 { reason = "view display-state not found in referenced config"; return result; }
 
@@ -1533,6 +2216,7 @@ namespace ADDIN.Commands
                     reason = entryError;
                     return result;
                 }
+                probe.DisplayStateBodyCount = dsBodyEntries.Count;
 
                 // Official SOLIDWORKS 2024 IView API. Get visible faces for THIS view.
                 Array visible = view.GetVisibleEntities2(null,
@@ -1549,6 +2233,7 @@ namespace ADDIN.Commands
                 string bodySource;
                 if (visible != null && visible.Length > 0)
                 {
+                    probe.VisibleFaceCount = visible.Length;
                     // Fail closed on a missing flat body. NEVER fall back to Part.GetBodies2:
                     // that reads the active configuration, possibly the folded body.
                     Face2 visibleFace = visible.GetValue(visible.GetLowerBound(0)) as Face2;
@@ -1556,9 +2241,40 @@ namespace ADDIN.Commands
                     if (body == null)
                     { reason = "visible face has no verified flat-pattern body"; return result; }
 
+                    if (probe.ViewSelectiveBodyCount > 1)
+                    {
+                        probe.MultipleBodiesAmbiguous = true;
+                        reason = "view displays multiple selective bodies";
+                        return result;
+                    }
+                    if (probe.ViewSelectiveBodyCount == 1)
+                    {
+                        Array viewBodies = view.Bodies as Array;
+                        if (viewBodies != null && viewBodies.Length == 1 &&
+                            !CdSameObject(viewBodies.GetValue(viewBodies.GetLowerBound(0)), body))
+                        {
+                            probe.MultipleBodiesAmbiguous = true;
+                            reason = "visible face body differs from view selective body";
+                            return result;
+                        }
+                    }
+                    if (activeConfigSame)
+                    {
+                        Array activeSolidBodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as Array;
+                        probe.ActiveConfigSolidBodyCount = activeSolidBodies != null ? activeSolidBodies.Length : 0;
+                        if (probe.ActiveConfigSolidBodyCount > 1 && probe.ViewSelectiveBodyCount <= 0)
+                        {
+                            probe.MultipleBodiesAmbiguous = true;
+                            reason = "active flat configuration contains multiple solid bodies";
+                            return result;
+                        }
+                    }
+
                     bodyFaces = body.GetFaces() as Array;
                     if (bodyFaces == null || bodyFaces.Length == 0)
                     { reason = "flat-pattern body faces unavailable"; return result; }
+                    probe.BodyFaceCount = bodyFaces.Length;
+                    try { probe.BodyIsSheetMetal = body.IsSheetMetal(); } catch { }
 
                     // Every returned visible face must actually belong to THIS one body.
                     // A mixed-body / unmatched face invalidates the direct conclusion.
@@ -1578,6 +2294,7 @@ namespace ADDIN.Commands
                         { reason = "visible face is not in the selected flat-pattern body"; return result; }
                         matchedVisibleFaces++;
                     }
+                    probe.MatchedVisibleFaceCount = matchedVisibleFaces;
                     if (matchedVisibleFaces != visible.Length)
                     { reason = "visible face to body coverage is incomplete"; return result; }
 
@@ -1608,6 +2325,7 @@ namespace ADDIN.Commands
                         return result;
                     }
                     bodySource = "VISIBLE_ENTITIES2";
+                    probe.BodyResolutionMethod = bodySource;
                     LogDebug("[FLAT DIRECT BODY] view=" + result.ViewName +
                         " bodySource=" + bodySource +
                         " visible=" + visible.Length + " matched=" + matchedVisibleFaces +
@@ -1635,7 +2353,10 @@ namespace ADDIN.Commands
                         reason = "hidden-view flat-pattern body faces unavailable";
                         return result;
                     }
+                    probe.BodyFaceCount = bodyFaces.Length;
+                    try { probe.BodyIsSheetMetal = body.IsSheetMetal(); } catch { }
                     bodySource = "HIDDEN_DS_FACE_BODY";
+                    probe.BodyResolutionMethod = bodySource;
                     LogDebug("[FLAT DIRECT BODY] view=" + result.ViewName +
                         " bodySource=" + bodySource +
                         " visible=0 bodyFaces=" + bodyFaces.Length +
@@ -1703,46 +2424,60 @@ namespace ADDIN.Commands
                     }
                 }
 
-                double positiveArea = 0, negativeArea = 0;
+                double positiveArea = 0, negativeArea = 0, otherArea = 0;
                 double positivePink = 0, negativePink = 0;
                 var sources = new HashSet<string>(StringComparer.Ordinal);
+                var frontSources = new HashSet<string>(StringComparer.Ordinal);
+                var backSources = new HashSet<string>(StringComparer.Ordinal);
                 foreach (object item in bodyFaces)
                 {
                     Face2 face = item as Face2;
                     if (face == null) continue;
-                    double z = CdFaceViewZ(face, math, xform);
-                    if (Math.Abs(z) < 0.98) continue;
                     double area = face.GetArea();
                     if (area <= 0) continue;
-                    if (z > 0) positiveArea += area;
-                    else negativeArea += area;
+                    double z = CdFaceViewZ(face, math, xform);
+                    if (Math.Abs(z) < 0.98)
+                    {
+                        otherArea += area;
+                        continue;
+                    }
+                    if (z > 0)
+                    {
+                        positiveArea += area;
+                        probe.FrontPlanarFaceCount++;
+                    }
+                    else
+                    {
+                        negativeArea += area;
+                        probe.BackPlanarFaceCount++;
+                    }
 
                     double[] rgb;
                     string conflict;
                     string source = null;
 
-                    if (!CdResolveAppearanceLevel(face, dsFaceEntries, rmFaceEntries, true, "face", out rgb, out conflict))
+                    if (!CdResolveAppearanceLevel(face, face, dsFaceEntries, rmFaceEntries, true, "face", out rgb, out conflict))
                     { reason = conflict; return result; }
                     if (rgb != null) source = "FACE";
 
                     if (rgb == null)
                     {
                         Feature faceFeature = face.GetFeature() as Feature;
-                        if (!CdResolveAppearanceLevel(faceFeature, dsFeatureEntries, rmFeatureEntries, false, "feature", out rgb, out conflict))
+                        if (!CdResolveAppearanceLevel(faceFeature, face, dsFeatureEntries, rmFeatureEntries, false, "feature", out rgb, out conflict))
                         { reason = conflict; return result; }
                         if (rgb != null) source = "FEATURE";
                     }
 
                     if (rgb == null)
                     {
-                        if (!CdResolveAppearanceLevel(body, dsBodyEntries, rmBodyEntries, false, "body", out rgb, out conflict))
+                        if (!CdResolveAppearanceLevel(body, face, dsBodyEntries, rmBodyEntries, false, "body", out rgb, out conflict))
                         { reason = conflict; return result; }
                         if (rgb != null) source = "BODY";
                     }
 
                     if (rgb == null)
                     {
-                        if (!CdResolveAppearanceLevel(model, dsModelEntries, rmModelEntries, false, "model", out rgb, out conflict))
+                        if (!CdResolveAppearanceLevel(model, face, dsModelEntries, rmModelEntries, false, "model", out rgb, out conflict))
                         { reason = conflict; return result; }
                         if (rgb != null) source = "MODEL";
                     }
@@ -1753,15 +2488,36 @@ namespace ADDIN.Commands
                         reason = "effective color unresolved for a planar flat face";
                         return result;
                     }
-                    if (source != null) sources.Add(source);
-                    if (CdPink(rgb))
+                    if (source != null)
+                    {
+                        sources.Add(source);
+                        if (z > 0) frontSources.Add(source);
+                        else backSources.Add(source);
+                    }
+                    bool isPink = CdPink(rgb);
+                    if (isPink)
                     {
                         if (z > 0) positivePink += area;
                         else negativePink += area;
                     }
+                    if (probe.FaceAuditSummary.Count < 16)
+                    {
+                        probe.FaceAuditSummary.Add(string.Format(CultureInfo.InvariantCulture,
+                            "z={0:F2} area={1:F1}mm2 src={2} rgb={3:F2},{4:F2},{5:F2} pink={6}",
+                            z, area * 1000000.0, source ?? "NONE", rgb[0], rgb[1], rgb[2], isPink));
+                    }
                 }
+                probe.TotalPositiveAreaMm2 = positiveArea * 1000000.0;
+                probe.TotalNegativeAreaMm2 = negativeArea * 1000000.0;
+                probe.TotalOtherAreaMm2 = otherArea * 1000000.0;
                 result.FrontPinkAreaMm2 = positivePink * 1000000;
                 result.BackPinkAreaMm2 = negativePink * 1000000;
+                probe.FrontPinkAreaMm2 = result.FrontPinkAreaMm2;
+                probe.BackPinkAreaMm2 = result.BackPinkAreaMm2;
+                probe.FrontAppearanceSources = string.Join("+", frontSources);
+                probe.BackAppearanceSources = string.Join("+", backSources);
+                probe.CombinedAppearanceSources = string.Join("+", sources);
+                probe.AllPlanarFacesResolvedUnambiguously = true;
                 if (positiveArea <= 1e-12 || negativeArea <= 1e-12)
                 { reason = "sheet metal pair of planar sides not found"; return result; }
 
@@ -1775,7 +2531,10 @@ namespace ADDIN.Commands
                 else if (backPink && frontAbsent) result.PinkFacingViewer = false;
                 else { reason = "no unambiguous one-sided pink paint"; return result; }
 
-                string sourceList = string.Join("+", sources);
+                probe.HasExplicitPinkOnOneSideOnly = true;
+                probe.VerdictPinkFacingViewer = result.PinkFacingViewer;
+
+                string sourceList = probe.CombinedAppearanceSources;
                 result.Message = "[Direct Drawing View / verified config+state] " +
                     (result.PinkFacingViewer.Value
                         ? "Mặt đang nhìn có màu hồng (ウラ)."
@@ -1798,6 +2557,7 @@ namespace ADDIN.Commands
             {
                 if (!result.PinkFacingViewer.HasValue)
                 {
+                    probe.FailureReason = reason;
                     result.Message = "[Direct Drawing View chưa xác minh] " + reason;
                     LogDebug("[FLAT DIRECT UNKNOWN] view=" + result.ViewName + " reason=" + reason);
                 }
@@ -3560,6 +4320,10 @@ namespace ADDIN.Commands
                 CompareFlatSideMarker("ウラ", null) != DrawingBomCheckStatus.Warning)
                 throw new InvalidOperationException("Fail case 29");
             LogDebug("[SELFTEST PASS] case=29_URAOMOTE_UNKNOWN_WARNING");
+
+            // Case 30: Policy tests for PR #62 pilot/fail-closed logic (synthetic, not COM verification)
+            int policyCount = CdFlatSidePilotPolicy.RunSelfTests();
+            LogDebug("[SELFTEST PASS] case=30_PR62_PILOT_POLICY assertions=" + policyCount);
         }
 
         private static void RunWidthLengthSelfTests()
