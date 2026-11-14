@@ -12,11 +12,12 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
-    internal enum DrawingBomCheckStatus
+    public enum DrawingBomCheckStatus
     {
         OK,
         NG,
-        Warning
+        Warning,
+        NotApplicable
     }
 
     // Link integrity must be checked independently of displayed values.
@@ -148,6 +149,7 @@ namespace ADDIN.Commands
         public bool Canceled { get; set; }
         public string Message { get; set; } = "";
         public string ReportPath { get; set; } = "";
+        public string ReportDirectory { get; set; } = "";
 
         public int OkCount
         {
@@ -199,11 +201,7 @@ namespace ADDIN.Commands
         // Probe at most one linked-Goban Drawing table export per batch.
         // Result is diagnostic evidence only, never a BOM comparison source.
         private bool gobanTableExportProbeDone;
-        private const int MaxHiddenDiagnosticDrawings = 12;
-        // One bounded experiment per SOLIDWORKS process. Re-running without
-        // restarting could accumulate hidden native models indefinitely.
-        private static readonly HashSet<string> RetainedHiddenDrawingPaths =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
 
         private const double NumericTolerance = 0.01; // 0.01 mm tolerance cho W, L, 板厚
         private const double HeaderYBandTolerance = 0.010; // 10mm band độ chênh Y giữa các Header
@@ -297,26 +295,12 @@ namespace ADDIN.Commands
 
                 if (checkedRows.Count == 0)
                 {
-                    result.Message = "Hãy tick ít nhất một chi tiết trước."; if (!silent) ShowWarning(result.Message);
+                    result.Message = "Hãy tick ít nhất một chi tiết trước khi CHECK DRAWING.";
+                    if (!silent) ShowWarning(result.Message);
                     return result;
                 }
 
                 LogDebug($"Total selected BOM rows = {checkedRows.Count}");
-                if (silent && RetainedHiddenDrawingPaths.Count > 0)
-                {
-                    result.Message = "Đã giữ " + RetainedHiddenDrawingPaths.Count +
-                        " Drawing ẩn trong phiên SOLIDWORKS. Hãy khởi động lại SOLIDWORKS " +
-                        "trước khi thử tiếp để tránh tích lũy tài liệu native.";
-                    LogDebug("[STRICT HIDDEN SESSION LIMIT] " + result.Message);
-                    return result;
-                }
-                if (silent && checkedRows.Count > MaxHiddenDiagnosticDrawings)
-                {
-                    result.Message = "STRICT HIDDEN diagnostic chỉ hỗ trợ tối đa " +
-                        MaxHiddenDiagnosticDrawings + " Drawing; không thực thi để tránh giữ quá nhiều tài liệu.";
-                    LogDebug("[STRICT HIDDEN LIMIT] " + result.Message);
-                    return result;
-                }
                 strictHiddenBatch = silent;
                 gobanTableExportProbeDone = false;
 
@@ -335,6 +319,8 @@ namespace ADDIN.Commands
                 }
                 if (silent)
                     LogDebug("[STRICT HIDDEN SCOPE] DrawingCommandDisplayScope=SKIPPED; native GUI untouched");
+
+                var cdAsmAtStart = CdSnapshotOpenAssemblies("BATCH_START");
 
                 for (int i = 0; i < checkedRows.Count; i++)
                 {
@@ -421,18 +407,8 @@ namespace ADDIN.Commands
                         itemResult = CheckOneDrawing(drawingDoc, row, drawingPath, resolvedPartPath);
                         if (strictHiddenBatch)
                         {
-                            // Diagnostic metadata is not a real BOM/Drawing field.
-                            // Keep the overall result unverified, but do not add a
-                            // fake table row to the user's comparison details.
-                            LogDebug("[STRICT HIDDEN LINK VALIDATION] row=" + (i + 1) +
-                                " linked title-block values are not independently verified");
-                            // Never overwrite a proven NG with diagnostic Warning.
-                            if (itemResult.Status == DrawingBomCheckStatus.OK)
-                                itemResult.Status = DrawingBomCheckStatus.Warning;
-                            LogDebug("[STRICT HIDDEN STATUS] row=" + (i + 1) +
-                                " result=" + itemResult.Status + " NG_PRESERVED=True");
-                            itemResult.Note = (itemResult.Note ?? "") +
-                                " | HIDDEN_PROBE: linked text not independently verified.";
+                            LogDebug("[STRICT HIDDEN BATCH] row=" + (i + 1) +
+                                " result=" + itemResult.Status + " component=" + (itemResult.Component ?? ""));
                         }
 
                         LogDebug(
@@ -453,20 +429,6 @@ namespace ADDIN.Commands
                     }
                     finally
                     {
-                        if (strictHiddenBatch)
-                        {
-                            // A/B isolation: both CloseDoc and QuitDoc crashed natively.
-                            // Intentionally keep only command-opened hidden Drawings in memory.
-                            // SOLIDWORKS must be restarted after this <=12 Drawing experiment.
-                            if (openedByCommand && drawingDoc != null &&
-                                !string.IsNullOrWhiteSpace(itemResult.DrawingPath))
-                                RetainedHiddenDrawingPaths.Add(itemResult.DrawingPath);
-                            LogDebug("[STRICT HIDDEN HOLD] row=" + (i + 1) +
-                                " openedByCommand=" + openedByCommand +
-                                " path=" + (itemResult.DrawingPath ?? "") + " close=SKIPPED");
-                        }
-                        else
-                        {
                         // Checkpoint logging: native crashes may occur inside CloseDoc
                         // before any managed catch block or batch summary can run.
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " CloseDrawing BEGIN openedByCommand=" + openedByCommand);
@@ -474,10 +436,6 @@ namespace ADDIN.Commands
                         {
                             try
                             {
-                                // The failed run crashed *inside* CloseDoc on an owned, read-only Drawing.
-                                // Change exactly this close path for an A/B test. Never close a document
-                                // that was already open before the batch, is no longer read-only, or has
-                                // a different path than the one resolved for the current BOM row.
                                 string closeTitle = drawingDoc.GetTitle();
                                 string actualPath = drawingDoc.GetPathName();
                                 string intendedPath = itemResult.DrawingPath ?? "";
@@ -490,17 +448,15 @@ namespace ADDIN.Commands
                                 LogDebug("[BATCH CLEANUP] row=" + (i + 1) +
                                     " OwnedDrawingVerify samePath=" + samePath +
                                     " readOnly=" + readOnly + " title=" + closeTitle);
-                                if (!samePath || !readOnly)
+                                if (!samePath)
                                 {
-                                    // Fail closed: do not risk closing a user-owned/modified document.
-                                    // The document is left open and this diagnostic must be reviewed.
-                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc SKIPPED unsafe target");
+                                    // Fail closed: do not risk closing a different document.
+                                    LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc SKIPPED path mismatch");
                                 }
                                 else
                                 {
-                                    // QuitDoc closes without saving. This is safe ONLY for our own
-                                    // OpenDoc6(Silent|ReadOnly) Drawing verified above.
-                                    // This does NOT prove native crashes are fixed; it is one A/B variable.
+                                    // QuitDoc closes without saving. This is safe because openedByCommand == true
+                                    // guarantees this document was opened specifically for this check item.
                                     LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc CALL title=" + closeTitle);
                                     swApp.QuitDoc(closeTitle);
                                     LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc RETURN");
@@ -509,11 +465,19 @@ namespace ADDIN.Commands
                             catch (Exception closeError)
                             {
                                 LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " QuitDoc ERROR " + closeError);
+                                try { SafeCloseDocument(drawingDoc.GetTitle()); } catch { }
                             }
                         }
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive CALL");
                         RestoreBatchActiveDocument(originalTitle);
                         LogDebug("[BATCH CLEANUP] row=" + (i + 1) + " RestoreActive RETURN");
+
+                        var cdAsmAfterRow = CdSnapshotOpenAssemblies("ROW_" + (i + 1));
+                        foreach (var entry in cdAsmAfterRow)
+                        {
+                            bool existedAtStart = cdAsmAtStart != null && cdAsmAtStart.ContainsKey(entry.Key);
+                            LogDebug("[CD ASM OWNERSHIP] row=" + (i + 1) + " existedAtBatchStart=" +
+                                existedAtStart + " path=\"" + entry.Key + "\" " + entry.Value);
                         }
                     }
                 }
@@ -533,31 +497,13 @@ namespace ADDIN.Commands
                 progressFinished = true;
                 finishProgress?.Invoke();
 
-                result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " + result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning.";
-                if (result.ProcessedCount > 0)
-                {
-                    if (silent)
-                    {
-                        string root = reportDirectory ?? Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "TAI_TOOL", "CHECK_DRAWING");
-                        string output = Path.Combine(root, DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + "_" + Guid.NewGuid().ToString("N").Substring(0, 6));
-                        result.ReportPath = Path.Combine(output, "CHECK_DRAWING.xlsx");
-                        Directory.CreateDirectory(output);
-                        File.WriteAllText(Path.ChangeExtension(result.ReportPath, ".json"),
-                            new System.Web.Script.Serialization.JavaScriptSerializer { MaxJsonLength = 50000000 }.Serialize(result),
-                            new UTF8Encoding(true));
-                        // Silent controls dialogs; CHECK DRAWING keeps its
-                        // original summary and grouped detail report layout.
-                        ExcelDrawingCheckExporter.ExportToFile(result, result.ReportPath);
-                    }
-                    else ExcelDrawingCheckExporter.Export(result);
-                }
-
+                // On-Demand Export: chỉ lưu kết quả trong bộ nhớ để hiển thị Preview trước.
+                // Tuyệt đối không tự động tạo hoặc mở file Excel trong RunBatch().
+                result.ReportDirectory = reportDirectory ?? "";
+                result.ReportPath = "";
                 result.Message = result.ProcessedCount + "/" + result.TotalSelected + " dòng BOM: " +
                     result.OkCount + " OK, " + result.NgCount + " NG, " + result.WarningCount + " Warning.";
-                if (strictHiddenBatch)
-                    result.Message += " | TEST STRICT HIDDEN: linked text/chức năng 表/ウラ chưa được " +
-                        "xác minh; Drawing mở bởi batch được giữ trong bộ nhớ. Khởi động lại SOLIDWORKS " +
-                        "sau lần thử này.";
+
                 if (!silent) ShowBatchSummaryDialog(result);
             }
             catch (Exception ex)
@@ -575,8 +521,6 @@ namespace ADDIN.Commands
             {
                 RestoreBatchActiveDocument(originalTitle);
                 displayScope?.Dispose();
-                if (strictHiddenBatch)
-                    LogDebug("[STRICT HIDDEN END] diagnostic retained command-opened Drawings in memory; restart SOLIDWORKS.");
                 strictHiddenBatch = false;
                 if (progressStarted && !progressFinished)
                 {
@@ -738,16 +682,29 @@ namespace ADDIN.Commands
 
             // 表/ウラ applies only to Part drawings. UNIT/Assembly drawings
             // return above without inspecting or reporting the flat view side.
-            if (strictHiddenBatch)
+            // Restore the existing 表/ウラ ↔ 展開 check for Part Drawings in
+            // hidden batch as requested. Never replace the real result with an
+            // unconditional diagnostic Warning. CheckFlatDrawingView uses its
+            // own disposable Part working copy; keep native crash verification
+            // on isolated test files before this change is merged.
+            LogDebug("[FLAT SIDE RESTORED] mode=" +
+                (strictHiddenBatch ? "STRICT_HIDDEN_BATCH" : "NORMAL") +
+                " drawing=\"" + (itemResult.DrawingPath ?? "") + "\"");
+            try
+            {
+                AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
+            }
+            catch (Exception ex)
+            {
                 itemResult.Fields.Add(new DrawingBomFieldResult
                 {
                     FieldName = "表/ウラ ↔ 展開",
-                    Source = "STRICT_HIDDEN_DIAGNOSTIC",
+                    Source = "DRAWING_FLAT_SIDE_API_ERROR",
                     Status = DrawingBomCheckStatus.Warning,
-                    Message = "NOT CHECKED: tạm bỏ Working Copy để cô lập lỗi đóng tài liệu native."
+                    Message = "Không thể xác minh mặt 表/ウラ của view 展開: " + ex.Message
                 });
-            else
-                AddFlatPatternSideChecks(itemResult, drawing, sheetName, notes, frameBounds);
+                LogDebug("[FLAT SIDE ERROR] " + ex.Message);
+            }
 
             BomNumberValues bomNumbers = GetBomNumberValues(bomRow);
             itemResult.Fields.Add(CompareBomNumbers(bomNumbers));
@@ -815,14 +772,40 @@ namespace ADDIN.Commands
             else if (!string.IsNullOrWhiteSpace(buhinNoBom))
                 expectedDxf = buhinNoBom;
 
+            string bomColumnW;
+            bool hasBomColumnW = TryGetBomDimensionCellValue(bomRow, "W", out bomColumnW);
+            string bomColumnL;
+            bool hasBomColumnL = TryGetBomDimensionCellValue(bomRow, "L", out bomColumnL);
+
+            string partWValue, partWSource;
+            bool partWIsLinked;
+            bool hasVerifiedPartW = TryGetVerifiedPartDimensionProperty(
+                drawing, activeSheet, sheetName, bomRow, referencedModel,
+                referencedConfiguration, itemResult.PartPath, "W",
+                out partWValue, out partWSource, out partWIsLinked);
+
+            string partLValue, partLSource;
+            bool partLIsLinked;
+            bool hasVerifiedPartL = TryGetVerifiedPartDimensionProperty(
+                drawing, activeSheet, sheetName, bomRow, referencedModel,
+                referencedConfiguration, itemResult.PartPath, "L",
+                out partLValue, out partLSource, out partLIsLinked);
+
             // 7. So sánh 12 trường Part hiện tại
             itemResult.Fields.Add(ComparePartNumber(drawingData.PartNumber, buhinNoBom, drawingData.PartNumberSource));
-            itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
-                CompareNumericField("W", drawingData.Width, bomW, drawingData.WidthSource),
-                GetPropertyLinkAudit(propertyLinkAudits, "W")));
-            itemResult.Fields.Add(ApplyRequiredPropertyLinkAudit(
-                CompareNumericField("L", drawingData.Length, bomL, drawingData.LengthSource),
-                GetPropertyLinkAudit(propertyLinkAudits, "L")));
+            DrawingBomFieldResult widthField = CompareWidthLengthField(
+                "W", drawingData.Width,
+                hasVerifiedPartW, partWValue, partWSource, partWIsLinked,
+                hasBomColumnW, bomColumnW);
+            itemResult.Fields.Add(widthField);
+            LogDebug($"[PART DIM W] component=\"{componentName}\" drawing=\"{drawingData.Width}\" part=\"{partWValue}\" verifiedPart={hasVerifiedPartW} partSource=\"{partWSource}\" linked={partWIsLinked} hasBom={hasBomColumnW} bom=\"{bomColumnW}\" status={widthField.Status}");
+
+            DrawingBomFieldResult lengthField = CompareWidthLengthField(
+                "L", drawingData.Length,
+                hasVerifiedPartL, partLValue, partLSource, partLIsLinked,
+                hasBomColumnL, bomColumnL);
+            itemResult.Fields.Add(lengthField);
+            LogDebug($"[PART DIM L] component=\"{componentName}\" drawing=\"{drawingData.Length}\" part=\"{partLValue}\" verifiedPart={hasVerifiedPartL} partSource=\"{partLSource}\" linked={partLIsLinked} hasBom={hasBomColumnL} bom=\"{bomColumnL}\" status={lengthField.Status}");
             itemResult.Fields.Add(CompareQuantityField(
                 drawingData.Quantity,
                 bomQuantity,
@@ -850,12 +833,13 @@ namespace ADDIN.Commands
             }
             // A hard-coded Drawing cell may equal BOM but must still be NG.
             ApplyGobanTemplateLinkAudit(gobanComparison, drawingData);
-            itemResult.Fields.Add(gobanComparison);
 
-            // Reporting-only: never replace Drawing displayed text with Model/BOM data.
+            // Detailed Property link verification: updates gobanComparison and itemResult.PropertyLinkRows
             AddGobanPropertyLinkReportRow(
                 itemResult, drawingData, gobanComparison, bomRow, referencedModel,
                 referencedConfiguration, sheetName, drawing, activeSheet);
+
+            itemResult.Fields.Add(gobanComparison);
 
             itemResult.Fields.Add(CompareFileNameField(drawingData.PartFileName, componentName));
             itemResult.Fields.Add(CompareDxfField(drawingData.DxfFileName, expectedDxf));
@@ -942,7 +926,94 @@ namespace ADDIN.Commands
                     FlatDrawingViewSideResult side;
                     if (!cache.TryGetValue(name, out side))
                     {
-                        side = checker.CheckFlatDrawingView(candidates[0]);
+                        SolidWorks.Interop.sldworks.View candidateView = candidates[0];
+                        CdDirectFlatSideProbe probe;
+                        FlatDrawingViewSideResult direct =
+                            CdTryFlatSideReadOnlyDetailed(candidateView, drawing as ModelDoc2, itemResult.PartPath, out probe);
+                        FlatDrawingViewSideResult workingCopy =
+                            checker.CheckFlatDrawingView(candidateView);
+
+                        CdWorkingCopyBlockAssessment blockAssessment =
+                            CdClassifyWorkingCopyBlock(candidateView, drawing as ModelDoc2, itemResult.PartPath, workingCopy, probe);
+
+                        CdFlatSideProof proof = CdBuildCandidateFlatSideProof(
+                            candidateView,
+                            drawing as ModelDoc2,
+                            itemResult.PartPath,
+                            direct,
+                            probe,
+                            blockAssessment);
+
+                        bool pilotEnabled = CdIsReviewedFlatSidePilotEnabled();
+                        CdFlatSidePolicyInput input = new CdFlatSidePolicyInput
+                        {
+                            PilotEnabled = pilotEnabled,
+                            DirectPinkFacingViewer = direct.PinkFacingViewer,
+                            WorkingCopyPinkFacingViewer = workingCopy.PinkFacingViewer,
+                            WorkingCopyFrontPinkMm2 = workingCopy.FrontPinkAreaMm2,
+                            WorkingCopyBackPinkMm2 = workingCopy.BackPinkAreaMm2,
+                            WorkingCopyBlockedSpecificallyByDirtyAssembly =
+                                blockAssessment.BlockedSpecificallyByDirtyAssembly,
+                            DirectProof = proof
+                        };
+
+                        CdFlatSidePolicyDecision decision = CdFlatSidePilotPolicy.Evaluate(input);
+                        LogDebug("[CD PROVENANCE] " + CdFormatProvenanceLog(probe, proof, blockAssessment, workingCopy));
+                        LogDebug("[CD PILOT DECISION] view=" + name +
+                            " enabled=" + input.PilotEnabled +
+                            " action=" + decision.Choice +
+                            " code=" + decision.Code +
+                            " direct=" + direct.PinkFacingViewer +
+                            " legacy=" + workingCopy.PinkFacingViewer +
+                            " wcFrontPinkMm2=" + workingCopy.FrontPinkAreaMm2.ToString("F1", CultureInfo.InvariantCulture) +
+                            " wcBackPinkMm2=" + workingCopy.BackPinkAreaMm2.ToString("F1", CultureInfo.InvariantCulture) +
+                            " blockKind=" + blockAssessment.BlockCategory +
+                            " proofComplete=" + proof.IsComplete +
+                            " reason=" + decision.Explanation);
+
+                        bool bothPinkLegacy = workingCopy.FrontPinkAreaMm2 > 1e-6 && workingCopy.BackPinkAreaMm2 > 1e-6;
+                        if (decision.Code == "DIRECT_WORKCOPY_DISAGREE" ||
+                            decision.Code == "WC_BOTH_SIDES_PINK_AMBIGUOUS" ||
+                            (!input.PilotEnabled && direct.PinkFacingViewer.HasValue &&
+                             ((workingCopy.PinkFacingViewer.HasValue && direct.PinkFacingViewer.Value != workingCopy.PinkFacingViewer.Value) ||
+                              bothPinkLegacy)))
+                        {
+                            LogDebug("[DIRECT_WORKCOPY_DISAGREE] view=" + name +
+                                " mode=" + (input.PilotEnabled ? "pilot" : "shadow") +
+                                " code=" + decision.Code +
+                                " direct=" + direct.PinkFacingViewer +
+                                " fallback=" + workingCopy.PinkFacingViewer +
+                                " wcFrontMm2=" + workingCopy.FrontPinkAreaMm2.ToString("F1", CultureInfo.InvariantCulture) +
+                                " wcBackMm2=" + workingCopy.BackPinkAreaMm2.ToString("F1", CultureInfo.InvariantCulture) +
+                                " directMsg=" + direct.Message +
+                                " fallbackMsg=" + workingCopy.Message);
+                        }
+
+                        if (decision.Choice == CdFlatSideChoice.UseDirectRead)
+                        {
+                            side = direct;
+                            side.Message += " [PILOT direct-check; dependency freshness separately verified]";
+                        }
+                        else if (decision.Choice == CdFlatSideChoice.Unknown)
+                        {
+                            side = new FlatDrawingViewSideResult
+                            {
+                                ViewName = direct.ViewName,
+                                Configuration = direct.Configuration,
+                                DisplayState = direct.DisplayState,
+                                PinkFacingViewer = null,
+                                Message = "[CD PILOT " + decision.Code + "] " +
+                                    decision.Explanation +
+                                    " | Direct=" + direct.Message +
+                                    " | Working Copy=" + workingCopy.Message
+                            };
+                        }
+                        else
+                        {
+                            side = workingCopy;
+                            if (!workingCopy.PinkFacingViewer.HasValue)
+                                side.Message = direct.Message + " | Working Copy: " + workingCopy.Message;
+                        }
                         cache.Add(name, side);
                     }
                     status = CompareFlatSideMarker(expected, side.PinkFacingViewer);
@@ -1120,6 +1191,1412 @@ namespace ADDIN.Commands
                 return DrawingBomCheckStatus.Warning;
             return pinkFacingViewer.Value == (marker == "ウラ") ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
         }
+
+        #region Direct Read-Only Flat Side Verification (PR #62 Shadow / Fail-Closed)
+
+        // Keep both false in user-facing builds until independent freshness + body proof
+        // is established across all target cases.
+        private const bool CdEnableDirectFlatSideVerdict = false;
+        private const bool CdEnableReviewedFlatSidePilot = false;
+
+        // Isolated test-harness opt-in ONLY (always defaults to false in production).
+        internal static bool CdReviewedFlatSidePilotOptInForTestsOnly = false;
+
+        private static bool CdIsReviewedFlatSidePilotEnabled()
+        {
+            return CdEnableReviewedFlatSidePilot ||
+                   CdEnableDirectFlatSideVerdict ||
+                   CdReviewedFlatSidePilotOptInForTestsOnly;
+        }
+
+        internal sealed class CdExternalRefRecord
+        {
+            public string FeatureName { get; set; } = "";
+            public string ReferencedPath { get; set; } = "";
+            public int Status { get; set; }
+        }
+
+        internal sealed class CdDirectFlatSideProbe
+        {
+            public string DrawingPath { get; set; } = "";
+            public bool DrawingExists { get; set; }
+            public bool DrawingDirty { get; set; }
+            public bool DrawingVisible { get; set; }
+            public string SheetName { get; set; } = "";
+            public string ViewName { get; set; } = "";
+            public bool ViewModelLoaded { get; set; }
+            public int ViewSuppressState { get; set; }
+            public bool ViewModelOutOfDate { get; set; }
+            public bool ViewDisableAutoUpdate { get; set; }
+            public bool ViewLightweight { get; set; }
+            public int ViewSelectiveBodyCount { get; set; }
+            public string ViewReferencedPartPath { get; set; } = "";
+            public string ExpectedPartPath { get; set; } = "";
+            public bool PartExists { get; set; }
+            public bool PartDirty { get; set; }
+            public int PartNeedsRebuild2 { get; set; } = -1;
+            public string ActiveModelConfig { get; set; } = "";
+            public string RequestedConfig { get; set; } = "";
+            public bool ActiveConfigMatchesRequested { get; set; }
+            public bool RequestedConfigExists { get; set; }
+            public bool RequestedConfigDirty { get; set; }
+            public bool RequestedConfigNeedsRebuild { get; set; }
+            public string DisplayState { get; set; } = "";
+            public bool DisplayStateFound { get; set; }
+            public bool DisplayStateLinkedToConfig { get; set; }
+            public string BodyResolutionMethod { get; set; } = "NONE";
+            public int VisibleFaceCount { get; set; }
+            public int MatchedVisibleFaceCount { get; set; }
+            public int BodyFaceCount { get; set; }
+            public int ActiveConfigSolidBodyCount { get; set; } = -1;
+            public int DisplayStateBodyCount { get; set; }
+            public bool MultipleBodiesAmbiguous { get; set; }
+            public bool BodyIsSheetMetal { get; set; }
+            public int FrontPlanarFaceCount { get; set; }
+            public int BackPlanarFaceCount { get; set; }
+            public double TotalPositiveAreaMm2 { get; set; }
+            public double TotalNegativeAreaMm2 { get; set; }
+            public double TotalOtherAreaMm2 { get; set; }
+            public double FrontPinkAreaMm2 { get; set; }
+            public double BackPinkAreaMm2 { get; set; }
+            public string FrontAppearanceSources { get; set; } = "";
+            public string BackAppearanceSources { get; set; } = "";
+            public string CombinedAppearanceSources { get; set; } = "";
+            public bool AllPlanarFacesResolvedUnambiguously { get; set; }
+            public bool HasExplicitPinkOnOneSideOnly { get; set; }
+            public int PartExternalRefCount { get; set; } = -1;
+            public List<CdExternalRefRecord> ExternalRefs { get; } = new List<CdExternalRefRecord>();
+            public List<string> FaceAuditSummary { get; } = new List<string>();
+            public bool? VerdictPinkFacingViewer { get; set; }
+            public string FailureReason { get; set; } = "";
+        }
+
+        internal sealed class CdWorkingCopyBlockAssessment
+        {
+            public bool BlockedSpecificallyByDirtyAssembly { get; set; }
+            public bool DrawingDirty { get; set; }
+            public bool PartDirty { get; set; }
+            public string BlockCategory { get; set; } = "NONE";
+            public List<string> MatchedDirtyAssemblyPaths { get; } = new List<string>();
+            public List<string> OtherDirtyDependencyPaths { get; } = new List<string>();
+            public string Detail { get; set; } = "";
+        }
+
+        private static bool CdExactPath(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return false;
+            try
+            {
+                return string.Equals(
+                    Path.GetFullPath(a.Trim()),
+                    Path.GetFullPath(b.Trim()),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        private static string CdNormalizeFullPathOrEmpty(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return "";
+            try { return Path.GetFullPath(path.Trim()); }
+            catch { return path.Trim(); }
+        }
+
+        private bool CdDependencyArrayContainsPath(Array deps, string targetPath)
+        {
+            if (deps == null || string.IsNullOrWhiteSpace(targetPath)) return false;
+            int lb = deps.GetLowerBound(0);
+            for (int i = 1; i < deps.Length; i += 2)
+            {
+                string depPath = Convert.ToString(deps.GetValue(lb + i) ?? "");
+                if (CdExactPath(depPath, targetPath)) return true;
+            }
+            return false;
+        }
+
+        private ModelDoc2 CdFindOpenDocByPath(string targetPath)
+        {
+            if (swApp == null || string.IsNullOrWhiteSpace(targetPath)) return null;
+            try
+            {
+                Array docs = swApp.GetDocuments() as Array;
+                if (docs == null) return null;
+                foreach (object docObj in docs)
+                {
+                    ModelDoc2 doc = docObj as ModelDoc2;
+                    if (doc == null) continue;
+                    if (CdExactPath(doc.GetPathName(), targetPath))
+                        return doc;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static string CdExtractTrailingPathToken(string msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg)) return "";
+            int idx = msg.LastIndexOf(": ", StringComparison.Ordinal);
+            if (idx < 0 || idx + 2 >= msg.Length) return "";
+            string tail = msg.Substring(idx + 2).Trim();
+            return tail.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase) ||
+                   tail.EndsWith(".SLDPRT", StringComparison.OrdinalIgnoreCase) ||
+                   tail.EndsWith(".SLDDRW", StringComparison.OrdinalIgnoreCase)
+                ? tail : "";
+        }
+
+        // Structured classifier at the CHECK DRAWING call boundary:
+        // verifies dirty state using live SOLIDWORKS COM docs & dependency graph,
+        // NOT localized message strings alone.
+        private CdWorkingCopyBlockAssessment CdClassifyWorkingCopyBlock(
+            SolidWorks.Interop.sldworks.View view,
+            ModelDoc2 ownerDrawing,
+            string expectedPartPath,
+            FlatDrawingViewSideResult workingCopy,
+            CdDirectFlatSideProbe probe)
+        {
+            var assessment = new CdWorkingCopyBlockAssessment();
+            try
+            {
+                if (workingCopy == null || workingCopy.PinkFacingViewer.HasValue)
+                {
+                    assessment.BlockCategory = "NOT_BLOCKED";
+                    return assessment;
+                }
+
+                string drawingPath = ownerDrawing != null ? (ownerDrawing.GetPathName() ?? "") : "";
+                bool drawingDirty = false;
+                try { drawingDirty = ownerDrawing != null && ownerDrawing.GetSaveFlag(); } catch { }
+                assessment.DrawingDirty = drawingDirty;
+
+                ModelDoc2 partDoc = view != null ? view.ReferencedDocument as ModelDoc2 : null;
+                if (partDoc == null && !string.IsNullOrWhiteSpace(expectedPartPath))
+                    partDoc = CdFindOpenDocByPath(expectedPartPath);
+                bool partDirty = false;
+                try { partDirty = partDoc != null && partDoc.GetSaveFlag(); } catch { }
+                assessment.PartDirty = partDirty;
+
+                if (drawingDirty)
+                {
+                    assessment.BlockCategory = "DIRTY_DRAWING";
+                    assessment.Detail = "Owner drawing has unsaved changes.";
+                    return assessment;
+                }
+                if (partDirty)
+                {
+                    assessment.BlockCategory = "DIRTY_PART";
+                    assessment.Detail = "Referenced part has unsaved changes.";
+                    return assessment;
+                }
+
+                // If Working Copy actually measured pink area on either face, it was NOT
+                // blocked at CheckPartWorkingCopy's dirty-reference gate; it failed later
+                // during paint/geometry classification.
+                if (workingCopy.FrontPinkAreaMm2 > 1e-6 || workingCopy.BackPinkAreaMm2 > 1e-6)
+                {
+                    assessment.BlockCategory = "COLOR_OR_GEOMETRY_UNKNOWN";
+                    assessment.Detail = "Working Copy measured pink area but remained indeterminate.";
+                    return assessment;
+                }
+
+                if (view == null || !view.IsModelLoaded() || view.SuppressState != 0 ||
+                    string.IsNullOrWhiteSpace(view.ReferencedConfiguration) ||
+                    string.IsNullOrWhiteSpace(view.DisplayState))
+                {
+                    assessment.BlockCategory = "VIEW_OR_CONFIG_UNAVAILABLE";
+                    assessment.Detail = "Drawing view model/config/display-state is unavailable.";
+                    return assessment;
+                }
+
+                string partFullPath = !string.IsNullOrWhiteSpace(expectedPartPath)
+                    ? expectedPartPath
+                    : (partDoc != null ? (partDoc.GetPathName() ?? "") : "");
+
+                Array partDeps = !string.IsNullOrWhiteSpace(partFullPath)
+                    ? swApp?.GetDocumentDependencies2(partFullPath, true, true, false) as Array : null;
+                Array drawingDeps = !string.IsNullOrWhiteSpace(drawingPath)
+                    ? swApp?.GetDocumentDependencies2(drawingPath, true, true, false) as Array : null;
+
+                var extRefAsmPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (probe != null)
+                {
+                    foreach (CdExternalRefRecord er in probe.ExternalRefs)
+                    {
+                        if (!string.IsNullOrWhiteSpace(er.ReferencedPath) &&
+                            er.ReferencedPath.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase))
+                            extRefAsmPaths.Add(CdNormalizeFullPathOrEmpty(er.ReferencedPath));
+                    }
+                }
+
+                var openDocs = swApp?.GetDocuments() as Array;
+                if (openDocs != null)
+                {
+                    foreach (object docObj in openDocs)
+                    {
+                        ModelDoc2 doc = docObj as ModelDoc2;
+                        if (doc == null) continue;
+                        bool docDirty = false;
+                        try { docDirty = doc.GetSaveFlag(); } catch { }
+                        if (!docDirty) continue;
+
+                        string docPath = CdNormalizeFullPathOrEmpty(doc.GetPathName());
+                        if (string.IsNullOrWhiteSpace(docPath)) continue;
+                        if (CdExactPath(docPath, drawingPath)) continue;
+                        if (CdExactPath(docPath, partFullPath))
+                        {
+                            assessment.PartDirty = true;
+                            assessment.BlockCategory = "DIRTY_PART";
+                            assessment.Detail = "Open part document matches referenced part and is dirty.";
+                            return assessment;
+                        }
+
+                        bool isAsm = IsAssemblyDocument(doc);
+                        bool related = false;
+                        if (extRefAsmPaths.Contains(docPath)) related = true;
+                        else if (CdDependencyArrayContainsPath(partDeps, docPath)) related = true;
+                        else if (CdDependencyArrayContainsPath(drawingDeps, docPath)) related = true;
+                        else if (isAsm && !string.IsNullOrWhiteSpace(partFullPath))
+                        {
+                            try
+                            {
+                                Array asmDeps = swApp.GetDocumentDependencies2(docPath, true, true, false) as Array;
+                                if (CdDependencyArrayContainsPath(asmDeps, partFullPath))
+                                    related = true;
+                            }
+                            catch { }
+                        }
+
+                        if (!related) continue;
+                        if (isAsm)
+                            assessment.MatchedDirtyAssemblyPaths.Add(docPath);
+                        else
+                            assessment.OtherDirtyDependencyPaths.Add(docPath);
+                    }
+                }
+
+                if (assessment.OtherDirtyDependencyPaths.Count > 0)
+                {
+                    assessment.BlockCategory = "DIRTY_NON_ASSEMBLY_DEP";
+                    assessment.Detail = "Dirty non-assembly dependency: " + string.Join("; ", assessment.OtherDirtyDependencyPaths);
+                    return assessment;
+                }
+
+                string wcMsg = workingCopy.Message ?? "";
+                string reportedDirtyPath = CdExtractTrailingPathToken(wcMsg);
+                bool wcReportsPaintMissing =
+                    wcMsg.IndexOf("không có màu hồng", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    wcMsg.IndexOf("khong co mau hong", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                if (assessment.MatchedDirtyAssemblyPaths.Count > 0 && !wcReportsPaintMissing)
+                {
+                    if (!string.IsNullOrWhiteSpace(reportedDirtyPath))
+                    {
+                        bool reportedIsMatchedAsm = assessment.MatchedDirtyAssemblyPaths.Any(p => CdExactPath(p, reportedDirtyPath));
+                        if (!reportedIsMatchedAsm)
+                        {
+                            assessment.BlockCategory = "DIRTY_PATH_MISMATCH";
+                            assessment.Detail = "Reported dirty ref does not match structurally matched open dirty assemblies: " + reportedDirtyPath;
+                            return assessment;
+                        }
+                    }
+                    assessment.BlockedSpecificallyByDirtyAssembly = true;
+                    assessment.BlockCategory = "DIRTY_ASSEMBLY_ONLY";
+                    assessment.Detail = "Verified clean Drawing+Part; open dirty related assemblies=" +
+                        string.Join("; ", assessment.MatchedDirtyAssemblyPaths);
+                    return assessment;
+                }
+
+                assessment.BlockCategory = wcReportsPaintMissing ? "COLOR_OR_GEOMETRY_UNKNOWN" : "UNRELATED_OR_UNVERIFIED_WC_BLOCK";
+                assessment.Detail = wcMsg;
+            }
+            catch (Exception ex)
+            {
+                assessment.BlockCategory = "CLASSIFIER_ERROR";
+                assessment.Detail = ex.Message;
+            }
+            return assessment;
+        }
+
+        private CdFlatSideProof CdBuildCandidateFlatSideProof(
+            SolidWorks.Interop.sldworks.View view,
+            ModelDoc2 ownerDrawing,
+            string expectedPartPath,
+            FlatDrawingViewSideResult direct,
+            CdDirectFlatSideProbe probe,
+            CdWorkingCopyBlockAssessment blockAssessment)
+        {
+            var proof = new CdFlatSideProof();
+            try
+            {
+                if (view == null || ownerDrawing == null || direct == null || probe == null)
+                    return proof;
+
+                proof.BodyResolutionMethod = probe.BodyResolutionMethod;
+                proof.AppearanceSources = probe.CombinedAppearanceSources;
+
+                proof.DrawingPathVerified = probe.DrawingExists && !string.IsNullOrWhiteSpace(probe.DrawingPath);
+                proof.ReferencedPartPathVerified = probe.PartExists &&
+                    CdExactPath(probe.ViewReferencedPartPath, expectedPartPath);
+                proof.ConfigurationVerified = probe.RequestedConfigExists &&
+                    probe.ViewModelLoaded &&
+                    probe.ViewSuppressState == 0 &&
+                    string.Equals(direct.Configuration, probe.RequestedConfig, StringComparison.OrdinalIgnoreCase);
+                proof.DisplayStateVerified = probe.DisplayStateFound &&
+                    !string.IsNullOrWhiteSpace(probe.DisplayState) &&
+                    string.Equals(direct.DisplayState, probe.DisplayState, StringComparison.OrdinalIgnoreCase);
+
+                bool visibleBodyVerified =
+                    string.Equals(probe.BodyResolutionMethod, "VISIBLE_ENTITIES2", StringComparison.Ordinal) &&
+                    probe.VisibleFaceCount > 0 &&
+                    probe.MatchedVisibleFaceCount == probe.VisibleFaceCount &&
+                    !probe.MultipleBodiesAmbiguous &&
+                    probe.ViewSelectiveBodyCount <= 1 &&
+                    probe.FrontPlanarFaceCount >= 1 &&
+                    probe.BackPlanarFaceCount >= 1 &&
+                    probe.TotalPositiveAreaMm2 > 0 &&
+                    probe.TotalNegativeAreaMm2 > 0;
+                proof.FlatPatternBodyVerified = visibleBodyVerified;
+
+                proof.FaceColorCompleteAndUnambiguous =
+                    direct.PinkFacingViewer.HasValue &&
+                    probe.AllPlanarFacesResolvedUnambiguously &&
+                    probe.HasExplicitPinkOnOneSideOnly;
+
+                // Freshness audit: fail closed unless every link in the chain is clean AND
+                // no non-locked in-context external references link to an open dirty assembly, AND
+                // view faces were directly obtained from VISIBLE_ENTITIES2 (not hidden DS inference).
+                var freshnessBlocks = new List<string>();
+                if (probe.DrawingDirty) freshnessBlocks.Add("drawing_dirty");
+                if (probe.PartDirty) freshnessBlocks.Add("part_dirty");
+                if (probe.RequestedConfigDirty) freshnessBlocks.Add("cfg_dirty");
+                if (probe.RequestedConfigNeedsRebuild) freshnessBlocks.Add("cfg_needs_rebuild");
+                if (probe.PartNeedsRebuild2 != (int)swModelRebuildStatus_e.swModelRebuildStatus_FullyRebuilt)
+                    freshnessBlocks.Add("part_needs_rebuild=" + probe.PartNeedsRebuild2);
+                if (probe.ViewModelOutOfDate) freshnessBlocks.Add("view_out_of_date");
+                if (probe.ViewDisableAutoUpdate) freshnessBlocks.Add("view_disable_auto_update");
+                if (probe.ViewLightweight) freshnessBlocks.Add("view_lightweight");
+                if (!visibleBodyVerified)
+                    freshnessBlocks.Add("body_not_visible_entities2(" + probe.BodyResolutionMethod + ")");
+
+                if (probe.PartExternalRefCount < 0)
+                {
+                    freshnessBlocks.Add("ext_ref_count_unavailable");
+                }
+                else if (probe.PartExternalRefCount > 0)
+                {
+                    // Check whether any non-locked external reference points to an open dirty assembly
+                    // or is currently unresolved/out-of-context/broken/dangling while dirty assemblies exist.
+                    int nonLockedDirtyOrOpenExtRefs = 0;
+                    foreach (CdExternalRefRecord er in probe.ExternalRefs)
+                    {
+                        bool isLocked = er.Status == (int)swExternalReferenceStatus_e.swExternalReferenceLocked;
+                        if (isLocked) continue;
+
+                        bool targetIsDirtyOpen = blockAssessment != null &&
+                            blockAssessment.MatchedDirtyAssemblyPaths.Any(p => CdExactPath(p, er.ReferencedPath));
+                        ModelDoc2 targetDoc = CdFindOpenDocByPath(er.ReferencedPath);
+                        bool targetDocDirty = false;
+                        try { targetDocDirty = targetDoc != null && targetDoc.GetSaveFlag(); } catch { }
+
+                        if (targetIsDirtyOpen || targetDocDirty)
+                        {
+                            nonLockedDirtyOrOpenExtRefs++;
+                        }
+                        else if (er.Status != (int)swExternalReferenceStatus_e.swExternalReferenceInContext &&
+                                 blockAssessment != null &&
+                                 blockAssessment.MatchedDirtyAssemblyPaths.Count > 0)
+                        {
+                            nonLockedDirtyOrOpenExtRefs++;
+                        }
+                    }
+
+                    if (nonLockedDirtyOrOpenExtRefs > 0)
+                    {
+                        freshnessBlocks.Add("non_locked_ext_refs_to_dirty_asm=" + nonLockedDirtyOrOpenExtRefs + "/" + probe.PartExternalRefCount);
+                    }
+                    else if (blockAssessment != null && blockAssessment.MatchedDirtyAssemblyPaths.Count > 0 &&
+                             probe.ExternalRefs.Count == 0)
+                    {
+                        freshnessBlocks.Add("ext_refs_detail_unavailable_count=" + probe.PartExternalRefCount);
+                    }
+                }
+
+                proof.SourceFreshnessVerified = freshnessBlocks.Count == 0;
+                proof.FreshnessReason = freshnessBlocks.Count == 0
+                    ? "VERIFIED_CLEAN_VISIBLE_AND_NO_DIRTY_INCONTEXT_EXTREF"
+                    : "UNVERIFIED: " + string.Join("; ", freshnessBlocks);
+                proof.ProvenanceSummary =
+                    "draw=" + Path.GetFileName(probe.DrawingPath) +
+                    " sheet=" + probe.SheetName +
+                    " view=" + probe.ViewName +
+                    " cfg=" + probe.RequestedConfig +
+                    " activeCfg=" + probe.ActiveModelConfig +
+                    " ds=" + probe.DisplayState +
+                    " body=" + probe.BodyResolutionMethod +
+                    " extRefs=" + probe.PartExternalRefCount +
+                    " fresh=" + proof.SourceFreshnessVerified;
+            }
+            catch (Exception ex)
+            {
+                proof.SourceFreshnessVerified = false;
+                proof.FreshnessReason = "PROOF_ERROR: " + ex.Message;
+                LogDebug("[CD PILOT PROOF ERROR] " + ex.Message);
+            }
+            return proof;
+        }
+
+        private static string CdFormatProvenanceLog(
+            CdDirectFlatSideProbe probe,
+            CdFlatSideProof proof,
+            CdWorkingCopyBlockAssessment blockAssessment,
+            FlatDrawingViewSideResult workingCopy)
+        {
+            if (probe == null || proof == null) return "unavailable";
+            string asmList = blockAssessment != null && blockAssessment.MatchedDirtyAssemblyPaths.Count > 0
+                ? string.Join("|", blockAssessment.MatchedDirtyAssemblyPaths.Select(Path.GetFileName))
+                : "none";
+            string extStatuses = probe.ExternalRefs.Count > 0
+                ? string.Join(",", probe.ExternalRefs.Select(e => e.Status).Distinct())
+                : "none";
+            return string.Format(CultureInfo.InvariantCulture,
+                "view={0} sheet={1} draw=\"{2}\" part=\"{3}\" expectedPart=\"{4}\" activeCfg=\"{5}\" viewCfg=\"{6}\" ds=\"{7}\" bodySrc={8} vis={9}/{10} selBodies={11} activeBodies={12} frontFaces={13} backFaces={14} frontPinkMm2={15:F1} backPinkMm2={16:F1} frontSrc={17} backSrc={18} extRefs={19} extStatuses=[{20}] drawDirty={21} partDirty={22} cfgDirty={23} cfgRebuild={24} partRebuild2={25} viewOutOfDate={26} disableAuto={27} lightweight={28} wcBlock={29} dirtyAsms=[{30}] proof=[D={31},P={32},C={33},DS={34},Body={35},Color={36},Fresh={37}] freshnessReason=\"{38}\" faceAudit=[{39}]",
+                probe.ViewName,
+                probe.SheetName,
+                probe.DrawingPath,
+                probe.ViewReferencedPartPath,
+                probe.ExpectedPartPath,
+                probe.ActiveModelConfig,
+                probe.RequestedConfig,
+                probe.DisplayState,
+                probe.BodyResolutionMethod,
+                probe.MatchedVisibleFaceCount,
+                probe.VisibleFaceCount,
+                probe.ViewSelectiveBodyCount,
+                probe.ActiveConfigSolidBodyCount,
+                probe.FrontPlanarFaceCount,
+                probe.BackPlanarFaceCount,
+                probe.FrontPinkAreaMm2,
+                probe.BackPinkAreaMm2,
+                probe.FrontAppearanceSources,
+                probe.BackAppearanceSources,
+                probe.PartExternalRefCount,
+                extStatuses,
+                probe.DrawingDirty,
+                probe.PartDirty,
+                probe.RequestedConfigDirty,
+                probe.RequestedConfigNeedsRebuild,
+                probe.PartNeedsRebuild2,
+                probe.ViewModelOutOfDate,
+                probe.ViewDisableAutoUpdate,
+                probe.ViewLightweight,
+                blockAssessment != null ? blockAssessment.BlockCategory : "NONE",
+                asmList,
+                proof.DrawingPathVerified,
+                proof.ReferencedPartPathVerified,
+                proof.ConfigurationVerified,
+                proof.DisplayStateVerified,
+                proof.FlatPatternBodyVerified,
+                proof.FaceColorCompleteAndUnambiguous,
+                proof.SourceFreshnessVerified,
+                proof.FreshnessReason,
+                string.Join(" ; ", probe.FaceAuditSummary.Take(8)));
+        }
+
+        private static bool CdSameFace(Face2 first, Face2 second)
+        {
+            if (first == null || second == null) return false;
+            try { return first.IsSame(second); } catch { return false; }
+        }
+
+        private static bool CdPink(double[] m)
+        {
+            if (m == null || m.Length < 3) return false;
+            double r = m[0], g = m[1], b = m[2];
+            if (r < 0 || r > 1 || g < 0 || g > 1 || b < 0 || b > 1) return false;
+            double max = Math.Max(r, Math.Max(g, b));
+            double min = Math.Min(r, Math.Min(g, b));
+            // Same recognition thresholds as UraOmoteChecker.IsPinkMaterial.
+            return r > 0.45 && r >= g + 0.08 && b >= g - 0.05 && max - min > 0.08;
+        }
+
+        // Unlike CdPink(), this is a *data-quality* guard. White/default paint
+        // may be valid; missing or unassigned RGB must be treated as UNKNOWN.
+        private static bool CdKnownRgb(double[] rgb)
+        {
+            if (rgb == null || rgb.Length < 3) return false;
+            for (int i = 0; i < 3; i++)
+            {
+                if (double.IsNaN(rgb[i]) || double.IsInfinity(rgb[i]) ||
+                    rgb[i] < 0.0 || rgb[i] > 1.0)
+                    return false;
+            }
+            return true;
+        }
+
+        private sealed class CdAppearanceEntry
+        {
+            public object Entity;
+            public double[] Rgb;
+            private bool _facesLoaded;
+            private Face2[] _ownedFaces;
+
+            public Face2[] GetOwnedFaces()
+            {
+                if (_facesLoaded) return _ownedFaces;
+                _facesLoaded = true;
+                try
+                {
+                    Array raw = (Entity as Body2)?.GetFaces() as Array
+                        ?? (Entity as Feature)?.GetFaces() as Array;
+                    if (raw == null || raw.Length == 0) return null;
+                    var list = new List<Face2>(raw.Length);
+                    foreach (object item in raw)
+                    {
+                        Face2 f = item as Face2;
+                        if (f != null) list.Add(f);
+                    }
+                    _ownedFaces = list.ToArray();
+                }
+                catch
+                {
+                    _ownedFaces = null;
+                }
+                return _ownedFaces;
+            }
+        }
+
+        private bool CdSameObject(object first, object second)
+        {
+            if (first == null || second == null) return false;
+            if (ReferenceEquals(first, second)) return true;
+            try
+            {
+                return swApp != null &&
+                    swApp.IsSame(first, second) == (int)swObjectEquality.swObjectSame;
+            }
+            catch { return false; }
+        }
+
+        private static bool CdSameRgb(double[] first, double[] second)
+        {
+            if (!CdKnownRgb(first) || !CdKnownRgb(second)) return false;
+            for (int i = 0; i < 3; i++)
+                if (Math.Abs(first[i] - second[i]) > 1e-4) return false;
+            return true;
+        }
+
+        private static double[] CdDisplayStateRgb(Array properties, int index)
+        {
+            if (properties == null || index < 0) return null;
+            try
+            {
+                object value = index < properties.Length
+                    ? properties.GetValue(index + properties.GetLowerBound(0)) : null;
+                Array nested = value as Array;
+                if (nested != null && nested.Length >= 3)
+                {
+                    int lb = nested.GetLowerBound(0);
+                    return new[] { Convert.ToDouble(nested.GetValue(lb)),
+                        Convert.ToDouble(nested.GetValue(lb + 1)),
+                        Convert.ToDouble(nested.GetValue(lb + 2)) };
+                }
+                int off = index * 9 + properties.GetLowerBound(0);
+                if (properties.Length < (index + 1) * 9) return null;
+                return new[] { Convert.ToDouble(properties.GetValue(off)),
+                    Convert.ToDouble(properties.GetValue(off + 1)),
+                    Convert.ToDouble(properties.GetValue(off + 2)) };
+            }
+            catch { return null; }
+        }
+
+        private static bool CdTryReadDisplayStateEntries(
+            Array entities, Array values, string levelName,
+            out List<CdAppearanceEntry> entries, out string error)
+        {
+            entries = new List<CdAppearanceEntry>();
+            error = null;
+            if (entities == null || entities.Length == 0) return true;
+            if (values == null)
+            {
+                error = levelName + " display-state property values unavailable";
+                return false;
+            }
+            int elb = entities.GetLowerBound(0);
+            for (int i = 0; i < entities.Length; i++)
+            {
+                object entity = entities.GetValue(elb + i);
+                if (entity == null) continue;
+                entries.Add(new CdAppearanceEntry
+                {
+                    Entity = entity,
+                    Rgb = CdDisplayStateRgb(values, i)
+                });
+            }
+            return true;
+        }
+
+        private bool CdEntryMatches(CdAppearanceEntry entry, object target, Face2 ownerFace, bool isFaceLevel)
+        {
+            if (entry == null) return false;
+            if (isFaceLevel)
+                return CdSameFace(target as Face2, entry.Entity as Face2);
+            if (CdSameObject(target, entry.Entity))
+                return true;
+            if (ownerFace == null) return false;
+            if (entry.Entity is Body2 || entry.Entity is Feature)
+            {
+                Face2[] owned = entry.GetOwnedFaces();
+                if (owned != null)
+                {
+                    foreach (Face2 f in owned)
+                    {
+                        if (CdSameFace(ownerFace, f)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private bool CdResolveAppearanceLevel(
+            object target,
+            Face2 ownerFace,
+            List<CdAppearanceEntry> legacyEntries,
+            List<CdAppearanceEntry> renderEntries,
+            bool isFaceLevel,
+            string levelName,
+            out double[] resolvedRgb,
+            out string conflictReason)
+        {
+            resolvedRgb = null;
+            conflictReason = null;
+            if (target == null && (isFaceLevel || ownerFace == null)) return true;
+
+            double[] legacyRgb = null;
+            if (legacyEntries != null)
+            {
+                foreach (CdAppearanceEntry entry in legacyEntries)
+                {
+                    if (!CdEntryMatches(entry, target, ownerFace, isFaceLevel)) continue;
+                    if (!CdKnownRgb(entry.Rgb))
+                    {
+                        conflictReason = levelName + " display-state color is invalid";
+                        return false;
+                    }
+                    if (legacyRgb != null && !CdSameRgb(legacyRgb, entry.Rgb))
+                    {
+                        conflictReason = "conflicting legacy " + levelName + " display-state colors";
+                        return false;
+                    }
+                    legacyRgb = entry.Rgb;
+                }
+            }
+
+            double[] renderRgb = null;
+            if (renderEntries != null)
+            {
+                foreach (CdAppearanceEntry entry in renderEntries)
+                {
+                    if (!CdEntryMatches(entry, target, ownerFace, isFaceLevel)) continue;
+                    if (!CdKnownRgb(entry.Rgb))
+                    {
+                        conflictReason = levelName + " render color is invalid";
+                        return false;
+                    }
+                    if (renderRgb != null && !CdSameRgb(renderRgb, entry.Rgb))
+                    {
+                        conflictReason = "conflicting " + levelName + " render materials";
+                        return false;
+                    }
+                    renderRgb = entry.Rgb;
+                }
+            }
+
+            if (legacyRgb != null && renderRgb != null && CdPink(legacyRgb) != CdPink(renderRgb))
+            {
+                conflictReason = "conflicting " + levelName + " paint from render and legacy sources";
+                return false;
+            }
+            resolvedRgb = renderRgb ?? legacyRgb;
+            return true;
+        }
+
+        private static double CdFaceViewZ(Face2 face, MathUtility math, MathTransform viewXform)
+        {
+            try
+            {
+                double[] normal = face == null ? null : face.Normal as double[];
+                if (normal == null || normal.Length < 3) return 0;
+                MathVector v = math.CreateVector(normal) as MathVector;
+                v = v == null ? null : v.MultiplyTransform(viewXform) as MathVector;
+                double[] xyz = v == null ? null : v.ArrayData as double[];
+                if (xyz == null || xyz.Length < 3) return 0;
+                double len = Math.Sqrt(xyz[0] * xyz[0] + xyz[1] * xyz[1] + xyz[2] * xyz[2]);
+                return len > 1e-12 ? xyz[2] / len : 0;
+            }
+            catch { return 0; }
+        }
+
+        private bool CdIsDrawingHiddenForView(SolidWorks.Interop.sldworks.View view, ModelDoc2 ownerDrawing)
+        {
+            if (ownerDrawing != null)
+            {
+                try { return !ownerDrawing.Visible; } catch { return strictHiddenBatch; }
+            }
+            if (strictHiddenBatch) return true;
+            try
+            {
+                Array docs = swApp?.GetDocuments() as Array;
+                if (docs == null) return false;
+                foreach (object docObj in docs)
+                {
+                    ModelDoc2 doc = docObj as ModelDoc2;
+                    DrawingDoc drw = docObj as DrawingDoc;
+                    if (doc == null || drw == null) continue;
+                    SolidWorks.Interop.sldworks.View cur = drw.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                    while (cur != null)
+                    {
+                        if (CdSameObject(cur, view)) return !doc.Visible;
+                        cur = cur.GetNextView() as SolidWorks.Interop.sldworks.View;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private Body2 CdResolveHiddenFlatBody(
+            SolidWorks.Interop.sldworks.View view,
+            PartDoc part,
+            bool activeConfigSame,
+            List<CdAppearanceEntry> dsFaceEntries,
+            MathUtility math,
+            MathTransform xform,
+            out string failReason)
+        {
+            failReason = null;
+            if (!view.IsModelLoaded() || view.SuppressState != 0)
+            {
+                failReason = "GetVisibleEntities2 empty and hidden view model not loaded/suppressed";
+                return null;
+            }
+
+            var candidateBodies = new List<Body2>();
+            foreach (CdAppearanceEntry entry in dsFaceEntries)
+            {
+                Face2 face = entry.Entity as Face2;
+                Body2 candidate = face?.GetBody() as Body2;
+                if (candidate == null) continue;
+                bool seen = false;
+                foreach (Body2 existing in candidateBodies)
+                {
+                    if (CdSameObject(existing, candidate)) { seen = true; break; }
+                }
+                if (!seen) candidateBodies.Add(candidate);
+            }
+            if (candidateBodies.Count == 0)
+            {
+                failReason = "GetVisibleEntities2 empty in hidden view and display-state has no explicit face body";
+                return null;
+            }
+            if (candidateBodies.Count > 1)
+            {
+                failReason = "hidden-view display-state faces span multiple bodies";
+                return null;
+            }
+
+            Body2 body = candidateBodies[0];
+            if (!activeConfigSame)
+            {
+                Array activeBodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as Array;
+                if (activeBodies != null)
+                {
+                    foreach (object activeObj in activeBodies)
+                    {
+                        if (CdSameObject(body, activeObj))
+                        {
+                            failReason = "hidden-view body matches active non-flat configuration body";
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            Array bodyFaces = body.GetFaces() as Array;
+            if (bodyFaces == null || bodyFaces.Length == 0)
+            {
+                failReason = "hidden-view flat-pattern body faces unavailable";
+                return null;
+            }
+            double posA = 0, negA = 0, otherA = 0;
+            foreach (object faceObj in bodyFaces)
+            {
+                Face2 f = faceObj as Face2;
+                if (f == null) continue;
+                double area = f.GetArea();
+                if (area <= 0) continue;
+                double z = CdFaceViewZ(f, math, xform);
+                if (z >= 0.98) posA += area;
+                else if (z <= -0.98) negA += area;
+                else otherA += area;
+            }
+            double totalA = posA + negA + otherA;
+            if (posA <= 1e-12 || negA <= 1e-12 || totalA <= 0 ||
+                (posA + negA) / totalA < 0.60 ||
+                Math.Min(posA, negA) < Math.Max(posA, negA) * 0.70)
+            {
+                failReason = "hidden-view body failed flat-pattern geometry verification";
+                return null;
+            }
+            return body;
+        }
+
+        private static void CdReadExternalReferences(ModelDoc2 model, CdDirectFlatSideProbe probe)
+        {
+            if (model == null || probe == null) return;
+            try
+            {
+                ModelDocExtension ext = model.Extension;
+                if (ext == null) return;
+                int count = ext.ListExternalFileReferencesCount();
+                probe.PartExternalRefCount = count;
+                if (count <= 0) return;
+
+                object mp = null, comp = null, feat = null, dt = null, st = null, rfn = null, fc = null, co = null, cn = null;
+                ext.ListExternalFileReferences2(out mp, out comp, out feat, out dt, out st, out rfn, out fc, out co, out cn);
+                Array aMp = mp as Array;
+                Array aFeat = feat as Array;
+                Array aSt = st as Array;
+                if (aMp == null) return;
+
+                int lbMp = aMp.GetLowerBound(0);
+                int lbFeat = aFeat != null ? aFeat.GetLowerBound(0) : 0;
+                int lbSt = aSt != null ? aSt.GetLowerBound(0) : 0;
+                for (int i = 0; i < aMp.Length; i++)
+                {
+                    string refPath = Convert.ToString(aMp.GetValue(lbMp + i) ?? "");
+                    string featName = aFeat != null && i < aFeat.Length
+                        ? Convert.ToString(aFeat.GetValue(lbFeat + i) ?? "") : "";
+                    int status = -1;
+                    if (aSt != null && i < aSt.Length)
+                    {
+                        try { status = Convert.ToInt32(aSt.GetValue(lbSt + i)); }
+                        catch { status = -1; }
+                    }
+                    probe.ExternalRefs.Add(new CdExternalRefRecord
+                    {
+                        FeatureName = featName,
+                        ReferencedPath = refPath,
+                        Status = status
+                    });
+                }
+            }
+            catch { }
+        }
+
+        private FlatDrawingViewSideResult CdTryFlatSideReadOnly(
+            SolidWorks.Interop.sldworks.View view)
+        {
+            CdDirectFlatSideProbe _;
+            return CdTryFlatSideReadOnlyDetailed(view, null, null, out _);
+        }
+
+        private FlatDrawingViewSideResult CdTryFlatSideReadOnlyCore(
+            SolidWorks.Interop.sldworks.View view, ModelDoc2 ownerDrawing)
+        {
+            CdDirectFlatSideProbe _;
+            return CdTryFlatSideReadOnlyDetailed(view, ownerDrawing, null, out _);
+        }
+
+        // This method MUST be fail-closed: null PinkFacingViewer means no direct verdict.
+        // Reading a face's color without verifying its exact Configuration, Display State,
+        // and actual view visibility MUST NOT produce an OK/NG verdict.
+        private FlatDrawingViewSideResult CdTryFlatSideReadOnlyDetailed(
+            SolidWorks.Interop.sldworks.View view,
+            ModelDoc2 ownerDrawing,
+            string expectedPartPath,
+            out CdDirectFlatSideProbe probe)
+        {
+            FlatDrawingViewSideResult result = new FlatDrawingViewSideResult();
+            probe = new CdDirectFlatSideProbe
+            {
+                ExpectedPartPath = expectedPartPath ?? ""
+            };
+            string reason = "not started";
+            try
+            {
+                if (ownerDrawing != null)
+                {
+                    try { probe.DrawingPath = ownerDrawing.GetPathName() ?? ""; } catch { }
+                    try { probe.DrawingExists = !string.IsNullOrWhiteSpace(probe.DrawingPath) && File.Exists(probe.DrawingPath); } catch { }
+                    try { probe.DrawingDirty = ownerDrawing.GetSaveFlag(); } catch { }
+                    try { probe.DrawingVisible = ownerDrawing.Visible; } catch { }
+                }
+
+                if (view == null) { reason = "view null"; return result; }
+                result.ViewName = view.Name ?? "";
+                probe.ViewName = result.ViewName;
+                try { probe.SheetName = (view.Sheet as Sheet)?.GetName() ?? ""; } catch { }
+                try { probe.ViewModelLoaded = view.IsModelLoaded(); } catch { }
+                try { probe.ViewSuppressState = view.SuppressState; } catch { }
+                try { probe.ViewModelOutOfDate = view.IsModelOutOfDate(); } catch { }
+                try { probe.ViewDisableAutoUpdate = view.DisableAutoUpdate; } catch { }
+                try { probe.ViewLightweight = view.IsLightweight(); } catch { }
+                try { probe.ViewSelectiveBodyCount = view.GetBodiesCount(); } catch { }
+
+                result.Configuration = view.ReferencedConfiguration ?? "";
+                result.DisplayState = view.DisplayState ?? "";
+                probe.RequestedConfig = result.Configuration;
+                probe.DisplayState = result.DisplayState;
+
+                ModelDoc2 model = view.ReferencedDocument as ModelDoc2;
+                PartDoc part = model as PartDoc;
+                if (model != null)
+                {
+                    try { probe.ViewReferencedPartPath = model.GetPathName() ?? ""; } catch { }
+                    try { probe.PartExists = !string.IsNullOrWhiteSpace(probe.ViewReferencedPartPath) && File.Exists(probe.ViewReferencedPartPath); } catch { }
+                    try { probe.PartDirty = model.GetSaveFlag(); } catch { }
+                    try { probe.PartNeedsRebuild2 = model.Extension != null ? model.Extension.NeedsRebuild2 : -1; } catch { }
+                    try { probe.DisplayStateLinkedToConfig = model.ConfigurationManager != null && model.ConfigurationManager.LinkDisplayStatesToConfigurations; } catch { }
+                    CdReadExternalReferences(model, probe);
+                }
+
+                if (model == null || part == null || result.Configuration.Length == 0 ||
+                    result.DisplayState.Length == 0)
+                { reason = "Part, config or display-state unavailable"; return result; }
+
+                // Crucial guard: Never activate a different config or mutate the user's model.
+                // If the active config differs from the view's referenced config, resolve by name.
+                Configuration activeCfg = model.ConfigurationManager.ActiveConfiguration;
+                probe.ActiveModelConfig = activeCfg != null ? (activeCfg.Name ?? "") : "";
+                bool activeConfigSame = activeCfg != null && string.Equals(activeCfg.Name,
+                    result.Configuration, StringComparison.OrdinalIgnoreCase);
+                probe.ActiveConfigMatchesRequested = activeConfigSame;
+                Configuration cfg = activeConfigSame
+                    ? activeCfg
+                    : model.GetConfigurationByName(result.Configuration) as Configuration;
+                if (cfg == null)
+                {
+                    reason = "referenced config differs from active model config and not found by name";
+                    return result;
+                }
+                probe.RequestedConfigExists = true;
+                try { probe.RequestedConfigDirty = cfg.IsDirty(); } catch { }
+                try { probe.RequestedConfigNeedsRebuild = cfg.NeedsRebuild; } catch { }
+
+                Array states = cfg.GetDisplayStates() as Array;
+                bool stateFound = false;
+                if (states != null)
+                    foreach (object state in states)
+                        if (string.Equals(Convert.ToString(state), result.DisplayState,
+                            StringComparison.OrdinalIgnoreCase)) stateFound = true;
+                probe.DisplayStateFound = stateFound;
+                if (!stateFound)
+                { reason = "view display-state not found in referenced config"; return result; }
+
+                MathUtility math = swApp?.GetMathUtility() as MathUtility;
+                MathTransform xform = view.ModelToViewTransform;
+                if (math == null || xform == null)
+                { reason = "view transform unavailable"; return result; }
+
+                // Read 4-level Display State properties scoped strictly to (Configuration, DisplayState):
+                // Face (4) > Feature (3) > Body (2) > Model (1).
+                // Never ApplyDisplayState, ActivateDoc, switch configuration, or read un-scoped face properties.
+                object rawFaces, rawFeats, rawBodies;
+                Array faceValues = cfg.GetDisplayStateFaceProperties(result.DisplayState, out rawFaces) as Array;
+                Array featValues = cfg.GetDisplayStateFeatureProperties(result.DisplayState, out rawFeats) as Array;
+                Array bodyValues = cfg.GetDisplayStateBodyProperties(result.DisplayState, out rawBodies) as Array;
+
+                List<CdAppearanceEntry> dsFaceEntries, dsFeatureEntries, dsBodyEntries;
+                string entryError;
+                if (!CdTryReadDisplayStateEntries(rawFaces as Array, faceValues, "face", out dsFaceEntries, out entryError) ||
+                    !CdTryReadDisplayStateEntries(rawFeats as Array, featValues, "feature", out dsFeatureEntries, out entryError) ||
+                    !CdTryReadDisplayStateEntries(rawBodies as Array, bodyValues, "body", out dsBodyEntries, out entryError))
+                {
+                    reason = entryError;
+                    return result;
+                }
+                probe.DisplayStateBodyCount = dsBodyEntries.Count;
+
+                // Official SOLIDWORKS 2024 IView API. Get visible faces for THIS view.
+                Array visible = view.GetVisibleEntities2(null,
+                    (int)swViewEntityType_e.swViewEntityType_Face) as Array;
+                if (visible == null || visible.Length == 0)
+                {
+                    Component2 comp = (view.RootDrawingComponent as DrawingComponent)?.Component;
+                    if (comp != null)
+                        visible = view.GetVisibleEntities2(comp, (int)swViewEntityType_e.swViewEntityType_Face) as Array;
+                }
+
+                Body2 body;
+                Array bodyFaces;
+                string bodySource;
+                if (visible != null && visible.Length > 0)
+                {
+                    probe.VisibleFaceCount = visible.Length;
+                    // Fail closed on a missing flat body. NEVER fall back to Part.GetBodies2:
+                    // that reads the active configuration, possibly the folded body.
+                    Face2 visibleFace = visible.GetValue(visible.GetLowerBound(0)) as Face2;
+                    body = visibleFace?.GetBody() as Body2;
+                    if (body == null)
+                    { reason = "visible face has no verified flat-pattern body"; return result; }
+
+                    if (probe.ViewSelectiveBodyCount > 1)
+                    {
+                        probe.MultipleBodiesAmbiguous = true;
+                        reason = "view displays multiple selective bodies";
+                        return result;
+                    }
+                    if (probe.ViewSelectiveBodyCount == 1)
+                    {
+                        Array viewBodies = view.Bodies as Array;
+                        if (viewBodies != null && viewBodies.Length == 1 &&
+                            !CdSameObject(viewBodies.GetValue(viewBodies.GetLowerBound(0)), body))
+                        {
+                            probe.MultipleBodiesAmbiguous = true;
+                            reason = "visible face body differs from view selective body";
+                            return result;
+                        }
+                    }
+                    if (activeConfigSame)
+                    {
+                        Array activeSolidBodies = part.GetBodies2((int)swBodyType_e.swSolidBody, true) as Array;
+                        probe.ActiveConfigSolidBodyCount = activeSolidBodies != null ? activeSolidBodies.Length : 0;
+                        if (probe.ActiveConfigSolidBodyCount > 1 && probe.ViewSelectiveBodyCount <= 0)
+                        {
+                            probe.MultipleBodiesAmbiguous = true;
+                            reason = "active flat configuration contains multiple solid bodies";
+                            return result;
+                        }
+                    }
+
+                    bodyFaces = body.GetFaces() as Array;
+                    if (bodyFaces == null || bodyFaces.Length == 0)
+                    { reason = "flat-pattern body faces unavailable"; return result; }
+                    probe.BodyFaceCount = bodyFaces.Length;
+                    try { probe.BodyIsSheetMetal = body.IsSheetMetal(); } catch { }
+
+                    // Every returned visible face must actually belong to THIS one body.
+                    // A mixed-body / unmatched face invalidates the direct conclusion.
+                    int matchedVisibleFaces = 0;
+                    foreach (object obj in visible)
+                    {
+                        Face2 viewFace = obj as Face2;
+                        if (viewFace == null)
+                        { reason = "visible view entity is not a Face2"; return result; }
+                        bool matched = false;
+                        foreach (object faceObject in bodyFaces)
+                        {
+                            if (CdSameFace(viewFace, faceObject as Face2))
+                            { matched = true; break; }
+                        }
+                        if (!matched)
+                        { reason = "visible face is not in the selected flat-pattern body"; return result; }
+                        matchedVisibleFaces++;
+                    }
+                    probe.MatchedVisibleFaceCount = matchedVisibleFaces;
+                    if (matchedVisibleFaces != visible.Length)
+                    { reason = "visible face to body coverage is incomplete"; return result; }
+
+                    double visiblePositive = 0, visibleNegative = 0;
+                    foreach (object item in visible)
+                    {
+                        Face2 face = item as Face2;
+                        if (face == null) continue;
+                        bool bodyMatch = false;
+                        foreach (object bodyItem in bodyFaces)
+                        {
+                            if (CdSameFace(face, bodyItem as Face2)) { bodyMatch = true; break; }
+                        }
+                        if (!bodyMatch) continue;
+                        double z = CdFaceViewZ(face, math, xform);
+                        if (Math.Abs(z) < 0.98) continue; // don't classify thickness edges
+                        double area = face.GetArea();
+                        if (area <= 0) continue;
+                        if (z > 0) visiblePositive += area;
+                        else visibleNegative += area;
+                    }
+                    if (visiblePositive <= 1e-12 ||
+                        visiblePositive < (visiblePositive + visibleNegative) * 0.98)
+                    {
+                        // Mirrors CheckFlatDrawingView's z>0 viewer-facing convention.
+                        // If the API's visible-face normal does not support it, do NOT guess.
+                        reason = "visible faces fail viewer-side normal check";
+                        return result;
+                    }
+                    bodySource = "VISIBLE_ENTITIES2";
+                    probe.BodyResolutionMethod = bodySource;
+                    LogDebug("[FLAT DIRECT BODY] view=" + result.ViewName +
+                        " bodySource=" + bodySource +
+                        " visible=" + visible.Length + " matched=" + matchedVisibleFaces +
+                        " bodyFaces=" + bodyFaces.Length +
+                        " viewConfig=" + result.Configuration + " displayState=" + result.DisplayState +
+                        " activeConfigSame=" + activeConfigSame);
+                }
+                else
+                {
+                    if (!CdIsDrawingHiddenForView(view, ownerDrawing))
+                    {
+                        reason = "GetVisibleEntities2 returned no visible faces";
+                        return result;
+                    }
+                    string hiddenFail;
+                    body = CdResolveHiddenFlatBody(view, part, activeConfigSame, dsFaceEntries, math, xform, out hiddenFail);
+                    if (body == null)
+                    {
+                        reason = hiddenFail;
+                        return result;
+                    }
+                    bodyFaces = body.GetFaces() as Array;
+                    if (bodyFaces == null || bodyFaces.Length == 0)
+                    {
+                        reason = "hidden-view flat-pattern body faces unavailable";
+                        return result;
+                    }
+                    probe.BodyFaceCount = bodyFaces.Length;
+                    try { probe.BodyIsSheetMetal = body.IsSheetMetal(); } catch { }
+                    bodySource = "HIDDEN_DS_FACE_BODY";
+                    probe.BodyResolutionMethod = bodySource;
+                    LogDebug("[FLAT DIRECT BODY] view=" + result.ViewName +
+                        " bodySource=" + bodySource +
+                        " visible=0 bodyFaces=" + bodyFaces.Length +
+                        " viewConfig=" + result.Configuration + " displayState=" + result.DisplayState +
+                        " activeConfigSame=" + activeConfigSame);
+                }
+
+                var dsModelEntries = new List<CdAppearanceEntry>();
+                double[] dsModelRaw = cfg.GetDisplayStateProperties(result.DisplayState) as double[];
+                if (CdKnownRgb(dsModelRaw))
+                {
+                    dsModelEntries.Add(new CdAppearanceEntry
+                    {
+                        Entity = model,
+                        Rgb = new[] { dsModelRaw[0], dsModelRaw[1], dsModelRaw[2] }
+                    });
+                }
+
+                // RenderMaterials via swSpecifyDisplayState query the active configuration's display state.
+                // Guard with activeConfigSame so an active config's state name cannot cross-contaminate
+                // a different ReferencedConfiguration, and never use swAllDisplayState / swThisDisplayState.
+                var rmFaceEntries = new List<CdAppearanceEntry>();
+                var rmFeatureEntries = new List<CdAppearanceEntry>();
+                var rmBodyEntries = new List<CdAppearanceEntry>();
+                var rmModelEntries = new List<CdAppearanceEntry>();
+                if (activeConfigSame)
+                {
+                    int option = (int)swDisplayStateOpts_e.swSpecifyDisplayState;
+                    object stateArg = new[] { result.DisplayState };
+                    int renderCount = model.Extension.GetRenderMaterialsCount2(option, stateArg);
+                    Array render = model.Extension.GetRenderMaterials2(option, stateArg) as Array;
+                    if (renderCount < 0 || (renderCount > 0 &&
+                        (render == null || render.Length != renderCount)))
+                    { reason = "render-material list ambiguous"; return result; }
+                    if (render != null)
+                    {
+                        foreach (object renderObject in render)
+                        {
+                            RenderMaterial mat = renderObject as RenderMaterial;
+                            if (mat == null) { reason = "render material unavailable"; return result; }
+                            Array entities = mat.GetEntities() as Array;
+                            if (mat.GetEntitiesCount() > 0 && entities == null)
+                            { reason = "render entities unavailable"; return result; }
+                            if (entities == null || entities.Length == 0) continue;
+                            int color = mat.PrimaryColor;
+                            if (color < 0 || mat.SecondaryColor != color)
+                            { reason = "complex render color"; return result; }
+                            double[] rgb = { (color & 255) / 255.0,
+                                ((color >> 8) & 255) / 255.0,
+                                ((color >> 16) & 255) / 255.0 };
+                            foreach (object entity in entities)
+                            {
+                                if (entity is Face2)
+                                    rmFaceEntries.Add(new CdAppearanceEntry { Entity = entity, Rgb = rgb });
+                                else if (entity is Feature)
+                                    rmFeatureEntries.Add(new CdAppearanceEntry { Entity = entity, Rgb = rgb });
+                                else if (entity is Body2)
+                                    rmBodyEntries.Add(new CdAppearanceEntry { Entity = entity, Rgb = rgb });
+                                else if (entity is ModelDoc2)
+                                    rmModelEntries.Add(new CdAppearanceEntry { Entity = entity, Rgb = rgb });
+                                else
+                                { reason = "unsupported render entity; cannot prove effective color"; return result; }
+                            }
+                        }
+                    }
+                }
+
+                double positiveArea = 0, negativeArea = 0, otherArea = 0;
+                double positivePink = 0, negativePink = 0;
+                var sources = new HashSet<string>(StringComparer.Ordinal);
+                var frontSources = new HashSet<string>(StringComparer.Ordinal);
+                var backSources = new HashSet<string>(StringComparer.Ordinal);
+                foreach (object item in bodyFaces)
+                {
+                    Face2 face = item as Face2;
+                    if (face == null) continue;
+                    double area = face.GetArea();
+                    if (area <= 0) continue;
+                    double z = CdFaceViewZ(face, math, xform);
+                    if (Math.Abs(z) < 0.98)
+                    {
+                        otherArea += area;
+                        continue;
+                    }
+                    if (z > 0)
+                    {
+                        positiveArea += area;
+                        probe.FrontPlanarFaceCount++;
+                    }
+                    else
+                    {
+                        negativeArea += area;
+                        probe.BackPlanarFaceCount++;
+                    }
+
+                    double[] rgb;
+                    string conflict;
+                    string source = null;
+
+                    if (!CdResolveAppearanceLevel(face, face, dsFaceEntries, rmFaceEntries, true, "face", out rgb, out conflict))
+                    { reason = conflict; return result; }
+                    if (rgb != null) source = "FACE";
+
+                    if (rgb == null)
+                    {
+                        Feature faceFeature = face.GetFeature() as Feature;
+                        if (!CdResolveAppearanceLevel(faceFeature, face, dsFeatureEntries, rmFeatureEntries, false, "feature", out rgb, out conflict))
+                        { reason = conflict; return result; }
+                        if (rgb != null) source = "FEATURE";
+                    }
+
+                    if (rgb == null)
+                    {
+                        if (!CdResolveAppearanceLevel(body, face, dsBodyEntries, rmBodyEntries, false, "body", out rgb, out conflict))
+                        { reason = conflict; return result; }
+                        if (rgb != null) source = "BODY";
+                    }
+
+                    if (rgb == null)
+                    {
+                        if (!CdResolveAppearanceLevel(model, face, dsModelEntries, rmModelEntries, false, "model", out rgb, out conflict))
+                        { reason = conflict; return result; }
+                        if (rgb != null) source = "MODEL";
+                    }
+
+                    // null / -1 / invalid RGB means UNKNOWN, *not* confirmed non-pink.
+                    if (!CdKnownRgb(rgb))
+                    {
+                        reason = "effective color unresolved for a planar flat face";
+                        return result;
+                    }
+                    if (source != null)
+                    {
+                        sources.Add(source);
+                        if (z > 0) frontSources.Add(source);
+                        else backSources.Add(source);
+                    }
+                    bool isPink = CdPink(rgb);
+                    if (isPink)
+                    {
+                        if (z > 0) positivePink += area;
+                        else negativePink += area;
+                    }
+                    if (probe.FaceAuditSummary.Count < 16)
+                    {
+                        probe.FaceAuditSummary.Add(string.Format(CultureInfo.InvariantCulture,
+                            "z={0:F2} area={1:F1}mm2 src={2} rgb={3:F2},{4:F2},{5:F2} pink={6}",
+                            z, area * 1000000.0, source ?? "NONE", rgb[0], rgb[1], rgb[2], isPink));
+                    }
+                }
+                probe.TotalPositiveAreaMm2 = positiveArea * 1000000.0;
+                probe.TotalNegativeAreaMm2 = negativeArea * 1000000.0;
+                probe.TotalOtherAreaMm2 = otherArea * 1000000.0;
+                result.FrontPinkAreaMm2 = positivePink * 1000000;
+                result.BackPinkAreaMm2 = negativePink * 1000000;
+                probe.FrontPinkAreaMm2 = result.FrontPinkAreaMm2;
+                probe.BackPinkAreaMm2 = result.BackPinkAreaMm2;
+                probe.FrontAppearanceSources = string.Join("+", frontSources);
+                probe.BackAppearanceSources = string.Join("+", backSources);
+                probe.CombinedAppearanceSources = string.Join("+", sources);
+                probe.AllPlanarFacesResolvedUnambiguously = true;
+                if (positiveArea <= 1e-12 || negativeArea <= 1e-12)
+                { reason = "sheet metal pair of planar sides not found"; return result; }
+
+                // Explicit pink must belong to exactly one side, with a clear margin.
+                // Never infer front side solely from a lack of visible pink.
+                bool frontPink = positivePink > positiveArea * 0.01;
+                bool backPink = negativePink > negativeArea * 0.01;
+                bool frontAbsent = positivePink < positiveArea * 0.001;
+                bool backAbsent = negativePink < negativeArea * 0.001;
+                if (frontPink && backAbsent) result.PinkFacingViewer = true;
+                else if (backPink && frontAbsent) result.PinkFacingViewer = false;
+                else { reason = "no unambiguous one-sided pink paint"; return result; }
+
+                probe.HasExplicitPinkOnOneSideOnly = true;
+                probe.VerdictPinkFacingViewer = result.PinkFacingViewer;
+
+                string sourceList = probe.CombinedAppearanceSources;
+                result.Message = "[Direct Drawing View / verified config+state] " +
+                    (result.PinkFacingViewer.Value
+                        ? "Mặt đang nhìn có màu hồng (ウラ)."
+                        : "Mặt đang nhìn là mặt màu (表), mặt đối diện có màu hồng.");
+                LogDebug("[FLAT DIRECT OK] view=" + result.ViewName +
+                    " cfg=" + result.Configuration + " state=" + result.DisplayState +
+                    " bodySource=" + bodySource +
+                    " sources=" + sourceList +
+                    " frontPinkMm2=" + result.FrontPinkAreaMm2 +
+                    " backPinkMm2=" + result.BackPinkAreaMm2 +
+                    " isUra=" + result.PinkFacingViewer.Value);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                reason = "direct read COM/API error: " + ex.Message;
+                return result;
+            }
+            finally
+            {
+                if (!result.PinkFacingViewer.HasValue)
+                {
+                    probe.FailureReason = reason;
+                    result.Message = "[Direct Drawing View chưa xác minh] " + reason;
+                    LogDebug("[FLAT DIRECT UNKNOWN] view=" + result.ViewName + " reason=" + reason);
+                }
+            }
+        }
+
+        // ----- OPTIONAL DIAGNOSTICS (CHECK DRAWING ONLY; READ-ONLY) -----
+        // Helps test Anti's hypothesis that this command or SOLIDWORKS implicitly
+        // opens an assembly and marks it Dirty during the component-drawing batch.
+        private Dictionary<string, string> CdSnapshotOpenAssemblies(string stage)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                Array documents = swApp?.GetDocuments() as Array;
+                if (documents == null) return result;
+                foreach (object value in documents)
+                {
+                    ModelDoc2 doc = value as ModelDoc2;
+                    if (doc == null || !IsAssemblyDocument(doc)) continue;
+                    string path = doc.GetPathName() ?? "";
+                    if (path.Length == 0) continue;
+                    bool dirty = doc.GetSaveFlag();
+                    bool readOnly = doc.IsOpenedReadOnly();
+                    bool configDirty = false;
+                    try { configDirty = doc.ConfigurationManager.ActiveConfiguration.IsDirty(); }
+                    catch { }
+                    string data = "dirty=" + dirty + " cfgDirty=" + configDirty +
+                        " readOnly=" + readOnly;
+                    result[path] = data;
+                    LogDebug("[CD ASM SNAPSHOT] stage=" + stage +
+                        " path=\"" + path + "\" " + data);
+                }
+            }
+            catch (Exception ex) { LogDebug("[CD ASM SNAPSHOT ERROR] " + ex.Message); }
+            return result;
+        }
+
+        #endregion
 
         private static void SaveDrawingValueLocation(
             DrawingDisplayedData data,
@@ -1850,174 +3327,260 @@ namespace ADDIN.Commands
                 drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.NotApplicable)
                 return;
 
-            var row = new DrawingPropertyLinkReportRow
-            {
-                FieldName = "合番",
-                DrawingRaw = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable
-                    ? "(Không đọc được Raw Text)" : (drawingData.GobanLinkRawExpression ?? ""),
-                LinkStatus = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Valid
-                    ? DrawingBomCheckStatus.OK
-                    : drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid
-                        ? DrawingBomCheckStatus.NG
-                        : DrawingBomCheckStatus.Warning
-            };
-            var reasons = new List<string>();
-            if (row.LinkStatus == DrawingBomCheckStatus.NG)
-                reasons.Add("Mất hoặc sai công thức bắt buộc $PRPSHEET:\"合番\".");
-            else if (row.LinkStatus == DrawingBomCheckStatus.Warning)
-                reasons.Add("Không xác minh được raw link hoặc có nhiều bảng phù hợp.");
-
-            string bomDirect;
-            bool hasBomValue = TryReadBomGobanColumn(bomRow, out bomDirect);
-            row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番 riêng)";
-
+            // 1. Đọc giá trị Property từ Model/Config đã xác minh
             string propValue;
             string propSource;
             bool gotProperty = TryGetVerifiedSheetGobanProperty(
                 drawing, sheet, sheetName, referencedModel, referencedConfiguration,
                 item.PartPath, out propValue, out propSource);
+
+            // 2. Đọc giá trị BOM nếu có
+            string bomDirect;
+            bool hasBomValue = TryReadBomGobanColumn(bomRow, out bomDirect);
+
+            // 3. Tổng hợp kết quả mà KHÔNG gọi lại retry DisplayedText
+            PopulateGobanPropertyLinkReportRow(
+                item, drawingData, comparison,
+                gotProperty, propValue, propSource,
+                hasBomValue, bomDirect);
+        }
+
+        internal static void PopulateGobanPropertyLinkReportRow(
+            DrawingCheckItemResult item,
+            DrawingDisplayedData drawingData,
+            DrawingBomFieldResult comparison,
+            bool gotProperty,
+            string propValue,
+            string propSource,
+            bool hasBomValue,
+            string bomDirect)
+        {
+            if (item == null || drawingData == null ||
+                drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.NotApplicable)
+                return;
+
+            var row = new DrawingPropertyLinkReportRow
+            {
+                FieldName = "合番",
+                DrawingRaw = drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Unavailable
+                    ? "(Không đọc được công thức ô Drawing)" : (drawingData.GobanLinkRawExpression ?? "")
+            };
+
             row.PropertyValue = gotProperty ? propValue : "(Chưa xác minh được Property)";
+            row.BomValue = hasBomValue ? bomDirect : "(BOM không có cột 合番 riêng)";
 
-            // Property↔BOM can be OK only if BOTH independent sources were read.
-            // ReadBomAndComponentProperties() falls back to Model property, so NEVER
-            // use its bomGoban variable as independent BOM evidence here.
-            if (gotProperty && hasBomValue && !string.IsNullOrWhiteSpace(bomDirect))
+            // Chỉ sử dụng chữ đọc trực tiếp đã có từ lần quét bảng, không retry Hidden/Visible/Activate/Redraw.
+            bool directDisplayRead = !drawingData.GobanDisplayUnavailable && !string.IsNullOrWhiteSpace(drawingData.Goban);
+            bool priorConfirmedDisplayNg = directDisplayRead &&
+                comparison != null &&
+                comparison.Status == DrawingBomCheckStatus.NG &&
+                !string.Equals(comparison.Source, "DRAWING_GOBAN_LINK_INVALID", StringComparison.OrdinalIgnoreCase);
+
+            // 4. Đánh giá trạng thái Link Integrity (Công thức + Model/Config tham chiếu)
+            if (drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Invalid)
             {
-                row.PropertyStatus = string.Equals(
-                    NormalizeText(propValue), NormalizeText(bomDirect),
-                    StringComparison.OrdinalIgnoreCase)
-                    ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
-                if (row.PropertyStatus == DrawingBomCheckStatus.NG)
-                    reasons.Add("Giá trị Property khác BOM.");
+                row.LinkStatus = DrawingBomCheckStatus.NG;
+            }
+            else if (drawingData.GobanLinkAuditState == DrawingGobanLinkAuditState.Valid)
+            {
+                row.LinkStatus = gotProperty ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.Warning;
             }
             else
             {
-                row.PropertyStatus = DrawingBomCheckStatus.Warning;
-                reasons.Add(!gotProperty
-                    ? "Chưa xác nhận được Property từ đúng model/config của Sheet: " + propSource
-                    : "Thiếu dữ liệu 合番 độc lập trong BOM.");
+                row.LinkStatus = DrawingBomCheckStatus.Warning;
             }
 
-            string actualDisplayed = drawingData.Goban ?? "";
-            if (drawingData.GobanDisplayUnavailable ||
-                string.IsNullOrWhiteSpace(actualDisplayed) || !gotProperty)
+            // 5. Đánh giá trạng thái Display Verification
+            if (directDisplayRead)
             {
+                string actualDisplayed = drawingData.Goban ?? "";
+                row.DisplayOrReferenceValue = actualDisplayed;
+                row.DisplayOrReferenceSource = "DRAWING_DISPLAY_VERIFIED";
+                if (gotProperty)
+                {
+                    bool displayMatch = string.Equals(
+                        NormalizeText(actualDisplayed), NormalizeText(propValue),
+                        StringComparison.OrdinalIgnoreCase);
+                    row.DisplayStatus = (displayMatch && !priorConfirmedDisplayNg)
+                        ? DrawingBomCheckStatus.OK
+                        : DrawingBomCheckStatus.NG;
+                }
+                else
+                {
+                    row.DisplayStatus = priorConfirmedDisplayNg
+                        ? DrawingBomCheckStatus.NG
+                        : DrawingBomCheckStatus.Warning;
+                }
+            }
+            else
+            {
+                // Chưa xác minh trực tiếp chữ hiển thị trên Drawing trong chế độ Silent
                 row.DisplayStatus = DrawingBomCheckStatus.Warning;
-                reasons.Add("Chưa đối chiếu được chữ hiển thị thực tế trên Drawing.");
+                if (row.LinkStatus == DrawingBomCheckStatus.OK && gotProperty)
+                {
+                    row.DisplayOrReferenceValue = propValue;
+                    row.DisplayOrReferenceSource = "PROPERTY_RESOLVED_REFERENCE_ONLY";
+                }
+                else if (row.LinkStatus == DrawingBomCheckStatus.NG)
+                {
+                    row.DisplayOrReferenceValue = !string.IsNullOrWhiteSpace(drawingData.GobanLinkRawExpression)
+                        ? drawingData.GobanLinkRawExpression : "(Chữ nhập tay)";
+                    row.DisplayOrReferenceSource = "DRAWING_RAW_LINK";
+                }
+                else
+                {
+                    row.DisplayOrReferenceValue = "(Chưa xác minh)";
+                    row.DisplayOrReferenceSource = "DRAWING_DISPLAY_UNAVAILABLE";
+                }
+            }
+
+            // 6. Đánh giá Property ↔ BOM
+            if (hasBomValue && !string.IsNullOrWhiteSpace(bomDirect))
+            {
+                if (gotProperty)
+                {
+                    row.PropertyStatus = string.Equals(
+                        NormalizeText(propValue), NormalizeText(bomDirect),
+                        StringComparison.OrdinalIgnoreCase)
+                        ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
+                }
+                else
+                {
+                    row.PropertyStatus = DrawingBomCheckStatus.Warning;
+                }
             }
             else
             {
-                row.DisplayStatus = string.Equals(
-                    NormalizeText(actualDisplayed), NormalizeText(propValue),
-                    StringComparison.OrdinalIgnoreCase)
-                    ? DrawingBomCheckStatus.OK : DrawingBomCheckStatus.NG;
-                if (row.DisplayStatus == DrawingBomCheckStatus.NG)
-                    reasons.Add("Chữ hiển thị Drawing khác Property.");
+                row.PropertyStatus = DrawingBomCheckStatus.NotApplicable;
             }
 
-            // A verified mismatch must also affect the existing field result, not
-            // merely the new presentation tab. Existing NG is never downgraded.
-            if (comparison != null &&
-                (row.PropertyStatus == DrawingBomCheckStatus.NG ||
-                 row.DisplayStatus == DrawingBomCheckStatus.NG))
+            // 7. Đồng bộ kết quả vào field so sánh chính theo đúng thứ tự ưu tiên:
+            // Confirmed NG > Unverified required check (Warning) > Verified OK
+            if (comparison != null)
             {
-                comparison.Status = DrawingBomCheckStatus.NG;
-                comparison.Message = (comparison.Message ?? "") +
-                    " | Property/BOM/DisplayedValue mismatch confirmed.";
+                if (row.LinkStatus == DrawingBomCheckStatus.NG)
+                {
+                    comparison.Status = DrawingBomCheckStatus.NG;
+                    comparison.DrawingValue = row.DisplayOrReferenceValue;
+                    comparison.Source = "DRAWING_RAW_LINK";
+                    comparison.Message = "Phát hiện ô 合番 đã bị sửa hoặc nhập tay chữ cố định (" +
+                        (drawingData.GobanLinkRawExpression ?? "") +
+                        "), làm mất công thức liên kết bắt buộc $PRPSHEET:\"合番\". " +
+                        "Dù giá trị chữ trùng với Property hoặc BOM vẫn được tính là NG.";
+                    LogDebug("[GOBAN LINK NG] component=" + (item.Component ?? "") + " raw=\"" + drawingData.GobanLinkRawExpression + "\"");
+                }
+                else if (row.DisplayStatus == DrawingBomCheckStatus.NG)
+                {
+                    comparison.Status = DrawingBomCheckStatus.NG;
+                    comparison.DrawingValue = row.DisplayOrReferenceValue;
+                    comparison.Source = "DRAWING_DISPLAY_VERIFIED";
+                    comparison.Message = "Chữ hiển thị đọc trực tiếp trên Drawing (" + row.DisplayOrReferenceValue +
+                        ") không khớp với giá trị Property của Part tham chiếu (" + propValue + ").";
+                    LogDebug("[GOBAN DISPLAY NG] component=" + (item.Component ?? "") + " display=\"" + row.DisplayOrReferenceValue + "\" prop=\"" + propValue + "\"");
+                }
+                else if (row.PropertyStatus == DrawingBomCheckStatus.NG)
+                {
+                    comparison.Status = DrawingBomCheckStatus.NG;
+                    comparison.DrawingValue = propValue;
+                    comparison.Source = "PROPERTY_BOM_MISMATCH";
+                    comparison.Message = "Giá trị Property 合番 của Part tham chiếu (" + propValue + ") không khớp với dòng BOM (" + bomDirect + ").";
+                }
+                else if (row.LinkStatus == DrawingBomCheckStatus.OK && gotProperty)
+                {
+                    comparison.Status = DrawingBomCheckStatus.OK;
+                    if (row.DisplayStatus == DrawingBomCheckStatus.OK)
+                    {
+                        comparison.DrawingValue = row.DisplayOrReferenceValue;
+                        comparison.Source = "DRAWING_DISPLAY_VERIFIED";
+                        comparison.Message = "Liên kết 合番 hợp lệ. Đã xác minh trực tiếp chữ hiển thị trên Drawing (" +
+                            row.DisplayOrReferenceValue + ") trùng khớp với Property của Part tham chiếu.";
+                        LogDebug("[GOBAN FULL OK] component=" + (item.Component ?? "") + " display=\"" + row.DisplayOrReferenceValue + "\" prop=\"" + propValue + "\"");
+                    }
+                    else
+                    {
+                        comparison.DrawingValue = propValue;
+                        comparison.Source = "PROPERTY_RESOLVED_REFERENCE_ONLY";
+                        comparison.Message = "Liên kết 合番 hợp lệ. Đã đọc giá trị " + propValue +
+                            " từ Property của Part tham chiếu. Chưa xác minh trực tiếp chữ hiển thị trên Drawing do giới hạn đọc dữ liệu trong chế độ Silent.";
+                        LogDebug("[GOBAN LINK INTEGRITY OK] component=" + (item.Component ?? "") + " property=\"" + propValue + "\" source=" + propSource + " status=OK");
+                    }
+                }
+                else
+                {
+                    comparison.Status = DrawingBomCheckStatus.Warning;
+                    comparison.DrawingValue = "(Chưa xác minh)";
+                    comparison.Source = "DRAWING_GOBAN_LINK_UNVERIFIED";
+                    comparison.Message = DescribeUnverifiedGobanReason(drawingData.GobanLinkAuditState, propSource);
+                }
             }
-            bool displayedWasRead =
-                !drawingData.GobanDisplayUnavailable &&
-                !string.IsNullOrWhiteSpace(drawingData.Goban);
 
-            if (displayedWasRead)
-            {
-                row.DisplayOrReferenceValue = drawingData.Goban;
-                row.DisplayOrReferenceSource = "Drawing API";
-            }
-            else if (row.LinkStatus == DrawingBomCheckStatus.OK && gotProperty)
-            {
-                // Reference value only; not proof of actual Drawing display.
-                row.DisplayOrReferenceValue = propValue;
-                row.DisplayOrReferenceSource = "Property (tham chiếu)";
-            }
-            else if (row.LinkStatus == DrawingBomCheckStatus.NG &&
-                     !string.IsNullOrWhiteSpace(drawingData.GobanLinkRawExpression) &&
-                     !drawingData.GobanLinkRawExpression.TrimStart().StartsWith(
-                         "$", StringComparison.Ordinal))
-            {
-                row.DisplayOrReferenceValue = drawingData.GobanLinkRawExpression;
-                row.DisplayOrReferenceSource = "Raw Text (nhập tay)";
-            }
-            else
-            {
-                row.DisplayOrReferenceValue = "(Chưa đọc được)";
-                row.DisplayOrReferenceSource = "Chưa xác minh";
-            }
-
+            // 8. Tạo ghi chú chi tiết bằng ngôn ngữ dễ hiểu cho người dùng
             var readable = new List<string>();
             if (row.LinkStatus == DrawingBomCheckStatus.OK)
-                readable.Add("Liên kết 合番 đúng công thức.");
+                readable.Add("Liên kết 合番 hợp lệ ($PRPSHEET:\"合番\"), đã đọc giá trị " + propValue + " từ Property của Part tham chiếu.");
             else if (row.LinkStatus == DrawingBomCheckStatus.NG)
-                readable.Add("Liên kết 合番 sai hoặc đã bị nhập tay. Công thức cần có: " +
-                    "$PRPSHEET:\"合番\".");
+                readable.Add("Liên kết 合番 bị lỗi hoặc đã nhập tay chữ cố định. Bắt buộc dùng công thức $PRPSHEET:\"合番\".");
             else
-                readable.Add("Chưa xác minh được công thức gốc trong ô 合番.");
-
-            if (gotProperty)
-                readable.Add("Đã đọc giá trị từ Property của model tham chiếu (" +
-                    propSource + ").");
-            else
-                readable.Add("Chưa xác định được giá trị Property 合番 từ Model mà Drawing tham chiếu.");
+                readable.Add(DescribeUnverifiedGobanReason(drawingData.GobanLinkAuditState, propSource));
 
             if (!hasBomValue)
-                readable.Add("BOM không có cột 合番 riêng nên chưa thể đối chiếu Property với BOM.");
+                readable.Add("BOM không có cột 合番 riêng nên không áp dụng đối chiếu trực tiếp với BOM.");
             else if (row.PropertyStatus == DrawingBomCheckStatus.NG)
-                readable.Add("Property không trùng giá trị 合番 của BOM.");
+                readable.Add("Giá trị Property của Part không khớp với cột 合番 trong BOM.");
             else if (row.PropertyStatus == DrawingBomCheckStatus.OK)
-                readable.Add("Property trùng giá trị 合番 của BOM.");
-            else
-                readable.Add("Chưa đủ dữ liệu để đối chiếu Property và BOM.");
+                readable.Add("Giá trị Property của Part trùng khớp với cột 合番 trong BOM.");
 
             if (row.DisplayStatus == DrawingBomCheckStatus.NG)
-                readable.Add("Chữ đọc trực tiếp từ Drawing khác Property.");
+                readable.Add("Chữ hiển thị đọc trực tiếp trên Drawing không khớp với Property.");
             else if (row.DisplayStatus == DrawingBomCheckStatus.OK)
-                readable.Add("Đã xác minh chữ trực tiếp từ Drawing.");
-            else if (row.DisplayOrReferenceSource == "Property (tham chiếu)")
-                readable.Add("Chữ ở cột Giá trị chữ lấy từ Property; " +
-                    "chưa xác minh trực tiếp chữ Drawing.");
+                readable.Add("Đã xác minh trực tiếp chữ hiển thị trên Drawing trùng khớp với Property.");
+            else if (row.DisplayOrReferenceSource == "PROPERTY_RESOLVED_REFERENCE_ONLY")
+                readable.Add("Chưa xác minh trực tiếp chữ hiển thị trên Drawing do giới hạn đọc dữ liệu trong chế độ Silent.");
             else
-                readable.Add("Chưa xác minh trực tiếp chữ đang hiển thị trên Drawing.");
+                readable.Add("Chưa xác minh được chữ hiển thị trên Drawing.");
 
             row.Note = string.Join(" ", readable);
-
-            // The primary result grid and the first two Excel sheets read
-            // comparison.DrawingValue, not PropertyLinkRows. Show a verified
-            // reference value when the Drawing display API is unavailable,
-            // without claiming that the Drawing's rendered text was read.
-            // Never overwrite a known NG (for example, manually typed "aa").
-            if (comparison != null &&
-                row.LinkStatus == DrawingBomCheckStatus.OK &&
-                comparison.Status == DrawingBomCheckStatus.Warning &&
-                drawingData.GobanDisplayUnavailable &&
-                gotProperty &&
-                !string.IsNullOrWhiteSpace(propValue))
-            {
-                comparison.DrawingValue = propValue;
-                comparison.Source = "PROPERTY_RESOLVED_REFERENCE_ONLY";
-                comparison.Message =
-                    "Ô 合番 có công thức liên kết đúng. " +
-                    "Giá trị đang hiển thị trong báo cáo được lấy từ Property " +
-                    "của Model tham chiếu; chưa đọc được trực tiếp chữ trên Drawing.";
-                LogDebug("[GOBAN MAIN REPORT VALUE] component=" +
-                    (item.Component ?? "") + " value=\"" + propValue +
-                    "\" source=PROPERTY_RESOLVED_REFERENCE_ONLY status=" +
-                    comparison.Status);
-            }
 
             item.PropertyLinkRows.Add(row);
             LogDebug("[GOBAN REPORT ROW] link=" + row.LinkStatus +
                 " property=" + row.PropertyStatus + " display=" + row.DisplayStatus +
                 " source=" + propSource + " raw=\"" + row.DrawingRaw + "\"");
+        }
+
+        private static string DescribeUnverifiedGobanReason(
+            DrawingGobanLinkAuditState linkState,
+            string propSource)
+        {
+            if (linkState == DrawingGobanLinkAuditState.Unavailable)
+                return "Chưa đọc được công thức gốc trong ô 合番 từ bảng trên Drawing.";
+            if (linkState == DrawingGobanLinkAuditState.Ambiguous)
+                return "Có nhiều hơn một bảng 合番 trên cùng Sheet nên chưa thể xác định duy nhất ô cần kiểm tra.";
+
+            switch ((propSource ?? "").Trim().ToUpperInvariant())
+            {
+                case "CUSTOM_PROPERTY_VIEW_UNSPECIFIED":
+                case "CUSTOM_PROPERTY_VIEW_API_ERROR":
+                    return "Chưa xác định được thiết lập Custom Property View trên Sheet Drawing.";
+                case "DEFAULT_VIEW_NOT_FOUND":
+                case "EXPLICIT_VIEW_NOT_FOUND":
+                case "SHEET_VIEW_NOT_FOUND":
+                case "VIEW_SHEET_UNVERIFIED":
+                case "SHEET_CONTEXT_MISMATCH":
+                    return "Không tìm thấy Drawing View nguồn hợp lệ trên Sheet để đọc Property 合番.";
+                case "REFERENCED_MODEL_NOT_LOADED":
+                case "REFERENCED_MODEL_API_ERROR":
+                    return "Drawing View nguồn chưa tải được Model 3D tham chiếu để đọc Property 合番.";
+                case "PROPERTY_SOURCE_MODEL_MISMATCH":
+                    return "Model 3D gắn với Drawing View nguồn không khớp với chi tiết đang kiểm tra trong BOM.";
+                case "VIEW_CONFIGURATION_UNKNOWN":
+                case "VIEW_CONFIGURATION_API_ERROR":
+                    return "Chưa xác định được Configuration tham chiếu của Drawing View nguồn.";
+                case "PROPERTY_NOT_RESOLVED":
+                case "PROPERTY_GET6_API_ERROR":
+                    return "Không tìm thấy hoặc chưa đọc được giá trị Custom Property '合番' trong Part tham chiếu.";
+                default:
+                    return "Chưa xác minh được đầy đủ Model hoặc Configuration tham chiếu của ô 合番 trên Sheet.";
+            }
         }
 
         private static bool TryReadBomGobanColumn(DataGridViewRow row, out string value)
@@ -2303,51 +3866,686 @@ namespace ADDIN.Commands
 
 #if DEBUG
         // No SOLIDWORKS document, user file, BOM grid, or COM object is touched.
-        // This is a regression guard for the exact scenario requested by user.
+        // Complete 29-case regression suite covering Goban Link/Display, Goban Total,
+        // Overall Item Finalize, On-Demand Excel & Preview Sync, and Ura/Omote.
         private static void RunGobanLinkSelfTests()
         {
-            CheckGobanSyntheticCase("LINKED_VALUE_MATCHES_BOM",
-                "$PRPSHEET:\"合番\"", true, "※単品搬入", "※単品搬入",
-                DrawingGobanLinkAuditState.Valid, DrawingBomCheckStatus.OK);
-            CheckGobanSyntheticCase("HARDCODE_VALUE_MATCHES_BOM",
-                "※単品搬入", true, "※単品搬入", "※単品搬入",
-                DrawingGobanLinkAuditState.Invalid, DrawingBomCheckStatus.NG);
-            CheckGobanSyntheticCase("WRONG_PROPERTY_LINK",
-                "$PRPSHEET:\"材質\"", true, "※単品搬入", "※単品搬入",
-                DrawingGobanLinkAuditState.Invalid, DrawingBomCheckStatus.NG);
-            CheckGobanSyntheticCase("MISSING_DISPLAY",
-                "$PRPSHEET:\"合番\"", true, "", "※単品搬入",
-                DrawingGobanLinkAuditState.Valid, DrawingBomCheckStatus.Warning);
-            CheckGobanSyntheticCase("RAW_API_ERROR",
-                "", false, "※単品搬入", "※単品搬入",
-                DrawingGobanLinkAuditState.Unavailable, DrawingBomCheckStatus.Warning);
-            LogDebug("[GOBAN LINK SELFTEST] ALL_PASS count=5 source=SYNTHETIC_ONLY");
+            // --- I. 合番 (Cases 1..7) ---
+            // Case 1: Liên kết đúng, Property hợp lệ, Display đọc được và khớp
+            VerifyGobanFullCase(
+                "01_LINK_OK_PROP_VALID_DISPLAY_OK",
+                raw: "$PRPSHEET:\"合番\"", rawReadSucceeded: true,
+                drawingValue: "※単品搬入", displayUnavailable: false,
+                gotProperty: true, propValue: "※単品搬入", propSource: "SHEET_VIEW:Drawing View1|CONFIG:Default",
+                hasBomValue: true, bomValue: "※単品搬入",
+                expectedLinkAudit: DrawingGobanLinkAuditState.Valid,
+                expectedLinkStatus: DrawingBomCheckStatus.OK,
+                expectedDisplayStatus: DrawingBomCheckStatus.OK,
+                expectedFieldStatus: DrawingBomCheckStatus.OK,
+                expectedFieldSource: "DRAWING_DISPLAY_VERIFIED");
+
+            // Case 2: Liên kết đúng nhưng Display unavailable (chế độ Silent)
+            VerifyGobanFullCase(
+                "02_LINK_OK_DISPLAY_UNAVAILABLE_SILENT",
+                raw: "$PRPSHEET:\"合番\"", rawReadSucceeded: true,
+                drawingValue: "", displayUnavailable: true,
+                gotProperty: true, propValue: "※単品搬入", propSource: "SHEET_VIEW:Drawing View1|CONFIG:Default",
+                hasBomValue: false, bomValue: "",
+                expectedLinkAudit: DrawingGobanLinkAuditState.Valid,
+                expectedLinkStatus: DrawingBomCheckStatus.OK,
+                expectedDisplayStatus: DrawingBomCheckStatus.Warning,
+                expectedFieldStatus: DrawingBomCheckStatus.OK,
+                expectedFieldSource: "PROPERTY_RESOLVED_REFERENCE_ONLY");
+
+            // Case 3: Chữ nhập tay bằng Property
+            VerifyGobanFullCase(
+                "03_MANUAL_TEXT_EQUALS_PROPERTY",
+                raw: "※単品搬入", rawReadSucceeded: true,
+                drawingValue: "※単品搬入", displayUnavailable: false,
+                gotProperty: true, propValue: "※単品搬入", propSource: "SHEET_VIEW:Drawing View1|CONFIG:Default",
+                hasBomValue: true, bomValue: "※単品搬入",
+                expectedLinkAudit: DrawingGobanLinkAuditState.Invalid,
+                expectedLinkStatus: DrawingBomCheckStatus.NG,
+                expectedDisplayStatus: DrawingBomCheckStatus.OK,
+                expectedFieldStatus: DrawingBomCheckStatus.NG,
+                expectedFieldSource: "DRAWING_RAW_LINK");
+
+            // Case 4: Chữ nhập tay khác Property
+            VerifyGobanFullCase(
+                "04_MANUAL_TEXT_DIFFERS_PROPERTY",
+                raw: "aa", rawReadSucceeded: true,
+                drawingValue: "aa", displayUnavailable: false,
+                gotProperty: true, propValue: "※単品搬入", propSource: "SHEET_VIEW:Drawing View1|CONFIG:Default",
+                hasBomValue: true, bomValue: "※単品搬入",
+                expectedLinkAudit: DrawingGobanLinkAuditState.Invalid,
+                expectedLinkStatus: DrawingBomCheckStatus.NG,
+                expectedDisplayStatus: DrawingBomCheckStatus.NG,
+                expectedFieldStatus: DrawingBomCheckStatus.NG,
+                expectedFieldSource: "DRAWING_RAW_LINK");
+
+            // Case 5: Sai tên Property ($PRPSHEET:"材質")
+            VerifyGobanFullCase(
+                "05_WRONG_PROPERTY_LINK",
+                raw: "$PRPSHEET:\"材質\"", rawReadSucceeded: true,
+                drawingValue: "※単品搬入", displayUnavailable: false,
+                gotProperty: true, propValue: "※単品搬入", propSource: "SHEET_VIEW:Drawing View1|CONFIG:Default",
+                hasBomValue: true, bomValue: "※単品搬入",
+                expectedLinkAudit: DrawingGobanLinkAuditState.Invalid,
+                expectedLinkStatus: DrawingBomCheckStatus.NG,
+                expectedDisplayStatus: DrawingBomCheckStatus.OK,
+                expectedFieldStatus: DrawingBomCheckStatus.NG,
+                expectedFieldSource: "DRAWING_RAW_LINK");
+
+            // Case 6: Không xác minh được Model tham chiếu
+            VerifyGobanFullCase(
+                "06_UNVERIFIED_REFERENCED_MODEL",
+                raw: "$PRPSHEET:\"合番\"", rawReadSucceeded: true,
+                drawingValue: "", displayUnavailable: true,
+                gotProperty: false, propValue: "", propSource: "REFERENCED_MODEL_NOT_LOADED",
+                hasBomValue: false, bomValue: "",
+                expectedLinkAudit: DrawingGobanLinkAuditState.Valid,
+                expectedLinkStatus: DrawingBomCheckStatus.Warning,
+                expectedDisplayStatus: DrawingBomCheckStatus.Warning,
+                expectedFieldStatus: DrawingBomCheckStatus.Warning,
+                expectedFieldSource: "DRAWING_GOBAN_LINK_UNVERIFIED");
+
+            // Case 7: Display đọc được thực tế nhưng khác Property -> Bắt buộc NG (không bị Link OK ghi đè)
+            VerifyGobanFullCase(
+                "07_DISPLAY_READ_MISMATCHES_PROPERTY",
+                raw: "$PRPSHEET:\"合番\"", rawReadSucceeded: true,
+                drawingValue: "BR-99", displayUnavailable: false,
+                gotProperty: true, propValue: "※単品搬入", propSource: "SHEET_VIEW:Drawing View1|CONFIG:Default",
+                hasBomValue: false, bomValue: "",
+                expectedLinkAudit: DrawingGobanLinkAuditState.Valid,
+                expectedLinkStatus: DrawingBomCheckStatus.OK,
+                expectedDisplayStatus: DrawingBomCheckStatus.NG,
+                expectedFieldStatus: DrawingBomCheckStatus.NG,
+                expectedFieldSource: "DRAWING_DISPLAY_VERIFIED");
+
+            // --- II. 合番合計 (Cases 8..14) ---
+            RunGobanTotalSelfTests();
+
+            // --- III. Overall Result (Cases 15..19) ---
+            RunItemFinalizeSelfTests();
+
+            // --- IV. Excel On-Demand & Preview Consistency (Cases 20..25) ---
+            RunExcelAndPreviewSyncSelfTests();
+
+            // --- V. 裏表 (Cases 26..29) ---
+            RunUraOmoteSelfTests();
+
+            // --- VI. W/L Value Validation (Cases 30..41 - 12 Required Cases) ---
+            RunWidthLengthSelfTests();
+
+            // --- VII. UNIT Summary Table Resolution (Case 42) ---
+            RunUnitSummaryTableSelfTests();
+
+            LogDebug("[CHECK DRAWING SELFTEST] ALL_PASS count=42 source=SYNTHETIC_ONLY");
         }
 
-        private static void CheckGobanSyntheticCase(
-            string name, string raw, bool rawReadSucceeded,
-            string drawingValue, string bomValue,
-            DrawingGobanLinkAuditState expectedLink,
-            DrawingBomCheckStatus expectedStatus)
+        private static void VerifyGobanFullCase(
+            string name,
+            string raw, bool rawReadSucceeded,
+            string drawingValue, bool displayUnavailable,
+            bool gotProperty, string propValue, string propSource,
+            bool hasBomValue, string bomValue,
+            DrawingGobanLinkAuditState expectedLinkAudit,
+            DrawingBomCheckStatus expectedLinkStatus,
+            DrawingBomCheckStatus expectedDisplayStatus,
+            DrawingBomCheckStatus expectedFieldStatus,
+            string expectedFieldSource)
         {
+            var item = new DrawingCheckItemResult { Component = "TEST_" + name };
             var data = new DrawingDisplayedData
             {
+                Goban = drawingValue,
+                GobanDisplayUnavailable = displayUnavailable,
                 GobanLinkAuditState = EvaluateGobanLink(raw, rawReadSucceeded),
                 GobanLinkRawExpression = raw
             };
-            DrawingBomFieldResult field = CompareGobanField(drawingValue, bomValue);
+            DrawingBomFieldResult field = CompareGobanField(drawingValue, hasBomValue ? bomValue : propValue);
+            if (displayUnavailable)
+            {
+                field.DrawingValue = "(Chưa đọc được chữ hiển thị)";
+                field.Source = "DRAWING_TABLE_DISPLAY_UNAVAILABLE";
+                field.Status = DrawingBomCheckStatus.Warning;
+            }
             ApplyGobanTemplateLinkAudit(field, data, false);
-            if (data.GobanLinkAuditState != expectedLink ||
-                field.Status != expectedStatus)
+            PopulateGobanPropertyLinkReportRow(
+                item, data, field,
+                gotProperty, propValue, propSource,
+                hasBomValue, bomValue);
+
+            if (item.PropertyLinkRows.Count != 1)
+                throw new InvalidOperationException("[SELFTEST FAIL] " + name + ": missing PropertyLinkRow");
+
+            DrawingPropertyLinkReportRow row = item.PropertyLinkRows[0];
+            if (data.GobanLinkAuditState != expectedLinkAudit ||
+                row.LinkStatus != expectedLinkStatus ||
+                row.DisplayStatus != expectedDisplayStatus ||
+                field.Status != expectedFieldStatus ||
+                !string.Equals(field.Source, expectedFieldSource, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    "[GOBAN LINK SELFTEST] FAIL case=" + name +
-                    " link=" + data.GobanLinkAuditState +
-                    " status=" + field.Status);
+                    "[SELFTEST FAIL] " + name +
+                    " audit=" + data.GobanLinkAuditState +
+                    " link=" + row.LinkStatus +
+                    " display=" + row.DisplayStatus +
+                    " field=" + field.Status +
+                    " source=" + field.Source);
             }
-            LogDebug("[GOBAN LINK SELFTEST] PASS case=" + name +
-                " link=" + data.GobanLinkAuditState +
-                " status=" + field.Status);
+            LogDebug("[SELFTEST PASS] case=" + name +
+                " link=" + row.LinkStatus +
+                " display=" + row.DisplayStatus +
+                " field=" + field.Status +
+                " source=" + field.Source);
+        }
+
+        private static void RunGobanTotalSelfTests()
+        {
+            // Case 8: Không có cột 合番 -> NotApplicable
+            var res8 = CompareBomGobanTotal(new BomNumberValues { Goban = "", Quantity = "1" });
+            if (res8.Status != DrawingBomCheckStatus.NotApplicable)
+                throw new InvalidOperationException("Fail case 08: expected NotApplicable, got " + res8.Status);
+            LogDebug("[SELFTEST PASS] case=08_TOTAL_NO_GOBAN_COLUMN status=" + res8.Status);
+
+            // Case 9: Ghi chú đơn thuần (※単品搬入) -> NotApplicable
+            var res9 = CompareBomGobanTotal(new BomNumberValues { Goban = "※単品搬入", Quantity = "1" });
+            if (res9.Status != DrawingBomCheckStatus.NotApplicable)
+                throw new InvalidOperationException("Fail case 09: expected NotApplicable, got " + res9.Status);
+            LogDebug("[SELFTEST PASS] case=09_TOTAL_PLAIN_NOTE status=" + res9.Status);
+
+            // Case 10: Phân bổ đúng tổng -> OK
+            var res10 = CompareBomGobanTotal(new BomNumberValues { Goban = "A:2 / B:3", Quantity = "5" });
+            if (res10.Status != DrawingBomCheckStatus.OK || res10.DrawingValue != "5")
+                throw new InvalidOperationException("Fail case 10: expected OK(5), got " + res10.Status + "(" + res10.DrawingValue + ")");
+            LogDebug("[SELFTEST PASS] case=10_TOTAL_VALID_MATCH status=" + res10.Status);
+
+            // Case 11: Phân bổ sai tổng -> NG
+            var res11 = CompareBomGobanTotal(new BomNumberValues { Goban = "A:2 / B:3", Quantity = "4" });
+            if (res11.Status != DrawingBomCheckStatus.NG || res11.DrawingValue != "5")
+                throw new InvalidOperationException("Fail case 11: expected NG(5), got " + res11.Status);
+            LogDebug("[SELFTEST PASS] case=11_TOTAL_VALID_MISMATCH status=" + res11.Status);
+
+            // Case 12: Phân bổ sai cú pháp (A:xx, A:2 / B:?, A:2 B:?) -> WARNING (không được thành N/A)
+            string[] badSyntaxes = { "A:xx", "A:2 / B:?", "A:2 B:?" };
+            foreach (string bad in badSyntaxes)
+            {
+                var res12 = CompareBomGobanTotal(new BomNumberValues { Goban = bad, Quantity = "5" });
+                if (res12.Status != DrawingBomCheckStatus.Warning)
+                    throw new InvalidOperationException("Fail case 12 ('" + bad + "'): expected Warning, got " + res12.Status);
+            }
+            LogDebug("[SELFTEST PASS] case=12_TOTAL_MALFORMED_SYNTAX status=Warning");
+
+            // Case 13: Không đọc được Quantity -> WARNING
+            var res13a = CompareBomGobanTotal(new BomNumberValues { Goban = "A:2 / B:3", Quantity = "" });
+            var res13b = CompareBomGobanTotal(new BomNumberValues { Goban = "A:2 / B:3", Quantity = "abc" });
+            if (res13a.Status != DrawingBomCheckStatus.Warning || res13b.Status != DrawingBomCheckStatus.Warning)
+                throw new InvalidOperationException("Fail case 13: expected Warning for invalid Quantity");
+            LogDebug("[SELFTEST PASS] case=13_TOTAL_INVALID_QUANTITY status=Warning");
+
+            // Case 14: Phân bổ nhiều mã 合番 -> OK
+            var res14 = CompareBomGobanTotal(new BomNumberValues { Goban = "BR-01: 2枚 / BR-02: 3枚\nBR-03: 5枚", Quantity = "10" });
+            if (res14.Status != DrawingBomCheckStatus.OK || res14.DrawingValue != "10")
+                throw new InvalidOperationException("Fail case 14: expected OK(10), got " + res14.Status);
+            LogDebug("[SELFTEST PASS] case=14_TOTAL_MULTI_GOBAN status=" + res14.Status);
+        }
+
+        private static void RunItemFinalizeSelfTests()
+        {
+            // Case 15: Tất cả kiểm tra bắt buộc OK -> OK
+            var item15 = new DrawingCheckItemResult();
+            item15.Fields.Add(new DrawingBomFieldResult { FieldName = "部品番号", Status = DrawingBomCheckStatus.OK });
+            item15.Fields.Add(new DrawingBomFieldResult { FieldName = "W", Status = DrawingBomCheckStatus.OK });
+            item15.Fields.Add(new DrawingBomFieldResult { FieldName = "合番", Status = DrawingBomCheckStatus.OK });
+            FinalizeItemResult(item15, "BOM");
+            if (item15.Status != DrawingBomCheckStatus.OK)
+                throw new InvalidOperationException("Fail case 15");
+            LogDebug("[SELFTEST PASS] case=15_OVERALL_ALL_OK status=" + item15.Status);
+
+            // Case 16: Có một WARNING (vd W lệch giữa Drawing và Part 3D) -> WARNING
+            var item16 = new DrawingCheckItemResult();
+            item16.Fields.Add(new DrawingBomFieldResult { FieldName = "部品番号", Status = DrawingBomCheckStatus.OK });
+            item16.Fields.Add(CompareWidthLengthField("W", "68.3", true, "70.0", "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", false, false, ""));
+            item16.Fields.Add(new DrawingBomFieldResult { FieldName = "合番", Status = DrawingBomCheckStatus.OK });
+            FinalizeItemResult(item16, "BOM");
+            if (item16.Status != DrawingBomCheckStatus.Warning)
+                throw new InvalidOperationException("Fail case 16");
+            LogDebug("[SELFTEST PASS] case=16_OVERALL_ONE_WARNING status=" + item16.Status);
+
+            // Case 17: Có một NG -> NG
+            var item17 = new DrawingCheckItemResult();
+            item17.Fields.Add(new DrawingBomFieldResult { FieldName = "部品番号", Status = DrawingBomCheckStatus.OK });
+            item17.Fields.Add(new DrawingBomFieldResult { FieldName = "合番", Status = DrawingBomCheckStatus.NG });
+            FinalizeItemResult(item17, "BOM");
+            if (item17.Status != DrawingBomCheckStatus.NG)
+                throw new InvalidOperationException("Fail case 17");
+            LogDebug("[SELFTEST PASS] case=17_OVERALL_ONE_NG status=" + item17.Status);
+
+            // Case 18: Có NotApplicable -> Không làm thay đổi trạng thái OK
+            var item18 = new DrawingCheckItemResult();
+            item18.Fields.Add(new DrawingBomFieldResult { FieldName = "部品番号", Status = DrawingBomCheckStatus.OK });
+            item18.Fields.Add(new DrawingBomFieldResult { FieldName = "合番合計 ↔ 数量 (BOM)", Status = DrawingBomCheckStatus.NotApplicable });
+            FinalizeItemResult(item18, "BOM");
+            if (item18.Status != DrawingBomCheckStatus.OK)
+                throw new InvalidOperationException("Fail case 18");
+            LogDebug("[SELFTEST PASS] case=18_OVERALL_WITH_NOT_APPLICABLE status=" + item18.Status);
+
+            // Case 19: Có cả NG và WARNING -> NG
+            var item19 = new DrawingCheckItemResult();
+            item19.Fields.Add(new DrawingBomFieldResult { FieldName = "合番", Status = DrawingBomCheckStatus.NG });
+            item19.Fields.Add(new DrawingBomFieldResult { FieldName = "W", Status = DrawingBomCheckStatus.Warning, Message = "Static" });
+            item19.Fields.Add(new DrawingBomFieldResult { FieldName = "合番合計 ↔ 数量 (BOM)", Status = DrawingBomCheckStatus.NotApplicable });
+            FinalizeItemResult(item19, "BOM");
+            if (item19.Status != DrawingBomCheckStatus.NG)
+                throw new InvalidOperationException("Fail case 19");
+            LogDebug("[SELFTEST PASS] case=19_OVERALL_NG_AND_WARNING status=" + item19.Status);
+        }
+
+        private static void RunExcelAndPreviewSyncSelfTests()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "TAI_CHECK_DRAWING_SELFTEST_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            try
+            {
+                var batch = new DrawingBatchCheckResult
+                {
+                    TotalSelected = 1,
+                    ProcessedCount = 1,
+                    ReportDirectory = tempDir,
+                    ReportPath = ""
+                };
+                var item = new DrawingCheckItemResult
+                {
+                    BomRowIndex = 0,
+                    BomItemNumber = "1",
+                    PartNumber = "P-01",
+                    Component = "4331-03-TJ-h1-1",
+                    DrawingPath = @"C:\Test\4331-03-TJ-h1-1.SLDDRW"
+                };
+                var gobanData = new DrawingDisplayedData
+                {
+                    Goban = "",
+                    GobanDisplayUnavailable = true,
+                    GobanLinkAuditState = DrawingGobanLinkAuditState.Valid,
+                    GobanLinkRawExpression = "$PRPSHEET:\"合番\""
+                };
+                var gobanField = new DrawingBomFieldResult
+                {
+                    FieldName = "合番",
+                    BomValue = "※単品搬入"
+                };
+                PopulateGobanPropertyLinkReportRow(
+                    item, gobanData, gobanField,
+                    gotProperty: true, propValue: "※単品搬入", propSource: "SHEET_VIEW:Drawing View1|CONFIG:Default",
+                    hasBomValue: false, bomDirect: "");
+                item.Fields.Add(gobanField);
+                item.Fields.Add(CompareBomGobanTotal(new BomNumberValues { Goban = "※単品搬入", Quantity = "1" }));
+                item.Fields.Add(new DrawingBomFieldResult
+                {
+                    FieldName = "表/ウラ ↔ 展開",
+                    DrawingValue = "Drawing View1: 表 / mặt màu (表)",
+                    BomValue = "表 → mặt màu; ウラ → mặt hồng",
+                    Source = "DRAWING_FLAT_SIDE",
+                    Status = CompareFlatSideMarker("表", false)
+                });
+                item.Fields.Add(CompareWidthLengthField(
+                    "W", "68.3",
+                    hasVerifiedPartValue: true, partRawValue: "68.3",
+                    partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                    hasIndependentBomValue: false, bomRawValue: ""));
+                FinalizeItemResult(item, "BOM");
+                batch.Items.Add(item);
+
+                using (var form = new ADDIN.UI.DrawingBomCheckReviewForm(batch, null))
+                {
+                    // Case 20: CHECK DRAWING hoàn thành nhưng chưa xuất Excel
+                    if (!string.IsNullOrEmpty(batch.ReportPath) ||
+                        Directory.Exists(tempDir) ||
+                        form.ReportButtonText != "Xuất Excel" ||
+                        !form.IsReportButtonEnabled)
+                    {
+                        throw new InvalidOperationException("Fail case 20: Excel must not be auto-created before user clicks Export");
+                    }
+                    LogDebug("[SELFTEST PASS] case=20_EXCEL_NOT_CREATED_BEFORE_CLICK button=\"" + form.ReportButtonText + "\"");
+
+                    // Case 21 & 22: Người dùng nhấn Xuất Excel -> Xuất thành công
+                    int exportCallCount = 0;
+                    bool exported = form.TriggerReportAction((res, targetPath) =>
+                    {
+                        exportCallCount++;
+                        Directory.CreateDirectory(Path.GetDirectoryName(targetPath));
+                        File.WriteAllBytes(targetPath, new byte[] { 0x50, 0x4B, 0x03, 0x04 });
+                    }, openAfterExport: false, showErrorDialog: false);
+
+                    if (!exported || exportCallCount != 1 ||
+                        string.IsNullOrWhiteSpace(batch.ReportPath) ||
+                        !File.Exists(batch.ReportPath) ||
+                        form.ReportButtonText != "Mở báo cáo")
+                    {
+                        throw new InvalidOperationException("Fail case 21/22: On-demand export failed");
+                    }
+                    string firstReportPath = batch.ReportPath;
+                    LogDebug("[SELFTEST PASS] case=21_22_EXCEL_ON_DEMAND_EXPORT_SUCCESS button=\"" + form.ReportButtonText + "\"");
+
+                    // Case 23: Nhấn lại nút sau khi đã xuất -> Không tạo thêm file trùng lặp
+                    bool reopened = form.TriggerReportAction((res, targetPath) =>
+                    {
+                        exportCallCount++;
+                    }, openAfterExport: false, showErrorDialog: false);
+
+                    if (!reopened || exportCallCount != 1 || batch.ReportPath != firstReportPath)
+                    {
+                        throw new InvalidOperationException("Fail case 23: Clicking again must reuse existing report without re-exporting");
+                    }
+                    LogDebug("[SELFTEST PASS] case=23_EXCEL_REUSE_EXISTING_REPORT exportCalls=" + exportCallCount);
+
+                    // Case 25: Kết quả Excel giống Preview & thông báo dễ hiểu
+                    foreach (DrawingBomFieldResult f in item.Fields)
+                    {
+                        string previewStatus = ADDIN.UI.DrawingBomCheckReviewForm.StatusText(f.Status);
+                        string excelStatus = ExcelDrawingCheckExporter.GetEffectiveFieldStatus(f.FieldName, f);
+                        if (!string.Equals(previewStatus, excelStatus, StringComparison.Ordinal))
+                            throw new InvalidOperationException("Fail case 25: Preview/Excel mismatch on " + f.FieldName);
+                    }
+                    DrawingPropertyLinkReportRow linkRow = item.PropertyLinkRows[0];
+                    if (ExcelDrawingCheckExporter.GobanFriendlyStatus(linkRow.LinkStatus) != "OK" ||
+                        ExcelDrawingCheckExporter.GobanFriendlyStatus(linkRow.DisplayStatus) != "Chưa xác minh" ||
+                        ExcelDrawingCheckExporter.GobanFriendlyStatus(linkRow.PropertyStatus) != "N/A" ||
+                        ExcelDrawingCheckExporter.FormatReadableSource(linkRow.DisplayOrReferenceSource).Contains("PROPERTY_RESOLVED_REFERENCE_ONLY") ||
+                        gobanField.Message.Contains("PROPERTY_RESOLVED_REFERENCE_ONLY"))
+                    {
+                        throw new InvalidOperationException("Fail case 25: Goban link/display status or readable message mismatch");
+                    }
+                    LogDebug("[SELFTEST PASS] case=25_PREVIEW_EXCEL_SYNC_VERIFIED");
+                }
+
+                // Case 24: Excel bị khóa hoặc không thể ghi
+                var lockedBatch = new DrawingBatchCheckResult
+                {
+                    TotalSelected = 1,
+                    ProcessedCount = 1,
+                    ReportDirectory = tempDir,
+                    ReportPath = ""
+                };
+                lockedBatch.Items.Add(item);
+                using (var lockedForm = new ADDIN.UI.DrawingBomCheckReviewForm(lockedBatch, null))
+                {
+                    bool failedResult = lockedForm.TriggerReportAction((res, targetPath) =>
+                    {
+                        throw new IOException("File đang được mở hoặc không có quyền ghi.");
+                    }, openAfterExport: false, showErrorDialog: false);
+
+                    if (failedResult ||
+                        !string.IsNullOrEmpty(lockedBatch.ReportPath) ||
+                        lockedForm.ReportButtonText != "Xuất Excel" ||
+                        !lockedForm.IsReportButtonEnabled ||
+                        !lockedForm.StatusMessage.Contains("Không thể xuất Excel"))
+                    {
+                        throw new InvalidOperationException("Fail case 24: Locked/unwritable Excel error not handled properly");
+                    }
+                    LogDebug("[SELFTEST PASS] case=24_EXCEL_LOCKED_ERROR_HANDLED message=\"" + lockedForm.StatusMessage + "\"");
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(tempDir))
+                        Directory.Delete(tempDir, true);
+                }
+                catch { }
+            }
+        }
+
+        private static void RunUraOmoteSelfTests()
+        {
+            // Case 26: 表 đúng (mặt màu -> pinkFacingViewer = false) -> OK
+            if (CompareFlatSideMarker("表", false) != DrawingBomCheckStatus.OK)
+                throw new InvalidOperationException("Fail case 26");
+            LogDebug("[SELFTEST PASS] case=26_URAOMOTE_OMOTE_OK");
+
+            // Case 27: ウラ đúng (mặt hồng -> pinkFacingViewer = true) -> OK
+            if (CompareFlatSideMarker("ウラ", true) != DrawingBomCheckStatus.OK)
+                throw new InvalidOperationException("Fail case 27");
+            LogDebug("[SELFTEST PASS] case=27_URAOMOTE_URA_OK");
+
+            // Case 28: 表/ウラ ngược -> NG
+            if (CompareFlatSideMarker("表", true) != DrawingBomCheckStatus.NG ||
+                CompareFlatSideMarker("ウラ", false) != DrawingBomCheckStatus.NG)
+                throw new InvalidOperationException("Fail case 28");
+            LogDebug("[SELFTEST PASS] case=28_URAOMOTE_REVERSED_NG");
+
+            // Case 29: Không xác định được mặt (pinkFacingViewer = null) -> WARNING
+            if (CompareFlatSideMarker("表", null) != DrawingBomCheckStatus.Warning ||
+                CompareFlatSideMarker("ウラ", null) != DrawingBomCheckStatus.Warning)
+                throw new InvalidOperationException("Fail case 29");
+            LogDebug("[SELFTEST PASS] case=29_URAOMOTE_UNKNOWN_WARNING");
+
+            // Case 30: Policy tests for PR #62 pilot/fail-closed logic (synthetic, not COM verification)
+            int policyCount = CdFlatSidePilotPolicy.RunSelfTests();
+            LogDebug("[SELFTEST PASS] case=30_PR62_PILOT_POLICY assertions=" + policyCount);
+        }
+
+        private static void RunWidthLengthSelfTests()
+        {
+            // WL Case 1: W nhập tay nhưng đúng giá trị -> OK
+            var wl01 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.3",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl01.Status != DrawingBomCheckStatus.OK ||
+                wl01.DrawingValue != "68.3" ||
+                wl01.BomValue != "68.3" ||
+                wl01.Message != "Drawing: 68.3 | Part 3D: 68.3 — Giá trị W trên Drawing và Part 3D khớp nhau.")
+            {
+                throw new InvalidOperationException("Fail WL Case 01: " + wl01.Status + " | " + wl01.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_01_W_MANUAL_MATCH_OK message=\"" + wl01.Message + "\"");
+
+            // WL Case 2: L nhập tay nhưng đúng giá trị -> OK
+            var wl02 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: true, partRawValue: "1810.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl02.Status != DrawingBomCheckStatus.OK ||
+                wl02.DrawingValue != "1810.0" ||
+                wl02.BomValue != "1810.0" ||
+                wl02.Message != "Drawing: 1810.0 | Part 3D: 1810.0 — Giá trị L trên Drawing và Part 3D khớp nhau.")
+            {
+                throw new InvalidOperationException("Fail WL Case 02: " + wl02.Status + " | " + wl02.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_02_L_MANUAL_MATCH_OK message=\"" + wl02.Message + "\"");
+
+            // WL Case 3: W có link và đúng giá trị -> OK
+            var wl03 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.3",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl03.Status != DrawingBomCheckStatus.OK ||
+                wl03.Message != "Drawing: 68.3 | Part 3D: 68.3 — Giá trị W trên Drawing và Part 3D khớp nhau.")
+            {
+                throw new InvalidOperationException("Fail WL Case 03: " + wl03.Status + " | " + wl03.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_03_W_LINKED_MATCH_OK message=\"" + wl03.Message + "\"");
+
+            // WL Case 4: L có link và đúng giá trị -> OK
+            var wl04 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: true, partRawValue: "1810.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl04.Status != DrawingBomCheckStatus.OK ||
+                wl04.Message != "Drawing: 1810.0 | Part 3D: 1810.0 — Giá trị L trên Drawing và Part 3D khớp nhau.")
+            {
+                throw new InvalidOperationException("Fail WL Case 04: " + wl04.Status + " | " + wl04.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_04_L_LINKED_MATCH_OK message=\"" + wl04.Message + "\"");
+
+            // WL Case 5: W có link nhưng khác Drawing -> WARNING
+            var wl05 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "70.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl05.Status != DrawingBomCheckStatus.Warning ||
+                wl05.Message != "Drawing: 68.3 | Part 3D: 70.0 — Giá trị W trên Drawing khác Custom Property của Part 3D.")
+            {
+                throw new InvalidOperationException("Fail WL Case 05: " + wl05.Status + " | " + wl05.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_05_W_LINKED_MISMATCH_WARNING message=\"" + wl05.Message + "\"");
+
+            // WL Case 6: L có link nhưng khác Drawing -> WARNING
+            var wl06 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: true, partRawValue: "1825.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl06.Status != DrawingBomCheckStatus.Warning ||
+                wl06.Message != "Drawing: 1810.0 | Part 3D: 1825.0 — Giá trị L trên Drawing khác Custom Property của Part 3D.")
+            {
+                throw new InvalidOperationException("Fail WL Case 06: " + wl06.Status + " | " + wl06.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_06_L_LINKED_MISMATCH_WARNING message=\"" + wl06.Message + "\"");
+
+            // WL Case 7: Drawing đúng với BOM nhưng khác Part -> WARNING (không dùng BOM thay thế Part 3D)
+            var wl07 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "70.0",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: true, bomRawValue: "68.3");
+            if (wl07.Status != DrawingBomCheckStatus.Warning ||
+                !wl07.Message.Contains("Giá trị W trên Drawing khác Custom Property của Part 3D"))
+            {
+                throw new InvalidOperationException("Fail WL Case 07: " + wl07.Status + " | " + wl07.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_07_DRAWING_MATCHES_BOM_DIFFERS_PART_WARNING message=\"" + wl07.Message + "\"");
+
+            // WL Case 8: Drawing đúng với Part nhưng khác BOM (khi BOM có giá trị riêng) -> WARNING
+            var wl08 = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.3",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: true, bomRawValue: "70.0");
+            if (wl08.Status != DrawingBomCheckStatus.Warning ||
+                !wl08.Message.Contains("khác giá trị cột W trong BOM"))
+            {
+                throw new InvalidOperationException("Fail WL Case 08: " + wl08.Status + " | " + wl08.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_08_DRAWING_MATCHES_PART_DIFFERS_BOM_WARNING message=\"" + wl08.Message + "\"");
+
+            // WL Case 9: Không đọc được Drawing W/L -> WARNING
+            var wl09 = CompareWidthLengthField(
+                "W", "",
+                hasVerifiedPartValue: true, partRawValue: "68.3",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl09.Status != DrawingBomCheckStatus.Warning ||
+                wl09.Message != "Drawing: Chưa đọc được | Part 3D: 68.3 — Chưa thể xác minh giá trị W trên Drawing.")
+            {
+                throw new InvalidOperationException("Fail WL Case 09: " + wl09.Status + " | " + wl09.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_09_DRAWING_UNREADABLE_WARNING message=\"" + wl09.Message + "\"");
+
+            // WL Case 10: Không đọc được Part hoặc Configuration -> WARNING
+            var wl10 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: false, partRawValue: "",
+                partSource: "REFERENCED_MODEL_NOT_LOADED", partIsLinked: false,
+                hasIndependentBomValue: true, bomRawValue: "1810.0");
+            if (wl10.Status != DrawingBomCheckStatus.Warning ||
+                wl10.Message != "Drawing: 1810.0 | Part 3D: Chưa đọc được — Chưa thể xác minh giá trị L của Part 3D.")
+            {
+                throw new InvalidOperationException("Fail WL Case 10: " + wl10.Status + " | " + wl10.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_10_PART_OR_CONFIG_UNREADABLE_WARNING message=\"" + wl10.Message + "\"");
+
+            // WL Case 11: Giá trị số tương đương 1810 và 1810.0 -> OK
+            var wl11 = CompareWidthLengthField(
+                "L", "1810.0",
+                hasVerifiedPartValue: true, partRawValue: "1810",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|MANUAL", partIsLinked: false,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl11.Status != DrawingBomCheckStatus.OK ||
+                wl11.DrawingValue != "1810.0" ||
+                wl11.BomValue != "1810.0")
+            {
+                throw new InvalidOperationException("Fail WL Case 11: " + wl11.Status + " | " + wl11.Message);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_11_EQUIVALENT_NUMERIC_1810_AND_1810_0_OK message=\"" + wl11.Message + "\"");
+
+            // WL Case 12: Kiểm tra dung sai 0.01 mm và làm tròn biên (không bỏ sót sai lệch thật như 68.21 vs 68.29 hoặc 68.3 vs 68.32)
+            var wl12WithinTol = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.305",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            var wl12CeilingTrap = CompareWidthLengthField(
+                "W", "68.21",
+                hasVerifiedPartValue: true, partRawValue: "68.29",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            var wl12OutsideTol = CompareWidthLengthField(
+                "W", "68.3",
+                hasVerifiedPartValue: true, partRawValue: "68.32",
+                partSource: "SHEET_VIEW:Drawing View1|CONFIG:Default|LINKED", partIsLinked: true,
+                hasIndependentBomValue: false, bomRawValue: "");
+            if (wl12WithinTol.Status != DrawingBomCheckStatus.OK ||
+                wl12CeilingTrap.Status != DrawingBomCheckStatus.Warning ||
+                wl12OutsideTol.Status != DrawingBomCheckStatus.Warning)
+            {
+                throw new InvalidOperationException(
+                    "Fail WL Case 12: withinTol=" + wl12WithinTol.Status +
+                    " ceilingTrap=" + wl12CeilingTrap.Status +
+                    " outsideTol=" + wl12OutsideTol.Status);
+            }
+            LogDebug("[SELFTEST PASS] case=WL_12_TOLERANCE_AND_BOUNDARY_ROUNDING withinTol=OK ceilingTrap=Warning outsideTol=Warning");
+        }
+
+        private static void RunUnitSummaryTableSelfTests()
+        {
+            var unitTable = new TableDiagnosticInfo
+            {
+                Index = 1,
+                RowCount = 2,
+                ColumnCount = 3
+            };
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 0, Column = 0, DisplayedText = "合番", ApiDisplayedText = "合番", RawText = "合番" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 0, Column = 1, DisplayedText = "数量", ApiDisplayedText = "数量", RawText = "数量" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 0, Column = 2, DisplayedText = "重量", ApiDisplayedText = "重量", RawText = "重量" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 1, Column = 0, DisplayedText = "", ApiDisplayedText = "", RawText = "$PRPSHEET:\"合番\"" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 1, Column = 1, DisplayedText = "", ApiDisplayedText = "", RawText = "$PRPSHEET:\"数量\"" });
+            unitTable.Cells.Add(new TableCellDiagnosticInfo { Row = 1, Column = 2, DisplayedText = "(kg)", ApiDisplayedText = "(kg)", RawText = "$PRPSHEET:\"重量\" (kg)" });
+
+            var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "合番", "SB-1" },
+                { "数量", "2" },
+                { "重量", "61.65" }
+            };
+
+            ResolveAssemblyTableCellsCore(
+                new List<TableDiagnosticInfo> { unitTable },
+                (raw, propName) => props.ContainsKey(propName) ? props[propName] : "");
+
+            int headerRow = FindAssemblySummaryHeaderRow(unitTable);
+            int dataRow = FindAssemblySummaryDataRow(unitTable, headerRow, "SB-1");
+            string gobanCellText = CleanTableCellText(GetTableCellText(unitTable, dataRow, 0));
+            string qtyCellText = CleanTableCellText(GetTableCellText(unitTable, dataRow, 1));
+            string weightCellText = CleanTableCellText(GetTableCellText(unitTable, dataRow, 2));
+
+            if (headerRow != 0 || dataRow != 1 ||
+                gobanCellText != "SB-1" ||
+                qtyCellText != "2" ||
+                weightCellText != "61.65" ||
+                !AreAssemblyValuesEquivalent("合番", gobanCellText, "SB-1") ||
+                !AreAssemblyValuesEquivalent("重量", weightCellText, "61.65"))
+            {
+                throw new InvalidOperationException("Fail case 42: UNIT summary table cell resolution failed");
+            }
+            LogDebug("[SELFTEST PASS] case=42_UNIT_SUMMARY_TABLE_LINK_RESOLVED goban=" + gobanCellText + " qty=" + qtyCellText + " weight=" + weightCellText);
         }
 #endif
 
@@ -2814,25 +5012,53 @@ namespace ADDIN.Commands
             {
                 FieldName = "合番合計 ↔ 数量 (BOM)",
                 BomValue = values?.Quantity ?? "",
+                DrawingValue = "-",
                 Source = "BOM: tổng 合番 / 数量 cùng dòng",
-                Status = DrawingBomCheckStatus.Warning,
-                Message = "Không đọc đầy đủ được số lượng của từng 合番 hoặc 数量 trong dòng BOM."
+                Status = DrawingBomCheckStatus.NotApplicable,
+                Message = "Không áp dụng (BOM không có cột hoặc cấu trúc phân bổ số lượng 合番)."
             };
-            decimal expected;
-            if (string.IsNullOrWhiteSpace(goban) ||
-                !decimal.TryParse(quantity.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
-                    CultureInfo.InvariantCulture, out expected))
+
+            // Nhóm A1: Không có giá trị 合番 trong dòng BOM
+            if (string.IsNullOrWhiteSpace(goban) || goban == "-")
+            {
                 return field;
+            }
 
             // Consume the complete cell, including multiline and slash-separated
             // entries. Repeated 合番 entries contribute separately to the total.
             MatchCollection entries = Regex.Matches(goban,
                 @"\G[\s/,、;]*(?<goban>[^\s:/,、;]+)(?:\s*:\s*|\s+)(?<qty>[0-9]+(?:[.,][0-9]+)?)\s*枚?(?=$|[\s/,、;])");
             if (entries.Count == 0)
+            {
+                // Phân biệt Nhóm A (ghi chú đơn thuần như ※単品搬入) với Nhóm C (có dấu hiệu phân bổ nhưng sai cú pháp như A:xx, A:?)
+                if (HasGobanAllocationIndicator(goban))
+                {
+                    field.Status = DrawingBomCheckStatus.Warning;
+                    field.Message = "Phát hiện dấu hiệu phân bổ số lượng 合番 nhưng cú pháp không hợp lệ: '" + goban + "'.";
+                    return field;
+                }
+
+                // Nhóm A2: Ô 合番 chỉ chứa ghi chú hoặc mã đơn không có cấu trúc phân bổ số lượng -> Không áp dụng
                 return field;
+            }
+
             Match last = entries[entries.Count - 1];
             if (!Regex.IsMatch(goban.Substring(last.Index + last.Length), @"^[\s/,、;]*$"))
+            {
+                // Nhóm C: Có cấu trúc phân bổ nhưng phần sau bị lỗi cú pháp (ví dụ: "A:2 / B:?" hoặc "A:2 B:?")
+                field.Status = DrawingBomCheckStatus.Warning;
+                field.Message = "Cú pháp phân bổ số lượng 合番 trong BOM không hợp lệ: '" + goban + "'.";
                 return field;
+            }
+
+            decimal expected;
+            if (!decimal.TryParse(quantity.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture, out expected))
+            {
+                field.Status = DrawingBomCheckStatus.Warning;
+                field.Message = "BOM có phân bổ 合番 nhưng không đọc được số lượng 数量 hợp lệ: '" + quantity + "'.";
+                return field;
+            }
 
             decimal total = 0;
             var terms = new List<string>();
@@ -2841,9 +5067,18 @@ namespace ADDIN.Commands
                 decimal amount;
                 if (!decimal.TryParse(entry.Groups["qty"].Value.Replace(',', '.'),
                     NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount))
+                {
+                    field.Status = DrawingBomCheckStatus.Warning;
+                    field.Message = "Không đọc được số lượng của mã 合番: " + entry.Groups["goban"].Value;
                     return field;
+                }
                 try { total += amount; }
-                catch (OverflowException) { return field; }
+                catch (OverflowException)
+                {
+                    field.Status = DrawingBomCheckStatus.Warning;
+                    field.Message = "Tràn số khi tính tổng số lượng 合番.";
+                    return field;
+                }
                 terms.Add(entry.Groups["goban"].Value + ": " + amount.ToString(CultureInfo.InvariantCulture));
             }
             field.DrawingValue = total.ToString(CultureInfo.InvariantCulture);
@@ -2852,6 +5087,22 @@ namespace ADDIN.Commands
                 + "; 数量 BOM = " + quantity
                 + (total == expected ? " — khớp." : " — không khớp.");
             return field;
+        }
+
+        private static bool HasGobanAllocationIndicator(string normalizedGoban)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedGoban))
+                return false;
+
+            if (normalizedGoban.IndexOf(':') >= 0 ||
+                normalizedGoban.IndexOf('枚') >= 0 ||
+                normalizedGoban.IndexOf('?') >= 0)
+                return true;
+
+            if (Regex.IsMatch(normalizedGoban, @"(?:^|[\s/,、;])[^\s:/,、;]+\s+[0-9]+"))
+                return true;
+
+            return false;
         }
 
         private static DrawingBomFieldResult ComparePartNumber(string drawVal, string bomVal, string source)
@@ -2944,6 +5195,460 @@ namespace ADDIN.Commands
                 "\" raw=\"" + audit.RawExpression + "\"");
 
             return field;
+        }
+
+        private static bool TryGetBomDimensionCellValue(
+            DataGridViewRow row,
+            string dimensionHeaderName,
+            out string value)
+        {
+            value = "";
+            if (row == null || row.DataGridView == null || string.IsNullOrWhiteSpace(dimensionHeaderName))
+                return false;
+
+            for (int c = 0; c < row.DataGridView.Columns.Count; c++)
+            {
+                string header = NormalizeText(row.DataGridView.Columns[c].HeaderText ?? "");
+                if (!string.Equals(header, dimensionHeaderName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string cellText = Convert.ToString(row.Cells[c].Value ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(cellText))
+                {
+                    value = cellText;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool TryGetVerifiedPartDimensionProperty(
+            DrawingDoc drawing,
+            Sheet sheet,
+            string sheetName,
+            DataGridViewRow bomRow,
+            ModelDoc2 fallbackReferencedModel,
+            string fallbackReferencedConfiguration,
+            string expectedPartPath,
+            string propertyName,
+            out string value,
+            out string source,
+            out bool isLinked)
+        {
+            value = "";
+            source = "PART_SOURCE_UNVERIFIED";
+            isLinked = false;
+
+            if (string.IsNullOrWhiteSpace(propertyName))
+                return false;
+
+            // Priority 1: Verified Sheet CustomPropertyView on current Drawing
+            if (drawing != null && sheet != null)
+            {
+                try
+                {
+                    string propertyView = sheet.CustomPropertyView ?? "";
+                    if (!string.IsNullOrWhiteSpace(propertyView))
+                    {
+                        SolidWorks.Interop.sldworks.View targetView;
+                        string viewReason;
+                        if (TryLocateGobanPropertyView(
+                                drawing, sheet, sheetName, propertyView,
+                                out targetView, out viewReason) &&
+                            targetView != null)
+                        {
+                            ModelDoc2 viewModel = targetView.ReferencedDocument as ModelDoc2;
+                            string viewCfg = targetView.ReferencedConfiguration ?? "";
+                            string viewName = (targetView.GetName2() ?? "").Trim();
+                            if (TryReadVerifiedModelDimensionProperty(
+                                    viewModel,
+                                    viewCfg,
+                                    expectedPartPath,
+                                    propertyName,
+                                    "SHEET_VIEW:" + viewName,
+                                    out value,
+                                    out source,
+                                    out isLinked))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogDebug("[PART DIM VIEW ERROR] prop=\"" + propertyName + "\" err=" + ex.Message);
+                }
+            }
+
+            // Priority 2: Primary Referenced Model of Drawing
+            if (fallbackReferencedModel != null)
+            {
+                if (TryReadVerifiedModelDimensionProperty(
+                        fallbackReferencedModel,
+                        fallbackReferencedConfiguration,
+                        expectedPartPath,
+                        propertyName,
+                        "DRAWING_VIEW_MODEL",
+                        out value,
+                        out source,
+                        out isLinked))
+                {
+                    return true;
+                }
+            }
+
+            // Priority 3: BOM Row Component / Snapshot Model
+            if (bomRow != null)
+            {
+                try
+                {
+                    object tag = bomRow.Tag;
+                    var snapshot = tag as BomDrawingReference;
+                    if (snapshot != null && swApp != null)
+                    {
+                        ModelDoc2 compModel = swApp.GetOpenDocumentByName(snapshot.ModelPath ?? "") as ModelDoc2;
+                        if (compModel != null &&
+                            TryReadVerifiedModelDimensionProperty(
+                                compModel,
+                                snapshot.Configuration ?? "",
+                                expectedPartPath,
+                                propertyName,
+                                "BOM_SNAPSHOT_MODEL",
+                                out value,
+                                out source,
+                                out isLinked))
+                        {
+                            return true;
+                        }
+                    }
+
+                    if (tag is object[] comps && comps.Length > 0)
+                    {
+                        foreach (object obj in comps)
+                        {
+                            Component2 comp = obj as Component2;
+                            if (comp == null) continue;
+                            ModelDoc2 compModel = comp.GetModelDoc2() as ModelDoc2;
+                            if (compModel != null &&
+                                TryReadVerifiedModelDimensionProperty(
+                                    compModel,
+                                    comp.ReferencedConfiguration ?? "",
+                                    expectedPartPath,
+                                    propertyName,
+                                    "BOM_COMPONENT_MODEL",
+                                    out value,
+                                    out source,
+                                    out isLinked))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogDebug("[PART DIM BOM MODEL ERROR] prop=\"" + propertyName + "\" err=" + ex.Message);
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryReadVerifiedModelDimensionProperty(
+            ModelDoc2 model,
+            string configurationName,
+            string expectedPartPath,
+            string propertyName,
+            string originPrefix,
+            out string value,
+            out string source,
+            out bool isLinked)
+        {
+            value = "";
+            source = originPrefix + "_UNVERIFIED";
+            isLinked = false;
+
+            if (model == null)
+            {
+                source = originPrefix + "_MODEL_NULL";
+                return false;
+            }
+
+            string modelPath = "";
+            try { modelPath = model.GetPathName() ?? ""; }
+            catch
+            {
+                source = originPrefix + "_PATH_API_ERROR";
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(expectedPartPath) &&
+                !string.IsNullOrWhiteSpace(modelPath) &&
+                !PathsEqualSafe(modelPath, expectedPartPath))
+            {
+                source = "PROPERTY_SOURCE_MODEL_MISMATCH";
+                return false;
+            }
+
+            string cfg = (configurationName ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(cfg))
+                cfg = GetSafeActiveConfigurationName(model);
+
+            if (string.IsNullOrWhiteSpace(cfg))
+            {
+                source = originPrefix + "_CONFIGURATION_UNKNOWN";
+                return false;
+            }
+
+            string[] scopes = new[] { cfg, "" };
+            foreach (string scope in scopes)
+            {
+                try
+                {
+                    CustomPropertyManager mgr = model.Extension.get_CustomPropertyManager(scope ?? "");
+                    if (mgr == null) continue;
+
+                    string raw;
+                    string resolved;
+                    bool wasResolved;
+                    bool linkedToParent;
+                    int getResult = mgr.Get6(
+                        propertyName,
+                        false,
+                        out raw,
+                        out resolved,
+                        out wasResolved,
+                        out linkedToParent);
+
+                    string effective = !string.IsNullOrWhiteSpace(resolved)
+                        ? resolved.Trim()
+                        : (raw ?? "").Trim();
+
+                    bool exists =
+                        getResult == (int)swCustomInfoGetResult_e.swCustomInfoGetResult_ResolvedValue ||
+                        !string.IsNullOrWhiteSpace(effective);
+
+                    if (!exists || string.IsNullOrWhiteSpace(effective) || LooksLikeUnresolvedPropertyToken(effective))
+                        continue;
+
+                    value = effective;
+                    isLinked = linkedToParent || LooksLikePropertyExpression(raw);
+                    string scopeLabel = string.IsNullOrWhiteSpace(scope) ? "(DOCUMENT)" : scope;
+                    source = originPrefix + "|CONFIG:" + scopeLabel + (isLinked ? "|LINKED" : "|MANUAL");
+                    return true;
+                }
+                catch
+                {
+                    source = originPrefix + "_GET6_ERROR";
+                }
+            }
+
+            source = originPrefix + "_PROPERTY_NOT_FOUND";
+            return false;
+        }
+
+        private static bool LooksLikeUnresolvedPropertyToken(string text)
+        {
+            string trimmed = (text ?? "").Trim();
+            if (trimmed.Length == 0)
+                return true;
+
+            return trimmed.IndexOf("$PRP", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   string.Equals(trimmed, "###", StringComparison.Ordinal);
+        }
+
+        private static bool TryParseDimensionValueMm(string rawText, out double value)
+        {
+            value = 0.0;
+            if (string.IsNullOrWhiteSpace(rawText))
+                return false;
+
+            string cleaned = NormalizeText(rawText)
+                .Replace(',', '.')
+                .Trim();
+
+            if (cleaned.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+                cleaned = cleaned.Substring(0, cleaned.Length - 2).Trim();
+
+            return double.TryParse(
+                cleaned,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value);
+        }
+
+        private static string FormatDimensionDisplayValue(string rawText)
+        {
+            double parsed;
+            if (TryParseDimensionValueMm(rawText, out parsed))
+            {
+                return Math.Round(parsed, 4)
+                    .ToString("0.0###", CultureInfo.InvariantCulture);
+            }
+
+            return (rawText ?? "").Trim();
+        }
+
+        private static DrawingBomFieldResult CompareWidthLengthField(
+            string fieldName,
+            string drawingRawValue,
+            bool hasVerifiedPartValue,
+            string partRawValue,
+            string partSource,
+            bool partIsLinked,
+            bool hasIndependentBomValue,
+            string bomRawValue)
+        {
+            string drawTrimmed = (drawingRawValue ?? "").Trim();
+            string partTrimmed = (partRawValue ?? "").Trim();
+            string bomTrimmed = (bomRawValue ?? "").Trim();
+
+            double dVal = 0.0;
+            bool hasValidDrawing =
+                !string.IsNullOrWhiteSpace(drawTrimmed) &&
+                !LooksLikeUnresolvedPropertyToken(drawTrimmed) &&
+                TryParseDimensionValueMm(drawTrimmed, out dVal);
+
+            double pVal = 0.0;
+            bool hasValidPart =
+                hasVerifiedPartValue &&
+                !string.IsNullOrWhiteSpace(partTrimmed) &&
+                !LooksLikeUnresolvedPropertyToken(partTrimmed) &&
+                TryParseDimensionValueMm(partTrimmed, out pVal);
+
+            double bVal = 0.0;
+            bool hasValidBom =
+                hasIndependentBomValue &&
+                !string.IsNullOrWhiteSpace(bomTrimmed) &&
+                TryParseDimensionValueMm(bomTrimmed, out bVal);
+
+            string drawDisplay = hasValidDrawing
+                ? FormatDimensionDisplayValue(drawTrimmed)
+                : "Chưa đọc được";
+
+            string partDisplay = hasValidPart
+                ? FormatDimensionDisplayValue(partTrimmed)
+                : "Chưa đọc được";
+
+            string bomDisplay = hasValidBom
+                ? FormatDimensionDisplayValue(bomTrimmed)
+                : (hasIndependentBomValue && !string.IsNullOrWhiteSpace(bomTrimmed) ? bomTrimmed : "");
+
+            // Rule 5: Không đọc được một trong hai nguồn (Drawing 2D hoặc Part 3D) -> WARNING, ghi rõ chưa xác minh.
+            // Tuyệt đối không dùng BOM để thay thế cho Part 3D khi xác minh Drawing <-> Part 3D.
+            if (!hasValidDrawing && !hasValidPart)
+            {
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = "Chưa đọc được",
+                    BomValue = !string.IsNullOrWhiteSpace(bomDisplay)
+                        ? $"Part 3D: Chưa đọc được (BOM: {bomDisplay})"
+                        : "Chưa đọc được",
+                    Source = "DRAWING_AND_PART_DIMENSION_UNVERIFIED",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = $"Drawing: Chưa đọc được | Part 3D: Chưa đọc được — Chưa thể xác minh giá trị {fieldName} trên Drawing và Part 3D."
+                };
+            }
+
+            if (!hasValidDrawing)
+            {
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = "Chưa đọc được",
+                    BomValue = partDisplay,
+                    Source = "DRAWING_DIMENSION_UNVERIFIED",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = $"Drawing: Chưa đọc được | Part 3D: {partDisplay} — Chưa thể xác minh giá trị {fieldName} trên Drawing."
+                };
+            }
+
+            if (!hasValidPart)
+            {
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = drawDisplay,
+                    BomValue = !string.IsNullOrWhiteSpace(bomDisplay)
+                        ? $"Part 3D: Chưa đọc được (BOM: {bomDisplay})"
+                        : "Chưa đọc được",
+                    Source = "PART_DIMENSION_UNVERIFIED",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = $"Drawing: {drawDisplay} | Part 3D: Chưa đọc được — Chưa thể xác minh giá trị {fieldName} của Part 3D."
+                };
+            }
+
+            // Cả Drawing 2D và Part 3D đều đã đọc và xác minh được số thực.
+            // Quy tắc 1, 2, 6, 7: So sánh giá trị thực với dung sai NumericTolerance (0.01 mm).
+            // Không bắt buộc Custom Property W/L trong Part phải có công thức liên kết.
+            bool drawMatchesPart = Math.Abs(dVal - pVal) <= NumericTolerance;
+
+            if (hasIndependentBomValue && !string.IsNullOrWhiteSpace(bomTrimmed))
+            {
+                bool drawMatchesBom = hasValidBom && Math.Abs(dVal - bVal) <= NumericTolerance;
+                bool partMatchesBom = hasValidBom && Math.Abs(pVal - bVal) <= NumericTolerance;
+
+                if (drawMatchesPart && drawMatchesBom && partMatchesBom)
+                {
+                    return new DrawingBomFieldResult
+                    {
+                        FieldName = fieldName,
+                        DrawingValue = drawDisplay,
+                        BomValue = partDisplay,
+                        Source = "DRAWING_PART_BOM_DIMENSION_MATCH",
+                        Status = DrawingBomCheckStatus.OK,
+                        Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} — Giá trị {fieldName} trên Drawing và Part 3D khớp nhau."
+                    };
+                }
+
+                if (!drawMatchesPart)
+                {
+                    return new DrawingBomFieldResult
+                    {
+                        FieldName = fieldName,
+                        DrawingValue = drawDisplay,
+                        BomValue = $"{partDisplay} (BOM: {bomDisplay})",
+                        Source = "DRAWING_PART_DIMENSION_MISMATCH",
+                        Status = DrawingBomCheckStatus.Warning,
+                        Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} | BOM: {bomDisplay} — Giá trị {fieldName} trên Drawing khác Custom Property của Part 3D."
+                    };
+                }
+
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = drawDisplay,
+                    BomValue = $"{partDisplay} (BOM: {bomDisplay})",
+                    Source = "DRAWING_PART_BOM_DIMENSION_MISMATCH",
+                    Status = DrawingBomCheckStatus.Warning,
+                    Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} | BOM: {bomDisplay} — Giá trị {fieldName} trên Drawing và Part 3D khớp nhau nhưng khác giá trị cột {fieldName} trong BOM."
+                };
+            }
+
+            if (drawMatchesPart)
+            {
+                return new DrawingBomFieldResult
+                {
+                    FieldName = fieldName,
+                    DrawingValue = drawDisplay,
+                    BomValue = partDisplay,
+                    Source = "DRAWING_PART_DIMENSION_MATCH",
+                    Status = DrawingBomCheckStatus.OK,
+                    Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} — Giá trị {fieldName} trên Drawing và Part 3D khớp nhau."
+                };
+            }
+
+            return new DrawingBomFieldResult
+            {
+                FieldName = fieldName,
+                DrawingValue = drawDisplay,
+                BomValue = partDisplay,
+                Source = "DRAWING_PART_DIMENSION_MISMATCH",
+                Status = DrawingBomCheckStatus.Warning,
+                Message = $"Drawing: {drawDisplay} | Part 3D: {partDisplay} — Giá trị {fieldName} trên Drawing khác Custom Property của Part 3D."
+            };
         }
 
         private static DrawingBomFieldResult CompareNumericField(string fieldName, string drawVal, string bomVal, string source)
@@ -3633,6 +6338,12 @@ namespace ADDIN.Commands
 
                 if (string.IsNullOrWhiteSpace(configurationName))
                     configurationName = GetSafeActiveConfigurationName(assemblyModel);
+
+                ResolveAssemblyTableCells(
+                    tables,
+                    drawing as ModelDoc2,
+                    assemblyModel,
+                    configurationName);
 
                 int matchedPropertyCount = AddAssemblyPropertyChecks(
                     itemResult,
@@ -4812,26 +7523,7 @@ namespace ADDIN.Commands
                 FindAssemblySummaryTable(tables);
 
             if (summaryTable == null)
-            {
-                int missing = 0;
-                foreach (string name in new[] { "合番", "重量", "数量" })
-                {
-                    if (checkedLogicalNames != null && !checkedLogicalNames.Add(name))
-                        continue;
-                    itemResult.Fields.Add(new DrawingBomFieldResult
-                    {
-                        FieldName = "ASM:" + name,
-                        DrawingValue = "(Không đọc được bảng UNIT)",
-                        BomValue = name == "数量" ? (bomQuantity ?? "")
-                            : GetModelCustomProperty(assemblyModel, configurationName, name),
-                        Source = "ASSEMBLY_TABLE_MISSING",
-                        Status = DrawingBomCheckStatus.Warning,
-                        Message = "Không nhận diện được bảng tổng hợp UNIT; chưa thể xác nhận giá trị trên Drawing."
-                    });
-                    missing++;
-                }
-                return missing;
-            }
+                return 0;
 
             int added = 0;
 
@@ -4915,24 +7607,8 @@ namespace ADDIN.Commands
                     headerRow,
                     expectedGoban);
 
-            // Preserve the check even when all linked display cells are blank.
-            // The summary structure has already identified the header and columns.
-            if (dataRow < 0 && headerRow + 1 < table.RowCount)
-                dataRow = headerRow + 1;
             if (dataRow < 0)
-            {
-                itemResult.Fields.Add(new DrawingBomFieldResult
-                {
-                    FieldName = "ASM:" + logicalName,
-                    DrawingValue = "(Không có dòng dữ liệu UNIT)",
-                    BomValue = logicalName == "数量" ? (bomQuantity ?? "")
-                        : GetModelCustomProperty(assemblyModel, configurationName, logicalName),
-                    Source = "ASSEMBLY_TABLE_ROW_MISSING",
-                    Status = DrawingBomCheckStatus.Warning,
-                    Message = "Bảng UNIT có tiêu đề nhưng không có dòng dữ liệu đọc được."
-                });
-                return 1;
-            }
+                return 0;
 
             TableCellDiagnosticInfo valueCell =
                 FindTableCell(
@@ -4958,25 +7634,10 @@ namespace ADDIN.Commands
                         configurationName,
                         logicalName);
 
-            // Required summary fields must never disappear from the report.
-            if (string.IsNullOrWhiteSpace(drawingValue) || string.IsNullOrWhiteSpace(assemblyValue)
-                || IsIncompleteLinkedTableDisplay(valueCell.RawText, drawingValue))
-            {
-                itemResult.Fields.Add(new DrawingBomFieldResult
-                {
-                    FieldName = "ASM:" + logicalName,
-                    DrawingValue = string.IsNullOrWhiteSpace(drawingValue)
-                        ? "(Không đọc được giá trị hiển thị)" : drawingValue,
-                    BomValue = assemblyValue,
-                    Source = "ASSEMBLY_TABLE_VALUE_UNAVAILABLE",
-                    Status = DrawingBomCheckStatus.Warning,
-                    Message = "Thiếu giá trị hiển thị của ô bảng hoặc giá trị đối chiếu. "
-                        + "Raw='" + valueCell.RawText + "'; API='" + valueCell.ApiDisplayedText
-                        + "'; API hidden='" + valueCell.ApiDisplayedTextWithHidden + "'."
-                });
-                LogDebug($"[ASM TABLE UNAVAILABLE] field={logicalName} table={table.Index} row={dataRow} col={column} source={valueCell.ValueSource} raw={valueCell.RawText}");
-                return 1;
-            }
+            // Với 数量, kể cả BOM quantity bị trống vẫn tạo field Warning để
+            // người dùng thấy rõ BOM không có số lượng cho UNIT này.
+            if (!isQuantity && string.IsNullOrWhiteSpace(assemblyValue))
+                return 0;
 
             LogDebug(
                 $"[ASM TABLE FIELD] field=\"{logicalName}\" " +
@@ -5019,6 +7680,102 @@ namespace ADDIN.Commands
                 drawingValue,
                 assemblyValue,
                 "ASSEMBLY_TABLE_PROPERTY");
+        }
+
+        private static void ResolveAssemblyTableCells(
+            List<TableDiagnosticInfo> tables,
+            ModelDoc2 drawingModel,
+            ModelDoc2 assemblyModel = null,
+            string configurationName = "")
+        {
+            ResolveAssemblyTableCellsCore(
+                tables,
+                (rawText, propName) =>
+                {
+                    string resolved =
+                        ResolveLinkedTableProperty(
+                            drawingModel,
+                            rawText,
+                            propName);
+
+                    if (string.IsNullOrWhiteSpace(resolved) &&
+                        assemblyModel != null &&
+                        !string.IsNullOrWhiteSpace(propName))
+                    {
+                        resolved =
+                            GetModelCustomProperty(
+                                assemblyModel,
+                                configurationName ?? "",
+                                propName);
+                    }
+
+                    return resolved;
+                });
+        }
+
+        private static void ResolveAssemblyTableCellsCore(
+            List<TableDiagnosticInfo> tables,
+            Func<string, string, string> linkedPropertyResolver)
+        {
+            if (tables == null)
+                return;
+
+            foreach (TableDiagnosticInfo table in tables)
+            {
+                if (table == null || table.Cells == null)
+                    continue;
+
+                foreach (TableCellDiagnosticInfo cell in table.Cells)
+                {
+                    if (cell == null)
+                        continue;
+
+                    string apiDisplayedText = cell.ApiDisplayedText ?? "";
+                    string apiDisplayedTextWithHidden = cell.ApiDisplayedTextWithHidden ?? "";
+                    string rawText = cell.RawText ?? "";
+                    string displayText = apiDisplayedText;
+                    string valueSource = "DISPLAYED_TEXT2";
+
+                    Match linkedPropertyMatch = Regex.Match(
+                        rawText,
+                        @"\$PRP(?:SHEET|MODEL)?\s*:\s*""([^""]+)""",
+                        RegexOptions.IgnoreCase);
+
+                    if (linkedPropertyMatch.Success)
+                    {
+                        string propName =
+                            (linkedPropertyMatch.Groups[1].Value ?? "").Trim();
+
+                        string resolved =
+                            linkedPropertyResolver != null
+                                ? (linkedPropertyResolver(rawText, propName) ?? "")
+                                : "";
+
+                        if (!string.IsNullOrWhiteSpace(resolved))
+                        {
+                            displayText = resolved;
+                            valueSource = "LINK_RESOLVED";
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(rawText) &&
+                             !rawText.TrimStart().StartsWith("$", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Static/general-table text: the raw cell text is the source of truth.
+                        displayText = rawText;
+                        valueSource = "RAW_TEXT";
+                    }
+
+                    if (string.IsNullOrWhiteSpace(displayText) &&
+                        !string.IsNullOrWhiteSpace(apiDisplayedTextWithHidden))
+                    {
+                        displayText = apiDisplayedTextWithHidden;
+                        valueSource = "DISPLAYED_TEXT2_INCLUDE_HIDDEN";
+                    }
+
+                    cell.DisplayedText = displayText;
+                    cell.ValueSource = valueSource;
+                }
+            }
         }
 
 
@@ -5088,12 +7845,8 @@ namespace ADDIN.Commands
                         ? CleanTableCellText(GetTableCellText(table, r, qtyCol))
                         : "";
 
-                TableCellDiagnosticInfo gobanCell = FindTableCell(table, r, gobanCol);
-                TableCellDiagnosticInfo qtyCell = FindTableCell(table, r, qtyCol);
-                bool hasLinkedData = ContainsTablePropertyExpression(gobanCell?.RawText)
-                    || ContainsTablePropertyExpression(qtyCell?.RawText);
                 if (string.IsNullOrWhiteSpace(goban) &&
-                    string.IsNullOrWhiteSpace(qty) && !hasLinkedData)
+                    string.IsNullOrWhiteSpace(qty))
                 {
                     if (firstDataRow >= 0)
                         break;
@@ -5409,17 +8162,26 @@ namespace ADDIN.Commands
             string drawingValue,
             string assemblyValue)
         {
-            if (string.Equals(logicalName, "板厚", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(logicalName, "板厚", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase))
             {
-                double thicknessDrawing;
-                double thicknessAssembly;
-                if (TryParseThicknessMm(drawingValue, out thicknessDrawing) &&
-                    TryParseThicknessMm(assemblyValue, out thicknessAssembly))
-                    return Math.Abs(thicknessDrawing - thicknessAssembly) <= NumericTolerance;
+                string d = Regex.Replace(drawingValue ?? "", @"[tTmM\s]", "").Trim();
+                string a = Regex.Replace(assemblyValue ?? "", @"[tTmM\s]", "").Trim();
+
+                double dv;
+                double av;
+                if (double.TryParse(d.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out dv) &&
+                    double.TryParse(a.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out av))
+                {
+                    return Math.Abs(dv - av) <= NumericTolerance;
+                }
             }
 
-            if (string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase))
-                return AreDisplayedMassValuesEquivalent(drawingValue, assemblyValue);
+            if (string.Equals(logicalName, "重量", StringComparison.OrdinalIgnoreCase) &&
+                AreDisplayedMassValuesEquivalent(drawingValue, assemblyValue))
+            {
+                return true;
+            }
 
             string normDrawing = NormalizeText(drawingValue).TrimEnd('-').Trim();
             string normAssembly = NormalizeText(assemblyValue).TrimEnd('-').Trim();
@@ -5562,7 +8324,7 @@ namespace ADDIN.Commands
 
             foreach (DrawingBomFieldResult field in itemResult.Fields)
             {
-                if (field == null)
+                if (field == null || field.Status == DrawingBomCheckStatus.NotApplicable)
                     continue;
 
                 if (field.Status == DrawingBomCheckStatus.NG)
@@ -5841,7 +8603,7 @@ namespace ADDIN.Commands
             if (model == null || audits == null)
                 return;
 
-            string[] requiredProperties = { "W", "L", "材質", "板厚" };
+            string[] requiredProperties = { "材質", "板厚" };
             foreach (string propertyName in requiredProperties)
             {
                 ModelPropertyLinkAudit audit = ReadModelPropertyLinkAudit(
@@ -7567,7 +10329,7 @@ namespace ADDIN.Commands
                 sb.AppendLine($"• ❌ NG                 : {result.NgCount}");
                 sb.AppendLine($"• ⚠️ Warning            : {result.WarningCount}");
                 sb.AppendLine();
-                sb.AppendLine("📊 Đã xuất toàn bộ kết quả chi tiết sang Excel.");
+                sb.AppendLine("📋 Kết quả đã sẵn sàng. Bấm 'Xuất Excel' trên bảng kết quả khi cần tạo báo cáo.");
             }
 
             MessageBoxIcon icon = result.NgCount > 0

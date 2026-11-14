@@ -307,6 +307,7 @@
     </Compile>
     <Compile Include="Commands\CheckBalloon.cs" />
     <Compile Include="Commands\CheckDrawingBom.cs" />
+    <Compile Include="Commands\CdFlatSidePilotPolicy.cs" />
     <Compile Include="Commands\ExcelDrawingCheckExporter.cs" />
     <Compile Include="Commands\CheckRound.cs" />
     <Compile Include="Commands\CheckSamePart.cs" />
